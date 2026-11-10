@@ -119,3 +119,53 @@ describe('admin i18n: every static t() key resolves to a string in en and ar', (
     expect(unresolvedKeys()).toEqual([]);
   });
 });
+
+/**
+ * F6 (2026-11-02): `tTemplates(store.template)` read `onboarding.flow.template.<id>`, a group that existed in NEITHER
+ * file, and shipped a raw key on onboarding step 7. A dynamic key cannot be resolved statically, but its static part
+ * can: every `useT('ns')` namespace, and the literal prefix of every template-literal key (`t(`role.${r}`)` -> `role`),
+ * must resolve to a GROUP (object) in BOTH en and ar. A namespace or prefix missing from both files fails here.
+ */
+function deadNamespaces(): string[] {
+  const problems: string[] = [];
+  const bindRe = /const\s+(\w+)\s*=\s*use(?:T|Translations)\(\s*(['"])([^'"]+)\2\s*\)/g;
+  for (const file of walk(ADMIN_SRC)) {
+    const src = stripComments(readFileSync(file, 'utf8'));
+    const rel = file.replace(ADMIN_SRC, 'apps/admin/src');
+    const binds = [...src.matchAll(bindRe)].map(m => ({ at: m.index ?? 0, name: m[1], ns: m[3] }));
+    const check = (path: string, where: string) => {
+      for (const [loc, messages] of [
+        ['en', en],
+        ['ar', ar],
+      ] as const) {
+        const node = lookup(messages, path);
+        if (node === null || typeof node !== 'object') {
+          problems.push(
+            `${where} ${path} (${loc}: ${node === undefined ? 'missing' : 'not a group'})`
+          );
+        }
+      }
+    };
+    for (const b of binds) check(b.ns, `${rel}:${src.slice(0, b.at).split('\n').length}`);
+    for (const name of new Set(binds.map(b => b.name))) {
+      // `t(`a.b.${x}`)`: the literal part before the first `${`, up to its last dot, is a group path.
+      const tplRe = new RegExp(`(?<![\\w.])${name}\\(\\s*\`([^\`$]*)\\$\\{`, 'g');
+      for (const m of src.matchAll(tplRe)) {
+        const at = m.index ?? 0;
+        const bind = binds.filter(b => b.name === name && b.at < at).pop();
+        if (!bind) continue;
+        const lit = m[1];
+        const dot = lit.lastIndexOf('.');
+        if (dot <= 0) continue; // `${key}` alone, or `x${y}`: nothing static to check beyond the namespace
+        check(`${bind.ns}.${lit.slice(0, dot)}`, `${rel}:${src.slice(0, at).split('\n').length}`);
+      }
+    }
+  }
+  return [...new Set(problems)];
+}
+
+describe('admin i18n: every useT namespace and dynamic-key prefix is a group in en and ar (F6)', () => {
+  it('has no dead namespace or prefix', () => {
+    expect(deadNamespaces()).toEqual([]);
+  });
+});

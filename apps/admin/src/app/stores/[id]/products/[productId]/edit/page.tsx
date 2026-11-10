@@ -50,6 +50,7 @@ import {
   personalisationPayload,
   type PersonalisationForm,
 } from './_components/PersonalisationCard';
+import { applyAiLanguagePair, applyAiSeoSuggestion } from '../../../seo/language-guard';
 
 interface Product {
   id: string;
@@ -508,17 +509,8 @@ export default function EditProductPage() {
         );
       } else {
         const s = seoResult.data.suggestion;
-        setFormData(prev => ({
-          ...prev,
-          metaTitle: mode === 'overwrite' || !prev.metaTitle ? s.title : prev.metaTitle,
-          metaTitleAr: mode === 'overwrite' || !prev.metaTitleAr ? s.titleAr : prev.metaTitleAr,
-          metaDescription:
-            mode === 'overwrite' || !prev.metaDescription ? s.description : prev.metaDescription,
-          metaDescriptionAr:
-            mode === 'overwrite' || !prev.metaDescriptionAr
-              ? s.descriptionAr
-              : prev.metaDescriptionAr,
-        }));
+        // QA P2-2: same language guard as the store SEO page, Arabic never lands in an English field.
+        setFormData(prev => applyAiSeoSuggestion(prev, s, mode).next);
       }
 
       if (aeoResult.error || !aeoResult.data) {
@@ -527,13 +519,16 @@ export default function EditProductPage() {
         );
       } else {
         const aeo = aeoResult.data.aeo;
-        setFormData(prev => ({
-          ...prev,
-          metaDescriptionAeo:
-            mode === 'overwrite' || !prev.metaDescriptionAeo ? aeo.en : prev.metaDescriptionAeo,
-          metaDescriptionAeoAr:
-            mode === 'overwrite' || !prev.metaDescriptionAeoAr ? aeo.ar : prev.metaDescriptionAeoAr,
-        }));
+        setFormData(prev => {
+          const pair = applyAiLanguagePair(
+            prev.metaDescriptionAeo,
+            prev.metaDescriptionAeoAr,
+            aeo.en,
+            aeo.ar,
+            mode
+          );
+          return { ...prev, metaDescriptionAeo: pair.en, metaDescriptionAeoAr: pair.ar };
+        });
       }
 
       if (!faqOk) {

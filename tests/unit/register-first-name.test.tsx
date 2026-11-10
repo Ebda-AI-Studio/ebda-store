@@ -4,10 +4,13 @@
  * several change events landing in ONE batch (autofill, a fast typist, a password manager) cannot overwrite a sibling field
  * with a stale copy, and the submit button waits for hydration.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 
-const register = vi.fn(async () => ({ success: true }));
+const register = vi.fn(
+  async (..._a: unknown[]): Promise<Record<string, unknown>> => ({ success: true })
+);
+const ui = vi.hoisted(() => ({ lang: 'en' as 'en' | 'ar', lastError: '' }));
 vi.mock('../../apps/web/src/lib/api', () => ({
   api: { register: (...a: unknown[]) => register(...(a as [])) },
 }));
@@ -23,7 +26,7 @@ vi.mock('../../apps/web/src/contexts/StoreContext', () => ({
   useStore: () => ({ store: { id: 'store-1' } }),
 }));
 vi.mock('../../apps/web/src/contexts/LanguageContext', () => ({
-  useLanguage: () => ({ t: (en: string) => en }),
+  useLanguage: () => ({ t: (en: string, ar: string) => (ui.lang === 'ar' ? ar : en) }),
 }));
 vi.mock('../../apps/web/src/app/auth/register/validate-registration', () => ({
   validateRegistration: () => null,
@@ -34,7 +37,15 @@ vi.mock('../../apps/web/src/hooks/useAuthFormSubmit', () => ({
     isLoading: false,
     error: '',
     setError: vi.fn(),
-    submit: async (fn: () => Promise<void>) => fn(),
+    submit: async (fn: () => Promise<void>) => {
+      try {
+        await fn();
+        return true;
+      } catch (e) {
+        ui.lastError = (e as Error).message;
+        return false;
+      }
+    },
   }),
 }));
 vi.mock('@ebda/ui', () => ({
@@ -50,7 +61,15 @@ vi.mock('@ebda/ui', () => ({
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & { isLoading?: boolean }) => <button {...p} />,
 }));
 
+import { renderToString } from 'react-dom/server';
+import { hydrateRoot } from 'react-dom/client';
 import RegisterClient from '../../apps/web/src/app/auth/register/RegisterClient';
+
+beforeEach(() => {
+  ui.lang = 'en';
+  ui.lastError = '';
+  register.mockClear();
+});
 
 describe('storefront register form', () => {
   it('keeps every field when several change events land in one batch', async () => {
@@ -85,5 +104,44 @@ describe('storefront register form', () => {
     expect(register).toHaveBeenCalledWith(
       expect.objectContaining({ firstName: 'Sara', lastName: 'Ali', storeId: 'store-1' })
     );
+  });
+
+  it('keeps a first name typed BEFORE hydration when the shopper moves to the next field (QA P2-1)', async () => {
+    const host = document.createElement('div');
+    host.innerHTML = renderToString(<RegisterClient />);
+    document.body.appendChild(host);
+    // The shopper types into the server-rendered input before React has attached.
+    const firstSsr = host.querySelector('input[aria-label="First name"]') as HTMLInputElement;
+    firstSsr.value = 'سارة';
+    await act(async () => {
+      hydrateRoot(host, <RegisterClient />);
+    });
+    const first = host.querySelector('input[aria-label="First name"]') as HTMLInputElement;
+    const last = host.querySelector('input[aria-label="Last name"]') as HTMLInputElement;
+    act(() => {
+      fireEvent.change(last, { target: { value: 'علي' } });
+    });
+    expect(first.value).toBe('سارة');
+    expect(last.value).toBe('علي');
+    host.remove();
+  });
+
+  it('a throttled sign-up reads Egyptian Arabic, never the API English (QA P2-10 class)', async () => {
+    ui.lang = 'ar';
+    register.mockResolvedValueOnce({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again.' },
+    });
+    render(<RegisterClient />);
+    const set = (label: string, value: string) =>
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    set('الاسم الأول', 'سارة');
+    set('اسم العائلة', 'علي');
+    set('البريد الإلكتروني', 'sara@example.test');
+    set('كلمة المرور', 'Str0ng-pass-word!');
+    set('تأكيد كلمة المرور', 'Str0ng-pass-word!');
+    fireEvent.submit(screen.getByRole('button', { name: 'إنشاء حساب' }).closest('form')!);
+    await waitFor(() => expect(ui.lastError).not.toBe(''));
+    expect(ui.lastError).toBe('محاولات كتير. استنى كام دقيقة وجرّب تاني.');
   });
 });

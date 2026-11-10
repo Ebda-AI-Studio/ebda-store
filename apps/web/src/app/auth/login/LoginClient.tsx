@@ -18,6 +18,8 @@ import {
   passkeyAutofillSupported,
   passkeysSupported,
 } from '../../../lib/passkeys';
+import { authRefusalText } from '../../../lib/auth-refusal';
+import { readTypedBeforeHydration } from '../../../lib/adopt-typed-before-hydration';
 
 const PASSKEY_FAILED = (t: (en: string, ar: string) => string) =>
   t(
@@ -57,6 +59,13 @@ export default function LoginClient() {
     setCanUsePasskey(passkeysSupported());
   }, []);
 
+  // QA P2-1 class: text typed before hydration lives only in the DOM; adopt it so the next re-render keeps it.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const typed = readTypedBeforeHydration(formRef.current, ['email', 'password'] as const);
+    if (Object.keys(typed).length > 0) setFormData(prev => ({ ...prev, ...typed }));
+  }, []);
+
   // Conditional UI: on the first focus of the email field the saved passkey is offered in the browser's
   // autofill list; this settles only if the shopper picks it. The button below starts a normal prompt.
   const conditionalStarted = useRef(false);
@@ -93,31 +102,38 @@ export default function LoginClient() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setUnverified(false);
-    await submit(async () => {
-      const result = await api.login(formData.email, formData.password, store?.id);
+    await submit(
+      async () => {
+        const result = await api.login(formData.email, formData.password, store?.id);
 
-      if (!result.success) {
-        if (result.error?.code === 'EMAIL_NOT_VERIFIED') {
-          setUnverified(true);
+        if (!result.success) {
+          if (result.error?.code === 'EMAIL_NOT_VERIFIED') {
+            setUnverified(true);
+            throw new Error(
+              t(
+                'Your email is not verified yet. Open the link we sent you, or ask for a new one below.',
+                'بريدك لسه متأكدش. افتح الرابط اللي بعتناه ليك، أو اطلب رابط جديد من تحت.'
+              )
+            );
+          }
           throw new Error(
-            t(
-              'Your email is not verified yet. Open the link we sent you, or ask for a new one below.',
-              'بريدك لسه متأكدش. افتح الرابط اللي بعتناه ليك، أو اطلب رابط جديد من تحت.'
-            )
+            authRefusalText(result.error, t) ||
+              result.error?.message ||
+              t('Sign-in did not work. Try again.', 'تسجيل الدخول منفعش. جرّب تاني.')
           );
         }
-        throw new Error(result.error?.message || 'Failed to login');
-      }
 
-      // Sync local cart to backend after login
-      await syncCartToBackend();
+        // Sync local cart to backend after login
+        await syncCartToBackend();
 
-      // Redirect to the original page or home. safeInternalPath rejects
-      // offsite targets \u2014 absolute, protocol-relative (//host), AND backslash
-      // tricks (/\host) that the old startsWith('//') check let through.
-      const redirectTo = safeInternalPath(searchParams.get('redirect'), '/');
-      router.push(storeUrl(redirectTo));
-    }, 'Failed to login');
+        // Redirect to the original page or home. safeInternalPath rejects
+        // offsite targets \u2014 absolute, protocol-relative (//host), AND backslash
+        // tricks (/\host) that the old startsWith('//') check let through.
+        const redirectTo = safeInternalPath(searchParams.get('redirect'), '/');
+        router.push(storeUrl(redirectTo));
+      },
+      t('Sign-in did not work. Try again.', 'تسجيل الدخول منفعش. جرّب تاني.')
+    );
   };
 
   return (
@@ -157,14 +173,18 @@ export default function LoginClient() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
               <Input
                 label={t('Email address', 'البريد الإلكتروني')}
                 type="email"
                 autoComplete="username webauthn"
                 onFocus={startConditionalPasskey}
+                name="email"
                 value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                onChange={e => {
+                  const email = e.target.value;
+                  setFormData(prev => ({ ...prev, email }));
+                }}
                 required
               />
 
@@ -173,8 +193,12 @@ export default function LoginClient() {
                   label={t('Password', 'كلمة المرور')}
                   type="password"
                   autoComplete="current-password"
+                  name="password"
                   value={formData.password}
-                  onChange={e => setFormData({ ...formData, password: e.target.value })}
+                  onChange={e => {
+                    const password = e.target.value;
+                    setFormData(prev => ({ ...prev, password }));
+                  }}
                   required
                 />
                 <div className="mt-2 text-right">

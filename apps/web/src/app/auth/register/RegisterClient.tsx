@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { validateRegistration } from './validate-registration';
 import { useRouter } from 'next/navigation';
@@ -10,7 +10,8 @@ import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { demoRefusalText } from '../../../lib/demo-refusal';
+import { authRefusalText } from '../../../lib/auth-refusal';
+import { readTypedBeforeHydration } from '../../../lib/adopt-typed-before-hydration';
 import { PENDING_VERIFICATION_EMAIL_KEY } from '../../../components/ResendVerification';
 
 export default function RegisterClient() {
@@ -35,9 +36,21 @@ export default function RegisterClient() {
   };
 
   // The submit button stays disabled until the page has hydrated: before that, typed text lives only in the DOM and a
-  // submit would send the still-empty state.
+  // submit would send the still-empty state. On hydration the text already typed is adopted into state, or the next
+  // re-render (typing in the next field) would write the empty state back over it (QA P2-1).
+  const formRef = useRef<HTMLFormElement>(null);
   const [hydrated, setHydrated] = useState(false);
-  useEffect(() => setHydrated(true), []);
+  useEffect(() => {
+    const typed = readTypedBeforeHydration(formRef.current, [
+      'firstName',
+      'lastName',
+      'email',
+      'password',
+      'confirmPassword',
+    ] as const);
+    if (Object.keys(typed).length > 0) setFormData(prev => ({ ...prev, ...typed }));
+    setHydrated(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +74,7 @@ export default function RegisterClient() {
 
         if (!result.success) {
           throw new Error(
-            demoRefusalText(result.error, t) ||
+            authRefusalText(result.error, t) ||
               result.error?.message ||
               t('Failed to register', 'فشل إنشاء الحساب')
           );
@@ -115,11 +128,12 @@ export default function RegisterClient() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <Input
                   label={t('First name', 'الاسم الأول')}
                   autoComplete="given-name"
+                  name="firstName"
                   value={formData.firstName}
                   onChange={setField('firstName')}
                   required
@@ -127,6 +141,7 @@ export default function RegisterClient() {
                 <Input
                   label={t('Last name', 'اسم العائلة')}
                   autoComplete="family-name"
+                  name="lastName"
                   value={formData.lastName}
                   onChange={setField('lastName')}
                   required
@@ -137,6 +152,7 @@ export default function RegisterClient() {
                 label={t('Email address', 'البريد الإلكتروني')}
                 type="email"
                 autoComplete="email"
+                name="email"
                 value={formData.email}
                 onChange={setField('email')}
                 required
@@ -146,6 +162,7 @@ export default function RegisterClient() {
                 label={t('Password', 'كلمة المرور')}
                 type="password"
                 autoComplete="new-password"
+                name="password"
                 value={formData.password}
                 onChange={setField('password')}
                 required
@@ -155,6 +172,7 @@ export default function RegisterClient() {
                 label={t('Confirm password', 'تأكيد كلمة المرور')}
                 type="password"
                 autoComplete="new-password"
+                name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={setField('confirmPassword')}
                 required
