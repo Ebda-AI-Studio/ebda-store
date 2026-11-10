@@ -56,14 +56,5 @@ describe('resolveSlugRedirectCached', () => {
   });
 });
 
-describe('the public resolve route uses the cached resolver', () => {
-  it('GET /redirects/resolve calls resolveSlugRedirectCached, not the raw chain walk', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const src = readFileSync(join(__dirname, '../../apps/api/src/routes/public.routes.ts'), 'utf8');
-    const handler = src.slice(src.indexOf("router.get('/redirects/resolve'"));
-    const body = handler.slice(0, handler.indexOf('\n});'));
-    expect(body).toContain('resolveSlugRedirectCached(');
-    expect(body).not.toMatch(/resolveSlugRedirect\(/);
-  });
-});
+// The route half (GET /redirects/resolve answers through the cached resolver) runs the real handler in
+// tests/unit/slug-redirect-resolve-route-cached.test.ts (this file mocks the database, not the service).

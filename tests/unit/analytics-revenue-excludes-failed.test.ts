@@ -9,47 +9,78 @@
  * breakdown BY payment status and must keep showing the failed bucket.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 import { join } from 'node:path';
+import {
+  code,
+  enclosingFunctionName,
+  leadingComments,
+  nodesOf,
+  parseFile,
+  stringText,
+} from './helpers/ast-query';
 import { countsTowardSpend } from '@api/services/customer-aggregate.service';
 
-const src = readFileSync(
-  join(__dirname, '../../apps/api/src/services/analytics.service.ts'),
-  'utf8'
-);
+const sf = parseFile(join(__dirname, '../../apps/api/src/services/analytics.service.ts'));
+const BREAKDOWN = 'getRevenueByPaymentStatus';
+const prop = (o: ts.ObjectLiteralExpression, name: string) =>
+  o.properties.find(
+    (p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && code(p.name) === name
+  );
+/** Object literals `{ status: { notIn: [...NON_REVENUE_ORDER_STATUSES] }, ... }` = a Prisma revenue filter. */
+const revenueFilters = () =>
+  nodesOf(sf).filter(
+    (n): n is ts.ObjectLiteralExpression =>
+      ts.isObjectLiteralExpression(n) &&
+      prop(n, 'status') !== undefined &&
+      code(prop(n, 'status')!.initializer) === '{ notIn: [...NON_REVENUE_ORDER_STATUSES] }'
+  );
+/** SQL statements (template literals) with their `-- comments` removed and `${x}` replaced. */
+const sqlTemplates = () =>
+  nodesOf(sf)
+    .filter(
+      (n): n is ts.TemplateExpression | ts.NoSubstitutionTemplateLiteral =>
+        ts.isTemplateExpression(n) || ts.isNoSubstitutionTemplateLiteral(n)
+    )
+    .map(n => (stringText(n, '?') ?? '').replace(/--.*$/gm, ''));
 
 describe('revenue population excludes failed payments (issue 2235)', () => {
   it('every Prisma revenue filter outside the payment-status breakdown excludes failed', () => {
-    const breakdownAt = src.indexOf('static async getRevenueByPaymentStatus');
-    const filters = [
-      ...src.matchAll(/status: \{ notIn: \[\.\.\.NON_REVENUE_ORDER_STATUSES\] \},/g),
-    ].map(m => m.index!);
-    const outside = filters.filter(i => i < breakdownAt || i > breakdownAt + 1500);
+    const outside = revenueFilters().filter(o => enclosingFunctionName(o) !== BREAKDOWN);
     expect(outside.length).toBeGreaterThanOrEqual(4);
-    for (const i of outside) {
-      expect(src.slice(i, i + 200)).toContain("paymentStatus: { not: 'failed' }");
+    for (const o of outside) {
+      // the SAME where-object carries the sibling predicate
+      expect(
+        code(prop(o, 'paymentStatus')?.initializer ?? o),
+        `revenue filter in ${enclosingFunctionName(o)}`
+      ).toBe("{ not: 'failed' }");
     }
   });
 
   it('every raw-SQL revenue filter excludes failed', () => {
-    const sqlFilters = [
-      ...src.matchAll(
-        /status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/g
-      ),
-    ].map(m => m.index!);
-    expect(sqlFilters.length).toBe(2);
-    for (const i of sqlFilters) {
-      expect(src.slice(i, i + 120)).toMatch(/payment_status <> 'failed'/);
+    const sql = sqlTemplates().filter(t =>
+      /status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/.test(t)
+    );
+    expect(sql.length).toBe(2);
+    for (const t of sql) {
+      // ANDed directly after the status filter inside the same statement
+      expect(t).toMatch(
+        /status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)\s+AND\s+(?:\w+\.)?payment_status <> 'failed'/
+      );
     }
   });
 
   // PR 2335 audit P3: the payment-status breakdown keeps failed payments ON
   // PURPOSE; the decision is pinned so it cannot drift silently either way.
   it('the payment-status breakdown deliberately keeps failed payments, and says so', () => {
-    const at = src.indexOf('static async getRevenueByPaymentStatus');
-    const body = src.slice(at, at + 1200);
-    expect(body).not.toContain("paymentStatus: { not: 'failed' }");
-    expect(src.slice(at - 600, at)).toMatch(
+    const method = nodesOf(sf).find(
+      (n): n is ts.MethodDeclaration => ts.isMethodDeclaration(n) && code(n.name) === BREAKDOWN
+    )!;
+    expect(method).toBeDefined();
+    const filters = revenueFilters().filter(o => enclosingFunctionName(o) === BREAKDOWN);
+    expect(filters.length).toBeGreaterThan(0);
+    for (const o of filters) expect(prop(o, 'paymentStatus')).toBeUndefined();
+    expect(leadingComments(method)).toMatch(
       /DELIBERATELY the full population, failed payments included/
     );
   });

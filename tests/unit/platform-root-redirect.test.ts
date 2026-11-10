@@ -1,7 +1,33 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PLATFORM_MARKETING_URL } from '../../apps/web/src/lib/platform';
+
+// generateMetadata harness (same shape as storefront-head-metadata.test.ts); the builder is a spy
+// around the real one so the platform sentinel test can prove it never reaches it.
+const h = vi.hoisted(() => ({ builder: vi.fn() }));
+vi.mock('next/headers', () => ({
+  headers: async () => ({ get: (k: string) => (k === 'host' ? 'ebda.app' : null) }),
+  cookies: async () => ({ get: () => undefined }),
+}));
+vi.mock('next/font/google', () => {
+  const font = () => ({ className: 'f', variable: '--f', style: { fontFamily: 'f' } });
+  return { Plus_Jakarta_Sans: font, IBM_Plex_Sans_Arabic: font, Amiri: font, Marcellus: font };
+});
+vi.mock('../../apps/web/src/lib/store-resolver', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../apps/web/src/lib/store-resolver')>()),
+  getStore: async () => ({ id: 'demo', slug: 'demo', name: 'Force', settings: {} }),
+}));
+vi.mock('../../apps/web/src/lib/storefront-metadata', async importOriginal => {
+  const real = await importOriginal<typeof import('../../apps/web/src/lib/storefront-metadata')>();
+  return {
+    ...real,
+    buildStorefrontMetadata: (...a: Parameters<typeof real.buildStorefrontMetadata>) => {
+      h.builder();
+      return real.buildStorefrontMetadata(...a);
+    },
+  };
+});
 
 const web = (p: string) => readFileSync(resolve(__dirname, '../../apps/web/src', p), 'utf8');
 
@@ -68,21 +94,17 @@ describe('platform root redirect', () => {
     expect(web('lib/unknown-store-page.ts')).toContain('BRAND_MARKETING_URL');
   });
 
-  it('titles the platform sentinel as a 404, not as a merchant store', () => {
+  it('titles the platform sentinel as a 404, not as a merchant store', async () => {
     // DEFAULT_STORE is named "Force", so the shared storefront metadata builder
     // produced "Force - Online Shopping in Egypt" — a merchant title for a
     // store that does not exist, on a page whose body is a 404. The tab kept
     // making a promise the page had stopped making.
-    const src = web('app/layout.tsx');
-    expect(src).toMatch(/if \(store\.id === 'demo'\) \{/);
-    expect(src).toMatch(/title: `Page not found — \$\{BRAND\.product\.nameEn\}`/);
-    expect(src).toMatch(/robots: \{ index: false, follow: false \}/);
-    // It must short-circuit BEFORE the storefront builder, not after.
-    const sentinel = src.indexOf("store.id === 'demo'");
-    // The call, not the import: the builder's result is now spread with the manifest link (Ruling PWA-MANIFEST-2).
-    const builder = src.indexOf('buildStorefrontMetadata(');
-    expect(sentinel).toBeGreaterThan(-1);
-    expect(builder).toBeGreaterThan(-1);
-    expect(sentinel).toBeLessThan(builder);
+    // Behaviour: run the real generateMetadata for the sentinel store.
+    const { generateMetadata } = await import('../../apps/web/src/app/layout');
+    const meta = await generateMetadata();
+    expect(String(meta.title)).toMatch(/^Page not found — /);
+    expect(meta.robots).toEqual({ index: false, follow: false });
+    // It must short-circuit BEFORE the storefront builder, not after (the builder is never reached).
+    expect(h.builder).not.toHaveBeenCalled();
   });
 });

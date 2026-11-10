@@ -12,6 +12,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
+import { parseSource, findAll, callsTo, nameOf } from './helpers/ts-ast';
 
 const calls = vi.hoisted(() => ({
   deleteByPattern: [] as string[],
@@ -98,12 +100,18 @@ describe('(b) every write path calls the immediate purge, none calls the order-c
   const service = read('apps/api/src/services/gold-rate/gold-rate.service.ts');
   const serviceCode = stripComments(service);
 
-  /** The body of `static async <name>(` up to the next `static async` / end of class. */
-  const body = (src: string, name: string): string => {
-    const start = src.search(new RegExp(`static async ${name}[(<]`));
-    if (start < 0) return '';
-    const next = src.indexOf('\n  static async ', start + 10);
-    return src.slice(start, next < 0 ? undefined : next);
+  /**
+   * Calls to `callee` made from inside `static async <name>(…)`. AST, not a text window to the
+   * next `static async`: a comment, a string, or a call in the NEXT method cannot count.
+   */
+  const callsIn = (code: string, name: string, callee: string): string[] => {
+    const sf = parseSource('gold-rate.service.ts', code);
+    const method = findAll(
+      sf,
+      (n): n is ts.MethodDeclaration => ts.isMethodDeclaration(n) && nameOf(n) === name
+    )[0];
+    if (!method) return [];
+    return callsTo(method, callee).map(c => c.arguments.map(a => a.getText()).join(','));
   };
 
   // each public path that can change a price a shopper sees
@@ -117,11 +125,11 @@ describe('(b) every write path calls the immediate purge, none calls the order-c
 
   for (const name of PATHS)
     it(`${name} purges through purgeGoldPrices`, () => {
-      expect(body(service, name), name).toContain('purgeGoldPrices(storeId)');
+      expect(callsIn(service, name, 'purgeGoldPrices'), name).toContain('storeId');
     });
 
   it('bulkSwitchMode purges because every product it switches goes through setProductPricing', () => {
-    expect(body(service, 'bulkSwitchMode')).toContain('this.setProductPricing(');
+    expect(callsIn(service, 'bulkSwitchMode', 'this.setProductPricing').length).toBeGreaterThan(0);
   });
 
   it('purgeGoldPrices is the IMMEDIATE invalidator, never the AfterOrder one', () => {
@@ -141,8 +149,16 @@ describe('(b) every write path calls the immediate purge, none calls the order-c
   });
 
   it('NEGATIVE CONTROL: a path without the purge is detected', () => {
-    const fake = `static async bogus(storeId: string) { await withMoneyTx(prisma, async () => {}); }\n  static async next() {}`;
-    expect(body(fake, 'bogus')).not.toContain('purgeGoldPrices(storeId)');
+    const fake = `class X { static async bogus(storeId: string) { await withMoneyTx(prisma, async () => {}); }\n  static async next() { purgeGoldPrices(storeId); } }`;
+    expect(callsIn(fake, 'bogus', 'purgeGoldPrices')).not.toContain('storeId');
+    // and a purge that is only mentioned in a comment is not a call
+    expect(
+      callsIn(
+        `class X { static async bogus(storeId: string) { /* purgeGoldPrices(storeId) */ } }`,
+        'bogus',
+        'purgeGoldPrices'
+      )
+    ).toEqual([]);
   });
 });
 

@@ -12,6 +12,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
+import { code, nodesOf, parseText } from './helpers/ast-query';
 import { render, cleanup } from '@testing-library/react';
 import { formatMoney, localizeDigits } from '@ebda/shared';
 
@@ -103,8 +105,19 @@ describe('C-03: one label on the desktop summary and the phone sticky bar', () =
     expect(src).toMatch(/ctaLabel=\{CART_CHECKOUT_CTA\.en\}/);
     expect(src).toMatch(/ctaLabelAr=\{CART_CHECKOUT_CTA\.ar\}/);
     expect(src.match(/t\(CART_CHECKOUT_CTA\.en, CART_CHECKOUT_CTA\.ar\)/g)?.length).toBe(3);
-    const sticky = src.slice(src.indexOf('<StickyCartTotal'));
-    expect(sticky).toMatch(/label=\{t\(CART_CHECKOUT_CTA\.en, CART_CHECKOUT_CTA\.ar\)\}/);
+    // AST: the `label` attribute of the <StickyCartTotal> element itself (not whatever text follows it in the file).
+    const sticky = nodesOf(parseText(src, 'CartClient.tsx')).filter(
+      (n): n is ts.JsxSelfClosingElement | ts.JsxOpeningElement =>
+        (ts.isJsxSelfClosingElement(n) || ts.isJsxOpeningElement(n)) &&
+        code(n.tagName) === 'StickyCartTotal'
+    );
+    expect(sticky).toHaveLength(1);
+    const label = sticky[0].attributes.properties.find(
+      (p): p is ts.JsxAttribute => ts.isJsxAttribute(p) && code(p.name) === 'label'
+    );
+    expect(label && code(label.initializer!)).toBe(
+      '{t(CART_CHECKOUT_CTA.en, CART_CHECKOUT_CTA.ar)}'
+    );
   });
   it('no other checkout label is left on the cart', () => {
     expect(src).not.toMatch(
