@@ -3,8 +3,10 @@ import { LEGAL_POLICIES, currentLegalVersion, formatLegalDate } from '@ebda/shar
 import { COPY } from '../lib/content';
 import { HOME, pagePath, type LegalExtraSlug, type LegalSlug, type Locale } from '../lib/site';
 import type { LegalPages } from '../lib/legal-types';
+import { pageJsonLd } from '../lib/seo';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { JsonLd } from './JsonLd';
 import { OfficeBlock } from './OfficeBlock';
 
 type StoreDocKey = keyof Pick<
@@ -40,6 +42,12 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | 
   const current = doc.meta ?? currentLegalVersion(LEGAL_POLICIES, DOC_KEY[page as LegalSlug]);
   return (
     <>
+      <JsonLd
+        data={pageJsonLd(locale, page, doc.title, doc.sections[0].p[0].slice(0, 160), {
+          dateModified: current.publishedAt,
+          legalEntity: true,
+        })}
+      />
       <Header locale={locale} page={page} />
       <main id="main" className="wrap legal">
         <header className="legal-head">

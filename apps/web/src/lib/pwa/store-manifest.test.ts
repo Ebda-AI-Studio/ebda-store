@@ -6,28 +6,31 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
  * `<html lang="ar">` even though `store.nameAr` was available. Locked down
  * here against the mutation of reverting to `store.name` unconditionally.
  *
- * `getStore` and `cookies()` are mocked so this exercises `manifest()`'s
+ * `getStore` and `cookies()` are mocked so this exercises the builder's
  * own locale/name-selection logic in isolation, the same pattern
- * `tests/unit/sitemap-fanout.test.ts` uses for another `app/*.ts` special
- * file that calls `next/headers` directly.
+ * `tests/unit/sitemap-fanout.test.ts` uses for an `app/*.ts` special
+ * file that calls `next/headers` directly. The builder lived in
+ * `app/manifest.ts` until Ruling PWA-MANIFEST-2 moved it here.
  */
 
 const storeRef: { current: Record<string, unknown> | null } = { current: null };
 const cookieRef: { lang: string | undefined } = { lang: undefined };
+/** The language the middleware read from the URL (`/en/manifest.webmanifest` → `en`). */
+const urlRef: { lang: string | undefined } = { lang: undefined };
 
-vi.mock('../lib/store-resolver', () => ({
+vi.mock('../store-resolver', () => ({
   getStore: async () => storeRef.current,
 }));
 
 vi.mock('next/headers', () => ({
-  headers: async () => new Headers(),
+  headers: async () => new Headers(urlRef.lang ? { 'x-locale-path': urlRef.lang } : {}),
   cookies: async () => ({
     get: (k: string) =>
       k === 'force-language' && cookieRef.lang ? { value: cookieRef.lang } : undefined,
   }),
 }));
 
-const { default: manifest } = await import('./manifest');
+const { buildStoreManifest: manifest } = await import('./store-manifest');
 
 function makeStore(overrides: Record<string, unknown> = {}) {
   return {
@@ -49,6 +52,7 @@ afterEach(() => {
   global.fetch = originalFetch;
   storeRef.current = null;
   cookieRef.lang = undefined;
+  urlRef.lang = undefined;
   vi.clearAllMocks();
 });
 
@@ -158,7 +162,7 @@ describe('manifest — the per-store manifest is fetched from a route the API re
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const routes = JSON.parse(
-      readFileSync(resolve(__dirname, '../../../api/workers-test/route-table.json'), 'utf8')
+      readFileSync(resolve(__dirname, '../../../../api/workers-test/route-table.json'), 'utf8')
     ) as string[];
     storeRef.current = makeStore();
     cookieRef.lang = 'en';
@@ -575,5 +579,47 @@ describe('manifest — saved PWA settings are laid over the generic manifest (Ru
         expect(parsed.success && parsed.data, member).toStrictEqual({ [member]: value });
       }
     });
+  });
+});
+
+describe('manifest: the language in the URL decides, a cookie the browser never sends does not (Ruling PWA-MANIFEST-2)', () => {
+  const noSaved = () => {
+    global.fetch = vi.fn(async () => ({ ok: false })) as unknown as typeof fetch;
+  };
+
+  it('/en/manifest.webmanifest on an Arabic-default store, no cookie: English', async () => {
+    storeRef.current = makeStore({ settings: { defaultLanguage: 'ar' } });
+    urlRef.lang = 'en';
+    noSaved();
+    const result = await manifest();
+    expect(result.name).toBe('Demo Shop');
+    expect(result.description).not.toMatch(/[\u0600-\u06FF]/);
+  });
+
+  it('/ar/manifest.webmanifest on an English-default store, no cookie: Arabic', async () => {
+    storeRef.current = makeStore({ settings: { defaultLanguage: 'en' } });
+    urlRef.lang = 'ar';
+    noSaved();
+    const result = await manifest();
+    expect(result.name).toBe('وادي الجوز');
+    expect(result.description).toMatch(/[\u0600-\u06FF]/);
+  });
+
+  it('the URL language beats a cookie that says otherwise', async () => {
+    storeRef.current = makeStore({ settings: { defaultLanguage: 'ar' } });
+    urlRef.lang = 'ar';
+    cookieRef.lang = 'en';
+    noSaved();
+    expect((await manifest()).name).toBe('وادي الجوز');
+  });
+
+  it('the shared /manifest.webmanifest with no cookie keeps the store default, byte for byte', async () => {
+    storeRef.current = makeStore({ settings: { defaultLanguage: 'ar' } });
+    noSaved();
+    const shared = JSON.stringify(await manifest());
+    urlRef.lang = 'ar';
+    expect(JSON.stringify(await manifest())).toBe(shared);
+    urlRef.lang = 'en';
+    expect(JSON.stringify(await manifest())).not.toBe(shared);
   });
 });

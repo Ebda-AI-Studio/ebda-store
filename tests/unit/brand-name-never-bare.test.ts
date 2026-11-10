@@ -52,7 +52,7 @@ const AR_END = `(?!${AR_LETTER})`;
 const AR_CTX = [
   // brand as the object of a preposition or a noun: «من ابدأ», «على إبدأ», «مدعوم من ابدأ», «تواصل مع ابدأ»
   new RegExp(
-    `(?:^|[\\s«"'(])(?:من|على|مع|عن|لـ|بـ|في|إلى|عند|خارج|وصول|اسم|منصة|واتساب|تسجيل|اشتراك|فواتير|أعمال|بتوصل لـ?)\\s+${AR_BRAND}${AR_END}${AR_NEXT_OK}`
+    `(?:^|[\\s«"'(])(?:من|على|مع|عن|لـ|بـ|في|إلى|عند|خارج|وصول|اسم|منصة|منتجات|منتج|خدمات|واتساب|تسجيل|اشتراك|فواتير|أعمال|بتوصل لـ?)\\s+${AR_BRAND}${AR_END}${AR_NEXT_OK}`
   ),
   // brand as the subject of a verb: «ابدأ بيعمل», «إبدأ بتدعم», «لا تأخذ ابدأ أي»
   new RegExp(
@@ -113,6 +113,24 @@ describe('BRAND-NAME-1: the brand is never written alone', () => {
     expect(hits, hits.join('\n')).toEqual([]);
   });
 
+  // The legal documents are formal Arabic and never use the verb, so there the rule needs no context heuristic:
+  // every «ابدأ» and every "Ebda" is followed by its product or company word.
+  it('legal copy (ar and en): the brand is always followed by its product or company word', () => {
+    const dir = path.join(ROOT, 'apps/marketing/src/lib');
+    const legal = readdirSync(dir).filter(f => /^legal-.*\.ts$/.test(f));
+    expect(legal.length).toBeGreaterThanOrEqual(7);
+    const strict = new RegExp(`${AR_BRAND}${AR_END}${AR_NEXT_OK}`);
+    const hits = legal.flatMap(f =>
+      readFileSync(path.join(dir, f), 'utf8')
+        .split('\n')
+        .map((raw, i) => ({ raw, n: i + 1 }))
+        .filter(({ raw }) => !isComment(raw))
+        .filter(({ raw }) => strict.test(raw) || EN_BARE_RE().test(mask(raw, EN_ALLOW)))
+        .map(({ raw, n }) => `${f}:${n}: ${raw.trim().slice(0, 110)}`)
+    );
+    expect(hits, hits.join('\n')).toEqual([]);
+  });
+
   it('negative control: the scanner flags a bare brand and passes the full names and the verb', () => {
     const probe = (s: string) => scanLine(s).length > 0;
     expect(probe('Powered by Ebda')).toBe(true);
@@ -120,6 +138,11 @@ describe('BRAND-NAME-1: the brand is never written alone', () => {
     expect(probe('Contact Ebda AI Studio')).toBe(false);
     expect(probe('مدعوم من ابدأ')).toBe(true);
     expect(probe('مدعوم من ابدأ ستور')).toBe(false);
+    // pre-QA 2026-11-09 finding 5: «منتجات ابدأ» in the Acceptable Use Policy passed the scan
+    expect(probe('عبر أي منتج من منتجات ابدأ، ومنها ابدأ ستور وابدأ شات')).toBe(true);
+    expect(probe('عبر أي منتج من منتجات ابدأ ستوديو للذكاء الاصطناعي، ومنها ابدأ ستور')).toBe(
+      false
+    );
     expect(probe('ابدأ بيعمل طلب')).toBe(true);
     expect(probe('ابدأ متجرك أونلاين')).toBe(false);
     expect(probe('ابدأ دلوقتي')).toBe(false);

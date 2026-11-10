@@ -404,7 +404,7 @@ export class PWAService {
     // the storefront's home-screen icon look like. The manifest route itself
     // has no Redis cache today (see generateManifest below — not behind
     // getCached), so the only stale-read surface is the Next.js storefront's
-    // own data-cache fetch (apps/web/src/app/manifest.ts, `next: { tags:
+    // own data-cache fetch (apps/web/src/lib/pwa/store-manifest.ts, `next: { tags:
     // ['pwa:<storeId>'] }`). Bust that tag on every settings/icon write —
     // same pattern as invalidateStoreProductCaches's revalidateStorefront
     // call — so a merchant doesn't have to wait out the 300s TTL to see a
@@ -437,7 +437,7 @@ export class PWAService {
 
     // ONLY what the merchant saved (Ruling PWA-MANIFEST-1). No default is filled in here: no store name, no
     // `Shop at <name>` / `تسوق في <name>`, no default colour, display, orientation, start URL or scope. A member the
-    // merchant never saved is ABSENT, and the storefront (apps/web/src/app/manifest.ts) fills it with the same value
+    // merchant never saved is ABSENT, and the storefront (apps/web/src/lib/pwa/store-manifest.ts) fills it with the same value
     // its generic manifest uses, which knows the store's theme colour and its own description. So a store that never
     // saved PWA settings answers `{}` here and keeps exactly the manifest it had before the per-store one applied.
     const settings = (store.pwaSettings ?? {}) as Partial<PWASettings>;
@@ -507,7 +507,7 @@ export class PWAService {
       });
     }
 
-    // No icon uploaded: NO `icons` member, and the storefront (apps/web/src/app/manifest.ts) serves its own (the store
+    // No icon uploaded: NO `icons` member, and the storefront (apps/web/src/lib/pwa/store-manifest.ts) serves its own (the store
     // favicon, else its shipped `/icon-192.png` + `/icon-512.png`). This used to name `/icons/icon-192x192.png` and
     // `/icons/icon-512x512.png`, two files no app ships (404 on the live storefront, measured 2026-11-10): the API cannot
     // know the storefront's static files.

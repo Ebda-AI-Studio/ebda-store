@@ -75,6 +75,7 @@ export function CategoryRail({
                 <li key={c.id} className="w-24 shrink-0 snap-start sm:w-28">
                   <Link
                     href={`${urlPrefix}/products?category=${encodeURIComponent(c.slug ?? c.id)}`}
+                    prefetch={false}
                     className="group flex min-h-11 flex-col items-center gap-2 rounded-[var(--radius)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <span className="relative block aspect-square w-full overflow-hidden rounded-[var(--radius)] bg-card">
