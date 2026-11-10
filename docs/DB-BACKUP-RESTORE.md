@@ -44,7 +44,7 @@ Restore one image: fetch `media/objects/<etag>/<key>.age`, `age -d -i <identity>
 
 `ebda-db-backups` lives in the **same** Cloudflare account as production, so it does not survive losing the account. `scripts/ops/pull-cf-backups.mjs` (launchd `app.ebda.cf-backup-pull`, daily 08:05 local, installed by `bash scripts/ops/install-cf-backup-pull.sh`, log `~/Library/Logs/ebda-cf-backup-pull.log`) pulls the newest daily set and the whole `media/` mirror over api.cloudflare.com into `~/Desktop/projects/_backups/ebda-cf-encrypted/` (local, not iCloud), checks every file's sha256 against the manifest, fails when the newest backup is more than 2 days old or lacks `d1-ebda-identity`, keeps the newest **30** day folders (hard links into content-addressed `objects/`, so unchanged artifacts cost nothing) and never prunes `media/`. Files stay encrypted on the Mac. It needs a Cloudflare API token with **Workers R2 Storage: Read** only, in the Keychain as `ebda-r2-backup-read`. To restore from it: lay a day folder out as `cf/daily/<day>/` + `cf/latest.json` in a directory and run `restore-drill.mjs --dir <that directory>`.
 
-The older Worker sweep (`ebda-private/{store-do-backups,d1-backups}`, platform D1 + StoreDOs only, no identity) is still pulled by `backup-ebda-cloudflare.sh` (force-ai-foundation, launchd `com.forceai.ebda-cf-backup`, 07:15).
+The older Worker sweep (`ebda-private/{store-do-backups,d1-backups}`, platform D1 + StoreDOs only, no identity) is still pulled by the older Mac job `backup-ebda-cloudflare.sh` (launchd, 07:15 local; it lives outside this repo).
 
 ## Real recovery (restore production from these backups)
 
