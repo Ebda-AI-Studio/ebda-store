@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/vitest-pool-workers/types" />
 /**
  * LAUNCH-RL: the publicSearchLimiter key is PER CLIENT on workerd. The Worker overwrites X-Forwarded-For with
- * CF-Connecting-IP (worker.ts withTrustedClientIp) and Express runs `trust proxy` 1, so req.ip is the Cloudflare-seen client.
+ * CF-Connecting-IP (worker.ts, cf/ssr-client-ip.ts resolveClientAddress) and Express runs `trust proxy` 1, so req.ip is the Cloudflare-seen client.
  * If the key ever collapsed to one value (127.0.0.1, an edge IP, undefined) the 60/min search limit would be GLOBAL.
  *
  *   npx vitest run --config vitest.workers.config.mts workers-test/search-limiter-key.test.ts   (after `npm run cf:dry-run`)

@@ -57,6 +57,10 @@ import {
   storeVerdict,
   type R2Like,
 } from './store-edge-cache';
+import { installApiFetchForwarding, withClientAddress } from './ssr-client-address';
+
+// Ruling RL-SSR-IP-6: server-side fetches to the API carry the shopper's signed address (ssr-client-address.ts).
+installApiFetchForwarding(new URL(DEMO_EDGE_API_URL).origin);
 
 interface WorkerEnv {
   /** Server-side Sentry DSN for this Worker. Set via `wrangler deploy --var
@@ -73,6 +77,8 @@ interface WorkerEnv {
   STOREFRONT_HTML_EDGE_OFF?: string;
   /** The OpenNext incremental-cache bucket; the purge epochs live under `html-epoch/`. */
   NEXT_INC_CACHE_R2_BUCKET?: R2Like;
+  /** Shared with the API (cache purges); also signs the shopper address forwarded to the API (Ruling RL-SSR-IP-6). */
+  REVALIDATE_SECRET?: string;
   /** The Worker version (wrangler `version_metadata`): `/health` reports its id, and both HTML edge caches key by it
    * so a copy rendered by one build is never served by another (Ruling EDGE-BUILD-1). */
   CF_VERSION_METADATA?: { id?: unknown } | null;
@@ -109,81 +115,82 @@ function warnNoBuildId(): void {
  * subrequest never re-enters this Worker (no loop).
  */
 const baseHandler = {
-  async fetch(request: Request, env: WorkerEnv, ctx: unknown): Promise<Response> {
-    // GET /health: commit + deploymentId, answered before Next (Ruling HEALTH-ALL-1).
-    if (isHealthRequest(request)) return healthResponse('web', env, request.method);
-    const { hostname, pathname, search } = new URL(request.url);
-    const route = companyHostRoute(hostname, pathname, search);
-    if (route.kind === 'redirect') {
-      return Response.redirect(route.location, route.status);
-    }
-    if (route.kind === 'proxy') {
-      // `new Request(url, request)` copies method/headers/body; the outbound
-      // Host is derived from the proxy origin so Pages serves the company site.
-      return fetch(new Request(route.origin + pathname + search, request));
-    }
-    // An old unprefixed URL of a locale-path store: an empty-body redirect here, never a render (Ruling
-    // LOCALE-REDIRECT-EDGE-1). Null = undecidable, Next handles it exactly as before.
-    const localeRedirect = await edgeLocaleRedirect(request, env, async host => {
-      const v = await storeVerdict(host, DEMO_EDGE_API_URL);
-      return v.ok ? (v.defaultLanguage ?? null) : null;
-    });
-    if (localeRedirect) return localeRedirect;
-    // route.kind === 'next' — all merchant domains + platform subdomains,
-    // routed to the Next storefront exactly as before this carve-out.
-    // Demo showroom hosts only (Ruling DEMO-EDGE-1): served from the edge cache when eligible.
-    const waitCtx = ctx as { waitUntil(p: Promise<unknown>): void };
-    const origin = (r: Request) => nextHandler.fetch(r, env, ctx);
-    const allow = edgeAllowlistFromEnv(env);
-    // A storefront purge from the API: after Next accepts it, record the per-store epoch (Ruling STORE-EDGE-1)
-    // so every data centre stops serving pages rendered before it. ALWAYS, even while the layer is off (Ruling
-    // STORE-EDGE-2): turning it back on must never serve a copy rendered before a purge that happened meanwhile.
-    if (
-      env.NEXT_INC_CACHE_R2_BUCKET &&
-      request.method === 'POST' &&
-      pathname === '/api/revalidate'
-    ) {
-      let tags: string[] = [];
-      try {
-        const body = (await request.clone().json()) as { tags?: unknown };
-        if (Array.isArray(body.tags))
-          tags = body.tags.filter((t): t is string => typeof t === 'string');
-      } catch {
-        // not a purge we understand: Next answers it (400); nothing to record
-      }
-      const res = await origin(request);
-      if (res.ok && tags.length > 0)
-        await bumpEpochs(env.NEXT_INC_CACHE_R2_BUCKET, tags, Date.now());
-      return res;
-    }
-    const edgeCache = (
-      globalThis as unknown as {
-        caches?: { default?: Parameters<typeof serveStoreEdge>[3]['cache'] };
-      }
-    ).caches?.default;
-    // Cached HTML names this build's `/_next/static` files: both layers key by the Worker version (Ruling EDGE-BUILD-1).
-    const build = edgeBuildId(env);
-    if (!build) warnNoBuildId();
-    return serveDemoEdge(
-      request,
-      waitCtx,
-      r => {
-        // Not a demo request: real stores that the operator listed may use the store edge cache.
-        if (allow.size === 0 || !edgeCache) return origin(r);
-        return serveStoreEdge(r, waitCtx, origin, {
-          allow,
-          r2: env.NEXT_INC_CACHE_R2_BUCKET,
-          cache: edgeCache,
-          build,
-          verdict: host => storeVerdict(host, DEMO_EDGE_API_URL),
-          now: Date.now,
-        });
-      },
-      host => isDemoStoreHost(host, DEMO_EDGE_API_URL),
-      build
+  fetch(request: Request, env: WorkerEnv, ctx: unknown): Promise<Response> {
+    return withClientAddress(request, env.REVALIDATE_SECRET, () =>
+      handleRequest(request, env, ctx)
     );
   },
 };
+
+async function handleRequest(request: Request, env: WorkerEnv, ctx: unknown): Promise<Response> {
+  // GET /health: commit + deploymentId, answered before Next (Ruling HEALTH-ALL-1).
+  if (isHealthRequest(request)) return healthResponse('web', env, request.method);
+  const { hostname, pathname, search } = new URL(request.url);
+  const route = companyHostRoute(hostname, pathname, search);
+  if (route.kind === 'redirect') {
+    return Response.redirect(route.location, route.status);
+  }
+  if (route.kind === 'proxy') {
+    // `new Request(url, request)` copies method/headers/body; the outbound
+    // Host is derived from the proxy origin so Pages serves the company site.
+    return fetch(new Request(route.origin + pathname + search, request));
+  }
+  // An old unprefixed URL of a locale-path store: an empty-body redirect here, never a render (Ruling
+  // LOCALE-REDIRECT-EDGE-1). Null = undecidable, Next handles it exactly as before.
+  const localeRedirect = await edgeLocaleRedirect(request, env, async host => {
+    const v = await storeVerdict(host, DEMO_EDGE_API_URL);
+    return v.ok ? (v.defaultLanguage ?? null) : null;
+  });
+  if (localeRedirect) return localeRedirect;
+  // route.kind === 'next' — all merchant domains + platform subdomains,
+  // routed to the Next storefront exactly as before this carve-out.
+  // Demo showroom hosts only (Ruling DEMO-EDGE-1): served from the edge cache when eligible.
+  const waitCtx = ctx as { waitUntil(p: Promise<unknown>): void };
+  const origin = (r: Request) => nextHandler.fetch(r, env, ctx);
+  const allow = edgeAllowlistFromEnv(env);
+  // A storefront purge from the API: after Next accepts it, record the per-store epoch (Ruling STORE-EDGE-1)
+  // so every data centre stops serving pages rendered before it. ALWAYS, even while the layer is off (Ruling
+  // STORE-EDGE-2): turning it back on must never serve a copy rendered before a purge that happened meanwhile.
+  if (env.NEXT_INC_CACHE_R2_BUCKET && request.method === 'POST' && pathname === '/api/revalidate') {
+    let tags: string[] = [];
+    try {
+      const body = (await request.clone().json()) as { tags?: unknown };
+      if (Array.isArray(body.tags))
+        tags = body.tags.filter((t): t is string => typeof t === 'string');
+    } catch {
+      // not a purge we understand: Next answers it (400); nothing to record
+    }
+    const res = await origin(request);
+    if (res.ok && tags.length > 0) await bumpEpochs(env.NEXT_INC_CACHE_R2_BUCKET, tags, Date.now());
+    return res;
+  }
+  const edgeCache = (
+    globalThis as unknown as {
+      caches?: { default?: Parameters<typeof serveStoreEdge>[3]['cache'] };
+    }
+  ).caches?.default;
+  // Cached HTML names this build's `/_next/static` files: both layers key by the Worker version (Ruling EDGE-BUILD-1).
+  const build = edgeBuildId(env);
+  if (!build) warnNoBuildId();
+  return serveDemoEdge(
+    request,
+    waitCtx,
+    r => {
+      // Not a demo request: real stores that the operator listed may use the store edge cache.
+      if (allow.size === 0 || !edgeCache) return origin(r);
+      return serveStoreEdge(r, waitCtx, origin, {
+        allow,
+        r2: env.NEXT_INC_CACHE_R2_BUCKET,
+        cache: edgeCache,
+        build,
+        verdict: host => storeVerdict(host, DEMO_EDGE_API_URL),
+        now: Date.now,
+      });
+    },
+    host => isDemoStoreHost(host, DEMO_EDGE_API_URL),
+    build
+  );
+}
 
 export default Sentry.withSentry(
   (env: WorkerEnv) => ({
