@@ -1381,6 +1381,19 @@
     "pageAr": "ظهور في جوجل"
   },
   {
+    "id": "seo.hide-from-search",
+    "kind": "setting",
+    "route": "/seo",
+    "access": "owner",
+    "en": "Hide my store from search engines",
+    "ar": "إخفاء متجري من محركات البحث",
+    "synEn": "hide store from google search engines noindex private draft not live launch",
+    "synAr": "اخفاء المتجر من جوجل محركات البحث مخفي قبل الاطلاق",
+    "feature": "seo",
+    "pageEn": "Search appearance",
+    "pageAr": "ظهور في جوجل"
+  },
+  {
     "id": "seo.aeo",
     "kind": "setting",
     "route": "/seo",

@@ -1887,6 +1887,7 @@ export class StoreService {
       twitterHandle?: string;
       googleSiteVerification?: string;
       emailSenderLocalPart?: string;
+      hideFromSearchEngines?: boolean;
     }
   ) {
     const store = await this.getById(storeId);
@@ -1897,10 +1898,26 @@ export class StoreService {
       appConfig.storagePublicUrl
     );
 
-    const updatedStore = await updateStoreThrough(storeId, tx =>
-      tx.store.update({
+    const updatedStore = await updateStoreThrough(storeId, async tx => {
+      // "Hide from search engines" lives in the `settings` JSON: merge the one key into the live bag so a concurrent
+      // settings write to another key is not clobbered.
+      let settingsPatch: { settings: Prisma.InputJsonValue } | Record<string, never> = {};
+      if (seo.hideFromSearchEngines !== undefined) {
+        const live = await tx.store.findUnique({
+          where: { id: storeId },
+          select: { settings: true },
+        });
+        settingsPatch = {
+          settings: {
+            ...((live?.settings as Record<string, unknown> | null) ?? {}),
+            hideFromSearchEngines: seo.hideFromSearchEngines,
+          } as Prisma.InputJsonValue,
+        };
+      }
+      return tx.store.update({
         where: { id: storeId },
         data: {
+          ...settingsPatch,
           metaTitle: seo.metaTitle,
           metaTitleAr: seo.metaTitleAr,
           metaDescription: seo.metaDescription,
@@ -1916,8 +1933,8 @@ export class StoreService {
           googleSiteVerification: seo.googleSiteVerification,
           emailSenderLocalPart: seo.emailSenderLocalPart,
         },
-      })
-    );
+      });
+    });
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);

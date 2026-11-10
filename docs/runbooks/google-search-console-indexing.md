@@ -267,3 +267,9 @@ Architecture + capture points: `docs/architecture/slug-redirects.md`.
 - [Google Search Central: Structured Data for Ecommerce](https://developers.google.com/search/docs/specialty/ecommerce/include-structured-data-relevant-to-ecommerce)
 - [Google's llms.txt guidance (SearchEngineJournal, 2025)](https://www.searchenginejournal.com/googles-llms-txt-guidance-depends-on-which-product-you-ask/575431/)
 - [Anthropic Claude bots framework — ClaudeBot vs Claude-SearchBot](https://almcorp.com/blog/anthropic-claude-bots-robots-txt-strategy/)
+
+---
+
+## Keeping a store out of search while it is being prepared
+
+Admin: Store settings, SEO, "Hide my store from search engines" (Ruling SEO-HIDE-1, `docs/rulings/SEO-HIDE-1.md`). On: `noindex, nofollow` on every page, empty `sitemap.xml`, no sitemap line in `robots.txt`, `llms.txt` 404. Do not add a `Disallow: /` by hand: crawlers must be able to read the `noindex` meta. Turn it off at launch, then submit the sitemap in Search Console.
