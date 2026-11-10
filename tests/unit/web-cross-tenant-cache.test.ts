@@ -111,7 +111,7 @@ describe('middleware — the Host alone picks the store', () => {
   );
 
   // Upcoming products: Ebda AI Studio's coming-soon page (200 + noindex), still no store and nothing cacheable.
-  it.each(['whatsapp.ebda.app', 'wa.ebda.app', 'crm.ebda.app'])(
+  it.each(['crm.ebda.app', 'erp.ebda.app', 'hub.ebda.app', 'id.ebda.app'])(
     'upcoming product host %s is a coming-soon page, never a store',
     host => {
       const res = middleware(at(host, '/'));
@@ -122,8 +122,32 @@ describe('middleware — the Host alone picks the store', () => {
     }
   );
 
+  // Ebda Chat is LIVE at wa.ebda.app (Ruling WHATSAPP-HOST-REDIRECT-1): whatsapp.ebda.app is a 301 there, path and
+  // query kept, and never a "coming soon" page again.
+  it.each([
+    ['/', 'https://wa.ebda.app/'],
+    ['/inbox?x=1', 'https://wa.ebda.app/inbox?x=1'],
+  ])('whatsapp.ebda.app%s redirects (301) to the live Ebda Chat at %s', (path, target) => {
+    const res = middleware(at('whatsapp.ebda.app', path));
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe(target);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(forwarded(res, 'x-store-domain')).toBeNull();
+  });
+
+  it('nothing the storefront renders says Ebda Chat is coming soon', async () => {
+    const { renderStudioPage } = await import('@ebda/shared');
+    for (const lang of ['ar', 'en'] as const)
+      for (const kind of ['coming-soon', 'not-found'] as const) {
+        const html = renderStudioPage({ lang, kind, product: 'crm' });
+        expect(html).not.toMatch(/(Ebda Chat|ابدأ شات)[^<]*(<b>)?[^<]*(coming soon|قريب)/i);
+        expect(html).toContain('href="https://wa.ebda.app/"');
+      }
+  });
+
   it.each([
     'store.ebda.app', // there is no store.ebda.app
+    'wa.ebda.app', // served by the Ebda Chat Worker's own route; if it ever reaches this Worker, a 404, never "coming soon"
     'app.ebda.app', // retired label: never served, never a store
     'x.y.ebda.app',
     'ab.ebda.app',
