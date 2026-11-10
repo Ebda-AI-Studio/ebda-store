@@ -2,6 +2,7 @@
 import { cfBindings, type DurableObjectStubLike } from './bindings';
 import type { Op } from './auth-state-core';
 import { hop } from '../lib/hop-timing';
+import logger from '../lib/logger';
 
 export const CACHEGEN_PREFIX = 'cachegen:';
 
@@ -145,27 +146,59 @@ function stub(shard: number): AuthStateStub {
   return ns.get(ns.idFromName(`shard-${shard}`)) as unknown as AuthStateStub;
 }
 
+/**
+ * API-HANG-1 (Ruling API-HANG-1): every AuthState round trip is bounded. A DO call has no deadline of its own, so a stuck or
+ * overloaded instance held the whole request until the caller gave up (the storefront's 8 s cut-off, Logpush outcome `canceled`
+ * on `apply`). After this many ms the call rejects with {@link AuthStateTimeoutError}, which every caller already handles as an
+ * AuthState outage (a limiter's `passOnStoreError` policy, a cache fill that skips its write). The RPC itself is not cancelled:
+ * an op that lands late (a `hit`) is counted, exactly as when the caller disconnects.
+ */
+export const AUTH_STATE_TIMEOUT_MS = 2_500;
+
+export class AuthStateTimeoutError extends Error {
+  constructor(readonly label: string) {
+    super(`AuthState call timed out after ${AUTH_STATE_TIMEOUT_MS} ms (${label})`);
+    this.name = 'AuthStateTimeoutError';
+  }
+}
+
+/** `call` raced against {@link AUTH_STATE_TIMEOUT_MS}; the losing side never surfaces as an unhandled rejection. */
+export function withAuthStateDeadline<T>(
+  label: string,
+  call: Promise<T>,
+  ms = AUTH_STATE_TIMEOUT_MS
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      logger.warn({ authStateTimeout: true, op: label, ms }, 'AuthState call timed out');
+      reject(new AuthStateTimeoutError(label));
+    }, ms);
+  });
+  call.catch(() => undefined);
+  return Promise.race([call, deadline]).finally(() => clearTimeout(timer));
+}
+
 /** Run ops on the shard owning `key` (atomically, in order). */
 export function applyOn(key: string, ops: Op[]): Promise<unknown[]> {
-  return hop(
-    `do-${key.split(':')[0]}-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`,
-    () => stub(shardOf(key)).apply(ops)
-  );
+  const label = `do-${key.split(':')[0]}-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`;
+  return hop(label, () => withAuthStateDeadline(label, stub(shardOf(key)).apply(ops)));
 }
 
 /** Run ops on one explicit shard (cache generations route by name list, not by one key). */
 export function applyOnShard(shard: number, ops: Op[]): Promise<unknown[]> {
-  return hop(
-    `do-cachegen-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`,
-    () => stub(shard).apply(ops)
-  );
+  const label = `do-cachegen-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`;
+  return hop(label, () => withAuthStateDeadline(label, stub(shard).apply(ops)));
 }
 
 /** Run ops on EVERY shard and the cache-generation instance (sweeps: prefix scans). */
 export async function applyOnAll(ops: Op[]): Promise<unknown[][]> {
+  const label = `do-all-${String(ops[0]?.[0] ?? 'op')}`;
   return Promise.all([
-    ...Array.from({ length: AUTH_STATE_SHARDS }, (_, i) => stub(i).apply(ops)),
-    stub(CACHEGEN_SHARD).apply(ops),
+    ...Array.from({ length: AUTH_STATE_SHARDS }, (_, i) =>
+      withAuthStateDeadline(label, stub(i).apply(ops))
+    ),
+    withAuthStateDeadline(label, stub(CACHEGEN_SHARD).apply(ops)),
   ]);
 }
 
