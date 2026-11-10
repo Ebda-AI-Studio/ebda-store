@@ -162,3 +162,70 @@ describe('apiRequest applies the map (forced 429, 400, 502 non-JSON, offline)', 
     expect((await apiGet('/x')).error?.message).toBe(ERROR_AR.NETWORK_ERROR);
   });
 });
+
+// 2026-11-10 P1 (Ruling ADMIN-ERR-1): the onboarding photo upload answered 500 and the Arabic page printed the API's raw
+// "Internal server error". The upload reads its XHR itself, so it goes through localizedApiMessage, not apiRequest.
+describe('a refusal read outside apiRequest (uploads, raw fetches)', () => {
+  const PROD_500 = {
+    success: false,
+    error: { code: 'INTERNAL_ERROR', message: 'Internal server error', requestId: 'r' },
+  };
+  afterEach(() => {
+    document.documentElement.dir = '';
+  });
+  it('a 500 upload shows the Arabic sentence in the Arabic UI, never the server text', async () => {
+    document.documentElement.dir = 'rtl';
+    const { uploadErrorText } = await import('../../hooks/useImageUpload');
+    expect(uploadErrorText(PROD_500, 'فشل رفع الصورة (500)', 500)).toBe(ERROR_AR.SERVER_ERROR);
+  });
+  it('a 500 upload shows the English sentence in the English UI, never the server text', async () => {
+    const { uploadErrorText } = await import('../../hooks/useImageUpload');
+    expect(uploadErrorText(PROD_500, 'Upload failed (500)', 500)).toBe(ERROR_EN.SERVER_ERROR);
+  });
+  it('INTERNAL_ERROR without a status still never prints the server text', async () => {
+    document.documentElement.dir = 'rtl';
+    const { localizedApiMessage } = await import('../api');
+    expect(localizedApiMessage('INTERNAL_ERROR', 'Internal server error', undefined)).toBe(
+      ERROR_AR.INTERNAL_ERROR
+    );
+  });
+  it('bilingual details still win (byte-sniff refusals)', async () => {
+    document.documentElement.dir = 'rtl';
+    const { localizedApiMessage } = await import('../api');
+    expect(
+      localizedApiMessage(
+        'INVALID_IMAGE',
+        'Not an image',
+        { messageAr: 'الملف ده مش صورة.', messageEn: 'Not an image.' },
+        400
+      )
+    ).toBe('الملف ده مش صورة.');
+  });
+  it('an unknown 4xx with English server text shows the generic Arabic sentence in the Arabic UI', () => {
+    expect(
+      resolveErrorMessage({
+        code: 'X',
+        status: 400,
+        serverMessage: 'Folder x is not allowed',
+        locale: 'ar',
+      })
+    ).toBe(ERROR_AR.REQUEST_FAILED);
+  });
+  it('an Arabic caller fallback survives an unknown code', () => {
+    expect(
+      resolveErrorMessage({ code: 'X', status: 400, serverMessage: 'فشل الرفع', locale: 'ar' })
+    ).toBe('فشل الرفع');
+  });
+  it('apiRequest: a 500 INTERNAL_ERROR in the Arabic UI', async () => {
+    document.documentElement.dir = 'rtl';
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 500, json: async () => PROD_500 }))
+    );
+    vi.resetModules();
+    const { apiPost } = await import('../api');
+    expect((await apiPost('/x', {})).error?.message).toBe(ERROR_AR.SERVER_ERROR);
+    vi.unstubAllGlobals();
+  });
+});

@@ -1,4 +1,4 @@
-import { decodeRpc } from './codec';
+import { decodeRpc, wirePrismaNulls } from './codec';
 import { rethrow, type DoQuery, type DoQueryResult, type ReadOp, READ_OPS } from './reads';
 import { PROC_MODEL, WRITE_OPS, type DoMutation, type WriteOp } from './writes';
 
@@ -38,7 +38,9 @@ async function runAll<T>(
   // Any write in the batch routes the WHOLE batch to the atomic mutate RPC (reads in it see the writes before them).
   const writes = queries.some(q => isWriteOp(q.op) || q.model === PROC_MODEL);
   if (writes && !mutate) throw new Error('DO client: writes are not enabled on this client');
-  const r = writes ? await mutate!({ key, ops: queries }) : await send(queries);
+  // Prisma null sentinels cannot be structured-cloned: tagged here, revived in the StoreDO (Ruling PRISMA-NULL-RPC-1).
+  const wire = wirePrismaNulls(queries);
+  const r = writes ? await mutate!({ key, ops: wire }) : await send(wire);
   if (!r.ok) rethrow(r);
   return decodeRpc<T[]>(r.json);
 }

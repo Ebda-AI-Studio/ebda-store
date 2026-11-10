@@ -94,7 +94,8 @@ export function FontsCard({
           localizedApiMessage(
             data.error?.code,
             data.error?.message ?? `Upload failed (HTTP ${res.status})`,
-            data.error?.details
+            data.error?.details,
+            res.status
           )
         );
         return;
