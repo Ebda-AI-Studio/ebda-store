@@ -73,7 +73,9 @@ export const LEGAL_EN: LegalPages = {
         p: [
           'These terms are an agreement between you and ' +
             OP +
-            ', which owns and operates Ebda Store (the "Service"). By creating an account, opening a store or using the website or the Service, you accept these terms, the Merchant Agreement, the Acceptable Use Policy and the Privacy Policy. If you do not accept them, do not use the Service. If you accept on behalf of a business, you confirm that you have authority to do so.',
+            ' (the legal entity ' +
+            BRAND.company.legalNameEn +
+            '), which owns and operates Ebda Store (the "Service"). By creating an account, opening a store or using the website or the Service, you accept these terms, the Merchant Agreement, the Acceptable Use Policy and the Privacy Policy. If you do not accept them, do not use the Service. If you accept on behalf of a business, you confirm that you have authority to do so.',
         ],
       },
       {
@@ -93,7 +95,7 @@ export const LEGAL_EN: LegalPages = {
         h: '4. Plans, fees and payment',
         p: [
           'Paid plans, prices and billing rules are in the Merchant Agreement and the Pricing section of the website. Fees are charged in advance, in Egyptian pounds, and are non-refundable except where mandatory law says otherwise. Prices and VAT. All prices are final amounts in Egyptian pounds. We are not registered for value-added tax (VAT) and therefore charge none. If we become registered, VAT will be introduced only after at least 30 days of written notice, as a change to fees, will be shown as a separate line, and will never apply retroactively to any amount already paid or invoiced.',
-          'Ebda Chat is a separate service with its own terms (https://ebda.app/legal/whatsapp-terms/). If you use it, those terms apply to it in addition to these.',
+          'Ebda Chat is a separate service with its own terms (https://ebda.app/en/legal/whatsapp-terms/). If you use it, those terms apply to it in addition to these.',
         ],
       },
       {
@@ -136,7 +138,9 @@ export const LEGAL_EN: LegalPages = {
         h: '11. Limitation of liability',
         p: [
           'To the fullest extent permitted by law, we are not liable for indirect, incidental, special or consequential loss, or for lost profits, revenue, sales, goodwill, customers or data, however caused, even if we were told it could happen.',
-          'Our total liability to you for all claims arising out of or relating to the Service is limited to the fees you paid to Ebda Store in the 3 months before the event that gave rise to the claim.',
+          'Our total liability to you for all claims arising out of or relating to the Service is limited to the fees you paid to ' +
+            OP +
+            ' for Ebda Store in the 3 months before the event that gave rise to the claim.',
           'Nothing in these terms excludes or limits liability that cannot be excluded or limited under mandatory Egyptian law, including liability for fraud or gross fault.',
         ],
       },
@@ -342,13 +346,17 @@ export const LEGAL_EN: LegalPages = {
         p: [
           'This policy explains how Ebda Store (a product of ' +
             OP +
+            ', the legal entity ' +
+            BRAND.company.legalNameEn +
             ") handles personal data under Egypt's Personal Data Protection Law No. 151 of 2020. It covers: merchants and their staff who use Ebda Store; visitors to ebda.app; and shoppers who buy from a merchant's store. Questions and requests: privacy@ebda.app.",
         ],
       },
       {
         h: '2. Our two roles',
         p: [
-          'Controller: for merchant account, billing, support, security and website-visitor data, Ebda Store decides why and how the data is used.',
+          'Controller: for merchant account, billing, support, security and website-visitor data, ' +
+            OP +
+            ' decides why and how the data is used.',
           "Processor: for the personal data of a merchant's own customers and visitors (orders, addresses, phone numbers, emails, messages), the merchant is the controller and Ebda Store only processes it on the merchant's behalf to run the store. If you are a shopper, the merchant you bought from is responsible for how your data is used; send requests about it to that merchant.",
         ],
       },
@@ -374,7 +382,7 @@ export const LEGAL_EN: LegalPages = {
             ? POST_CUTOVER.en.providers
             : [
                 'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues, file/image storage and email delivery: transactional and campaign email); Neon (database hosting, EU region); Sentry (error and performance monitoring, EU region); Inngest (background job processing); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard and, with your consent, the sign-up funnel); Meta (advertising measurement of our own ads, only with your consent); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
-                'When a merchant uses Ebda Chat, Meta Platforms (WhatsApp) also receives the messages and related data needed to send and receive them, as an independent controller under its own terms; see the Ebda Chat Privacy Policy (https://ebda.app/legal/whatsapp-privacy/).',
+                'When a merchant uses Ebda Chat, Meta Platforms (WhatsApp) also receives the messages and related data needed to send and receive them, as an independent controller under its own terms; see the Ebda Chat Privacy Policy (https://ebda.app/en/legal/whatsapp-privacy/).',
                 'We may add or replace providers; the current list is maintained on this page. We do not sell personal data.',
               ],
       },
@@ -390,13 +398,13 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '7. Retention',
         p: [
-          'We keep data for as long as the account is active and as needed for the purposes above. We keep a store and its data, including while it is suspended, until the merchant asks us to delete it or the account is closed; we then delete or anonymise them within 90 days, except records we must or reasonably need to keep (for example billing and tax records, audit and security logs, and material needed to prevent fraud or defend claims), which are kept only as long as necessary. Backups age out on their normal cycle.',
+          'We keep data for as long as the account is active and as needed for the purposes above. We keep a store and its data, including while it is suspended, until the merchant asks us to delete it or the account is closed; we then delete or anonymise them within 90 days, except records we must or reasonably need to keep (for example billing and tax records, audit and security logs, and material needed to prevent fraud or defend claims), which are kept only as long as necessary. Backups age out on their normal cycle (30 days).',
         ],
       },
       {
         h: '8. Your rights',
         p: [
-          "Under Law No. 151 of 2020 you may ask to access, correct, update or delete your data, to restrict or object to processing, and to withdraw consent. Write to privacy@ebda.app, or follow the steps on the data deletion page (https://ebda.app/legal/data-deletion/); we may need to verify your identity, and will reply within a reasonable time. Requests about a shopper's data in a merchant's store are passed to that merchant. You may also complain to the Personal Data Protection Centre in Egypt.",
+          "Under Law No. 151 of 2020 you may ask to access, correct, update or delete your data, to restrict or object to processing, and to withdraw consent. Write to privacy@ebda.app, or follow the steps on the data deletion page (https://ebda.app/en/legal/data-deletion/); we may need to verify your identity, and will reply within a reasonable time. Requests about a shopper's data in a merchant's store are passed to that merchant. You may also complain to the Personal Data Protection Centre in Egypt.",
         ],
       },
       {

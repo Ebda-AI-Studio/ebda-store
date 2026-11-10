@@ -5,10 +5,9 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
   waTerms: {
     title: 'Ebda Chat Terms of Service',
     meta: {
-      version: '1.1',
-      publishedAt: '2026-11-09',
+      version: '1.2',
+      publishedAt: '2026-11-10',
     },
-    note: 'Clauses marked "Provisional, under legal review" have not been reviewed by counsel yet and may change.',
     sections: [
       {
         h: 'Overview',
@@ -62,7 +61,7 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
           '6.3 Overdraft: for urgent messages (service replies inside the 24-hour window and verification codes) the wallet may go below zero by up to 50 EGP. Marketing messages stop at zero and never go below zero. A negative balance is a debt, and your next top-up first pays that debt. On the shared number, an urgent message that cannot be paid waits up to 48 hours for a top-up, then fails and we notify you.',
           '6.4 Your wallet balance does not expire while your account is active. After you cancel, the remaining balance can be refunded for 12 months (clause 6.5); once that period ends it can no longer be refunded. AI credits that come with a package are valid for that package period only and do not carry over to the next one.',
           '6.4.1 Packages. A package you buy runs for its period. If you renew the same package before the period ends, the new period starts when the current one ends, so you keep the days and the AI credits of the current period until then. If a package payment is refunded or reversed by your bank or card issuer (a chargeback), the package ends at once: AI credits you already used are not reversed, and the unused AI credits of that package are removed. If only part of the payment is refunded, the package period and its unused AI credits are reduced in the same proportion instead. If your Store plan includes a package, that package applies again.',
-          "6.5 Refunds. [Provisional, under legal review] The remaining wallet balance can be refunded for 12 months after you cancel, once any debt is settled. The minimum refund is 50 EGP. Refunds go to the original payment method through the payment provider where possible; otherwise by bank transfer or InstaPay after an identity check. The following are not refundable: card fees already paid, AI credits that came with a package, the current package period (which keeps working until it ends), and purchased AI credits that were used or are older than 14 days. For a yearly package, the whole months left after the current month can be refunded at the package's monthly price (the yearly price divided by 12), up to what you paid for that year and after any debt is settled; the current month is not refunded. To ask for a refund, write to ahlan@ebda.app. We keep financial records as the law requires, even after you cancel or ask for deletion of data.",
+          "6.5 Refunds. The remaining wallet balance can be refunded for 12 months after you cancel, once any debt is settled. The minimum refund is 50 EGP. Refunds go to the original payment method through the payment provider where possible; otherwise by bank transfer or InstaPay after an identity check. The following are not refundable: card fees already paid, AI credits that came with a package, the current package period (which keeps working until it ends), and purchased AI credits that were used or are older than 14 days. For a yearly package, the whole months left after the current month can be refunded at the package's monthly price (the yearly price divided by 12), up to what you paid for that year and after any debt is settled; the current month is not refunded. To ask for a refund, write to ahlan@ebda.app. We keep financial records as the law requires, even after you cancel or ask for deletion of data.",
           '6.6 Prices and VAT. All prices are final amounts in Egyptian pounds. We are not registered for value-added tax (VAT) and therefore charge none. If we become registered, VAT will be introduced only after at least 30 days of written notice, as a change to fees, will be shown as a separate line, and will never apply retroactively to any amount already paid or invoiced.',
         ],
       },
@@ -92,7 +91,7 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
       {
         h: '10. Your data',
         p: [
-          "Your customers' messages and contact data are processed as described in the Ebda Chat Privacy Policy and the Data Processing Agreement, which form part of these terms. Contact deletion is available as described at https://ebda.app/legal/data-deletion/.",
+          "Your customers' messages and contact data are processed as described in the Ebda Chat Privacy Policy and the Data Processing Agreement, which form part of these terms. Contact deletion is available as described at https://ebda.app/en/legal/data-deletion/.",
         ],
       },
       {
@@ -150,8 +149,8 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
   waPrivacy: {
     title: 'Ebda Chat Privacy Policy',
     meta: {
-      version: '1.1',
-      publishedAt: '2026-11-09',
+      version: '1.2',
+      publishedAt: '2026-11-10',
     },
     sections: [
       {
@@ -164,7 +163,7 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
         h: '1. Who is responsible for what',
         p: [
           "• The merchant is the controller of its customers' data: phone numbers, names, messages, media and order references that pass through the merchant's workspace. The merchant decides why and how that data is used and is responsible for having a lawful basis, including consent for marketing.",
-          "• Ebda AI Studio is the processor of that conversation and contact data. We process it only on the merchant's behalf and instructions, under the Data Processing Agreement (https://ebda.app/legal/whatsapp-dpa/).",
+          "• Ebda AI Studio is the processor of that conversation and contact data. We process it only on the merchant's behalf and instructions, under the Data Processing Agreement (https://ebda.app/en/legal/whatsapp-dpa/).",
           "• Ebda AI Studio is the controller of the merchant's own account, billing and security data, which we use to run and protect the Service.",
           '• Meta Platforms is a separate, independent controller for WhatsApp. When a customer uses WhatsApp, Meta processes data under its own terms and privacy policy. We do not control that processing.',
         ],
@@ -230,7 +229,7 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
       {
         h: '9. Rights of data subjects',
         p: [
-          "Customers whose data passes through a merchant's workspace have rights under the PDPL: to know, access, correct, erase, object and restrict, and to withdraw consent. Because the merchant is the controller, a customer should send the request to the merchant. We help the merchant answer. A customer can also opt out of messages at any time by writing STOP. To request deletion of data, see https://ebda.app/legal/data-deletion/.",
+          "Customers whose data passes through a merchant's workspace have rights under the PDPL: to know, access, correct, erase, object and restrict, and to withdraw consent. Because the merchant is the controller, a customer should send the request to the merchant. We help the merchant answer. A customer can also opt out of messages at any time by writing STOP. To request deletion of data, see https://ebda.app/en/legal/data-deletion/.",
         ],
       },
       {
@@ -254,8 +253,8 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
   waDpa: {
     title: 'Ebda Chat Data Processing Agreement',
     meta: {
-      version: '1.1',
-      publishedAt: '2026-11-09',
+      version: '1.2',
+      publishedAt: '2026-11-10',
     },
     sections: [
       {
@@ -310,7 +309,7 @@ export const LEGAL_WA_EN: Record<'waTerms' | 'waPrivacy' | 'waDpa', LegalDoc> = 
       {
         h: '7. Assistance with data subject requests',
         p: [
-          'The Processor gives the Controller the tools and help it reasonably needs to answer requests from data subjects, including erasing a contact, exporting data and recording opt-outs. If a data subject contacts the Processor directly, the Processor refers them to the Controller. Deletion requests can also be made through https://ebda.app/legal/data-deletion/.',
+          'The Processor gives the Controller the tools and help it reasonably needs to answer requests from data subjects, including erasing a contact, exporting data and recording opt-outs. If a data subject contacts the Processor directly, the Processor refers them to the Controller. Deletion requests can also be made through https://ebda.app/en/legal/data-deletion/.',
         ],
       },
       {

@@ -12,7 +12,9 @@ import {
 /**
  * The 404's words and links, both languages (Egyptian Arabic in full sentences). One static 404.html serves
  * every path, so the page carries both and a tiny inline script shows the one matching the URL (/en/...).
- * The map is grouped by PRODUCT (Ebda Store live; WhatsApp / CRM / ERP coming soon), then help and contact.
+ * The map is grouped by PRODUCT (Ebda Store and Ebda Chat live; the coming-soon list is `BRAND.comingProducts`, never a
+ * hand-written list, so it cannot drift from the home page and nav: content audit C1/C2), then help and contact.
+ * Ebda Chat is LIVE at wa.ebda.app: never list it as coming soon.
  */
 export interface NotFoundLink {
   href: string;
@@ -39,6 +41,14 @@ const help = `https://${BRAND.domains.help}`;
 const docs = `https://${BRAND.domains.docs}`;
 const status = `https://${BRAND.domains.status}`;
 const demo = demoLookUrl('souq', 'catalogue');
+const chatApp = `https://${BRAND.domains.whatsappApp}/`;
+/** The coming-soon products, straight from BRAND (names only; they have no page to link yet). */
+const comingSoon = (lang: Locale): NotFoundLink[] =>
+  BRAND.comingProducts.map(p => ({
+    href: '',
+    label: lang === 'ar' ? p.nameAr : p.nameEn,
+    soon: true,
+  }));
 
 export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
   ar: {
@@ -48,15 +58,15 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
     searchPlaceholder: 'دوّر في الموقع والمساعدة والوثائق',
     searchButton: 'بحث',
     mapLabel: 'خريطة الموقع',
-    soon: 'قريباً',
+    soon: 'قريبًا',
     phoneCaption: 'جرّب متجر تجريبي',
     groups: [
       {
         title: BRAND.company.shortNameAr,
         links: [
           { href: HOME.ar, label: 'الرئيسية' },
-          { href: pagePath('ar', 'about'), label: 'عن ابدأ ستوديو' },
-          { href: pagePath('ar', 'contact'), label: 'تواصل معانا' },
+          { href: pagePath('ar', 'about'), label: 'عن الستوديو' },
+          { href: pagePath('ar', 'contact'), label: 'تواصل معنا' },
         ],
       },
       {
@@ -64,19 +74,19 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
         links: [
           { href: pagePath('ar', 'features'), label: 'المميزات' },
           { href: `${STORE_HOME.ar}#pricing`, label: 'الأسعار' },
-          { href: SIGNUP_URL, label: 'ابدأ متجرك' },
+          { href: SIGNUP_URL, label: 'افتح متجرك' },
           { href: LOGIN_URL, label: 'دخول' },
           { href: demo, label: 'متجر تجريبي' },
         ],
       },
       {
-        title: 'قريباً',
+        title: BRAND.productWhatsapp.nameAr,
         links: [
-          { href: '', label: 'ابدأ شات', soon: true },
-          { href: '', label: 'ابدأ CRM', soon: true },
-          { href: '', label: 'ابدأ ERP', soon: true },
+          { href: pagePath('ar', 'whatsapp'), label: 'إزاي بيشتغل' },
+          { href: chatApp, label: `ادخل على ${BRAND.productWhatsapp.nameAr}` },
         ],
       },
+      { title: 'قريبًا', links: comingSoon('ar') },
       {
         title: 'المساعدة',
         links: [
@@ -110,23 +120,23 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
         links: [
           { href: pagePath('en', 'features'), label: 'Features' },
           { href: `${STORE_HOME.en}#pricing`, label: 'Pricing' },
-          { href: SIGNUP_URL, label: 'Start your store' },
+          { href: SIGNUP_URL, label: 'Open your store' },
           { href: LOGIN_URL, label: 'Log in' },
           { href: demo, label: 'Demo store' },
         ],
       },
       {
-        title: 'Coming soon',
+        title: BRAND.productWhatsapp.nameEn,
         links: [
-          { href: '', label: 'Ebda Chat', soon: true },
-          { href: '', label: 'Ebda CRM', soon: true },
-          { href: '', label: 'Ebda ERP', soon: true },
+          { href: pagePath('en', 'whatsapp'), label: 'How it works' },
+          { href: chatApp, label: `Open ${BRAND.productWhatsapp.nameEn}` },
         ],
       },
+      { title: 'Coming soon', links: comingSoon('en') },
       {
         title: 'Help',
         links: [
-          { href: `${help}/en/`, label: 'Help center' },
+          { href: `${help}/en/`, label: 'Help centre' },
           { href: docs, label: 'Developer docs' },
           { href: `${status}/en`, label: 'Service status' },
         ],

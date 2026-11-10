@@ -78,3 +78,18 @@ export function probeAll(
 ): Promise<ProbeResult[]> {
   return Promise.all(components.map(c => probe(c, fetcher, timeoutMs)));
 }
+
+/**
+ * The Arabic (Egyptian) wording of a probe error for the public incident text (content audit C7): the English
+ * `error` strings above stay for logs and the English page; the Arabic page never shows them raw.
+ */
+export function probeErrorAr(error: string | null | undefined): string {
+  if (!error) return 'خطأ مش معروف';
+  const timeout = /^timeout after (\d+)ms$/.exec(error);
+  if (timeout) return `مفيش رد خلال ${Math.round(Number(timeout[1]) / 1000)} ثواني`;
+  const status = /^status (\d+), expected (\d+)$/.exec(error);
+  if (status) return `رجّع كود ${status[1]} بدل ${status[2]}`;
+  if (error === 'body did not match') return 'الصفحة رجعت من غير المحتوى المتوقع';
+  if (error.startsWith('fetch failed')) return 'الاتصال فشل';
+  return 'خطأ مش معروف';
+}

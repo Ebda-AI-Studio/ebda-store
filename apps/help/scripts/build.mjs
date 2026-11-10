@@ -29,7 +29,7 @@ const L = {
   ar: {
     prefix: '',
     site: `مركز مساعدة ${BRAND.company.shortNameAr}`,
-    skip: 'تخطَّ إلى المحتوى',
+    skip: 'روح للمحتوى',
     homeTitle: `مركز مساعدة ${BRAND.company.shortNameAr}`,
     homeIntro:
       'إجابات واضحة وصادقة عن إنشاء متجرك وإدارته. اللي لسه مش جاهز في المنصة مكتوب عليه «قريباً».',

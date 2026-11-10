@@ -302,7 +302,11 @@ export const WHATSAPP_PAGE: Record<Locale, WhatsAppPage> = {
         },
         starter: { name: 'Starter', short: 'Starter', tag: 'For a first team' },
         growth: { name: 'Growth', short: 'Growth', tag: 'Campaigns and ordering in the chat' },
-        pro: { name: 'Pro', short: 'Pro', tag: 'Integrations and priority support' },
+        pro: {
+          name: 'Professional',
+          short: 'Professional',
+          tag: 'Integrations and priority support',
+        },
       },
       cta: 'Start with {plan}',
       includedLabel: `Included with ${STORE_EN} ${BIZ.en}`,

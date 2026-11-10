@@ -121,7 +121,8 @@ describe('header: the CTA (NAV-CTA-1, NAV-CTA-2)', () => {
             expect(a![1], `${page} ${cls}`).toMatch(/#products$/);
             expect(a![2], `${page} ${cls}`).toBe(CHOOSE[l]);
           }
-          expect(html).not.toContain(TALK[l]);
+          // the short CTA as its own label (the WhatsApp button's «كلّمنا على واتساب» aria is not that CTA)
+          expect(html).not.toContain(`>${TALK[l]}<`);
         }
       }
     });

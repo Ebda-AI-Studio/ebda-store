@@ -6,6 +6,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { BRAND } from '../../packages/shared/src/brand/index';
 
 vi.mock('../../apps/marketing/src/app/globals.css', () => ({}));
 // RootShell loads its fonts through next/font, which only exists inside the Next compiler.
@@ -38,13 +39,18 @@ describe('marketing 404', () => {
     }
   });
 
-  it('maps the site by product and marks WhatsApp, CRM and ERP as coming soon (not links)', () => {
-    for (const label of ['ابدأ ستور', 'Ebda Store', 'ابدأ شات', 'Ebda CRM', 'Ebda ERP']) {
+  it('maps the site by product: Ebda Chat LIVE (linked), the coming-soon list from BRAND.comingProducts (not links)', () => {
+    for (const label of ['ابدأ ستور', 'Ebda Store', 'ابدأ شات', 'Ebda Chat'])
       expect(html).toContain(label);
+    for (const p of BRAND.comingProducts) {
+      expect(html).toContain(p.nameAr);
+      expect(html).toContain(p.nameEn);
     }
-    expect(html).toContain('قريباً');
+    expect(html).toContain('قريبًا');
     expect(html).toContain('Coming soon');
-    expect(html).not.toMatch(/<a [^>]*>Ebda (CRM|ERP|WhatsApp)<\/a>/);
+    // content audit C1: Ebda Chat is live at wa.ebda.app, linked, and never inside a coming-soon item
+    expect(html).toContain('href="https://wa.ebda.app/"');
+    expect(html).not.toMatch(/(Ebda Chat|ابدأ شات)(<!-- -->|\s)*<b>\s*(Coming soon|قريبًا)/);
     for (const href of [
       'https://help.ebda.app',
       'https://docs.ebda.app',

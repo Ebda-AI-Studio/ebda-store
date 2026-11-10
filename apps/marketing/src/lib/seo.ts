@@ -40,10 +40,6 @@ const productAlt = (locale: Locale) =>
 export const brandLine = () =>
   `${BRAND.product.nameEn} — ${BRAND.product.nameAr}, by ${BRAND.company.shortNameEn} (${BRAND.domains.marketing})`;
 
-/** Short tail for inner-page titles (SERP titles stay under ~60 characters); the full line is on the home title, OG site data and JSON-LD. */
-export const shortBrand = (locale: Locale) =>
-  `${productLabel(locale)} (${BRAND.domains.marketing})`;
-
 /** The Ebda Chat product page: its own name in the title tail, the OG site name, the brand line and the OG image. */
 export type PageProduct = 'store' | 'whatsapp' | 'studio';
 /** The title/OG product of a page, from its kind (NAV-PRODUCT-OF-PAGE-1): Store pages say Ebda Store, Chat pages Ebda Chat, every other page the studio. */
@@ -140,20 +136,31 @@ export function serviceLineJsonLd(locale: Locale, id: LineId) {
   };
 }
 
+/**
+ * A meta description cut from longer text (the legal pages use their first paragraph): at most `max` characters, cut at a
+ * word boundary and ended with "…", never mid-word (content audit C16; was `.slice(0, 160)`).
+ */
+export function snippet(text: string, max = 160): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const end = cut.lastIndexOf(' ');
+  return `${cut.slice(0, end > 0 ? end : cut.length).replace(/[\s,،؛;:(«"'—-]+$/u, '')}…`;
+}
+
 /** Meta title/description of the Services index and the line pages (descriptions 100-160 characters). */
 export const SERVICES_META = {
   ar: {
     marketing: {
       title: 'التسويق والإعلان وإنتاج المحتوى',
-      desc: 'خدمة تسويق وإعلان وإنتاج محتوى من ابدأ ستوديو: خطة بهدف واضح، محتوى وإعلانات، ورد على كل عميل على واتساب، وتقرير بالأرقام.',
+      desc: 'خدمة تسويق وإعلان وإنتاج محتوى من ابدأ ستوديو للذكاء الاصطناعي: خطة بهدف واضح، محتوى وإعلانات، ورد على كل عميل على واتساب، وتقرير بالأرقام.',
     },
     design: {
       title: 'التصميم والتنفيذ للبيوت',
-      desc: 'تصميم داخلي وخارجي وديكور وتنفيذ كامل من ابدأ ستوديو: تشوف بيتك صورة واقعية وتكلفته بالجنيه قبل ما يتنفذ، وتتابع على واتساب.',
+      desc: 'تصميم داخلي وخارجي وديكور وتنفيذ كامل من ابدأ ستوديو للذكاء الاصطناعي: تشوف بيتك صورة واقعية وتكلفته بالجنيه قبل ما يتنفذ، وتتابع على واتساب.',
     },
     events: {
       title: 'تنظيم الفعاليات',
-      desc: 'تنظيم فعاليات الشركات والمؤتمرات والمعارض وإطلاق المنتجات من ابدأ ستوديو: دعوات على واتساب وتسجيل بالـ QR وخطة وميزانية ومتابعة بعد الفعالية.',
+      desc: 'تنظيم فعاليات الشركات والمؤتمرات والمعارض وإطلاق المنتجات من ابدأ ستوديو للذكاء الاصطناعي: دعوات على واتساب وتسجيل بالـ QR وخطة وميزانية ومتابعة بعد الفعالية.',
     },
   },
   en: {
@@ -192,21 +199,20 @@ export function pageMetadata(
         ? BRAND.company.shortNameAr
         : BRAND.company.shortNameEn
       : productLabel(locale);
-  // Home: the product title as written. Other pages: page title, then the short brand tail. A title that already
-  // names the product (the about page) is not repeated.
-  const lead = (title ?? c.meta.title).replace(new RegExp(`^${name} — `), '');
-  const tail = wa || studio ? `${name} (${BRAND.domains.marketing})` : shortBrand(locale);
-  // the studio home carries its own full title; a studio inner page ends in the studio name unless its title already says it
+  // ONE title pattern (content audit C13, Ruling MKT-TITLE-1); every title ends in "(ebda.app)":
+  //  - a home page (the studio home, or a page with no title of its own: /store): its own full title + " (ebda.app)";
+  //  - an inner page: "<page> | <product of the page> (ebda.app)" (Ebda Store / Ebda Chat / Ebda AI Studio); a leading
+  //    "<product> — " or "<product>: " is dropped from <page> so the product is not said twice;
+  //  - a studio page whose title already names the studio (About, Contact): "<page> (ebda.app)".
+  const domain = `(${BRAND.domains.marketing})`;
+  const withDomain = (s: string) => (s.endsWith(domain) ? s : `${s} ${domain}`);
+  const lead = (title ?? c.meta.title).replace(new RegExp(`^${name}(?: — |: )`), '');
   const t =
-    studio && page === '' && title
-      ? title
-      : studio && title
-        ? lead.includes(name)
-          ? `${lead} (${BRAND.domains.marketing})`
-          : `${lead} | ${tail}`
-        : title
-          ? `${lead} | ${tail}`
-          : c.meta.title;
+    page === '' || !title
+      ? withDomain(title ?? c.meta.title)
+      : studio && lead.includes(name)
+        ? withDomain(lead)
+        : `${lead} | ${name} ${domain}`;
   const d = description ?? c.meta.description;
   // The five /for/<vertical>/ pages carry their own card (scripts/make-og-verticals.mjs); everything else the shared one.
   const vertical = page.match(/^for\/(fashion|electronics|beauty|food|jewellery)$/)?.[1];

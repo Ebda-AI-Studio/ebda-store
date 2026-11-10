@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage } from '@/components/LegalPage';
 import { COPY } from '@/lib/content';
-import { pageMetadata } from '@/lib/seo';
+import { pageMetadata, snippet } from '@/lib/seo';
 
 const doc = COPY['en'].legalPages.dataDeletion;
 
@@ -9,7 +9,7 @@ export const metadata: Metadata = pageMetadata(
   'en',
   'legal/data-deletion',
   doc.title,
-  doc.sections[0].p[0].slice(0, 160)
+  snippet(doc.sections[0].p[0])
 );
 
 export default function Page() {
