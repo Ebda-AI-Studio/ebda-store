@@ -59,6 +59,11 @@ on:
         required: false
         default: false
         type: boolean
+      abort_on_fail:
+        description: 'stop the run as soon as a threshold is crossed (after 30 s)'
+        required: false
+        default: false
+        type: boolean
   workflow_call:
     inputs:
       base_url: { required: true, type: string }
@@ -116,11 +121,12 @@ jobs:
           STORE_IDS: ${{ inputs.store_ids }}
           PRODUCT_SLUG: ${{ inputs.product_slug }}
           URLS: ${{ inputs.urls }}
+          ABORT_ON_FAIL: ${{ inputs.abort_on_fail && '1' || '0' }}
           P95_MS: ${{ inputs.p95_ms }}
           ERROR_RATE: ${{ inputs.error_rate }}
         run: |
           set +e
-          k6 run tests/load/ebda-load.js | tee k6-output.txt
+          k6 run tests/load/ebda-load.js 2>&1 | tee k6-output.txt
           echo "k6_exit=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
       - name: Job summary
         if: always()

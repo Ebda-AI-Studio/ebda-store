@@ -45,9 +45,26 @@ export const options = {
       maxVUs: 1000,
     },
   },
+  // ABORT_ON_FAIL=1 stops the run the moment a threshold is crossed (after a 30 s warm-up), for production runs.
   thresholds: {
-    http_req_duration: ['p(95)<' + Number(__ENV.P95_MS || 500)],
-    http_req_failed: ['rate<=' + Number(__ENV.ERROR_RATE || 0)],
+    http_req_duration: [
+      __ENV.ABORT_ON_FAIL === '1'
+        ? {
+            threshold: 'p(95)<' + Number(__ENV.P95_MS || 500),
+            abortOnFail: true,
+            delayAbortEval: '30s',
+          }
+        : 'p(95)<' + Number(__ENV.P95_MS || 500),
+    ],
+    http_req_failed: [
+      __ENV.ABORT_ON_FAIL === '1'
+        ? {
+            threshold: 'rate<=' + Number(__ENV.ERROR_RATE || 0),
+            abortOnFail: true,
+            delayAbortEval: '30s',
+          }
+        : 'rate<=' + Number(__ENV.ERROR_RATE || 0),
+    ],
   },
 };
 
@@ -58,9 +75,10 @@ const ok = r => r.status >= 200 && r.status < 300;
 export default function () {
   if (SCENARIO === 'pages') {
     // A real page load: the HTML document only (assets come from the CDN cache and are not the origin's load).
-    check(http.get(pick(URLS), { headers: { 'Accept-Language': 'ar' }, tags: { kind: 'page' } }), {
-      '2xx': ok,
-    });
+    const url = pick(URLS);
+    const r = http.get(url, { headers: { 'Accept-Language': 'ar' }, tags: { kind: 'page' } });
+    if (!ok(r)) console.warn('FAILED ' + r.status + ' ' + url);
+    check(r, { '2xx': ok });
     return;
   }
   if (SCENARIO === 'smoke') {
