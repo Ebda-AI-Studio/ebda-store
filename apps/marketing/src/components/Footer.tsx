@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { siteFooter, type NavLink } from '@ebda/shared/brand';
 import { SiteLink } from './SiteLink';
 import { CookieSettingsButton } from './CookieSettingsButton';
@@ -15,7 +15,7 @@ export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
   const f = siteFooter(locale);
   const A = ({ l }: { l: NavLink }) =>
     l.path ? (
-      <Link href={l.path}>{l.label}</Link>
+      <PageLink href={l.path}>{l.label}</PageLink>
     ) : (
       <SiteLink href={l.href} locale={locale}>
         {l.label}

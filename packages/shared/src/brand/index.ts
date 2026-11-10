@@ -533,7 +533,7 @@ export type NavSite = 'docs' | 'help' | 'status';
 /** Which product a marketing page belongs to; `studio` shows no product bar. */
 export type NavKind = 'studio' | 'store' | 'chat';
 
-/** One link. `href` is absolute (support sites render it as is); `path` is the same-origin marketing path when the target is a marketing page (the marketing site routes it with next/link). */
+/** One link. `href` is absolute (support sites render it as is); `path` is the same-origin marketing path when the target is on ebda.app (the marketing site renders it through PageLink: a page routes client-side, a file such as security.txt is a plain anchor). */
 export interface NavLink {
   id: string;
   label: string;
