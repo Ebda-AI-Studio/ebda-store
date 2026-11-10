@@ -4,8 +4,6 @@
  * cannot be recalled: Ruling WH-7.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { redactWebhookCustomerData } from '../../apps/api/src/services/webhook-erasure';
 
 const fakeTx = () => {
@@ -45,13 +43,5 @@ describe('redactWebhookCustomerData', () => {
     ).toBe(0);
     expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
-  it('eraseAccount calls it BEFORE the orders lose their customer link', () => {
-    const src = readFileSync(
-      resolve(__dirname, '../../apps/api/src/services/auth.service.ts'),
-      'utf8'
-    );
-    const call = src.indexOf('redactWebhookCustomerData(');
-    expect(call).toBeGreaterThan(0);
-    expect(call).toBeLessThan(src.indexOf('shippingAddress: anonymizedAddressJson'));
-  });
+  // That eraseAccount calls it BEFORE the orders lose their customer link is a behaviour test: tests/unit/webhook-erasure-order.test.ts.
 });
