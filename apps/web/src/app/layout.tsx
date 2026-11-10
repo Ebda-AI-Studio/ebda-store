@@ -534,7 +534,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const combinedStyleTag = [themeStyleTag, typographyCss].filter(Boolean).join('\n');
 
   return (
-    <html lang={lang} dir={dir} suppressHydrationWarning>
+    // globals.css turns on `scroll-behavior: smooth` for html; Next only switches it off while it resets
+    // the scroll after a navigation when this attribute is present (without it a page can open scrolled down).
+    <html lang={lang} dir={dir} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
