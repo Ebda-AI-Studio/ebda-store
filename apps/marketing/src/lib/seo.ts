@@ -409,6 +409,62 @@ export function studioJsonLd(locale: Locale) {
 }
 
 /**
+ * JSON-LD of a plain page (the legal documents, Contact, Credits, the Services index): the page itself as a WebPage (or a more
+ * specific page type), inside the one WebSite and published by the studio Organization, both under the ids every other graph
+ * uses. Pre-QA sweep 2026-11-09, finding 4: these pages had no structured data at all; `tests/unit/marketing-jsonld-route-walk.test.tsx`
+ * walks the route directory so a new page cannot ship without one.
+ */
+export function pageJsonLd(
+  locale: Locale,
+  page: Page,
+  name: string,
+  description: string,
+  opts: { type?: 'WebPage' | 'ContactPage' | 'CollectionPage'; dateModified?: string } = {}
+) {
+  const org = `${SITE_URL}/#organization`;
+  const site = `${SITE_URL}/#website`;
+  const url = absoluteUrl(pagePath(locale, page));
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': org,
+        name: BRAND.company.shortNameEn,
+        alternateName: BRAND.company.shortNameAr,
+        url: SITE_URL,
+        logo: `${SITE_URL}/icon-512.png`,
+        address: officePostalAddress(),
+        ...orgServices(locale),
+        legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
+        foundingDate: BRAND.company.foundedOn,
+        email: BRAND.supportEmail,
+      },
+      {
+        '@type': 'WebSite',
+        '@id': site,
+        url: absoluteUrl(HOME[locale]),
+        name: BRAND.company.shortNameEn,
+        alternateName: BRAND.company.shortNameAr,
+        inLanguage: locale,
+        publisher: { '@id': org },
+      },
+      {
+        '@type': opts.type ?? 'WebPage',
+        '@id': `${url}#webpage`,
+        url,
+        name,
+        description,
+        inLanguage: locale,
+        isPartOf: { '@id': site },
+        publisher: { '@id': org },
+        ...(opts.dateModified && { dateModified: opts.dateModified }),
+      },
+    ],
+  };
+}
+
+/**
  * JSON-LD of the Ebda Chat page: the studio (publisher), the product as a brand under it, a SoftwareApplication
  * and the page FAQ. Offers come from WHATSAPP_PACKAGES (WA-PRICE-1), the same constant the pricing section renders.
  */

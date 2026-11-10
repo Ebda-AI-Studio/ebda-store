@@ -1,12 +1,15 @@
 import Link from 'next/link';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
+import { pageJsonLd } from '../lib/seo';
+import { serviceLinesPublished } from '../lib/service-lines';
 import { SERVICE_LINE_CONTENT } from '../lib/service-lines-content';
 import { SERVICES_PAGE } from '../lib/services-page';
 import { pagePath, type Locale } from '../lib/site';
 import '@/app/services.css';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { JsonLd } from './JsonLd';
 import { ServicesGrid } from './ServicesGrid';
 
 /**
@@ -20,6 +23,13 @@ export function ServicesIndexPage({ locale }: { locale: Locale }) {
       <a href="#main" className="skip">
         {COPY[locale].skip}
       </a>
+      {serviceLinesPublished() && (
+        <JsonLd
+          data={pageJsonLd(locale, 'services', p.meta.title, p.meta.desc, {
+            type: 'CollectionPage',
+          })}
+        />
+      )}
       <Header locale={locale} page="services" />
       <main id="main" className="ab sv-index">
         <header className="wrap ab-hero">

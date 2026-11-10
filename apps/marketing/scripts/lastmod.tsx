@@ -4,7 +4,13 @@ import './no-css'; // first: the pages import stylesheets
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DATED_PAGES, pageHash } from '../src/lib/page-markup';
+
+// The page components import their stylesheets (services.css); Next compiles those, plain Node cannot. A stylesheet is not
+// markup, so it loads as an empty module here, registered before the pages are required.
+require.extensions['.css'] = () => {};
+type PageMarkup = typeof import('../src/lib/page-markup');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { DATED_PAGES, pageHash } = require('../src/lib/page-markup') as PageMarkup;
 
 const file = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
