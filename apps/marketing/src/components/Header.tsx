@@ -21,7 +21,7 @@ import { NavBehavior } from './NavBehavior';
 import { SiteLink } from './SiteLink';
 import { WhatsApp } from './WhatsApp';
 import { HeaderSearch } from './HeaderSearch';
-import { productOfPage, pagePath, type Locale, type PageSlug } from '../lib/site';
+import { absoluteUrl, productOfPage, pagePath, type Locale, type PageSlug } from '../lib/site';
 
 type Page = PageSlug;
 
@@ -87,6 +87,11 @@ function ProductIcon({ id, mirror = false }: { id: SiteNavProductId; mirror?: bo
  * Products, Resources, About, Contact, language, Log in, the studio CTA) and, only on a product page, the product bar
  * under it. Its data is the brand module's (`siteNav*`, `productBar`), the same that docs, help and status render.
  * `offHome` is kept for the 404 call site: every link is absolute now, so it changes nothing.
+ *
+ * The CTA: "Choose a product" (Ruling NAV-CTA-1) everywhere except a service page, where it asks for the conversation
+ * and opens the contact form with that service preselected (Ruling NAV-CTA-2). In the Menu the CTA and WhatsApp are one
+ * block, the LAST item, pinned to the panel's bottom edge by CSS (chrome.css, Ruling NAV-MENU-ACTIONS-1). Which items
+ * sit in the bar and which in the Menu at each width is CSS too (chrome.css, Ruling NAV-BAR-FIT-1): both are rendered.
  */
 export function Header({ locale, page = '' }: { locale: Locale; page?: Page; offHome?: boolean }) {
   const c = COPY[locale];
@@ -112,6 +117,20 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
   const svcHere = page === 'services' || page.startsWith('services/');
   const svcCur = (l: NavLink) =>
     l.id === 'all' ? page === 'services' : l.id === 'core' ? false : page === `services/${l.id}`;
+  // A service page asks for the conversation, not for a product (Ruling NAV-CTA-2): the same link as the page's own
+  // hero button, so the contact form opens with this service preselected. The label is the short one: the hero says
+  // the full sentence, the bar has room for two words.
+  const line = page.startsWith('services/') ? page.slice('services/'.length) : '';
+  const contact = `${line ? `?topic=${line}` : ''}#form`;
+  const primary: NavLink =
+    services && svcHere
+      ? {
+          id: 'cta',
+          label: SERVICES_PAGE[locale].headerCta,
+          path: `${pagePath(locale, 'contact')}/${contact}`,
+          href: `${absoluteUrl(pagePath(locale, 'contact'))}${contact}`,
+        }
+      : cta;
   return (
     <header className="site-header">
       <div className="wrap header-row">
@@ -261,16 +280,14 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                   ))}
                 </ul>
               </li>
-              <li className="menu-wa">
-                <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} />
-              </li>
               <li className="menu-lang">
                 <Link href={pagePath(other, page)} hrefLang={other} lang={other}>
                   {c.nav.switchTo}
                 </Link>
               </li>
-              <li className="menu-start">
-                <NavA locale={locale} l={bar ? bar.cta : cta} className="nav-cta" />
+              <li className="menu-actions">
+                <NavA locale={locale} l={bar ? bar.cta : primary} className="nav-cta menu-start" />
+                <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} />
               </li>
             </ul>
           </details>
@@ -307,7 +324,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
             </div>
           )}
           <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} locale={locale} compact />
-          {!bar && <NavA locale={locale} l={cta} className="btn btn-primary header-start" />}
+          {!bar && <NavA locale={locale} l={primary} className="btn btn-primary header-start" />}
         </div>
       </div>
       {bar && (

@@ -19,6 +19,8 @@ export const SERVICES_PAGE = {
       'فريق بيجيلك، ويخطط وينفذ ويتابع معاك من أول مكالمة. كل خدمة لها صفحة، وتقدر تتواصل معانا منها مباشرة.',
     cardCta: 'شوف الخدمة',
     contactCta: 'احكيلنا عن شغلك',
+    /** The header's own CTA on a service page: short, so it fits the bar and the Menu's pinned pair (Ruling NAV-CTA-2). */
+    headerCta: 'كلّمنا',
   },
   en: {
     nav: 'Services',
@@ -36,6 +38,7 @@ export const SERVICES_PAGE = {
       'A team that comes to you and plans, delivers and follows up from the first call. Each service has a page, and you can contact us from it.',
     cardCta: 'See the service',
     contactCta: 'Tell us about your work',
+    headerCta: 'Talk to us',
   },
 } as const;
 
