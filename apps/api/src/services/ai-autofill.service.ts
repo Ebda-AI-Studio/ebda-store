@@ -1,3 +1,4 @@
+import { isArabicText, isLatinText, isNamePlaceholder } from '../lib/product-name-pair';
 import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@ebda/shared';
 import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
 import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
@@ -223,8 +224,13 @@ export async function generateFill(plan: FillPlan): Promise<FillGeneration> {
   // computeFillSet treats it as "empty" — without this value check the engine
   // would OVERWRITE that human content. Never write over existing content that
   // isn't ours. (applyFill re-checks every field against the row at write time.)
+  // `name === nameAr` is the untranslated placeholder of an Arabic-only product (Ruling NAME-PAIR-1): a gap, unless the
+  // merchant owns `name`.
   const canWrite = (field: string, currentVal: string | null | undefined): boolean =>
-    fillSet.has(field) && (!currentVal?.trim() || sources[field] === 'ai');
+    fillSet.has(field) &&
+    (!currentVal?.trim() ||
+      sources[field] === 'ai' ||
+      (field === 'name' && sources.name !== 'human' && isNamePlaceholder(product)));
 
   try {
     // EN/AR content pairs — translate in WHICHEVER direction is needed. The
@@ -239,7 +245,10 @@ export async function generateFill(plan: FillPlan): Promise<FillGeneration> {
     ];
     for (const [target, source, from, kind] of pairs) {
       const text = product[source];
-      if (canWrite(target, product[target]) && text?.trim()) {
+      // Never "translate" a source written in the other script: Arabic typed into the English field became an English
+      // "translation" in nameAr (a swapped pair, onboarding 2026-11-10, Ruling NAME-PAIR-1).
+      const wrongScript = from === 'en' ? isArabicText(text) : isLatinText(text);
+      if (canWrite(target, product[target]) && text?.trim() && !wrongScript) {
         const { translation, cached } = await AIService.translate({
           storeId,
           text,

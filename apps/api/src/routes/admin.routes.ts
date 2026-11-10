@@ -4,6 +4,7 @@ import { d1StoreBriefs, platformDb as platformDirectoryDb } from '../lib/platfor
 import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
 import { customerAuthRoute } from '../lib/customer-auth';
+import { repairProductNames } from '../services/product-name-repair.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -460,6 +461,37 @@ router.get(
         success: true,
         data: { store: toSafeStoreResponse(store), stats },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /admin/stores/:id/repair-product-names — one-time name-pair repair (Ruling NAME-PAIR-1). DRY-RUN unless the body
+ * says `{ "apply": true }`: the report lists every product whose names are swapped, Arabic-in-English or an
+ * untranslated placeholder, and what each would become. Super admin only.
+ */
+router.post(
+  '/stores/:id/repair-product-names',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { apply } = z.object({ apply: z.boolean().optional() }).parse(req.body ?? {});
+      const report = await repairProductNames(req.params.id, { apply: apply === true });
+      if (report.apply) {
+        await auditLog({
+          action: 'product.names_repaired',
+          userId: req.user!.userId,
+          storeId: req.params.id,
+          resourceType: 'store',
+          resourceId: req.params.id,
+          details: { repaired: report.items.length },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
+      res.json({ success: true, data: report });
     } catch (error) {
       next(error);
     }
