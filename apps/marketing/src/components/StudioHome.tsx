@@ -204,6 +204,12 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                     </ul>
                   )}
                   <p className="actions">
+                    {it.href && (
+                      <a href={it.href} className="btn btn-ghost">
+                        {comingSoonLabels(locale).visit} {new URL(it.href).host}
+                        <span className="sv-card-sr"> — {it.name}</span>
+                      </a>
+                    )}
                     <PageLink
                       href={`${pagePath(locale, 'contact')}/?topic=products#form`}
                       className="btn btn-ghost"

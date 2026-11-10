@@ -8,8 +8,9 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-import { readFileSync } from 'fs';
 import path from 'path';
+import ts from 'typescript';
+import { code, parseFile } from './helpers/ast-query';
 import {
   createFakePrisma,
   storeRow,
@@ -330,13 +331,33 @@ describe('feature ON', () => {
   });
 
   it('#1954 — routes/index.ts mounts the test-send router without tenantContext, before the tenant-scoped mount', () => {
-    const src = readFileSync(path.resolve(__dirname, '../../apps/api/src/routes/index.ts'), 'utf8');
-    const bare = src.indexOf("router.use('/stores/:storeId/campaigns', campaignTestSendRouter);");
-    const scoped = src.indexOf(
-      "router.use('/stores/:storeId/campaigns', tenantContext, campaignRoutes);"
+    // Structural (routes/index.ts imports the whole API, so it cannot be mounted under fakes here; the harness
+    // above mirrors it): the top-level `router.use(...)` statements, in mount order.
+    const sf = parseFile(path.resolve(__dirname, '../../apps/api/src/routes/index.ts'));
+    const mounts = sf.statements.flatMap((st, order) => {
+      if (!ts.isExpressionStatement(st) || !ts.isCallExpression(st.expression)) return [];
+      const call = st.expression;
+      if (code(call.expression) !== 'router.use') return [];
+      const args = call.arguments.map(code);
+      const hasPath = call.arguments[0] && ts.isStringLiteralLike(call.arguments[0]);
+      return [
+        {
+          order,
+          path: hasPath ? (call.arguments[0] as ts.StringLiteral).text : '/',
+          handlers: args.slice(hasPath ? 1 : 0),
+        },
+      ];
+    });
+    const CAMPAIGNS = '/stores/:storeId/campaigns';
+    const bare = mounts.find(
+      m => m.path === CAMPAIGNS && m.handlers.join() === 'campaignTestSendRouter'
     );
-    expect(bare).toBeGreaterThan(-1);
-    expect(scoped).toBeGreaterThan(bare);
+    const scoped = mounts.find(
+      m => m.path === CAMPAIGNS && m.handlers.join() === 'tenantContext,campaignRoutes'
+    );
+    expect(bare).toBeDefined();
+    expect(scoped).toBeDefined();
+    expect(scoped!.order).toBeGreaterThan(bare!.order);
   });
 
   it('#1954 — the context-less test-send router still enforces the full auth chain', () => {

@@ -5,6 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DO_WRITABLE_MODELS } from '@ebda-src/repo';
 
@@ -116,13 +117,22 @@ describe('WritableModel type == the DO allow-list', () => {
       path.resolve(__dirname, '../../apps/api/src/lib/repo-factory.ts'),
       'utf8'
     );
-    const block = src.slice(
-      src.indexOf('export type WritableModel'),
-      src.indexOf('/** `inventory` is never')
-    );
-    const typed = [...block.matchAll(/'([a-zA-Z]+)'/g)].map(
-      m => m[1][0].toUpperCase() + m[1].slice(1)
-    );
-    expect([...typed].sort()).toEqual([...DO_WRITABLE_MODELS].sort());
+    // The type alias is parsed, not sliced: the members are the string-literal types of the union
+    // (types have no runtime, so a type-level list cannot be run; the AST is the real structure).
+    const sf = ts.createSourceFile('repo-factory.ts', src, ts.ScriptTarget.Latest, true);
+    const typed: string[] = [];
+    let found = 0;
+    sf.forEachChild(n => {
+      if (!ts.isTypeAliasDeclaration(n) || n.name.text !== 'WritableModel') return;
+      found++;
+      const members = ts.isUnionTypeNode(n.type) ? n.type.types : [n.type];
+      for (const t of members) {
+        expect(ts.isLiteralTypeNode(t) && ts.isStringLiteral(t.literal), t.getText(sf)).toBe(true);
+        typed.push(((t as ts.LiteralTypeNode).literal as ts.StringLiteral).text);
+      }
+    });
+    expect(found).toBe(1);
+    const pascal = typed.map(m => m[0].toUpperCase() + m.slice(1));
+    expect([...pascal].sort()).toEqual([...DO_WRITABLE_MODELS].sort());
   });
 });

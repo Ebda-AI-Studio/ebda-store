@@ -322,6 +322,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-11-10-store-miss-counts-unverified-store-only.md](plans/2026-11-10-store-miss-counts-unverified-store-only.md) - LAUNCH-RL-MISS-3: a dead product or blog link inside a verified store is not a store-miss
 - [plans/2026-11-10-ssr-client-address.md](plans/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
 - [plans/2026-11-10-services-header-actions.md](plans/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
+- [plans/2026-11-10-storefront-cold-render.md](plans/2026-11-10-storefront-cold-render.md) - PERF-LATENCY: why a cold storefront render took 4-12 s (empty per-build data cache after every deploy), the build-independent fetch cache and the widened warm step (Ruling WEB-COLD-2)
 - [plans/2026-11-10-api-hangs.md](plans/2026-11-10-api-hangs.md) - API-HANG-1: every AuthState call bounded at 2.5 s, a public cache fill answers before its write-back
 
 ## privacy - Privacy

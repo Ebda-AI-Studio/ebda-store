@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const ROOT = path.resolve(__dirname, '../../apps/web/src');
 
@@ -23,15 +24,20 @@ describe('storefront flex-1 form controls', () => {
     const offenders: string[] = [];
     for (const file of tsxFiles(ROOT)) {
       const src = readFileSync(file, 'utf8');
-      for (const m of src.matchAll(/<(input|select|textarea)\b/g)) {
-        const end = src.indexOf('/>', m.index);
-        const block = src.slice(m.index, end);
-        if (/(?<![\w-])flex-1(?![\w-])/.test(block) && !block.includes('min-w-0')) {
-          offenders.push(
-            `${path.relative(ROOT, file)}:${src.slice(0, m.index).split('\n').length}`
-          );
+      const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      // JSX AST: the element's own opening/self-closing tag, so an unclosed `<input ...>` can never swallow a neighbour.
+      const go = (n: ts.Node) => {
+        const tag = ts.isJsxSelfClosingElement(n) || ts.isJsxOpeningElement(n) ? n : null;
+        if (tag && /^(input|select|textarea)$/.test(tag.tagName.getText())) {
+          const block = tag.getText();
+          if (/(?<![\w-])flex-1(?![\w-])/.test(block) && !block.includes('min-w-0')) {
+            const line = sf.getLineAndCharacterOfPosition(tag.getStart()).line + 1;
+            offenders.push(`${path.relative(ROOT, file)}:${line}`);
+          }
         }
-      }
+        ts.forEachChild(n, go);
+      };
+      go(sf);
     }
     expect(offenders).toEqual([]);
   });

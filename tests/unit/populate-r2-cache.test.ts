@@ -7,7 +7,7 @@ const fakeKey = (key: string, o: { prefix?: string; buildId: string; cacheType: 
   `${o.prefix ?? 'incremental-cache'}/${o.buildId}/${key.replace(/\//g, '_')}.${o.cacheType}`;
 
 describe('planUploads', () => {
-  it('maps assets to keys with the fetch/cache type, build id and prefix', () => {
+  it('maps page assets to build-scoped keys and never uploads build-time fetch entries (WEB-COLD-2)', () => {
     const plan = planUploads(
       [
         { key: '/a', buildId: 'b1', isFetch: false, fullPath: '/x/a.cache' },
@@ -16,10 +16,7 @@ describe('planUploads', () => {
       'pre',
       fakeKey
     );
-    expect(plan).toEqual([
-      { key: 'pre/b1/_a.cache', file: '/x/a.cache' },
-      { key: 'pre/b1/_f.fetch', file: '/x/f' },
-    ]);
+    expect(plan).toEqual([{ key: 'pre/b1/_a.cache', file: '/x/a.cache' }]);
   });
   it('rejects duplicate keys', () => {
     const a = { key: '/a', buildId: 'b', isFetch: false, fullPath: '/p' };

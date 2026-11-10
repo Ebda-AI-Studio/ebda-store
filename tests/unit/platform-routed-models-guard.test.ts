@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import ts from 'typescript';
 import { FAMILY_MODELS } from '../../apps/api/src/services/platform/cutover';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -20,16 +21,30 @@ describe('routed models and transactions', () => {
   const models = Object.values(FAMILY_MODELS).flat();
 
   it('no array $transaction([...]) touches a routed model', () => {
+    // Structural: parse each file and look only at the ELEMENTS of an array literal passed straight to
+    // `$transaction(...)`, so no fixed-size text window can end early or swallow a neighbouring call.
+    // Behaviour is not practical here: the property is "no call site in the whole API has this shape".
     const offenders: string[] = [];
     for (const f of walk(path.join(ROOT, 'apps/api/src'))) {
       const src = fs.readFileSync(f, 'utf8');
-      for (const m of src.matchAll(/\$transaction\(\s*\[/g)) {
-        const body = src.slice(m.index!, m.index! + 1500);
-        const close = body.indexOf('])');
-        const block = close > 0 ? body.slice(0, close) : body;
-        if (models.some(model => new RegExp(`\\.${model}\\.`).test(block)))
+      if (!src.includes('$transaction')) continue;
+      const sf = ts.createSourceFile(f, src, ts.ScriptTarget.Latest, true);
+      const touchesRouted = (n: ts.Node): boolean =>
+        (ts.isPropertyAccessExpression(n) && models.includes(n.name.text)) ||
+        ts.forEachChild(n, touchesRouted) === true;
+      const visit = (n: ts.Node): void => {
+        if (
+          ts.isCallExpression(n) &&
+          ts.isPropertyAccessExpression(n.expression) &&
+          n.expression.name.text === '$transaction' &&
+          n.arguments[0] &&
+          ts.isArrayLiteralExpression(n.arguments[0]) &&
+          n.arguments[0].elements.some(touchesRouted)
+        )
           offenders.push(path.relative(ROOT, f));
-      }
+        ts.forEachChild(n, visit);
+      };
+      visit(sf);
     }
     expect(offenders).toEqual([]);
   });

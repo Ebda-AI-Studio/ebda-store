@@ -16,26 +16,41 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import postcss from 'postcss';
 
 const R = join(__dirname, '../..');
 const WEB = join(R, 'apps/web/src');
 const css = readFileSync(join(WEB, 'styles/globals.css'), 'utf8');
 
-/** The phone media block that holds the sticky-bar rules. */
-function phoneBlock(): string {
-  const start = css.indexOf('@media (max-width: 767px)', css.indexOf('Sticky mobile bars'));
-  expect(start).toBeGreaterThan(-1);
-  let depth = 0;
-  for (let i = css.indexOf('{', start); i < css.length; i++) {
-    if (css[i] === '{') depth++;
-    else if (css[i] === '}' && --depth === 0) return css.slice(start, i + 1);
-  }
-  throw new Error('unterminated media block');
+/**
+ * The phone media block that holds the sticky-bar rules: the root `@media (max-width: 767px)`
+ * that directly follows the "Sticky mobile bars" comment. Parsed with postcss, so braces in
+ * comments/strings and a look-alike selector elsewhere cannot move the window.
+ */
+function phoneBlock(): postcss.AtRule {
+  const root = postcss.parse(css);
+  const marker = root.nodes.find(
+    (n): n is postcss.Comment => n.type === 'comment' && n.text.startsWith('Sticky mobile bars')
+  );
+  expect(marker, 'the "Sticky mobile bars" comment moved').toBeDefined();
+  const media = marker!.next();
+  expect(media?.type).toBe('atrule');
+  expect((media as postcss.AtRule).params.replace(/\s+/g, ' ')).toBe('(max-width: 767px)');
+  return media as postcss.AtRule;
 }
-const decl = (block: string, selector: string) => {
-  const i = block.indexOf(`${selector} {`);
-  expect(i, selector).toBeGreaterThan(-1);
-  return block.slice(i, block.indexOf('}', i)).replace(/\s+/g, ' ');
+/** Declarations of every rule whose selector is EXACTLY `selector`, as `prop: value;` text. */
+const decl = (block: postcss.AtRule, selector: string) => {
+  const norm = (x: string) => x.replace(/\s+/g, ' ').trim();
+  const out: string[] = [];
+  block.each(n => {
+    if (n.type === 'rule' && n.selectors.map(norm).includes(norm(selector))) {
+      n.each(d => {
+        if (d.type === 'decl') out.push(`${d.prop}: ${norm(d.value)};`);
+      });
+    }
+  });
+  expect(out.length, selector).toBeGreaterThan(0);
+  return out.join(' ');
 };
 
 describe('C-04: one fixed-bottom layer, every bar feeds scroll-padding-bottom', () => {

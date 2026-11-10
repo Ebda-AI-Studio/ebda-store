@@ -90,16 +90,13 @@ describe('custom badge — every product-card render path resolves it', () => {
 });
 
 describe('custom badge — the data hops it must survive', () => {
-  it('the storefront product select carries both columns', () => {
+  it('the storefront product select carries both columns', async () => {
     // STOREFRONT_PRODUCT_SELECT is an explicit allowlist: a column missing
     // here reaches no card at all, with no error anywhere.
-    const src = read('apps/api/src/services/product.service.ts');
-    const select = src.slice(
-      src.indexOf('export const STOREFRONT_PRODUCT_SELECT'),
-      src.indexOf('} as const satisfies Prisma.ProductSelect;')
-    );
-    expect(select).toContain('badgeLabel: true');
-    expect(select).toContain('badgeLabelAr: true');
+    // Behaviour: the exported select object itself (no text window over product.service.ts).
+    const { STOREFRONT_PRODUCT_SELECT } = await import('@api/services/product.service');
+    expect(STOREFRONT_PRODUCT_SELECT.badgeLabel).toBe(true);
+    expect(STOREFRONT_PRODUCT_SELECT.badgeLabelAr).toBe(true);
   });
 
   it('toTemplateProduct carries both fields', () => {
