@@ -7,6 +7,9 @@ import type { CategoryStripProps } from '../types';
  * category for stores whose photos carry the page (Qamar Atelier). Text only,
  * one horizontal scroll row with snap, 44px targets, logical spacing (RTL-safe:
  * the flex row starts at the inline-start edge, so Arabic scrolls from the right).
+ *
+ * `prefetch={false}` (Ruling PERF-PREFETCH-1): every chip is the same page with another query
+ * string, so the default fetched one loading shell per category the moment the row came near the screen.
  */
 export function CategoryChips({
   categories,
@@ -21,6 +24,7 @@ export function CategoryChips({
           <li key={c.id} className="shrink-0 snap-start">
             <Link
               href={`${urlPrefix}/products?category=${encodeURIComponent(c.slug)}`}
+              prefetch={false}
               className="inline-flex min-h-[44px] items-center rounded-[var(--radius)] border border-input px-4 text-sm text-foreground hover:border-foreground"
             >
               {isRtl ? c.nameAr || c.name : c.name || c.nameAr}
