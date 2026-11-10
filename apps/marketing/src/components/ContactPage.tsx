@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { BRAND, whatsappDisplay, whatsappUrl } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { pageJsonLd } from '../lib/seo';
@@ -88,7 +88,7 @@ export function ContactPage({ locale }: { locale: Locale }) {
               </section>
               <p className="muted small">{p.company}</p>
               <p className="legal-back">
-                <Link href={HOME[locale]}>{c.legalPages.back}</Link>
+                <PageLink href={HOME[locale]}>{c.legalPages.back}</PageLink>
               </p>
             </article>
           </div>
