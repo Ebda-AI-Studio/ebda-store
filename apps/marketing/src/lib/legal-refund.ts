@@ -2,7 +2,7 @@ import type { LegalDoc } from './legal-types';
 
 /**
  * The refund and cancellation policy (/refund/, BIZ-25 / M-034): it RESTATES what the Terms of Service (sections 4, 13)
- * and the Merchant Agreement (section 11) already say about Ebda's own subscriptions, and points at the Ebda Chat
+ * and the Merchant Agreement (section 11) already say about Ebda Store's own subscriptions, and points at the Ebda Chat
  * terms for the wallet. It adds no new promise. It is published visibly provisional until counsel has read it
  * (the pending-review rule of docs/runbooks/legal-policy-change.md); change it together with the Terms, never alone.
  */
