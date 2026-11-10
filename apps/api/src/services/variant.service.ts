@@ -534,6 +534,10 @@ export class VariantService {
       });
     }
 
+    // A Durable Object store refuses stock columns on a row write (Ruling CF-R7-4): the opening stock is set right after the
+    // insert through the stock op, as ProductService.create does for a product. Gold rows go through goldCreateVariant.
+    const openingStockOnDo = input.inventory && !isGold ? await storeStock(storeId) : null;
+
     // Create variant
     const createVariantRow = (db: Pick<typeof prisma, 'productVariant'>) =>
       db.productVariant.create({
@@ -547,7 +551,7 @@ export class VariantService {
           compareAtPrice: input.compareAtPrice,
           costPrice: input.costPrice,
           // 0 is the column default; a non-zero opening stock is a stock write (refused on a DO store until D2)
-          ...(input.inventory ? { inventory: input.inventory } : {}),
+          ...(input.inventory && !openingStockOnDo ? { inventory: input.inventory } : {}),
           weight: input.weight,
           imageUrl: input.imageUrl,
           position: existingVariants.length,
@@ -599,6 +603,24 @@ export class VariantService {
       : await createVariantRow(
           (await storeWriter(storeId)) as unknown as Pick<typeof prisma, 'productVariant'>
         );
+
+    if (openingStockOnDo && input.inventory) {
+      try {
+        const r = await openingStockOnDo.setVariantInventory({
+          productId,
+          updates: [{ variantId: variant.id, inventory: input.inventory }],
+        });
+        if (r.updated !== 1)
+          throw new AppError(500, 'STOCK_WRITE_FAILED', 'Variant stock was not set');
+        (variant as { inventory: number }).inventory = input.inventory;
+      } catch (err) {
+        // Compensate: a variant that was asked to have stock must not exist with 0 (the merchant would sell nothing).
+        await (await storeWriter(storeId)).productVariant
+          .delete({ where: { id: variant.id } })
+          .catch(() => undefined);
+        throw err;
+      }
+    }
 
     // BARCODE-1: no barcode typed -> the store's next in-store EAN-13 (when inventory.barcode is on).
     const autoBarcode = typedBarcode
@@ -674,11 +696,21 @@ export class VariantService {
       }
     }
 
+    // A Durable Object store refuses stock columns on a row write (Ruling CF-R7-4): a changed stock goes through the stock op.
+    const { inventory: newInventory, ...rowInput } = input;
+    const stockOnDo = newInventory !== undefined ? await storeStock(storeId) : null;
+    if (stockOnDo && newInventory !== undefined) {
+      const r = await stockOnDo.setVariantInventory({
+        productId,
+        updates: [{ variantId, inventory: newInventory }],
+      });
+      if (r.updated !== 1) throw new AppError(404, 'NOT_FOUND', 'Variant not found');
+    }
     const updated = await (
       await storeWriter(storeId)
     ).productVariant.update({
       where: { id: variantId },
-      data: { ...input, ...barcodeUpdate },
+      data: { ...(stockOnDo ? rowInput : input), ...barcodeUpdate },
       include: {
         options: {
           include: {

@@ -1,12 +1,12 @@
 # Docs index
 
-Single index of everything under `docs/`. One line per doc, grouped by area. Rulings: [rulings/README.md](rulings/README.md) (one file per ruling, one table). Rules and invariants live in the repo-root `CLAUDE.md`; sizing baselines in the repo-root `design.md`.
+Single index of everything under `docs/`. One line per doc, grouped by area. Rulings: [rulings/README.md](rulings/README.md) (one file per ruling; the folder is the index, no table). Rules and invariants live in the repo-root `CLAUDE.md`; sizing baselines in the repo-root `design.md`.
 
 `tests/unit/docs-index.test.ts` fails when a doc under `docs/` is missing from this page.
 
 ## Rulings
 
-- [Rulings index](rulings/README.md) - every ruling, ID, one-line decision, date, file link. The old `RULINGS.md` is a pointer to it.
+- [Rulings index](rulings/README.md) - one file per ruling in `docs/rulings/`; add a ruling by adding its file only (no table row, no count). The old `RULINGS.md` is a pointer to it.
 
 ## Top level - Operations and platform references
 
@@ -233,6 +233,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [observability/slo.md](observability/slo.md) - Service Level Objectives (SLOs) — Ebda Store
 
+## ops - Operations
+
+- [ops/escalation.md](ops/escalation.md) - Escalation: who is contacted for P0/P1, payment and data incidents, channels, response targets
+
 ## perf - Performance
 
 - [perf/index-audit-2026-05.md](perf/index-audit-2026-05.md) - Index Audit — 2026-05-01
@@ -316,6 +320,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-26-barcode-1.md](plans/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
 - [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
 - [plans/2026-11-10-store-miss-counts-unverified-store-only.md](plans/2026-11-10-store-miss-counts-unverified-store-only.md) - LAUNCH-RL-MISS-3: a dead product or blog link inside a verified store is not a store-miss
+- [plans/2026-11-10-ssr-client-address.md](plans/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
 - [plans/2026-11-10-services-header-actions.md](plans/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
 - [plans/2026-11-10-api-hangs.md](plans/2026-11-10-api-hangs.md) - API-HANG-1: every AuthState call bounded at 2.5 s, a public cache fill answers before its write-back
 

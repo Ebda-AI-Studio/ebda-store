@@ -412,7 +412,7 @@ describe.skipIf(e.E2E_DB === '1')('DO storefront + cart with Postgres unreachabl
   }
   it('the deals row (sort=on_sale) lists exactly the on-sale product from the DO', async () => {
     const r = await api('/public/products?sort=on_sale', {
-      headers: { ...H, 'x-forwarded-for': '10.9.9.9' },
+      headers: { ...H, 'cf-connecting-ip': '10.9.9.9' },
     });
     expect(r.status).toBe(200);
     const body = (await r.json()) as { data: { products: Array<{ id: string }> } };

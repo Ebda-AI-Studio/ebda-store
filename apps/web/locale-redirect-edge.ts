@@ -14,8 +14,14 @@
  * Falls through to Next (the old path, unchanged) whenever it cannot decide: not GET/HEAD, locale paths off for the
  * store, the admin preview iframe (`?_preview=`), a path that is not pending, or a store the resolver does not vouch for
  * (unknown, inactive, resolver down). CACHE CLASS of the default language: BOUNDED-stale, <= 60 s per isolate after a
- * merchant changes it (the layout path read it through the Next data cache with the same window); the redirect itself is
- * `private, no-store`, so no browser or proxy keeps it.
+ * merchant changes it (the layout path read it through the Next data cache with the same window).
+ *
+ * Ruling ICEBERG-EDGE-308-1 (2026-11-10, Iceberg audit #18): the PERMANENT 308 to the store's default language is
+ * `private, max-age=300` + `Vary: Cookie`, so a returning visitor's browser skips the round trip (measured 2026-11-10:
+ * the 308 itself costs 0.65-2.2 s ttfb, a Worker isolate + resolver hop). `private` keeps it out of every shared/edge
+ * cache; `Vary: Cookie` re-asks once the visitor's `force-language` cookie changes. The cookie-driven 307 stays
+ * `private, no-store`. Staleness: BOUNDED, <= 300 s in one browser (+ the 60 s isolate) after a merchant changes the
+ * default language.
  */
 import {
   decideLocalePath,
@@ -69,6 +75,8 @@ export async function edgeLocaleRedirect(
   if (!target.location.startsWith('/') || target.location.startsWith('//')) return null;
   return new Response(null, {
     status: target.permanent ? 308 : 307,
-    headers: { location: target.location, 'cache-control': 'private, no-store' },
+    headers: target.permanent
+      ? { location: target.location, 'cache-control': 'private, max-age=300', vary: 'Cookie' }
+      : { location: target.location, 'cache-control': 'private, no-store' },
   });
 }

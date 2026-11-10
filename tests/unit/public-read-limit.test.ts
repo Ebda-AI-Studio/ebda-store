@@ -202,6 +202,21 @@ describe('publicReadLimit', () => {
     expect(out[3].res.headers['Retry-After']).toBe('60');
     expect(exact).not.toHaveBeenCalled();
   });
+  it('no client address (a storefront render with no shopper, RL-SSR-IP-6) is never pooled in a per-IP bucket', async () => {
+    const ipLimiter = counter(1);
+    const keys: string[] = [];
+    setCfBindings({
+      PUBLIC_IP_LIMITER: {
+        limit: async (o: { key: string }) => (keys.push(o.key), ipLimiter.limit(o)),
+      },
+      PUBLIC_TENANT_LIMITER: counter(1000),
+    } as any);
+    const mw = publicReadLimit(((_q: any, _r: any, n: any) => n()) as any);
+    const out = [];
+    for (let i = 0; i < 3; i++) out.push(await call(mw, get({ ip: undefined })));
+    expect(out.map(o => o.next)).toEqual([true, true, true]);
+    expect(keys).toEqual([]);
+  });
   it('the per-tenant limit blocks independently of the IP limit', async () => {
     setCfBindings({ PUBLIC_IP_LIMITER: counter(1000), PUBLIC_TENANT_LIMITER: counter(2) } as any);
     const mw = publicReadLimit(((_q: any, _r: any, n: any) => n()) as any);
