@@ -98,7 +98,7 @@ Rehearse C against local workerd first (`--api-url http://127.0.0.1:8798`, no ex
 ## Controller runbook: turning the nightly backup on (production changes; the build session ran none)
 
 1. Pick the Worker secret: `openssl rand -hex 32`; `cd apps/api && npx wrangler secret put BACKUP_EXPORT_SECRET`; the same value into GitHub environment `production`: `gh secret set BACKUP_EXPORT_SECRET --env production --repo Ebda-AI-Studio/ebda-store`.
-2. Confirm vars `EBDA_BACKUP_AGE_PUBLIC_KEY` and `CLOUDFLARE_ACCOUNT_ID` and secret `CLOUDFLARE_API_TOKEN` (R2 write + D1 read) exist in environment `production` (the deleted `db-backup.yml` used them too). Optional var `EBDA_BACKUP_CF_CAP_BYTES`.
+2. Confirm vars `EBDA_BACKUP_AGE_PUBLIC_KEY` and `CLOUDFLARE_ACCOUNT_ID` and secret `CLOUDFLARE_API_TOKEN` (R2 write on `ebda-db-backups`, R2 read/list on `ebda-media`, D1 read on `ebda-platform` AND `ebda-identity`) exist in environment `production` (the deleted `db-backup.yml` used them too). Optional vars `EBDA_BACKUP_CF_CAP_BYTES`, `EBDA_BACKUP_MEDIA_CAP_BYTES`.
 3. Deploy the API (`gh workflow run cf-api-deploy.yml`; the `__export` action ships in this PR). Check `/health` commit equals main.
 4. Set retention: `bash scripts/ops/r2-lifecycle-cf.sh` (prints), then `--apply`, then `npx wrangler r2 bucket lifecycle list ebda-db-backups` and confirm `final/` has NO rule.
 5. `gh workflow run cf-backup.yml`; read the step summary (sizes) and confirm `cf/latest.json` exists.

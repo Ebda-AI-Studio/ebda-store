@@ -29,6 +29,7 @@ jobs:
       EBDA_BACKUP_AGE_PUBLIC_KEY: ${{ vars.EBDA_BACKUP_AGE_PUBLIC_KEY }}
       BACKUP_EXPORT_SECRET: ${{ secrets.BACKUP_EXPORT_SECRET }}
       EBDA_BACKUP_CF_CAP_BYTES: ${{ vars.EBDA_BACKUP_CF_CAP_BYTES }}
+      EBDA_BACKUP_MEDIA_CAP_BYTES: ${{ vars.EBDA_BACKUP_MEDIA_CAP_BYTES }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
