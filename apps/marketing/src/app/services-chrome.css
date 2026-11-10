@@ -14,6 +14,15 @@
 .sh-soon {
   opacity: 0.96;
 }
+/* visually hidden suffix that names the product in a card CTA (screen readers hear "Tell me when it is ready — Ebda CRM") */
+.sv-card-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* header: the Services dropdown reuses the Products panel (no icons here); coming-soon products are plain, non-link rows */
 .nav-services .np-txt {

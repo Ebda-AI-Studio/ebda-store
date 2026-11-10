@@ -506,14 +506,7 @@ html[lang='en'] .sv-hero h1 {
 html[lang='ar'] .sv-card-cta::after {
   content: ' \2190';
 }
-.sv-card-sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
+/* .sv-card-sr lives in services-chrome.css: the studio home's coming-soon CTAs use it too, and only the chrome file loads there */
 
 @media (prefers-reduced-motion: no-preference) {
   .sv-card {
