@@ -30,7 +30,7 @@ const MAX_REDIRECTS = 3;
  * without `node:net` (this module also runs on Workers, where `dns` / `net` are not the
  * way to reach a resolver, R-EBDA-001 section 5).
  */
-function isIP(s: string): 0 | 4 | 6 {
+export function isIP(s: string): 0 | 4 | 6 {
   if (/^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(s))
     return 4;
   if (s.includes(':') && /^[0-9a-fA-F:.]+$/.test(s)) {
