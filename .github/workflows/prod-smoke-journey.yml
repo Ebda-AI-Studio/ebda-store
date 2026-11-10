@@ -2,7 +2,7 @@ name: prod-smoke-journey
 # Pre-launch program (docs/testing/prelaunch-program.md): the read-only shopper journey (home, search, PDP, cart,
 # checkout form; Arabic + English; 390 px + 1440 px) against PRODUCTION every 3 hours. It never places an order
 # (PRELAUNCH_WRITE is never set here). Output: prod-smoke-result.json (artifact) + a non-zero exit on any failure,
-# which the alert path reads. GitHub-hosted runners on purpose: it must not depend on the self-hosted fleet.
+# which the alert path reads. Runs on the EBDA_RUNS_ON switch like every workflow (unset = GitHub-hosted).
 on:
   schedule:
     - cron: '17 */3 * * *'
@@ -22,7 +22,8 @@ concurrency:
 
 jobs:
   journey:
-    runs-on: ubuntu-24.04
+    # The repo-wide runner switch (CI-UMBRA-1); unset = GitHub-hosted ubuntu-24.04, which this journey wants.
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
