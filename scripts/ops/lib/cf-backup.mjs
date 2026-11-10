@@ -1,11 +1,14 @@
-// Off-Cloudflare backup of production data (Ruling NZ-BACKUP-1): D1 `ebda-platform` + every StoreDO store ->
-// gzip -9 -> age -> R2 bucket `ebda-db-backups`, prefix `cf/{daily,weekly,monthly}/<YYYY-MM-DD>/`.
+// Off-Cloudflare backup of production data (Ruling NZ-BACKUP-1): D1 `ebda-platform` + D1 `ebda-identity` (Ruling ICEBERG-BK-1:
+// merchant credentials, MFA, passkeys) + every StoreDO store -> gzip -9 -> age -> R2 bucket `ebda-db-backups`, prefix
+// `cf/{daily,weekly,monthly}/<YYYY-MM-DD>/`. R2 `ebda-media` is copied incrementally (new/changed etag only) to `media/` by
+// backupMedia() below. Off-account: scripts/ops/pull-cf-backups.mjs pulls both to the Mac (launchd, keeps 30 days).
 //
 // All side effects (wrangler, age, the store-admin HTTP surface, R2) go through the injected `io`, so the unit tests run the
 // whole pipeline with fakes and the weekly drill runs it against a local directory standing in for R2.
 //
 // io = {
 //   exportD1() -> { raw: Buffer, tables }          wrangler d1 export --remote + digestSqlite
+//   exportIdentity() -> { raw: Buffer, tables }    same for D1 ebda-identity (assertIdentityTables)
 //   listStoreIds() -> string[]
 //   exportStore(id) -> { raw: Buffer, tables }     __tables + paged __export (see exportStoreOverHttp)
 //   encrypt(buf) -> Buffer                          age -r <public key>
@@ -48,6 +51,9 @@ export const objectKey = (tier, day, name) => `cf/${tier}/${day}/${name}`;
 export const manifestKey = (tier, day) => objectKey(tier, day, 'manifest.json');
 export const LEDGER_KEY = 'cf/ledger.json';
 export const LATEST_KEY = 'cf/latest.json';
+export const IDENTITY_ARTIFACT = 'd1-ebda-identity';
+/** v2 = the set carries d1-ebda-identity (the drill fails a v2 manifest without it; a v1 manifest predates it). */
+export const MANIFEST_VERSION = 2;
 
 /**
  * macOS `security find-generic-password -w` returns a multi-line secret as HEX when it contains a newline. An age identity file is
@@ -123,6 +129,18 @@ export function assertPlatformTables(tables) {
   if (!tables.stores)
     throw new Error(
       `D1 export has no \`stores\` table (found: ${names.slice(0, 8).join(', ')}): wrong or empty database`
+    );
+  return tables;
+}
+
+/** Same guard for D1 `ebda-identity`: `users` is the table every credential, passkey and session hangs off. */
+export function assertIdentityTables(tables) {
+  const names = Object.keys(tables ?? {});
+  if (names.length === 0)
+    throw new Error('identity D1 export has ZERO tables: refusing to back up an empty database');
+  if (!tables.users)
+    throw new Error(
+      `identity D1 export has no \`users\` table (found: ${names.slice(0, 8).join(', ')}): wrong or empty database`
     );
   return tables;
 }
@@ -309,6 +327,10 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
   const d1 = await io.exportD1();
   log(`D1 export done: ${Object.keys(d1.tables).length} tables, ${d1.raw.length} bytes`);
   artifacts.push({ name: 'd1-ebda-platform', ext: 'sql', ...d1 });
+  log('D1 ebda-identity export start');
+  const idn = await io.exportIdentity();
+  log(`D1 ebda-identity export done: ${Object.keys(idn.tables).length} tables, ${idn.raw.length} bytes`);
+  artifacts.push({ name: IDENTITY_ARTIFACT, ext: 'sql', ...idn });
   const ids = await io.listStoreIds();
   log(`${ids.length} StoreDO store(s) to export`);
   for (const id of ids) {
@@ -376,7 +398,7 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
   for (const tier of tiers) {
     const body = Buffer.from(
       JSON.stringify(
-        { version: 1, tier, day, takenAt: now.toISOString(), artifacts: manifests[tier].artifacts },
+        { version: MANIFEST_VERSION, tier, day, takenAt: now.toISOString(), artifacts: manifests[tier].artifacts },
         null,
         2
       )
@@ -407,12 +429,97 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
     day,
     tiers,
     artifacts: artifacts.length,
-    stores: artifacts.length - 1,
+    stores: artifacts.filter(a => a.name.startsWith('do-')).length,
     rawBytes: rawTotal,
     gzBytes: gzTotal,
     uploadedBytes: uploaded,
     reused: Object.values(manifests.daily.artifacts).filter(e => e.reused).length,
     estimatedCfTotalBytes: total,
+    capBytes: cap,
+    problems,
+  };
+}
+
+export const MEDIA_MANIFEST_KEY = 'media/manifest.json';
+export const MEDIA_CHECKPOINT_EVERY = 25;
+export const DEFAULT_MEDIA_CAP_BYTES = 10 * 1024 ** 3;
+/** Content-addressed by the source etag, so an overwritten source key keeps its older copy and a re-run overwrites nothing new. */
+export const mediaBackupKey = (key, etag) => `media/objects/${etag}/${key}.age`;
+
+/**
+ * Incremental copy of R2 `ebda-media` (Ruling ICEBERG-BK-2). Only objects whose etag is new or changed are fetched, encrypted
+ * (receipt photos live in this bucket), uploaded and read back; `media/manifest.json` maps every source key to its etag and backup
+ * object, so the copy is restorable without listing the backup bucket. A key gone from the source is marked `deletedAt` and its
+ * copy is kept (no lifecycle rule covers media/). The manifest is checkpointed every MEDIA_CHECKPOINT_EVERY uploads so a run that
+ * dies part-way resumes instead of starting over.
+ *
+ * io.media = { list() -> [{key, etag, size}], getSource(key) -> Buffer, put(key, buf), get(key) -> Buffer | null }; io.encrypt.
+ */
+export async function backupMedia({ io, now = new Date(), cap = DEFAULT_MEDIA_CAP_BYTES, log = () => {} }) {
+  const m = io.media;
+  const prevBuf = await m.get(MEDIA_MANIFEST_KEY);
+  const man = prevBuf ? JSON.parse(prevBuf.toString('utf8')) : { version: 1, objects: {} };
+  const at = now.toISOString();
+  const listed = await m.list();
+  log(`media: ${listed.length} source object(s), ${Object.keys(man.objects).length} in the manifest`);
+  const save = async () => {
+    const body = Buffer.from(JSON.stringify({ ...man, version: 1, updatedAt: at }, null, 2));
+    await m.put(MEDIA_MANIFEST_KEY, body);
+    const back = await m.get(MEDIA_MANIFEST_KEY);
+    if (!back || sha256(back) !== sha256(body)) throw new Error('read-back sha256 differs for media/manifest.json');
+  };
+  let copied = 0;
+  let uploadedBytes = 0;
+  let sinceCheckpoint = 0;
+  const seen = new Set();
+  for (const o of listed) {
+    seen.add(o.key);
+    const prev = man.objects[o.key];
+    if (prev && prev.etag === o.etag && !prev.deletedAt) continue;
+    const src = await m.getSource(o.key);
+    if (!src) throw new Error(`media ${o.key}: listed but could not be read`);
+    if (Number.isFinite(o.size) && src.length !== o.size)
+      throw new Error(`media ${o.key}: read ${src.length} bytes, the listing said ${o.size}`);
+    const enc = await io.encrypt(src);
+    const backupKey = mediaBackupKey(o.key, o.etag);
+    await m.put(backupKey, enc);
+    const back = await m.get(backupKey);
+    if (!back || sha256(back) !== sha256(enc)) throw new Error(`read-back sha256 differs for ${backupKey}`);
+    man.objects[o.key] = {
+      etag: o.etag,
+      size: src.length,
+      backupKey,
+      encBytes: enc.length,
+      encSha256: sha256(enc),
+      copiedAt: at,
+      ...(prev && prev.backupKey !== backupKey
+        ? { previous: [...(prev.previous ?? []), prev.backupKey].slice(-10) }
+        : {}),
+    };
+    copied++;
+    uploadedBytes += enc.length;
+    if (++sinceCheckpoint >= MEDIA_CHECKPOINT_EVERY) {
+      await save();
+      log(`media: checkpoint after ${copied} copied`);
+      sinceCheckpoint = 0;
+    }
+  }
+  let deleted = 0;
+  for (const [k, e] of Object.entries(man.objects))
+    if (!seen.has(k) && !e.deletedAt) ((e.deletedAt = at), deleted++);
+  await save();
+  const live = Object.values(man.objects).filter(e => !e.deletedAt);
+  const totalBytes = Object.values(man.objects).reduce((a, e) => a + (e.encBytes ?? 0), 0);
+  const problems = totalBytes > cap ? [`media/ holds an estimated ${totalBytes} bytes, over the cap of ${cap}`] : [];
+  return {
+    ok: problems.length === 0,
+    sourceObjects: listed.length,
+    copied,
+    unchanged: listed.length - copied,
+    markedDeleted: deleted,
+    liveObjects: live.length,
+    uploadedBytes,
+    totalBytes,
     capBytes: cap,
     problems,
   };

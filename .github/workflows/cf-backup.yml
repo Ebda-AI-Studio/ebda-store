@@ -1,8 +1,10 @@
 name: Cloudflare data backup
-# Ruling NZ-BACKUP-1: Postgres is gone (NEON-ZERO), so the nightly off-Cloudflare copy is D1 `ebda-platform` + every StoreDO store ->
+# Ruling NZ-BACKUP-1: Postgres is gone (NEON-ZERO), so the nightly copy is D1 `ebda-platform` + D1 `ebda-identity` (ICEBERG-BK-1) + every StoreDO store ->
 # gzip -9 -> age (public key only on this runner) -> R2 `ebda-db-backups` under cf/{daily,weekly,monthly}/. Unchanged artifacts are
 # referenced, not re-uploaded; every object is read back and sha256-compared; a size guard fails the run on >2x growth or a cf/ cap
 # breach. Restore: docs/DB-BACKUP-RESTORE.md "Real recovery"; drill: scripts/ops/restore-drill.mjs (weekly: cf-backup-drill.yml).
+# R2 `ebda-media` is copied incrementally (new/changed etag only, encrypted) to media/ (ICEBERG-BK-2). The bucket is in the same
+# Cloudflare account; the off-account copy is the Mac pull scripts/ops/pull-cf-backups.mjs (ICEBERG-BK-3).
 # The legacy Postgres job (db-backup.yml) stays disabled.
 on:
   schedule:
@@ -76,4 +78,4 @@ jobs:
           fi
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
-            --data-urlencode text="CF DATA BACKUP FAILED (D1 + StoreDO to R2, or its size guard). There is NO other nightly copy of production data. ${RUN_URL}" >/dev/null || true
+            --data-urlencode text="CF DATA BACKUP FAILED (D1 platform + identity + StoreDO + media to R2, or a size guard). There is NO other nightly copy of production data. ${RUN_URL}" >/dev/null || true

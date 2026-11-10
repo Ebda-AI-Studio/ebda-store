@@ -4,19 +4,21 @@
 
 ## Which path do I use? (Cloudflare era)
 
-| Situation                                                                         | Use                                                      | RPO        | Notes                                                                                                                                                         |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bad migration / bad write in D1, within 30 days                                   | **D1 Time Travel** (`wrangler d1 time-travel restore`)   | seconds    | in place; prints the bookmark to undo it                                                                                                                      |
-| Bad write in one store's DO, within 30 days                                       | **DO point-in-time recovery** (SQLite storage bookmarks) | seconds    | platform feature; NOT VERIFIED here: no operator route in this repo calls `storage.onNextSessionRestoreBookmark` yet, so it needs a one-off admin route first |
-| Older than 30 days, Cloudflare account/provider lost, or both D1 and a DO damaged | **R2 dumps** `cf/` (this document, "Real recovery")      | up to 24 h | needs the age private key (Ahmad's Keychain, `ebda-db-backup-age-key`)                                                                                        |
-| "Does the backup actually work?"                                                  | the restore drill                                        | n/a        | weekly fixture in CI; real one by the controller                                                                                                              |
+| Situation                                                             | Use                                                                                     | RPO         | Notes                                                                                                                                                         |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bad migration / bad write in D1, within 30 days                       | **D1 Time Travel** (`wrangler d1 time-travel restore`)                                  | seconds     | in place; prints the bookmark to undo it                                                                                                                      |
+| Bad write in one store's DO, within 30 days                           | **DO point-in-time recovery** (SQLite storage bookmarks)                                | seconds     | platform feature; NOT VERIFIED here: no operator route in this repo calls `storage.onNextSessionRestoreBookmark` yet, so it needs a one-off admin route first |
+| Older than 30 days, or both D1 and a DO damaged                       | **R2 dumps** `cf/` (this document, "Real recovery")                                     | up to 24 h  | needs the age private key (Ahmad's Keychain, `ebda-db-backup-age-key`)                                                                                        |
+| Cloudflare ACCOUNT lost (the R2 backup bucket is in the same account) | **Mac copy** `~/Desktop/projects/_backups/ebda-cf-encrypted/` (`days/<day>/`, `media/`) | up to ~30 h | same artifacts + the same age key; restore with `restore-drill.mjs --dir` laid out from it (see "Off-account copy")                                           |
+| "Does the backup actually work?"                                      | the restore drill                                                                       | n/a         | weekly fixture in CI; real one by the controller                                                                                                              |
 
 ## What is backed up (nightly 02:17 UTC, `.github/workflows/cf-backup.yml`)
 
 1. **D1 `ebda-platform`**: `wrangler d1 export --remote` (SQL).
-2. **Every StoreDO store** (`stores.storage_backend = 'do'`): the read-only, bearer-checked `POST /cutover/stores/<id>/__export` (paged by primary key, 2000 rows a page, same row shape `__import` takes) after `GET .../__tables`. The bearer is `BACKUP_EXPORT_SECRET`, which opens only `__export`/`__tables`/`__fks`/`__status`.
-3. Each artifact is **gzip -9, then age-encrypted** (public key only on the runner), uploaded, **read back and sha256-compared**, and listed in a **manifest** with raw, compressed and encrypted sizes, row counts and a content digest per table.
-4. Layout in bucket `ebda-db-backups`:
+1. **D1 `ebda-identity`** (merchant/staff credentials, MFA, passkeys, sessions; Ruling ICEBERG-BK-1, added 2026-11-10): same export, artifact `d1-ebda-identity.sql.gz.age`, encrypted with the same age public key. The drill restores it into a **scratch** local D1 and compares every table's row count + digest; a v2 manifest without it fails the drill.
+1. **Every StoreDO store** (`stores.storage_backend = 'do'`): the read-only, bearer-checked `POST /cutover/stores/<id>/__export` (paged by primary key, 2000 rows a page, same row shape `__import` takes) after `GET .../__tables`. The bearer is `BACKUP_EXPORT_SECRET`, which opens only `__export`/`__tables`/`__fks`/`__status`.
+1. Each artifact is **gzip -9, then age-encrypted** (public key only on the runner), uploaded, **read back and sha256-compared**, and listed in a **manifest** with raw, compressed and encrypted sizes, row counts and a content digest per table.
+1. Layout in bucket `ebda-db-backups`:
 
 | Prefix                             | Written       | Kept             | Lifecycle rule              |
 | ---------------------------------- | ------------- | ---------------- | --------------------------- |
@@ -26,11 +28,23 @@
 | `cf/ledger.json`, `cf/latest.json` | every night   | overwritten      | none (outside the prefixes) |
 | `final/`, `db/`                    | legacy Neon   | `final/` forever | untouched                   |
 
-Each folder holds `d1-ebda-platform.sql.gz.age`, `do-<storeId>.ndjson.gz.age` and `manifest.json`. **Skip-if-unchanged**: when an artifact's raw sha256 equals the last daily's, the daily manifest points at the earlier object (`reused: true`) and nothing is uploaded; that reference is used only while the target is at most 4 days old, so it can never outlive its own expiry. Weekly and monthly folders are always full uploads of their own.
+Each folder holds `d1-ebda-platform.sql.gz.age`, `d1-ebda-identity.sql.gz.age`, `do-<storeId>.ndjson.gz.age` and `manifest.json`. **Skip-if-unchanged**: when an artifact's raw sha256 equals the last daily's, the daily manifest points at the earlier object (`reused: true`) and nothing is uploaded; that reference is used only while the target is at most 4 days old, so it can never outlive its own expiry. Weekly and monthly folders are always full uploads of their own.
 
 **Size guard** (fails the run, so `notify-failure` pages Telegram): one run uploading more than 2x the median of the last 7 runs (ignored below 1 MiB), or the estimated `cf/` total (from `cf/ledger.json`, an estimate because wrangler cannot list a bucket) above `EBDA_BACKUP_CF_CAP_BYTES` (default 1 GiB). The step summary prints raw, compressed, uploaded and cf/ total sizes every night.
 
 **Footprint**: worst case is about 14 times the compressed size of one night (7 daily + 4 weekly + 3 monthly), fewer when nothing changes. Fixture measurement (measured, a small synthetic store): 82 KB raw to 15 KB gzip, 5.5x. Production raw sizes are NOT measured yet (no production access in the build session); the first nightly summary and the first drill print them. R2 costs $0.015 per GB-month after the first 10 GB, so a 700 MB compressed night is about 10 GB at worst and costs $0. The default 1 GiB cap therefore alarms when one compressed night passes roughly 75 MB: raise the variable if the real number is larger and still cheap.
+
+### R2 `ebda-media` (Ruling ICEBERG-BK-2, added 2026-11-10)
+
+After the databases, the same job copies **only new or changed** objects of `ebda-media` (compared by etag against `media/manifest.json`) over the Cloudflare REST API, age-encrypts each (expense receipt photos live in this bucket), uploads it to `media/objects/<etag>/<key>.age`, reads it back (sha256) and records key, etag, size and backup key in `media/manifest.json` (checkpointed every 25 copies). A source object that disappears is marked `deletedAt` and its copy is kept; an overwritten key keeps its older copies under `previous`. `media/` has **no lifecycle rule**. Size guard: `EBDA_BACKUP_MEDIA_CAP_BYTES` (default 10 GiB). Measured 2026-11-10: 259 objects, 23.6 MB. The REST quota is 1200 requests / 5 min shared with the job's wrangler calls (measured from the response headers), so the client sleeps to stay at 2 requests/s and honours `Retry-After` on a 429.
+
+Restore one image: fetch `media/objects/<etag>/<key>.age`, `age -d -i <identity> > file`, `wrangler r2 object put ebda-media/<key> --file file --remote`.
+
+### Off-account copy (Ruling ICEBERG-BK-3)
+
+`ebda-db-backups` lives in the **same** Cloudflare account as production, so it does not survive losing the account. `scripts/ops/pull-cf-backups.mjs` (launchd `app.ebda.cf-backup-pull`, daily 08:05 local, installed by `bash scripts/ops/install-cf-backup-pull.sh`, log `~/Library/Logs/ebda-cf-backup-pull.log`) pulls the newest daily set and the whole `media/` mirror over api.cloudflare.com into `~/Desktop/projects/_backups/ebda-cf-encrypted/` (local, not iCloud), checks every file's sha256 against the manifest, fails when the newest backup is more than 2 days old or lacks `d1-ebda-identity`, keeps the newest **30** day folders (hard links into content-addressed `objects/`, so unchanged artifacts cost nothing) and never prunes `media/`. Files stay encrypted on the Mac. It needs a Cloudflare API token with **Workers R2 Storage: Read** only, in the Keychain as `ebda-r2-backup-read`. To restore from it: lay a day folder out as `cf/daily/<day>/` + `cf/latest.json` in a directory and run `restore-drill.mjs --dir <that directory>`.
+
+The older Worker sweep (`ebda-private/{store-do-backups,d1-backups}`, platform D1 + StoreDOs only, no identity) is still pulled by `backup-ebda-cloudflare.sh` (force-ai-foundation, launchd `com.forceai.ebda-cf-backup`, 07:15).
 
 ## Real recovery (restore production from these backups)
 
@@ -52,6 +66,14 @@ npx wrangler d1 execute ebda-platform-restore --remote --file ./restore/d1-ebda-
 # point the API at it: set repo variable EBDA_PLATFORM_D1_ID to the new id, then
 gh workflow run cf-api-deploy.yml
 # verify: GET https://api.ebda.app/health (storage_backend counts) and one public store
+```
+
+**A2. D1 `ebda-identity` into a NEW database** (merchant sign-in lost; the extract writes it order-safe too)
+
+```bash
+npx wrangler d1 create ebda-identity-restore
+npx wrangler d1 execute ebda-identity-restore --remote --file ./restore/d1-ebda-identity.sql
+# point apps/accounts at it: database_id in apps/accounts/wrangler.jsonc (binding DB), redeploy accounts, then sign in once
 ```
 
 **B. D1 in place (within 30 days, no dump needed)**
