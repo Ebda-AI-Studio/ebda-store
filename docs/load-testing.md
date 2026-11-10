@@ -4,16 +4,19 @@ Ruling SCALE-READY-1 #7 (NEON-FOLD-1). Load tests never run on the Mac. Use the 
 (`.github/workflows/load-test.yml`, `EBDA_RUNS_ON` switch (unset = ubuntu-24.04 hosted), k6 pinned to 2.3.0) via Actions > load-test > Run workflow,
 or call it from another workflow with `uses: ./.github/workflows/load-test.yml`.
 
-| Input                  | Meaning                                                                                                                             |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `base_url`             | API root including `/api/v1` (a PR preview or prod). https only.                                                                    |
-| `scenario`             | `smoke` (constant `rps` on `paths`), `storefront-mix` (browse + cart over `store_ids`), `flash-sale` (one store, cart-add at `rps`) |
-| `duration`, `rps`      | defaults `60s`, `200`                                                                                                               |
-| `p95_ms`, `error_rate` | thresholds, defaults `500` and `0`; the job fails when either is breached                                                           |
-| `allow_prod`           | `flash-sale` against `*.ebda.app` is refused unless `true`                                                                          |
+| Input                  | Meaning                                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base_url`             | API root including `/api/v1` (a PR preview or prod). https only.                                                                                                                               |
+| `scenario`             | `smoke` (constant `rps` on `paths`), `storefront-mix` (browse + cart over `store_ids`), `flash-sale` (one store, cart-add at `rps`), `pages` (storefront HTML page loads at `rps` over `urls`) |
+| `urls`                 | `pages` only: comma list of full storefront page URLs; set `base_url` to any one of them (5 rps = 300 page loads/min)                                                                          |
+| `duration`, `rps`      | defaults `60s`, `200`                                                                                                                                                                          |
+| `p95_ms`, `error_rate` | thresholds, defaults `500` and `0`; the job fails when either is breached                                                                                                                      |
+| `allow_prod`           | `flash-sale` against `*.ebda.app` is refused unless `true`                                                                                                                                     |
 
 Safety: `flash-sale` stops after add-to-cart and a cart read. No scenario places an order or touches payment.
 Seed or pick a disposable store for the cart scenarios; they create real carts.
+
+Why it had never run before 2026-11-10: it has no schedule and no caller, only Run workflow, and nobody had dispatched it; it also had no storefront page scenario. Pre-launch target: `pages` at 5 rps for 5 min over the demo stores + the Amelia QA store, after the rate-limit (#514) and resolve-hardening (#519) PRs are deployed (docs/testing/prelaunch-program.md).
 
 Output: `k6-results` artifact (`k6-summary.json`, `k6-output.txt`) and a summary in the job summary.
 Script: `tests/load/ebda-load.js`. The older local scenarios in `loadtests/` are unchanged.

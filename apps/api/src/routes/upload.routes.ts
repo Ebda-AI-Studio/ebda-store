@@ -8,7 +8,7 @@ import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
 import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
-import { runInTenantContext } from '@ebda/database';
+import { runInStoreTenantContext } from '../lib/store-scoped-read';
 import {
   IMAGE_UPLOAD_MAX_BYTES,
   IMAGE_UPLOAD_BATCH_MAX,
@@ -33,10 +33,13 @@ import {
  * so RLS policies enforce tenant isolation. The legacy super_admin
  * "no storeId" path still needs to write platform-scoped rows, so we
  * fall through to the bare prisma client there.
+ *
+ * A store on its Durable Object gets the bare store scope (no Postgres transaction): `runInTenantContext` opened a
+ * Prisma `$transaction`, which is POSTGRES_REMOVED on the Worker and 500ed every photo upload (2026-11-10, Ruling UPLOAD-DO-1).
  */
 function withOptionalTenantContext<T>(storeId: string | null, fn: () => Promise<T>): Promise<T> {
   if (!storeId) return fn();
-  return runInTenantContext(storeId, fn);
+  return runInStoreTenantContext(storeId, fn);
 }
 
 const router = Router();
@@ -279,6 +282,7 @@ router.post(
         await generateImageVariants(uploaded.key, resizedBuffer);
 
         await auditLog({
+          storeId: resolved.storeId ?? undefined,
           action: 'file.uploaded',
           userId: req.user!.userId,
           resourceType: 'file',
@@ -429,6 +433,7 @@ router.post(
         });
 
         await auditLog({
+          storeId: resolved.storeId ?? undefined,
           action: 'file.uploaded',
           userId: req.user!.userId,
           resourceType: 'file',
@@ -511,6 +516,7 @@ router.post(
         });
 
         await auditLog({
+          storeId: resolved.storeId ?? undefined,
           action: 'files.uploaded',
           userId: req.user!.userId,
           resourceType: 'file',
@@ -599,6 +605,7 @@ router.delete(
         await StorageService.delete(key);
 
         await auditLog({
+          storeId,
           action: 'file.deleted',
           userId: req.user!.userId,
           resourceType: 'file',
@@ -726,6 +733,7 @@ router.post(
         );
 
         await auditLog({
+          storeId,
           action: 'font.uploaded',
           userId: req.user!.userId,
           resourceType: 'file',

@@ -1416,6 +1416,7 @@ export default function EditProductPage() {
           onReset={resetForm}
           onSave={() => formRef.current?.requestSubmit()}
           saveLabel={t('actions.saveProduct')}
+          error={error}
         />
       </form>
     </AdminLayout>

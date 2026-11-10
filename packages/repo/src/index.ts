@@ -21,7 +21,7 @@ export {
 export { ensureSearchIndex } from './do/search';
 export { ensurePaymentSchema } from './do/payments';
 export { trialBalance, postEntry as postJournalEntry } from './do/ledger';
-export { encodeRpc, decodeRpc } from './rpc/codec';
+export { encodeRpc, decodeRpc, wirePrismaNulls, revivePrismaNulls } from './rpc/codec';
 export {
   runReads,
   rethrow,

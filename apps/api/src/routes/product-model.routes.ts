@@ -8,7 +8,7 @@
  * Why the two uploads are NOT inside a request transaction: a 15 MB file on a
  * mobile link can take longer than the 30 s the request transaction lives.
  * They validate the bytes, put the object in R2 with no transaction open, then
- * write the row in ONE short `runInTenantContext`; if that write fails, the
+ * write the row in ONE short `runInStoreTenantContext` (a bare store scope on a Durable Object store, Ruling UPLOAD-DO-1); if that write fails, the
  * just-written object is deleted (compensation, rule multi-step-rollback).
  * Every other route is DB-only and runs under `tenantContext` as usual.
  *
@@ -16,7 +16,6 @@
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { runInTenantContext } from '@ebda/database';
 import {
   MODEL3D_MAX_BYTES,
   model3dBindingsBodySchema,
@@ -42,6 +41,7 @@ import {
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { storeDb, storeWriter } from '../lib/repo-factory';
+import { runInStoreTenantContext } from '../lib/store-scoped-read';
 import {
   ADMIN_MODEL3D_SELECT,
   assertProductInStore,
@@ -147,7 +147,7 @@ router.post(
         return;
       }
       // Fail before the R2 write when the product is not this store's.
-      await runInTenantContext(storeId, () => assertProductInStore(storeId, productId));
+      await runInStoreTenantContext(storeId, () => assertProductInStore(storeId, productId));
 
       const uploaded = await StorageService.upload(
         req.file.buffer,
@@ -166,7 +166,7 @@ router.post(
         model: unknown;
       };
       try {
-        saved = await runInTenantContext(storeId, async () => {
+        saved = await runInStoreTenantContext(storeId, async () => {
           const w = await upsertModel(storeId, productId, {
             modelUrl: uploaded.url,
             modelBytes: uploaded.size,
@@ -238,7 +238,7 @@ router.post(
         sendInvalid(res, result.code);
         return;
       }
-      await runInTenantContext(storeId, () => getModelRow(storeId, productId));
+      await runInStoreTenantContext(storeId, () => getModelRow(storeId, productId));
       const uploaded = await StorageService.upload(
         req.file.buffer,
         fileNameWith(req.file.originalname, '.usdz'),
@@ -252,7 +252,7 @@ router.post(
       );
       let previous: string | null;
       try {
-        const r0 = await runInTenantContext(storeId, async () => {
+        const r0 = await runInStoreTenantContext(storeId, async () => {
           const r = await setUsdz(storeId, productId, uploaded.url, uploaded.size);
           await auditLog({
             action: 'product.model3d.usdz_uploaded',

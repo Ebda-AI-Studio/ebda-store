@@ -408,6 +408,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [superpowers/specs/2026-07-23-warehouse-stock-integrity-design.md](superpowers/specs/2026-07-23-warehouse-stock-integrity-design.md) - WarehouseStock Data-Integrity Fixes — Design Spec
 - [superpowers/specs/2026-09-11-mcp-merchant-admin-design.md](superpowers/specs/2026-09-11-mcp-merchant-admin-design.md) - MCP Merchant-Admin Surface — Design Spec
 
+## testing - Test programs
+
+- [testing/prelaunch-program.md](testing/prelaunch-program.md) - Pre-launch test program
+
 ## third-party - Third-party notes
 
 - [third-party/barkod-studio.md](third-party/barkod-studio.md) - BARKOD studio shape drawings

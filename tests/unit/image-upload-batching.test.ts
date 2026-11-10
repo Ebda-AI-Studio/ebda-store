@@ -7,6 +7,7 @@ import {
   IMAGE_UPLOAD_MAX_BYTES,
 } from '@ebda/shared';
 import { chunk, useImageUpload } from '../../apps/admin/src/hooks/useImageUpload';
+import { ERROR_EN } from '../../apps/admin/src/lib/error-messages';
 import { partitionImageFiles } from '../../apps/admin/src/components/image-upload/accept-files';
 
 vi.mock('next-intl', () => {
@@ -136,7 +137,8 @@ describe('useImageUpload.uploadMulti with more files than one batch (Review Focu
     );
     expect(out.urls).toEqual(['a', 'b', 'c', 'd', 'i'].map(n => `https://cdn/${n}.png`));
     expect(out.failed.map(f => f.name)).toEqual(['e.png', 'f.png', 'g.png', 'h.png']);
-    expect(out.failed[0].reason).toBe('Storage is down');
+    // a 503's server text is never shown; the fixed sentence is (Ruling ADMIN-ERR-1)
+    expect(out.failed[0].reason).toBe(ERROR_EN.SERVER_ERROR);
     expect(result.current.error).toContain('h.png');
   });
 

@@ -1,6 +1,7 @@
 import { localePathsOn, localizeUrlsInText, storeKeyForHost } from '../../lib/locale-paths';
 import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
+import { hidesFromSearch } from '../../lib/hide-from-search';
 import { resolvedViaCookie } from '../../lib/agent-store-resolver';
 import { storeOrigin, BRAND, resolveDefaultLanguage } from '@ebda/shared';
 
@@ -134,7 +135,7 @@ async function fetchStoreByHost(host: string): Promise<PublicStore | null> {
   if (!host) return null;
   try {
     const res = await fetch(`${API_URL}/public/store/resolve`, {
-      next: { revalidate: 600 },
+      next: { revalidate: 600, tags: [`store-domain:${host}`] },
       headers: { 'Content-Type': 'application/json', 'x-store-domain': host },
     });
     if (!res.ok) return null;
@@ -513,6 +514,14 @@ export async function perStoreResponse(
   // The public store endpoint always includes id, so this should never fall
   // back to slug — but we guard anyway.
   const storeId: string = store.id || store.slug;
+
+  // The merchant hid the store from search engines: no index of its catalogue for AI crawlers either.
+  if (hidesFromSearch(store as { settings?: Record<string, unknown> | null })) {
+    return new Response('Not Found', {
+      status: 404,
+      headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' },
+    });
+  }
 
   // Categories are needed either way now: to validate/rewrite the merchant
   // override's links, or to build the auto-generated body. `null` = the API

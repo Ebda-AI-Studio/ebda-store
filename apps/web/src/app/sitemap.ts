@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { API_URL } from '../lib/api';
+import { hideTags, hidesFromSearch } from '../lib/hide-from-search';
 import {
   localePathsOn,
   localeAlternates,
@@ -31,6 +32,8 @@ type StoreListEntry = {
   slug: string;
   /** The demo showroom (Ruling B1-14): listed nowhere. */
   isDemo?: boolean;
+  /** The merchant switched on "hide from search engines": nothing to submit. */
+  hidden?: boolean;
   /** `settings.defaultLanguage`: the x-default of a store that has language-in-URL ON (LOCALE-PATHS-1). */
   defaultLanguage?: string;
 };
@@ -65,7 +68,7 @@ async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> 
   if (!host) return null;
   try {
     const res = await fetch(`${API_URL}/public/store/resolve`, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 3600, tags: hideTags(host) },
       headers: { 'Content-Type': 'application/json', 'x-store-domain': host },
     });
     // 404 is the API's definitive "no store owns this host" (platform path,
@@ -81,6 +84,7 @@ async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> 
       id: store.id,
       slug: store.slug,
       isDemo: store.isDemo === true,
+      hidden: hidesFromSearch(store),
       defaultLanguage: store.settings?.defaultLanguage,
     };
   } catch (error) {
@@ -280,7 +284,7 @@ async function buildTenantSitemap(
  *       `/<slug>/…` — that path-based layout is gone.
  *   - a store host that resolves to no store
  *     → 404, never another store's URLs
- *   - the demo showroom (`isDemo`) → an empty sitemap (noindex, Ruling B1-14)
+ *   - the demo showroom (`isDemo`) or a store hidden from search engines → an empty sitemap (noindex, Ruling B1-14)
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
@@ -296,7 +300,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tenant = await resolveStoreByHost(storeHost);
   if (!tenant) notFound();
   // The demo showroom is noindex (Ruling B1-14): nothing to submit.
-  if (tenant.isDemo) return [];
+  // A store hidden from search engines by its merchant lists no URLs either.
+  if (tenant.isDemo || tenant.hidden) return [];
   return buildTenantSitemap(
     storeHost,
     tenant.id,
