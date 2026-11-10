@@ -23,9 +23,43 @@ vi.mock('../../apps/web/src/contexts/LanguageContext', async importOriginal => (
 }));
 
 vi.mock('../../apps/web/src/contexts/StoreContext', () => ({
-  useStore: () => ({ store: { theme: {}, look: null }, layout: null }),
+  useStore: () => ({
+    store: { id: 'store-a', name: 'Shop', theme: {}, look: null, settings: {} },
+    layout: null,
+  }),
   useStoreUrl: () => (p: string) => p,
   useStoreTheme: () => ({}),
+}));
+
+// The cart page, rendered for real: a non-empty cart so the "Continue shopping" row is on screen.
+vi.mock('../../apps/web/src/contexts/FeatureContext', () => ({
+  useFeatures: () => ({ isEnabled: () => false }),
+}));
+vi.mock('../../apps/web/src/contexts/CartContext', () => ({
+  useCart: () => ({
+    items: [{ id: 'line', productId: 'p1', name: 'Ring', price: 10000, quantity: 1 }],
+    bundles: [],
+    itemCount: 1,
+    total: 10000,
+    isReady: true,
+  }),
+}));
+vi.mock('../../apps/web/src/lib/api', () => ({
+  api: { get: () => Promise.resolve({ success: true, data: {} }) },
+}));
+vi.mock('../../apps/web/src/hooks/useTemplateComponents', () => ({
+  useTemplateComponents: () => ({ components: null }),
+}));
+vi.mock('../../apps/web/src/hooks/useLastListing', () => ({ useLastListing: () => '/products' }));
+vi.mock('../../apps/web/src/components', () => ({
+  ShopChrome: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+vi.mock('../../apps/web/src/components/CartRecommendations', () => ({
+  CartRecommendations: () => null,
+}));
+vi.mock('@ebda/ui', async original => ({
+  ...(await original<Record<string, unknown>>()),
+  useToast: () => ({ info: vi.fn(), success: vi.fn(), error: vi.fn() }),
 }));
 
 const T = '../../apps/web/src/templates';
@@ -52,11 +86,15 @@ describe.each(SKINS)('%s EmptyState CTA', skin => {
 
 describe('the cart page "Continue shopping" link is a 44px target (P1-N3)', () => {
   it('measured 97-151 x 20; it is now a 44px inline-flex row', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const src = readFileSync(join(__dirname, '../../apps/web/src/app/cart/CartClient.tsx'), 'utf8');
-    const i = src.indexOf("'Continue shopping'");
-    const link = src.slice(src.lastIndexOf('<Link', i), i);
-    expect(link).toMatch(/className="inline-flex min-h-11 items-center/);
+    const { default: CartClient } = await import('../../apps/web/src/app/cart/CartClient');
+    const { container } = render(<CartClient />);
+    // The mocked `t` returns the Arabic string, which is what the shopper reads here.
+    const link = [...container.querySelectorAll('a')].find(a =>
+      a.textContent?.includes(
+        '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
+      )
+    );
+    expect(link, 'the Continue shopping link is not on the cart page').toBeTruthy();
+    expect(smallTargets(link!.parentElement!, 44)).toEqual([]);
   });
 });
