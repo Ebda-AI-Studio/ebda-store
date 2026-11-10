@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import {
   BRAND,
   WHATSAPP_MONTHLY_PACKAGES,
@@ -98,13 +98,13 @@ function Pricing({ locale }: { locale: Locale }) {
                   ))}
                 </ul>
                 {included ? (
-                  <Link
+                  <PageLink
                     href={`${STORE_HOME[locale]}#pricing`}
                     className="btn btn-ghost"
                     data-plan-cta={p.id}
                   >
                     {c.ctaIncluded}
-                  </Link>
+                  </PageLink>
                 ) : (
                   <SiteLink
                     href={WHATSAPP_APP_URL}
@@ -270,7 +270,7 @@ export function WhatsAppPage({ locale }: { locale: Locale }) {
               {p.helpLink}
             </SiteLink>
             {' · '}
-            <Link href={pagePath(locale, 'features')}>{COPY[locale].nav.features}</Link>
+            <PageLink href={pagePath(locale, 'features')}>{COPY[locale].nav.features}</PageLink>
           </p>
         </section>
       </main>
@@ -287,9 +287,9 @@ export function WhatsAppTeaser({ locale }: { locale: Locale }) {
       <h3>{t.h}</h3>
       <p>{t.p}</p>
       <p className="actions">
-        <Link href={pagePath(locale, 'whatsapp')} className="btn btn-ghost">
+        <PageLink href={pagePath(locale, 'whatsapp')} className="btn btn-ghost">
           {t.cta}
-        </Link>
+        </PageLink>
       </p>
     </div>
   );
