@@ -46,6 +46,10 @@ export function RootShell({ locale, children }: { locale: Locale; children: Reac
     <html
       lang={locale}
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
+      // globals.css sets `scroll-behavior: smooth` on html. Next's router only turns that off while it
+      // resets the scroll after a navigation when this attribute is present; without it the reset is
+      // animated, races the router's own scrollIntoView and a page can open at its footer.
+      data-scroll-behavior="smooth"
       style={tokens}
       className={`${geist.variable} ${geistMono.variable} ${plexArabic.variable}`}
     >

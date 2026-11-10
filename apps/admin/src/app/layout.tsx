@@ -95,7 +95,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
-    <html lang={locale} dir={dir} suppressHydrationWarning>
+    // globals.css turns on `scroll-behavior: smooth` for html; Next only switches it off while it resets
+    // the scroll after a navigation when this attribute is present (without it a page can open scrolled down).
+    <html lang={locale} dir={dir} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {/* Inline script to prevent flash of wrong theme on page load.
             Only reads from localStorage — no user input, safe static content. */}

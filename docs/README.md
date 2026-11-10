@@ -185,6 +185,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [ebda/templates/souq.md](ebda/templates/souq.md) - Souq (سوق): the general retail and electronics template and its three looks
 - [ebda/truth-table-2026-10.md](ebda/truth-table-2026-10.md) - Ebda truth table — 2026-10-10
 - [ebda/ui/2026-10-05-merchant-ui-verification.md](ebda/ui/2026-10-05-merchant-ui-verification.md) - Ebda merchant UI — verification, 5 October 2026
+- [ebda/ui/smooth-scroll-and-navigation.md](ebda/ui/smooth-scroll-and-navigation.md) - Smooth scrolling and page navigation: why the root html element carries data-scroll-behavior
 
 ## incidents - Incident write-ups
 
@@ -313,6 +314,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/ai-features.md](plans/ai-features.md) - AI features plan — making "Ebda AI Studio" mean something
 - [plans/2026-10-26-barcode-1.md](plans/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
 - [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
+- [plans/2026-11-10-store-miss-counts-unverified-store-only.md](plans/2026-11-10-store-miss-counts-unverified-store-only.md) - LAUNCH-RL-MISS-3: a dead product or blog link inside a verified store is not a store-miss
 
 ## privacy - Privacy
 

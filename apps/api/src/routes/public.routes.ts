@@ -43,6 +43,7 @@ import {
   viewIngestLimiter,
 } from '../middleware/security';
 import { refuseUnknownPublicStore } from '../middleware/tenant-context';
+import { catalogueMissRoute } from '../middleware/catalogue-miss';
 import {
   queryBudgetSpent,
   queryBudgetSpentUntil,
@@ -511,6 +512,8 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
 });
 
 // GET /products/:slugOrId - Get a product by slug or ID
+// LAUNCH-RL-MISS-3: its 404 inside a verified store is a dead link, not a store-miss (middleware/catalogue-miss.ts).
+router.get('/products/:slugOrId', catalogueMissRoute('GET /public/products/:slugOrId'));
 router.get('/products/:slugOrId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { slugOrId } = req.params;
@@ -810,7 +813,8 @@ router.get('/redirects/resolve', async (req: Request, res: Response, next: NextF
     const toSlug = await resolveSlugRedirectCached(storeId, entityType, slug);
     // "No redirect for this slug" is an answer about a store that exists, so it is a 200 with `toSlug: null`, not a 404:
     // the storefront asks this after every unknown product/category/page/blog slug, and a 404 here made one dead link cost
-    // the shopper's IP TWO misses of the per-IP store-miss budget (the product 404 plus this one). A store that
+    // the shopper's IP TWO misses of the per-IP store-miss budget (the product 404 plus this one; since LAUNCH-RL-MISS-3
+    // the product 404 of a verified store is no longer counted, a 404 here still would be). A store that
     // does not resolve is still refused (400 STORE_NOT_RESOLVED, getStoreIdFromRequest), exactly as before. The storefront
     // reads only `toSlug` and treats null and a non-2xx the same (apps/web/src/lib/slug-redirect.ts).
     res.json({ toSlug: toSlug ?? null });

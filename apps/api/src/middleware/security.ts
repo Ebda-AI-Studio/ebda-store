@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { publicTenantKey } from './public-limiter-keys';
+import { isVerifiedCatalogueMiss } from './catalogue-miss';
 import rateLimit, {
   ipKeyGenerator,
   MemoryStore,
@@ -1001,6 +1002,11 @@ export const authIpAllLimiter = createAuthIpLimiter({ countSuccess: true, prefix
  *
  * Reading then counting is not atomic: misses already in flight when the budget runs out are still answered, so a burst
  * can pass the limit by its own concurrency. The atomic per-IP public limiter in front of it bounds that.
+ *
+ * LAUNCH-RL-MISS-3: every 404 is a miss EXCEPT a dead product or blog link inside a store the resolver verified
+ * (`isVerifiedCatalogueMiss`, middleware/catalogue-miss.ts: verified-store flag AND listed route AND same store id).
+ * Counting those let ordinary browsing of one real store, or the storefront's server render of it, lock the IP out of
+ * the whole public router. An unknown store, an unmatched route and every other route's 404 stay counted, no marker.
  */
 export function createStoreMissLimiter(opts?: {
   skip?: (req: Request) => boolean;
@@ -1052,6 +1058,8 @@ export function createStoreMissLimiter(opts?: {
     }
     res.once('finish', () => {
       if (res.statusCode !== 404) return;
+      // LAUNCH-RL-MISS-3: a dead product or blog link inside a store the resolver verified is not store probing
+      if (isVerifiedCatalogueMiss(req, res)) return;
       // after the response: `cfWaitUntil` keeps the count alive on a Worker and swallows a store error
       cfWaitUntil(Promise.resolve().then(() => store.increment(key)));
     });

@@ -187,8 +187,9 @@ router.delete(
 //
 // "No row" is the NORMAL state of privacy / terms / about on a store that
 // never edited them (the storefront then shows its built-in copy), so it is
-// answered 200, not 404: every 404 on the public router spends the caller's
-// per-IP store-miss budget (`storeMissLimiter`, 20 a minute), and a shopper
+// answered 200, not 404: a 404 from this route spends the caller's per-IP
+// store-miss budget (`storeMissLimiter`, 20 a minute; only a dead product or
+// blog link in a verified store is left out, LAUNCH-RL-MISS-3), and a shopper
 // reading the policy pages of a real store was being counted as a prober
 // (pre-QA sweep 2026-11-09, finding 6). An unknown store is still a 404.
 router.get(
