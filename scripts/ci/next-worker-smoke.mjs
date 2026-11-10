@@ -19,9 +19,17 @@ import { tmpdir } from 'node:os';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** Paths + statuses mirror the `--probe` lines in .github/workflows/cf-{web,admin,orders}-deploy.yml. */
+/**
+ * Paths + statuses mirror the `--probe` lines in .github/workflows/cf-{web,admin,orders}-deploy.yml.
+ * `smokeOnly` entries run here and NOT after a deploy: [path, status, content-type prefix]. The web
+ * app manifest is a hand-written route (Ruling PWA-MANIFEST-2), so nothing but a request to the built
+ * Worker proves it is still served; for a host that is no store it answers the generic manifest.
+ */
 export const PROBES = {
-  web: { port: 8811, host: 'ebda-deploy-probe.ebda.app', paths: [['/', 404]] },
+  web: {
+    port: 8811, host: 'ebda-deploy-probe.ebda.app', paths: [['/', 404]],
+    smokeOnly: [['/manifest.webmanifest', 200, 'application/manifest+json']],
+  },
   admin: { port: 8812, host: 'store.ebda.app', paths: [['/signup', 200], ['/login', 200]] },
   orders: { port: 8813, host: 'orders.ebda.app', paths: [['/login', 200]] },
 };
@@ -58,10 +66,12 @@ async function main() {
       try { await fetch(`${base}/__smoke_ping`, { redirect: 'manual' }); up = true; break; } catch { await new Promise((r) => setTimeout(r, 1000)); }
     }
     if (!up) failures.push('wrangler dev did not start listening within 90s');
-    else for (const [p, want] of cfg.paths) {
+    else for (const [p, want, type] of [...cfg.paths, ...(cfg.smokeOnly ?? [])]) {
       const res = await fetch(base + p, { headers: { host: cfg.host }, redirect: 'manual' });
-      console.log(`${app} ${p} -> ${res.status} (want ${want})`);
+      const got = res.headers.get('content-type') ?? '';
+      console.log(`${app} ${p} -> ${res.status} (want ${want})${type ? ` ${got} (want ${type})` : ''}`);
       if (res.status !== want) failures.push(`${p}: got ${res.status}, want ${want}`);
+      else if (type && !got.startsWith(type)) failures.push(`${p}: content-type ${got || '(none)'}, want ${type}`);
     }
   } finally {
     child.kill('SIGTERM');
