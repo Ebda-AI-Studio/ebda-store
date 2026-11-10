@@ -12,15 +12,16 @@ import { pathToFileURL } from 'node:url';
 import { statSync } from 'node:fs';
 
 /** Pure: the upload plan [{ key, file }] for the given OpenNext cache assets. */
+// Ruling WEB-COLD-2: build-time `fetch` entries are NOT uploaded. The storefront reads every fetch entry from ONE
+// build-independent key space (apps/web/shared-fetch-cache.ts), so a copy fetched at build time would overwrite a newer
+// entry the running Worker wrote, stamped with the upload time as if it were fresh. The runtime fills them on first read.
 export function planUploads(assets, prefix, computeCacheKey) {
-  const plan = assets.map(a => ({
-    key: computeCacheKey(a.key, {
-      prefix,
-      buildId: a.buildId,
-      cacheType: a.isFetch ? 'fetch' : 'cache',
-    }),
-    file: a.fullPath,
-  }));
+  const plan = assets
+    .filter(a => !a.isFetch)
+    .map(a => ({
+      key: computeCacheKey(a.key, { prefix, buildId: a.buildId, cacheType: 'cache' }),
+      file: a.fullPath,
+    }));
   const seen = new Set();
   for (const p of plan) {
     if (seen.has(p.key)) throw new Error(`duplicate R2 cache key in the plan: ${p.key}`);

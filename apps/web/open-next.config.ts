@@ -16,7 +16,7 @@
 // To verify what IS deployed, read the worker's bindings, not this file.
 
 import { defineCloudflareConfig } from '@opennextjs/cloudflare';
-import r2IncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache';
+import r2IncrementalCache from './shared-fetch-cache'; // fetch entries survive a deploy (Ruling WEB-COLD-2)
 
 // R2-backed ISR/SSG incremental cache (bucket already exists: ebda-web-isr-cache,
 // bound as NEXT_INC_CACHE_R2_BUCKET in wrangler.jsonc). Without this, OpenNext

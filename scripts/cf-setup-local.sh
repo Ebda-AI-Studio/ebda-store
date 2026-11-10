@@ -80,7 +80,9 @@ for app in "${APPS[@]}"; do
   if [ "${OPENNEXT_CACHE:-}" = "true" ] && [ "$app" = "web" ]; then
     cat > "$dir/open-next.config.ts" <<'EOF'
 import { defineCloudflareConfig } from '@opennextjs/cloudflare';
-import r2IncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache';
+// Ruling WEB-COLD-2: the stock R2 cache with fetch (data) entries keyed independently of the build, so a deploy
+// keeps the storefront's API data cache instead of starting empty (apps/web/shared-fetch-cache.ts).
+import r2IncrementalCache from './shared-fetch-cache';
 import doShardedTagCache from '@opennextjs/cloudflare/overrides/tag-cache/do-sharded-tag-cache';
 import doQueue from '@opennextjs/cloudflare/overrides/queue/do-queue';
 import queueCache from '@opennextjs/cloudflare/overrides/queue/queue-cache';
