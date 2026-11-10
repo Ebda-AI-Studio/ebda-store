@@ -133,9 +133,14 @@ describe('storefront text controls are 16px or larger on a phone', () => {
   });
 
   it('the shared field components the storefront forms are built from are 16px on a phone', () => {
-    for (const name of ['input', 'select', 'textarea']) {
+    // The file names are capitalised on disk (Input.tsx); a lower-case path only opens on a file system that ignores case.
+    for (const [file, name] of [
+      ['Input', 'input'],
+      ['Select', 'select'],
+      ['Textarea', 'textarea'],
+    ]) {
       const src = readFileSync(
-        join(ROOT, 'packages', 'ui', 'src', 'components', `${name}.tsx`),
+        join(ROOT, 'packages', 'ui', 'src', 'components', `${file}.tsx`),
         'utf8'
       );
       const tag = openingTag(src, src.search(new RegExp(`<${name}\\b`)));
