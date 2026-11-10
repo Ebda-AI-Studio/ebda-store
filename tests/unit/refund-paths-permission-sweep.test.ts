@@ -10,12 +10,80 @@
  * names a refund must carry the permission, so a new refund route fails here
  * instead of silently shipping open to staff.
  *
- * Static source checks (no DB, no app boot).
+ * The route-declaration sweep is a static source check (no DB, no app boot); the
+ * in-handler checks at the bottom mount the real routers with fake collaborators
+ * and observe refusals and writes.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import express, { type Express } from 'express';
+import request from 'supertest';
 import { readFileSync, readdirSync } from 'fs';
 import path from 'path';
 import { hasPermission } from '../../apps/api/src/middleware/rbac';
+
+// ─── Fakes for mounting the real order + return routers (rbac stays REAL) ──
+const h = vi.hoisted(() => ({
+  state: { role: 'staff' as string },
+  getById: vi.fn(),
+  updateStatus: vi.fn(),
+  recordManualRefund: vi.fn(),
+  complete: vi.fn(),
+}));
+
+vi.mock('@ebda/database', () => ({
+  prisma: { $queryRaw: async () => [] },
+  hasTenantContext: () => true,
+  currentTenantGucs: () => undefined,
+  runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
+  Prisma: { PrismaClientKnownRequestError: class PrismaClientKnownRequestError {} },
+}));
+vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (_q: any, _s: any, n: any) => n(),
+  customerUserId: () => null,
+  authenticate: (req: any, _res: any, next: any) => {
+    req.user = { userId: 'user-1', role: h.state.role };
+    next();
+  },
+  authorize: () => (_q: any, _s: any, n: any) => n(),
+}));
+vi.mock('@api/middleware/store-access', () => ({
+  requireStoreAccess: (_q: any, _s: any, n: any) => n(),
+  checkStoreAccess: vi.fn().mockResolvedValue(true),
+}));
+vi.mock('@api/middleware/feature-gate', () => ({
+  requireFeature: () => (_q: any, _s: any, n: any) => n(),
+}));
+vi.mock('@api/middleware/security', () => ({
+  auditLog: vi.fn().mockResolvedValue(undefined),
+  writeLimiter: (_q: any, _s: any, n: any) => n(),
+}));
+vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
+vi.mock('@api/services/order.service', () => ({
+  OrderService: {
+    getById: (...a: unknown[]) => h.getById(...a),
+    updateStatus: (...a: unknown[]) => h.updateStatus(...a),
+    recordManualRefund: (...a: unknown[]) => h.recordManualRefund(...a),
+  },
+  assertValidTransition: vi.fn(),
+}));
+vi.mock('@api/services/return.service', async importOriginal => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, ReturnService: { complete: (...a: unknown[]) => h.complete(...a) } };
+});
+vi.mock('@api/services/payment-providers/payment.factory', () => ({ PaymentService: {} }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));
+vi.mock('@api/lib/logger', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
+vi.mock('@api/services/payment-event.service', () => ({ recordPaymentEvent: vi.fn() }));
+vi.mock('@api/services/payment-confirm.service', () => ({
+  confirmPaymentFromProviderStatus: vi.fn(),
+}));
+vi.mock('@api/services/invoice.service', () => ({ InvoiceService: {} }));
+vi.mock('@api/config', () => ({ config: {} }));
+vi.mock('exceljs', () => ({ default: class {} }));
+vi.mock('@api/lib/exports/xlsx', () => ({ neutralizeRowObject: vi.fn() }));
 
 const routesDir = path.resolve(__dirname, '../../apps/api/src/routes');
 const read = (f: string) => readFileSync(path.join(routesDir, f), 'utf-8');
@@ -65,24 +133,76 @@ describe('every route whose path names a refund is permission-gated', () => {
 });
 
 describe('refund-by-status and return completion check the permission in-handler', () => {
-  it("PUT /:id/status → 'refunded' needs orders:refund before it records anything", () => {
-    const src = read('order.routes.ts');
-    const i = src.indexOf("if (status === 'refunded' && previousOrder.status !== 'refunded')");
-    expect(i).toBeGreaterThan(-1);
-    const block = src.slice(i, i + 400);
-    expect(block).toContain("hasPermission(actor.role as Role, 'orders:refund')");
-    expect(block).toContain('403');
-    // …and the permission check precedes the status write.
-    expect(i).toBeLessThan(src.indexOf('OrderService.updateStatus(storeId, id, status)'));
+  let app: Express;
+  const STORE = '11111111-1111-1111-1111-111111111111';
+  const ORDER = '22222222-2222-2222-2222-222222222222';
+
+  beforeAll(async () => {
+    const { default: orderRouter } = await import('@api/routes/order.routes');
+    const { default: returnRouter } = await import('@api/routes/return.routes');
+    const { errorHandler } = await import('@api/middleware/error-handler');
+    app = express();
+    app.use(express.json());
+    app.use('/stores/:storeId/orders', orderRouter);
+    app.use('/stores/:storeId/returns', returnRouter);
+    app.use(errorHandler);
   });
 
-  it('return completion gates every gateway refund method on orders:refund', () => {
-    const src = read('return.routes.ts');
-    const i = src.indexOf('GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod)');
-    expect(i).toBeGreaterThan(-1);
-    expect(src.slice(i, i + 300)).toContain(
-      "hasPermission(req.user!.role as Role, 'orders:refund')"
-    );
-    expect(i).toBeLessThan(src.indexOf('ReturnService.complete('));
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.getById.mockResolvedValue({
+      id: ORDER,
+      status: 'delivered',
+      paymentStatus: 'paid',
+      payments: [{ status: 'completed', refundedAmount: 1000 }],
+    });
+    h.updateStatus.mockResolvedValue({ id: ORDER, status: 'refunded' });
+    h.complete.mockResolvedValue({ id: 'ret-1', status: 'completed' });
+  });
+
+  const putStatus = (status: string) =>
+    request(app).put(`/stores/${STORE}/orders/${ORDER}/status`).send({ status });
+
+  it("PUT /:id/status → 'refunded' needs orders:refund before it records anything", async () => {
+    h.state.role = 'staff';
+    const res = await putStatus('refunded');
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+    expect(h.updateStatus).not.toHaveBeenCalled();
+    expect(h.recordManualRefund).not.toHaveBeenCalled();
+  });
+
+  it('PUT /:id/status: staff keep the ordinary workflow, store_admin can record the refund (controls)', async () => {
+    h.state.role = 'staff';
+    const shipped = await putStatus('shipped');
+    expect(shipped.status).toBe(200);
+    expect(h.updateStatus).toHaveBeenCalledWith(STORE, ORDER, 'shipped');
+
+    h.updateStatus.mockClear();
+    h.state.role = 'store_admin';
+    const refunded = await putStatus('refunded');
+    expect(refunded.status).toBe(200);
+    expect(h.updateStatus).toHaveBeenCalledWith(STORE, ORDER, 'refunded');
+  });
+
+  const complete = (refundMethod: string) =>
+    request(app).post(`/stores/${STORE}/returns/admin/ret-1/complete`).send({ refundMethod });
+
+  it('return completion gates every gateway refund method on orders:refund', async () => {
+    h.state.role = 'staff';
+    const { GATEWAY_REFUND_METHODS } = await import('@api/services/return.service');
+    expect(GATEWAY_REFUND_METHODS.length).toBeGreaterThan(0);
+    for (const method of GATEWAY_REFUND_METHODS) {
+      const res = await complete(method);
+      expect(res.status, method).toBe(403);
+      expect(res.body.error.code).toBe('REFUND_PERMISSION_REQUIRED');
+    }
+    expect(h.complete).not.toHaveBeenCalled();
+
+    // control: a store_admin completes the same gateway method.
+    h.state.role = 'store_admin';
+    const ok = await complete(GATEWAY_REFUND_METHODS[0]);
+    expect(ok.status).toBe(200);
+    expect(h.complete).toHaveBeenCalledTimes(1);
   });
 });
