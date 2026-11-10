@@ -32,6 +32,10 @@ function mkIo(b: ReturnType<typeof bucket>, state: { d1: string; store: string }
       raw: Buffer.from(state.d1),
       tables: { stores: { count: 1, digest: 'd' + state.d1.length } },
     }),
+    exportIdentity: async () => ({
+      raw: Buffer.from('identity-' + state.d1),
+      tables: { users: { count: 1, digest: 'u' + state.d1.length } },
+    }),
     listStoreIds: async () => ['s1'],
     exportStore: async () => ({
       raw: Buffer.from(state.store),
@@ -98,14 +102,14 @@ describe('runBackup', () => {
     const orig = io2.r2Put;
     io2.r2Put = async (k, v) => (puts.push(k), orig(k, v));
     const r = await B.runBackup({ io: io2, now: at('2026-11-05') });
-    expect(r.reused).toBe(2);
+    expect(r.reused).toBe(3);
     expect(puts.filter(k => k.endsWith('.age'))).toEqual([]);
     const man = JSON.parse(b.m.get('cf/daily/2026-11-05/manifest.json')!.toString());
     expect(man.artifacts['do-s1'].key).toBe('cf/daily/2026-11-04/do-s1.ndjson.gz.age');
     expect(man.artifacts['do-s1'].reused).toBe(true);
     st.store = 'c'.repeat(3000);
     const r3 = await B.runBackup({ io: mkIo(b, st), now: at('2026-11-06') });
-    expect(r3.reused).toBe(1);
+    expect(r3.reused).toBe(2);
     expect(b.m.has('cf/daily/2026-11-06/do-s1.ndjson.gz.age')).toBe(true);
   });
   it('never references an object that is about to expire: after the reuse window it uploads again', async () => {
@@ -169,6 +173,7 @@ describe('drill', () => {
       ...b,
       encrypt: async (x: Buffer) => enc(x),
       exportD1: async () => ({ raw: Buffer.from('SQL'), tables: { stores: tbl(1) } }),
+      exportIdentity: async () => ({ raw: Buffer.from('IDSQL'), tables: { users: tbl(1) } }),
       listStoreIds: async () => ['s1'],
       exportStore: async () => ({ raw: Buffer.from(store), tables: { products: tbl(1) } }),
     };
@@ -178,6 +183,7 @@ describe('drill', () => {
   const targets = (over: any = {}) => ({
     decrypt: dec,
     loadD1: async () => ({ tables: { stores: tbl(1) }, stores: [] }),
+    loadIdentity: async () => ({ tables: { users: tbl(1) } }),
     post: async (p: string) =>
       p.endsWith('__verify')
         ? { tables: { products: tbl(1) }, fk: { violations: 0, sample: [] } }
@@ -632,6 +638,7 @@ describe('drill expectations (drill 6: inactive store, search_dirty, older backu
       ...b,
       encrypt: async (x: Buffer) => enc(x),
       exportD1: async () => ({ raw: Buffer.from('SQL'), tables: { stores: tbl(1) } }),
+      exportIdentity: async () => ({ raw: Buffer.from('IDSQL'), tables: { users: tbl(1) } }),
       listStoreIds: async () => ['s1'],
       exportStore: async () => ({ raw: Buffer.from(dumpText), tables: storeTables }),
     };
@@ -649,6 +656,7 @@ describe('drill expectations (drill 6: inactive store, search_dirty, older backu
       .join('\n') + '\n';
   const mkTargets = (verify: any, over: any = {}) => ({
     decrypt: dec,
+    loadIdentity: async () => ({ tables: { users: tbl(1) } }),
     loadD1: async () => ({
       tables: { stores: tbl(1) },
       stores: [{ id: 's1', slug: 's', domain: null, owner_id: 'o', status: 'active' }],

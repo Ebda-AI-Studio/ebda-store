@@ -12,12 +12,23 @@ const get = (url: string, headers: Record<string, string> = {}, method = 'GET') 
   new Request(url, { method, headers });
 
 describe('edge locale redirect', () => {
-  it('bare host -> 308 /ar (the store default), empty body, never cached', async () => {
+  it('bare host -> 308 /ar (the store default), empty body, browser-cacheable for 5 min only (Ruling ICEBERG-EDGE-308-1)', async () => {
     const res = (await edgeLocaleRedirect(get('https://storedemo-lamma.ebda.app/'), ON, ar))!;
     expect(res.status).toBe(308);
     expect(res.headers.get('location')).toBe('/ar');
-    expect(res.headers.get('cache-control')).toBe('private, no-store');
+    // private: never a shared/edge copy; Vary: Cookie: a visitor who later picks the other language is asked again
+    expect(res.headers.get('cache-control')).toBe('private, max-age=300');
+    expect(res.headers.get('vary')).toBe('Cookie');
     expect(await res.text()).toBe('');
+  });
+  it('the cookie-driven 307 is never cached (it follows a visitor choice, not the store default)', async () => {
+    const c = (await edgeLocaleRedirect(
+      get('https://s.ebda.app/', { cookie: 'force-language=en' }),
+      ON,
+      ar
+    ))!;
+    expect(c.status).toBe(307);
+    expect(c.headers.get('cache-control')).toBe('private, no-store');
   });
   it('keeps the path and query; a visitor cookie in the other language gets a temporary 307 there', async () => {
     const p = (await edgeLocaleRedirect(
