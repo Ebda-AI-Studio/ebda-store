@@ -35,6 +35,9 @@ const nextIp = () => `198.51.${(n >> 8) & 255}.${n++ & 255 || 1}`;
 const STORES = 5;
 const CONCURRENT = 200;
 const HANG_MS = 2_000;
+// measured 2026-11-10 on local workerd with 150 ms per AuthState call: 348 ms with the write-back in waitUntil, 654-661 ms with it
+// on the response path (the code before API-HANG-1)
+const PROD_LIKE_P95_MS = 500;
 
 export function pct(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1)] ?? 0;
@@ -127,4 +130,81 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
     ).toEqual([]);
     void summary;
   }, 120_000);
+  // The `x-dev-authstate-*` headers are honoured only with DEV_STATS=1 (this test config; never production): see
+  // cf/auth-state-client.ts `call`. They make local workerd behave like production: a real DO round trip, or a stuck instance.
+  const STALL_BUDGET_MS = 2_500 + 1_500; // AUTH_STATE_TIMEOUT_MS + the rest of the request
+  let cold = 0;
+  const coldProducts = (s: { id: string }, headers: Record<string, string>) =>
+    e.API.fetch(`${BASE}/public/products?limit=${(cold++ % 40) + 1}&page=${cold}`, {
+      headers: { 'cf-connecting-ip': nextIp(), 'x-store-id': s.id, ...headers },
+    });
+
+  it('a STUCK cache-generation instance: cold reads still answer 200 within the deadline, none hangs', async () => {
+    const results = await Promise.all(
+      Array.from({ length: 20 }, async (_, i) => {
+        const t0 = Date.now();
+        const res = await coldProducts(stores[i % STORES], {
+          'x-dev-authstate-stall': 'cachegen:',
+        });
+        await res.text();
+        return { ms: Date.now() - t0, status: res.status };
+      })
+    );
+    const ms = results.map(r => r.ms).sort((a, b) => a - b);
+    const summary = `p50 ${pct(ms, 50)} ms, p95 ${pct(ms, 95)} ms, max ${ms[ms.length - 1]} ms`;
+    expect(
+      results.filter(r => r.status !== 200),
+      summary
+    ).toEqual([]);
+    expect(ms[ms.length - 1], summary).toBeLessThan(STALL_BUDGET_MS);
+  }, 45_000);
+
+  it('a production-like 150 ms AuthState round trip: a cold read waits on ONE generation read, not three', async () => {
+    const results = await Promise.all(
+      Array.from({ length: 25 }, async (_, i) => {
+        const t0 = Date.now();
+        const res = await coldProducts(stores[i % STORES], { 'x-dev-authstate-delay-ms': '150' });
+        await res.text();
+        return { ms: Date.now() - t0, status: res.status };
+      })
+    );
+    const ms = results.map(r => r.ms).sort((a, b) => a - b);
+    const summary = `p50 ${pct(ms, 50)} ms, p95 ${pct(ms, 95)} ms, max ${ms[ms.length - 1]} ms`;
+    expect(
+      results.filter(r => r.status !== 200),
+      summary
+    ).toEqual([]);
+    // critical path: limiter batch (+ tenant shard) + 1 generation read = 2-3 x 150 ms, plus StoreDO/D1. The write-back on the
+    // response path (the old code) adds 2 x 150 ms + the KV put to every cold read.
+    expect(pct(ms, 95), summary).toBeLessThan(PROD_LIKE_P95_MS);
+    void summary;
+  }, 45_000);
+
+  it('a stuck limiter instance: a credential limiter answers 429 + Retry-After (fail closed), a public read is served', async () => {
+    const stall = { 'x-dev-authstate-stall': 'rl:' };
+    const t0 = Date.now();
+    const login = await e.API.fetch(`${BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'cf-connecting-ip': nextIp(), 'content-type': 'application/json', ...stall },
+      body: JSON.stringify({
+        email: 'nobody@exit-test.invalid',
+        password: 'Wrong-pass-1',
+        storeId: stores[0].id,
+      }),
+    });
+    const loginBody = (await login.json()) as { error?: { code?: string } };
+    const loginMs = Date.now() - t0;
+    expect(login.status, JSON.stringify(loginBody)).toBe(429);
+    expect(loginBody.error?.code).toBeTruthy();
+    expect(Number(login.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(loginMs).toBeLessThan(STALL_BUDGET_MS);
+
+    const t1 = Date.now();
+    const read = await e.API.fetch(`${BASE}/public/stores/${stores[1].slug}`, {
+      headers: { 'cf-connecting-ip': nextIp(), ...stall },
+    });
+    await read.text();
+    expect(read.status).toBe(200);
+    expect(Date.now() - t1).toBeLessThan(STALL_BUDGET_MS);
+  }, 45_000);
 });

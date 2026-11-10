@@ -59,7 +59,7 @@ describe('AuthState deadline', () => {
     );
   });
 
-  it('applyOn against a stuck instance fails fast instead of hanging the request', async () => {
+  it('a BOUNDED applyOn against a stuck instance fails fast instead of hanging the request', async () => {
     vi.useFakeTimers();
     setCfBindings({
       AUTH_STATE: {
@@ -67,10 +67,35 @@ describe('AuthState deadline', () => {
         get: () => ({ apply: () => new Promise<never>(() => undefined) }),
       },
     } as unknown as CfBindings);
-    const p = applyOn('rl:public:10.0.0.1', [['hit', 'rl:public:10.0.0.1', 60_000]]);
+    const p = applyOn('rl:public:10.0.0.1', [['hit', 'rl:public:10.0.0.1', 60_000]], {
+      bounded: true,
+    });
     const assertion = expect(p).rejects.toBeInstanceOf(AuthStateTimeoutError);
     await vi.advanceTimersByTimeAsync(AUTH_STATE_TIMEOUT_MS);
     await assertion;
+  });
+});
+
+describe('unbounded calls keep their old semantics', () => {
+  it('an unbounded applyOn (bumps, jti, lockout, locks) is NOT cut off at the deadline', async () => {
+    vi.useFakeTimers();
+    let answer!: (v: unknown[]) => void;
+    setCfBindings({
+      AUTH_STATE: {
+        idFromName: (n: string) => n,
+        get: () => ({ apply: () => new Promise<unknown[]>(r => (answer = r)) }),
+      },
+    } as unknown as CfBindings);
+    const p = applyOn('jti:deny:abc', [['get', 'jti:deny:abc']]);
+    let outcome = 'pending';
+    p.then(
+      () => (outcome = 'ok'),
+      () => (outcome = 'rejected')
+    );
+    await vi.advanceTimersByTimeAsync(AUTH_STATE_TIMEOUT_MS * 3);
+    expect(outcome).toBe('pending');
+    answer(['1']);
+    await expect(p).resolves.toEqual(['1']);
   });
 });
 

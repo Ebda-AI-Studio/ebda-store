@@ -3,6 +3,7 @@ import { cfBindings, type DurableObjectStubLike } from './bindings';
 import type { Op } from './auth-state-core';
 import { hop } from '../lib/hop-timing';
 import logger from '../lib/logger';
+import { currentIoTally } from '../lib/io-tally';
 
 export const CACHEGEN_PREFIX = 'cachegen:';
 
@@ -147,7 +148,7 @@ function stub(shard: number): AuthStateStub {
 }
 
 /**
- * API-HANG-1 (Ruling API-HANG-1): every AuthState round trip is bounded. A DO call has no deadline of its own, so a stuck or
+ * API-HANG-1 (Ruling API-HANG-1): a BOUNDED AuthState round trip (see ApplyOpts) has a deadline. A DO call has no deadline of its own, so a stuck or
  * overloaded instance held the whole request until the caller gave up (the storefront's 8 s cut-off, Logpush outcome `canceled`
  * on `apply`). After this many ms the call rejects with {@link AuthStateTimeoutError}, which every caller already handles as an
  * AuthState outage (a limiter's `passOnStoreError` policy, a cache fill that skips its write). The RPC itself is not cancelled:
@@ -180,25 +181,59 @@ export function withAuthStateDeadline<T>(
 }
 
 /** Run ops on the shard owning `key` (atomically, in order). */
-export function applyOn(key: string, ops: Op[]): Promise<unknown[]> {
+/**
+ * Which calls carry the deadline (Ruling API-HANG-1, as amended after review): ONLY those whose caller has a defined answer to
+ * "AuthState did not answer in time", i.e. `bounded: true`:
+ *   - the rate-limit store (cf/rate-limit-store.ts): a credential/write limiter then FAILS CLOSED (429), a public read limiter
+ *     fails open (RL_FAIL_OPEN_PREFIXES there);
+ *   - cache-generation READS (ioredis-cf `cacheGenerations`): a fill that cannot vouch for its generations skips its write.
+ * Everything else stays unbounded, exactly as before: generation BUMPS (an invalidation must not delete before its bump has
+ * landed, or a fill holding the old generation re-publishes NEVER-stale data), jti/token-version/lockout/CSRF ops, locks.
+ */
+export interface ApplyOpts {
+  bounded?: boolean;
+}
+
+/**
+ * Test / local dev only (DEV_STATS=1, never set in production; lib/request-timing.ts reads the `x-dev-authstate-*` headers
+ * into the request's io tally): add `delayMs` to every AuthState call, and hold a call whose first key starts with `stall`
+ * for 20 s (a stuck instance; a timer, not a dead promise, so workerd does not flag the request as hung). This is how workers-test/api-hang-concurrency.test.ts gives local workerd a production-like DO round trip and a
+ * stuck instance.
+ */
+const STALL_MS = 20_000;
+function call(target: AuthStateStub, ops: Op[]): Promise<unknown[]> {
+  const fault = currentIoTally()?.authStateFault;
+  if (!fault) return target.apply(ops);
+  const firstKey = String(ops[0]?.[1] ?? '');
+  if (fault.stall && firstKey.startsWith(fault.stall))
+    return new Promise(r => setTimeout(r, STALL_MS)).then(() => target.apply(ops));
+  if (!fault.delayMs) return target.apply(ops);
+  return new Promise(r => setTimeout(r, fault.delayMs)).then(() => target.apply(ops));
+}
+
+function run(label: string, target: AuthStateStub, ops: Op[], opts: ApplyOpts): Promise<unknown[]> {
+  return hop(label, () =>
+    opts.bounded ? withAuthStateDeadline(label, call(target, ops)) : call(target, ops)
+  );
+}
+
+/** Run ops on the shard owning `key` (atomically, in order). */
+export function applyOn(key: string, ops: Op[], opts: ApplyOpts = {}): Promise<unknown[]> {
   const label = `do-${key.split(':')[0]}-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`;
-  return hop(label, () => withAuthStateDeadline(label, stub(shardOf(key)).apply(ops)));
+  return run(label, stub(shardOf(key)), ops, opts);
 }
 
 /** Run ops on one explicit shard (cache generations route by name list, not by one key). */
-export function applyOnShard(shard: number, ops: Op[]): Promise<unknown[]> {
+export function applyOnShard(shard: number, ops: Op[], opts: ApplyOpts = {}): Promise<unknown[]> {
   const label = `do-cachegen-${String(ops[0]?.[0] ?? 'op')}${ops.length > 1 ? `x${ops.length}` : ''}`;
-  return hop(label, () => withAuthStateDeadline(label, stub(shard).apply(ops)));
+  return run(label, stub(shard), ops, opts);
 }
 
-/** Run ops on EVERY shard and the cache-generation instance (sweeps: prefix scans). */
+/** Run ops on EVERY shard and the cache-generation instance (sweeps: prefix scans). Unbounded. */
 export async function applyOnAll(ops: Op[]): Promise<unknown[][]> {
-  const label = `do-all-${String(ops[0]?.[0] ?? 'op')}`;
   return Promise.all([
-    ...Array.from({ length: AUTH_STATE_SHARDS }, (_, i) =>
-      withAuthStateDeadline(label, stub(i).apply(ops))
-    ),
-    withAuthStateDeadline(label, stub(CACHEGEN_SHARD).apply(ops)),
+    ...Array.from({ length: AUTH_STATE_SHARDS }, (_, i) => stub(i).apply(ops)),
+    stub(CACHEGEN_SHARD).apply(ops),
   ]);
 }
 
