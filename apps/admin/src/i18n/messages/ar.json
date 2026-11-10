@@ -5580,7 +5580,7 @@
       "title": "نطاق مخصّص",
       "subtitle": "ربط نطاق مخصّص بمتجرك",
       "heading": "نطاق مخصّص",
-      "storeDomainSuffix": "النطاق",
+      "storeDomainTitle": "نطاق {name}",
       "storeNotFound": "المتجر غير موجود.",
       "addDomain": "إضافة نطاق",
       "changeDomain": "تغيير النطاق",

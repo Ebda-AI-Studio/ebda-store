@@ -11,6 +11,43 @@ const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
 // fallback CNAME, so a timeout surfaces as "provider unreachable", not a hang.
 const CF_FETCH_TIMEOUT_MS = 8000;
 
+const DOH_URL = 'https://cloudflare-dns.com/dns-query';
+const DOH_TIMEOUT_MS = 4000;
+
+async function dohAddresses(name: string): Promise<{ cname: string[]; addrs: string[] }> {
+  const out = { cname: [] as string[], addrs: [] as string[] };
+  for (const type of ['A', 'AAAA']) {
+    const res = await fetch(`${DOH_URL}?name=${encodeURIComponent(name)}&type=${type}`, {
+      headers: { accept: 'application/dns-json' },
+      signal: AbortSignal.timeout(DOH_TIMEOUT_MS),
+    });
+    if (!res.ok) continue;
+    const json = (await res.json()) as { Answer?: Array<{ type: number; data: string }> };
+    for (const a of json.Answer ?? []) {
+      if (a.type === 5) out.cname.push(a.data.replace(/\.$/, '').toLowerCase());
+      else if (a.type === 1 || a.type === 28) out.addrs.push(a.data.toLowerCase());
+    }
+  }
+  return out;
+}
+
+/**
+ * Does `host` route to our Cloudflare-for-SaaS target? True for a visible CNAME to it, AND for a
+ * FLATTENED apex (Cloudflare DNS, CNAME-flattening registrars): a flattened CNAME answers A/AAAA
+ * records, never a CNAME, so a CNAME-only check calls a correct setup misconfigured. Addresses are
+ * compared with what the target itself resolves to. Any lookup failure is "not proven" (false).
+ */
+export async function dnsPointsAtTarget(host: string, target: string): Promise<boolean> {
+  try {
+    const want = target.replace(/\.$/, '').toLowerCase();
+    const [mine, ours] = await Promise.all([dohAddresses(host), dohAddresses(want)]);
+    if (mine.cname.includes(want)) return true;
+    return mine.addrs.length > 0 && mine.addrs.some(a => ours.addrs.includes(a));
+  } catch {
+    return false;
+  }
+}
+
 interface CfCustomHostname {
   id: string;
   hostname: string;
@@ -110,7 +147,14 @@ export class CloudflareDomainService {
     try {
       const ch = await this.findByHostname(domain);
       if (!ch) return null;
-      const verified = ch.status === 'active' && ch.ssl?.status === 'active';
+      const sslActive = ch.ssl?.status === 'active';
+      let verified = ch.status === 'active' && sslActive;
+      // Cloudflare keeps the hostname `pending` (ownership not proven) when the apex is a flattened
+      // CNAME, although the certificate is issued and traffic already routes to us. SSL issued +
+      // DNS demonstrably pointing at our target is a verified claim.
+      if (!verified && sslActive && ch.status === 'pending') {
+        verified = await dnsPointsAtTarget(domain, config.cfFallbackOrigin);
+      }
       // Terminal provider states: the hostname was blocked/moved/deleted, or
       // DCV / issuance timed out. Anything else (pending_validation, …) is "not yet".
       const failed =
