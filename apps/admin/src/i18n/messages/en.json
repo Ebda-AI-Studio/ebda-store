@@ -9204,6 +9204,7 @@
       "backToLogin": "Back to sign in",
       "passwordTitle": "Confirm your password",
       "passwordBody": "Enter the password you chose when you signed up to finish verifying your email.",
+      "passwordHint": "Opened this on another phone, or someone else signed you up? Tap \"Forgot your password?\" below, choose a new password, and your email is confirmed at the same time.",
       "password": "Password",
       "verifyButton": "Verify my email",
       "wrongPassword": "That is not the password this verification was created with.",
