@@ -1,6 +1,6 @@
 /**
  * Ebda AI Studio's own "this address has nothing for you" pages: the Apple-style 404 and the
- * "coming soon" page for reserved product hosts (crm, erp, hub, id). ONE pure renderer, no runtime
+ * "coming soon" page for reserved product hosts (crm, erp, invite, quote, hub, id). ONE pure renderer, no runtime
  * imports, so the store Worker's middleware, the marketing build and the status Worker share it.
  *
  * Calm on purpose: one sentence, a search box (a plain GET form to the help search, so it works with no
@@ -12,7 +12,7 @@ import { BRAND, brandMarkSvg } from '../brand';
 export type StudioLang = 'ar' | 'en';
 export type StudioPageKind = 'not-found' | 'coming-soon';
 /** Which upcoming product a coming-soon page names; `reserved` = an address held for a future service. */
-export type ComingSoonProduct = 'crm' | 'erp' | 'reserved';
+export type ComingSoonProduct = 'crm' | 'erp' | 'invite' | 'quote' | 'reserved';
 
 export interface StudioPageInput {
   lang: StudioLang;
@@ -28,6 +28,9 @@ export type StudioHostPlan =
 const COMING_SOON_LABELS: Readonly<Record<string, ComingSoonProduct>> = {
   crm: 'crm',
   erp: 'erp',
+  // every coming-soon software product gets its own page (Ruling SUBDOMAIN-SOON-2); names = BRAND.comingProducts
+  invite: 'invite',
+  quote: 'quote',
   hub: 'reserved',
   id: 'reserved',
 };
@@ -88,7 +91,7 @@ interface Copy {
   switchTo: string;
   groups: { live: string; support: string; next: string };
   links: { home: string; store: string; help: string; docs: string; status: string };
-  products: { whatsapp: string; crm: string; erp: string };
+  products: { whatsapp: string; crm: string; erp: string; invite: string; quote: string };
 }
 
 const COPY: Record<StudioLang, Copy> = {
@@ -104,6 +107,8 @@ const COPY: Record<StudioLang, Copy> = {
     soonLine: {
       crm: 'Ebda CRM is coming soon.',
       erp: 'Ebda ERP is coming soon.',
+      invite: 'Ebda Invite is coming soon.',
+      quote: 'Ebda Quote Studio is coming soon.',
       reserved: 'This address is held for an upcoming service from Ebda AI Studio.',
     },
     soonHint: "We're still building it. Here is what is live today.",
@@ -117,7 +122,13 @@ const COPY: Record<StudioLang, Copy> = {
       docs: 'Developer docs',
       status: 'Service status',
     },
-    products: { whatsapp: 'Ebda Chat', crm: 'Ebda CRM', erp: 'Ebda ERP' },
+    products: {
+      whatsapp: 'Ebda Chat',
+      crm: 'Ebda CRM',
+      erp: 'Ebda ERP',
+      invite: 'Ebda Invite',
+      quote: 'Ebda Quote Studio',
+    },
   },
   ar: {
     title404: 'الصفحة مش موجودة',
@@ -131,6 +142,8 @@ const COPY: Record<StudioLang, Copy> = {
     soonLine: {
       crm: 'ابدأ CRM جاي قريب.',
       erp: 'ابدأ ERP جاي قريب.',
+      invite: 'ابدأ إنفايت جاي قريب.',
+      quote: 'ابدأ ستوديو للتسعير جاي قريب.',
       reserved: 'العنوان ده محجوز لخدمة جاية من ابدأ ستوديو للذكاء الاصطناعي.',
     },
     soonHint: 'لسه بنشتغل عليه. وده اللي شغال النهارده.',
@@ -144,7 +157,13 @@ const COPY: Record<StudioLang, Copy> = {
       docs: 'وثائق المطوّرين',
       status: 'حالة الخدمة',
     },
-    products: { whatsapp: 'ابدأ شات', crm: 'ابدأ CRM', erp: 'ابدأ ERP' },
+    products: {
+      whatsapp: 'ابدأ شات',
+      crm: 'ابدأ CRM',
+      erp: 'ابدأ ERP',
+      invite: 'ابدأ إنفايت',
+      quote: 'ابدأ ستوديو للتسعير',
+    },
   },
 };
 
@@ -217,7 +236,7 @@ export function renderStudioPage(input: StudioPageInput): string {
   const searchAction = lang === 'ar' ? `${help}/search/` : `${help}/en/search/`;
   const otherLang = lang === 'ar' ? 'en' : 'ar';
   const li = (href: string, label: string) => `<li><a href="${esc(href)}">${esc(label)}</a></li>`;
-  const next = (key: 'crm' | 'erp') =>
+  const next = (key: 'crm' | 'erp' | 'invite' | 'quote') =>
     `<li class="soon"${soon && product === key ? ' aria-current="page"' : ''}>${esc(c.products[key])}<b>${esc(c.soon)}</b></li>`;
   const wa = `https://wa.me/${BRAND.contact.whatsapp.replace(/\D/g, '')}`;
 
@@ -261,6 +280,8 @@ ${li(wa, 'WhatsApp')}
 <div><h2>${esc(c.groups.next)}</h2><ul>
 ${next('crm')}
 ${next('erp')}
+${next('invite')}
+${next('quote')}
 </ul></div>
 </nav>
 </main>

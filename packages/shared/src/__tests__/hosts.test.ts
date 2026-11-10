@@ -58,6 +58,9 @@ describe('RESERVED_SLUGS — the single source of truth', () => {
         'studio',
         'checkin',
         'manage',
+        // coming-soon software pages (SUBDOMAIN-SOON-2)
+        'invite',
+        'quote',
       ].sort()
     );
   });

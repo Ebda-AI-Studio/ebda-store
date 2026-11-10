@@ -111,16 +111,20 @@ describe('middleware — the Host alone picks the store', () => {
   );
 
   // Upcoming products: Ebda AI Studio's coming-soon page (200 + noindex), still no store and nothing cacheable.
-  it.each(['crm.ebda.app', 'erp.ebda.app', 'hub.ebda.app', 'id.ebda.app'])(
-    'upcoming product host %s is a coming-soon page, never a store',
-    host => {
-      const res = middleware(at(host, '/'));
-      expect(res.status).toBe(200);
-      expect(res.headers.get('x-robots-tag')).toContain('noindex');
-      expect(res.headers.get('cache-control')).toBe('no-store');
-      expect(forwarded(res, 'x-store-domain')).toBeNull();
-    }
-  );
+  it.each([
+    'crm.ebda.app',
+    'erp.ebda.app',
+    'invite.ebda.app',
+    'quote.ebda.app',
+    'hub.ebda.app',
+    'id.ebda.app',
+  ])('upcoming product host %s is a coming-soon page, never a store', host => {
+    const res = middleware(at(host, '/'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-robots-tag')).toContain('noindex');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(forwarded(res, 'x-store-domain')).toBeNull();
+  });
 
   // Ebda Chat is LIVE at wa.ebda.app (Ruling WHATSAPP-HOST-REDIRECT-1): whatsapp.ebda.app is a 301 there, path and
   // query kept, and never a "coming soon" page again.
@@ -133,6 +137,20 @@ describe('middleware — the Host alone picks the store', () => {
     expect(res.headers.get('location')).toBe(target);
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(forwarded(res, 'x-store-domain')).toBeNull();
+  });
+
+  // SUBDOMAIN-SOON-2: every coming-soon software product has its page, named as in BRAND.comingProducts. invite.ebda.app
+  // used to reach the store lookup and answer 500 (and quote.ebda.app the store's 404); now neither ever looks up a store.
+  it.each([
+    ['invite.ebda.app', 'ابدأ إنفايت جاي قريب.', 'Ebda Invite is coming soon.'],
+    ['quote.ebda.app', 'ابدأ ستوديو للتسعير جاي قريب.', 'Ebda Quote Studio is coming soon.'],
+  ])('%s is its coming-soon page in both languages, never a store', async (host, ar, en) => {
+    const resAr = middleware(at(host, '/'));
+    expect(resAr.status).toBe(200);
+    expect(forwarded(resAr, 'x-store-domain')).toBeNull();
+    expect(await resAr.text()).toContain(`<h1>${ar}</h1>`);
+    const resEn = middleware(at(host, '/?lang=en'));
+    expect(await resEn.text()).toContain(`<h1>${en}</h1>`);
   });
 
   it('nothing the storefront renders says Ebda Chat is coming soon', async () => {

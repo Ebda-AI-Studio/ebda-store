@@ -110,7 +110,17 @@ describe('product name (PRODUCT-NAME-1)', () => {
 
   it('reserves the product-family slugs', async () => {
     const { isReservedSlug } = await import('../../packages/shared/src/hosts/reserved-slugs');
-    for (const s of ['store', 'whatsapp', 'crm', 'erp', 'hub', 'id', 'accounts']) {
+    for (const s of [
+      'store',
+      'whatsapp',
+      'crm',
+      'erp',
+      'hub',
+      'id',
+      'accounts',
+      'invite',
+      'quote',
+    ]) {
       expect(isReservedSlug(s)).toBe(true);
     }
   });

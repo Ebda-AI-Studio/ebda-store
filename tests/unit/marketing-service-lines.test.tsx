@@ -91,12 +91,10 @@ describe('ON publishes everything together', () => {
     expect(home).toContain('on-the-ground');
     for (const id of ['quote-studio', 'invite', 'ads', 'crm', 'erp'])
       expect(home).toContain(`data-coming-soon="${id}"`);
-    // CRM and ERP also link to their own live coming-soon pages; the other three have no site yet
-    expect(home).toContain('href="https://crm.ebda.app/"');
-    expect(home).toContain('href="https://erp.ebda.app/"');
-    expect(
-      home.match(/href="https:\/\/[a-z]+\.ebda\.app\/"[^>]*class="btn btn-ghost"/g)
-    ).toHaveLength(2);
+    // the cards link to their own live coming-soon pages (crm, erp, invite, quote); Ads has none
+    for (const h of ['crm', 'erp', 'invite', 'quote'])
+      expect(home).toContain(`href="https://${h}.ebda.app/"`);
+    expect(home).not.toContain('ads.ebda.app');
     expect(home).toMatch(/\/en\/contact\/?\?topic=products#form/);
     const seo = await import('../../apps/marketing/src/lib/seo');
     expect(JSON.stringify(seo.studioJsonLd('en'))).toContain('/en/services/marketing/');
@@ -271,10 +269,10 @@ describe('coming-soon cards (software only, names distinct from the services)', 
       'ابدأ CRM',
       'ابدأ ERP',
     ]);
-    // only CRM and ERP link out, each to its own live subdomain page
+    // every product with a live coming-soon subdomain page links to it (SUBDOMAIN-SOON-2); Ads has none
     expect(comingSoonItems('en').map(i => [i.id, i.href])).toEqual([
-      ['quote-studio', undefined],
-      ['invite', undefined],
+      ['quote-studio', 'https://quote.ebda.app/'],
+      ['invite', 'https://invite.ebda.app/'],
       ['ads', undefined],
       ['crm', 'https://crm.ebda.app/'],
       ['erp', 'https://erp.ebda.app/'],
