@@ -41,3 +41,56 @@ export function normalizeLanguagePair(
   if (b !== '' && !hasArabicScript(b)) b = '';
   return { en: a, ar: b, swapped };
 }
+
+/** The four SEO meta fields an `/ai/seo` answer fills (store, category and product forms share the names). */
+export interface SeoMetaFields {
+  metaTitle?: string;
+  metaTitleAr?: string;
+  metaDescription?: string;
+  metaDescriptionAr?: string;
+}
+
+/**
+ * QA P2-2: every `/ai/seo` caller applies the AI answer through here, so Arabic never lands in an English field on
+ * ANY form (the store SEO page had the guard; the product and category forms copied the answer straight in). Each
+ * pair goes through `normalizeLanguagePair`; `fill-empty` touches only empty fields, a value dropped as wrong-language
+ * leaves the field as it was. Returns the next fields and the names of the fields it filled.
+ */
+export function applyAiSeoSuggestion<T extends SeoMetaFields>(
+  prev: T,
+  s: { title: string; titleAr: string; description: string; descriptionAr: string },
+  mode: 'fill-empty' | 'overwrite'
+): { next: T; filled: Array<keyof SeoMetaFields> } {
+  const title = normalizeLanguagePair(s.title ?? '', s.titleAr ?? '');
+  const description = normalizeLanguagePair(s.description ?? '', s.descriptionAr ?? '');
+  const targets: Array<[keyof SeoMetaFields, string]> = [
+    ['metaTitle', title.en],
+    ['metaTitleAr', title.ar],
+    ['metaDescription', description.en],
+    ['metaDescriptionAr', description.ar],
+  ];
+  const next = { ...prev };
+  const filled: Array<keyof SeoMetaFields> = [];
+  for (const [field, value] of targets) {
+    if (value === '') continue;
+    if (mode === 'overwrite' || !prev[field]) {
+      next[field] = value as T[keyof SeoMetaFields];
+      filled.push(field);
+    }
+  }
+  return { next, filled };
+}
+
+/** One English/Arabic text pair (the product AEO answer) with the same rule: swapped back, wrong-language dropped. */
+export function applyAiLanguagePair(
+  prevEn: string | undefined,
+  prevAr: string | undefined,
+  en: string,
+  ar: string,
+  mode: 'fill-empty' | 'overwrite'
+): { en: string; ar: string } {
+  const pair = normalizeLanguagePair(en ?? '', ar ?? '');
+  const pick = (prev: string | undefined, value: string) =>
+    value !== '' && (mode === 'overwrite' || !prev) ? value : (prev ?? '');
+  return { en: pick(prevEn, pair.en), ar: pick(prevAr, pair.ar) };
+}

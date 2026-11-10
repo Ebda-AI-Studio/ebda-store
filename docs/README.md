@@ -316,6 +316,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
 - [plans/2026-11-10-store-miss-counts-unverified-store-only.md](plans/2026-11-10-store-miss-counts-unverified-store-only.md) - LAUNCH-RL-MISS-3: a dead product or blog link inside a verified store is not a store-miss
 - [plans/2026-11-10-ssr-client-address.md](plans/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
+- [plans/2026-11-10-services-header-actions.md](plans/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
 
 ## privacy - Privacy
 
@@ -421,3 +422,4 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [uat/storefront-design-save.md](uat/storefront-design-save.md) - UAT: Storefront Design Save — Smart Palette & Page Builder
 - [uat/tax-reports.md](uat/tax-reports.md) - UAT — Tax Reports (accounting.tax_reports)
 - [plans/2026-11-10-preqa-p2-batch.md](plans/2026-11-10-preqa-p2-batch.md) - Pre-QA sweep P2 batch: JSON-LD on every marketing page, brand name in legal copy, guest auth calls, menu vs cookie bar, look preview colour, checkout selects, returns register, /en manifest (2026-11-10)
+- [plans/2026-11-10-qa-p2-admin-batch.md](plans/2026-11-10-qa-p2-admin-batch.md) - QA P2-1..10 status on main, F6 onboarding look name + i18n guards, F2 search (already fixed), storefront auth refusals in Arabic (2026-11-10)

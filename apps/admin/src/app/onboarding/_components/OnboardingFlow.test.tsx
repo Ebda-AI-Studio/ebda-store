@@ -361,6 +361,8 @@ describe('onboarding stepper', () => {
     ).nextElementSibling!;
     expect(templateValue.textContent).not.toMatch(/onboarding\./);
     expect(templateValue.textContent).toBeTruthy();
+    // The #389 fix read the look from `store.template` (a skin id, never a look id) and showed a dash for every store.
+    expect(templateValue.textContent).not.toBe('—');
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.live.publish' }));
     expect(await screen.findByText('onboarding.flow.live.doneTitle')).toBeTruthy();
     expect(apiPost).toHaveBeenCalledWith('/api/v1/onboarding/stores/s1/go-live');

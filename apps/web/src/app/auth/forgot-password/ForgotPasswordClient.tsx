@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import Link from '../../../components/StoreLink';
 import { Button, Input } from '@ebda/ui';
@@ -8,7 +8,8 @@ import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { demoRefusalText } from '../../../lib/demo-refusal';
+import { authRefusalText } from '../../../lib/auth-refusal';
+import { readTypedBeforeHydration } from '../../../lib/adopt-typed-before-hydration';
 
 export default function ForgotPasswordClient() {
   const { isLoading, error, submit } = useAuthFormSubmit();
@@ -17,17 +18,28 @@ export default function ForgotPasswordClient() {
   const { t } = useLanguage();
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [email, setEmail] = useState('');
+  // QA P2-1 class: an address typed before hydration lives only in the DOM; adopt it into state.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const typed = readTypedBeforeHydration(formRef.current, ['email'] as const);
+    if (typed.email) setEmail(typed.email);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = await submit(async () => {
-      const result = await api.forgotPassword(email, store?.id);
-      if (!result.success) {
-        throw new Error(
-          demoRefusalText(result.error, t) || result.error?.message || 'Failed to send reset email'
-        );
-      }
-    }, 'Failed to send reset email');
+    const ok = await submit(
+      async () => {
+        const result = await api.forgotPassword(email, store?.id);
+        if (!result.success) {
+          throw new Error(
+            authRefusalText(result.error, t) ||
+              result.error?.message ||
+              t('Sending the reset link did not work.', 'إرسال الرابط منفعش.')
+          );
+        }
+      },
+      t('Sending the reset link did not work. Try again.', 'إرسال الرابط منفعش. جرّب تاني.')
+    );
     if (ok) setIsSubmitted(true);
   };
 
@@ -111,11 +123,12 @@ export default function ForgotPasswordClient() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
               <Input
                 label={t('Email address', 'البريد الإلكتروني')}
                 type="email"
                 autoComplete="email"
+                name="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required

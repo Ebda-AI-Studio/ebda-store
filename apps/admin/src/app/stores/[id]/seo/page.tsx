@@ -9,7 +9,7 @@ import { apiGet, apiPost, apiPut, unwrapObject } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { StickySaveBar } from '../../../../components/StickySaveBar';
-import { arabicInEnglishFields, normalizeLanguagePair } from './language-guard';
+import { applyAiSeoSuggestion, arabicInEnglishFields } from './language-guard';
 
 interface SeoSettings {
   metaTitle: string;
@@ -267,24 +267,9 @@ export default function StoreSeoPage() {
         return;
       }
       const s = data.suggestion;
-      // The AI sometimes answers with the two languages swapped: put each text back in its own field (QA P2-1).
-      const title = normalizeLanguagePair(s.title, s.titleAr);
-      const description = normalizeLanguagePair(s.description, s.descriptionAr);
-      const targets: Array<[keyof SeoSettings, string]> = [
-        ['metaTitle', title.en],
-        ['metaTitleAr', title.ar],
-        ['metaDescription', description.en],
-        ['metaDescriptionAr', description.ar],
-      ];
-      const next = { ...settings };
-      const filled: string[] = [];
-      for (const [field, value] of targets) {
-        if (value === '') continue;
-        if (mode === 'overwrite' || !settings[field]) {
-          next[field] = value;
-          filled.push(t(`aiField.${field}`));
-        }
-      }
+      // The AI sometimes answers with the two languages swapped: put each text back in its own field (QA P2-2).
+      const { next, filled: filledFields } = applyAiSeoSuggestion(settings, s, mode);
+      const filled = filledFields.map(field => t(`aiField.${field}`));
       if (filled.length === 0) {
         toastSuccess(t('aiNothingToFillTitle'), t('aiNothingToFillBody'));
         return;

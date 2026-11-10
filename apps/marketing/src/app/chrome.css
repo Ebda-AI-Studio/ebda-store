@@ -24,6 +24,96 @@
   color: var(--night);
 }
 
+/* The header bar's budget (Ruling NAV-BAR-FIT-1). Every item in the bar is one line and the header clips sideways, so
+   an item that does not fit is cut off without a scrollbar: the CTA sat fully off-screen on a 600px Arabic screen.
+   One ladder, items only ever added as the screen widens:
+     up to 520px   wordmark, Menu, search                      (globals.css)
+     from 521px    + WhatsApp, the Menu's label                (globals.css)
+     from 680px    + language, Log in
+     from 800px    + the CTA
+     from 1200px   the links sit inline, no Menu               (globals.css)
+   Whatever is not in the bar is in the Menu: language and Log in as rows, the CTA in the pinned pair below. */
+@media (max-width: 799px) {
+  .header-actions .header-start {
+    display: none;
+  }
+  .nav-menu .menu-start {
+    display: flex;
+  }
+}
+@media (min-width: 521px) and (max-width: 679px) {
+  .header-actions .lang-toggle,
+  .link-login,
+  .login-menu {
+    display: none;
+  }
+  .nav-menu .menu-login,
+  .nav-menu .menu-lang {
+    display: list-item;
+  }
+  .nav-menu .menu-lang a {
+    display: flex;
+    align-items: center;
+    min-height: 44px; /* globals.css gives menu links their 44px only up to 520px; this row is new at these widths (it measured 36px) */
+  }
+}
+@media (min-width: 1480px) {
+  /* The row stops growing at 1280px, so the roomier link spacing globals.css turns on here has no new room to spend:
+     with the WhatsApp label and "Choose a product" the English bar had 2px to spare (measured on production, Ruling
+     NAV-BAR-FIT-1). English keeps the 1200px spacing. */
+  html[lang='en'] .nav-links {
+    gap: 18px;
+    padding-inline-start: 8px;
+  }
+}
+
+/* The Menu's actions (Ruling NAV-MENU-ACTIONS-1): the page's CTA and WhatsApp as ONE pair, the last item of the panel,
+   pinned to its bottom edge so both stay in view while the links scroll under them. Before, they were three unrelated
+   rows 420 to 520px below the fold of the panel (measured at 390 and 360px). The CTA shows under 800px (from there it
+   is in the header bar); WhatsApp shows at every Menu width. One row when both fit, two when a label is long: the pair
+   wraps, a label never does. */
+.nav-menu > ul {
+  scroll-padding-block-end: 124px; /* a focused link scrolls clear of the pinned pair (two rows at most) */
+  overscroll-behavior: contain;
+}
+.nav-menu li.menu-actions {
+  position: sticky;
+  bottom: -8px; /* the panel's own bottom padding: at 0 the pair sat 8px up and links showed in the strip under it */
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px -14px -8px; /* full bleed: cancels the panel's 8px 14px padding */
+  padding: 10px 14px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.nav-menu .menu-actions a.nav-cta {
+  flex: 2 1 auto;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+.nav-menu .menu-actions .wa {
+  display: flex;
+  flex: 1 1 auto;
+}
+.nav-menu .menu-actions .wa-link {
+  flex: 1 1 auto;
+  justify-content: center;
+  padding-block: 0;
+  border-radius: 10px; /* the CTA's radius: the two read as a pair, not a bar and a pill */
+}
+@media (min-width: 521px) {
+  /* Tablet and small laptop: the panel hangs from the sticky header, so whatever ran past the bottom of the screen could
+     not be reached at all (the page scrolls, the panel does not). It scrolls inside itself, as on a phone. */
+  .nav-menu > ul {
+    max-height: calc(100dvh - 88px - var(--ebda-consent-h, 0px));
+    overflow-y: auto;
+  }
+}
+
 .product-bar {
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel) 72%, transparent);

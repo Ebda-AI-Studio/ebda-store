@@ -6,6 +6,7 @@ import { AITranslateMissingButton } from '../../../../components/AITranslateMiss
 import { apiPost } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { SizeChartSelect, type SizeChartOption } from '../../../../components/SizeChartSelect';
+import { applyAiSeoSuggestion } from '../seo/language-guard';
 
 interface CategoryFormData {
   name: string;
@@ -83,17 +84,8 @@ export function CategoryForm({
         return;
       }
       const s = data.suggestion;
-      onFormChange(prev => ({
-        ...prev,
-        metaTitle: mode === 'overwrite' || !prev.metaTitle ? s.title : prev.metaTitle,
-        metaTitleAr: mode === 'overwrite' || !prev.metaTitleAr ? s.titleAr : prev.metaTitleAr,
-        metaDescription:
-          mode === 'overwrite' || !prev.metaDescription ? s.description : prev.metaDescription,
-        metaDescriptionAr:
-          mode === 'overwrite' || !prev.metaDescriptionAr
-            ? s.descriptionAr
-            : prev.metaDescriptionAr,
-      }));
+      // QA P2-2: same language guard as the store SEO page, Arabic never lands in an English field.
+      onFormChange(prev => applyAiSeoSuggestion(prev, s, mode).next);
       setSeoMessage(t('seoFilled'));
     } catch {
       setSeoMessage(t('seoNetworkError'));

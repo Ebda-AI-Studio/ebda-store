@@ -6,6 +6,7 @@ import { Button } from '@ebda/ui';
 import {
   buildStoreShareMessage,
   getLook,
+  TEMPLATE_FAMILIES,
   resolveDefaultLanguage,
   waMeShareLink,
 } from '@ebda/shared';
@@ -14,11 +15,21 @@ import { useT } from '@/i18n/useT';
 import type { OnboardingStore } from './types';
 import { useLocale } from 'next-intl';
 
-/** The chosen look's name from the registry (the only source of look names), never a translation key. A store whose look is
- * not registered (yet) shows a dash rather than a raw key. */
-function templateName(id: string | null | undefined, locale: 'ar' | 'en'): string {
-  const look = getLook(id);
-  return look ? look.name[locale] : '—';
+/**
+ * F6: the summary names what the merchant picked, never a translation key. `store.look` is the registry look id
+ * (`qamar.atelier`); `store.template` is the skin (`qamar`), which is NOT a look id, so reading the look from it showed
+ * "—" for every store. A store with no look yet falls back to its template family's name.
+ */
+function chosenLookName(
+  look: string | null | undefined,
+  template: string | null | undefined,
+  locale: 'ar' | 'en'
+): string {
+  const picked = getLook(look);
+  if (picked) return picked.name[locale];
+  const family = TEMPLATE_FAMILIES.find(f => f.id === template || f.skin === template);
+  if (family) return locale === 'ar' ? family.labelAr : family.labelEn;
+  return '—';
 }
 
 interface LiveResult {
@@ -155,7 +166,9 @@ export function LiveStep({
         </div>
         <div className="flex justify-between gap-3 p-3">
           <dt className="text-muted-foreground">{t('checklistTemplate')}</dt>
-          <dd className="font-medium text-foreground">{templateName(store.template, locale)}</dd>
+          <dd className="font-medium text-foreground">
+            {chosenLookName(store.look, store.template, locale)}
+          </dd>
         </div>
         <div className="flex justify-between gap-3 p-3">
           <dt className="text-muted-foreground">{t('checklistProduct')}</dt>

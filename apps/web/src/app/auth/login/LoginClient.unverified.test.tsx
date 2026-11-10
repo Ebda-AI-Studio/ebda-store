@@ -66,7 +66,10 @@ describe('storefront login: unverified email', () => {
     });
     const { container } = render(<LoginClient />);
     fireEvent.submit(container.querySelector('form') as HTMLFormElement);
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Invalid'));
+    // Our sentence, never the API's English (QA P2-10 class): see lib/auth-refusal.ts.
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('The email or password is not right.')
+    );
     expect(screen.queryByText(/resend:/)).toBeNull();
   });
 });
