@@ -1,8 +1,8 @@
 import type { MetadataRoute } from 'next';
-import { getStore } from '../lib/store-resolver';
-import { API_URL } from '../lib/api';
-import { pickMetaDescription } from '../lib/seo/meta-description';
-import { resolveStorefrontLocale } from '../lib/seo/resolve-locale';
+import { getStore } from '../store-resolver';
+import { API_URL } from '../api';
+import { pickMetaDescription } from '../seo/meta-description';
+import { resolveStorefrontLocale } from '../seo/resolve-locale';
 import { hslToHex, BRAND, storePwaManifestSchema, type StorePwaManifest } from '@ebda/shared';
 
 type ManifestIconPurpose = 'any' | 'maskable' | 'monochrome';
@@ -174,7 +174,17 @@ function withSavedSettings(
   };
 }
 
-export default async function manifest(): Promise<MetadataRoute.Manifest> {
+/**
+ * The store's web app manifest, in the language of the request (Ruling PWA-MANIFEST-2).
+ *
+ * This is NOT `app/manifest.ts`: a file-based manifest at the app root always wins over the `manifest` a layout
+ * names in its metadata, so every page would link the one shared URL. A browser fetches a manifest without
+ * cookies, so that one URL can only ever answer in the store's default language. The route handler
+ * `app/manifest.webmanifest/route.ts` serves this instead, and the root layout links `/<lang>/manifest.webmanifest`
+ * from a `/ar` or `/en` page; the middleware carries that language here as `x-locale-path`, which
+ * `resolveStorefrontLocale` reads first.
+ */
+export async function buildStoreManifest(): Promise<MetadataRoute.Manifest> {
   const store = await getStore();
   const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
     ?.defaultLanguage as string | undefined;

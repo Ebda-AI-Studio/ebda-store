@@ -282,6 +282,14 @@ describe('DemoLookBar: template, then look', () => {
       expect(s.className).toBe(DEMO_BAR_SELECT_CLASS);
   });
 
+  it('both selects are 16px on a phone, so iOS Safari does not zoom the page when one is tapped', () => {
+    // text-sm (14px) alone made the whole demo store zoom in on focus and stay zoomed.
+    const sizes = DEMO_BAR_SELECT_CLASS.split(/\s+/).filter(c =>
+      /^(\w+:)?text-(xs|sm|base|lg)$/.test(c)
+    );
+    expect(sizes).toEqual(['text-base', 'sm:text-sm']);
+  });
+
   it('the select boundary is >= 3:1 against the bar on every look (WCAG 1.4.11)', () => {
     // The bar is bg-foreground (the look's ink); the border is the page colour at N% over it.
     const alpha = Number(/\bborder-background\/(\d+)\b/.exec(DEMO_BAR_SELECT_CLASS)?.[1]) / 100;

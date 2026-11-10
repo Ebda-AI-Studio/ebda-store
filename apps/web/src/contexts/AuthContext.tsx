@@ -14,6 +14,7 @@ import {
   api,
   getProfileWithMountRetries,
   hasSessionHint,
+  sessionProbeSpent,
   isTransientSessionAnswer,
   type User,
 } from '../lib/api';
@@ -96,7 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checked = useRef(false);
   useEffect(() => {
     if (checked.current) return;
-    if (!intent && !hasSessionHint()) {
+    // ...and only until this tab has been told "no session" once (`sessionProbeSpent`): from then on
+    // a browser with no hint is a guest on the intent routes too, and repeats no 401 per page.
+    if (!hasSessionHint() && (!intent || sessionProbeSpent())) {
       setIsLoading(false);
       return;
     }

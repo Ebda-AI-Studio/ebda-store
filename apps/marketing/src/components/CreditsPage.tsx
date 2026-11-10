@@ -2,9 +2,11 @@ import { SiteLink } from './SiteLink';
 import Link from 'next/link';
 import { COPY } from '../lib/content';
 import { MODEL_CREDITS } from '../lib/credits';
+import { pageJsonLd } from '../lib/seo';
 import { HOME, type Locale } from '../lib/site';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { JsonLd } from './JsonLd';
 
 /** /credits (Ruling MKT-12): the attribution that used to sit under the 3D viewer, linked from every footer. */
 export function CreditsPage({ locale }: { locale: Locale }) {
@@ -12,6 +14,7 @@ export function CreditsPage({ locale }: { locale: Locale }) {
   const p = c.creditsPage;
   return (
     <>
+      <JsonLd data={pageJsonLd(locale, 'credits', p.title, p.desc)} />
       <Header locale={locale} page="credits" />
       <main id="main" className="wrap legal">
         <header className="legal-head">

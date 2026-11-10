@@ -109,7 +109,22 @@ export type LocalePathDecision =
   /** `/ar/products` -> serve `/products` in Arabic. */
   | { kind: 'rewrite'; locale: PathLocale; rest: string }
   /** `/products` (an old URL): the root layout redirects it once it has the store's default language. */
-  | { kind: 'pending'; rest: string };
+  | { kind: 'pending'; rest: string }
+  /** `/en/manifest.webmanifest`: serve the one manifest route in that language (Ruling PWA-MANIFEST-2). */
+  | { kind: 'manifest'; locale: PathLocale };
+
+/** The one web app manifest route (`app/manifest.webmanifest/route.ts`). */
+export const MANIFEST_PATH = '/manifest.webmanifest';
+
+/**
+ * The manifest a page links (Ruling PWA-MANIFEST-2). A browser fetches a manifest WITHOUT cookies, so the
+ * `force-language` cookie never reaches it: the language has to be in the manifest's own URL. A page under
+ * `/ar` or `/en` links `/<lang>/manifest.webmanifest`; a page with no language in its URL (a store without
+ * locale paths, the cart, checkout) links the shared one, which answers in the store's default language.
+ */
+export function manifestHref(urlLocale: PathLocale | null): string {
+  return urlLocale ? `/${urlLocale}${MANIFEST_PATH}` : MANIFEST_PATH;
+}
 
 function safeDecode(v: string): string {
   try {
@@ -130,6 +145,9 @@ export function decideLocalePath(a: {
   if (prefixed) {
     if (isLocalePathRoute(prefixed.rest))
       return { kind: 'rewrite', locale: prefixed.locale, rest: prefixed.rest };
+    // Exactly this path, before the redirect below: redirected to the shared URL it would answer in the
+    // store's default language again, which is the defect (Ruling PWA-MANIFEST-2).
+    if (prefixed.rest === MANIFEST_PATH) return { kind: 'manifest', locale: prefixed.locale };
     // Open-redirect guard (Ruling LOCALE-PATHS-3): `/ar//evil.com` leaves rest = `//evil.com`, a protocol-relative URL.
     // A backslash anywhere (raw or %5C), or a decoded rest that starts with two slashes, is refused (no redirect, the
     // request falls through to a plain 404); leading slashes are otherwise collapsed so the target is always a path.

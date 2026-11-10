@@ -6,7 +6,7 @@ import { resolveDefaultLanguage } from '@ebda/shared';
  * The storefront's only two render locales. Kept as its own type (rather
  * than importing `Language` from LanguageContext) so this module has zero
  * client-component dependencies and can be called from server-only code
- * (`generateMetadata`, `manifest.ts`, JSON-LD builders).
+ * (`generateMetadata`, the web app manifest, JSON-LD builders).
  */
 export type StorefrontLocale = 'en' | 'ar';
 

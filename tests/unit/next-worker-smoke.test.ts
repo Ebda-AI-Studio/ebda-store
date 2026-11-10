@@ -35,4 +35,12 @@ describe('next-worker-smoke probes mirror the deploy probes', () => {
       }
     });
   }
+
+  it('web: the built Worker is also asked for the app manifest route (Ruling PWA-MANIFEST-2)', () => {
+    expect(PROBES.web.smokeOnly).toContainEqual([
+      '/manifest.webmanifest',
+      200,
+      'application/manifest+json',
+    ]);
+  });
 });

@@ -16,7 +16,8 @@ type CatalogProduct = NonNullable<
   Awaited<ReturnType<typeof api.getWholesaleProducts>>['data']
 >['products'][number];
 
-const INPUT = 'mt-1 min-h-11 w-full rounded-md border px-3 py-2';
+// 16px on a phone: under that, iOS Safari zooms the page on focus. The label around it is text-sm.
+const INPUT = 'mt-1 min-h-11 w-full rounded-md border px-3 py-2 text-base sm:text-sm';
 
 export default function WholesaleClient() {
   const { t } = useLanguage();

@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { BRAND, whatsappDisplay, whatsappUrl } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
+import { pageJsonLd } from '../lib/seo';
 import { HOME, SECURITY_EMAIL, type Locale } from '../lib/site';
 import { serviceLinesBuilt } from '../lib/service-lines';
 import { ContactForm } from './ContactForm';
 import { Footer } from './Footer';
 import { Header } from './Header';
+import { JsonLd } from './JsonLd';
 import { OfficeBlock } from './OfficeBlock';
 import { SiteLink } from './SiteLink';
 
@@ -15,6 +17,7 @@ export function ContactPage({ locale }: { locale: Locale }) {
   const en = locale === 'en';
   return (
     <>
+      <JsonLd data={pageJsonLd(locale, 'contact', p.title, p.desc, { type: 'ContactPage' })} />
       <Header locale={locale} page="contact" />
       <main id="main" className="ab">
         <header className="wrap ab-hero">

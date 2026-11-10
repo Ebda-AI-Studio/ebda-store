@@ -4,11 +4,12 @@ import { EmptyStateKit } from '../../components/EmptyStateKit';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from '../../components/StoreLink';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, hasSessionHint } from '@/lib/api';
 import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { useCurrentUrl } from '../../hooks/useCurrentUrl';
 import type { TemplateProduct } from '../../templates/types';
@@ -45,8 +46,10 @@ export default function WishlistClient() {
   const [actionError, setActionError] = useState<string | null>(null);
   const hasFetched = useRef(false);
 
-  // Derive the share URL from the current user's auth state
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // Derive the share URL from the current user's auth state. AuthContext owns that state: this page
+  // used to ask `/auth/me` a second time on its own (a second red 401 in a guest's console).
+  const { user, isLoading: authLoading } = useAuth();
+  const currentUserId = user?.id ?? null;
   // The page URL is '' until after hydration (useCurrentUrl), so the origin never differs
   // between the server render and the hydrating one.
   const currentUrl = useCurrentUrl();
@@ -82,26 +85,22 @@ export default function WishlistClient() {
 
   useEffect(() => {
     if (hasFetched.current) return;
+    // Wait for AuthContext's one session check to settle.
+    if (authLoading) return;
     hasFetched.current = true;
 
-    const checkAuthAndLoad = async () => {
-      // Auth is via HTTP-only cookies — try loading the wishlist directly.
-      // If the API returns UNAUTHORIZED, loadWishlist handles it.
-      setIsLoggedIn(true);
-      // Fetch current user ID for share URL
-      try {
-        const meResponse = await api.get<{ user: { id: string } }>('/auth/me');
-        if (meResponse.success && meResponse.data?.user?.id) {
-          setCurrentUserId(meResponse.data.user.id);
-        }
-      } catch {
-        // non-critical — share URL just won't render
-      }
-      await loadWishlist();
-    };
-
-    checkAuthAndLoad();
-  }, [loadWishlist]);
+    // No customer and no sign that this browser ever held a session: a guest. Show the signed-out
+    // state without asking the API for a wishlist it can only refuse.
+    if (!user && !hasSessionHint()) {
+      setIsLoggedIn(false);
+      setIsLoading(false);
+      return;
+    }
+    // Otherwise try loading the wishlist directly (auth is via HTTP-only cookies). If the API
+    // returns UNAUTHORIZED, loadWishlist handles it.
+    setIsLoggedIn(true);
+    loadWishlist();
+  }, [authLoading, user, loadWishlist]);
 
   async function toggleVisibility() {
     setIsTogglingVisibility(true);
