@@ -185,6 +185,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [ebda/templates/souq.md](ebda/templates/souq.md) - Souq (سوق): the general retail and electronics template and its three looks
 - [ebda/truth-table-2026-10.md](ebda/truth-table-2026-10.md) - Ebda truth table — 2026-10-10
 - [ebda/ui/2026-10-05-merchant-ui-verification.md](ebda/ui/2026-10-05-merchant-ui-verification.md) - Ebda merchant UI — verification, 5 October 2026
+- [ebda/ui/smooth-scroll-and-navigation.md](ebda/ui/smooth-scroll-and-navigation.md) - Smooth scrolling and page navigation: why the root html element carries data-scroll-behavior
 
 ## incidents - Incident write-ups
 
