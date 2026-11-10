@@ -35,7 +35,7 @@ import {
   assertLoopback,
   apiChecksForStore,
 } from './lib/cf-drill.mjs';
-import { assertPlatformTables, digestSqlite } from './lib/cf-backup.mjs';
+import { assertIdentityTables, assertPlatformTables, digestSqlite } from './lib/cf-backup.mjs';
 import {
   ageDecrypt,
   dirR2,
@@ -86,7 +86,7 @@ if (a.extract) {
   for (const [name, buf] of Object.entries(files))
     writeFileSync(
       path.join(a.extract, `${name}.${manifest.artifacts[name].ext}`),
-      name === 'd1-ebda-platform' ? Buffer.from(normalizeD1Sql(buf.toString('utf8'))) : buf,
+      name.startsWith('d1-') ? Buffer.from(normalizeD1Sql(buf.toString('utf8'))) : buf,
       {
         mode: 0o600,
       }
@@ -238,7 +238,49 @@ async function req(method, p, body, ctype) {
 }
 const post = (p, body, ctype) => req('POST', p, body, ctype);
 const get = p => req('GET', p);
+/**
+ * D1 ebda-identity -> a SCRATCH local D1 (Ruling ICEBERG-BK-1): its own throwaway wrangler config + persist dir under the workdir,
+ * loaded with the same `wrangler d1 execute --file` a real recovery uses, then digested table by table. It never names the live
+ * database id, so it cannot touch production.
+ */
+async function loadScratchIdentity(sql) {
+  const dir = path.join(work, 'identity');
+  mkdirSync(dir, { recursive: true });
+  const cfg = path.join(dir, 'wrangler.identity-drill.jsonc');
+  writeFileSync(
+    cfg,
+    JSON.stringify({
+      name: 'identity-restore-drill',
+      compatibility_date: '2025-01-01',
+      d1_databases: [
+        {
+          binding: 'DB',
+          database_name: 'ebda-identity-restore-drill',
+          database_id: '00000000-0000-4000-8000-00000000d1d1',
+        },
+      ],
+    })
+  );
+  const f = path.join(dir, 'identity.sql');
+  writeFileSync(f, normalizeD1Sql(sql), { mode: 0o600 });
+  const r = spawnSync(
+    'npx',
+    ['wrangler', 'd1', 'execute', 'DB', '--local', '--persist-to', path.join(dir, 'state'), '--config', cfg, '--file', f],
+    { cwd: ROOT, encoding: 'utf8' }
+  );
+  if (r.status !== 0) throw new Error(`scratch identity D1 load failed: ${r.stderr || r.stdout}`);
+  const sq = path.join(dir, 'state/v3/d1/miniflare-D1DatabaseObject');
+  const files = readdirSync(sq).filter(n => n.endsWith('.sqlite') && n !== 'metadata.sqlite');
+  if (files.length !== 1) throw new Error(`expected one scratch identity sqlite file, found ${files.length}`);
+  const db = new DatabaseSync(path.join(sq, files[0]), { readOnly: true });
+  try {
+    return { tables: assertIdentityTables(await digestSqlite(db)) };
+  } finally {
+    db.close();
+  }
+}
 const targets = { decrypt: ageDecrypt(identity), post, get };
+targets.loadIdentity = loadScratchIdentity;
 if (a.target === 'harness') {
   targets.loadD1 = async sql => {
     const tables = assertPlatformTables(await d1Digests(sql));

@@ -168,7 +168,7 @@ export const CAPABILITIES: Record<Locale, Record<CardId, CapabilityCopy>> = {
     },
     payments: {
       t: 'دفع وشحن زي ما السوق المصري متعود',
-      d: 'الدفع عند الاستلام، وإنستاباي، والكارت والمحفظة عن طريق Paymob وKashier وFawryPay. والشحن مع بوسطة وShipBlu ومايلرز وأرامكس، أو توصّل بنفسك.',
+      d: 'الدفع عند الاستلام وإنستاباي من أول يوم، والكارت والمحفظة بحسابك إنت في Paymob أو Kashier أو FawryPay. والشحن مع بوسطة وShipBlu ومايلرز وأرامكس، أو توصّل بنفسك.',
     },
     warehouse: {
       t: 'أكتر من مخزن وأوامر شراء',
@@ -268,7 +268,7 @@ export const CAPABILITIES: Record<Locale, Record<CardId, CapabilityCopy>> = {
     },
     payments: {
       t: 'Payments and shipping the Egyptian market expects',
-      d: 'Cash on delivery, InstaPay, and card and wallet payments through Paymob, Kashier and FawryPay. Shipping with Bosta, ShipBlu, Mylerz and Aramex, or deliver yourself.',
+      d: 'Cash on delivery and InstaPay from day one; card and wallet payments with your own Paymob, Kashier or FawryPay account. Shipping with Bosta, ShipBlu, Mylerz and Aramex, or deliver yourself.',
     },
     warehouse: {
       t: 'Multiple warehouses and purchase orders',

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { pageJsonLd } from '../lib/seo';
@@ -61,10 +61,10 @@ export function ServicesIndexPage({ locale }: { locale: Locale }) {
                 return (
                   <li key={l.id} className={`sv-card sv-${l.id}`} data-service-line={l.id}>
                     <h3>
-                      <Link href={`${pagePath(locale, `services/${l.id}`)}/`}>
+                      <PageLink href={`${pagePath(locale, `services/${l.id}`)}/`}>
                         {name}
                         <span className="sv-card-sr"> — {c.tagline}</span>
-                      </Link>
+                      </PageLink>
                     </h3>
                     <p className="sv-card-tag">{c.tagline}</p>
                     <p>{c.what.statement}</p>

@@ -80,6 +80,12 @@ const FALSE_POSITIVES: Record<string, Array<[RegExp, string]>> = {
     ],
   ],
   'tests/unit/editor-matrix.test.ts': [[/\?\? 'classic'/, 'the classic builder capability label']],
+  'packages/cf-schema/src/store/migrations.generated.ts': [
+    [
+      /^\s*sql: "-- Hand-written \(Ruling SKIN-DEL-9\)/,
+      'the StoreDO migration that remaps the retired values (Ruling SKIN-DEL-9); its .sql twin is under migrations/, which this walk skips',
+    ],
+  ],
 };
 
 function hitsOf(re: RegExp): string[] {

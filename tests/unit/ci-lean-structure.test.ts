@@ -2,11 +2,12 @@
  * Lean CI (SP4 task 9): the shape of .github/workflows/ci.yml and the
  * workspace-affected logic in scripts/ci-affected.mjs.
  *
- * Ahmad's decision: pull requests run only lint, typecheck and unit tests for
- * the paths that changed; integration, e2e and mutation run on main or nightly.
- * That is what keeps Ebda inside 2,000 GitHub-hosted minutes/month
- * (docs/ebda/ci.md). A job that drifts into the wrong lane is a budget bug, so
- * the lanes are pinned here.
+ * Pull requests run only lint, typecheck and unit tests for the paths that
+ * changed (fast merges). Ruling CI-FULL-MAIN-1 (2026-11-10): every push to main,
+ * every cron and a manual dispatch run the FULL lane (build, integration,
+ * workerd, e2e, audit); mutation is the Sunday cron or a ticked dispatch.
+ * Budget: docs/ebda/ci.md. A job that drifts into the wrong lane is either a
+ * slow PR or a main that is no longer proven, so the lanes are pinned here.
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -74,10 +75,13 @@ function skipsOnPr(name: string, seen = new Set<string>()): boolean {
 }
 
 describe('ci.yml triggers', () => {
-  it('runs on PRs to main, pushes to main, a Sunday full run and manual dispatch', () => {
+  it('runs on PRs to main, pushes to main, a nightly (Mon-Sat) + Sunday full run and manual dispatch', () => {
     expect(ci.on.pull_request.branches).toEqual(['main']);
     expect(ci.on.push.branches).toEqual(['main']);
-    expect(ci.on.schedule.map((e: { cron: string }) => e.cron)).toEqual(['17 1 * * 0']);
+    expect(ci.on.schedule.map((e: { cron: string }) => e.cron)).toEqual([
+      '17 1 * * 1-6',
+      '17 1 * * 0',
+    ]);
     expect(ci.on).toHaveProperty('workflow_dispatch');
   });
 
@@ -88,10 +92,15 @@ describe('ci.yml triggers', () => {
     for (const u of used) expect(declared, u).toContain(u);
   });
 
-  it('cancels superseded PR runs, and only PR runs', () => {
+  it('cancels superseded PR runs and superseded main pushes, never a cron or manual run', () => {
     expect(ci.concurrency.group).toMatch(/^ci-/);
-    expect(ci.concurrency.group).toContain('github.ref');
-    expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}");
+    // PR runs group per ref, every main push shares one group, anything else is alone (run_id)
+    expect(ci.concurrency.group).toBe(
+      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && 'main-push' || github.run_id) }}"
+    );
+    expect(ci.concurrency['cancel-in-progress']).toBe(
+      "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}"
+    );
   });
 
   it('uses Node 22 (wrangler >= 4.110) and caches npm (hosted runners only) in every setup-node that installs', () => {
@@ -153,19 +162,96 @@ describe('ci.yml lanes', () => {
     expect(raw).toMatch(/defence-mutation-record\.mjs --tier=unit/);
   });
 
-  it('a push to main runs only the lite guards (the merge commit already passed its PR)', () => {
-    const runsOnPush = (name: string): boolean => {
+  // Ruling CI-FULL-MAIN-1: evaluate each job's `if:` for an event (a small, closed evaluator: anything it cannot
+  // rewrite throws, so a new expression shape fails here instead of silently passing).
+  const runsOn = (event: string, schedule = '', seen = new Map<string, boolean>()) => {
+    const run = (name: string): boolean => {
+      if (seen.has(name)) return seen.get(name)!;
       const j = ci.jobs[name];
-      const cond = j.if ?? '';
-      if (/needs\.build\.result == 'success'/.test(cond)) return runsOnPush('build');
-      if (/github\.event_name\s*==\s*'(pull_request|schedule|workflow_dispatch)'/.test(cond))
-        return false;
-      if (/always\(\)/.test(cond)) return true;
-      if (/needs\.changes\./.test(cond)) return false;
-      return ([] as string[]).concat(j.needs ?? []).every(runsOnPush);
+      const needs = ([] as string[]).concat(j.needs ?? []);
+      let res: boolean;
+      if (!j.if) res = needs.every(run);
+      else {
+        const expr = j.if
+          .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
+          .replace(/needs\.([\w-]+)\.result == 'success'/g, (_, n) => String(run(n)))
+          .replace(/needs\.[\w-]+\.outputs\.\w+ (==|!=) '[^']*'/g, (_, op) =>
+            String(op === '!=' ? false : false)
+          )
+          .replace(/github\.event\.schedule/g, `'${schedule}'`)
+          .replace(/github\.event_name/g, `'${event}'`)
+          .replace(/inputs\.mutation/g, 'false')
+          .replace(/!cancelled\(\)/g, 'true')
+          .replace(/always\(\)/g, 'true')
+          .replace(/==/g, '===')
+          .replace(/!=/g, '!==');
+        if (!/^[\s'\w*\- ()!=&|]+$/.test(expr)) throw new Error(`${name}: cannot evaluate ${expr}`);
+        res = Boolean(new Function(`return (${expr});`)());
+      }
+      seen.set(name, res);
+      return res;
     };
-    const onPush = Object.keys(ci.jobs).filter(runsOnPush);
-    expect(onPush.sort()).toEqual(['guards', 'notify-failure']);
+    return Object.keys(ci.jobs).filter(run).sort();
+  };
+  const PR_ONLY = [
+    'changes',
+    'lint',
+    'typecheck',
+    'unit',
+    'worker-dry-run',
+    'app-build',
+    'app-builds',
+  ];
+  const FULL_LANE = Object.keys(ci.jobs)
+    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation')
+    .sort();
+
+  it('a push to main runs the FULL lane except mutation (build, unit, integration, workerd, e2e, audit)', () => {
+    expect(runsOn('push')).toEqual(FULL_LANE);
+    for (const j of [
+      'build',
+      'test-unit',
+      'test-integration',
+      'test-e2e',
+      'builder-e2e',
+      'security',
+      'api-workerd-smoke',
+      'workerd-integration',
+      'orphan-tests',
+      'notify-failure',
+    ])
+      expect(runsOn('push'), j).toContain(j);
+  });
+
+  it('the nightly cron runs the full lane, the Sunday cron adds mutation, neither depends on EBDA_RUNS_ON', () => {
+    expect(runsOn('schedule', '17 1 * * 1-6')).toEqual(FULL_LANE);
+    expect(runsOn('schedule', '17 1 * * 0')).toEqual([...FULL_LANE, 'mutation'].sort());
+    expect(runsOn('workflow_dispatch')).toEqual(FULL_LANE);
+    // Ruling CI-HOSTED-1's scheduled no-op is retired
+    expect(raw).not.toMatch(/vars\.EBDA_RUNS_ON != ''/);
+  });
+
+  it('the full lane runs the WHOLE workers-test suite (route-sweep included), a PR the slice', () => {
+    expect(raw).toMatch(
+      /if \[ "\$EVENT" = "pull_request" \]; then\n\s+npm run cf:test -w apps\/api -- workers-test\//
+    );
+    expect(raw).toMatch(/else\n\s+# full lane[^\n]*\n\s+npm run cf:test -w apps\/api\n/);
+  });
+
+  it('a red full lane on main opens or updates the ci-main-red issue, and a green one closes it', () => {
+    const n = ci.jobs['notify-failure'] as Job & { permissions?: Record<string, string> };
+    expect(n.permissions?.issues).toBe('write');
+    expect(raw).toMatch(/gh issue create --label ci-main-red/);
+    expect(raw).toMatch(/gh issue close "\$num"/);
+    // a job that hits its timeout reports `cancelled` (run 42820243819): that is red too, never "green"
+    expect(raw).toContain(
+      "if: (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && github.ref == 'refs/heads/main'"
+    );
+    expect(raw).toContain(
+      "!contains(needs.*.result, 'cancelled') && github.ref == 'refs/heads/main'"
+    );
+    const needs = ([] as string[]).concat(n.needs ?? []);
+    for (const j of FULL_LANE.filter(j => j !== 'notify-failure')) expect(needs, j).toContain(j);
   });
 
   it('the PR lane runs lint, typecheck and unit tests for changed paths only', () => {

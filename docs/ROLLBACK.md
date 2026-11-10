@@ -268,3 +268,7 @@ Flipping `SEARCH_SEMANTIC_ENABLED` to `false` (or rolling the API back to a vers
 ## Page revision publisher (`20261107000220_store_page_revisions_published_by`)
 
 Additive, nullable. Rollback: `ALTER TABLE store_page_revisions DROP COLUMN published_by;` (history then simply shows no publisher; nothing else reads them).
+
+## Current templates only on SQLite (D1 `0009_store_template_current`, StoreDO `cf-0004_template_current`)
+
+Ruling SKIN-DEL-9. Data step: rows on a retired skin are moved to the template they already render as (in production only `qa-walk-store-1010`, `modern` to `souq`). Rule step: two triggers per database refuse a retired template. Applied by `cf-api-deploy.yml` (`wrangler d1 migrations apply ebda-platform --remote`, before the Worker deploy) and by each StoreDO on its next start; a code rollback does not undo it (expand-then-contract, CF-MIGRATE-1). Undo on D1: `DROP TRIGGER IF EXISTS stores_template_current_insert; DROP TRIGGER IF EXISTS stores_template_current_update;` and, only if the old value is wanted back, `UPDATE stores SET template = 'modern' WHERE slug = 'qa-walk-store-1010';` (the generated CHECK still allows it). In a StoreDO: the same two `DROP TRIGGER` for `store_profile_template_current_insert` / `_update`. Do not delete the `d1_migrations` / `_migrations` row: the triggers are `IF NOT EXISTS`, so a re-run is harmless either way.

@@ -611,7 +611,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'عملائي يقدروا يدفعوا أونلاين؟',
-          a: 'أيوه، بالكارت والمحفظة عن طريق Paymob وKashier وFawryPay، وكمان كاش وإنستاباي.',
+          a: 'أيوه. الدفع عند الاستلام وإنستاباي شغالين من أول يوم. والكارت والمحفظة بيشتغلوا لما تربط حسابك إنت في Paymob أو Kashier أو FawryPay، والحساب ده بيتفتح باسمك وبموافقتهم.',
         },
         {
           q: 'الشحن بيشتغل إزاي؟',
@@ -1048,7 +1048,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'Can customers pay online?',
-          a: 'Yes, by card and wallet through Paymob, Kashier and FawryPay, plus cash and InstaPay.',
+          a: 'Yes. Cash on delivery and InstaPay work from day one. Card and wallet payments work once you connect your own Paymob, Kashier or FawryPay account, opened in your name and approved by them.',
         },
         {
           q: 'How does shipping work?',

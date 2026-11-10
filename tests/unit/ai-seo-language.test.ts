@@ -80,6 +80,19 @@ describe('seoLanguagesOk with product names (Opus review #4)', () => {
       false
     );
   });
+  it('an English title carrying the Arabic store name passes; a title that is only that name does not (PR #512 review)', () => {
+    const qamar = {
+      title: 'Qamar قمر بوتيك — Dresses',
+      titleAr: 'قمر بوتيك — فساتين سهرة',
+      description: 'Evening dresses from Cairo.',
+      descriptionAr: 'فساتين سهرة من القاهرة.',
+    };
+    expect(seoLanguagesOk(qamar, ['قمر بوتيك'])).toBe(true);
+    // without the name, 8 Arabic letters of 21 (38%) is over the English ceiling
+    expect(seoLanguagesOk(qamar)).toBe(false);
+    // an English field made of nothing but the Arabic name is still Arabic
+    expect(seoLanguagesOk({ ...qamar, title: 'قمر بوتيك' }, ['قمر بوتيك'])).toBe(false);
+  });
 });
 
 describe('AIService.suggestSeo language check', () => {

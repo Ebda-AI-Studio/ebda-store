@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import {
   BRAND,
   BRAND_SECURITY_EMAIL,
@@ -66,9 +66,9 @@ export function AboutPage({ locale }: { locale: Locale }) {
                 <li key={pr.id} className="ab-card">
                   <h3>{pr.label}</h3>
                   <p>{pr.blurb}</p>
-                  <Link href={pr.path!} className="btn btn-ghost">
+                  <PageLink href={pr.path!} className="btn btn-ghost">
                     {p.productCta} {pr.label}
-                  </Link>
+                  </PageLink>
                 </li>
               ))}
             </ul>
@@ -124,13 +124,13 @@ export function AboutPage({ locale }: { locale: Locale }) {
             </p>
             <OfficeBlock locale={locale} />
             <p>
-              <Link href={pagePath(locale, 'contact')} className="btn btn-primary">
+              <PageLink href={pagePath(locale, 'contact')} className="btn btn-primary">
                 {p.talkCta}
-              </Link>
+              </PageLink>
             </p>
             <p className="muted">{p.contactHelp}</p>
             <p>
-              <Link href={pagePath(locale, 'contact')}>{c.nav.contact}</Link>
+              <PageLink href={pagePath(locale, 'contact')}>{c.nav.contact}</PageLink>
             </p>
           </div>
         </section>
@@ -138,7 +138,7 @@ export function AboutPage({ locale }: { locale: Locale }) {
         <p className="wrap ab-legal muted small">
           {p.legalLabel}: {locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn}
           {' · '}
-          <Link href={pagePath(locale, 'legal')}>{p.legalLink}</Link>
+          <PageLink href={pagePath(locale, 'legal')}>{p.legalLink}</PageLink>
         </p>
       </main>
       <Footer locale={locale} />

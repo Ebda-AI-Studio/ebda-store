@@ -68,29 +68,88 @@ function globalRule(className: string): string {
   return m ? m[1] : '';
 }
 
-/**
- * Everything that decides the control's classes: the tag itself, any `const NAME = '…'` in the same
- * file that the tag's className names, and the globals.css rule of any plain class it uses.
- */
-function classSources(tag: string, src: string): string {
-  let text = tag;
-  const expr = tag.match(/className=\{([^}]*)\}/);
-  if (expr) {
-    for (const ident of expr[1].match(/\b[A-Za-z_][A-Za-z0-9_]*\b/g) ?? []) {
-      const decl = src.match(new RegExp(`(?:const|let)\\s+${ident}\\s*=([\\s\\S]*?);\\n`));
-      if (decl) text += ` ${decl[1]}`;
-    }
-  }
-  const literal = tag.match(/className="([^"]*)"/);
-  if (literal) {
-    for (const cls of literal[1].split(/\s+/)) {
-      if (/^[a-z][a-z-]*$/.test(cls)) text += ` ${globalRule(cls)}`;
-    }
-  }
-  return text;
+/** Tailwind's default font-size scale (the storefront theme does not redefine it), in px. */
+const SCALE_PX: Record<string, number> = {
+  xs: 12,
+  sm: 14,
+  base: 16,
+  lg: 18,
+  xl: 20,
+  '2xl': 24,
+  '3xl': 30,
+  '4xl': 36,
+  '5xl': 48,
+  '6xl': 60,
+};
+
+/** The px size a single font-size utility sets (`text-base`, `text-[16px]`, `text-[1rem]`), else null. */
+function utilityPx(utility: string): number | null {
+  const m = utility.match(/^text-(?:(xs|sm|base|lg|[2-6]?xl)|\[(\d+(?:\.\d+)?)(px|rem)\])$/);
+  if (!m) return null;
+  if (m[1]) return SCALE_PX[m[1]];
+  return m[3] === 'rem' ? Number(m[2]) * 16 : Number(m[2]);
 }
 
-type Control = { where: string; tag: string; classes: string };
+/** Class tokens out of a chunk of source (a className literal, a const's initialiser, a @apply body). */
+const tokensOf = (text: string) =>
+  text
+    .split(/\s+/)
+    .map(t => t.replace(/^[`'"(,]+|[`'",);]+$/g, ''))
+    .filter(Boolean);
+
+/**
+ * The font size that APPLIES to a control on a phone (under Tailwind's `sm` 640px), from its classes:
+ * - a `max-sm:`-style variant (any `max-*:`) applies on a phone and beats an unprefixed utility;
+ * - otherwise the control's own unprefixed size utility (utilities layer);
+ * - otherwise a size from a globals.css component rule it uses (components layer: a utility on the tag
+ *   beats it, so a tag `text-sm` over `.search-input { @apply text-base }` is 14px, not 16px);
+ * - a `sm:`/`md:`/... variant never applies on a phone and is ignored.
+ * Two conflicting sizes in one layer count as the SMALLER one: which wins depends on stylesheet order, so the
+ * check must not assume the friendly one does. Returns null when nothing sets a size (the control inherits).
+ */
+function phoneSizePx(utilities: string[], components: string[]): number | null {
+  const pick = (tokens: string[]) => {
+    const phoneVariant = tokens
+      .map(t => t.match(/^max-[\w-]+:(text-.+)$/)?.[1])
+      .map(t => (t ? utilityPx(t) : null))
+      .filter((n): n is number => n !== null);
+    if (phoneVariant.length) return Math.min(...phoneVariant);
+    const plain = tokens.map(utilityPx).filter((n): n is number => n !== null);
+    return plain.length ? Math.min(...plain) : null;
+  };
+  return pick(utilities) ?? pick(components);
+}
+
+/**
+ * The classes of ONE control, by layer: its own className (a literal, or the `const NAME = '…'` the
+ * className expression names, in the same file) and the globals.css rules of the plain classes it uses.
+ * A className expression this cannot resolve to one class list (a ternary, a prop, a function call) is
+ * reported as unresolved instead of guessed: merging every branch's text made a 16px class from one
+ * branch hide a smaller (or missing) size on another.
+ */
+function classLayers(
+  tag: string,
+  src: string
+): { utilities: string[]; components: string[] } | { unresolved: string } {
+  let own: string[] = [];
+  const expr = tag.match(/className=\{([^}]*)\}/);
+  const literal = tag.match(/className="([^"]*)"/);
+  if (expr) {
+    const ident = expr[1].trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(ident)) return { unresolved: expr[1].trim() };
+    const decl = src.match(new RegExp(`(?:const|let)\\s+${ident}\\s*=([\\s\\S]*?);\\n`));
+    if (!decl || !/^\s*['"`]/.test(decl[1])) return { unresolved: ident };
+    own = tokensOf(decl[1]);
+  } else if (literal) {
+    own = tokensOf(literal[1]);
+  }
+  const components = own
+    .filter(cls => /^[a-z][a-z-]*$/.test(cls))
+    .flatMap(cls => tokensOf(globalRule(cls).replace(/@apply/g, ' ')));
+  return { utilities: own, components };
+}
+
+type Control = { where: string; tag: string; sizePx: number | null; unresolved?: string };
 
 function controls(): Control[] {
   const found: Control[] = [];
@@ -104,7 +163,11 @@ function controls(): Control[] {
       if (NON_TEXT_TYPES.test(tag)) continue;
       if (EXEMPT.some(e => e.file === rel && tag.includes(e.marker))) continue;
       const line = src.slice(0, m.index).split('\n').length;
-      found.push({ where: `${rel} (<${m[1]}> #${line})`, tag, classes: classSources(tag, src) });
+      const layers = classLayers(tag, src);
+      const where = `${rel} (<${m[1]}> #${line})`;
+      if ('unresolved' in layers)
+        found.push({ where, tag, sizePx: null, unresolved: layers.unresolved });
+      else found.push({ where, tag, sizePx: phoneSizePx(layers.utilities, layers.components) });
     }
   }
   return found;
@@ -120,9 +183,15 @@ describe('storefront text controls are 16px or larger on a phone', () => {
     expect(all.some(c => c.where.startsWith('app/checkout/'))).toBe(true);
   });
 
-  it('every raw input, select and textarea carries its own phone size of 16px or more', () => {
-    const missing = all.filter(c => !PHONE_16.test(c.classes)).map(c => c.where);
-    expect(missing).toEqual([]);
+  it('every control has a className this check can resolve to one class list', () => {
+    expect(all.filter(c => c.unresolved).map(c => `${c.where}: ${c.unresolved}`)).toEqual([]);
+  });
+
+  it('every raw input, select and textarea is 16px or more at phone width', () => {
+    const small = all
+      .filter(c => !c.unresolved && (c.sizePx === null || c.sizePx < 16))
+      .map(c => `${c.where}: ${c.sizePx === null ? 'inherits' : `${c.sizePx}px`}`);
+    expect(small).toEqual([]);
   });
 
   it('every exemption still points at a real control', () => {
@@ -146,6 +215,19 @@ describe('storefront text controls are 16px or larger on a phone', () => {
       const tag = openingTag(src, src.search(new RegExp(`<${name}\\b`)));
       expect(PHONE_16.test(tag), `packages/ui ${name}`).toBe(true);
     }
+  });
+
+  it('the phone size is the class that applies, not any 16px class found nearby', () => {
+    const size = (own: string, comp = '') => phoneSizePx(tokensOf(own), tokensOf(comp));
+    expect(size('min-h-11 text-base sm:text-sm')).toBe(16);
+    expect(size('min-h-11 sm:text-base')).toBeNull(); // a wider-screen size does not apply on a phone
+    expect(size('text-base max-sm:text-sm')).toBe(14); // a phone-only variant beats the plain utility
+    expect(size('text-base text-sm')).toBe(14); // a conflict counts as the smaller size
+    expect(size('search-input text-sm', 'text-base sm:text-sm')).toBe(14); // utilities beat a component rule
+    expect(size('search-input', 'min-h-11 text-base sm:text-sm')).toBe(16); // the component rule applies alone
+    expect(size('w-full text-[1rem]')).toBe(16);
+    expect(size('w-full text-[15px]')).toBe(15);
+    expect(size('w-full text-foreground')).toBeNull();
   });
 
   it('the size check tells a phone size from a wider-screen one', () => {

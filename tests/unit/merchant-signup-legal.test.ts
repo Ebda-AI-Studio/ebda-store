@@ -7,11 +7,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { txLog, state } = vi.hoisted(() => ({
   txLog: [] as Array<{ tx: number; op: string; args: any }>,
-  state: { existing: null as null | Record<string, unknown>, profileForReturnedId: false },
+  state: {
+    existing: null as null | Record<string, unknown>,
+    profileForReturnedId: false,
+    pgGone: false,
+  },
 }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+vi.mock('@api/lib/postgres-present', () => ({ postgresRemovedOnThisWorker: () => state.pgGone }));
 vi.mock('bcryptjs', () => ({ default: { hash: async () => 'hash', compare: async () => false } }));
 vi.mock('@ebda/database', () => {
   let n = 0;
@@ -87,6 +92,27 @@ beforeEach(() => {
   txLog.length = 0;
   state.existing = null;
   state.profileForReturnedId = false;
+  state.pgGone = false;
+});
+
+describe('Worker with no Postgres (Ruling NZ-D23)', () => {
+  const input = () => merchantSignupSchema.parse({ ...base, acceptedLegal: true });
+
+  it('writes NO users profile row (it would throw POSTGRES_REMOVED -> 500) but still records the acceptances', async () => {
+    state.pgGone = true;
+    const result = await MerchantSignupService.signup(input(), { ip: '203.0.113.9' });
+    expect(result).toEqual({ emailVerificationSent: true });
+    expect(txLog.some(l => l.op === 'user.create')).toBe(false);
+    expect(txLog.filter(l => l.op === 'legalAcceptance.createMany')).toHaveLength(1);
+  });
+
+  it('adopts an orphan identity without reading a Postgres profile', async () => {
+    state.pgGone = true;
+    identity.forceId = '00000000-0000-4000-8000-0000000000a1';
+    identity.account = { email: 'a@b.co', emailVerified: false };
+    await MerchantSignupService.signup(input(), {});
+    expect(txLog.filter(l => l.op === 'legalAcceptance.createMany')).toHaveLength(1);
+  });
 });
 
 describe('identity binding (Ruling SIGNUP-TAKEOVER-1)', () => {
