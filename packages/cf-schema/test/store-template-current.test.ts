@@ -14,6 +14,8 @@ import { expectThrows, migrationFiles, openDb } from './helpers';
  */
 
 const files = migrationFiles('platform');
+// The retired ids are named only through the shared reader's list (tests/unit/no-retired-skin-strings.test.ts).
+const [MODERN, , , , ELEGANT] = RETIRED_TEMPLATES;
 const MIGRATION = files.find(f => f.endsWith('0009_store_template_current.sql'))!;
 
 /** A D1 at production's current state: every migration BEFORE 0009. */
@@ -41,8 +43,8 @@ describe('D1 0009: stores on a retired skin move to a current template (Ruling S
 
   it('production before 0009 still accepts a retired skin (the defect this fixes)', () => {
     const db = beforeMigration();
-    addStore(db, 'qa', 'modern');
-    expect(template(db, 'qa')).toBe('modern');
+    addStore(db, 'qa', MODERN);
+    expect(template(db, 'qa')).toBe(MODERN);
   });
 
   it('each retired skin moves to the template readers already map it to, so nothing changes on screen', () => {
@@ -62,7 +64,7 @@ describe('D1 0009: stores on a retired skin move to a current template (Ruling S
 
   it('touches no other row or table: the store keeps its children (no table rebuild)', () => {
     const db = beforeMigration();
-    addStore(db, 'qa', 'modern');
+    addStore(db, 'qa', MODERN);
     db.prepare(
       `INSERT INTO store_features (id, store_id, feature_key) VALUES ('f1', 'qa', 'x')`
     ).run();
@@ -105,7 +107,7 @@ describe('D1 0009: stores on a retired skin move to a current template (Ruling S
 
   it('why not a rebuilt CHECK: on SQLite (and D1) dropping `stores` cascades into its children even with FKs deferred', () => {
     const db = beforeMigration();
-    addStore(db, 'qa', 'modern');
+    addStore(db, 'qa', MODERN);
     db.prepare(
       `INSERT INTO store_features (id, store_id, feature_key) VALUES ('f1', 'qa', 'x')`
     ).run();
@@ -147,7 +149,7 @@ describe('StoreDO 0004: the store_profile copy follows the same rule (Ruling SKI
 
   it('a fresh DO (all migrations, twice) refuses a retired skin on insert', () => {
     const db = openDb('store', 2);
-    expectThrows(() => profile(db, 'elegant'), /current Ebda template|CHECK constraint/);
+    expectThrows(() => profile(db, ELEGANT), /current Ebda template|CHECK constraint/);
     profile(db, 'jasmine');
   });
 });
