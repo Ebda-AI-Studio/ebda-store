@@ -17,7 +17,8 @@ const ALLOWED: Record<string, string> = {
   'lib/api.ts': 'the ApiClient: getProfile() is the one read, behind the session gates',
   'app/account/profile/ProfileClient.tsx':
     'PUT /auth/me: a signed-in customer saving their profile',
-  'components/ReviewSection.tsx': 'reads only behind hasSessionHint() (asserted below)',
+  'components/ReviewSection.tsx':
+    'reads only behind hasSessionHint() (rendered with and without the hint in storefront-review-section-auth-gate.test.tsx)',
 };
 
 function sourceFiles(dir: string): string[] {
@@ -55,13 +56,5 @@ describe('storefront: only AuthContext asks the API who the visitor is', () => {
         true
       );
     }
-  });
-
-  it('the review form asks only behind the session hint', () => {
-    const src = readFileSync(join(WEB_SRC, 'components/ReviewSection.tsx'), 'utf8');
-    const call = src.indexOf('/auth/me`');
-    const gate = src.indexOf('!hasSessionHint()');
-    expect(gate).toBeGreaterThan(-1);
-    expect(gate).toBeLessThan(call);
   });
 });
