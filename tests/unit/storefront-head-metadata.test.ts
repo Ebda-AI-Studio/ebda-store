@@ -113,6 +113,38 @@ describe('the manifest link follows the language in the URL (Ruling PWA-MANIFEST
     expect((await meta()).manifest).toBe('/manifest.webmanifest');
   });
 
+  // What the browser actually reads is the <link rel="manifest"> Next renders from this metadata, not the
+  // metadata object. Render it through Next's own head renderer (the same `createMetadataElements` the App
+  // Router uses; the merge step only stringifies a URL-typed manifest) and read the href per locale.
+  it('the rendered <link rel="manifest"> carries the URL language', async () => {
+    const { createDefaultMetadata } = await import('next/dist/lib/metadata/default-metadata');
+    const { createMetadataElements } = await import('next/dist/lib/metadata/metadata-elements');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { createElement, Fragment } = await import('react');
+    const linkHref = async () => {
+      const { manifest } = await meta();
+      const resolved = {
+        ...createDefaultMetadata(),
+        manifest: manifest == null ? null : String(manifest),
+      };
+      const html = renderToStaticMarkup(
+        createElement(Fragment, null, ...(createMetadataElements(resolved as never) as never[]))
+      );
+      const links = [...html.matchAll(/<link rel="manifest" href="([^"]*)"/g)].map(m => m[1]);
+      expect(links).toHaveLength(1);
+      return links[0];
+    };
+    for (const [urlLang, href] of [
+      ['en', '/en/manifest.webmanifest'],
+      ['ar', '/ar/manifest.webmanifest'],
+      [undefined, '/manifest.webmanifest'],
+    ] as const) {
+      state.urlLang = urlLang;
+      state.cookieLang = urlLang === 'en' ? 'ar' : 'en';
+      expect(await linkHref(), String(urlLang)).toBe(href);
+    }
+  });
+
   it('every branch keeps a manifest link: an unreachable store and the platform 404 too', async () => {
     state.urlLang = 'en';
     state.store = { ...BASE, transientResolveFailure: true };

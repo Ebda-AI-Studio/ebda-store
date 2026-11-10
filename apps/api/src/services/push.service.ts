@@ -12,6 +12,7 @@ import { currentStoreId, prisma, withStore, runInTenantContext } from '@ebda/dat
 import logger from '../lib/logger';
 import { config } from '../config';
 import { notificationConfigService } from './notification-config.service';
+import { withStoreRw } from '../lib/jobs/store-db';
 
 /**
  * Push audiences. A single store can fan out to two distinct device sets:
@@ -86,7 +87,9 @@ class PushService {
     // internal read already scoped by `where: { storeId }`, so it enters the store scope with withStore.
     // Only the DB read is wrapped — the webpush network sends below stay OUTSIDE
     // any transaction so we never hold a Neon connection open across HTTP I/O.
-    const subscriptions = await withStore(storeId, tx =>
+    // `withStoreRw`: a store on its Durable Object reads (and deletes, below) `push_subscriptions` from its DO; the `prisma`
+    // proxy threw PostgresRemovedError there on the Worker, so every dispatched push failed (Ruling NZ-D23).
+    const subscriptions = await withStoreRw(storeId, tx =>
       tx.pushSubscription.findMany({
         where: { storeId },
         select: { id: true, endpoint: true, p256dh: true, auth: true },
@@ -143,7 +146,7 @@ class PushService {
     // 7. Clean up expired subscriptions (RLS-bypass: same FORCE-RLS table, called
     // from non-tenant-context fan-out — without bypass the delete would match 0 rows).
     if (expiredEndpoints.length > 0) {
-      await withStore(storeId, tx =>
+      await withStoreRw(storeId, tx =>
         tx.pushSubscription.deleteMany({
           where: { storeId, endpoint: { in: expiredEndpoints } },
         })

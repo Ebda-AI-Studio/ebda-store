@@ -25,6 +25,7 @@ const REDACT_KEYS = new Set([
   'authorization',
   'cookie',
   'x-csrf-token',
+  'x-ebda-ssr-auth',
   'password',
   'currentPassword',
   'newPassword',

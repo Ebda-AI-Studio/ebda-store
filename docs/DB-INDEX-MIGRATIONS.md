@@ -1,5 +1,7 @@
 # DB index migrations — lock procedure
 
+> **RETIRED STACK (2026-11-10 note).** This document describes the Railway-hosted Express API on Neon Postgres, retired 2026-11-05 (NEON-ZERO; the API is the `ebda-api` Cloudflare Worker on D1 + Durable Objects). Kept as history only. Live runbooks: `docs/INCIDENT.md`, `docs/ROLLBACK.md`, `docs/DB-BACKUP-RESTORE.md`, `docs/observability/slo.md`.
+
 How to add (or drop) an index on the production Neon database without blocking writes. Companion to
 [`DB-BACKUP-RESTORE.md`](./DB-BACKUP-RESTORE.md) and [`ROLLBACK.md`](./ROLLBACK.md). The index
 audits that produce these changes live in [`docs/perf/`](./perf/).

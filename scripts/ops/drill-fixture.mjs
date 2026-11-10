@@ -145,34 +145,51 @@ const q = v =>
       : v instanceof Uint8Array
         ? `X'${Buffer.from(v).toString('hex')}'`
         : `'${String(v).replace(/'/g, "''")}'`;
-const objs = d1
-  .prepare(
-    "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END, name"
-  )
-  .all();
-const dump =
-  [
-    ...objs.filter(o => o.type === 'table').map(o => o.sql + ';'),
-    ...objs
-      .filter(o => o.type === 'table')
-      .flatMap(o =>
-        d1
-          .prepare(`SELECT * FROM "${o.name}"`)
-          .all()
-          .map(
-            r =>
-              `INSERT INTO "${o.name}" (${Object.keys(r)
-                .map(k => `"${k}"`)
-                .join(',')}) VALUES (${Object.values(r).map(q).join(',')});`
-          )
-      ),
-    ...objs.filter(o => o.type !== 'table').map(o => o.sql + ';'),
-  ].join('\n') + '\n';
+const dumpOf = db => {
+  const objs = db
+    .prepare(
+      "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END, name"
+    )
+    .all();
+  return (
+    [
+      ...objs.filter(o => o.type === 'table').map(o => o.sql + ';'),
+      ...objs
+        .filter(o => o.type === 'table')
+        .flatMap(o =>
+          db
+            .prepare(`SELECT * FROM "${o.name}"`)
+            .all()
+            .map(
+              r =>
+                `INSERT INTO "${o.name}" (${Object.keys(r)
+                  .map(k => `"${k}"`)
+                  .join(',')}) VALUES (${Object.values(r).map(q).join(',')});`
+            )
+        ),
+      ...objs.filter(o => o.type !== 'table').map(o => o.sql + ';'),
+    ].join('\n') + '\n'
+  );
+};
+const dump = dumpOf(d1);
+
+// Identity D1 stand-in (Ruling ICEBERG-BK-1): the REAL ebda-identity schema (apps/accounts/migrations) plus one merchant user.
+const idDb = new DatabaseSync(':memory:');
+const idMig = path.join(ROOT, 'apps/accounts/migrations');
+for (const f of readdirSync(idMig)
+  .filter(n => n.endsWith('.sql'))
+  .sort())
+  idDb.exec(readFileSync(path.join(idMig, f), 'utf8'));
+idDb.exec(
+  `INSERT INTO users (id, email, password_hash, first_name, last_name, role, status, created_at, updated_at) VALUES ('${ownerId}', 'owner@fixture.invalid', 'x', 'Fixture', 'Owner', 'store_admin', 'active', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`
+);
+const idDump = dumpOf(idDb);
 
 const io = {
   ...dirR2(out),
   encrypt: ageEncrypt(recipient),
   exportD1: async () => ({ raw: Buffer.from(dump), tables: await digestSqlite(d1) }),
+  exportIdentity: async () => ({ raw: Buffer.from(idDump), tables: await digestSqlite(idDb) }),
   listStoreIds: async () => [storeId],
   exportStore: id => exportStoreOverHttp(call, id),
 };

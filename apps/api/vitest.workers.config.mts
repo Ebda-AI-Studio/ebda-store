@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
 import { existsSync, readdirSync } from 'node:fs';
+import { generateKeyPairSync } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
@@ -29,6 +30,10 @@ const apiVars = {
   TRUST_PROXY_HOPS: '1',
   // The dev-only POST /__dev/create-store route (src/worker.ts); never set in wrangler.jsonc.
   DEV_STATS: '1',
+  // merchant-signup.test.ts posts a signup right after minting the form token (the default floor is 3 s).
+  SIGNUP_MIN_FILL_MS: '0',
+  // merchant-journey.test.ts: the onboarding billing step chooses InstaPay (unset = the option is refused, fail closed).
+  EBDA_INSTAPAY_HANDLE: 'ebda@instapay',
   // The cutover target state (Ruling NZ-PG-8): background jobs follow each store's D1 backend flag, so a cron run hides the DO
   // stores from a sweep that is not ported and their alarms own the ported ones. The cron-tick group asserts no job reaches Postgres.
   JOBS_ON_DO: '1',
@@ -44,6 +49,18 @@ const apiVars = {
   // The alerts webhook bridge fails closed without a token; a sweep request carries none, so it answers 401, not 503.
   ALERTS_WEBHOOK_TOKEN: 'workers-test-alerts-token',
 };
+
+// The identity service's ES256 signing key for this run (merchant-journey.test.ts signs a real `aud=store` access token with
+// the private half; the accounts stub serves the public half as its JWKS, so the API verifies it exactly as in production).
+const ACCOUNTS_TEST_KID = 'workers-test-accounts-key';
+const accountsKeys = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const ACCOUNTS_PUBLIC_JWK = {
+  ...accountsKeys.publicKey.export({ format: 'jwk' }),
+  kid: ACCOUNTS_TEST_KID,
+  alg: 'ES256',
+  use: 'sig',
+};
+const ACCOUNTS_PRIVATE_JWK = { ...accountsKeys.privateKey.export({ format: 'jwk' }), kid: ACCOUNTS_TEST_KID };
 
 // Two workers in one Miniflare: the BUILT API Worker (`npm run cf:dry-run`: wrangler's esbuild bundle with
 // the alias block applied, i.e. exactly what would be deployed) loaded from disk, and the vitest test
@@ -70,6 +87,7 @@ export default defineConfig(async () => {
             SWEEP_STRICT: process.env.SWEEP_STRICT ?? '',
             SWEEP_FILTER: process.env.SWEEP_FILTER ?? '',
             ...apiVars,
+            TEST_ACCOUNTS_PRIVATE_JWK: JSON.stringify(ACCOUNTS_PRIVATE_JWK),
           },
           d1Databases: { PLATFORM_DB: 'platform-db' },
           serviceBindings: { API: 'api', S3_STUB: 'gateway-stub' },
@@ -115,7 +133,13 @@ export default defineConfig(async () => {
                   async revokeUser() {}
                   async setStatus() {}
                   async setRole() { return true; }
-                  async inviteUser(i) { return { id: i.id, created: true }; }
+                  async createUser(i) { return { id: i.id }; }
+                  // as the real inviteFor: an address that already has an account answers THAT account (created: false). Here an
+                  // account's address is '<id>@exit-test.invalid' (getAccountState above), so a uuid local part is an existing one.
+                  async inviteUser(i) {
+                    const m = /^([0-9a-f-]{36})@exit-test\.invalid$/.exec(i.email);
+                    return m ? { id: m[1], created: false } : { id: i.id, created: true };
+                  }
                   async updateProfile(id, _i, _r, actor) {
                     // an id with this prefix is a super_admin: only that user may edit it (security tests of the admin user edit)
                     if (id.startsWith('00000000-0000-4000-8000-0000000000aa') && actor !== id) return { ok: false, code: 'FORBIDDEN_TARGET' };
@@ -124,7 +148,7 @@ export default defineConfig(async () => {
                   async deleteStoreClients() { return { clients: 0 }; }
                   async eraseUser() { return { erased: true, remaining: 0 }; }
                   async exportUser() { return {}; }
-                  async fetch() { return new Response(JSON.stringify({ keys: [] }), { headers: { 'content-type': 'application/json' } }); }
+                  async fetch() { return new Response(JSON.stringify({ keys: [${JSON.stringify(ACCOUNTS_PUBLIC_JWK)}] }), { headers: { 'content-type': 'application/json' } }); }
                 }`,
             },
             {

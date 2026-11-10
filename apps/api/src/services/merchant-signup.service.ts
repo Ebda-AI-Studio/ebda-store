@@ -13,6 +13,7 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod/v3';
 import { withUser, type Prisma } from '@ebda/database';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 import { normalizeEgyptianMobile } from '@ebda/shared';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -90,6 +91,8 @@ async function isAdoptableOrphan(identityId: string, email: string): Promise<boo
   const acc = await getAccountState(identityId).catch(() => null);
   if (!acc || acc.emailVerified || acc.email.trim().toLowerCase() !== email.trim().toLowerCase())
     return false;
+  // NZ-D23: no Postgres profile table on the Worker, so no profile row can exist under this id.
+  if (postgresRemovedOnThisWorker()) return true;
   const profile = await withUser(identityId, tx =>
     tx.user.findUnique({ where: { id: identityId }, select: { id: true } })
   );
@@ -175,22 +178,28 @@ export class MerchantSignupService {
     // Profile row (same id as the identity, so every foreign key resolves) + click-wrap acceptance in ONE transaction, as
     // the new user (Ruling LEGAL-4). Credentials are NOT stored here.
     const acquisition = buildAcquisition(input.tracking, request);
+    // NZ-D23: on a Worker with no Postgres the identity service IS the account (no `users` profile row to write; the
+    // acceptances live on the platform D1, where no FK needs the row). A Prisma call here throws POSTGRES_REMOVED (500).
+    const pgGone = postgresRemovedOnThisWorker();
     await withUser(profileId, async tx => {
-      await tx.user.create({
-        data: {
-          id: profileId,
-          storeId: null,
-          email,
-          passwordHash: '!identity',
-          firstName,
-          lastName,
-          phone,
-          role: 'store_admin',
-          emailVerified: false,
-          language: language ?? 'ar',
-          ...(acquisition ? { acquisition: acquisition as unknown as Prisma.InputJsonValue } : {}),
-        },
-      });
+      if (!pgGone)
+        await tx.user.create({
+          data: {
+            id: profileId,
+            storeId: null,
+            email,
+            passwordHash: '!identity',
+            firstName,
+            lastName,
+            phone,
+            role: 'store_admin',
+            emailVerified: false,
+            language: language ?? 'ar',
+            ...(acquisition
+              ? { acquisition: acquisition as unknown as Prisma.InputJsonValue }
+              : {}),
+          },
+        });
       await tx.legalAcceptance.createMany({
         data: signupAcceptanceRows(profileId, request),
         skipDuplicates: true,
