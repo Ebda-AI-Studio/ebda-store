@@ -94,7 +94,7 @@ export interface ResolvedStore {
   marketingPixels?: Record<string, unknown>;
 
   // PWA — set by the admin's PWA settings page. The storefront's
-  // app/manifest.ts already pulls a fully-formed manifest from the API, but
+  // manifest (lib/pwa/store-manifest.ts) already pulls a fully-formed manifest from the API, but
   // the values are mirrored here so app/layout.tsx can emit the matching iOS
   // meta tags (status-bar style, web-app-capable, apple-touch-icon) without
   // a second round-trip per request.
@@ -770,7 +770,7 @@ const TRANSIENTLY_UNRESOLVED_STORE: ResolvedStore = {
  *
  * `getStore()` renders the chrome that both the 404 page and the retry page
  * live inside (`app/layout.tsx` + its `generateMetadata`, `app/not-found.tsx`,
- * `app/manifest.ts`, the favicon and OG routes). If a 429 threw out of there,
+ * the manifest (`lib/pwa/store-manifest.ts`), the favicon and OG routes). If a 429 threw out of there,
  * the shopper would lose the branded layout entirely and fall through to
  * `global-error.tsx` — a worse outcome than the demo chrome, and it would take
  * the 404 page down with it.

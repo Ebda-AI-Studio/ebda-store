@@ -607,7 +607,9 @@ describe('marketing SEO and trust surface', () => {
       for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain('ahlan@ebda.app');
-        expect(html).not.toMatch(/\[[^\]]*\]/);
+        // a bracketed placeholder in the document; the page's JSON-LD (arrays) is not document text
+        const text = html.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '');
+        expect(text).not.toMatch(/\[[^\]]*\]/);
         expect(html.match(/<section/g)!.length).toBeGreaterThanOrEqual(5);
       }
   });

@@ -208,7 +208,7 @@ describe('the lenient resolver still never throws into the layout', () => {
     headerBag.value.set('x-store-domain', domain);
     fetchMock.mockResolvedValue(json({ success: false }, 429));
 
-    // app/layout.tsx, its generateMetadata, app/not-found.tsx, manifest.ts and
+    // app/layout.tsx, its generateMetadata, app/not-found.tsx, the web app manifest and
     // the favicon route all call this. If it threw, the retry page would lose
     // the layout it renders inside and fall through to global-error.tsx.
     await expect(getStore()).resolves.toMatchObject({ id: 'demo' });

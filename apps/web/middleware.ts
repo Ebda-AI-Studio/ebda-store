@@ -20,6 +20,7 @@ import {
   LOCALE_PENDING_HEADER,
   LOCALE_REST_HEADER,
   LOCALE_SEARCH_HEADER,
+  MANIFEST_PATH,
   decideLocalePath,
   localePathsOn,
   type PathLocale,
@@ -425,6 +426,19 @@ function handleStoreHost(
       pending.headers.set('Cache-Control', 'private, no-store');
       return pending;
     }
+    if (decision.kind === 'manifest') {
+      // `/en/manifest.webmanifest`: the one manifest route, with the URL's language on the request (Ruling
+      // PWA-MANIFEST-2). No cookie: a browser fetches a manifest without credentials and drops a Set-Cookie on
+      // the answer, and the page that linked this URL already set it.
+      requestHeaders.set(LOCALE_PATH_HEADER, decision.locale);
+      const target = request.nextUrl.clone();
+      target.pathname = MANIFEST_PATH;
+      const response = uncacheableForDemoLook(
+        NextResponse.rewrite(target, { request: { headers: requestHeaders } })
+      );
+      response.headers.set('x-store-domain', host);
+      return response;
+    }
     if (decision.kind === 'rewrite') {
       requestHeaders.set(LOCALE_PATH_HEADER, decision.locale);
       requestHeaders.set(LOCALE_REST_HEADER, decision.rest);
@@ -688,8 +702,8 @@ export const config = {
      * manifest.webmanifest is NOT excluded either (it was, from 2026-03-16,
      * "so it is not treated as a store slug" — `extractStoreSlug` has since
      * skipped any dotted first segment, so that reason is gone). Excluded, it
-     * never received `x-store-domain` / `x-store-slug`, so `app/manifest.ts`'s
-     * `getStore()` resolved NO store and every custom-domain merchant served
+     * never received `x-store-domain` / `x-store-slug`, so the manifest's
+     * `getStore()` (today `lib/pwa/store-manifest.ts`) resolved NO store and every custom-domain merchant served
      * the platform's "Force" manifest — verified live on demo-store.example
      * 2026-10-01. It must see the same store context every page gets.
      *

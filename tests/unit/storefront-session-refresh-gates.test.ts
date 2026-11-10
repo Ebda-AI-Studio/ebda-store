@@ -233,6 +233,27 @@ describe('#2164 / #2157 — one evidence-free session probe per tab', () => {
     expect(session.getItem('authProbe')).toBeNull();
   });
 
+  it('sessionProbeSpent: false until the tab has asked once and been told there is no session', async () => {
+    const fetchMock = vi.fn(async (url: unknown) =>
+      String(url).includes('/auth/refresh')
+        ? res(401, { success: false })
+        : res(401, { success: false })
+    );
+    globalThis.fetch = fetchMock as never;
+    const { api, sessionProbeSpent } = await import('@web/lib/api');
+
+    expect(sessionProbeSpent()).toBe(false);
+    await api.getProfile();
+    expect(refreshes(fetchMock)).toHaveLength(1);
+    expect(sessionProbeSpent()).toBe(true);
+  });
+
+  it('sessionProbeSpent: no sessionStorage → false, so the caller keeps asking (never a silent guest)', async () => {
+    vi.stubGlobal('window', { localStorage: local, navigator: { userAgent: 'node' } });
+    const { sessionProbeSpent } = await import('@web/lib/api');
+    expect(sessionProbeSpent()).toBe(false);
+  });
+
   it('no sessionStorage available → no evidence-free probe (conservative budget)', async () => {
     vi.stubGlobal('window', { localStorage: local, navigator: { userAgent: 'node' } });
     const fetchMock = vi.fn(async () => res(401, { success: false }));

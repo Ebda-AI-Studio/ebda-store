@@ -29,6 +29,7 @@ beforeEach(() => {
   document.head.innerHTML = '';
   document.body.innerHTML = '';
   document.documentElement.lang = 'ar';
+  document.documentElement.style.removeProperty('--ebda-consent-h');
   delete (window as unknown as Record<string, unknown>).fbq;
   delete (window as unknown as Record<string, unknown>)._fbq;
   window.history.replaceState(null, '', '/');
@@ -190,6 +191,66 @@ describe('banner', () => {
     const bar = document.getElementById('ebda-consent')!;
     expect(bar.style.padding).toBe('16px');
     expect(bar.style.bottom).toBe('16px');
+  });
+  it('publishes its height as --ebda-consent-h (px) while shown and removes it on either answer', () => {
+    // Pre-QA sweep finding 8: the fixed bar covered the last row of the phone menu. Page chrome
+    // reads this property to stop above the bar, so the name and the unit are a contract.
+    const root = document.documentElement;
+    const real = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      return { height: this.id === 'ebda-consent' ? 132.4 : 0 } as DOMRect;
+    };
+    try {
+      for (const label of ['موافق', 'لا، شكرًا']) {
+        clearCookies();
+        expect(root.style.getPropertyValue('--ebda-consent-h')).toBe('');
+        createTracker(CFG, window).showBanner();
+        expect(root.style.getPropertyValue('--ebda-consent-h')).toBe('133px');
+        const bar = document.getElementById('ebda-consent')!;
+        [...bar.querySelectorAll('button')].find(b => b.textContent === label)!.click();
+        expect(document.getElementById('ebda-consent')).toBeNull();
+        expect(root.style.getPropertyValue('--ebda-consent-h')).toBe('');
+      }
+    } finally {
+      Element.prototype.getBoundingClientRect = real;
+    }
+  });
+  it('follows the bar when it changes height, and stops watching once it is gone', () => {
+    const root = document.documentElement;
+    const w = window as unknown as { ResizeObserver?: unknown };
+    const realRO = w.ResizeObserver;
+    const realRect = Element.prototype.getBoundingClientRect;
+    let height = 133;
+    let fire: () => void = () => {};
+    const seen = { observed: null as Element | null, disconnected: false };
+    w.ResizeObserver = class {
+      constructor(cb: () => void) {
+        fire = cb;
+      }
+      observe(el: Element) {
+        seen.observed = el;
+      }
+      disconnect() {
+        seen.disconnected = true;
+      }
+    };
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      return { height: this.id === 'ebda-consent' ? height : 0 } as DOMRect;
+    };
+    try {
+      createTracker(CFG, window).showBanner();
+      const bar = document.getElementById('ebda-consent')!;
+      expect(seen.observed).toBe(bar);
+      height = 152; // the copy wrapped onto one more line
+      fire();
+      expect(root.style.getPropertyValue('--ebda-consent-h')).toBe('152px');
+      bar.querySelector('button')!.click();
+      expect(seen.disconnected).toBe(true);
+      expect(root.style.getPropertyValue('--ebda-consent-h')).toBe('');
+    } finally {
+      Element.prototype.getBoundingClientRect = realRect;
+      w.ResizeObserver = realRO;
+    }
   });
   it('does not reappear once decided, unless forced (cookie settings link)', () => {
     setConsent(false, false);

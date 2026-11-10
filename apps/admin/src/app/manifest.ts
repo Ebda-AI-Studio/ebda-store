@@ -13,7 +13,7 @@ import { productName } from '../lib/product-name';
  *
  * Single-tenant manifest: this is the operator console, not a per-store
  * surface, so the values are constant. The storefront keeps its own
- * per-store manifest at apps/web/src/app/manifest.ts.
+ * per-store manifest at apps/web/src/lib/pwa/store-manifest.ts.
  */
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const locale = await getLocale();

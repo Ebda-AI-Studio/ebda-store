@@ -296,6 +296,18 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
     }
     const row = doc.createElement('div');
     row.style.cssText = compact ? 'display:flex;gap:8px' : 'display:flex;gap:8px;flex-wrap:wrap';
+    // The bar is fixed over the page, so page chrome that reaches the bottom of the screen (the
+    // phone menu panel) has to stop above it. Publish the bar's height on the root element as
+    // `--ebda-consent-h` (px) while it is shown, and take it away with the bar. The name and the
+    // unit are read by the sites' stylesheets: change them together.
+    const root = doc.documentElement;
+    const publishHeight = () => {
+      const h = Math.ceil(bar.getBoundingClientRect().height);
+      root.style.setProperty('--ebda-consent-h', `${h}px`);
+    };
+    // Keeps the value true when the bar wraps differently (rotation, a font arriving late).
+    const Observer = (win as Window & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+    const sizeWatch = typeof Observer === 'function' ? new Observer(publishHeight) : null;
     const mk = (label: string, primary: boolean, choice: boolean) => {
       const b = doc.createElement('button');
       b.type = 'button';
@@ -308,12 +320,16 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
       b.addEventListener('click', () => {
         setConsent({ analytics: choice, marketing: choice });
         bar.remove();
+        sizeWatch?.disconnect();
+        root.style.removeProperty('--ebda-consent-h');
       });
       return b;
     };
     row.append(mk(t.accept, true, true), mk(t.decline, false, false));
     bar.append(p, row);
     doc.body.appendChild(bar);
+    publishHeight();
+    sizeWatch?.observe(bar);
   }
 
   function signupPayload(): SignupTracking | undefined {

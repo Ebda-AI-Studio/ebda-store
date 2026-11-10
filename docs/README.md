@@ -419,3 +419,4 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [uat/store-creation.md](uat/store-creation.md) - UAT: Store Creation (Super-Admin Flow)
 - [uat/storefront-design-save.md](uat/storefront-design-save.md) - UAT: Storefront Design Save — Smart Palette & Page Builder
 - [uat/tax-reports.md](uat/tax-reports.md) - UAT — Tax Reports (accounting.tax_reports)
+- [plans/2026-11-10-preqa-p2-batch.md](plans/2026-11-10-preqa-p2-batch.md) - Pre-QA sweep P2 batch: JSON-LD on every marketing page, brand name in legal copy, guest auth calls, menu vs cookie bar, look preview colour, checkout selects, returns register, /en manifest (2026-11-10)
