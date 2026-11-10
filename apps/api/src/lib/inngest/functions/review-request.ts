@@ -7,7 +7,7 @@ import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import { storeOrigin } from '@ebda/shared';
 import { storeDb, storeMoney } from '../../repo-factory';
-import { customersById, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
+import { customersById, runInStoreCtx, storeActiveForJob, withStoreDb } from '../../jobs/store-db';
 
 /**
  * Post-purchase review request — fires when an order transitions to
@@ -23,6 +23,8 @@ import { customersById, runInStoreCtx, withStoreDb } from '../../jobs/store-db';
  *   - No customer email (guest checkout with no email, edge case)
  *   - Order has no items
  *   - Store not found (deleted between fire and execution)
+ *   - Store not active (inactive / suspended / storage removed): checked before the wait and again after it, logged at
+ *     debug; a skip, never a failure (a retry cannot reopen a store)
  */
 export const reviewRequest: JobDef = inngest.createFunction(
   {
@@ -40,6 +42,12 @@ export const reviewRequest: JobDef = inngest.createFunction(
       return { skipped: 'missing-ids' };
     }
 
+    if (
+      !(await step.run('check-store-active', () => storeActiveForJob(storeId, 'review-request')))
+    ) {
+      return { skipped: true, reason: 'store_not_active' };
+    }
+
     // Feature gate — skip review requests when reviews feature is disabled.
     // In a step: on a Workflow only step bodies hold a database connection.
     const reviewsEnabled = await step.run('check-feature', () =>
@@ -52,6 +60,15 @@ export const reviewRequest: JobDef = inngest.createFunction(
 
     // Durable 7-day wait — survives API restarts / redeploys
     await step.sleep('wait-7-days', '7d');
+
+    // A store can be suspended or closed during the week.
+    if (
+      !(await step.run('check-store-active-after-wait', () =>
+        storeActiveForJob(storeId, 'review-request')
+      ))
+    ) {
+      return { skipped: true, reason: 'store_not_active' };
+    }
 
     // ── Re-verify order state after the delay ──────────────────────────────
     // The order lives in the store's backend (its Durable Object, or Postgres under the tenant scope); the customer is a platform

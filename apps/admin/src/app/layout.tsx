@@ -8,6 +8,7 @@ import { intlFormats } from '../i18n/formats';
 import '../styles/globals.css';
 import { BRAND } from '@ebda/shared';
 import { productName } from '../lib/product-name';
+import { THEME_INIT_SCRIPT } from '@/lib/auth-theme';
 
 const geist = Geist({
   subsets: ['latin'],
@@ -100,11 +101,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={locale} dir={dir} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {/* Inline script to prevent flash of wrong theme on page load.
-            Only reads from localStorage — no user input, safe static content. */}
+            Only reads from localStorage — no user input, safe static content.
+            The signed-out pages stay light (lib/auth-theme.ts). */}
         <script
           nonce={nonce}
           dangerouslySetInnerHTML={{
-            __html: `try{var s=localStorage.getItem('admin-theme');if(s!=='light'){document.documentElement.classList.add('dark')}}catch(e){}`,
+            __html: THEME_INIT_SCRIPT,
           }}
         />
       </head>
