@@ -440,7 +440,11 @@ export function pageJsonLd(
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
-        ...orgServices(locale),
+        // What the studio offers (knowsAbout + makesOffer, ~1.3KB) belongs on the Services index; every other plain page
+        // names the Organization by identity only (the home and product graphs describe its offers under the same @id).
+        // Carrying it on the legal pages pushed their HTML over budget twice over (JSON-LD + its RSC copy), Ruling
+        // MKT-LEGAL-HTML-BUDGET-2.
+        ...(opts.type === 'CollectionPage' && orgServices(locale)),
         ...(opts.legalEntity && {
           legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         }),

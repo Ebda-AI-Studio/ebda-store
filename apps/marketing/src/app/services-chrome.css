@@ -1,4 +1,6 @@
-/* Services dropdown + coming-soon rows: loaded on every page (header/home). The line pages' styles live in services.css and load only on those routes. */
+/* Coming-soon rows on the studio home: loaded on every page. The Services dropdown's rows (.np-soon, .np-badge) live in
+   the generated nav-products block in globals.css (a copy here was dead weight, Ruling MKT-LEGAL-HTML-BUDGET-2). The line
+   pages' styles live in services.css and load only on those routes. */
 /* coming-soon product rows on the studio home (published only) */
 .sh-badge {
   display: inline-block;
@@ -13,35 +15,4 @@
 }
 .sh-soon {
   opacity: 0.96;
-}
-
-/* header: the Services dropdown reuses the Products panel (no icons here); coming-soon products are plain, non-link rows */
-.nav-services .np-txt {
-  display: grid;
-  gap: 2px;
-}
-.np-soon {
-  padding: 10px;
-  min-height: 44px;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-}
-.np-soon .np-txt b,
-.np-soon > span {
-  font-weight: 600;
-  color: var(--muted);
-}
-.np-badge {
-  font-style: normal;
-  margin-inline-start: 6px;
-  padding: 1px 8px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent-text);
-}
-.menu-group .np-soon {
-  padding: 8px 0;
 }

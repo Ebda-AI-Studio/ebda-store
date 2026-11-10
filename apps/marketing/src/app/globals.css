@@ -17,19 +17,6 @@
   --maxw: 1280px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
-/* a deliberately dark band (the footer): same names, night values */
-.band-dark {
-  --canvas: var(--night);
-  --panel: #121415;
-  --raise: #181b1c;
-  --line: #2f3435;
-  --line-strong: #6f7775;
-  --fg: #f3f5f4;
-  --muted: #a9b1af;
-  --accent-text: var(--lift);
-  background: var(--canvas);
-  color: var(--fg);
-}
 html {
   background: var(--canvas);
 }
@@ -797,7 +784,6 @@ html[lang='ar'] .hero-sub {
   position: relative;
   height: 100%;
   overflow: hidden;
-  background: #000;
   container-type: inline-size;
 }
 .dev-phone .dev-screen {
@@ -1499,46 +1485,6 @@ html[lang='ar'] .story h2 {
 .fx-push span {
   color: #575c5d;
 }
-.fx-ai {
-  align-content: center;
-}
-.fx-ai .fx-ui {
-  padding: 12px;
-  display: grid;
-  gap: 8px;
-}
-.fx-ai-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.fx-ai-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: #141414;
-  color: #fff;
-  font-weight: 600;
-}
-.fx-lang {
-  display: flex;
-  gap: 4px;
-  font-weight: 700;
-}
-.fx-lang span {
-  padding: 1px 8px;
-  border-radius: 6px;
-  background: #f2f2f2;
-}
-.fx-text {
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: #f6f6f6;
-}
 .feature-list {
   list-style: none;
   padding: 0;
@@ -1598,7 +1544,6 @@ html[lang='ar'] .story h2 {
   margin: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
 }
 .rails li {
   font-weight: 600;
@@ -3391,8 +3336,6 @@ body:has(.studio-home) {
 .sh-eyebrow::before {
   content: '';
   width: 44px;
-  height: 1px;
-  background: var(--gold);
 }
 .studio-home h1 {
   margin: 0 0 clamp(16px, 2.4vw, 28px);
