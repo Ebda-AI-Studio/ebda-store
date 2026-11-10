@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  assertIdentityTables,
   assertPlatformTables,
   digestSqlite,
   exportStoreOverHttp,
@@ -73,6 +74,72 @@ export function wranglerR2({
       if (r.status !== 0) throw new Error(`r2 put ${key} failed: ${r.stderr || r.stdout}`);
     },
   };
+}
+
+/**
+ * R2 over the Cloudflare REST API (api.cloudflare.com), used for the media copy: wrangler has no object listing and spawning it per
+ * object would not fit the job timeout. Rate limit (measured 2026-11-10, response headers): `ratelimit-policy: "rtwo_gw_apigw";
+ * q=1200;w=300`, a quota SHARED with the wrangler R2 calls of the same job. Every request is followed by a sleep that keeps this
+ * client at <= rps (default 2 = 600 per 5 min, half the quota) - a measured throttle, not retry-on-429. A 429 still happens when
+ * something else drained the quota (seen live: r=0, retry-after 300), so a 429/5xx is retried at most 3 times, waiting the
+ * server's Retry-After (capped at 300 s), then fails the run.
+ */
+export function restR2({ accountId, token, rps = 2, fetchImpl = fetch, sleep = ms => new Promise(r => setTimeout(r, ms)) }) {
+  const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`;
+  const gap = Math.ceil(1000 / rps);
+  let last = 0;
+  const enc = key => key.split('/').map(encodeURIComponent).join('/');
+  const call = async (method, url, body) => {
+    for (let attempt = 1; ; attempt++) {
+      const wait = last + gap - Date.now();
+      if (wait > 0) await sleep(wait);
+      const res = await fetchImpl(url, {
+        method,
+        headers: { authorization: `Bearer ${token}` },
+        ...(body ? { body } : {}),
+        signal: AbortSignal.timeout(120_000),
+      });
+      last = Date.now();
+      if ((res.status === 429 || res.status >= 500) && attempt < 3) {
+        const ra = Number(res.headers?.get?.('retry-after'));
+        await sleep(Number.isFinite(ra) && ra > 0 ? Math.min(ra, 300) * 1000 : 2000 * attempt);
+        continue;
+      }
+      return res;
+    }
+  };
+  return bucket => ({
+    async list() {
+      const out = [];
+      let cursor = '';
+      for (;;) {
+        const res = await call('GET', `${base}/${bucket}/objects?per_page=1000${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j?.success) throw new Error(`r2 list ${bucket} failed: HTTP ${res.status} ${JSON.stringify(j?.errors ?? '')}`);
+        for (const o of j.result ?? []) out.push({ key: o.key, etag: o.etag, size: Number(o.size) });
+        cursor = j.result_info?.is_truncated ? j.result_info.cursor : '';
+        if (!cursor) return out;
+      }
+    },
+    async get(key) {
+      const res = await call('GET', `${base}/${bucket}/objects/${enc(key)}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`r2 get ${bucket}/${key} failed: HTTP ${res.status}`);
+      return Buffer.from(await res.arrayBuffer());
+    },
+    async put(key, buf) {
+      const res = await call('PUT', `${base}/${bucket}/objects/${enc(key)}`, buf);
+      if (!res.ok) throw new Error(`r2 put ${bucket}/${key} failed: HTTP ${res.status}`);
+    },
+  });
+}
+
+/** io.media for backupMedia(): source = ebda-media, destination = the backup bucket, both over REST. */
+export function restMediaIo({ accountId, token, source = 'ebda-media', dest = BUCKET, rps }) {
+  const r = restR2({ accountId, token, rps });
+  const src = r(source);
+  const dst = r(dest);
+  return { list: src.list, getSource: src.get, put: dst.put, get: dst.get };
 }
 
 /** A directory standing in for the bucket (the weekly fixture drill and the tests). */
@@ -187,7 +254,9 @@ export function realBackupIo({
   apiUrl,
   secret,
   d1Name = 'ebda-platform',
+  identityD1Name = 'ebda-identity',
   r2,
+  media,
   log = () => {},
 }) {
   const tmp = mkdtempSync(path.join(tmpdir(), 'cfbk-'));
@@ -204,19 +273,26 @@ export function realBackupIo({
     }
     return r;
   };
+  const exportD1Db = async (name, assertTables, file) => {
+    const out = path.join(tmp, file);
+    const r = wr(['d1', 'export', name, '--remote', '--output', out]);
+    if (r.status !== 0) throw new Error(`d1 export ${name} failed: ${r.stderr || r.stdout}`);
+    const exported = readFileSync(out);
+    log(`D1 ${name} exported: ${exported.length} bytes`);
+    const tables = assertTables(await d1Digests(exported.toString('utf8')));
+    const raw = Buffer.from(normalizeD1Sql(exported.toString('utf8')));
+    log(`D1 ${name} export normalized (parents before children, schema first): ${raw.length} bytes`);
+    return { raw, tables };
+  };
   return {
     ...r2,
+    ...(media ? { media } : {}),
     encrypt: ageEncrypt(recipient),
     async exportD1() {
-      const out = path.join(tmp, 'd1.sql');
-      const r = wr(['d1', 'export', d1Name, '--remote', '--output', out]);
-      if (r.status !== 0) throw new Error(`d1 export failed: ${r.stderr || r.stdout}`);
-      const exported = readFileSync(out);
-      log(`D1 ${d1Name} exported: ${exported.length} bytes`);
-      const tables = assertPlatformTables(await d1Digests(exported.toString('utf8')));
-      const raw = Buffer.from(normalizeD1Sql(exported.toString('utf8')));
-      log(`D1 export normalized (parents before children, schema first): ${raw.length} bytes`);
-      return { raw, tables };
+      return exportD1Db(d1Name, assertPlatformTables, 'd1.sql');
+    },
+    async exportIdentity() {
+      return exportD1Db(identityD1Name, assertIdentityTables, 'identity.sql');
     },
     async listStoreIds() {
       const r = wr([

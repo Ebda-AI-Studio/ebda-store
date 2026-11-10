@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { scrubPostHogCapture } from '@ebda/shared';
+import { EBDA_CONSENT_EVENT, analyticsConsentedFromCookies } from '@ebda/shared/tracking';
 
 /**
  * PostHog product analytics — Orders PWA (fulfilment staff tooling).
@@ -12,10 +13,9 @@ import { scrubPostHogCapture } from '@ebda/shared';
  * Sentry (errors) was added 2026-07-02; this adds behavioural analytics so an
  * operator's confusing/broken UX moment (not just an outright crash) is visible.
  *
- * Orders is operator-only (store staff, no public visitors), so — mirroring the
- * admin dashboard — PostHog is NOT consent-gated (internal-tool telemetry, not
- * customer data) and session recording stays OFF (behavioural analytics only,
- * matching web/admin; the deliberate no-replay posture, 2026-07-09).
+ * CONSENT-GATED like the admin (Ruling ICEBERG-ADM-CONSENT-1, 2026-11-10): posthog-js is not imported until the shared
+ * first-party `ebda_consent` cookie (*.ebda.app) says `analytics: true`; a later decline opts capture out. Session recording
+ * stays OFF (behavioural analytics only; the deliberate no-replay posture, 2026-07-09).
  *
  * The heavy `posthog-js` lib is dynamically imported so it stays out of the
  * first-load (login) bundle. No-op when NEXT_PUBLIC_POSTHOG_KEY is missing
@@ -31,9 +31,25 @@ let posthogInstance: typeof import('posthog-js').default | null = null;
 export function PostHogProvider({ children }: Props) {
   const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   const apiHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
+  const [consented, setConsented] = useState(false);
 
   useEffect(() => {
-    if (!apiKey) return;
+    if (typeof window === 'undefined') return;
+    const sync = () => {
+      const ok = analyticsConsentedFromCookies(document.cookie);
+      setConsented(ok);
+      if (posthogInstance?.__loaded) {
+        if (ok) posthogInstance.opt_in_capturing();
+        else posthogInstance.opt_out_capturing();
+      }
+    };
+    sync();
+    window.addEventListener(EBDA_CONSENT_EVENT, sync);
+    return () => window.removeEventListener(EBDA_CONSENT_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    if (!apiKey || !consented) return;
     if (typeof window === 'undefined') return;
 
     let cancelled = false;
@@ -64,13 +80,14 @@ export function PostHogProvider({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [apiKey, apiHost]);
+  }, [apiKey, apiHost, consented]);
 
   return <>{children}</>;
 }
 
 export function captureEvent(eventName: string, properties?: Record<string, unknown>): void {
   if (typeof window === 'undefined') return;
+  if (!analyticsConsentedFromCookies(document.cookie)) return;
   if (!posthogInstance?.__loaded) return;
   posthogInstance.capture(eventName, properties);
 }

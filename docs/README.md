@@ -1,12 +1,12 @@
 # Docs index
 
-Single index of everything under `docs/`. One line per doc, grouped by area. Rulings: [rulings/README.md](rulings/README.md) (one file per ruling, one table). Rules and invariants live in the repo-root `CLAUDE.md`; sizing baselines in the repo-root `design.md`.
+Single index of everything under `docs/`. One line per doc, grouped by area. Rulings: [rulings/README.md](rulings/README.md) (one file per ruling; the folder is the index, no table). Rules and invariants live in the repo-root `CLAUDE.md`; sizing baselines in the repo-root `design.md`.
 
 `tests/unit/docs-index.test.ts` fails when a doc under `docs/` is missing from this page.
 
 ## Rulings
 
-- [Rulings index](rulings/README.md) - every ruling, ID, one-line decision, date, file link. The old `RULINGS.md` is a pointer to it.
+- [Rulings index](rulings/README.md) - one file per ruling in `docs/rulings/`; add a ruling by adding its file only (no table row, no count). The old `RULINGS.md` is a pointer to it.
 
 ## Top level - Operations and platform references
 
@@ -232,6 +232,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 ## observability - Observability
 
 - [observability/slo.md](observability/slo.md) - Service Level Objectives (SLOs) — Ebda Store
+
+## ops - Operations
+
+- [ops/escalation.md](ops/escalation.md) - Escalation: who is contacted for P0/P1, payment and data incidents, channels, response targets
 
 ## perf - Performance
 

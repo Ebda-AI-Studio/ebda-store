@@ -1,49 +1,82 @@
 # Incident Response — Ebda Store
 
-Companion to `docs/ROLLBACK.md`. Rollback covers HOW to recover.
-This doc covers HOW to know there's an incident AND HOW to triage it.
+Rewritten 2026-11-10 for the real stack (Iceberg audit #25): Cloudflare Workers, D1, Durable Objects, R2, Queues/Workflows.
+Neon, Railway, Axiom and UptimeRobot are gone (Postgres retired 2026-11-05); nothing here should send you to them.
+Companion docs: **who to call and when** → [`ops/escalation.md`](ops/escalation.md) · **how to roll back** →
+[`ROLLBACK.md`](ROLLBACK.md) · **data recovery** → [`DB-BACKUP-RESTORE.md`](DB-BACKUP-RESTORE.md) · targets → [`observability/slo.md`](observability/slo.md).
+
+## What runs where
+
+| Worker                                       | Host                                        | Data                                                                                          |
+| -------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `ebda-api`                                   | `api.ebda.app`                              | D1 `ebda-platform`, one StoreDO per store, AuthState DO, KV, R2, Queues/Workflows `ebda-jobs` |
+| `ebda-web`                                   | `*.ebda.app` storefronts + merchant domains | calls the API; ISR cache R2 `ebda-web-isr-cache`                                              |
+| `ebda-admin`                                 | `store.ebda.app`                            | calls the API                                                                                 |
+| `ebda-orders`                                | `orders.ebda.app`                           | calls the API                                                                                 |
+| `ebda-accounts`                              | `accounts.ebda.app`                         | D1 `ebda-identity` (merchant sign-in, MFA, passkeys)                                          |
+| `ebda-marketing` / `ebda-help` / `ebda-docs` | `ebda.app` / help / docs                    | static                                                                                        |
+| `ebda-status`                                | `status.ebda.app`                           | probes every component once a minute                                                          |
+
+Ebda Chat / WhatsApp is a separate repo and Worker (`ebda-whatsapp`, `wa.ebda.app`) with its own per-alert runbooks.
 
 ## Severity matrix
 
-| Severity | Definition                                                    | Examples                                                                                                    | Response time           |
-| -------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------- |
-| **P0**   | Site fully down OR data integrity at risk OR payments failing | API health check failing, Neon unreachable, all checkouts 500ing, customer data leak                        | Investigate immediately |
-| **P1**   | Major feature broken, workaround exists                       | Checkout works but cart sync broken, admin can't log in but storefront works, AI sweep stuck queued for >2h | Investigate within 1h   |
-| **P2**   | Minor feature degraded, low-impact                            | Slow image loads, abandoned-cart emails delayed, single store's pixel firing wrong event                    | Same-day                |
-| **P3**   | Cosmetic / non-functional bug                                 | Typo, off-by-one date format, AR translation slightly wrong                                                 | Next-sprint backlog     |
+| Severity | Definition                                                 | Examples                                                                                        | Response (see escalation.md) |
+| -------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------- |
+| **P0**   | Storefronts or checkout down, data at risk, payments wrong | `api.ebda.app/health` not 200, storefront probes red on status.ebda.app, D1 errors, a data leak | ack 15 min, work immediately |
+| **P1**   | Major feature broken, workaround exists                    | merchants cannot sign in but stores sell; one provider's payments failing; jobs stuck > 2 h     | ack 1 h                      |
+| **P2**   | Degraded, low impact                                       | slow images, delayed emails, one store's pixel wrong                                            | same day                     |
+| **P3**   | Cosmetic                                                   | typo, Arabic wording                                                                            | backlog                      |
 
-## Detection sources (where alerts come from)
+## Detection (where an incident shows up)
 
-In rough order of how an incident usually surfaces:
+1. **status.ebda.app** (`apps/status`, Worker `ebda-status`): probes every component once a minute (8 s timeout); an
+   incident **opens after 3 consecutive failures**, resolves after 2 good probes, and each open/resolve goes to
+   **Telegram** (`apps/status/src/alert.ts`). Probes: `apps/status/src/config.ts`.
+2. **API alerts → Telegram** (`apps/api/src/services/alerts.service.ts`): P1 alerts from jobs, queues, payment webhooks,
+   email/SMS dead letters, `alerts-failure-watch`.
+3. **Sentry** (error tracker for api/web/admin/orders) → alert bridge → Telegram.
+4. **GitHub Actions**: a red `cf-<app>-deploy.yml` means that Worker still serves the OLD build; `cf-api-deploy.yml`
+   auto-rolls back when `/health` or the unknown-store probe fail after deploy. A red `cf-backup.yml` /
+   `cf-backup-drill.yml` pages Telegram (no nightly backup).
+5. **Merchant report** (WhatsApp / email, see escalation.md): treat as P1 until ruled out.
 
-1. **UptimeRobot / BetterUptime monitor** — `/health` endpoint check every 5 min → Telegram alert on 2 consecutive failures. **Configure this first; without it everything below is reactive.**
-2. **Sentry** — new error cluster or rate spike on existing cluster. Alert rules: >10 new errors/hr OR any new issue type. Telegram integration.
-3. **Merchant report** — WhatsApp / email from Ahmad's contacts. Treat as P1 minimum until ruled out — merchants don't ping for cosmetic issues.
-4. **`cf-deploy.yml` workflow failure (GitHub Actions)** — a red `cf-deploy` run on `main` means Cloudflare Workers (web/admin/orders) are still serving the OLD build even though the merge shows green. P1; rerun with `gh run rerun <id> --failed` after fixing the cause — or, if a newer run on `main` has since gone green, do NOT rerun the old one (its deploy jobs would ship the older commit); the next run already diffs from the last success and picks the failed changes up, or `workflow_dispatch` redeploys `main`.
-5. **Workers Logs / Logpush** (G7) - the first place to look once an alert names a Worker: dashboard > Workers & Pages > the Worker > Logs (live, recent); older than that, the 30-day gzip NDJSON in R2 bucket `ebda-logs` (`workers/<date>/`, how to read it: `docs/DEPLOYMENT.md` section 7). Filter on `Outcome != ok` and the `Exceptions` field first.
-6. **Railway deployment failure** — same, P0 if production health check failed.
-7. **Customer-facing site error message** — explicit user complaint, often surfaces P1-P2 issues that don't trigger alerts.
+## P0 triage (in order; stop at the root cause)
 
-## P0 Triage Checklist (run in order, stop when you find the root cause)
-
-**1. Is the API up?**
+**1. Is the API up, and is it the commit you think?**
 
 ```bash
-curl -sS -m 10 -o /dev/null -w "HTTP %{http_code} | %{time_total}s\n" \
-  https://api.ebda.app/health
+curl -sS -m 10 https://api.ebda.app/health        # want status ok, platform_db ok
+git ls-remote origin main                           # compare to /health "commit"
+curl -sS -m 10 -o /dev/null -w '%{http_code} %{time_total}s\n' https://storedemo-souq.ebda.app/ar
 ```
 
-- HTTP 200 in <1s → API is up; problem is downstream
-- HTTP 5xx OR timeout → API is down; check Railway dashboard
-- HTTP 401/403 → auth middleware error; check Sentry
+**2. Which Worker, and what is it logging?** (wrangler OAuth login is enough for deployments + tail)
 
-**2. Is the database reachable?**
+```bash
+npx wrangler deployments list --name ebda-api      # or ebda-web / ebda-admin / ebda-orders / ebda-accounts …
+npx wrangler tail ebda-api --format pretty --status error     # live stream
+```
 
-- Railway dashboard → API service → Logs → search "prisma:error" → "Connection refused" / "Closed"
-- Neon dashboard → check compute status + connection pool depth
-- If Neon is degraded → check Neon status page (status.neon.tech)
+Older than the live window: Workers Logs in the dashboard (Workers & Pages → Worker → Logs; `ebda-api` and `ebda-web` keep a 10 % sample), then the 30-day Logpush
+copy in R2 bucket **`ebda-logs`** (gzip NDJSON under `workers/<date>/`, read key in `~/.claude/.ebda-logpush-env`,
+`docs/DEPLOYMENT.md` §7):
 
-**3. Are background jobs running?**
+```bash
+rclone lsf r2logs:ebda-logs/workers/ | tail -3
+rclone cat r2logs:ebda-logs/workers/<date>/<file>.log.gz | gunzip | jq -c 'select(.Outcome != "ok") | {ScriptName, Outcome, Exceptions}'
+```
+
+**3. Is the data layer answering?** (read-only)
+
+```bash
+npx wrangler d1 execute ebda-platform --remote --command "SELECT count(*) FROM stores"
+npx wrangler d1 execute ebda-identity --remote --command "SELECT count(*) FROM users"
+```
+
+A single store failing while others work points at that store's Durable Object: check its errors in the tail output.
+
+**4. Are background jobs running?**
 
 ```bash
 cd apps/api
@@ -51,67 +84,44 @@ npx wrangler workflows instances list ebda-jobs | head
 npx wrangler queues list | grep ebda-jobs
 ```
 
-- Instances `errored` or stuck `running` → read the instance (`wrangler workflows instances describe ebda-jobs <id>`) and the `inngest/function.failed` alert from `alerts-failure-watch`.
-- A message sitting in `ebda-jobs-dlq` → the job exhausted its attempts; the failure path already alerted.
-- A gate that never frees (`concurrency gate ... not free`) → the `JobGate` lease expires by itself after 20 min.
-
-**4. Is Sentry showing a new error cluster?**
-
-- sentry.io → Whisky-11 project → Issues sorted by Last Seen
-- New cluster in last 30 min = likely the root cause
-- Stack trace's top frame is your starting point
+`errored` / stuck instances → `wrangler workflows instances describe ebda-jobs <id>`; a message in `ebda-jobs-dlq`
+exhausted its attempts and has already alerted; a `JobGate` lease frees itself after 20 min.
 
 **5. Did anything deploy in the last hour?**
 
 ```bash
-cd ~/Desktop/projects/ebda-store
-git log --since="1 hour ago" --pretty=oneline
+gh run list --workflow cf-api-deploy.yml -L 3 ; gh run list --workflow cf-web-deploy.yml -L 3
+git log origin/main --since="1 hour ago" --oneline
 ```
 
-- If yes → strong signal that the deploy regressed something. Read `docs/ROLLBACK.md` for paths.
+**6. Payments specifically?** Day-1 methods are COD and InstaPay (manual confirmation); card gateways run on the
+merchant's own Paymob/Kashier/Fawry account. Check the super-admin `/webhook-events` inbox (replayable), Sentry tag
+`payment.provider`, and the provider's merchant portal; a rotated per-store secret breaks webhook signatures.
 
-**6. Are payments failing specifically?**
+## Recovery
 
-- Filter Sentry by tag `payment.provider` (paymob / kashier / fawry / instapay)
-- Check the provider's own status page:
-  - Paymob / Kashier / Fawry: status from the provider's merchant portal
-- If provider is up but Ebda Store shows errors → check the recent webhook signatures (per-store credential rotation can break HMAC)
+| Symptom                                  | Fix                                                                                                                                                                                                               |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bad deploy of one Worker                 | `cd apps/<app> && npx wrangler rollback` (or `npx wrangler versions deploy <id>@100`); after main is fixed, `gh workflow run cf-<app>-deploy.yml` (a rollback is invisible to the deploy workflow, `ROLLBACK.md`) |
+| Bad code across apps                     | `bash scripts/rollback.sh` (revert + push); if the revert touches no API path, also `gh workflow run cf-api-deploy.yml`                                                                                           |
+| Bad D1 migration / bad write in D1       | `npx wrangler d1 time-travel restore ebda-platform --timestamp <before>` (prints the bookmark to undo); identity: same on `ebda-identity`                                                                         |
+| One store's data damaged                 | StoreDO point-in-time recovery, else restore that store from the nightly R2 dump (`DB-BACKUP-RESTORE.md`)                                                                                                         |
+| Cloudflare account lost                  | the Mac off-account copy `~/Desktop/projects/_backups/ebda-cf-encrypted/` + the age key (`DB-BACKUP-RESTORE.md`)                                                                                                  |
+| Jobs not firing                          | `wrangler workflows instances list ebda-jobs`; Cron Triggers in `apps/api/wrangler.jsonc`; `ebda-jobs` queue depth                                                                                                |
+| Rate-limit false positives               | raise the limiter temporarily or add a path skip, deploy through `cf-api-deploy.yml`                                                                                                                              |
+| Webhook signatures failing for one store | re-paste the webhook secret from the provider portal into that store's payment settings                                                                                                                           |
 
-## Recovery actions
+Every fix ends with the production check: `/health` commit = tip of main, the failing probe green on status.ebda.app.
 
-Once you've identified the failure mode:
+## After the incident
 
-| Symptom                                  | Fix                                                                                                                                                                                                                                                                                                                              | Reference                                     |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Bad deploy, no migrations                | `git revert HEAD && git push`                                                                                                                                                                                                                                                                                                    | `scripts/rollback.sh`                         |
-| Bad deploy WITH a migration              | Neon branch restore → `prod-<previous-sha>`                                                                                                                                                                                                                                                                                      | `docs/ROLLBACK.md`                            |
-| Worker (web/admin/orders) down           | `wrangler rollback` to the previous version, or rerun the LATEST green `cf-deploy` run (re-running an older run is a deliberate no-op — its commit is already live). After a `wrangler rollback`, redeploy with `gh workflow run cf-deploy.yml` once main is fixed — push-triggered detection cannot see an out-of-band rollback | `docs/ROLLBACK.md`                            |
-| Railway service stuck                    | Railway dashboard → API service → Deployments → previous → "Redeploy"                                                                                                                                                                                                                                                            | `docs/ROLLBACK.md`                            |
-| Background jobs not firing               | `wrangler workflows instances list ebda-jobs`; check the Cron Triggers in `wrangler.jsonc` and the `ebda-jobs` queue depth                                                                                                                                                                                                       | `feedback-inngest-deploy-sync-trap.md`        |
-| Rate-limit false positives               | Bump `publicLimiter` cap temporarily OR add path-specific skip                                                                                                                                                                                                                                                                   | `feedback-status-polling-rate-limiter.md`     |
-| Webhook signatures failing for one store | Re-paste webhook secret from provider portal → admin `/stores/[id]/seo` payment settings                                                                                                                                                                                                                                         | `feedback-payment-listing-bugs-2026-05-12.md` |
+1. Every P0/P1: a short postmortem in `docs/incidents/<date>-<slug>.md` (what happened, impact, root cause, fix,
+   prevention: test, alert or guard).
+2. A new failure class → memory + a deterministic gate (test, lint, probe), not a note.
+3. Tell affected merchants what happened and what changed (escalation.md, merchant comms).
 
-## Post-incident
+## Solo-operator reality
 
-After every P0 or P1 resolved:
-
-1. Write a one-paragraph summary in `docs/incidents/<date>-<short-title>.md`:
-   - What happened
-   - What customer/merchant impact
-   - Root cause
-   - How resolved
-   - Prevention: add to memory? add to test suite? add new alert?
-
-2. If a new failure class was discovered → update memory at `~/.claude/projects/-Users-ahmadsharaf/memory/` OR Ebda Store project memory.
-
-3. If a code change is needed → file under `docs/superpowers/plans/` with the canonical date-prefix slug.
-
-## Solo-developer reality check
-
-Ebda Store is operated by one person. The P0 response time of "investigate immediately" depends on Ahmad being awake or near a phone. The minimum bar:
-
-- **UptimeRobot Telegram alert** is the only reliable wake-up signal at 3am. Without it, downtime can run for hours undetected.
-- **Sentry Telegram alert** catches application errors when uptime is fine but functionality is degrading.
-- These two together cover the realistic P0 surface for a solo-operator project.
-
-Until one of those channels exists, this runbook is aspirational — you can't triage what you don't know about.
+Ebda is run by one person today. The wake-up signals that exist are status.ebda.app → Telegram and the API/Sentry alert
+bridge → Telegram. There is **no second operator yet**; what happens when Ahmad is unreachable is in
+[`ops/escalation.md`](ops/escalation.md).
