@@ -106,6 +106,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
 - [cf/neon-zero-integration.md](cf/neon-zero-integration.md) - NEON-ZERO integration branch: every merge conflict between the twelve PRs and its resolution
 - [cf/neon-zero-remaining.md](cf/neon-zero-remaining.md) - NEON-ZERO route sweep with Postgres dead: routes still failing, by owner PR
+- [cf/jobs-postgres-removed-sweep.md](cf/jobs-postgres-removed-sweep.md) - background jobs vs the removed Postgres: every job call path classified (ported / unreachable / fails) with fixes
 - [cf/neon-zero-routes-b.md](cf/neon-zero-routes-b.md) - NEON-ZERO routes group B (per-store admin): sweep before/after and what is left
 - [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
 - [cf/loyalty-do-migration.md](cf/loyalty-do-migration.md) - Loyalty on Durable Object stores: one-off ledger migration (Ruling FP-2)
