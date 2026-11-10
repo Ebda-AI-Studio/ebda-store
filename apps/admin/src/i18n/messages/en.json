@@ -5570,7 +5570,7 @@
       "title": "Custom Domain",
       "subtitle": "Connect a custom domain to your store",
       "heading": "Custom Domain",
-      "storeDomainSuffix": "Domain",
+      "storeDomainTitle": "{name} domain",
       "storeNotFound": "Store not found.",
       "addDomain": "Add Domain",
       "changeDomain": "Change Domain",
