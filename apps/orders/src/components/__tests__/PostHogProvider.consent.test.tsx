@@ -6,7 +6,7 @@ import { act, cleanup, render } from '@testing-library/react';
 const init = vi.fn();
 const optOut = vi.fn();
 const optIn = vi.fn();
-const posthog: any = {
+const posthog: { __loaded: boolean } & Record<string, unknown> = {
   __loaded: false,
   init: vi.fn((...a: unknown[]) => {
     init(...a);
