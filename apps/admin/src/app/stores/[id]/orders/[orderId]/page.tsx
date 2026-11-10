@@ -32,7 +32,7 @@ import { useFeatures } from '@/hooks/useFeatures';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ArrowStart } from '@/components/ArrowStart';
 
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -212,7 +212,11 @@ export default function OrderDetailPage() {
         <div className="flex items-center justify-between mb-5">
           <Link
             href={`/stores/${storeId}/orders`}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted/70 transition-colors"
+            className={buttonVariants({
+              variant: 'secondary',
+              size: 'icon',
+              className: 'justify-center',
+            })}
             aria-label={t('back')}
           >
             <ArrowStart className="h-5 w-5" />

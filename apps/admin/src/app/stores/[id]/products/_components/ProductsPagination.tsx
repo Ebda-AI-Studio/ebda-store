@@ -56,17 +56,11 @@ export function ProductsPagination({
         )}
       </div>
       <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page <= 1}
-          onClick={() => onPageChange(p => p - 1)}
-        >
+        <Button variant="outline" disabled={page <= 1} onClick={() => onPageChange(p => p - 1)}>
           {t('previous')}
         </Button>
         <Button
           variant="outline"
-          size="sm"
           disabled={page >= pagination.totalPages}
           onClick={() => onPageChange(p => p + 1)}
         >

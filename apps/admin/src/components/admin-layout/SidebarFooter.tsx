@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useFocusMode } from '@/contexts/FocusModeContext';
 import { useT } from '@/i18n/useT';
@@ -135,7 +135,11 @@ export function SidebarFooter({
           </div>
           <Link
             href="/account/security"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className={buttonVariants({
+              variant: 'ghost',
+              size: 'icon',
+              className: 'justify-center',
+            })}
             aria-label={t('security')}
             title={t('security')}
           >

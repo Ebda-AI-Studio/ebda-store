@@ -529,6 +529,7 @@ export default function StoreSettingsPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {groupCards.map(card => (
                   <Link
+                    data-ui="tile"
                     key={card.href}
                     href={card.href}
                     className="group flex min-h-20 items-start gap-4 rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md"

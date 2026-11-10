@@ -26,7 +26,6 @@ export function StoresPagination({ pagination, onPageChange }: StoresPaginationP
       <div className="flex gap-2">
         <Button
           variant="outline"
-          size="sm"
           disabled={pagination.page === 1}
           onClick={() => onPageChange(pagination.page - 1)}
         >
@@ -35,7 +34,6 @@ export function StoresPagination({ pagination, onPageChange }: StoresPaginationP
         </Button>
         <Button
           variant="outline"
-          size="sm"
           disabled={pagination.page === pagination.totalPages}
           onClick={() => onPageChange(pagination.page + 1)}
         >

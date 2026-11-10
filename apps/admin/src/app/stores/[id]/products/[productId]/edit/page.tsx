@@ -767,7 +767,7 @@ export default function EditProductPage() {
                 href={`${storefrontOrigin(storeHost)}/products/${product.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11')}
+                className={buttonVariants({ variant: 'outline' })}
               >
                 {t('viewInStore')}
               </a>
@@ -846,7 +846,7 @@ export default function EditProductPage() {
             <span>{t('createdBanner')}</span>
             <Link
               href={`/stores/${storeId}/products/${product.id}/variants`}
-              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'min-h-11')}
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
             >
               {t('addVariants')}
             </Link>

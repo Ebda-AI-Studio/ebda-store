@@ -42,6 +42,7 @@ export function SettingsRail({ storeId }: { storeId: string }) {
                   return (
                     <li key={i.card}>
                       <Link
+                        data-ui="nav"
                         href={href}
                         aria-current={active ? 'page' : undefined}
                         className={`flex min-h-9 items-center rounded-lg px-2 text-sm transition-colors ${

@@ -35,7 +35,7 @@ One rule set for where buttons live on every admin page. Source: the 2026-11-04 
 
 `tests/unit/admin-action-placement.test.ts` ratchets two rules: no `backToSettings|backToStore` and no native `confirm()/alert()`. Pages that still break them are listed in `admin-action-placement-known-debt.json`; the list may only shrink (a listed file that is clean fails the test). The owner track of each page removes its entries as it adopts the components.
 
-`tests/unit/admin-button-system.test.ts` (Ruling ADM-BTN-1) fails on a raw `<button>` that styles its own height, padding, type size, radius, fill or border, on a `<Button>` className that overrides the scale, and on the storefront `Button` from `@ebda/ui` imported in admin. A control that is not a button (switch, swatch, tile, list row, nav item, editor canvas, drag handle) is exempt only through its true ARIA role or `data-ui="swatch|tile|row|nav|canvas|handle"`. Measure what renders with `node scripts/visual/admin-button-styles.mjs`.
+`tests/unit/admin-button-system.test.ts` (Ruling ADM-BTN-1) fails on a raw `<button>` that styles its own height, padding, type size, radius, fill or border, on a `<Button>` className that overrides the scale, and on the storefront `Button` from `@ebda/ui` imported in admin, and on a `<Link>`/`<a>` dressed as a button by hand. Every control in the page header row is `md`; list pagination is `md`. A control that is not a button (switch, swatch, tile, list row, nav item, editor canvas, drag handle) is exempt only through its true ARIA role or `data-ui="swatch|tile|row|nav|canvas|handle"`. Measure what renders with `node scripts/visual/admin-button-styles.mjs`.
 
 ## Hubs
 

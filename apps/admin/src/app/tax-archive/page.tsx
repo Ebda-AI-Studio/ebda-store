@@ -9,6 +9,7 @@
  * Route guard: super_admin only (RequireSuperAdmin + the API's authorize('super_admin')).
  */
 
+import { buttonVariants } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
@@ -83,7 +84,7 @@ function TaxArchiveInner() {
       cell: s => (
         <Link
           href={`/tax-archive/${s.storeId}`}
-          className="inline-flex rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+          className={buttonVariants({ variant: 'outline', size: 'sm' })}
         >
           {t('viewDocuments')}
         </Link>

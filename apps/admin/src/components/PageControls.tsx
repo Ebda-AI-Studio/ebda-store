@@ -22,7 +22,6 @@ export function PageControls({
     <div className="mt-4 flex items-center gap-2 text-sm">
       <Button
         variant="outline"
-        size="sm"
         type="button"
         disabled={meta.page <= 1}
         onClick={() => onPageChange(meta.page - 1)}
@@ -37,7 +36,6 @@ export function PageControls({
       </span>
       <Button
         variant="outline"
-        size="sm"
         type="button"
         disabled={meta.page >= meta.totalPages}
         onClick={() => onPageChange(meta.page + 1)}

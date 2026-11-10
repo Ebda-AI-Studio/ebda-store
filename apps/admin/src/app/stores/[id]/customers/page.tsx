@@ -5,7 +5,7 @@ import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigat
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { useToast } from '@ebda/ui';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
 import { apiGet, apiFetch } from '../../../../lib/api';
@@ -376,7 +376,7 @@ export default function StoreCustomersPage() {
       cell: customer => (
         <Link
           href={customerHref(customer)}
-          className="inline-flex min-h-8 items-center rounded-lg border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+          className={buttonVariants({ variant: 'outline', size: 'sm' })}
           title={t('viewCustomerTitle')}
         >
           {t('viewCustomer')}
@@ -559,17 +559,11 @@ export default function StoreCustomersPage() {
               })}
             </p>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
-              >
+              <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
                 {t('previous')}
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 disabled={page === totalPages}
                 onClick={() => setPage(p => p + 1)}
               >

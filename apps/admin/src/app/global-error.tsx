@@ -1,5 +1,5 @@
 'use client';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 
 // NOTE: This is Next.js's last-resort error boundary — it replaces the entire
 // <html> shell when the root layout itself fails. NextIntlClientProvider lives
@@ -67,7 +67,7 @@ export default function GlobalError({
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error has no Next.js context */}
             <a
               href="/"
-              className="inline-block rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-foreground no-underline hover:bg-muted"
+              className={buttonVariants({ variant: 'outline', className: 'no-underline' })}
             >
               {t.goHome}
             </a>

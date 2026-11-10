@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { PACKING_SLIP_MAX } from '../../../../../components/orders/PackingSlipViewer';
 
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 interface OrdersBulkBarProps {
   /** With `selectedIds`, enables "print packing slips" for the selection. */
   storeId?: string;
@@ -52,7 +52,7 @@ export function OrdersBulkBar({
           ) : (
             <Link
               href={`/stores/${storeId}/orders/packing-slips?ids=${selectedIds.join(',')}`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+              className={buttonVariants({ variant: 'outline', size: 'sm', className: 'gap-1.5' })}
             >
               {tSlip('printBulk', { count: selectedIds.length })}
             </Link>

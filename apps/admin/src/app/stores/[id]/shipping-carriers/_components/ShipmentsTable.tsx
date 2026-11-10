@@ -186,7 +186,6 @@ export function ShipmentsTable({
               onClick={() => onPageChange(p => Math.max(1, p - 1))}
               disabled={page === 1}
               variant="outline"
-              size="sm"
             >
               {t('pagination.previous')}
             </Button>
@@ -195,7 +194,6 @@ export function ShipmentsTable({
               onClick={() => onPageChange(p => Math.min(pages, p + 1))}
               disabled={page === pages}
               variant="outline"
-              size="sm"
             >
               {t('pagination.next')}
             </Button>

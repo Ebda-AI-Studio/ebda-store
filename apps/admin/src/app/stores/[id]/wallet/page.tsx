@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet } from '../../../../lib/api';
@@ -151,10 +151,7 @@ export default function WalletPage() {
             {rows.length === 0 ? (
               <div className="flex flex-col items-start gap-3 p-6">
                 <p className="text-sm text-muted-foreground">{t('empty')}</p>
-                <Link
-                  href={`/stores/${storeId}/customers`}
-                  className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
-                >
+                <Link href={`/stores/${storeId}/customers`} className={buttonVariants()}>
                   {t('emptyAction')}
                 </Link>
               </div>
@@ -205,7 +202,7 @@ export default function WalletPage() {
                       cell: row => (
                         <Link
                           href={`/stores/${storeId}/customers/${encodeURIComponent(row.customerId)}`}
-                          className="inline-flex min-h-11 items-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+                          className={buttonVariants({ variant: 'outline', size: 'sm' })}
                         >
                           {t('view')}
                         </Link>

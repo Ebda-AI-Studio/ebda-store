@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
@@ -83,11 +83,7 @@ export function UpsellDialog() {
         {event.message}
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href={href}
-          onClick={close}
-          className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground sm:min-h-10"
-        >
+        <Link href={href} onClick={close} className={buttonVariants()}>
           {planName ? t('upgradeTo', { plan: planName }) : t('seePlans')}
         </Link>
         <Button variant="outline" ref={closeRef} type="button" onClick={close}>

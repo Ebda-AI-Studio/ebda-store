@@ -7,7 +7,7 @@ import { apiPost, apiPut } from '../../../../../lib/api';
 import { formatPrice } from '../../../../../lib/format';
 import type { GoldDisagreement, PendingRate, RateView } from './types';
 
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 /**
  * The two automatic sources disagree: the STORE OWNER decides (Ruling GOLD-DISAGREE-MERCHANT-1). Shows both
  * values and the gap, and offers the four ways out, all on the existing paths: apply the first source =
@@ -103,10 +103,7 @@ export function DisagreementBanner({
           >
             {t('applyFallback')}
           </Button>
-          <a
-            href="#gold-rate-editor"
-            className="inline-flex min-h-11 items-center rounded-md border px-4"
-          >
+          <a href="#gold-rate-editor" className={buttonVariants({ variant: 'outline' })}>
             {t('manual')}
           </a>
           <Button

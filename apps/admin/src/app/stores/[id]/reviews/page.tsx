@@ -510,7 +510,6 @@ export default function ReviewsPage() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                size="sm"
                 disabled={meta.page === 1}
                 onClick={() => setMeta(prev => ({ ...prev, page: prev.page - 1 }))}
               >
@@ -518,7 +517,6 @@ export default function ReviewsPage() {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 disabled={meta.page === meta.totalPages}
                 onClick={() => setMeta(prev => ({ ...prev, page: prev.page + 1 }))}
               >

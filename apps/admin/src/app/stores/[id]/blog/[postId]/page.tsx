@@ -9,7 +9,7 @@ import { ImageUpload } from '../../../../../components/ImageUpload';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { AdminSkeletonDetail } from '../../../../../components/AdminSkeleton';
 import { useT } from '@/i18n/useT';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 
 interface BlogPost {
   id: string;
@@ -315,7 +315,7 @@ export default function BlogPostEditorPage({
           <div className="flex items-center justify-end gap-3 border-t pt-6">
             <Link
               href={`/stores/${storeId}/blog`}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+              className={buttonVariants({ variant: 'outline' })}
             >
               {t('cancel')}
             </Link>

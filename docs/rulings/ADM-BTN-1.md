@@ -29,6 +29,12 @@ B3 the storefront Button imported in admin. Non-button controls are exempt only 
 both visible in the markup. `DEFERRED` holds `app/login/page.tsx` (PR #533 is rewriting the sign-in
 pages) and may only shrink. Measured with `scripts/visual/admin-button-styles.mjs`.
 
+Round 2 (controller review of the first push): every control in the page header row (language toggle,
+notifications, view store, the "..." overflow, the primary) is `md` (40 px desktop, 44 px phone, 12 px radius);
+list pagination is `md`; links dressed as buttons take `buttonVariants()` (rule B4), and classes appended beside
+`buttonVariants()` are checked too (`cn(buttonVariants(), 'min-h-11')` was forcing 44 px on desktop). Measured
+on 14 pages: 10 distinct styles, no pill (radius >= half the height) anywhere.
+
 Cost if wrong: a control that should have kept a bespoke look now wears the scale (fix = an exempt
 kind, visible in review), or a `data-ui` exemption is abused to dodge the guard (fix = review the
 `data-ui=` grep, which is short by design).

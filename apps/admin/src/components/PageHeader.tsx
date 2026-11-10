@@ -1,7 +1,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { cn } from '@ebda/ui';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { RowActions, type RowActionItem } from './RowActions';
@@ -37,7 +36,7 @@ function ActionButton({
 }) {
   if (action.href && !action.disabled) {
     return (
-      <Link href={action.href} className={cn(buttonVariants({ variant }), 'min-h-11')}>
+      <Link href={action.href} className={buttonVariants({ variant })}>
         {action.label}
       </Link>
     );

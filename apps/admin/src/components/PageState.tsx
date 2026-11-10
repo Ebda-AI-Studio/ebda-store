@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { AdminSkeletonPage } from './AdminSkeleton';
 import { ErrorState } from './ErrorState';
 
@@ -36,10 +36,7 @@ export function PageState({ loading, error, empty, onRetry, children }: PageStat
         {empty.body && <p className="mb-6 max-w-sm text-muted-foreground">{empty.body}</p>}
         {empty.action &&
           (empty.action.href ? (
-            <a
-              href={empty.action.href}
-              className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-            >
+            <a href={empty.action.href} className={buttonVariants()}>
               {empty.action.label}
             </a>
           ) : (

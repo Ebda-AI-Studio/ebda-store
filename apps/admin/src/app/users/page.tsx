@@ -388,7 +388,6 @@ export default function UsersPage() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
                   disabled={pagination.page === 1}
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                 >
@@ -396,7 +395,6 @@ export default function UsersPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
                   disabled={pagination.page === pagination.totalPages}
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
                 >

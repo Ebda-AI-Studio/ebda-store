@@ -24,7 +24,7 @@ import {
 } from './_components/types';
 
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 
 export default function LoyaltySettingsPage() {
   const { gate } = useRequireFeature('loyalty');
@@ -251,7 +251,7 @@ export default function LoyaltySettingsPage() {
             {/* Transactions sub-page link */}
             <Link
               href={`/stores/${storeId}/loyalty/transactions`}
-              className="ms-auto px-4 py-2 rounded-lg font-medium text-sm bg-muted text-foreground hover:bg-muted/80 transition-colors inline-flex items-center gap-1.5"
+              className={buttonVariants({ variant: 'secondary', className: 'ms-auto gap-1.5' })}
             >
               <svg
                 className="h-4 w-4"

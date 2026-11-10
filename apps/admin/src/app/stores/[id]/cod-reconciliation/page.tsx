@@ -383,7 +383,6 @@ export default function CodReconciliationPage() {
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
                     type="button"
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
@@ -392,7 +391,6 @@ export default function CodReconciliationPage() {
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
                     type="button"
                     onClick={() => setPage(p => Math.min(pages, p + 1))}
                     disabled={page === pages}

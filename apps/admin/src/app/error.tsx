@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 
@@ -44,10 +44,7 @@ export default function Error({
           <Button type="button" onClick={reset}>
             {t('retry')}
           </Button>
-          <Link
-            href="/"
-            className="rounded-lg border border-border px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-          >
+          <Link href="/" className={buttonVariants({ variant: 'outline' })}>
             {t('goHome')}
           </Link>
         </div>

@@ -150,7 +150,6 @@ export function ReturnsTable({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              size="sm"
               disabled={meta.page === 1}
               onClick={() => onPageChange(meta.page - 1)}
             >
@@ -158,7 +157,6 @@ export function ReturnsTable({
             </Button>
             <Button
               variant="outline"
-              size="sm"
               disabled={meta.page === meta.totalPages}
               onClick={() => onPageChange(meta.page + 1)}
             >

@@ -166,7 +166,6 @@ export function AbandonedCartsTable({
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
               type="button"
               onClick={() => onPageChange(Math.max(1, page - 1))}
               disabled={page === 1}
@@ -175,7 +174,6 @@ export function AbandonedCartsTable({
             </Button>
             <Button
               variant="outline"
-              size="sm"
               type="button"
               onClick={() => onPageChange(Math.min(meta.totalPages, page + 1))}
               disabled={page === meta.totalPages}

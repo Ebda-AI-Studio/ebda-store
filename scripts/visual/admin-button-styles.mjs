@@ -10,7 +10,8 @@
  *
  * Writes <out>/<page>-<locale>-<width>-<theme>.png and <out>/styles.json: each distinct
  * style (height | font | radius | filled | bordered) with its count and three example labels.
- * A style is a visible <button>, [role=button] or <a> whose classes come from buttonVariants().
+ * A style is a visible <button>, [role=button], or an <a> dressed as a button (fill or border + padding).
+ * `rpill` marks a fully round control (radius >= half its height).
  */
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -55,11 +56,18 @@ for (const locale of ['ar', 'en'])
 async function measure(page) {
   return page.evaluate(() => {
     const out = [];
-    for (const el of document.querySelectorAll('button, [role="button"]')) {
+    for (const el of document.querySelectorAll('button, [role="button"], a')) {
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height) continue;
       const cs = getComputedStyle(el);
       if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+      // A link counts only when it is dressed as a button (a fill or a border, and padding).
+      if (el.tagName === 'A' && !el.hasAttribute('data-ui')) {
+        const dressed =
+          (cs.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(cs.borderTopWidth) > 0) &&
+          parseFloat(cs.paddingInlineStart) > 0;
+        if (!dressed) continue;
+      }
       const exemptRole =
         /^(switch|menuitem|menuitemradio|menuitemcheckbox|option|radio|tab|gridcell)$/.test(
           el.getAttribute('role') || ''
@@ -73,8 +81,10 @@ async function measure(page) {
         cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
       const bordered = parseFloat(cs.borderTopWidth) > 0;
       const radius = Math.round(parseFloat(cs.borderTopLeftRadius));
+      // A pill: the radius reaches half the height (the ends are fully round).
+      const pill = radius >= Math.floor(r.height / 2);
       out.push({
-        key: `${Math.round(r.height)}px|${cs.fontSize}|r${radius > 100 ? 'pill' : radius}|${filled ? 'fill' : 'ghost'}|b${bordered ? 1 : 0}`,
+        key: `${Math.round(r.height)}px|${cs.fontSize}|r${pill ? 'pill' : radius}|${filled ? 'fill' : 'ghost'}|b${bordered ? 1 : 0}`,
         label: (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 24),
       });
     }

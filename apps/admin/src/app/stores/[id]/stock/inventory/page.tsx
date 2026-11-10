@@ -586,7 +586,6 @@ export default function StockInventoryPage() {
               <div className="mt-3 flex items-center justify-between gap-3">
                 <Button
                   variant="outline"
-                  size="sm"
                   disabled={currentPage <= 1}
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 >
@@ -597,7 +596,6 @@ export default function StockInventoryPage() {
                 </span>
                 <Button
                   variant="outline"
-                  size="sm"
                   disabled={currentPage >= totalPages}
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 >

@@ -219,7 +219,6 @@ export function AffiliatesTable({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              size="sm"
               type="button"
               onClick={() => onPageChange(p => Math.max(1, p - 1))}
               disabled={page <= 1}
@@ -228,7 +227,6 @@ export function AffiliatesTable({
             </Button>
             <Button
               variant="outline"
-              size="sm"
               type="button"
               onClick={() => onPageChange(p => Math.min(meta.totalPages, p + 1))}
               disabled={page >= meta.totalPages}

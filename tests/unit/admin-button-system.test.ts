@@ -13,6 +13,8 @@
  *   B2  a <Button> or buttonVariants() overrides the scale (h-*, min-h-*, px-/py-/p-*, rounded*,
  *       text-xs..text-xl) through className. Pick a size instead.
  *   B3  admin imports the storefront's Button from @ebda/ui (its sizes are not the admin scale).
+ *   B4  a <Link>/<a> dressed as a button by hand (padding/height + radius + fill/border): use buttonVariants().
+ *   (B2 also catches classes appended beside buttonVariants(): cn(buttonVariants(), 'min-h-11').)
  *
  * Not a button look, so exempt from B1 (the reason is in the markup, greppable):
  *   - role="switch" | "menuitem" | "menuitemradio" | "menuitemcheckbox" | "option" | "radio" | "tab" (a tab
@@ -127,6 +129,23 @@ export function rawSelfStyled(tag: string, src = ''): boolean {
   return SELF_STYLE.test(resolveClasses(cls, src));
 }
 
+/**
+ * B4: a <Link>/<a> dressed as a button by hand: padding or a height, a radius, and a fill or border.
+ * A link that should look like a button takes buttonVariants(); an inline text link never trips this.
+ */
+export function linkLooksLikeButton(tag: string): boolean {
+  if (isExempt(tag)) return false;
+  const cls = classAttr(tag);
+  if (/\bbuttonVariants\(/.test(cls)) return false;
+  // A skip link (sr-only until focused) is not a button.
+  if (TOKEN('sr-only').test(cls)) return false;
+  return (
+    TOKEN('p[xy]-\\S+|h-\\d+|min-h-\\S+').test(cls) &&
+    TOKEN('rounded(?:-\\S+)?').test(cls) &&
+    TOKEN('bg-\\S+|border(?:-\\S+)?').test(cls)
+  );
+}
+
 /** B2: className passed to <Button>/buttonVariants() that fights the scale. */
 export function overridesScale(cls: string): boolean {
   return SCALE_OVERRIDE.test(cls.replace(/\b(?:sm|md|lg|xl|2xl|max-\w+|coarse):\S+/g, ''));
@@ -143,7 +162,7 @@ function scan(): Finding[] {
     const lineOf = (i: number) => src.slice(0, i).split('\n').length;
     if (/import\s*\{[^}]*\bButton\b[^}]*\}\s*from\s*['"]@ebda\/ui['"]/.test(src))
       out.push({ file, line: 1, rule: 'B3', snippet: "Button from '@ebda/ui'" });
-    const re = /<(button|Button)(?=[\s>])/g;
+    const re = /<(button|Button|Link|a)(?=[\s>])/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(src))) {
       const tag = openingTag(src, m.index);
@@ -152,6 +171,15 @@ function scan(): Finding[] {
         out.push({ file, line: lineOf(m.index), rule: 'B1', snippet });
       if (m[1] === 'Button' && overridesScale(resolveClasses(classAttr(tag), src)))
         out.push({ file, line: lineOf(m.index), rule: 'B2', snippet });
+      if ((m[1] === 'Link' || m[1] === 'a') && linkLooksLikeButton(tag))
+        out.push({ file, line: lineOf(m.index), rule: 'B4', snippet });
+    }
+    // B2 also covers classes appended next to buttonVariants(): cn(buttonVariants(..), 'min-h-11'), `${buttonVariants(..)} h-9`.
+    const appended =
+      /(?:cn\(\s*buttonVariants\([^)]*\)\s*,|\$\{\s*buttonVariants\([^)]*\)\s*\})([^)}>]*)/g;
+    while ((m = appended.exec(src))) {
+      if (overridesScale(m[1]))
+        out.push({ file, line: lineOf(m.index), rule: 'B2', snippet: m[0].slice(0, 140) });
     }
     const bv = /buttonVariants\(\{([^}]*)\}\)/g;
     while ((m = bv.exec(src))) {
@@ -185,6 +213,13 @@ describe('admin button system', () => {
     expect(rawSelfStyled(t('<button className={btn}>'), hoisted)).toBe(true);
     expect(rawSelfStyled(t('<button className={cn(btn, open && "x")}>'), hoisted)).toBe(true);
     expect(rawSelfStyled(t('<button className={wrap}>'), "const wrap = 'flex gap-2';")).toBe(false);
+    expect(
+      linkLooksLikeButton(t('<Link href="/x" className="rounded-lg bg-primary px-4 py-2">'))
+    ).toBe(true);
+    expect(linkLooksLikeButton(t('<Link href="/x" className="text-primary-ink underline">'))).toBe(
+      false
+    );
+    expect(linkLooksLikeButton(t('<a className={buttonVariants({ size: "sm" })}>'))).toBe(false);
     expect(overridesScale('w-full justify-start gap-2')).toBe(false);
     expect(overridesScale('h-9 w-full')).toBe(true);
     expect(overridesScale('rounded-full')).toBe(true);

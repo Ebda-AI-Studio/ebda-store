@@ -55,7 +55,6 @@ export function OrdersPagination({
           disabled={pagination.page <= 1}
           onClick={() => onPageChange(p => p - 1)}
           variant="outline"
-          size="sm"
         >
           {t('previous')}
         </Button>
@@ -64,7 +63,6 @@ export function OrdersPagination({
           disabled={pagination.page >= pagination.totalPages}
           onClick={() => onPageChange(p => p + 1)}
           variant="outline"
-          size="sm"
         >
           {t('next')}
         </Button>

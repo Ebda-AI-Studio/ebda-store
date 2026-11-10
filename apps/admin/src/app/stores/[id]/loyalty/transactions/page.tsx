@@ -343,7 +343,6 @@ export default function LoyaltyTransactionsPage() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                size="sm"
                 type="button"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
@@ -352,7 +351,6 @@ export default function LoyaltyTransactionsPage() {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 type="button"
                 onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
                 disabled={page >= meta.totalPages}
