@@ -13,6 +13,7 @@ import express, { type RequestHandler } from 'express';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   CLIENT_IP_HEADER,
+  NO_CLIENT_ADDRESS_HEADER,
   SSR_AUTH_HEADER,
   SSR_FORWARD_ROUTES,
   __resetSsrClientIpForTests,
@@ -128,6 +129,31 @@ describe('API: forwarded shopper address (cf/ssr-client-ip.ts)', () => {
     }
   );
 
+  it('a signed `none` (storefront render, no shopper) on a storefront read = no address; unsigned or on a write = ignored', async () => {
+    const none = await signClientIp(SECRET, 'none');
+    const base = {
+      'cf-connecting-ip': WORKER_EGRESS,
+      'x-forwarded-for': '6.6.6.6',
+      [CLIENT_IP_HEADER]: 'none',
+    };
+    const ok = await resolveClientAddress(
+      apiRequest('/api/v1/public/store/resolve', { ...base, [SSR_AUTH_HEADER]: none }),
+      SECRET
+    );
+    expect(ok).toMatchObject({ ip: null, forwarded: true });
+    expect(ok.request.headers.has('x-forwarded-for')).toBe(false);
+    const unsigned = await resolveClientAddress(
+      apiRequest('/api/v1/public/store/resolve', { ...base, [SSR_AUTH_HEADER]: 'ab'.repeat(32) }),
+      SECRET
+    );
+    expect(unsigned).toMatchObject({ ip: WORKER_EGRESS, forwarded: false });
+    const write = await resolveClientAddress(
+      apiRequest('/api/v1/auth/login', { ...base, [SSR_AUTH_HEADER]: none }, 'POST'),
+      SECRET
+    );
+    expect(write).toMatchObject({ ip: WORKER_EGRESS, forwarded: false });
+  });
+
   it('deletes a typed X-Forwarded-For when there is no cf-connecting-ip and no valid forward', async () => {
     const r = await resolveClientAddress(
       apiRequest('/api/v1/public/products', { 'x-forwarded-for': '6.6.6.6' }),
@@ -135,6 +161,17 @@ describe('API: forwarded shopper address (cf/ssr-client-ip.ts)', () => {
     );
     expect(r.ip).toBeNull();
     expect(r.request.headers.has('x-forwarded-for')).toBe(false);
+    expect(r.request.headers.get(NO_CLIENT_ADDRESS_HEADER)).toBe('1');
+    // and a caller can never set the marker itself
+    const typed = await resolveClientAddress(
+      apiRequest('/api/v1/public/products', {
+        'cf-connecting-ip': '198.51.100.50',
+        [NO_CLIENT_ADDRESS_HEADER]: '1',
+      }),
+      SECRET
+    );
+    expect(typed.ip).toBe('198.51.100.50');
+    expect(typed.request.headers.has(NO_CLIENT_ADDRESS_HEADER)).toBe(false);
   });
 
   it('every GET route of the storefront render routers is classified (forward or own)', () => {
@@ -200,17 +237,17 @@ describe('storefront: API-origin fetches carry the signed shopper address (apps/
     expect(outside.headers.has(CLIENT_IP_HEADER)).toBe(false);
   });
 
-  it('adds neither header with no shopper address or no secret', async () => {
-    const noIp = new Request('https://storedemo.ebda.app/');
-    await withClientAddress(noIp, SECRET, () => fetch(`${API}/api/v1/public/products`));
+  it('adds neither header with no secret; with no shopper address it forwards the signed `none`', async () => {
     const withIp = new Request('https://storedemo.ebda.app/', {
       headers: { 'cf-connecting-ip': '203.0.113.7' },
     });
     await withClientAddress(withIp, undefined, () => fetch(`${API}/api/v1/public/products`));
-    for (const s of seen) {
-      expect(s.headers.has(CLIENT_IP_HEADER)).toBe(false);
-      expect(s.headers.has(SSR_AUTH_HEADER)).toBe(false);
-    }
+    const noIp = new Request('https://storedemo.ebda.app/'); // OpenNext background revalidation
+    await withClientAddress(noIp, SECRET, () => fetch(`${API}/api/v1/public/store/resolve`));
+    expect(seen[0].headers.has(CLIENT_IP_HEADER)).toBe(false);
+    expect(seen[0].headers.has(SSR_AUTH_HEADER)).toBe(false);
+    expect(seen[1].headers.get(CLIENT_IP_HEADER)).toBe('none');
+    expect(seen[1].headers.get(SSR_AUTH_HEADER)).toBe(await signClientIp(SECRET, 'none'));
   });
 
   it('does not follow a redirect with the signed headers unless the caller asked to', async () => {
@@ -303,43 +340,82 @@ describe("storefront wrapper sits BELOW Next's fetch cache (the forward headers 
   });
 });
 
-describe('limiters key on the resolved address', () => {
+describe('limiters key on the resolved address (real storefront wrapper -> API resolution -> Express)', () => {
   let server: Server;
   let base: string;
+  const realFetch = globalThis.fetch;
   beforeAll(async () => {
     const app = express();
     app.set('trust proxy', 1); // as the Worker's Express: X-Forwarded-For is set by worker.ts only
+    // app.ts: the Worker's no-address marker leaves req.ip empty (workers-test/search-limiter-key.test.ts proves the
+    // whole chain on workerd).
+    app.use((req, _res, next) => {
+      if (req.headers[NO_CLIENT_ADDRESS_HEADER])
+        Object.defineProperty(req, 'ip', { value: undefined });
+      next();
+    });
     app.get('/api/v1/public/products', publicLimiter, (_req, res) => res.json({ ok: true }));
+    app.get('/api/v1/public/store/resolve', publicLimiter, storeResolveLimiter, (_req, res) =>
+      res.json({ ok: true })
+    );
     await new Promise<void>(r => {
       server = app.listen(0, r);
     });
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    // The storefront Worker's outbound network: the API Worker sees the storefront's egress address as
+    // cf-connecting-ip and resolves the forward (cf/ssr-client-ip.ts) before Express.
+    resetStorefront();
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const headers = new Headers(init?.headers);
+      headers.set('cf-connecting-ip', WORKER_EGRESS);
+      const { request } = await resolveClientAddress(new Request(url, { headers }), SECRET);
+      const xff = request.headers.get('x-forwarded-for');
+      const marker = request.headers.get(NO_CLIENT_ADDRESS_HEADER);
+      const out: Record<string, string> = {};
+      if (xff) out['x-forwarded-for'] = xff;
+      if (marker) out[NO_CLIENT_ADDRESS_HEADER] = marker;
+      return realFetch(base + new URL(url).pathname, { headers: out });
+    }) as typeof fetch;
+    installApiFetchForwarding(API);
   });
-  afterAll(() => new Promise<void>(r => server.close(() => r())));
+  afterAll(async () => {
+    globalThis.fetch = realFetch;
+    resetStorefront();
+    await new Promise<void>(r => server.close(() => r()));
+  });
 
-  /** storefront render (signed forward from the Worker's egress) -> API worker resolution -> Express. */
-  async function renderFor(shopper: string): Promise<number> {
-    const auth = await signClientIp(SECRET, shopper);
-    const { request } = await resolveClientAddress(
-      apiRequest('/api/v1/public/products', {
-        'cf-connecting-ip': WORKER_EGRESS,
-        [CLIENT_IP_HEADER]: shopper,
-        [SSR_AUTH_HEADER]: auth,
-      }),
-      SECRET
-    );
-    const res = await realFetchTo(base + '/api/v1/public/products', request.headers);
-    return Number(res.headers.get('ratelimit-remaining'));
+  /** One server-side API fetch made while rendering for `shopper` (null = no shopper: background revalidation). */
+  async function renderFor(shopper: string | null, path: string): Promise<Response> {
+    const headers: Record<string, string> = shopper ? { 'cf-connecting-ip': shopper } : {};
+    const incoming = new Request('https://storedemo.ebda.app/', { headers });
+    return withClientAddress(incoming, SECRET, () => fetch(`${API}${path}`));
   }
-  const realFetchTo = (url: string, h: Headers) =>
-    fetch(url, { headers: { 'x-forwarded-for': h.get('x-forwarded-for') ?? '' } });
+  const remaining = (r: Response) => Number(r.headers.get('ratelimit-remaining'));
 
-  it('two shoppers rendered by the storefront get two budgets', async () => {
-    const a1 = await renderFor('203.0.113.21');
-    const a2 = await renderFor('203.0.113.21');
-    const b1 = await renderFor('203.0.113.22');
+  it('two shoppers rendered by the storefront get two publicLimiter budgets', async () => {
+    const a1 = remaining(await renderFor('203.0.113.21', '/api/v1/public/products'));
+    const a2 = remaining(await renderFor('203.0.113.21', '/api/v1/public/products'));
+    const b1 = remaining(await renderFor('203.0.113.22', '/api/v1/public/products'));
     expect(a2).toBe(a1 - 1);
     expect(b1).toBe(a1);
+  });
+
+  it('two shoppers rendered by the storefront get two store-resolve budgets (30/min each, not one shared)', async () => {
+    const statusA: number[] = [];
+    for (let i = 0; i < 31; i++)
+      statusA.push((await renderFor('203.0.113.61', '/api/v1/public/store/resolve')).status);
+    expect(statusA.slice(0, 30).every(s => s === 200)).toBe(true);
+    expect(statusA[30]).toBe(429);
+    expect((await renderFor('203.0.113.62', '/api/v1/public/store/resolve')).status).toBe(200);
+  });
+
+  it('a storefront render with no shopper is counted in NO per-address bucket (store resolve + public reads)', async () => {
+    for (let i = 0; i < 35; i++) {
+      const r = await renderFor(null, '/api/v1/public/store/resolve');
+      expect(r.status).toBe(200);
+      expect(r.headers.has('ratelimit-remaining')).toBe(false);
+    }
   });
 
   it.each([
@@ -355,7 +431,7 @@ describe('limiters key on the resolved address', () => {
     const srv = await new Promise<Server>(r => {
       const x = app.listen(0, () => r(x));
     });
-    const res = await fetch(`http://127.0.0.1:${(srv.address() as AddressInfo).port}/x`);
+    const res = await realFetch(`http://127.0.0.1:${(srv.address() as AddressInfo).port}/x`);
     expect(res.status).toBe(200);
     expect(res.headers.has('ratelimit-remaining')).toBe(false);
     await new Promise<void>(r => srv.close(() => r()));

@@ -29,4 +29,20 @@ describe('publicSearchLimiter keys on the client IP on workerd', () => {
     // a different client is NOT affected: the bucket is not global
     expect((await suggest(b)).status).toBe(400);
   });
+
+  it('a request with no client address (no cf-connecting-ip: X-Forwarded-For deleted) is never counted (RL-SSR-IP-6)', async () => {
+    // A typed X-Forwarded-For without cf-connecting-ip is deleted, so req.ip is empty and the per-IP limiters skip it
+    // (`noClientIp`) instead of pooling every such request: a storefront render with no shopper takes this shape.
+    const statuses: number[] = [];
+    for (let i = 0; i < 64; i++) {
+      const res = await api.fetch(
+        'https://api.ebda.app/api/v1/public/not-a-uuid/search/suggest?q=a',
+        {
+          headers: { 'x-forwarded-for': '203.0.113.250' },
+        }
+      );
+      statuses.push(res.status);
+    }
+    expect(statuses.every(s => s === 400)).toBe(true);
+  });
 });

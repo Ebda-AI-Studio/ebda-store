@@ -17,6 +17,14 @@ import { isIP } from '../lib/safe-fetch';
 
 export const CLIENT_IP_HEADER = 'x-ebda-client-ip';
 export const SSR_AUTH_HEADER = 'x-ebda-ssr-auth';
+/** Signed by the storefront for a render with no shopper behind it (background revalidation): no per-address bucket. */
+export const NO_SHOPPER_ADDRESS = 'none';
+/**
+ * Set by this module (never by a caller: an inbound copy is always removed) when a request has NO client address.
+ * Express has no socket address on workerd and would otherwise fall back to one fixed value for every such request;
+ * app.ts reads this marker and leaves `req.ip` empty, so the per-address limiters skip it (`noClientIp`).
+ */
+export const NO_CLIENT_ADDRESS_HEADER = 'x-ebda-no-client-address';
 const SIGNING_CONTEXT = 'ebda-ssr-client-ip.v1\n';
 const PUBLIC_PREFIX = '/api/v1/public';
 
@@ -131,6 +139,7 @@ export async function resolveClientAddress(
   const headers = new Headers(incoming.headers);
   headers.delete(CLIENT_IP_HEADER);
   headers.delete(SSR_AUTH_HEADER);
+  headers.delete(NO_CLIENT_ADDRESS_HEADER);
 
   let ip = seen;
   let forwarded = false;
@@ -139,25 +148,33 @@ export async function resolveClientAddress(
     auth &&
     typeof secret === 'string' &&
     secret.length > 0 &&
-    isIP(claimed) !== 0 &&
+    (isIP(claimed) !== 0 || claimed === NO_SHOPPER_ADDRESS) &&
     isForwardableRead(incoming.method, new URL(incoming.url).pathname)
   ) {
     try {
       if (await verifyClientIpSignature(secret, claimed, auth)) {
-        ip = claimed;
+        // `none`: the storefront itself, no shopper. No address = the per-IP limiters skip it (`noClientIp`), the
+        // per-store limits still apply. Never the storefront Worker's egress address, which every store would share.
+        ip = claimed === NO_SHOPPER_ADDRESS ? null : claimed;
         forwarded = true;
       }
     } catch {
       // a WebCrypto failure is a "no": the address Cloudflare saw stands
     }
   }
-  const hadForward =
-    incoming.headers.has(CLIENT_IP_HEADER) || incoming.headers.has(SSR_AUTH_HEADER);
-  if (!hadForward && incoming.headers.get('x-forwarded-for') === ip) {
+  const hadInternal =
+    incoming.headers.has(CLIENT_IP_HEADER) ||
+    incoming.headers.has(SSR_AUTH_HEADER) ||
+    incoming.headers.has(NO_CLIENT_ADDRESS_HEADER);
+  if (ip && !hadInternal && incoming.headers.get('x-forwarded-for') === ip) {
     return { request: incoming, ip, forwarded };
   }
-  if (ip) headers.set('x-forwarded-for', ip);
-  else headers.delete('x-forwarded-for');
+  if (ip) {
+    headers.set('x-forwarded-for', ip);
+  } else {
+    headers.delete('x-forwarded-for');
+    headers.set(NO_CLIENT_ADDRESS_HEADER, '1');
+  }
   return { request: new Request(incoming, { headers }), ip, forwarded };
 }
 

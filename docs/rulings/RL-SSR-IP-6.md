@@ -24,6 +24,11 @@ API fetch. Design:
   No `REVALIDATE_SECRET` on the API = nothing trusted, one `console.error` per isolate.
 - `publicLimiter` and `storeResolveLimiter` key explicitly on the address and skip a request with none
   (`noClientIp`), instead of pooling it. Every limit, window and 429 body is unchanged; no new secret or binding.
+- No shopper behind a render (OpenNext background revalidation arrives over the self service binding without
+  `cf-connecting-ip`): the storefront forwards the signed value `none`, the API turns it into NO address (X-Forwarded-For deleted and the Worker-only marker `x-ebda-no-client-address`, so `app.ts` leaves `req.ip` empty: on workerd Express otherwise falls back to one fixed address for every such request, measured red in `workers-test/search-limiter-key.test.ts` without the hook), and the per-address limiters skip it (`noClientIp`; the native `PUBLIC_IP_LIMITER` path
+  in `public-read-limit.ts` too); the per-store limits still count. It never pools in the storefront Worker's own
+  bucket. Store resolve (`GET /public/store/resolve`, `storeResolveLimiter` 30/min) is a `forward` route: diagnosed
+  2026-11-10 as already failing in production (unknown hosts flipping 404/500 when the shared bucket hit 429).
 - Cache safety (launch load): Next's patched fetch puts request headers into its data-cache key
   (`IncrementalCache.generateCacheKey`, next 16.4.3). The wrapper is installed at Worker-entry module scope; on workerd
   Next patches `globalThis.fetch` only inside the server function OpenNext imports on the first request, so Next's cache

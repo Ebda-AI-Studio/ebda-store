@@ -15,6 +15,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 export const CLIENT_IP_HEADER = 'x-ebda-client-ip';
 export const SSR_AUTH_HEADER = 'x-ebda-ssr-auth';
+/** The signed value a render with no shopper behind it forwards (Ruling RL-SSR-IP-6). */
+export const NO_SHOPPER_ADDRESS = 'none';
 const SIGNING_CONTEXT = 'ebda-ssr-client-ip.v1\n';
 /** next/dist/server/lib/patch-fetch-symbol.js */
 const NEXT_PATCH_SYMBOL = Symbol.for('next-patch');
@@ -93,8 +95,11 @@ export async function withClientAddress<T>(
   secret: unknown,
   fn: () => Promise<T>
 ): Promise<T> {
-  const ip = request.headers.get('cf-connecting-ip')?.trim();
-  if (!ip || typeof secret !== 'string' || secret.length === 0) return store.run(null, fn);
+  if (typeof secret !== 'string' || secret.length === 0) return store.run(null, fn);
+  // A request with no shopper behind it (OpenNext's background revalidation arrives over the self service binding
+  // without `cf-connecting-ip`) forwards the signed `none`: the API then counts it against no per-address bucket
+  // instead of pooling every store's background renders in the storefront Worker's own bucket.
+  const ip = request.headers.get('cf-connecting-ip')?.trim() || NO_SHOPPER_ADDRESS;
   const auth = await signClientIp(secret, ip);
   return store.run({ ip, auth }, fn);
 }
