@@ -938,3 +938,10 @@ Sweep subset `^((GET|POST|PUT|PATCH|DELETE) /(admin|webhooks|alerts)|SCHEDULED)`
 | `routes/admin.routes.ts:1199`                                 | not reachable on the Worker | `onHub` (hub on D1) answers from the identity result, `prisma.user.create` is the non-hub leg only        |
 | `services/auth.service.ts:524`                                | not reachable on the Worker | customer register takes `route.kind === 'do'` first (line ~405); Postgres leg is for Postgres stores only |
 | every other `user.*` read/write, `$transaction`, other models | NOT SWEPT                   | still open: section B above; needs a workerd route test per path (apps/api/workers-test)                  |
+
+### D.2 Bounded sweep of direct `prisma.` / `$transaction` / `withUser` / `withStore` use (2026-11-10)
+
+- Files in `apps/api/src/{routes,services}` that use them: 166. 27 mention `postgresRemovedOnThisWorker` / `onAccessD1` / `storeWritesToDo` / `hubOnD1` / `POSTGRES_REMOVED`; 139 do not (textual, not a reachability proof: most models are routed by the proxy to D1 / the StoreDO).
+- Runtime evidence instead of a per-file read: `SWEEP_STRICT=1 vitest run --config vitest.workers.config.mts workers-test/route-sweep.test.ts` passes (9 tests, exit 0) on this head: no swept route reaches Postgres. Blind spot found: the sweep posts `/auth/merchant/signup` with an INVALID body, so it never reached `user.create`.
+- Bugs found: 1 (merchant signup), fixed with `workers-test/merchant-signup.test.ts` (fails on the old service file with `POSTGRES_REMOVED ... user.create`, passes after).
+- NOT done: per-file reachability classification of the 139 files, and valid-body flow coverage for other merchant write routes (store create, staff invite, onboarding). Follow-up: extend the sweep with valid bodies per merchant write route; every body-validated route is unproven until then.

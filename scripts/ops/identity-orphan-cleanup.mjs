@@ -2,12 +2,14 @@
 // Orphan merchant identities left by the 2026-11-10 signup 500: unverified, '!pending' hash, created that day.
 // The Store profile table is gone from the Worker (NZ-D23), so "no profile row" holds for every such row.
 // Dry-run by default; --apply deletes ONLY the rows the same SELECT returns (FKs cascade). Never prints a hash.
-// Usage: node scripts/ops/identity-orphan-cleanup.mjs [--apply] [--day=2026-11-10]
+// Usage: node scripts/ops/identity-orphan-cleanup.mjs [--apply] [--created-on=2026-11-10]
 import { execFileSync } from 'node:child_process';
 
 const apply = process.argv.includes('--apply');
-const day = (process.argv.find(a => a.startsWith('--day=')) ?? '--day=2026-11-10').slice(6);
-if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('bad --day');
+const day = (
+  process.argv.find(a => a.startsWith('--created-on=')) ?? '--created-on=2026-11-10'
+).slice(13);
+if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('bad --created-on (UTC date)');
 const env = { ...process.env, CLOUDFLARE_ACCOUNT_ID: '69188202efc4df480140dd76545aa3ab' };
 const d1 = sql =>
   JSON.parse(
@@ -21,8 +23,12 @@ const mask = e => e.replace(/^(.{2}).*(@.*)$/, '$1***$2');
 const SCOPE = `password_hash = '!pending' AND email_verified = 0`;
 const rows = () => d1(`SELECT id, email, created_at FROM users WHERE ${SCOPE} ORDER BY created_at`);
 
-const before = rows();
-const stray = before.filter(r => !String(r.created_at).startsWith(day));
+const all = rows();
+const before = all.filter(r => String(r.created_at).startsWith(day));
+const stray = [];
+const others = all.length - before.length;
+if (others)
+  console.log(`note: ${others} other unverified+pending row(s) outside ${day} are left untouched`);
 console.log(`before: ${before.length} unverified+pending rows`);
 for (const r of before) console.log(`  ${mask(r.email)}  ${r.created_at}`);
 if (stray.length) {
