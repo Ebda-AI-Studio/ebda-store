@@ -7,6 +7,7 @@ import { Button, Select } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { api, API_URL, type Order } from '../../lib/api';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { returnPolicyCopy, returnPolicyKind } from '../../lib/return-policy-text';
@@ -58,7 +59,10 @@ async function authFetch(url: string, options: RequestInit = {}) {
 function ReturnRequestForm({ storeId }: { storeId: string }) {
   const storeUrl = useStoreUrl();
   const { t } = useLanguage();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // AuthContext owns the "who is this?" question. This form used to ask `/auth/me` a second time
+  // on its own: a second red 401 in a guest's console, and a customer whose 30-minute access token
+  // had lapsed was shown the signed-out state, because a raw fetch never refreshes.
+  const { isAuthenticated: isLoggedIn } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState('');
@@ -76,13 +80,6 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
     text: string;
     returnNumber?: string;
   } | null>(null);
-
-  useEffect(() => {
-    // Check auth by trying to fetch profile (cookie-based auth)
-    fetch(`${API_URL}/auth/me`, { credentials: 'include' })
-      .then(res => setIsLoggedIn(res.ok))
-      .catch(() => setIsLoggedIn(false));
-  }, []);
 
   useEffect(() => {
     if (!isLoggedIn) return;

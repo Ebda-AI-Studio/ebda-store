@@ -630,6 +630,26 @@ function claimSessionProbe(endpoint: string, options: RequestInit): boolean {
 }
 
 /**
+ * Has this tab already spent its one evidence-free probe? Then it asked `/auth/me`, tried the one
+ * refresh, and was told there is no session. Every way a session can start afterwards (login,
+ * passkey, a successful refresh) writes the session hint from this same script, so a browser with a
+ * spent probe and no hint is a guest: AuthContext stops asking on each cart / checkout / returns
+ * view, which was one red 401 per page in a guest's console (pre-QA sweep 2026-11-10 #7).
+ *
+ * No sessionStorage (private mode, a throwing accessor) answers false: no probe was ever claimed
+ * there, so the caller keeps asking rather than settle a possible customer as a guest.
+ */
+export function sessionProbeSpent(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const ss = window.sessionStorage;
+    return !!ss && ss.getItem(SESSION_PROBE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Auth routes a 401/CSRF-403 must NEVER send through a refresh (#2097).
  *
  * The loop guard only needs to exclude `/auth/refresh` itself (its own 401/429
