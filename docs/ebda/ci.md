@@ -39,8 +39,9 @@ all workspaces; docs-only changes select nothing; `tests/`, `scripts/` and
 
 `worker-dry-run` (`wrangler deploy --dry-run` on Node 22) runs only for a Worker
 app whose deploy surface changed: its `package.json`, wrangler / next /
-open-next config, Worker entry, or the root manifest, lockfile and `cf-*`
-scripts. It costs about 9 billed minutes per Next app (OpenNext build), so it
+open-next config, Worker entry (for `apps/web` also every local module that
+entry bundles: the two HTML edge caches, `edge-build-id.ts` and the rest of its
+relative imports), or the root manifest, lockfile and `cf-*` scripts. It costs about 9 billed minutes per Next app (OpenNext build), so it
 is not run for ordinary source edits. Apps without a wrangler config (apps/api
 today) are skipped, not failed.
 

@@ -9,3 +9,5 @@
 **Footprint:** 5 GETs and about 15-60 s of one runner step per web deploy; no extra cost.
 
 **Cost if wrong:** the warm-up only helps the colo and isolate the runner reaches; other colos still pay one cold render, and it does not fix a slow API read. If the post-deploy log still shows a first-hit TTFB above 5 s, read the API `Server-Timing` (`db-wait`, `handler`) on that request to find the slow read.
+
+**Amended 2026-11-10 (after EDGE-BUILD-1):** the step now sends one GET of `/ar` AND `/en` per demo host (10 GETs, cap 6 min = 10 x the 30 s curl limit). Reason: both HTML edge caches are keyed by the Worker version since EDGE-BUILD-1, so every deploy starts them empty and `/en` is its own entry; with only `/ar` warmed the first `/en` visitor after each deploy paid the cold render. Pinned by `tests/unit/web-deploy-warm.test.ts`. Not measured yet: the time the `/en` half adds (read it in the step log of the next web deploy). Unchanged residual: only the data centre the runner reaches is warmed.

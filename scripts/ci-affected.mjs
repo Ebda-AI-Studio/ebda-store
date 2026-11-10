@@ -95,9 +95,15 @@ const PRISMA_INPUT = /^packages\/database\/prisma\/(schema\.prisma|migrations\/)
 /** Always part of the unit lane when any code changed: cross-app source pins. */
 export const BASE_UNIT_PATHS = ['tests/unit'];
 
-/** Per-app files that can move the Worker bundle (beyond package.json + configs). */
+/**
+ * Per-app files that can move the Worker bundle (beyond package.json + configs).
+ * apps/web: the custom Worker entry AND every local module it bundles outside the Next build (the HTML edge caches,
+ * their build partition, the locale redirect, the company-host route, and the two src/lib files those import). tests/unit/ci-lean-structure.test.ts walks the
+ * entry's relative imports, so a module added to the entry without a line here fails CI.
+ */
 const WORKER_ENTRY = {
-  'apps/web': /^apps\/web\/sentry-worker-entry\.ts$/,
+  'apps/web':
+    /^apps\/web\/((sentry-worker-entry|demo-edge-cache|store-edge-cache|edge-build-id|edge-html-lang|csp-nonce-renew|locale-redirect-edge|company-host-route)\.ts|src\/lib\/(demo-hosts|locale-paths)\.ts)$/,
   'apps/status': /^apps\/status\/src\//,
   'apps/accounts': /^apps\/accounts\/src\//,
   'apps/api': /^apps\/api\//,
