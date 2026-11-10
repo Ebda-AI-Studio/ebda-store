@@ -1,5 +1,5 @@
 import { SiteLink } from './SiteLink';
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { COPY } from '../lib/content';
 import { MODEL_CREDITS } from '../lib/credits';
 import { pageJsonLd } from '../lib/seo';
@@ -74,7 +74,7 @@ export function CreditsPage({ locale }: { locale: Locale }) {
             <p>{p.photosP}</p>
           </section>
           <p className="legal-back">
-            <Link href={HOME[locale]}>{c.legalPages.back}</Link>
+            <PageLink href={HOME[locale]}>{c.legalPages.back}</PageLink>
           </p>
         </article>
       </main>
