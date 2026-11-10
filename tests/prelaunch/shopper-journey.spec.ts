@@ -123,6 +123,34 @@ for (const lang of LANGS) {
       await expect(page.locator('a[href*="/products/"]').first()).toBeVisible();
     });
 
+    test(`category page lists products (${lang})`, async ({ page }) => {
+      // The category index links each category to the filtered listing (/products?category=<slug>).
+      await open(page, lang, '/categories');
+      const href = await page.locator('main a[href*="category="]').first().getAttribute('href');
+      expect(href, 'a category link on /categories').toBeTruthy();
+      const u = new URL(href!, page.url());
+      const res = await open(page, lang, u.pathname + u.search);
+      expect(res?.status()).toBe(200);
+      await expect(page.locator('a[href*="/products/"]').first()).toBeVisible();
+      await noHorizontalScroll(page);
+    });
+
+    test(`variant picker on a product with options (${lang})`, async ({ page }) => {
+      test.skip(!process.env.PRELAUNCH_VARIANT_PRODUCT, 'set PRELAUNCH_VARIANT_PRODUCT=<slug>');
+      const res = await open(page, lang, `/products/${process.env.PRELAUNCH_VARIANT_PRODUCT}`);
+      expect(res?.status()).toBe(200);
+      const groups = page.locator('[data-option-group]');
+      await expect(groups.first()).toBeVisible();
+      const choices = groups.first().locator('button[aria-pressed]');
+      expect(await choices.count(), 'size choices').toBeGreaterThan(1);
+      await choices.first().click();
+      await expect(choices.first()).toHaveAttribute('aria-pressed', 'true');
+      await page.getByTestId('pdp-add').first().click();
+      await page.waitForTimeout(1500);
+      await open(page, lang, '/cart');
+      await expect(page.locator('a[href*="/products/"]').first()).toBeVisible();
+    });
+
     test(`PDP -> cart -> checkout form (${lang})`, async ({ page }) => {
       await open(page, lang, '/');
       const pdp = await firstProductPath(page);
