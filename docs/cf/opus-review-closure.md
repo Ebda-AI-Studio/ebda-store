@@ -37,7 +37,7 @@ Not ready when this branch was cut; nothing of it is here. When r6b merges onto 
 2. `apps/api/wrangler.jsonc`: delete `STORE_DO_ENABLED_IDS` and the `MERGE POINT feat/cf-r6b` comment above it.
 3. `docs/runbooks/cutover-cf.md` 8.3: delete the interim "set `STORE_DO_ENABLED_IDS` to EXACTLY the flipped store ids" clause, and invert the last test in `tests/unit/cutover-runbook-smoke.test.ts` (it asserts the interim clause).
 4. `tests/unit/fixtures/do-writable-direct-readers.json` is the reviewed baseline of direct readers of DO-writable models. This PR added the `shipment` readers the money-jobs line documents (`shipping-carrier.routes.ts`, `shipping-carrier.service.ts`, `cod-reconciliation.service.ts`, `shipment-pickup.service.ts`, `mcp/tools/admin-read.tools.ts`); r6b's review of the ~250 readers must resolve them and then lower the baseline.
-5. `docs/rulings/README.md` count: regenerate with `python3 ~/.claude/handoff/ebda-autopilot/fix-rulings-count.py docs/rulings/README.md` then prettier after any rebase conflict on the count line.
+5. `docs/rulings/README.md` count: retired by Ruling RULINGS-INDEX-1 (the README has no table or count; add a ruling file only).
 
 ## R7: the last blockers before the flip (Rulings CF-R7-1, CF-R7-2, CF-R7-3)
 

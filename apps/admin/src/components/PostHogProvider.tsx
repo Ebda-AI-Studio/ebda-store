@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { scrubPostHogCapture } from '@ebda/shared';
+import { EBDA_CONSENT_EVENT, analyticsConsentedFromCookies } from '@ebda/shared/tracking';
 
 // posthog-js is lazy-loaded (kept out of the first-load bundle); this holds the
 // instance once loaded so captureEvent() can use it (no-op until then).
@@ -12,11 +13,10 @@ let posthogInstance: any = null;
 /**
  * PostHog product analytics — admin side.
  *
- * Always-on (no consent gating). The admin is an operator-only
- * surface — no public visitors, no GDPR consent surface for ops
- * data. Operators are platform staff + merchants managing their
- * own stores; their usage is internal product telemetry, not
- * third-party tracking.
+ * CONSENT-GATED (Ruling ICEBERG-ADM-CONSENT-1, Iceberg audit #5, 2026-11-10): it used to be always-on, which loaded a
+ * third-party analytics script and set its cookie for merchants who had never said yes. It now follows the SAME first-party
+ * `ebda_consent` cookie the marketing site and the signup funnel write (shared across *.ebda.app): posthog-js is not even
+ * imported until that cookie says `analytics: true`; a later "decline" (EBDA_CONSENT_EVENT from the banner) opts capture out.
  *
  * Captures: pageviews on route change, click events, form submits.
  * Plus you can `captureEvent('bulk_ai_sweep_started', {...})` at
@@ -29,12 +29,31 @@ interface Props {
   children: ReactNode;
 }
 
+/** True only when the visitor's `ebda_consent` cookie allows analytics. No cookie, a bad cookie or "decline" = false. */
+export function adminAnalyticsConsented(doc: Document): boolean {
+  return analyticsConsentedFromCookies(doc.cookie);
+}
+
 export function PostHogProvider({ children }: Props) {
   const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   const apiHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
+  const [consented, setConsented] = useState(false);
 
   useEffect(() => {
-    if (!apiKey) return;
+    if (typeof window === 'undefined') return;
+    const sync = () => {
+      const ok = adminAnalyticsConsented(document);
+      setConsented(ok);
+      if (!ok && posthogInstance?.__loaded) posthogInstance.opt_out_capturing?.();
+      if (ok && posthogInstance?.__loaded) posthogInstance.opt_in_capturing?.();
+    };
+    sync();
+    window.addEventListener(EBDA_CONSENT_EVENT, sync);
+    return () => window.removeEventListener(EBDA_CONSENT_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    if (!apiKey || !consented) return;
     if (typeof window === 'undefined') return;
     let cancelled = false;
     // Lazy-load posthog-js so the (heavy) analytics lib is NOT in the admin's
@@ -78,13 +97,14 @@ export function PostHogProvider({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [apiKey, apiHost]);
+  }, [apiKey, apiHost, consented]);
 
   return <>{children}</>;
 }
 
 export function captureEvent(eventName: string, properties?: Record<string, unknown>): void {
   if (typeof window === 'undefined') return;
+  if (!adminAnalyticsConsented(document)) return;
   if (!posthogInstance || !posthogInstance.__loaded) return;
   posthogInstance.capture(eventName, properties);
 }

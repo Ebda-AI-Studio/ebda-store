@@ -102,7 +102,7 @@ async function hit(
     res = await e.API.fetch(url, {
       method,
       headers: {
-        'x-forwarded-for': freshIp(),
+        'cf-connecting-ip': freshIp(),
         ...headers,
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
       },
@@ -744,7 +744,7 @@ describe.skipIf(e.E2E_DB === '1')(
           (
             (await (
               await e.API.fetch(`https://api.ebda.app/__dev/pg-reaches${reset ? '?reset=1' : ''}`, {
-                headers: { 'x-forwarded-for': freshIp() },
+                headers: { 'cf-connecting-ip': freshIp() },
               })
             ).json()) as { reaches: Array<{ label: string; stack: string }> }
           ).reaches;
@@ -798,7 +798,7 @@ describe.skipIf(e.E2E_DB === '1')(
         // guard: a cron only STARTS most jobs (queue/workflow), so the bodies are driven here. Reaches are counted below.
         const ran = await e.API.fetch('https://api.ebda.app/__dev/run-jobs', {
           method: 'POST',
-          headers: { 'x-forwarded-for': freshIp() },
+          headers: { 'cf-connecting-ip': freshIp() },
         });
         expect(ran.status, 'the dev run-jobs endpoint answered').toBe(200);
         // eslint-disable-next-line no-console

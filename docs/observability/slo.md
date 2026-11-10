@@ -1,84 +1,67 @@
 # Service Level Objectives (SLOs) — Ebda Store
 
-_Last updated: 2026-06-09. Review cadence: quarterly and after any P0 incident._
+_Last updated: 2026-11-10 (rewritten for the Cloudflare stack, Iceberg audit #25). Review cadence: quarterly and after any P0._
 
-Monitoring stack: **Sentry** (error budgets, latency sampling) · **UptimeRobot** (external availability probes) · **pino** structured logs → **Axiom** (log drain, query on demand).
+Monitoring stack: **status.ebda.app** (Worker `ebda-status`: external probes once a minute, 8 s timeout, incident after
+3 consecutive failures, Telegram on open/resolve) · **Sentry** (errors, api/web/admin/orders) · **Workers Logs +
+Logpush** to R2 `ebda-logs` (30 days) · **Cloudflare Web Analytics** (page speed, no cookies) · **API alert bridge →
+Telegram** (`apps/api/src/services/alerts.service.ts`). Neon, Railway, Axiom and UptimeRobot are retired.
 
----
+**Where we are (measured on status.ebda.app, 2026-11-09/10): storefront probes 90.6-97 %, with "timeout after 8000 ms"
+incidents from cold SSR. The 99.9 % storefront target below is NOT met today**; the perf work (edge redirect, render
+cost, caching) is what closes it. Until it is met, every Telegram probe alert is a real miss, not noise.
 
-## 1. api — Express.js (Railway)
+## 1. api — `ebda-api` (Worker, D1 + Durable Objects)
 
-| SLO                            | Target       | Error Budget (30 days)                                           | Measurement                                           |
-| ------------------------------ | ------------ | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| Availability                   | **99.5 %**   | 216 min / month downtime                                         | UptimeRobot HTTP monitor at `GET /health` every 1 min |
-| p95 latency (non-AI routes)    | **< 800 ms** | Sentry Perf `p95(http.server.duration)` on `txn != *ai*`         |
-| p95 latency (AI/Gemini routes) | **< 5 s**    | Sentry Perf `p95(http.server.duration)` on `txn = *ai*`          |
-| Error rate (5xx)               | **< 0.5 %**  | Sentry `issue_type:error AND level:error` / total requests       |
-| Checkout success rate          | **> 99 %**   | Sentry custom metric `checkout.completed` / `checkout.initiated` |
+| SLO                         | Target       | Error budget (30 d) | Measurement                                                     |
+| --------------------------- | ------------ | ------------------- | --------------------------------------------------------------- |
+| Availability                | **99.5 %**   | 216 min             | status.ebda.app "API" probe (`GET /health`, 200 + `status: ok`) |
+| p95 latency (non-AI routes) | **< 800 ms** |                     | Workers Logs (`wallTime`) / Sentry performance                  |
+| p95 latency (AI routes)     | **< 5 s**    |                     | same, AI routes                                                 |
+| 5xx rate                    | **< 0.5 %**  |                     | Workers Logs `Outcome` + status codes; Sentry error events      |
 
-**Burn-rate alerts (Sentry):**
+## 2. storefronts — `ebda-web`
 
-- 1 h window exceeds 14× normal burn → page on-call immediately (consumes 2 % budget in 1 h).
-- 6 h window exceeds 6× normal burn → Telegram alert.
+| SLO           | Target       | Error budget (30 d) | Measurement                                                                     |
+| ------------- | ------------ | ------------------- | ------------------------------------------------------------------------------- |
+| Availability  | **99.9 %**   | 43 min              | status.ebda.app "Storefronts" + "Storefront product pages" probes               |
+| TTFB p75      | **< 200 ms** |                     | Cloudflare Web Analytics; spot check `curl -w '%{time_starttransfer}'` on `/ar` |
+| LCP (mobile)  | **< 2.5 s**  |                     | Cloudflare Web Analytics / Lighthouse                                           |
+| CLS           | **< 0.1**    |                     | same                                                                            |
+| JS error rate | **< 0.1 %**  |                     | Sentry (web)                                                                    |
 
----
+## 3. merchant surfaces — `ebda-admin`, `ebda-orders`, `ebda-accounts`
 
-## 2. admin — Next.js (Cloudflare Workers)
+| SLO           | Target      | Measurement                                                   |
+| ------------- | ----------- | ------------------------------------------------------------- |
+| Availability  | **99.9 %**  | status.ebda.app "Merchant dashboard", "Orders app", "Sign-in" |
+| JS error rate | **< 0.1 %** | Sentry (admin, orders)                                        |
 
-| SLO                             | Target                    | Error Budget (30 days)                               | Measurement                     |
-| ------------------------------- | ------------------------- | ---------------------------------------------------- | ------------------------------- |
-| Availability (Cloudflare edge)  | **99.9 %**                | 43 min / month downtime                              | UptimeRobot on `store.ebda.app` |
-| Core Web Vitals — LCP (desktop) | **< 2.5 s**               | Lighthouse CI nightly job · Cloudflare Web Analytics |
-| Core Web Vitals — CLS           | **< 0.1**                 | Same                                                 |
-| JS error rate                   | **< 0.1 %** of page loads | Sentry `NEXT_PUBLIC_SENTRY_DSN_ADMIN` capture        |
+## 4. data protection
 
----
+| Objective          | Target                                               | Measurement                                                         |
+| ------------------ | ---------------------------------------------------- | ------------------------------------------------------------------- |
+| RPO (nightly dump) | **≤ 24 h** (D1 Time Travel / DO PITR: seconds, 30 d) | `cf-backup.yml` green every night; failure pages Telegram           |
+| Restore proven     | weekly                                               | `cf-backup-drill.yml` (D1 platform + identity + StoreDO round-trip) |
+| Off-account copy   | ≤ 2 days old                                         | Mac launchd `app.ebda.cf-backup-pull` (alerts when older)           |
 
-## 3. web (storefront) — Next.js (Cloudflare Workers)
+## 5. Error budget policy
 
-| SLO                            | Target       | Error Budget (30 days)                            | Measurement                        |
-| ------------------------------ | ------------ | ------------------------------------------------- | ---------------------------------- |
-| Availability (Cloudflare edge) | **99.9 %**   | 43 min / month downtime                           | UptimeRobot on per-tenant root URL |
-| Core Web Vitals — LCP (mobile) | **< 2.5 s**  | Lighthouse CI nightly · Cloudflare Web Analytics  |
-| Core Web Vitals — CLS          | **< 0.1**    | Same                                              |
-| Time to First Byte (TTFB)      | **< 200 ms** | Cloudflare Web Analytics p75 TTFB (ISR/SSR pages) |
-| JS error rate                  | **< 0.1 %**  | Sentry `NEXT_PUBLIC_SENTRY_DSN_WEB` capture       |
+| Budget remaining | Action                                                       |
+| ---------------- | ------------------------------------------------------------ |
+| > 50 %           | ship features                                                |
+| 25 – 50 %        | slow down risky deploys                                      |
+| < 25 %           | feature freeze on the failing surface; reliability work only |
+| 0 %              | incident declared; postmortem before the next deploy         |
 
----
+## 6. Tracing
 
-## 4. Distributed Tracing (OpenTelemetry)
+OpenTelemetry (`apps/api/src/tracing.ts`) is imported only by the Node entry (`apps/api/src/index.ts`, local dev). The
+production Worker entry does not load it, so there is **no distributed tracing in production** today; use Workers Logs
+(per-request `wallTime`, `cpuTime`, subrequests) and Sentry.
 
-OTel tracing is wired in `apps/api/src/tracing.ts` behind the
+## 7. References
 
-> **LIVE since 2026-07-12:** exports to Grafana Cloud Tempo — stack `brownoak2576` (https://brownoak2576.grafana.net, prod-eu-west-2, free tier 50GB traces). Railway `api` service carries `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS` (Basic auth, instance `1720967`, access policy `ebda-api-otlp`). View: Grafana → Explore → Traces. Verified end-to-end (ebda-api spans incl. redis + http).
-> `OTEL_EXPORTER_OTLP_ENDPOINT` env flag. When the var is set, spans are exported
-> via OTLP/HTTP and trace context (`traceparent`) propagates through all downstream
-> HTTP calls (Neon, Redis, Gemini).
-
-**Recommended exporters:** Grafana Tempo (free in cloud tier) · Honeycomb · Jaeger
-(self-hosted). Set `OTEL_SERVICE_NAME=ebda-api` and
-`OTEL_EXPORTER_OTLP_ENDPOINT=<collector-url>` in Railway env vars.
-
-Sample rate: 10 % in production (`OTEL_TRACES_SAMPLER_ARG=0.1`), 100 % in dev.
-Override with `OTEL_TRACES_SAMPLER=always_on` for debugging a specific incident.
-
----
-
-## 5. Error Budget Policy
-
-| Budget remaining | Action                                                     |
-| ---------------- | ---------------------------------------------------------- |
-| > 50 %           | Business as usual — ship features                          |
-| 25 – 50 %        | Slow down risky deploys; review on-call runbook            |
-| < 25 %           | Feature freeze on API · prioritise reliability fixes       |
-| 0 %              | Incident declared · postmortem required before next deploy |
-
----
-
-## 6. Runbook References
-
-- **P0 incident:** `docs/INCIDENT.md`
-- **Rollback procedure:** `docs/ROLLBACK.md`
-- **Alerting bridge:** `apps/api/src/services/alerts.service.ts` (Telegram)
-- **UptimeRobot:** configured in `docs/runbooks/` per Ahmad's account
-- **Sentry DSN:** set via `SENTRY_DSN` Railway env var (API) and `NEXT_PUBLIC_SENTRY_DSN_ADMIN` / `NEXT_PUBLIC_SENTRY_DSN_WEB` GitHub repo variables, passed to the Cloudflare Workers build (admin/web) — see `docs/ENVIRONMENT.md`
+- P0 triage: `docs/INCIDENT.md` · escalation: `docs/ops/escalation.md` · rollback: `docs/ROLLBACK.md`
+- Probe list + thresholds: `apps/status/src/config.ts` (`DEFAULT_TIMEOUT_MS`, `DEFAULT_FAIL_THRESHOLD`, `DEFAULT_RECOVER_THRESHOLD`)
+- Logs: `docs/DEPLOYMENT.md` §7 · Sentry DSNs: `docs/ENVIRONMENT.md`
