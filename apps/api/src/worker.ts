@@ -13,7 +13,9 @@
  *     connection is closed, and the client returned, through `ctx.waitUntil`, after the post-commit
  *     deferred work (`deferAfterTenantCommit`) has drained on it.
  *   - the client's real IP: Cloudflare's `cf-connecting-ip` overwrites X-Forwarded-For,
- *     so `trust proxy` = 1 yields the connecting address and a spoofed header is dropped.
+ *     so `trust proxy` = 1 yields the connecting address and a spoofed header is dropped; with no
+ *     `cf-connecting-ip` the caller's X-Forwarded-For is deleted. A storefront server render's signed
+ *     shopper address replaces it on the anonymous storefront reads only (cf/ssr-client-ip.ts, Ruling RL-SSR-IP-6).
  *   - Queue, Cron and Durable Object entry points (consumers, scheduled, AuthState,
  *     StoreRealtime), and the WebSocket upgrade for realtime (`/socket.io/`).
  */
@@ -49,6 +51,7 @@ import type { JobParams } from './lib/jobs/start';
 import { sendAlert } from './services/alerts.service';
 import { servePublicEdge, stripFillMarker, type CacheLike } from './cf/public-edge-cache';
 import { readEdgeGensForHit } from './lib/edge-gens';
+import { resolveClientAddress, shouldWarnNoSecret } from './cf/ssr-client-ip';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import {
   sendCodeMail,
@@ -142,15 +145,6 @@ export function stripBackendHeader(request: Request): Request {
   if (!request.headers.has('x-ebda-backend')) return request;
   const headers = new Headers(request.headers);
   headers.delete('x-ebda-backend');
-  return new Request(request, { headers });
-}
-
-/** Overwrite X-Forwarded-For with the address Cloudflare saw, so `trust proxy` cannot be spoofed. */
-function withTrustedClientIp(request: Request): Request {
-  const ip = request.headers.get('cf-connecting-ip');
-  if (!ip) return request;
-  const headers = new Headers(request.headers);
-  headers.set('x-forwarded-for', ip);
   return new Request(request, { headers });
 }
 
@@ -278,12 +272,11 @@ async function routeRealtime(request: Request, env: CfBindings): Promise<Respons
  * health probes are exempt; a binding error fails OPEN.
  */
 async function floodGuard(
-  request: Request,
   env: CfBindings,
-  path: string
+  path: string,
+  ip: string | null
 ): Promise<Response | null> {
   if (!env.RATE_LIMITER || path === '/health') return null;
-  const ip = request.headers.get('cf-connecting-ip');
   if (!ip) return null;
   try {
     const { success } = await env.RATE_LIMITER.limit({ key: ip });
@@ -302,7 +295,18 @@ async function floodGuard(
 
 async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Response> {
   // The backend of a store is server-side state only (Ruling CF-BACKEND-1): the retired Phase 0 opt-in header never gets in.
-  const request = stripBackendHeader(incoming);
+  // Ruling RL-SSR-IP-6: the forward headers never reach Express; X-Forwarded-For is the one address limiters key on.
+  const secret =
+    (env as { REVALIDATE_SECRET?: unknown }).REVALIDATE_SECRET ?? process.env.REVALIDATE_SECRET;
+  if (shouldWarnNoSecret(secret)) {
+    logger.error(
+      'SSR client address OFF: REVALIDATE_SECRET is not set on ebda-api, so no forwarded shopper address is trusted and every storefront render is charged to the storefront Worker (Ruling RL-SSR-IP-6)'
+    );
+  }
+  const { request, ip: clientIp } = await resolveClientAddress(
+    stripBackendHeader(incoming),
+    secret
+  );
   const path = new URL(request.url).pathname;
   // Test only: the Postgres-client accesses since the last reset (workers-test/route-sweep.test.ts, cron group).
   if (path === '/__dev/pg-reaches' && env.DEV_STATS === '1') {
@@ -368,7 +372,7 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
   // Cutover admin surface (docs/runbooks/cutover-cf.md): bearer-checked before the StoreDO sees it.
   const cutover = await routeCutover(request, env);
   if (cutover) return cutover;
-  const flooded = await floodGuard(request, env, path);
+  const flooded = await floodGuard(env, path, clientIp);
   if (flooded) return flooded;
   if (path === '/socket.io/' || path === '/socket.io') {
     prepare(env);
@@ -376,13 +380,12 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
     return routeRealtime(request, env);
   }
   const origin = async (req: Request): Promise<Response> => {
-    const forwarded = withTrustedClientIp(req);
     return withWorkerContext(
       env,
       ctx,
       () =>
         withReachLabel(`http ${req.method} ${new URL(req.url).pathname}`, () =>
-          handleAsNodeRequest(PORT, forwarded, env, ctx)
+          handleAsNodeRequest(PORT, req, env, ctx)
         ),
       req.signal
     );

@@ -1771,7 +1771,10 @@ export const publicLimiter = rateLimit({
   // Redis became a single point of failure for the whole write surface while
   // the cache layer deliberately fails open. Unlimited-but-up beats down.
   passOnStoreError: true,
-  skip: skipForLoadTest,
+  // Ruling RL-SSR-IP-6: an explicit per-address key, and no address = not counted (the `noClientIp` convention) rather than
+  // every such request pooling in one bucket that would throttle all shoppers at once.
+  skip: req => noClientIp(req) || skipForLoadTest(req),
+  keyGenerator: req => ipKeyGenerator(req.ip ?? ''),
 });
 
 // Store resolver rate limiter - stricter for domain resolution
@@ -1791,7 +1794,10 @@ export const storeResolveLimiter = rateLimit({
   // Redis became a single point of failure for the whole write surface while
   // the cache layer deliberately fails open. Unlimited-but-up beats down.
   passOnStoreError: true,
-  skip: skipForLoadTest,
+  // Ruling RL-SSR-IP-6: an explicit per-address key, and no address = not counted (the `noClientIp` convention) rather than
+  // every such request pooling in one bucket that would throttle all shoppers at once.
+  skip: req => noClientIp(req) || skipForLoadTest(req),
+  keyGenerator: req => ipKeyGenerator(req.ip ?? ''),
 });
 
 // Cart rate limiter - prevent cart bombing

@@ -68,6 +68,7 @@ import { serverTiming } from './lib/request-timing';
 import { localizeRateLimited } from './lib/localized-error';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 import { repoScope } from './lib/repo-factory';
+import { NO_CLIENT_ADDRESS_HEADER } from './cf/ssr-client-ip';
 assertBillingConfigAtBoot();
 {
   // M-032: an UNSET provider in production is loud (P1 + error log) but does not stop an InstaPay-only API.
@@ -126,6 +127,17 @@ const TRUST_PROXY_HOPS = (() => {
 })();
 app.set('trust proxy', TRUST_PROXY_HOPS);
 logger.info({ trustProxyHops: TRUST_PROXY_HOPS }, '[startup] trust proxy hop count');
+
+// Ruling RL-SSR-IP-6: a request with no client address (worker.ts, cf/ssr-client-ip.ts) has an EMPTY req.ip, so the
+// per-address limiters skip it instead of pooling it on the fallback address. Only the Worker sets the marker (it
+// strips any inbound copy first); on Node it is removed and ignored.
+app.use((req, _res, next) => {
+  if (req.headers[NO_CLIENT_ADDRESS_HEADER] !== undefined) {
+    delete req.headers[NO_CLIENT_ADDRESS_HEADER];
+    if (isWorkers) Object.defineProperty(req, 'ip', { value: undefined, configurable: true });
+  }
+  next();
+});
 
 /** Flipped by the Node shell's graceful shutdown (index.ts); a Worker never sets it. */
 export const lifecycle = { isShuttingDown: false };
