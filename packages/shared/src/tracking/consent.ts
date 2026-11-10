@@ -8,6 +8,8 @@
 
 export const EBDA_CONSENT_COOKIE = 'ebda_consent';
 export const EBDA_CONSENT_MAX_AGE_DAYS = 180;
+/** Window event fired after the banner writes a new answer, so an already-mounted surface (the admin PostHog) can follow it. */
+export const EBDA_CONSENT_EVENT = 'ebda:consent-change';
 
 export interface EbdaConsent {
   v: 1;
@@ -38,4 +40,10 @@ export function parseConsent(raw: string | null | undefined): EbdaConsent | null
 /** True when the visitor allowed anything at all (what the signup payload gates on). */
 export function hasAnyConsent(c: EbdaConsent | null): boolean {
   return !!c && (c.analytics || c.marketing);
+}
+
+/** Analytics allowed by a `document.cookie` string? No cookie, a malformed one or "decline" = false (admin + orders PostHog gate). */
+export function analyticsConsentedFromCookies(cookieString: string): boolean {
+  const m = cookieString.match(new RegExp(`(?:^|; )${EBDA_CONSENT_COOKIE}=([^;]*)`));
+  return parseConsent(m ? m[1] : null)?.analytics === true;
 }

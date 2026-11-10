@@ -188,7 +188,13 @@ edit a backup that was already taken yesterday.
 
 **Cloudflare storage (from the cutover, G8/G10).** The same boundary applies to the new copies: nightly StoreDO exports (`ebda-private/store-do-backups/`), D1 exports (`d1-backups/`) and their copy on the Mac (`_backups/ebda-cloudflare/`, 30 days) keep a pre-erasure row until they rotate, and StoreDO PITR / D1 Time Travel keep 30 days. A restore from any of them must be followed by re-running the ledger's erasures (`erasure-ledger/<requestId>.json` lists every request; the job is idempotent). Erasure design and per-surface tests: `docs/privacy/erasure-export.md`.
 
-Concretely, as of 2026-07-11 (`docs/DB-BACKUP-RESTORE.md` is the live
+**Windows today (2026-11-10, Neon retired 2026-11-05; the Neon bullets below are history).** D1 Time Travel and StoreDO
+PITR 30 days; `ebda-db-backups/cf/` (D1 `ebda-platform`, D1 `ebda-identity`, every StoreDO) daily 7 days, weekly 28 days,
+monthly **93 days**; its Mac off-account copy (`_backups/ebda-cf-encrypted/`) 30 days; the `media/` copy of R2 `ebda-media`
+has no expiry (an erased merchant's images must be removed from it by hand). So the longest pre-erasure copy is **93 days**
+(plus any `media/` object). A restore from any of them must be followed by re-running the erasure ledger (see the paragraph above).
+
+Historical, as of 2026-07-11 (`docs/DB-BACKUP-RESTORE.md` is the live
 source of truth if these numbers ever change):
 
 - **Neon PITR (point-in-time recovery): 7-day window.** If production is
