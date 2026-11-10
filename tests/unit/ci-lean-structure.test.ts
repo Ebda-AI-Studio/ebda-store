@@ -255,6 +255,10 @@ describe('scripts/ci-affected.mjs', () => {
     expect(run('apps/admin/wrangler.jsonc').workers).toEqual(['admin']);
     expect(run('apps/orders/package.json').workers).toEqual(['orders']);
     expect(run('apps/web/sentry-worker-entry.ts').workers).toEqual(['web']);
+    // the two HTML edge caches and their build partition (EDGE-BUILD-1, #503) are bundled by that entry
+    expect(run('apps/web/demo-edge-cache.ts').workers).toEqual(['web']);
+    expect(run('apps/web/store-edge-cache.ts').workers).toEqual(['web']);
+    expect(run('apps/web/edge-build-id.ts').workers).toEqual(['web']);
     expect(run('apps/status/src/index.ts').workers).toEqual(['status']);
     expect(run('apps/accounts/src/app.ts').workers).toEqual(['accounts']);
     // the API is a Worker app since SP4 Stage 1 (apps/api/wrangler.jsonc)
@@ -269,6 +273,29 @@ describe('scripts/ci-affected.mjs', () => {
       'status',
       'web',
     ]);
+  });
+
+  it('every local module the web Worker entry bundles selects the web Worker checks', () => {
+    // The custom entry is compiled by wrangler outside the Next build, so a change to anything it imports moves the
+    // Worker bundle. Walk its relative imports (the OpenNext output is generated, not source) so a module added to
+    // the entry without a line in WORKER_ENTRY fails here instead of silently skipping the dry run.
+    const web = path.join(ROOT, 'apps/web');
+    const seen = new Set<string>();
+    const walk = (file: string) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const src = readFileSync(path.join(web, file), 'utf8');
+      for (const m of src.matchAll(/from\s+'(\.[^']+)'/g)) {
+        if (m[1].startsWith('./.open-next/')) continue;
+        walk(path.relative(web, path.resolve(web, path.dirname(file), m[1])) + '.ts');
+      }
+    };
+    walk('sentry-worker-entry.ts');
+    expect(seen.size).toBeGreaterThanOrEqual(8);
+    for (const f of seen) expect(run(`apps/web/${f}`).workers, f).toEqual(['web']);
+    // tests next to those modules and ordinary app source stay out
+    expect(run('apps/web/demo-edge-cache.test.ts').workers).toEqual([]);
+    expect(run('apps/web/src/lib/api.ts').workers).toEqual([]);
   });
 
   it.each([
