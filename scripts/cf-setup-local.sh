@@ -80,21 +80,27 @@ for app in "${APPS[@]}"; do
   if [ "${OPENNEXT_CACHE:-}" = "true" ] && [ "$app" = "web" ]; then
     cat > "$dir/open-next.config.ts" <<'EOF'
 import { defineCloudflareConfig } from '@opennextjs/cloudflare';
-// Ruling WEB-COLD-2: the stock R2 cache with fetch (data) entries keyed independently of the build, so a deploy
-// keeps the storefront's API data cache instead of starting empty (apps/web/shared-fetch-cache.ts).
-import r2IncrementalCache from './shared-fetch-cache';
+// Ruling WEB-COLD-2: the stock R2 cache with fetch (data) entries keyed by the DATA CONTRACT instead of the build, so a
+// deploy keeps the storefront's API data cache unless the API data shape changed (apps/web/shared-fetch-cache.ts).
+import { createSharedFetchCache } from './shared-fetch-cache';
 import doShardedTagCache from '@opennextjs/cloudflare/overrides/tag-cache/do-sharded-tag-cache';
 import doQueue from '@opennextjs/cloudflare/overrides/queue/do-queue';
 import queueCache from '@opennextjs/cloudflare/overrides/queue/queue-cache';
 
 // All four are DEFAULT exports in @opennextjs/cloudflare@1.19.11 (verified).
 export default defineCloudflareConfig({
-  incrementalCache: r2IncrementalCache,
+  incrementalCache: createSharedFetchCache('__FETCH_CONTRACT__'),
   tagCache: doShardedTagCache({ baseShardSize: 12, regionalCache: true }),
   queue: queueCache(doQueue),
   enableCacheInterception: true,
 });
 EOF
+    # The data-contract version (Ruling WEB-COLD-2): a hash of the API-shape files, so a contract change = fresh cache.
+    FETCH_CONTRACT="$(node "$ROOT/scripts/ci/fetch-contract-version.mjs")"
+    [[ "$FETCH_CONTRACT" =~ ^[0-9a-f]{16}$ ]] || { echo "cf-setup-local: bad fetch contract version '$FETCH_CONTRACT'" >&2; exit 1; }
+    sed -i.bak "s/__FETCH_CONTRACT__/$FETCH_CONTRACT/" "$dir/open-next.config.ts" && rm -f "$dir/open-next.config.ts.bak"
+    grep -q "createSharedFetchCache('$FETCH_CONTRACT')" "$dir/open-next.config.ts" || { echo "cf-setup-local: contract not baked in" >&2; exit 1; }
+    echo "✓ storefront fetch-cache data contract: $FETCH_CONTRACT"
     # The DO classes live in the OpenNext-GENERATED worker, but web's `main` is
     # the custom Sentry entry, which doesn't re-export them — workerd then
     # warns "no such Durable Object class is exported" at deploy time and

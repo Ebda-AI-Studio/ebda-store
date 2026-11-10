@@ -19,3 +19,4 @@
 3. `populate-r2-cache.mjs`: stop uploading build-time fetch entries (would overwrite newer runtime data). Test updated.
 4. Warm step -> `scripts/ci/warm-storefront.mjs` (home + listing + PDP, both languages, retry once on 5xx, logged). Test: `tests/unit/web-deploy-warm.test.ts`.
 5. Measure before/after cross-build locally; ruling WEB-COLD-2.
+6. Controller review: key the shared namespace by a DATA-CONTRACT hash (`scripts/ci/fetch-contract-version.mjs`, baked by `cf-setup-local.sh`), so a shape change starts fresh; prove tag purges reach carried-over entries with the real adapter + tag cache. Tests: `web-fetch-contract.test.ts`, `web-shared-fetch-cache.test.ts`, `cf-cache-bindings-assert.test.ts`.
