@@ -383,13 +383,29 @@ describe('awaitInFlightAlerts — graceful-shutdown drain', () => {
 
 describe('gracefulShutdown wiring (issue 2387)', () => {
   it('drains in-flight alerts before Redis is disconnected', async () => {
-    const { readFileSync } = await import('node:fs');
+    // Structural (index.ts boots the HTTP server on import, so it cannot run under a fake): the drain and the
+    // disconnect are awaited statements of ONE block inside gracefulShutdown, and the drain comes first.
     const { join } = await import('node:path');
-    const src = readFileSync(join(__dirname, '../../apps/api/src/index.ts'), 'utf8');
-    const body = src.slice(src.indexOf('async function gracefulShutdown'));
-    const drain = body.indexOf('await awaitInFlightAlerts(ALERT_SEND_DEADLINE_MS)');
-    const disconnect = body.indexOf('await redis.disconnect()');
-    expect(drain).toBeGreaterThan(-1);
+    const ts = (await import('typescript')).default;
+    const { parseFile, findFunction, nodesOf, code } = await import('./helpers/ast-query');
+    const fn = findFunction(
+      parseFile(join(__dirname, '../../apps/api/src/index.ts')),
+      'gracefulShutdown'
+    );
+    const awaited = (s: ts.Node, call: string) =>
+      ts.isExpressionStatement(s) &&
+      ts.isAwaitExpression(s.expression) &&
+      code(s.expression.expression) === call;
+    const blocks = nodesOf(fn).filter(ts.isBlock);
+    const sameBlock = blocks.filter(
+      b =>
+        b.statements.some(s => awaited(s, 'awaitInFlightAlerts(ALERT_SEND_DEADLINE_MS)')) &&
+        b.statements.some(s => awaited(s, 'redis.disconnect()'))
+    );
+    expect(sameBlock).toHaveLength(1);
+    const st = sameBlock[0].statements;
+    const drain = st.findIndex(s => awaited(s, 'awaitInFlightAlerts(ALERT_SEND_DEADLINE_MS)'));
+    const disconnect = st.findIndex(s => awaited(s, 'redis.disconnect()'));
     expect(disconnect).toBeGreaterThan(drain);
   });
 });

@@ -45,6 +45,8 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
+import { parseSource, findAll, isStr, callsTo, props, nameOf } from './helpers/ts-ast';
 
 const ROOT = path.resolve(__dirname, '../..');
 const ORDER_SERVICE = path.join(ROOT, 'apps/api/src/services/order.service.ts');
@@ -59,15 +61,27 @@ const CHECKOUT = path.join(ROOT, 'apps/web/src/app/checkout/CheckoutClient.tsx')
  * this gate lie in the other direction.
  */
 function codesThrownByOrderCreate(): string[] {
-  const src = fs.readFileSync(ORDER_SERVICE, 'utf-8');
-  const start = src.indexOf('static async create(');
-  expect(start, 'OrderService.create not found — this gate is measuring nothing').toBeGreaterThan(
-    -1
-  );
-  const rest = src.slice(start + 1);
-  const nextMethod = rest.search(/\n {2}(?:static )?async [a-zA-Z]/);
-  const body = nextMethod === -1 ? rest : rest.slice(0, nextMethod);
-  return [...new Set([...body.matchAll(/new AppError\(\s*\d+,\s*'([A-Z_]+)'/g)].map(m => m[1]))];
+  // AST, not a text window: only `new AppError(n, 'CODE')` NODES inside the `create` method
+  // count, so a comment or string that merely mentions one cannot make a code look thrown.
+  const sf = parseSource(ORDER_SERVICE);
+  const create = findAll(
+    sf,
+    (n): n is ts.MethodDeclaration => ts.isMethodDeclaration(n) && nameOf(n) === 'create'
+  )[0];
+  expect(create, 'OrderService.create not found — this gate is measuring nothing').toBeDefined();
+  return [...new Set(appErrorCodes(create))];
+}
+
+/** Second argument (the code) of every `new AppError(status, 'CODE', …)` under `root`. */
+function appErrorCodes(root: ts.Node): string[] {
+  return findAll(
+    root,
+    (n): n is ts.NewExpression => ts.isNewExpression(n) && n.expression.getText() === 'AppError'
+  )
+    .map(n => n.arguments?.[1])
+    .filter(isStr)
+    .map(a => a.text)
+    .filter(c => /^[A-Z_]+$/.test(c));
 }
 
 /**
@@ -83,16 +97,17 @@ function codesThrownByOrderCreate(): string[] {
  * nor a `paymentUrl`, so it is added when the client still does that.
  */
 function codesFromPaymentCreate(): string[] {
-  const src = fs.readFileSync(PAYMENT_ROUTES, 'utf-8');
-  const start = src.indexOf("'/create',");
-  expect(start, 'POST /payments/create not found — this gate is measuring nothing').toBeGreaterThan(
-    -1
+  const sf = parseSource(PAYMENT_ROUTES);
+  const route = callsTo(sf, 'router.post').find(
+    c => isStr(c.arguments[0]) && c.arguments[0].text === '/create'
   );
-  const rest = src.slice(start);
-  const next = rest.indexOf('\nrouter.', 1);
-  const body = next === -1 ? rest : rest.slice(0, next);
-  const inline = [...body.matchAll(/code:\s*'([A-Z_]+)'/g)].map(m => m[1]);
-  const thrown = [...body.matchAll(/new AppError\(\s*\d+,\s*'([A-Z_]+)'/g)].map(m => m[1]);
+  expect(route, 'POST /payments/create not found — this gate is measuring nothing').toBeDefined();
+  const inline = props(route!, 'code')
+    .map(p => p.initializer)
+    .filter(isStr)
+    .map(i => i.text)
+    .filter(c => /^[A-Z_]+$/.test(c));
+  const thrown = appErrorCodes(route!);
   // The fallback code for a failed payment call is synthesized client-side —
   // inline in CheckoutClient originally, in checkout/_lib/paymentResult.ts
   // since #1990 moved the result handling there. Read both.
@@ -116,15 +131,18 @@ function codesFromPaymentCreate(): string[] {
  */
 function codesMappedInCheckout(): Set<string> {
   const src = fs.readFileSync(CHECKOUT, 'utf-8');
-  const start = src.indexOf('switch (code)');
-  expect(start, 'the checkout error switch moved — this gate is measuring nothing').toBeGreaterThan(
-    -1
-  );
-  const body = src.slice(start, src.indexOf('\n      }', start));
-  const cases = [...body.matchAll(/case '([A-Z_]+)'/g)].map(m => m[1]);
+  const sw = findAll(
+    parseSource(CHECKOUT, src),
+    (n): n is ts.SwitchStatement => ts.isSwitchStatement(n) && n.expression.getText() === 'code'
+  )[0];
+  expect(sw, 'the checkout error switch moved — this gate is measuring nothing').toBeDefined();
+  const clauses = sw.caseBlock.clauses.filter(ts.isCaseClause).map(c => c.expression);
+  const cases = clauses.filter(isStr).map(c => c.text);
   // `PRODUCT_NO_LONGER_AVAILABLE` is matched through the imported constant, not
-  // a string literal, so it would look unmapped to the regex above.
-  const viaConstant = /case PRODUCT_NO_LONGER_AVAILABLE:/.test(body)
+  // a string literal, so it would look unmapped to the string-literal filter above.
+  const viaConstant = clauses.some(
+    c => ts.isIdentifier(c) && c.text === 'PRODUCT_NO_LONGER_AVAILABLE'
+  )
     ? ['PRODUCT_NO_LONGER_AVAILABLE']
     : [];
 
@@ -139,17 +157,21 @@ function codesMappedInCheckout(): Set<string> {
   // Pre-switch handlers in checkout/_lib/checkoutErrors.ts that own one code
   // (`if (code !== 'X') return null;` and copy for every other path), counted
   // only when CheckoutClient actually calls them.
-  const libSrc = fs.readFileSync(
-    path.resolve(path.dirname(CHECKOUT), '_lib/checkoutErrors.ts'),
-    'utf-8'
-  );
-  const libCodes = [
-    ...libSrc.matchAll(
-      /export function (\w+)\([^)]*\)[^{]*\{\s*if \(code !== '([A-Z_]+)'\) return null;/g
-    ),
-  ]
-    .filter(m => src.includes(`${m[1]}(`))
-    .map(m => m[2]);
+  const libSf = parseSource(path.resolve(path.dirname(CHECKOUT), '_lib/checkoutErrors.ts'));
+  const isReturnNull = (n: ts.Statement) =>
+    ts.isReturnStatement(n) && n.expression?.kind === ts.SyntaxKind.NullKeyword;
+  const libCodes = findAll(libSf, ts.isFunctionDeclaration)
+    .map(fn => {
+      const first = fn.body?.statements[0];
+      const cond = first && ts.isIfStatement(first) ? first.expression : undefined;
+      if (!first || !cond || !ts.isIfStatement(first)) return null;
+      if (!ts.isBinaryExpression(cond) || cond.left.getText() !== 'code' || !isStr(cond.right))
+        return null;
+      if (cond.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsEqualsToken) return null;
+      if (!isReturnNull(first.thenStatement)) return null;
+      return fn.name && src.includes(`${fn.name.text}(`) ? cond.right.text : null;
+    })
+    .filter((c): c is string => c !== null);
 
   return new Set([...cases, ...viaConstant, ...bundleCodes, ...libCodes]);
 }
@@ -168,17 +190,20 @@ function codesMappedInCheckout(): Set<string> {
  * hitting a plain out-of-stock item got the generic "Something went wrong".
  */
 function unconditionallyAnsweredBundleCodes(bundleSrc: string): string[] {
+  // AST: an `if (code === 'X') { … }` whose block holds no `return null` statement.
+  const sf = parseSource('checkout-bundle-errors.ts', bundleSrc);
   const codes: string[] = [];
-  for (const m of bundleSrc.matchAll(/if \(code === '([A-Z_]+)'\) \{/g)) {
-    const blockStart = m.index! + m[0].length;
-    let depth = 1;
-    let i = blockStart;
-    for (; i < bundleSrc.length && depth > 0; i++) {
-      if (bundleSrc[i] === '{') depth++;
-      else if (bundleSrc[i] === '}') depth--;
-    }
-    const block = bundleSrc.slice(blockStart, i - 1);
-    if (!/return null;/.test(block)) codes.push(m[1]);
+  for (const stmt of findAll(sf, ts.isIfStatement)) {
+    const c = stmt.expression;
+    if (
+      !(ts.isBinaryExpression(c) && c.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken)
+    )
+      continue;
+    if (c.left.getText() !== 'code' || !isStr(c.right) || !ts.isBlock(stmt.thenStatement)) continue;
+    const returnsNull = findAll(stmt.thenStatement, (n): n is ts.ReturnStatement =>
+      ts.isReturnStatement(n)
+    ).some(r => r.expression?.kind === ts.SyntaxKind.NullKeyword);
+    if (!returnsNull) codes.push(c.right.text);
   }
   return codes;
 }

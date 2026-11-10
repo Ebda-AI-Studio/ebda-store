@@ -93,24 +93,41 @@ describe('each rollup runs in its own step and tenant transaction (issue 2293)',
 
 describe('the nightly cron fans out one run per store (issue 2348)', () => {
   it('does no rollup work itself: one list step + batched events, never 3 steps per store', async () => {
-    const src = (await import('node:fs')).readFileSync(
-      (await import('node:path')).join(
-        __dirname,
-        '../../apps/api/src/lib/inngest/functions/analytics-daily-rollup.ts'
-      ),
-      'utf8'
-    );
-    const cron = src.slice(
-      src.indexOf('export const analyticsDailyRollupCron'),
-      src.indexOf('export const analyticsRollupOnDemand')
-    );
-    expect(cron).not.toMatch(/runStoreRollupSteps/);
-    expect(cron).toMatch(/step\.sendEvent\(/);
-    expect(cron).toMatch(/name: 'insights\/rollup-requested'/);
-    const onDemand = src.slice(src.indexOf('export const analyticsRollupOnDemand'));
-    expect(onDemand).toMatch(
-      /concurrency: \[\{ limit: 3 \}, \{ key: 'event\.data\.storeId', limit: 1 \}\]/
-    );
+    // Behaviour: run the real cron handler with a fake step and count what it does.
+    vi.resetModules();
+    const { inngest } = await import('@api/lib/inngest/client');
+    await import('@api/lib/inngest/functions/analytics-daily-rollup');
+    const stores = [{ id: 's1' }, { id: 's2' }, { id: 's3' }];
+    const stepRuns: string[] = [];
+    const events: Array<{ name: string; data: { storeId: string } }> = [];
+    const step = {
+      run: async (id: string, _fn: () => unknown) => {
+        stepRuns.push(id);
+        return stores;
+      },
+      sendEvent: async (_id: string, batch: typeof events) => {
+        events.push(...batch);
+      },
+    };
+    const call = vi
+      .mocked(inngest.createFunction)
+      .mock.calls.find(c => (c[0] as { id: string }).id === 'analytics-daily-rollup')!;
+    await (call[1] as unknown as (ctx: unknown) => Promise<unknown>)({ step });
+    // exactly ONE step (the store list); the three rollups are not run here, only requested
+    expect(stepRuns).toHaveLength(1);
+    expect(r.cohort).not.toHaveBeenCalled();
+    expect(r.funnel).not.toHaveBeenCalled();
+    expect(r.rfm).not.toHaveBeenCalled();
+    expect(events.map(e => e.name)).toEqual(Array(3).fill('insights/rollup-requested'));
+    expect(events.map(e => e.data.storeId)).toEqual(['s1', 's2', 's3']);
+    // and the per-store function is capped: 3 stores at once, one run per store
+    const onDemand = vi
+      .mocked(inngest.createFunction)
+      .mock.calls.find(c => (c[0] as { id: string }).id === 'analytics-rollup-on-demand')!;
+    expect((onDemand[0] as { concurrency: unknown }).concurrency).toEqual([
+      { limit: 3 },
+      { key: 'event.data.storeId', limit: 1 },
+    ]);
   });
 
   it('batches the fan-out: 1201 stores → 3 sendEvent calls', async () => {

@@ -200,12 +200,7 @@ describe('route wiring', () => {
     path.resolve(__dirname, '../../apps/api/src/routes/public.routes.ts'),
     'utf8'
   );
-  it('GET /orders/:id masks unless a customer or a valid token', () => {
-    const at = src.indexOf("'/orders/:id',\n  optionalAuthenticate");
-    const handler = src.slice(at, src.indexOf('OrderService.getById', at) + 3000);
-    expect(handler).toContain('requestHoldsOrderViewToken(req, order.id)');
-    expect(handler).toContain('maskGuestOrderView(visible)');
-  });
+  // GET /orders/:id masking is exercised against the real handler in guest-order-route-token.test.ts
   it('POST /orders hands a guest the token', () => {
     expect(src).toContain('viewToken: guestViewTokenFor(order.id)');
     expect(src).toContain('return signOrderViewToken(orderId);');

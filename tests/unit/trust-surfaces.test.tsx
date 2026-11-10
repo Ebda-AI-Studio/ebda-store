@@ -13,6 +13,8 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
+import { all, parseFile } from './helpers/ast-statements';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { localizeDigits } from '@ebda/shared';
 import type { Order } from '../../apps/web/src/lib/api';
@@ -174,16 +176,44 @@ describe('S-02: PDP trust line', () => {
   });
 
   it('sits under the buy button on the default PDP and the Dahab PDP', () => {
-    for (const [f, tag] of [
-      ['apps/web/src/app/products/[slug]/ProductDetailClient.tsx', '<TrustLine cod={codOffer} />'],
-      ['apps/web/src/templates/dahab/ProductDetail.tsx', '<TrustLine cod={p.codOffer ?? null} />'],
-    ]) {
-      const src = readFileSync(join(__dirname, '../..', f), 'utf8');
-      const chip = src.indexOf('<DeliveryChip');
-      expect(chip, f).toBeGreaterThan(0);
-      const trust = src.indexOf(tag);
-      expect(trust, f).toBeGreaterThan(chip);
-      expect(trust - chip, f).toBeLessThan(400);
+    // Structural (JSX AST): <TrustLine> is the very next element sibling after <DeliveryChip> in the same parent (only
+    // whitespace / comment-only expressions between), and carries the expected `cod` expression. A text distance could be
+    // satisfied by a neighbouring element or a comment.
+    for (const [f, cod] of [
+      ['apps/web/src/app/products/[slug]/ProductDetailClient.tsx', 'codOffer'],
+      ['apps/web/src/templates/dahab/ProductDetail.tsx', 'p.codOffer ?? null'],
+    ] as const) {
+      const sf = parseFile(f);
+      const chip = all(sf, ts.isJsxSelfClosingElement).filter(
+        e => e.tagName.getText() === 'DeliveryChip'
+      );
+      const trust = all(sf, ts.isJsxSelfClosingElement).filter(
+        e => e.tagName.getText() === 'TrustLine'
+      );
+      expect(chip, f).toHaveLength(1);
+      expect(trust, f).toHaveLength(1);
+      const parent = (n: ts.Node) => {
+        let p: ts.Node = n;
+        while (p.parent && !ts.isJsxElement(p.parent) && !ts.isJsxFragment(p.parent)) p = p.parent;
+        return { child: p, container: p.parent as ts.JsxElement | ts.JsxFragment };
+      };
+      const c = parent(chip[0]!);
+      const t = parent(trust[0]!);
+      expect(t.container, `${f}: same parent`).toBe(c.container);
+      const kids = [...c.container.children];
+      const [ci, ti] = [kids.indexOf(c.child as never), kids.indexOf(t.child as never)];
+      expect(ci, f).toBeGreaterThanOrEqual(0);
+      expect(ti, f).toBeGreaterThan(ci);
+      for (const k of kids.slice(ci + 1, ti)) {
+        const blank = ts.isJsxText(k)
+          ? k.text.trim() === ''
+          : ts.isJsxExpression(k) && !k.expression;
+        expect(blank, `${f}: nothing between the chip and the trust line`).toBe(true);
+      }
+      const attr = trust[0]!.attributes.properties.find(
+        x => ts.isJsxAttribute(x) && x.name.getText() === 'cod'
+      ) as ts.JsxAttribute;
+      expect((attr.initializer as ts.JsxExpression).expression!.getText(), f).toBe(cod);
     }
   });
 });

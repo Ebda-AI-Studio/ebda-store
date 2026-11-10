@@ -4,12 +4,11 @@
  * audit write is dropped.
  */
 import { describe, it, expect, vi } from 'vitest';
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Request, Response } from 'express';
+import ts from 'typescript';
 import { hasPermission, requirePermission } from '@api/middleware/rbac';
-
-const read = (rel: string) => fs.readFileSync(path.resolve(__dirname, '../../', rel), 'utf8');
+import { parseSource, callsTo, isStr, props } from './helpers/ts-ast';
 
 describe('customers:export permission', () => {
   it('owners and platform admins have it; staff and customers do not', () => {
@@ -39,20 +38,40 @@ describe('customers:export permission', () => {
 });
 
 describe('both bulk-export routes are guarded and audited', () => {
-  const routeSrc = (file: string, route: string) => {
-    const src = read(file);
-    const start = src.indexOf(`router.get(\n  '${route}'`);
-    expect(start, `${route} not found`).toBeGreaterThan(-1);
-    return src.slice(start, src.indexOf('\n);\n', start));
+  // AST, not a text window: running the real handlers needs a store DB, an xlsx writer and the
+  // full auth stack, so the check is structural. It looks at NODES of the exact `router.get`
+  // registration: the guard must be a real argument call and the audit action a real property
+  // of the handler, so a comment or an adjacent route cannot satisfy it.
+  const route = (file: string, route: string) => {
+    const sf = parseSource(path.resolve(__dirname, '../../', file));
+    const call = callsTo(sf, 'router.get').find(
+      c => isStr(c.arguments[0]) && c.arguments[0].text === route
+    );
+    expect(call, `${route} not found`).toBeDefined();
+    return call!;
   };
+  const guarded = (call: ts.CallExpression) =>
+    call.arguments
+      .slice(1, -1)
+      .some(
+        a =>
+          ts.isCallExpression(a) &&
+          a.expression.getText() === 'requirePermission' &&
+          isStr(a.arguments[0]) &&
+          a.arguments[0].text === 'customers:export'
+      );
+  const audits = (call: ts.CallExpression, action: string) =>
+    props(call.arguments[call.arguments.length - 1], 'action').some(
+      p => isStr(p.initializer) && p.initializer.text === action
+    );
   it('customers/export.xlsx', () => {
-    const r = routeSrc('apps/api/src/routes/customers.routes.ts', '/customers/export.xlsx');
-    expect(r).toContain("requirePermission('customers:export')");
-    expect(r).toContain("action: 'customers.exported'");
+    const r = route('apps/api/src/routes/customers.routes.ts', '/customers/export.xlsx');
+    expect(guarded(r)).toBe(true);
+    expect(audits(r, 'customers.exported')).toBe(true);
   });
   it('orders/export.xlsx', () => {
-    const r = routeSrc('apps/api/src/routes/order.routes.ts', '/export.xlsx');
-    expect(r).toContain("requirePermission('customers:export')");
-    expect(r).toContain("action: 'orders.exported'");
+    const r = route('apps/api/src/routes/order.routes.ts', '/export.xlsx');
+    expect(guarded(r)).toBe(true);
+    expect(audits(r, 'orders.exported')).toBe(true);
   });
 });

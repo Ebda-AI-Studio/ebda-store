@@ -16,6 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { parse as parseYaml } from 'yaml';
 
 const ROOT = join(__dirname, '../..');
 const SKILLS_DIR = join(ROOT, 'skills');
@@ -85,12 +86,18 @@ describe('agent skills name only tools that exist', () => {
   it.each(skillDirs())('%s has frontmatter with a name and a description', dir => {
     const src = readFileSync(join(SKILLS_DIR, dir, 'SKILL.md'), 'utf8');
     expect(src.startsWith('---\n'), `${dir}: no frontmatter block`).toBe(true);
-    const fm = src.slice(4, src.indexOf('\n---', 4));
-    expect(fm).toMatch(/^name:\s*\S+/m);
-    expect(fm).toMatch(/^description:\s*\S+/m);
+    // A real YAML parse of the frontmatter block: a missing closing `---` is a failure, never a window
+    // that swallows the body (where `name:` could appear in prose and pass).
+    const block = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(src);
+    expect(block, `${dir}: frontmatter block is not closed with ---`).not.toBeNull();
+    const fm = parseYaml(block![1]) as { name?: unknown; description?: unknown };
+    expect(typeof fm.name, `${dir}: frontmatter has no name`).toBe('string');
+    expect(String(fm.name).length).toBeGreaterThan(0);
+    expect(typeof fm.description, `${dir}: frontmatter has no description`).toBe('string');
+    expect(String(fm.description).length).toBeGreaterThan(0);
     // The directory name and the declared name must agree, or a client that
     // keys on one and displays the other shows the wrong skill.
-    expect(fm).toMatch(new RegExp(`^name:\\s*${dir}\\s*$`, 'm'));
+    expect(fm.name).toBe(dir);
   });
 
   it('no skill claims a write while every admin tool is read-only', () => {

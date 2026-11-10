@@ -23,6 +23,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
+import { productSearchSql } from '../../apps/api/src/services/product-search.service';
 import {
   scanRawProductQueries,
   scanSourceForProductSql,
@@ -162,17 +163,23 @@ describe('B2B raw-SQL product visibility checklist', () => {
   });
 
   it('the storefront search predicate sits BEFORE the LIMIT, in the WHERE', () => {
+    // Behaviour: build the REAL statement (productSearchSql is exported for exactly this) and read the SQL it generates.
+    const sqlOf = (scope: 'storefront' | 'admin') =>
+      productSearchSql('store-1', 'ring', { scope })!.sql.replace(/\s+/g, ' ');
+    const storefront = sqlOf('storefront');
+    const whereAt = storefront.indexOf('WHERE');
+    const audienceAt = storefront.indexOf("p.audience = 'public'");
+    const limitAt = storefront.indexOf('LIMIT');
+    expect(whereAt).toBeGreaterThan(-1);
+    expect(audienceAt).toBeGreaterThan(whereAt);
+    expect(audienceAt).toBeLessThan(limitAt);
+    // WHERE ends where ORDER BY begins: the predicate is a WHERE conjunct, not a trailing clause
+    expect(audienceAt).toBeLessThan(storefront.indexOf('ORDER BY'));
+    expect(sqlOf('admin')).not.toContain('p.audience');
     const src = require('node:fs').readFileSync(
       resolve(API_SRC, 'services/product-search.service.ts'),
       'utf8'
     ) as string;
-    const stmt = src.slice(src.indexOf('return Prisma.sql`SELECT p.id FROM products p'));
-    const whereAt = stmt.indexOf('WHERE');
-    const audienceAt = stmt.indexOf('${audience}');
-    const limitAt = stmt.indexOf('LIMIT');
-    expect(whereAt).toBeGreaterThan(-1);
-    expect(audienceAt).toBeGreaterThan(whereAt);
-    expect(audienceAt).toBeLessThan(limitAt);
     expect(src).toMatch(/storefront \? Prisma\.sql`AND p\.audience = 'public'`/);
     // the vector leg of the hybrid ranking (storefront only) filters before ITS limit too
     expect(src).toMatch(/AND p\.audience = 'public'\n\s+\) k/);

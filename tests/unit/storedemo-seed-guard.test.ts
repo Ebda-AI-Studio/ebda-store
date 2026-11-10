@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { callsIn, declNamed, parseFile } from './helpers/ast-statements';
 import {
   guard,
   isLocalUrl,
@@ -367,14 +368,20 @@ describe('storedemo seed: slug ownership (never overwrite a merchant store)', ()
     ).toBe(false);
   });
   it('the run checks every slug BEFORE any write (no partial seed): the claim check precedes the owner create', () => {
-    const src = readFileSync(path.resolve(__dirname, '../../scripts/storedemo/seed.mjs'), 'utf8');
-    const run = src.slice(src.indexOf('async function run()'));
-    const check = run.indexOf('assertSlugsClaimable');
-    expect(check).toBeGreaterThan(0);
-    expect(check).toBeLessThan(run.indexOf('tx.user.create'));
-    expect(check).toBeLessThan(run.indexOf('prisma.store.upsert'));
+    // Behaviour is not practical: run() opens a real Prisma client against a database. The ORDER is read off the parsed
+    // AST of run() (real call nodes, so a comment or string holding a name cannot satisfy it).
+    const run = declNamed(parseFile('scripts/storedemo/seed.mjs'), 'run');
+    const first = (name: string) => {
+      const c = callsIn(run, name);
+      expect(c.length, `${name} is called in run()`).toBeGreaterThan(0);
+      return c[0]!.getStart();
+    };
+    const check = first('assertSlugsClaimable');
+    for (const write of ['tx.user.create', 'prisma.store.upsert'])
+      for (const c of callsIn(run, write))
+        expect(check, `claim check precedes ${write}`).toBeLessThan(c.getStart());
     // and the production flag is still required for a non-loopback database
-    expect(run.indexOf('guard(url, argv)')).toBeLessThan(check);
+    expect(first('guard')).toBeLessThan(check);
   });
 });
 
