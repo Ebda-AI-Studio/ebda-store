@@ -723,6 +723,11 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
+    env:
+      # 4 GB, not the 2 GB default: the all-workspace `npm run typecheck` died of heap exhaustion (exit 134,
+      # Mark-Compact at 2,040 MB) on hosted ubuntu-24.04 in run 42818774650, the same class as the PR
+      # typecheck's #367 fix; the Next builds below need it too (every cf-*-deploy.yml sets the same).
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
