@@ -19,9 +19,14 @@ export const STORE_EXTRA_RESERVED_SLUGS = [
   'studio',
   'checkin',
   'manage',
-  // coming-soon software with a coming-soon page at <label>.ebda.app (Ruling SUBDOMAIN-SOON-2): Ebda Invite, Ebda Quote Studio
+  // coming-soon software with a coming-soon page at <label>.ebda.app (Ruling SUBDOMAIN-SOON-2): Ebda Invite, Ebda Ads,
+  // Ebda Quote Studio (`quote` and its BRAND id `quote-studio`)
   'invite',
+  'ads',
   'quote',
+  'quote-studio',
+  // Ebda Chat's other name: 301 to wa.ebda.app (Ruling WHATSAPP-HOST-REDIRECT-1)
+  'chat',
 ] as const;
 
 /** Any slug starting with one of these is reserved (per-deployment preview hosts). */

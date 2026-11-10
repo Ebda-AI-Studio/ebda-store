@@ -1,6 +1,7 @@
 /**
  * Ebda AI Studio's own "this address has nothing for you" pages: the Apple-style 404 and the
- * "coming soon" page for reserved product hosts (crm, erp, invite, quote, hub, id). ONE pure renderer, no runtime
+ * "coming soon" page for every coming-soon software product (crm, erp, invite, ads, quote: ONE template, only the copy
+ * differs, Ruling SUBDOMAIN-SOON-2) and the "reserved" page (hub, id). ONE pure renderer, no runtime
  * imports, so the store Worker's middleware, the marketing build and the status Worker share it.
  *
  * Calm on purpose: one sentence, a search box (a plain GET form to the help search, so it works with no
@@ -11,8 +12,10 @@ import { BRAND, brandMarkSvg } from '../brand';
 
 export type StudioLang = 'ar' | 'en';
 export type StudioPageKind = 'not-found' | 'coming-soon';
+/** A coming-soon software product, by its `BRAND.comingProducts` id (the single source of its names and one-line description). */
+export type ComingSoonProductId = (typeof BRAND.comingProducts)[number]['id'];
 /** Which upcoming product a coming-soon page names; `reserved` = an address held for a future service. */
-export type ComingSoonProduct = 'crm' | 'erp' | 'invite' | 'quote' | 'reserved';
+export type ComingSoonProduct = ComingSoonProductId | 'reserved';
 
 export interface StudioPageInput {
   lang: StudioLang;
@@ -26,11 +29,13 @@ export type StudioHostPlan =
   | { status: 301; kind: 'redirect'; host: string };
 
 const COMING_SOON_LABELS: Readonly<Record<string, ComingSoonProduct>> = {
+  // every coming-soon software product gets its own page (Ruling SUBDOMAIN-SOON-2); names = BRAND.comingProducts
   crm: 'crm',
   erp: 'erp',
-  // every coming-soon software product gets its own page (Ruling SUBDOMAIN-SOON-2); names = BRAND.comingProducts
   invite: 'invite',
-  quote: 'quote',
+  ads: 'ads',
+  quote: 'quote-studio',
+  'quote-studio': 'quote-studio',
   hub: 'reserved',
   id: 'reserved',
 };
@@ -43,7 +48,13 @@ const COMING_SOON_LABELS: Readonly<Record<string, ComingSoonProduct>> = {
  */
 const REDIRECT_LABELS: Readonly<Record<string, string>> = {
   whatsapp: BRAND.domains.whatsappApp,
+  chat: BRAND.domains.whatsappApp,
 };
+
+/** Every label that answers a coming-soon page (for tests and the reserved-slug parity check). */
+export const STUDIO_COMING_SOON_LABELS: readonly string[] = Object.keys(COMING_SOON_LABELS);
+/** Every label that redirects to a live product elsewhere. */
+export const STUDIO_REDIRECT_LABELS: readonly string[] = Object.keys(REDIRECT_LABELS);
 
 /**
  * What a bare label under `.ebda.app` (a reserved or malformed one that no Worker serves) should show:
@@ -85,13 +96,17 @@ interface Copy {
   searchButton: string;
   mapLabel: string;
   soon: string;
-  soonLine: Record<ComingSoonProduct, string>;
+  /** the page heading's sentence for a coming-soon product, built from its BRAND name */
+  soonLine: (name: string) => string;
+  reservedLine: string;
   soonHint: string;
+  notify: string;
+  backHome: string;
   contact: string;
   switchTo: string;
   groups: { live: string; support: string; next: string };
   links: { home: string; store: string; help: string; docs: string; status: string };
-  products: { whatsapp: string; crm: string; erp: string; invite: string; quote: string };
+  chat: string;
 }
 
 const COPY: Record<StudioLang, Copy> = {
@@ -104,14 +119,11 @@ const COPY: Record<StudioLang, Copy> = {
     searchButton: 'Search',
     mapLabel: 'Site sections',
     soon: 'Coming soon',
-    soonLine: {
-      crm: 'Ebda CRM is coming soon.',
-      erp: 'Ebda ERP is coming soon.',
-      invite: 'Ebda Invite is coming soon.',
-      quote: 'Ebda Quote Studio is coming soon.',
-      reserved: 'This address is held for an upcoming service from Ebda AI Studio.',
-    },
+    soonLine: name => `${name} is coming soon.`,
+    reservedLine: 'This address is held for an upcoming service from Ebda AI Studio.',
     soonHint: "We're still building it. Here is what is live today.",
+    notify: 'Tell me when it is ready',
+    backHome: 'Back to ebda.app',
     contact: 'Contact',
     switchTo: 'العربية',
     groups: { live: 'Live today', support: 'Help', next: 'Coming soon' },
@@ -122,13 +134,7 @@ const COPY: Record<StudioLang, Copy> = {
       docs: 'Developer docs',
       status: 'Service status',
     },
-    products: {
-      whatsapp: 'Ebda Chat',
-      crm: 'Ebda CRM',
-      erp: 'Ebda ERP',
-      invite: 'Ebda Invite',
-      quote: 'Ebda Quote Studio',
-    },
+    chat: 'Ebda Chat',
   },
   ar: {
     title404: 'الصفحة مش موجودة',
@@ -138,18 +144,15 @@ const COPY: Record<StudioLang, Copy> = {
     searchPlaceholder: 'دوّر في المساعدة والشروحات',
     searchButton: 'بحث',
     mapLabel: 'أقسام الموقع',
-    soon: 'قريباً',
-    soonLine: {
-      crm: 'ابدأ CRM جاي قريب.',
-      erp: 'ابدأ ERP جاي قريب.',
-      invite: 'ابدأ إنفايت جاي قريب.',
-      quote: 'ابدأ ستوديو للتسعير جاي قريب.',
-      reserved: 'العنوان ده محجوز لخدمة جاية من ابدأ ستوديو للذكاء الاصطناعي.',
-    },
+    soon: 'قريبًا',
+    soonLine: name => `${name} جاي قريب.`,
+    reservedLine: 'العنوان ده محجوز لخدمة جاية من ابدأ ستوديو للذكاء الاصطناعي.',
     soonHint: 'لسه بنشتغل عليه. وده اللي شغال النهارده.',
+    notify: 'عرّفني أول ما يجهز',
+    backHome: 'ارجع لـ ebda.app',
     contact: 'تواصل معانا',
     switchTo: 'English',
-    groups: { live: 'شغال النهارده', support: 'المساعدة', next: 'قريباً' },
+    groups: { live: 'شغال النهارده', support: 'المساعدة', next: 'قريبًا' },
     links: {
       home: 'ابدأ ستوديو للذكاء الاصطناعي',
       store: 'ابدأ ستور',
@@ -157,13 +160,7 @@ const COPY: Record<StudioLang, Copy> = {
       docs: 'وثائق المطوّرين',
       status: 'حالة الخدمة',
     },
-    products: {
-      whatsapp: 'ابدأ شات',
-      crm: 'ابدأ CRM',
-      erp: 'ابدأ ERP',
-      invite: 'ابدأ إنفايت',
-      quote: 'ابدأ ستوديو للتسعير',
-    },
+    chat: 'ابدأ شات',
   },
 };
 
@@ -196,6 +193,14 @@ nav.map ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
 nav.map li{min-block-size:28px}
 .soon{color:var(--muted)}
 .soon b{margin-inline-start:8px;font-weight:500;font-size:.8125rem;color:var(--gold)}
+.lead{margin:0 0 16px;font-size:1.125rem;color:var(--fg);max-inline-size:60ch}
+.badge{display:inline-block;margin:0 0 28px;padding:2px 12px;border:1px solid var(--gold);border-radius:999px;color:var(--lift);font-size:.8125rem;font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 56px}
+.actions a{display:inline-flex;align-items:center;min-block-size:48px;padding-inline:22px;border-radius:14px;font-weight:600;text-decoration:none}
+.actions .cta{background:var(--gold);color:var(--night)}
+.actions .cta:hover{background:var(--lift);color:var(--night)}
+.actions .home{border:1px solid var(--line);color:var(--fg)}
+.actions .home:hover{border-color:var(--gold)}
 [aria-current=page]{color:var(--fg);font-weight:600}
 footer{color:var(--muted);font-size:.875rem;border-top:1px solid var(--line)}
 form.search{position:relative}
@@ -229,15 +234,35 @@ export function renderStudioPage(input: StudioPageInput): string {
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
   const product = input.product ?? 'reserved';
   const soon = kind === 'coming-soon';
-  const line = soon ? c.soonLine[product] : c.line404;
+  const brandProduct =
+    soon && product !== 'reserved' ? BRAND.comingProducts.find(p => p.id === product) : undefined;
+  const name = brandProduct ? (lang === 'ar' ? brandProduct.nameAr : brandProduct.nameEn) : '';
+  const short = brandProduct ? (lang === 'ar' ? brandProduct.shortAr : brandProduct.shortEn) : '';
+  const line = soon ? (brandProduct ? c.soonLine(name) : c.reservedLine) : c.line404;
   const hint = soon ? c.soonHint : c.hint;
-  const title = `${soon ? c.soonLine[product] : c.title404} | ${lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}`;
+  const title = `${line === c.line404 ? c.title404 : line} | ${lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}`;
+  const home = `https://${BRAND.domains.marketing}${lang === 'ar' ? '/' : '/en/'}`;
+  const notifyHref = `${home}contact/?topic=products#form`;
   const help = `https://${BRAND.domains.help}`;
   const searchAction = lang === 'ar' ? `${help}/search/` : `${help}/en/search/`;
   const otherLang = lang === 'ar' ? 'en' : 'ar';
   const li = (href: string, label: string) => `<li><a href="${esc(href)}">${esc(label)}</a></li>`;
-  const next = (key: 'crm' | 'erp' | 'invite' | 'quote') =>
-    `<li class="soon"${soon && product === key ? ' aria-current="page"' : ''}>${esc(c.products[key])}<b>${esc(c.soon)}</b></li>`;
+  const next = (p: (typeof BRAND.comingProducts)[number]) =>
+    `<li class="soon"${soon && product === p.id ? ' aria-current="page"' : ''}>${esc(lang === 'ar' ? p.nameAr : p.nameEn)}<b>${esc(c.soon)}</b></li>`;
+  // ONE template for every coming-soon product (SUBDOMAIN-SOON-2): name, one line, the label, notify-me CTA, back to ebda.app.
+  // Only the copy differs between products; the 404 and the reserved page keep the search box.
+  const intro = brandProduct
+    ? `<h1>${esc(name)}</h1>
+<p class="lead">${esc(short)}</p>
+<p class="badge">${esc(c.soon)}</p>
+<p class="actions"><a class="cta" href="${esc(notifyHref)}">${esc(c.notify)}<span class="sr-only"> — ${esc(name)}</span></a><a class="home" href="${esc(home)}">${esc(c.backHome)}</a></p>`
+    : `<h1>${esc(line)}</h1>
+<p class="hint">${esc(hint)}</p>
+<form class="search" role="search" action="${esc(searchAction)}" method="get" data-sources="${esc(JSON.stringify(SOURCES(lang)))}">
+<label class="sr-only" for="q">${esc(c.searchLabel)}</label>
+<input id="q" name="q" type="search" placeholder="${esc(c.searchPlaceholder)}" autocomplete="off" enterkeyhint="search">
+<button type="submit">${esc(c.searchButton)}</button>
+</form>`;
   const wa = `https://wa.me/${BRAND.contact.whatsapp.replace(/\D/g, '')}`;
 
   return `<!doctype html>
@@ -257,18 +282,12 @@ export function renderStudioPage(input: StudioPageInput): string {
 <a class="brand" href="https://${BRAND.domains.marketing}/">${brandMarkSvg({ size: 28 })}<span>${esc(lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn)}</span></a>
 </header>
 <main id="main">
-<h1>${esc(line)}</h1>
-<p class="hint">${esc(hint)}</p>
-<form class="search" role="search" action="${esc(searchAction)}" method="get" data-sources="${esc(JSON.stringify(SOURCES(lang)))}">
-<label class="sr-only" for="q">${esc(c.searchLabel)}</label>
-<input id="q" name="q" type="search" placeholder="${esc(c.searchPlaceholder)}" autocomplete="off" enterkeyhint="search">
-<button type="submit">${esc(c.searchButton)}</button>
-</form>
+${intro}
 <nav class="map" aria-label="${esc(c.mapLabel)}">
 <div><h2>${esc(c.groups.live)}</h2><ul>
 ${li(`https://${BRAND.domains.marketing}/`, c.links.home)}
 ${li(`https://${BRAND.domains.storeApp}/`, c.links.store)}
-${li(`https://${BRAND.domains.whatsappApp}/`, c.products.whatsapp)}
+${li(`https://${BRAND.domains.whatsappApp}/`, c.chat)}
 ${li(`https://${BRAND.domains.status}/`, c.links.status)}
 </ul></div>
 <div><h2>${esc(c.groups.support)}</h2><ul>
@@ -278,10 +297,7 @@ ${li(`mailto:${BRAND.supportEmail}`, c.contact)}
 ${li(wa, 'WhatsApp')}
 </ul></div>
 <div><h2>${esc(c.groups.next)}</h2><ul>
-${next('crm')}
-${next('erp')}
-${next('invite')}
-${next('quote')}
+${BRAND.comingProducts.map(next).join('\n')}
 </ul></div>
 </nav>
 </main>
@@ -289,7 +305,7 @@ ${next('quote')}
 <span>© ${new Date().getUTCFullYear()} ${esc(lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn)}</span>
 <a href="?lang=${otherLang}" hreflang="${otherLang}" lang="${otherLang}">${esc(c.switchTo)}</a>
 </footer>
-<script src="https://${BRAND.domains.help}/assets/typeahead.js" defer></script>
+${brandProduct ? '' : `<script src="https://${BRAND.domains.help}/assets/typeahead.js" defer></script>`}
 </body>
 </html>
 `;

@@ -60,7 +60,10 @@ describe('RESERVED_SLUGS — the single source of truth', () => {
         'manage',
         // coming-soon software pages (SUBDOMAIN-SOON-2)
         'invite',
+        'ads',
         'quote',
+        'quote-studio',
+        'chat',
       ].sort()
     );
   });

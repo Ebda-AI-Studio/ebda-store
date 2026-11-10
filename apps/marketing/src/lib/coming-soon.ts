@@ -11,8 +11,8 @@ import type { Locale } from './site';
  * SOFTWARE only: the Products area is for software; the studio's on-the-ground services (Ebda Events, Ebda Marketing, Ebda Design) live under Services. The card names differ from the service names on purpose (names confirmed by Ahmad 2026-11-09; the Arabic follows the BRAND pattern of transliterating the English name, as in ابدأ ستور / ابدأ شات: ابدأ إنفايت, ابدأ آدز): Ebda Invite vs the Events service, Ebda Ads vs the Marketing service, Ebda Quote Studio vs the Design service.
  * Three cards: Ebda Quote Studio, Ebda Events, Ebda Marketing (approved by Ahmad 2026-11-09, same release flag, no separate one).
  * Plus Ebda CRM and Ebda ERP (Ahmad 2026-11-10, Ruling COMING-SOON-CRM-ERP-1): built like the others. A card whose product has its
- * own live coming-soon page at <label>.ebda.app (crm, erp, invite, quote: Ruling SUBDOMAIN-SOON-2, served by the storefront Worker)
- * ALSO links to it (`href`); Ebda Ads has no such page yet. DRAFT until Ahmad approves: the CRM and ERP blurbs and facts (plain
+ * own live coming-soon page at <label>.ebda.app (Ruling SUBDOMAIN-SOON-2, served by the storefront Worker)
+ * ALSO links to it (`href`); since SUBDOMAIN-SOON-2 that is all five (crm, erp, invite, ads, quote). DRAFT until Ahmad approves: the CRM and ERP blurbs and facts (plain
  * descriptions only; no dates, prices or feature promises).
  */
 export const comingSoonVisible = () => serviceLinesPublished();
@@ -29,10 +29,11 @@ export type ComingSoon = {
   href?: string;
 };
 
-/** The live coming-soon subdomain pages (SUBDOMAIN-SOON-2); Ebda Ads has none yet. */
+/** The live coming-soon subdomain pages (SUBDOMAIN-SOON-2). */
 const HREF: Partial<Record<ComingSoonId, string>> = {
   'quote-studio': 'https://quote.ebda.app/',
   invite: 'https://invite.ebda.app/',
+  ads: 'https://ads.ebda.app/',
   crm: 'https://crm.ebda.app/',
   erp: 'https://erp.ebda.app/',
 };

@@ -119,7 +119,10 @@ describe('product name (PRODUCT-NAME-1)', () => {
       'id',
       'accounts',
       'invite',
+      'ads',
       'quote',
+      'quote-studio',
+      'chat',
     ]) {
       expect(isReservedSlug(s)).toBe(true);
     }
