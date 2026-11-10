@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { LEGAL_POLICIES, currentLegalVersion, formatLegalDate } from '@ebda/shared/legal';
 import { COPY } from '../lib/content';
 import { HOME, pagePath, type LegalExtraSlug, type LegalSlug, type Locale } from '../lib/site';
@@ -95,9 +95,9 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | 
             ))}
             {page === 'privacy' && (
               <p className="legal-back">
-                <Link href={pagePath(locale, 'legal/data-deletion')}>
+                <PageLink href={pagePath(locale, 'legal/data-deletion')}>
                   {COPY[locale].footer.dataDeletion}
-                </Link>
+                </PageLink>
               </p>
             )}
             {page === 'legal' && (
@@ -111,14 +111,16 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | 
                 <ul>
                   {c.more.links.map(l => (
                     <li key={l.slug}>
-                      <Link href={pagePath(locale, l.slug as LegalExtraSlug)}>{l.label}</Link>
+                      <PageLink href={pagePath(locale, l.slug as LegalExtraSlug)}>
+                        {l.label}
+                      </PageLink>
                     </li>
                   ))}
                 </ul>
               </section>
             )}
             <p className="legal-back">
-              <Link href={HOME[locale]}>{c.back}</Link>
+              <PageLink href={HOME[locale]}>{c.back}</PageLink>
             </p>
           </article>
         </div>

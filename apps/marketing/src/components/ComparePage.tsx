@@ -1,5 +1,5 @@
 import { SiteLink } from './SiteLink';
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { COMPARE, COMPARE_PAGE, compareRows, type ResolvedRow } from '../lib/compare';
 import { COMING_LABEL } from '../lib/capability-registry';
 import { COPY } from '../lib/content';
@@ -117,9 +117,9 @@ export function ComparePage({ locale, slug }: { locale: Locale; slug: CompareSlu
           <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
             {k.cta}
           </SiteLink>
-          <Link href={pagePath(locale, 'features')} className="btn btn-ghost btn-lg">
+          <PageLink href={pagePath(locale, 'features')} className="btn btn-ghost btn-lg">
             {k.allFeatures}
-          </Link>
+          </PageLink>
         </p>
       </main>
       <Footer locale={locale} />
