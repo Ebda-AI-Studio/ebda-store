@@ -110,6 +110,14 @@ export default function VerifyEmailPage() {
               {t('forgotPassword')}
             </Link>
           </p>
+          {/* PRE-8: the link is often opened on another device or by someone who did not sign up; a reset also confirms the
+              email (accounts /password/reset sets email_verified), so say so instead of leaving them stuck at the password. */}
+          <p
+            className="text-center text-sm text-muted-foreground"
+            data-testid="verify-password-hint"
+          >
+            {t('passwordHint')}
+          </p>
         </form>
       </PublicShell>
     );

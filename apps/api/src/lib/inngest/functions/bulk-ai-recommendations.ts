@@ -84,6 +84,22 @@ const FBT_PAIRS_PER_PRODUCT = 6;
 // reflects the store's CURRENT catalogue behaviour, not stale history.
 const FBT_WINDOW_DAYS = 180;
 
+/**
+ * The products that already have AI recommendations (the smart-skip set). The `distinct` is done here, in JS, after the read:
+ * the DO read client (prisma-lite) refuses `distinct` ("prisma-lite: distinct is not supported"), which failed every sweep on
+ * the Worker (Ruling NZ-D23).
+ */
+export async function sourceProductIdsWithRecs(
+  db: Pick<StoreReads, 'aiRecommendation'>,
+  storeId: string
+): Promise<Set<string>> {
+  const rows = await db.aiRecommendation.findMany({
+    where: { storeId },
+    select: { sourceProductId: true },
+  });
+  return new Set(rows.map(r => r.sourceProductId));
+}
+
 async function coPurchaseRowsPg(
   storeId: string,
   since: Date
@@ -358,12 +374,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
 
           // Smart-skip set + FBT signal rebuilt fresh per batch — cheap
           // reads, and always reflect what earlier batches just wrote.
-          const existingRecRows = await sdb.aiRecommendation.findMany({
-            where: { storeId },
-            select: { sourceProductId: true },
-            distinct: ['sourceProductId'],
-          });
-          const productsWithRecs = new Set(existingRecRows.map(r => r.sourceProductId));
+          const productsWithRecs = await sourceProductIdsWithRecs(sdb, storeId);
 
           let coPurchase: Map<string, Array<{ productId: string; coOrders: number }>>;
           try {

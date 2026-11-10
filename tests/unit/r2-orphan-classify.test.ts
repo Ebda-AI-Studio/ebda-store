@@ -103,10 +103,7 @@ describe('r2-orphan-audit reads the registry as an owner-role connection (issue 
     const src = readFileSync(path.resolve(__dirname, '../../scripts/r2-orphan-audit.ts'), 'utf8');
     expect(src).toMatch(/const run = rlsBypassRunner\(prisma\)/);
     expect(src).not.toMatch(/run: fn => fn\(prisma\)/);
-    // The visibility guard sits in front of the delete.
-    expect(src.indexOf('await assertStrictTablesVisible(run, prisma)')).toBeLessThan(
-      src.indexOf('await deleteKeysInBatches(')
-    );
+    // That the visibility guard runs in front of the delete is a behaviour test: tests/unit/r2-orphan-delete-guard.test.ts.
   });
 
   it('STRICT_R2_TABLES is exactly the registry tables on the pinned STRICT list', () => {
@@ -239,22 +236,6 @@ describe('r2-orphan-audit reads the registry as an owner-role connection (issue 
     ).resolves.toBeNull();
   });
 
-  it('the dry run validates the report too — the guard runs whenever anything would be called an orphan', () => {
-    const src = readFileSync(path.resolve(__dirname, '../../scripts/r2-orphan-audit.ts'), 'utf8');
-    const guard = src.indexOf('assertStrictTablesVisible(run, prisma)');
-    expect(guard).toBeGreaterThan(0);
-    expect(src.slice(src.lastIndexOf('if (', guard), guard)).toMatch(/if \(orphans\.length > 0\)/);
-    expect(src.slice(src.lastIndexOf('if (', guard), guard)).not.toMatch(/apply/);
-  });
-
-  it('the Inngest sweep (the other bulk-delete collector) runs the same guard before deleting', () => {
-    const src = readFileSync(
-      path.resolve(__dirname, '../../apps/api/src/lib/inngest/functions/r2-orphan-sweep.ts'),
-      'utf8'
-    );
-    const guard = src.indexOf('await assertStrictTablesVisible(');
-    expect(guard).toBeGreaterThan(0);
-    expect(guard).toBeLessThan(src.indexOf("step.run('delete-orphans'"));
-    expect(src).toMatch(/if \(visibilityError && applyDeletes\) \{\s*throw/);
-  });
+  // The dry run validating the report too, and the Inngest sweep running the same guard before deleting, are behaviour
+  // tests: tests/unit/r2-orphan-delete-guard.test.ts.
 });

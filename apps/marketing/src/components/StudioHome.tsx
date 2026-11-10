@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { BRAND, SITE_NAV_ICONS, type SiteNavProductId } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { STUDIO_HOME } from '../lib/studio-home';
@@ -91,9 +91,9 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                     <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
                       {c.store.cta}
                     </SiteLink>
-                    <Link href={STORE_HOME[locale]} className="btn btn-ghost btn-lg">
+                    <PageLink href={STORE_HOME[locale]} className="btn btn-ghost btn-lg">
                       {c.store.more}
-                    </Link>
+                    </PageLink>
                   </p>
                 </div>
               </li>
@@ -113,9 +113,9 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                     >
                       {c.chat.cta}
                     </SiteLink>
-                    <Link href={pagePath(locale, 'whatsapp')} className="btn btn-ghost btn-lg">
+                    <PageLink href={pagePath(locale, 'whatsapp')} className="btn btn-ghost btn-lg">
                       {c.chat.more}
-                    </Link>
+                    </PageLink>
                   </p>
                 </div>
               </li>
@@ -144,9 +144,12 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
               <div className="sh-body">
                 <p className="sh-statement">{HOME_SERVICES[locale].p}</p>
                 <p className="actions">
-                  <Link href={`${pagePath(locale, 'services')}/`} className="btn btn-ghost btn-lg">
+                  <PageLink
+                    href={`${pagePath(locale, 'services')}/`}
+                    className="btn btn-ghost btn-lg"
+                  >
                     {HOME_SERVICES[locale].cta}
-                  </Link>
+                  </PageLink>
                 </p>
               </div>
             </div>
@@ -168,9 +171,9 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                   ))}
                 </ul>
                 <p className="actions">
-                  <Link href={STORE_HOME[locale]} className="btn btn-ghost">
+                  <PageLink href={STORE_HOME[locale]} className="btn btn-ghost">
                     {c.store.more}
-                  </Link>
+                  </PageLink>
                 </p>
               </li>
               <li>
@@ -182,9 +185,9 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                   ))}
                 </ul>
                 <p className="actions">
-                  <Link href={pagePath(locale, 'whatsapp')} className="btn btn-ghost">
+                  <PageLink href={pagePath(locale, 'whatsapp')} className="btn btn-ghost">
                     {c.chat.more}
-                  </Link>
+                  </PageLink>
                 </p>
               </li>
               {comingSoonItems(locale).map(it => (
@@ -201,13 +204,13 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                     </ul>
                   )}
                   <p className="actions">
-                    <Link
+                    <PageLink
                       href={`${pagePath(locale, 'contact')}/?topic=products#form`}
                       className="btn btn-ghost"
                     >
                       {comingSoonLabels(locale).notify}
                       <span className="sv-card-sr"> — {it.name}</span>
-                    </Link>
+                    </PageLink>
                   </p>
                 </li>
               ))}
@@ -253,12 +256,12 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                 ))}
               </ul>
               <p className="actions">
-                <Link href={pagePath(locale, 'contact')} className="btn btn-primary btn-lg">
+                <PageLink href={pagePath(locale, 'contact')} className="btn btn-primary btn-lg">
                   {c.trust.contactCta}
-                </Link>
-                <Link href={pagePath(locale, 'terms')} className="btn btn-ghost btn-lg">
+                </PageLink>
+                <PageLink href={pagePath(locale, 'terms')} className="btn btn-ghost btn-lg">
                   {c.trust.legalLabel}
-                </Link>
+                </PageLink>
               </p>
               <p className="muted small">{c.account}</p>
             </div>

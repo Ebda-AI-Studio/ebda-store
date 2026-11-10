@@ -297,18 +297,24 @@ async function countStoreRows(
   storeId: string,
   opts: { orders?: boolean } = {}
 ): Promise<{ products: number; categories: number; orders?: number }> {
-  return withStore(storeId, async tx => {
-    // products + categories follow the store's backend (a Postgres store keeps this very tx); orders stay on the tx
-    const db = (await storeRepo(storeId)).backend === 'do' ? await storeDb(storeId) : tx;
+  const count = async (db: {
+    product: { count(a: object): Promise<number> };
+    category: { count(a: object): Promise<number> };
+    order: { count(a: object): Promise<number> };
+  }) => {
     const [products, categories, orders] = await Promise.all([
       db.product.count({ where: { storeId } }),
       db.category.count({ where: { storeId } }),
-      opts.orders ? tx.order.count({ where: { storeId } }) : Promise.resolve(undefined),
+      opts.orders ? db.order.count({ where: { storeId } }) : Promise.resolve(undefined),
     ]);
     return opts.orders
       ? { products, categories, orders: orders as number }
       : { products, categories };
-  });
+  };
+  // A DO store has no Postgres: every count (orders included) is read from its DO, never from the tenant tx (which is the
+  // POSTGRES_REMOVED client on the Worker). A Postgres store keeps one tenant tx for all three.
+  if ((await storeRepo(storeId)).backend === 'do') return count((await storeDb(storeId)) as never);
+  return withStore(storeId, tx => count(tx as never));
 }
 
 /**

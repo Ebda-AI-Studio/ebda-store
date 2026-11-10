@@ -3,7 +3,8 @@
  * today `prismaCiSource` (Postgres, one row per call, by id, under the store's tenant scope); after the
  * StoreDO cutover the repo layer supplies a StoreDO-backed one. No method scans a table.
  */
-import { prisma, runInStoreScope, runInTenantContext, withUser } from '@ebda/database';
+import { prisma, runInStoreScope, runInTenantContext } from '@ebda/database';
+import { getAccountsBrief } from '../identity-client';
 import { storeMoney, storeRepo, type StoreRepo, type StoreReads } from '../repo-factory';
 import { toE164 } from '@ebda/shared';
 import { areaKeyFor, type AreaKeyResult } from './area-key';
@@ -109,10 +110,15 @@ async function inStore<T>(
     : runInTenantContext(storeId, () => fn(repo.db, repo));
 }
 
-/** The store's CI-sharing switch: a platform (`stores`) row, read in a short Postgres scope for either backend. */
+/**
+ * The store's CI-sharing switch, read through the store's backend like every other CI read (`inStore`): a DO store answers from
+ * its `db.store` delegate (D1 for the column the DO does not hold), a Postgres store keeps its tenant scope. It was a bare
+ * `runInTenantContext(storeId, () => prisma.store...)`, which opens a Postgres transaction and so threw `PostgresRemovedError`
+ * on the Worker for every CI event that carried a store (Ruling NZ-D23).
+ */
 async function readCiSharing(storeId: string): Promise<{ ciSharing: boolean } | null> {
-  return runInTenantContext(storeId, () =>
-    prisma.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } })
+  return inStore(storeId, db =>
+    db.store.findFirst({ where: { id: storeId }, select: { ciSharing: true } })
   );
 }
 
@@ -307,31 +313,23 @@ export const prismaCiSource: CiSource = {
   },
 
   async storeSetup(storeId) {
-    const s = await runInTenantContext(storeId, () =>
-      prisma.store.findFirst({
+    const s = await inStore(storeId, db =>
+      db.store.findFirst({
         where: { id: storeId },
         select: { template: true, ciSharing: true, ownerId: true },
       })
     );
     if (!s) return null;
-    // `users` rows are visible only under their own user context (strict RLS), never the store's.
-    const owner = await withUser(s.ownerId, tx =>
-      tx.user.findFirst({ where: { id: s.ownerId }, select: { createdAt: true } })
-    );
+    // The owner's signup instant lives in the identity service (`ebda-accounts`), not in a Postgres `users` row.
+    const [owner] = s.ownerId ? await getAccountsBrief([s.ownerId]) : [];
     return {
-      ownerSignupAt: owner?.createdAt ?? null,
+      ownerSignupAt: owner?.createdAt ? new Date(owner.createdAt) : null,
       template: s.template ? String(s.template) : null,
       ciSharing: s.ciSharing ?? false,
     };
   },
 
   async storeCiSharing(storeId) {
-    return runInTenantContext(storeId, async () => {
-      const s = await prisma.store.findFirst({
-        where: { id: storeId },
-        select: { ciSharing: true },
-      });
-      return s?.ciSharing ?? false;
-    });
+    return (await readCiSharing(storeId))?.ciSharing ?? false;
   },
 };

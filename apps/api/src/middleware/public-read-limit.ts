@@ -77,7 +77,9 @@ export function publicReadLimit(exactLimiters: RequestHandler): RequestHandler {
       .then(storeId => {
         if (!storeId) return exactLimiters(req, res, next);
         return Promise.all([
-          ipLimiter.limit({ key: publicIpKey(req) }),
+          // No client address (a storefront render with no shopper, Ruling RL-SSR-IP-6): no per-address bucket,
+          // rather than one shared `noip` bucket for every such render; the per-store bucket still counts.
+          req.ip ? ipLimiter.limit({ key: publicIpKey(req) }) : Promise.resolve({ success: true }),
           tenantLimiter.limit({ key: `t:${storeId}` }),
         ]).then(([ip, tenant]) => {
           if (ip.success && tenant.success) return next();

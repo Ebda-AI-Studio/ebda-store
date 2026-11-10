@@ -108,8 +108,8 @@ const ROWS: readonly RowDef[] = [
     group: 'strength',
     label: { ar: 'الدفع والشحن في مصر', en: 'Payments and shipping in Egypt' },
     ebda: {
-      ar: 'الدفع عند الاستلام، وإنستا باي، وPaymob وKashier وFawryPay، وشحن مع بوسطة وShipBlu ومايلرز وأرامكس.',
-      en: 'Cash on delivery, InstaPay, Paymob, Kashier, FawryPay, and shipping with Bosta, ShipBlu, Mylerz and Aramex.',
+      ar: 'الدفع عند الاستلام وإنستاباي من أول يوم، وPaymob وKashier وFawryPay بحسابك إنت، وشحن مع بوسطة وShipBlu ومايلرز وأرامكس.',
+      en: 'Cash on delivery and InstaPay from day one, Paymob, Kashier and FawryPay with your own account, and shipping with Bosta, ShipBlu, Mylerz and Aramex.',
     },
   },
   {

@@ -1,5 +1,6 @@
 /**
- * SEO language guard (UX:SEO-4, QA P2-1): Arabic text must not land in an English field. The AI sometimes answers
+ * SEO language guard (UX:SEO-4, QA P2-1): Arabic text must not land in an English field (Arabic text = more than
+ * half its letters Arabic, `isMostlyArabic`; an English title naming the brand in Arabic is English). The AI sometimes answers
  * with the languages swapped, and a merchant can paste Arabic into the English title. Search results then show the
  * wrong language to the wrong visitors, so the page swaps what is clearly swapped and refuses the rest, naming
  * the fields.
@@ -11,20 +12,41 @@ export function hasArabicScript(value: string): boolean {
   return ARABIC_SCRIPT.test(value);
 }
 
+const LETTER = /\p{L}/gu;
+const ARABIC_LETTER = /\p{Script=Arabic}/u;
+
+/**
+ * Is this text written in Arabic, rather than English that NAMES something Arabic? (PR #512 review.) The rule:
+ * more than half of its LETTERS are Arabic script. Digits, spaces and punctuation do not count either way.
+ * "Qamar | قمر — Dresses" (3 Arabic letters of 15) is an English title with the brand's Arabic name and is kept;
+ * "متجر الأمل Amal" (9 of 13) is Arabic in the wrong field. Text with no letters at all is not Arabic.
+ */
+export function isMostlyArabic(value: string): boolean {
+  const letters = value.match(LETTER) ?? [];
+  if (letters.length === 0) return false;
+  const arabic = letters.filter(ch => ARABIC_LETTER.test(ch)).length;
+  return arabic * 2 > letters.length;
+}
+
 /** The English-language fields of the SEO form (each has an Arabic twin). */
 export const ENGLISH_SEO_FIELDS = ['metaTitle', 'metaDescription', 'metaDescriptionAeo'] as const;
 export type EnglishSeoField = (typeof ENGLISH_SEO_FIELDS)[number];
 
-/** English fields that contain Arabic letters, in form order. Empty = the form is fine. */
+/**
+ * English fields written in Arabic (`isMostlyArabic`), in form order. Empty = the form is fine. An English title that
+ * only names the brand in Arabic is English and passes.
+ */
 export function arabicInEnglishFields(
   values: Partial<Record<EnglishSeoField, string>>
 ): EnglishSeoField[] {
-  return ENGLISH_SEO_FIELDS.filter(key => hasArabicScript(values[key] ?? ''));
+  return ENGLISH_SEO_FIELDS.filter(key => isMostlyArabic(values[key] ?? ''));
 }
 
 /**
- * One English/Arabic pair from the AI. Arabic in the English slot with a non-Arabic Arabic slot = swapped, so swap
- * them back. Anything still on the wrong side after that is dropped (empty) rather than saved in the wrong language.
+ * One English/Arabic pair from the AI. An English slot written in Arabic (`isMostlyArabic`) next to an Arabic slot
+ * that is not = swapped, so swap them back. Anything still on the wrong side after that is dropped (empty) rather
+ * than saved in the wrong language: an English slot that is still mostly Arabic, or an Arabic slot with no Arabic
+ * at all. An English title that carries the brand's Arabic name is English and is kept whole.
  */
 export function normalizeLanguagePair(
   en: string,
@@ -33,11 +55,11 @@ export function normalizeLanguagePair(
   let a = en.trim();
   let b = ar.trim();
   let swapped = false;
-  if (hasArabicScript(a) && !hasArabicScript(b)) {
+  if (isMostlyArabic(a) && !isMostlyArabic(b)) {
     [a, b] = [b, a];
     swapped = true;
   }
-  if (hasArabicScript(a)) a = '';
+  if (isMostlyArabic(a)) a = '';
   if (b !== '' && !hasArabicScript(b)) b = '';
   return { en: a, ar: b, swapped };
 }

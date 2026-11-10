@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * S2 (2026-10-14): the floating widget's custom button link was the one
  * merchant `<a href>` that reached the page with no scheme check — the API
@@ -5,7 +6,9 @@
  * verbatim, so a stored `javascript:` href ran on a visitor's click. Both the
  * dedicated route and the generic `PUT /stores/:id` settings blob could write it.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { createElement } from 'react';
+import { render, cleanup } from '@testing-library/react';
 import { readFileSync } from 'fs';
 import path from 'path';
 import {
@@ -79,12 +82,37 @@ describe('wiring (static)', () => {
     const src = read('apps/api/src/routes/store.routes.ts');
     expect(src).toContain('floatingWidgetLinkIssues(settings)');
   });
+});
 
-  it('the storefront widget sanitizes the custom href at render', () => {
-    const src = read('apps/web/src/templates/shared/FloatingWidget.tsx');
-    const i = src.indexOf("case 'custom'");
-    expect(i).toBeGreaterThan(-1);
-    expect(src.slice(i, i + 300)).toContain('sanitizeUrl(b.customHref');
-    expect(src).not.toMatch(/return b\.customHref/);
+afterEach(cleanup);
+
+describe('the storefront widget sanitizes the custom href at render', () => {
+  const html = async (customHref: string) => {
+    const { FloatingWidget } = await import('../../apps/web/src/templates/shared/FloatingWidget');
+    const { container } = render(
+      createElement(FloatingWidget, {
+        isRtl: false,
+        theme: undefined,
+        config: {
+          enabled: true,
+          startExpanded: true,
+          buttons: [{ id: 'c1', kind: 'custom', customHref }],
+        } as never,
+      })
+    );
+    return container.innerHTML;
+  };
+
+  it.each(['javascript:alert(1)', ' JaVaScRiPt:alert(1)', 'data:text/html,<b>x</b>'])(
+    'never emits %s as an href',
+    async bad => {
+      const out = await html(bad);
+      expect(out).not.toMatch(/href="\s*(javascript|data):/i);
+      expect(out.toLowerCase()).not.toContain('javascript:');
+    }
+  );
+
+  it('keeps a safe https custom link (control)', async () => {
+    expect(await html('https://example.com/x')).toContain('href="https://example.com/x"');
   });
 });
