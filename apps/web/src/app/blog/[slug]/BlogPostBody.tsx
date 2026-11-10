@@ -40,7 +40,10 @@ export async function fetchPost(storeId: string, slug: string): Promise<BlogDeta
   // Confirmed against production 2026-09-13: the admin path 401s
   // unauthenticated while the public path returns a clean 404. No blog post
   // has ever existed in production (0 rows), so no reader met it.
+  // `X-Store-ID` (LAUNCH-RL-MISS-3): the API's store-miss limiter leaves a dead blog link uncounted only when the
+  // store was verified from this header and it equals the path id; without it every 404 here is a counted miss.
   const res = await fetch(`${API_URL}/public/${storeId}/blog/${encodeURIComponent(slug)}`, {
+    headers: { 'X-Store-ID': storeId },
     next: { revalidate: 60 },
   });
   if (res.status === 404) return null; // definitive miss → caller resolves redirect / 404s

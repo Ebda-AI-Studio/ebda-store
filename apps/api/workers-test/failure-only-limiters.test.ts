@@ -13,6 +13,14 @@
  *     the counter holds exactly 20, another IP is unaffected.
  *  2b. normal browsing of a real store is not a miss: an unedited policy page (200, `page: null`) and a slug with no
  *     redirect (200, `toSlug: null`) leave the counter at 0; the same page on an unknown store id is a counted 404.
+ *  2c. LAUNCH-RL-MISS-3: a dead product or blog link inside a store the resolver verified is not a miss. 25 dead product
+ *     links on the real store from one IP are all 404 with the counter at 0; a blog post 404 is uncounted only when the
+ *     verified store is the path store. The product 404 says nothing: a draft, another store's product and one that never
+ *     existed answer the same bytes (the blog twin of that pin is tests/unit/blog-post-miss-body.test.ts: the fixture
+ *     store has no blog).
+ *  2d. the walk: every public row of `route-table.json` is called on a store id that does not exist (every 404 is counted)
+ *     and on the real store (a 404 is uncounted only on the two routes of `CATALOGUE_MISS_ROUTES`; nothing that is not a
+ *     404 is ever written). Every public route must be classified below, so a new one fails the walk until it is.
  *  3. the IP-wide sign-in limiter (`rl:auth-ip-fail`, give-back kind): successful sign-ins leave its counter at 0, failed ones
  *     are counted.
  *
@@ -27,6 +35,8 @@ import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { authState } from './helpers';
+import { CATALOGUE_MISS_ROUTES } from '../src/middleware/catalogue-miss';
+import ALL_ROUTES from './route-table.json';
 
 const e = env as unknown as {
   API: { fetch(u: string, i?: RequestInit): Promise<Response> };
@@ -62,6 +72,88 @@ const PW = 'Passw0rd!xyz';
 // bcrypt cost 4 of PW (test fixture only)
 const HASH = '$2b$04$jYDlZaJj/X/kmBmzPXDwsOP4.aIZ2IBm.rDUDGyiC8iKKUZPb/Rzm';
 const MISS_MAX = 20;
+// fixture products: one live and one DRAFT in the store, one live in ANOTHER store
+const P_LIVE = 'a1a1a1a1-0000-4000-8000-000000000001';
+const P_DRAFT = 'a1a1a1a1-0000-4000-8000-000000000002';
+const P_OTHER = 'b2b2b2b2-0000-4000-8000-000000000001';
+const NO_SUCH_ID = '00000000-0000-4000-8000-00000000dead';
+
+/** Every route the public limiters sit in front of, from the generated route table. */
+const PUBLIC_ROUTES = (ALL_ROUTES as string[]).filter(r => /^[A-Z]+ \/public(\/|$)/.test(r));
+/**
+ * LAUNCH-RL-MISS-3: the public routes whose 404 is a counted miss on ANY store, verified or not. With the two routes of
+ * `CATALOGUE_MISS_ROUTES` this must be the whole public route table: a new public route is counted by the limiter with no
+ * change, and it is added HERE (counted) unless a ruling puts it on the catalogue-miss list.
+ */
+const COUNTED_ON_ANY_STORE = [
+  'DELETE /public/cart',
+  'DELETE /public/cart/bundles/:cartBundleId',
+  'DELETE /public/cart/items/:itemId',
+  'GET /public/:storeId/affiliates/track',
+  'GET /public/:storeId/blog',
+  'GET /public/:storeId/cart/recommendations',
+  'GET /public/:storeId/locations',
+  'GET /public/:storeId/loyalty/info',
+  'GET /public/:storeId/loyalty/my-points',
+  'GET /public/:storeId/loyalty/my-transactions',
+  'GET /public/:storeId/pages/:slug',
+  'GET /public/:storeId/products/:productId/recommendations',
+  'GET /public/:storeId/search/suggest',
+  'GET /public/:storeId/wishlist/:userId',
+  'GET /public/campaigns/unsubscribe',
+  'GET /public/cart',
+  'GET /public/cart/whatsapp-optin',
+  'GET /public/categories',
+  'GET /public/customers/me/reorder',
+  'GET /public/feed/products.json',
+  'GET /public/health',
+  'GET /public/lifecycle-emails/unsubscribe',
+  'GET /public/orders',
+  'GET /public/orders/:id',
+  'GET /public/orders/:id/invoice',
+  'GET /public/products',
+  'GET /public/qr/scan',
+  'GET /public/redirects/resolve',
+  'GET /public/reviews/can-submit',
+  'GET /public/size-charts',
+  'GET /public/sms-consent/unsubscribe',
+  'GET /public/store/resolve',
+  'GET /public/stores',
+  'GET /public/stores/:slugOrId',
+  'GET /public/stores/:storeId/builder-preview',
+  'GET /public/stores/:storeId/layout',
+  'GET /public/stores/:storeId/pages/:kind',
+  'GET /public/stores/:storeId/testimonials',
+  'GET /public/tags',
+  'GET /public/wholesale/products',
+  'GET /public/wholesale/products/:slug',
+  'GET /public/wholesale/status',
+  'POST /public/:storeId/affiliates/apply',
+  'POST /public/:storeId/loyalty/join',
+  'POST /public/:storeId/push/subscribe',
+  'POST /public/:storeId/push/unsubscribe',
+  'POST /public/:storeId/views',
+  'POST /public/campaigns/unsubscribe',
+  'POST /public/cart/acknowledge-prices',
+  'POST /public/cart/bundles',
+  'POST /public/cart/email-optin',
+  'POST /public/cart/items',
+  'POST /public/cart/restore',
+  'POST /public/cart/sync',
+  'POST /public/cart/whatsapp-optin',
+  'POST /public/contact',
+  'POST /public/contact/enquiry',
+  'POST /public/lifecycle-emails/unsubscribe',
+  'POST /public/newsletter/subscribe',
+  'POST /public/orders',
+  'POST /public/orders/:id/verify-payment',
+  'POST /public/orders/quote',
+  'POST /public/pricing/resolve',
+  'POST /public/reviews/submit',
+  'POST /public/sms-consent/unsubscribe',
+  'POST /public/wholesale/apply',
+  'PUT /public/cart/items/:itemId',
+];
 
 const call = (
   path: string,
@@ -90,8 +182,9 @@ async function settled(key: string, want: number): Promise<number> {
 
 describe.skipIf(e.E2E_DB === '1')('failures-only limiters on workerd (LAUNCH-RL-MISS)', () => {
   let storeId = '';
+  let otherStoreId = '';
 
-  it('fixture: a DO store with one product and a verified shopper', async () => {
+  it('fixture: a DO store with a live and a draft product, a second store, and a verified shopper', async () => {
     await applyD1Migrations(e.PLATFORM_DB as never, e.TEST_PLATFORM_MIGRATIONS as never);
     for (const p of DEFAULT_PLAN_SEEDS)
       await e.PLATFORM_DB.prepare(
@@ -125,30 +218,46 @@ describe.skipIf(e.E2E_DB === '1')('failures-only limiters on workerd (LAUNCH-RL-
     });
     expect(created.status).toBe(200);
     storeId = ((await created.json()) as { id: string }).id;
-    const now = Date.now();
-    const seeded = await e.API.fetch(`${BASE}/internal/store-do/${storeId}/seed`, {
+    const createdOther = await e.API.fetch('https://api.ebda.app/__dev/create-store', {
       method: 'POST',
-      headers: {
-        authorization: 'Bearer workers-test-seed-token',
-        'content-type': 'application/json',
-      },
       body: JSON.stringify({
-        products: [
-          {
-            id: crypto.randomUUID(),
-            storeId,
-            name: 'P',
-            slug: 'rl-miss-p1',
-            price: 5000,
-            inventory: 10,
-            status: 'active',
-            createdAt: now,
-            updatedAt: now,
-          },
-        ],
+        ownerId: 'owner-rl-miss-b',
+        name: 'Other Shop',
+        slug: 'rl-miss-other',
+        operator: true,
       }),
     });
+    expect(createdOther.status).toBe(200);
+    otherStoreId = ((await createdOther.json()) as { id: string }).id;
+    const now = Date.now();
+    const seed = (store: string, products: Array<{ id: string; slug: string; status: string }>) =>
+      e.API.fetch(`${BASE}/internal/store-do/${store}/seed`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer workers-test-seed-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          products: products.map(p => ({
+            ...p,
+            storeId: store,
+            name: 'P',
+            price: 5000,
+            inventory: 10,
+            createdAt: now,
+            updatedAt: now,
+          })),
+        }),
+      });
+    const seeded = await seed(storeId, [
+      { id: P_LIVE, slug: 'rl-miss-p1', status: 'active' },
+      { id: P_DRAFT, slug: 'rl-miss-draft', status: 'draft' },
+    ]);
     expect(seeded.status).toBe(200);
+    const seededOther = await seed(otherStoreId, [
+      { id: P_OTHER, slug: 'rl-miss-b1', status: 'active' },
+    ]);
+    expect(seededOther.status).toBe(200);
 
     const sha = async (t: string) =>
       [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))]
@@ -279,6 +388,151 @@ describe.skipIf(e.E2E_DB === '1')('failures-only limiters on workerd (LAUNCH-RL-
     expect(((await unresolved.json()) as { error: { code: string } }).error.code).toBe(
       'STORE_NOT_RESOLVED'
     );
+  });
+
+  // LAUNCH-RL-MISS-3: a dead product link on a store that exists is not store probing. Before it, 20 of these from one IP
+  // (a shopper behind a carrier NAT, or the storefront's own server render) got the whole public router refused.
+  it('store-miss: 25 dead product links on a real store from one IP are all 404, never counted, never refused', async () => {
+    const ip = '192.0.2.20';
+    const key = `rl:store-miss:${ip}`;
+    const seen: string[] = [];
+    for (let i = 0; i < 25; i++) {
+      const res = await call(`/public/products/dead-link-${i}`, ip, {
+        headers: { 'x-store-id': storeId },
+      });
+      await res.text();
+      seen.push(`${res.status}:${res.headers.get('ratelimit-remaining')}`);
+    }
+    expect(seen).toEqual(Array.from({ length: 25 }, () => `404:${MISS_MAX}`));
+    await new Promise(r => setTimeout(r, 500));
+    expect(await counter(key)).toBe(0);
+    // the same caller, the same route, no verified store: the route never answers a 404 at all (the store is refused first)
+    for (const headers of [{ 'x-store-id': crypto.randomUUID() }, {}] as Record<string, string>[]) {
+      const res = await call('/public/products/dead-link-0', ip, { headers });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+        'STORE_NOT_RESOLVED'
+      );
+    }
+    // and this IP's budget is live: a store slug that does not exist is the first counted miss
+    expect((await call('/public/stores/no-such-store-x', ip)).status).toBe(404);
+    expect(await settled(key, 1)).toBe(1);
+  });
+
+  it('product by slug or id: a draft, another store’s product and one that never existed answer the same 404, byte for byte', async () => {
+    const ip = '192.0.2.21';
+    const get = async (ref: string, store = storeId) => {
+      const res = await call(`/public/products/${ref}`, ip, { headers: { 'x-store-id': store } });
+      return { status: res.status, type: res.headers.get('content-type'), body: await res.text() };
+    };
+    // controls: each product is real and served to its own store, by slug and by id
+    expect((await get('rl-miss-p1')).status).toBe(200);
+    expect((await get(P_LIVE)).status).toBe(200);
+    expect((await get('rl-miss-b1', otherStoreId)).status).toBe(200);
+    expect((await get(P_OTHER, otherStoreId)).status).toBe(200);
+
+    const never = await get('never-existed');
+    expect(never.status).toBe(404);
+    expect(JSON.parse(never.body)).toMatchObject({ success: false, error: { code: 'NOT_FOUND' } });
+    for (const ref of ['rl-miss-draft', P_DRAFT, 'rl-miss-b1', P_OTHER, NO_SUCH_ID])
+      expect(await get(ref), ref).toEqual(never);
+    // six dead links inside a verified store: none is a miss
+    await new Promise(r => setTimeout(r, 500));
+    expect(await counter(`rl:store-miss:${ip}`)).toBe(0);
+  });
+
+  it('blog post: a 404 is uncounted only when the verified store is the path store', async () => {
+    const ip = '192.0.2.22';
+    const key = `rl:store-miss:${ip}`;
+    const dead = async (pathStore: string, headers: Record<string, string>) => {
+      const res = await call(`/public/${pathStore}/blog/dead-post`, ip, { headers });
+      await res.text();
+      return res.status;
+    };
+    expect(await dead(storeId, { 'x-store-id': storeId })).toBe(404);
+    await new Promise(r => setTimeout(r, 500));
+    expect(await counter(key)).toBe(0);
+    // verified one store, asked about another (a real one): counted
+    expect(await dead(otherStoreId, { 'x-store-id': storeId })).toBe(404);
+    expect(await settled(key, 1)).toBe(1);
+    // a well-formed id of a real store in the path is not proof: counted
+    expect(await dead(storeId, {})).toBe(404);
+    expect(await settled(key, 2)).toBe(2);
+  });
+
+  describe('the public route table, walked (LAUNCH-RL-MISS-3)', () => {
+    const fill = (route: string, store: string) =>
+      route
+        .replace(/^[A-Z]+ /, '')
+        .replace(/:storeId/g, store)
+        .replace(/:(slug|slugOrId|kind)\b/g, 'dead-link')
+        .replace(/:[A-Za-z]+/g, NO_SUCH_ID);
+    /** One request per public route, each from its own IP, then the miss counter of each IP. */
+    async function walk(store: string, net: string) {
+      const rows: Array<{ route: string; key: string; status: number; counted: number }> = [];
+      for (const [i, route] of [...PUBLIC_ROUTES, 'GET /public/no-such-route'].entries()) {
+        const method = route.split(' ')[0];
+        const ip = `${net}.${i + 1}`;
+        const res = await call(fill(route, store), ip, {
+          method,
+          headers: { 'x-store-id': store },
+          ...(method === 'GET' ? {} : { body: '{}' }),
+          signal: AbortSignal.timeout(20_000),
+        });
+        await res.text();
+        rows.push({ route, key: `rl:store-miss:${ip}`, status: res.status, counted: 0 });
+      }
+      // the count is written after the response: give a wrong write time to land, and wait for each expected one
+      await new Promise(r => setTimeout(r, 500));
+      for (const row of rows)
+        row.counted = row.status === 404 ? await settled(row.key, 1) : await counter(row.key);
+      return rows;
+    }
+    const table = (rows: Array<{ route: string; status: number; counted: number }>) =>
+      rows.map(r => `${r.status} counted=${r.counted} ${r.route}`).join('\n');
+
+    it('every public route is classified: counted on any store, or on the catalogue-miss list', () => {
+      expect(PUBLIC_ROUTES.length).toBeGreaterThan(60);
+      expect([...COUNTED_ON_ANY_STORE, ...CATALOGUE_MISS_ROUTES].sort()).toEqual(
+        [...PUBLIC_ROUTES].sort()
+      );
+    });
+
+    it('a store id that does not exist: every 404 of every public route is a counted miss', async () => {
+      const rows = await walk(crypto.randomUUID(), '198.51.100');
+      for (const r of rows) {
+        expect(r.status, r.route).not.toBe(429);
+        expect(r.counted, `${r.status} ${r.route}\n${table(rows)}`).toBe(r.status === 404 ? 1 : 0);
+      }
+      const missed = rows.filter(r => r.status === 404).map(r => r.route);
+      // not vacuous: the two catalogue routes and an unmatched path are among the counted 404s
+      expect(missed).toEqual(
+        expect.arrayContaining(['GET /public/:storeId/blog/:slug', 'GET /public/no-such-route'])
+      );
+      expect(missed.length).toBeGreaterThan(20);
+    }, 180_000);
+
+    it('the real store: a 404 is uncounted only on the catalogue-miss routes, and nothing else is ever written', async () => {
+      const rows = await walk(storeId, '203.0.113');
+      const exempt = new Set<string>(CATALOGUE_MISS_ROUTES);
+      for (const r of rows) {
+        expect(r.status, r.route).not.toBe(429);
+        const want = r.status === 404 && !exempt.has(r.route) ? 1 : 0;
+        expect(r.counted, `${r.status} ${r.route}\n${table(rows)}`).toBe(want);
+      }
+      // not vacuous: both catalogue routes answered 404 (uncounted above), and in-store 404s elsewhere were counted
+      for (const route of CATALOGUE_MISS_ROUTES)
+        expect(rows.find(r => r.route === route)?.status, route).toBe(404);
+      const countedHere = rows.filter(r => r.counted === 1).map(r => r.route);
+      expect(countedHere).toEqual(
+        expect.arrayContaining([
+          'GET /public/no-such-route',
+          'GET /public/stores/:slugOrId', // a store slug that does not exist, asked with a real store's header
+          'GET /public/orders/:id', // an order id that does not exist: never a free guess
+          'GET /public/:storeId/locations',
+        ])
+      );
+    }, 180_000);
   });
 
   it('sign-in: successful sign-ins from one IP leave the IP-wide failure budget untouched, failed ones are counted', async () => {
