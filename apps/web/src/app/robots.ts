@@ -2,25 +2,28 @@ import type { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
 import { API_URL } from '../lib/api';
 import { getSiteUrl } from '../lib/structured-data';
+import { hideTags, hidesFromSearch } from '../lib/hide-from-search';
 
 const DEMO_PRIVATE_PATHS = ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'];
 
 /**
- * Whether the store that owns this host is the demo showroom (`isDemo`, Ruling B1-14). Asks the
+ * Whether the store that owns this host must stay out of search: the demo showroom (`isDemo`, Ruling B1-14) or a store whose merchant switched on "hide from search engines". Asks the
  * same `/public/store/resolve` the storefront resolves with (plan amendment C14). Any failure to
  * ask answers "no": robots.txt then stays what it was, and the page's own `noindex` meta (root
  * metadata) still covers the showroom.
  */
-async function isDemoHost(storeHost: string): Promise<boolean> {
+async function isHiddenHost(storeHost: string): Promise<boolean> {
   if (!storeHost) return false;
   try {
     const res = await fetch(`${API_URL}/public/store/resolve`, {
-      next: { revalidate: 3600 },
+      // Tagged so the merchant's "hide from search engines" toggle (purge of `store-domain:<host>`) reaches it at once.
+      next: { revalidate: 3600, tags: hideTags(storeHost) },
       headers: { 'Content-Type': 'application/json', 'x-store-domain': storeHost },
     });
     if (!res.ok) return false;
     const data = await res.json();
-    return data?.data?.store?.isDemo === true;
+    const store = data?.data?.store;
+    return store?.isDemo === true || hidesFromSearch(store);
   } catch {
     return false;
   }
@@ -44,7 +47,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   const host = h.get('host')?.toLowerCase();
   const base = host ? `https://${host}` : getSiteUrl();
 
-  if (await isDemoHost(h.get('x-store-domain')?.toLowerCase() ?? '')) {
+  if (await isHiddenHost(h.get('x-store-domain')?.toLowerCase() ?? '')) {
     // Crawlable on purpose: a `Disallow: /` would stop crawlers reading the page's own `noindex`
     // meta, so an externally linked URL could still be indexed URL-only. No sitemap is advertised.
     return { rules: [{ userAgent: '*', allow: '/', disallow: DEMO_PRIVATE_PATHS }] };

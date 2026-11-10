@@ -375,6 +375,9 @@ const seoSchema = z
     twitterHandle: optionalStr(50),
     googleSiteVerification: optionalGoogleVerification,
     emailSenderLocalPart: optionalEmailLocalPart,
+    // "Hide my store from search engines": stored as `store.settings.hideFromSearchEngines` (no column, so no
+    // store-resolver / DO-schema change) and exposed to the storefront through PUBLIC_SETTINGS_KEYS.
+    hideFromSearchEngines: z.boolean().optional(),
   })
   .strip();
 
@@ -1278,12 +1281,21 @@ router.get(
           twitterHandle: true,
           googleSiteVerification: true,
           emailSenderLocalPart: true,
+          settings: true,
         },
       });
 
       if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
 
-      res.json({ success: true, data: toSafeStoreResponse(store) });
+      const { settings, ...seoFields } = store;
+      res.json({
+        success: true,
+        data: toSafeStoreResponse({
+          ...seoFields,
+          hideFromSearchEngines:
+            (settings as Record<string, unknown> | null)?.hideFromSearchEngines === true,
+        }),
+      });
     } catch (error) {
       next(error);
     }

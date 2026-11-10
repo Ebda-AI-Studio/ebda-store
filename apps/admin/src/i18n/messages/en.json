@@ -2274,6 +2274,11 @@
       "on": "ON",
       "off": "OFF"
     },
+    "hideFromSearchChip": {
+      "label": "On Google:",
+      "visible": "Visible",
+      "hidden": "Hidden"
+    },
     "settingsSearch": {
       "placeholder": "Search settings...",
       "noResults": "No settings found"
@@ -5438,6 +5443,11 @@
       "twitterHandle": "Twitter / X Handle",
       "twitterPlaceholder": "yourstorehandle",
       "googleSiteVerification": "Google Search Console verification (custom domain only)",
+      "hideFromSearchTitle": "Hide my store from search engines",
+      "hideFromSearchLabel": "Keep my store out of Google and other search engines",
+      "hideFromSearchHint": "Turn this on while you are still preparing your store. Customers with the link can still browse, add to cart and check out, but search engines are asked not to list any page, and your sitemap is emptied. Turn it off when you are ready to launch. Search engines can take days to drop or re-add pages after you change it.",
+      "hideFromSearchOn": "Hidden: search engines are asked not to list your store.",
+      "hideFromSearchOff": "Visible: search engines may list your store.",
       "googleSiteVerificationPlaceholder": "Paste the meta tag or just the token",
       "googleSiteVerificationHint": "Your store is already verified on ebda.app — you only need this once you connect a custom domain (e.g. yourstore.com).\n1. Open Google Search Console and add your custom domain as a URL-prefix property.\n2. Pick the \"HTML tag\" verification method.\n3. Paste the whole meta tag (or just the content token) here and save.\n4. Click Verify in Search Console — your storefront will already be serving the tag.",
       "successMessage": "Search settings saved",

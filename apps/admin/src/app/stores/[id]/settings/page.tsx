@@ -58,6 +58,40 @@ function AiAutopilotChip({ storeId }: { storeId: string }) {
   );
 }
 
+/** Discoverability status-chip: "hide from search engines" lives on the SEO page, so its state shows on the SEO card. */
+function HideFromSearchChip({ storeId }: { storeId: string }) {
+  const t = useT('settings');
+  const [hidden, setHidden] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!storeId) return;
+    apiGet<{ hideFromSearchEngines?: boolean }>(`/api/v1/stores/${storeId}/seo`)
+      .then(({ data }) => {
+        if (data) setHidden(data.hideFromSearchEngines === true);
+      })
+      .catch(() => {
+        // Silent: the chip does not render on error
+      });
+  }, [storeId]);
+
+  if (hidden === null) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5" data-testid="hide-from-search-chip">
+      <span
+        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+          hidden
+            ? 'bg-warning/10 text-warning-ink border-warning/30'
+            : 'bg-muted text-muted-ink border-border'
+        }`}
+      >
+        {t('hideFromSearchChip.label')}{' '}
+        <strong>{hidden ? t('hideFromSearchChip.hidden') : t('hideFromSearchChip.visible')}</strong>
+      </span>
+    </div>
+  );
+}
+
 interface SettingsCard {
   /** Translation key under `settings.cards` (e.g. `branding`). */
   key: string;
@@ -545,6 +579,7 @@ export default function StoreSettingsPage() {
                         {tCards(`${card.key}.description`)}
                       </p>
                       {card.key === 'branding' && <AiAutopilotChip storeId={storeId} />}
+                      {card.key === 'seo' && <HideFromSearchChip storeId={storeId} />}
                     </div>
                   </Link>
                 ))}

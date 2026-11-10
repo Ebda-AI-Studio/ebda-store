@@ -3,6 +3,7 @@ import type { ResolvedStore } from './store-resolver';
 import { getSiteUrl, storeAbsoluteUrl } from './structured-data';
 import { pickMetaDescription } from './seo/meta-description';
 import { resolveStoreOgImage } from './seo/og-image';
+import { hidesFromSearch } from './hide-from-search';
 
 /**
  * Storefront `<head>` metadata builder — extracted 2026-07-12 from
@@ -222,7 +223,9 @@ export function buildStorefrontMetadata(
     },
     robots:
       // The demo showroom is never indexed (Ruling B1-14): it is a preview of looks, not a shop.
-      store.status === 'suspended' || store.isDemo
+      // A store the merchant hid from search engines (`hideFromSearchEngines`) is noindex on every page while they
+      // prepare it; cart and checkout still render (this is not maintenance).
+      store.status === 'suspended' || store.isDemo || hidesFromSearch(store)
         ? {
             // Suspended stores render the branded maintenance page on every
             // route — explicitly tell crawlers not to index that as the
