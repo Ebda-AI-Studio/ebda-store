@@ -61,42 +61,42 @@ newer commit's guards and every PR's own guard still check ordering.
 Budget: **50,000 Actions minutes/month** (GitHub Enterprise on the `Ebda-AI-Studio` org; Linux 1x; private-repo
 hosted runners are 2 vCPU).
 
-**Full lane, measured** (run 42820243819, 2026-11-10, hosted `ubuntu-24.04`, wall minutes per job; jobs run in
-parallel after `build`, so the run takes about 40 minutes end to end while billing about 95):
+**Full lane, measured** (run 42827770627, 2026-11-10, the first GREEN full run, hosted `ubuntu-24.04`, wall time
+per job; jobs run in parallel after `build`, so the run takes about 34 minutes end to end while billing about 95):
 
-| Job                       | Wall (measured)                   | Billed (rounded up) |
-| ------------------------- | --------------------------------- | ------------------- |
-| guards                    | 1m06s                             | 2                   |
-| security                  | 1m47s                             | 2                   |
-| api-workerd-smoke (whole) | 4m11s                             | 5                   |
-| workerd-integration       | 1m48s                             | 2                   |
-| build                     | 13m59s                            | 14                  |
-| test-unit                 | 20m+ (coverage step 16m47s)       | 22 (estimate)       |
-| test-integration          | 22m34s                            | 23                  |
-| orphan-tests              | ~2m with `--filesOnly` (estimate) | 3                   |
-| test-e2e                  | 3m48s                             | 4                   |
-| builder-e2e               | ~13m without failures (estimate)  | 15                  |
-| notify-failure            | <1m                               | 1                   |
-| **Full lane**             |                                   | **~93**             |
-| mutation (Sundays only)   | not measured (old estimate)       | 25                  |
+| Job                       | Wall (measured)                                    | Billed (rounded up) |
+| ------------------------- | -------------------------------------------------- | ------------------- |
+| guards                    | 1m32s                                              | 2                   |
+| security                  | 1m45s                                              | 2                   |
+| api-workerd-smoke (whole) | 4m16s                                              | 5                   |
+| workerd-integration       | 2m09s                                              | 3                   |
+| build                     | 9m18s                                              | 10                  |
+| test-unit                 | 20m05s (28m39s in the next green run, 42829048643) | 21-29               |
+| test-integration          | 24m26s                                             | 25                  |
+| orphan-tests              | 1m53s                                              | 2                   |
+| test-e2e                  | 2m19s                                              | 3                   |
+| builder-e2e               | 20m03s                                             | 21                  |
+| notify-failure            | 0m03s                                              | 1                   |
+| **Full lane**             |                                                    | **95**              |
+| mutation (Sundays only)   | not measured                                       | 25 (old estimate)   |
 
 Monthly arithmetic (estimates built on the measured per-run number):
 
 | Item                                      | Calculation        | Minutes   |
 | ----------------------------------------- | ------------------ | --------- |
-| nightly Mon-Sat + Sunday full lane        | 30 x 93            | 2,790     |
+| nightly Mon-Sat + Sunday full lane        | 30 x 95            | 2,850     |
 | Sunday mutation                           | 4.3 x 25           | ~110      |
-| full lane per main push, 60 merges/month  | 60 x 93            | 5,580     |
-| full lane per main push, 351 merges/month | 351 x 93 (ceiling) | 32,640    |
+| full lane per main push, 60 merges/month  | 60 x 95            | 5,700     |
+| full lane per main push, 351 merges/month | 351 x 95 (ceiling) | 33,345    |
 | PR lane + deploys + other workflows       | measured           | see below |
 
 Measured context: the org used **9,050 Actions minutes from 2026-11-05 to 2026-11-10** (billing usage API;
 8,646 of them on ebda-store, 5,120 on 2026-11-09 alone), during the pre-launch merge burst of **351 merged PRs in
 the 30 days to 2026-11-10**. So:
 
-- At a post-launch pace of about 60 merges a month the new lanes add **about 8,500 minutes/month** on top of the PR
+- At a post-launch pace of about 60 merges a month the new lanes add **about 8,700 minutes/month** on top of the PR
   lane and deploys: it fits with wide headroom.
-- At the pre-launch burst rate the per-push full lane alone could reach **about 32,600/month** (ceiling: docs-only
+- At the pre-launch burst rate the per-push full lane alone could reach **about 33,300/month** (ceiling: docs-only
   pushes skip the workflow, and a newer main push cancels the superseded run, so bursts of merges bill one run),
   which together with the PR lane can approach the 50,000 cap. Watch Settings, Billing, Actions usage weekly.
 - Lever if usage trends past 40,000 by mid-month: move the per-push full lane to an hourly cron that runs only when
