@@ -776,7 +776,9 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 20
+    # 40, not 20: on hosted ubuntu-24.04 (2 vCPU) the coverage step alone took 16m47s in run 42820243819 and the
+    # job was cancelled at 20:00 inside the accounts worker tests, with every assertion so far green.
+    timeout-minutes: 40
     needs: [build]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -923,13 +925,19 @@ jobs:
         # positional VALUE and greedily swallows the next arg as the output path)
         # writes ONLY the JSON to that file, keeping it clean of the setup-file
         # console warnings vitest's collection phase prints to stdout.
+        # --filesOnly (2026-11-10, run 42820243819): without it `vitest list` IMPORTS every test file to collect its
+        # tests, which ran past this job's 15 min on hosted ubuntu-24.04 (2,165 files) and the job was cancelled.
+        # --filesOnly lists the files the include globs match without importing them (under a second), a SUPERSET of
+        # the collected set (measured locally: 2,165 vs 1,980, nothing collected that it misses), so it is stricter.
+        # packages/cf-schema, packages/cf-migrate and packages/repo: test-unit runs them; this list had drifted
+        # without them (73 false orphans).
         run: |
           set -euo pipefail
 
-          npx vitest list --json=/tmp/all-tests.json
+          npx vitest list --filesOnly --json=/tmp/all-tests.json
 
-          npx vitest list \
-            tests/unit packages/shared/src packages/database/src packages/ui/src apps/web apps/admin/src apps/orders \
+          npx vitest list --filesOnly \
+            tests/unit packages/shared/src packages/database/src packages/ui/src packages/cf-schema packages/cf-migrate packages/repo apps/web apps/admin/src apps/orders \
             tests/integration apps/api/src \
             tests/e2e \
             --json=/tmp/covered-tests.json
@@ -1437,7 +1445,9 @@ jobs:
       issues: write
     steps:
       - name: Compose + send Telegram alert
-        if: contains(needs.*.result, 'failure')
+        # A job that hits its timeout reports `cancelled` while the run itself is not cancelled (run 42820243819:
+        # three timed-out jobs, notify still ran), so a timeout is red too; a superseded run never gets here.
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
@@ -1473,6 +1483,8 @@ jobs:
             res="${entry#*:}"
             if [ "$res" = "failure" ]; then
               FAILED_JOBS="${FAILED_JOBS}${name}, "
+            elif [ "$res" = "cancelled" ]; then
+              FAILED_JOBS="${FAILED_JOBS}${name} (timed out), "
             fi
           done
           FAILED_JOBS="${FAILED_JOBS%, }"
@@ -1498,7 +1510,7 @@ jobs:
             >/dev/null
           echo "alert sent"
       - name: Open or update the ci-main-red issue
-        if: contains(needs.*.result, 'failure') && github.ref == 'refs/heads/main'
+        if: (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -1518,7 +1530,7 @@ jobs:
           Opened by ci.yml notify-failure (Ruling CI-FULL-MAIN-1). Closed automatically by the next green full run on main."
           fi
       - name: Close the ci-main-red issue on a green full run
-        if: ${{ !contains(needs.*.result, 'failure') && github.ref == 'refs/heads/main' && needs.build.result == 'success' }}
+        if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && github.ref == 'refs/heads/main' && needs.build.result == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

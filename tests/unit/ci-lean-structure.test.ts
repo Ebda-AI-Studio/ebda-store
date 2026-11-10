@@ -243,6 +243,13 @@ describe('ci.yml lanes', () => {
     expect(n.permissions?.issues).toBe('write');
     expect(raw).toMatch(/gh issue create --label ci-main-red/);
     expect(raw).toMatch(/gh issue close "\$num"/);
+    // a job that hits its timeout reports `cancelled` (run 42820243819): that is red too, never "green"
+    expect(raw).toContain(
+      "if: (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && github.ref == 'refs/heads/main'"
+    );
+    expect(raw).toContain(
+      "!contains(needs.*.result, 'cancelled') && github.ref == 'refs/heads/main'"
+    );
     const needs = ([] as string[]).concat(n.needs ?? []);
     for (const j of FULL_LANE.filter(j => j !== 'notify-failure')) expect(needs, j).toContain(j);
   });
