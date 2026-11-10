@@ -44,6 +44,7 @@ describe('siteNavHtml and the service-lines flag', () => {
       expect((html.match(/menu-group/g) ?? []).length).toBeGreaterThanOrEqual(4);
       // coming-soon rows are not links
       expect(html).not.toMatch(/<a [^>]*>[^<]*Ebda Invite/);
+      expect(html).not.toMatch(/<a [^>]*>[^<]*Ebda CRM/);
     }
   );
 });
