@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useFocusMode } from '@/contexts/FocusModeContext';
 import { useT } from '@/i18n/useT';
@@ -34,10 +35,11 @@ export function SidebarFooter({
       {/* Focus Mode Entry — only shown when a store is in scope */}
       {storeId && (
         <div className="px-4 pb-2">
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={() => enterFocusMode(storeId)}
-            className="flex w-full items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="w-full gap-2 text-muted-foreground justify-start"
             title={t('focusMode.focusModeHint')}
           >
             <svg
@@ -59,7 +61,7 @@ export function SidebarFooter({
             <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
               {t('focusMode.ordersOnly')}
             </span>
-          </button>
+          </Button>
           <p className="mt-1.5 px-1 text-xs leading-snug text-muted-foreground">
             {t('focusMode.focusModeHint')}
           </p>
@@ -68,10 +70,12 @@ export function SidebarFooter({
 
       {/* Theme toggle. The language switcher lives in the top bar only (audit G-4: it appeared twice). */}
       <div className="flex items-center justify-end gap-2 px-4 pb-2">
-        <button
+        <Button
+          variant="outline"
+          size="icon"
           type="button"
           onClick={onToggleTheme}
-          className="flex h-11 w-11 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
+          className="justify-center text-muted-foreground"
           aria-label={isDark ? t('switchToLight') : t('switchToDark')}
         >
           {isDark ? (
@@ -105,7 +109,7 @@ export function SidebarFooter({
               />
             </svg>
           )}
-        </button>
+        </Button>
       </div>
 
       {/* User Profile Section */}
@@ -150,10 +154,12 @@ export function SidebarFooter({
               />
             </svg>
           </Link>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             type="button"
             onClick={onLogout}
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            className="justify-center text-muted-foreground hover:text-destructive"
             aria-label={t('logout')}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,7 +170,7 @@ export function SidebarFooter({
                 d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
               />
             </svg>
-          </button>
+          </Button>
         </div>
       </div>
     </>

@@ -7,6 +7,7 @@
  * here first so a 40 MB file never leaves the browser; the API enforces the
  * same limits and sniffs the bytes.
  */
+import { Button } from '@/components/ui/Button';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useT } from '@/i18n/useT';
 import { useImageUpload } from '@/hooks/useImageUpload';
@@ -103,31 +104,34 @@ export function VideoField({
           />
         )}
         <div className="flex flex-col items-start gap-0.5">
-          <button
+          <Button
+            variant="link"
+            size="sm"
             type="button"
             disabled={uploading}
             onClick={() => inputRef.current?.click()}
-            className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
           >
             {uploading ? t('videoUploading') : value ? t('changeVideo') : t('chooseVideo')}
-          </button>
+          </Button>
           {value && bytes !== null && (
             <span className="text-xs text-muted-foreground" data-testid="video-size">
               {t('videoSize', { size: formatMegabytes(bytes) })}
             </span>
           )}
           {value && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               onClick={() => {
                 setBytes(null);
                 setProblem(null);
                 onChange(undefined);
               }}
-              className="text-xs text-muted-foreground hover:underline"
+              className="text-muted-foreground"
             >
               {t('removeVideo')}
-            </button>
+            </Button>
           )}
         </div>
       </div>

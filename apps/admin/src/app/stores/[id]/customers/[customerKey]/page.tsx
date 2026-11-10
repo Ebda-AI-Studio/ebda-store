@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../../lib/api';
 import { useAuth } from '../../../../../lib/auth';

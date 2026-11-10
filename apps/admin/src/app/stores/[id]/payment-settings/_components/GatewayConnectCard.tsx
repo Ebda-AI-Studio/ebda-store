@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
@@ -57,10 +58,8 @@ interface Props {
 
 const inputClass =
   'w-full rounded-lg border border-input bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
-const btnPrimary =
-  'rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50';
-const btnOutline =
-  'rounded-lg border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted disabled:opacity-50';
+const btnPrimary = buttonVariants({ size: 'sm' });
+const btnOutline = buttonVariants({ variant: 'outline', size: 'sm' });
 
 const MODES: readonly CredentialMode[] = ['sandbox', 'live'];
 const TEST_CODES = ['ok', 'bad_credentials', 'wrong_mode', 'incomplete', 'unreachable', 'unknown'];

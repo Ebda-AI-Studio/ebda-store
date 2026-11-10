@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { RateFilter, TaxRate } from './types';
 
+import { Button } from '@/components/ui/Button';
 interface TaxRatesTableProps {
   rates: TaxRate[];
   filter: RateFilter;
@@ -56,15 +57,14 @@ export function TaxRatesTable({
       header: t('columns.status'),
       mobileBadge: true,
       cell: rate => (
-        <button
+        <Button
           type="button"
           onClick={() => onToggle(rate)}
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            rate.isActive ? 'bg-success/10 text-success-ink' : 'bg-muted text-muted-foreground'
-          }`}
+          variant={rate.isActive ? 'soft' : 'ghost'}
+          size="sm"
         >
           {rate.isActive ? t('status.active') : t('status.inactive')}
-        </button>
+        </Button>
       ),
     },
     {
@@ -73,12 +73,14 @@ export function TaxRatesTable({
       mobileActions: true,
       cell: rate => (
         <div className="flex items-center gap-2 md:justify-end">
-          <button
+          <Button
             type="button"
             onClick={() => onEdit(rate)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-primary transition-colors"
             title={t('actions.edit')}
             aria-label={t('actions.edit')}
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -88,13 +90,15 @@ export function TaxRatesTable({
                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
               />
             </svg>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => onDelete(rate)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-destructive transition-colors"
             title={t('actions.delete')}
             aria-label={t('actions.delete')}
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -104,7 +108,7 @@ export function TaxRatesTable({
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
               />
             </svg>
-          </button>
+          </Button>
         </div>
       ),
     },
@@ -132,13 +136,9 @@ export function TaxRatesTable({
         {taxEnabled ? t('empty.enabled') : t('empty.disabled')}
       </p>
       {taxEnabled && (
-        <button
-          type="button"
-          onClick={onAdd}
-          className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
+        <Button type="button" onClick={onAdd} variant="default">
           {t('empty.createFirst')}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -153,11 +153,12 @@ export function TaxRatesTable({
             </h2>
             <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={onAdd}
-            className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
             disabled={!taxEnabled}
+            variant="default"
+            className="gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -168,23 +169,20 @@ export function TaxRatesTable({
               />
             </svg>
             {t('addButton')}
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-wrap gap-2 p-4 bg-muted border-b border-border">
           {FILTERS.map(f => (
-            <button
+            <Button
               type="button"
               key={f}
               onClick={() => onFilterChange(f)}
-              className={`px-4 py-2 min-h-9 rounded-lg text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-card text-foreground hover:bg-muted border border-border'
-              }`}
+              variant={filter === f ? 'soft' : 'outline'}
+              size="sm"
             >
               {t(`filters.${f}`)}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

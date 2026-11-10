@@ -38,6 +38,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
 import { CAMPAIGN_ERROR_KEYS } from '../_components/campaignErrorKeys';
 import { ConfirmDialog } from '../_components/ConfirmDialog';
+import { Button } from '@/components/ui/Button';
 
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
 
@@ -502,13 +503,9 @@ export default function CampaignDetailPage() {
             {/* AI draft */}
             <div className="rounded-md border border-dashed border-border p-3">
               {!showAiBox ? (
-                <button
-                  type="button"
-                  onClick={() => setShowAiBox(true)}
-                  className="text-sm font-medium text-primary hover:underline"
-                >
+                <Button variant="link" size="sm" type="button" onClick={() => setShowAiBox(true)}>
                   {t('aiDraftOpen')}
-                </button>
+                </Button>
               ) : (
                 <div className="space-y-2">
                   <label className="block">
@@ -525,7 +522,9 @@ export default function CampaignDetailPage() {
                   </label>
                   {aiError && <p className="text-xs text-destructive-ink">{aiError}</p>}
                   <div className="flex justify-end gap-2">
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       type="button"
                       onClick={() => {
                         setShowAiBox(false);
@@ -533,20 +532,20 @@ export default function CampaignDetailPage() {
                         setAiError(null);
                       }}
                       disabled={aiLoading}
-                      className="rounded-md border px-3 py-1.5 text-xs"
                     >
                       {tc('cancel')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
                       type="button"
                       onClick={() => void submitAiDraft()}
                       disabled={
                         aiLoading || aiBrief.trim().length < 3 || aiBrief.trim().length > 500
                       }
-                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                     >
                       {aiLoading ? t('aiDraftGenerating') : t('aiDraftGenerate')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -580,13 +579,14 @@ export default function CampaignDetailPage() {
               </label>
               {form.bodyHtml.trim() && (
                 <div>
-                  <button
+                  <Button
+                    variant="link"
+                    size="sm"
                     type="button"
                     onClick={() => setPreviewEn(p => !p)}
-                    className="text-sm font-medium text-primary hover:underline"
                   >
                     {previewEn ? t('previewHide') : t('previewShow')}
-                  </button>
+                  </Button>
                   {previewEn && (
                     <div className="mt-2 overflow-hidden rounded-md border border-border bg-white">
                       <iframe
@@ -631,13 +631,14 @@ export default function CampaignDetailPage() {
               </label>
               {form.bodyHtmlAr.trim() && (
                 <div>
-                  <button
+                  <Button
+                    variant="link"
+                    size="sm"
                     type="button"
                     onClick={() => setPreviewAr(p => !p)}
-                    className="text-sm font-medium text-primary hover:underline"
                   >
                     {previewAr ? t('previewHide') : t('previewShow')}
-                  </button>
+                  </Button>
                   {previewAr && (
                     <div className="mt-2 overflow-hidden rounded-md border border-border bg-white">
                       <iframe
@@ -692,29 +693,33 @@ export default function CampaignDetailPage() {
             {!sendable && <p className="text-xs text-muted-foreground">{t('notSendableHint')}</p>}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-              <button
+              <Button
+                variant="default"
+                size="md"
                 type="button"
                 onClick={() => void save()}
                 disabled={saving || !isDirty}
-                className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
                 {saving ? tc('saving') : tc('save')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="md"
                 type="button"
                 onClick={() => void sendTest()}
                 disabled={testSending || !sendable}
-                className="rounded-md border px-3 py-2 text-sm disabled:opacity-50"
               >
                 {testSending ? t('sendingTest') : t('sendTest')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="md"
+                className="ms-auto border-destructive/40 text-destructive-ink"
                 type="button"
                 onClick={() => setPendingAction('delete')}
-                className="ms-auto rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive-ink hover:bg-destructive/10"
               >
                 {t('deleteDraft')}
-              </button>
+              </Button>
             </div>
 
             {testResult && (
@@ -729,14 +734,15 @@ export default function CampaignDetailPage() {
             {/* Send now / schedule */}
             <div className="rounded-md border border-border p-3 space-y-3">
               <h3 className="text-sm font-semibold">{t('sendHeading')}</h3>
-              <button
+              <Button
+                variant="default"
+                size="md"
                 type="button"
                 onClick={() => setPendingAction('sendNow')}
                 disabled={!sendable}
-                className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
                 {t('sendNow')}
-              </button>
+              </Button>
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="datetime-local"
@@ -744,14 +750,15 @@ export default function CampaignDetailPage() {
                   onChange={e => setScheduleInput(e.target.value)}
                   className="rounded-md border px-3 py-2 text-sm"
                 />
-                <button
+                <Button
+                  variant="outline"
+                  size="md"
                   type="button"
                   onClick={() => setPendingAction('schedule')}
                   disabled={!sendable || !scheduleInput}
-                  className="rounded-md border px-3 py-2 text-sm disabled:opacity-50"
                 >
                   {t('scheduleButton')}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -800,25 +807,29 @@ export default function CampaignDetailPage() {
 
             <div className="flex items-center gap-2 border-t border-border pt-4">
               {(campaign.status === 'scheduled' || campaign.status === 'sending') && (
-                <button
+                <Button
+                  variant="outline"
+                  size="md"
+                  className="border-destructive/40 text-destructive-ink"
                   type="button"
                   onClick={() => setPendingAction('cancel')}
-                  className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive-ink hover:bg-destructive/10"
                 >
                   {tD('cancelCampaign')}
-                </button>
+                </Button>
               )}
               {(campaign.status === 'cancelled' || campaign.status === 'failed') &&
                 (hasSendHistory ? (
                   <p className="text-xs text-muted-foreground">{tD('sendHistoryPermanent')}</p>
                 ) : (
-                  <button
+                  <Button
+                    variant="outline"
+                    size="md"
+                    className="border-destructive/40 text-destructive-ink"
                     type="button"
                     onClick={() => setPendingAction('delete')}
-                    className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive-ink hover:bg-destructive/10"
                   >
                     {tc('delete')}
-                  </button>
+                  </Button>
                 ))}
             </div>
 
@@ -891,7 +902,9 @@ export default function CampaignDetailPage() {
 
               {recipientsCursor && (
                 <div className="mt-3 flex justify-center">
-                  <button
+                  <Button
+                    variant="outline"
+                    size="md"
                     type="button"
                     onClick={() =>
                       void fetchRecipients({
@@ -901,10 +914,9 @@ export default function CampaignDetailPage() {
                       })
                     }
                     disabled={recipientsLoadingMore}
-                    className="rounded-md border px-4 py-2 text-sm hover:bg-muted disabled:opacity-50"
                   >
                     {recipientsLoadingMore ? tc('loading') : tD('loadMore')}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

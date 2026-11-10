@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 
 import { INSTAPAY_DEFAULT_EXPIRY_HOURS, minorToDecimalString, roundToMinor } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 export interface StorePaymentConfig {
   id?: string;
@@ -107,11 +108,7 @@ export function ProviderCard({
               </label>
             </div>
 
-            <button
-              type="button"
-              onClick={onToggleExpanded}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-            >
+            <Button variant="outline" size="sm" type="button" onClick={onToggleExpanded}>
               {t('configure')}
               <svg
                 className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -126,7 +123,7 @@ export function ProviderCard({
                   d="M19 9l-7 7-7-7"
                 />
               </svg>
-            </button>
+            </Button>
           </div>
         }
       </div>
@@ -148,14 +145,9 @@ export function ProviderCard({
           )}
 
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={saving}
-              className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-            >
+            <Button variant="default" size="md" type="button" onClick={onSave} disabled={saving}>
               {saving ? t('saving') : t('save')}
-            </button>
+            </Button>
           </div>
         </div>
       )}

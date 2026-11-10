@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
@@ -88,14 +89,9 @@ export function PackingSlipViewer({ storeId, orderIds }: { storeId: string; orde
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={print}
-          disabled={!html}
-          className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
-        >
+        <Button type="button" onClick={print} disabled={!html}>
           {t('print')}
-        </button>
+        </Button>
       </div>
       {tooMany && (
         <p role="alert" className="text-sm text-destructive-ink">

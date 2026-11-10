@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Input } from '@ebda/ui';
+import { Input } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiPost } from '../../lib/api';
 import { AccountsError, accountsFetch } from '../../lib/accounts';

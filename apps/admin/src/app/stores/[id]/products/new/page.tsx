@@ -29,6 +29,7 @@ type DiscountType = 'none' | 'percentage' | 'fixed';
 interface Category {
   id: string;
   name: string;
+  nameAr?: string | null;
 }
 
 export default function NewProductPage() {
@@ -240,7 +241,10 @@ export default function NewProductPage() {
 
   const categoryOptions = [
     { value: '', label: t('fields.noCategory') },
-    ...categories.map(c => ({ value: c.id, label: c.name })),
+    ...categories.map(c => ({
+      value: c.id,
+      label: uiLocale === 'ar' && c.nameAr ? c.nameAr : c.name,
+    })),
   ];
 
   const nameField = (lang: 'ar' | 'en', required: boolean) =>
@@ -348,6 +352,7 @@ export default function NewProductPage() {
               type="button"
               aria-expanded={showDetails}
               onClick={() => setShowDetails(v => !v)}
+              data-ui="row"
               className="flex min-h-11 w-full items-center justify-between gap-3 p-6 text-start"
             >
               <span>

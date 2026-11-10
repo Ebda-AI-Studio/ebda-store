@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import type { PageMeta } from '@/lib/api';
 import { useT } from '@/i18n/useT';
 
@@ -19,31 +20,33 @@ export function PageControls({
   if (!meta || meta.totalPages <= 1) return null;
   return (
     <div className="mt-4 flex items-center gap-2 text-sm">
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
         disabled={meta.page <= 1}
         onClick={() => onPageChange(meta.page - 1)}
         aria-label={t('previous')}
-        className="px-3 py-1 rounded border border-border disabled:opacity-40"
       >
         <span aria-hidden="true" className="inline-block rtl:rotate-180">
           ←
         </span>
-      </button>
+      </Button>
       <span className="text-muted-foreground">
         {t('pageOf', { page: meta.page, totalPages: meta.totalPages })}
       </span>
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
         disabled={meta.page >= meta.totalPages}
         onClick={() => onPageChange(meta.page + 1)}
         aria-label={t('next')}
-        className="px-3 py-1 rounded border border-border disabled:opacity-40"
       >
         <span aria-hidden="true" className="inline-block rtl:rotate-180">
           →
         </span>
-      </button>
+      </Button>
     </div>
   );
 }

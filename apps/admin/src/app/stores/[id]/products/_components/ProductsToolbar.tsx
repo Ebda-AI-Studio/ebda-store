@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { buttonVariants, cn } from '@ebda/ui';
+import { cn } from '@ebda/ui';
+import { buttonVariants } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useT } from '@/i18n/useT';
 

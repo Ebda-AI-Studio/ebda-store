@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 
@@ -40,13 +41,9 @@ export default function Error({
           {process.env.NODE_ENV === 'development' ? error.message || t('unknown') : t('generic')}
         </p>
         <div className="flex justify-center gap-3">
-          <button
-            type="button"
-            onClick={reset}
-            className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
+          <Button type="button" onClick={reset}>
             {t('retry')}
-          </button>
+          </Button>
           <Link
             href="/"
             className="rounded-lg border border-border px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"

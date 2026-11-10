@@ -9,7 +9,8 @@ import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
 
@@ -368,13 +369,15 @@ export default function StockInventoryPage() {
         {productsErr && (
           <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink flex items-center justify-between gap-4">
             <span title={productsErr}>{t('loadFailed', { error: productsErr })}</span>
-            <button
+            <Button
               type="button"
               onClick={retryProducts}
-              className="shrink-0 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-medium hover:bg-destructive/10 transition-colors"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
             >
               {tc('retry')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -387,13 +390,15 @@ export default function StockInventoryPage() {
                 {activeStockFilter === 'low_stock' ? t('filterLowStock') : t('filterOutOfStock')}
               </span>
             </span>
-            <button
+            <Button
               type="button"
               onClick={() => router.replace(`/stores/${storeId}/stock/inventory`)}
-              className="ms-auto rounded border border-border px-2 py-0.5 hover:bg-muted transition-colors"
+              variant="outline"
+              size="sm"
+              className="ms-auto"
             >
               {t('clearFilter')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -539,17 +544,18 @@ export default function StockInventoryPage() {
                   mobileActions: true,
                   className: 'w-28',
                   cell: p => (
-                    <button
+                    <Button
                       type="button"
                       onClick={() =>
                         router.push(
                           `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.totalInventory ?? p.inventory}`
                         )
                       }
-                      className="text-primary text-xs underline underline-offset-2 hover:opacity-80 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
+                      variant="link"
+                      size="sm"
                     >
                       {t('quickAdjust')}
-                    </button>
+                    </Button>
                   ),
                 },
               ];

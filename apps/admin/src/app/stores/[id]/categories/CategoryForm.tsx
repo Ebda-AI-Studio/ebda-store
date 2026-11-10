@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import { SizeChartSelect, type SizeChartOption } from '../../../../components/SizeChartSelect';
 import { applyAiSeoSuggestion } from '../seo/language-guard';
 
+import { Button } from '@/components/ui/Button';
 interface CategoryFormData {
   name: string;
   nameAr: string;
@@ -37,6 +38,8 @@ interface CategoryFormProps {
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
   slugify: (text: string) => string;
+  /** The store is Arabic-first: the Arabic name comes first and is the required one. */
+  arFirst: boolean;
   /** Tenant scope so the category cover lands under `stores/<storeId>/categories/...`. */
   storeId: string;
   /** Size-guide picker options. */
@@ -56,6 +59,7 @@ export function CategoryForm({
   onSubmit,
   onClose,
   slugify,
+  arFirst,
   storeId,
   sizeCharts,
 }: CategoryFormProps) {
@@ -94,6 +98,61 @@ export function CategoryForm({
     }
   }
 
+  const req = <span className="text-destructive-ink">{t('required')}</span>;
+  const inputCls = (error?: string) =>
+    `w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${error ? 'border-destructive' : 'border-border'}`;
+  const englishName = (
+    <div key="en">
+      <label className="block text-sm font-medium text-foreground mb-1">
+        {t('nameEnglish')} {!arFirst && req}
+      </label>
+      <input
+        type="text"
+        value={form.name}
+        onChange={e => {
+          const val = e.target.value;
+          onFormChange(prev => ({
+            ...prev,
+            name: val,
+            // Auto-generate slug only when adding, not editing; an empty English name falls back to the Arabic one.
+            slug: !editingId ? slugify(val.trim() ? val : prev.nameAr) : prev.slug,
+          }));
+          if (formErrors.name) onFormErrorChange(prev => ({ ...prev, name: '' }));
+        }}
+        placeholder={t('nameEnglishPlaceholder')}
+        className={inputCls(formErrors.name)}
+      />
+      {formErrors.name && <p className="mt-1 text-xs text-destructive-ink">{formErrors.name}</p>}
+    </div>
+  );
+  const arabicName = (
+    <div key="ar">
+      <label className="block text-sm font-medium text-foreground mb-1">
+        {t('nameArabic')} {arFirst && req}
+      </label>
+      <input
+        type="text"
+        lang="ar"
+        dir="rtl"
+        value={form.nameAr}
+        onChange={e => {
+          const val = e.target.value;
+          onFormChange(prev => ({
+            ...prev,
+            nameAr: val,
+            slug: !editingId && !prev.name.trim() ? slugify(val) : prev.slug,
+          }));
+          if (formErrors.nameAr) onFormErrorChange(prev => ({ ...prev, nameAr: '' }));
+        }}
+        placeholder={t('nameArabicPlaceholder')}
+        className={inputCls(formErrors.nameAr)}
+      />
+      {formErrors.nameAr && (
+        <p className="mt-1 text-xs text-destructive-ink">{formErrors.nameAr}</p>
+      )}
+    </div>
+  );
+
   return (
     <div className="mb-6 rounded-xl border bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
@@ -122,11 +181,13 @@ export function CategoryForm({
               },
             ]}
           />
-          <button
+          <Button
             type="button"
             onClick={onClose}
-            className="p-1 text-muted-foreground hover:text-muted-foreground"
             aria-label={t('close')}
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -136,49 +197,12 @@ export function CategoryForm({
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-          </button>
+          </Button>
         </div>
       </div>
       <form onSubmit={onSubmit} className="p-6 space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              {t('nameEnglish')} <span className="text-destructive-ink">{t('required')}</span>
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={e => {
-                const val = e.target.value;
-                onFormChange(prev => ({
-                  ...prev,
-                  name: val,
-                  // Auto-generate slug only when adding, not editing
-                  slug: !editingId ? slugify(val) : prev.slug,
-                }));
-                if (formErrors.name) onFormErrorChange(prev => ({ ...prev, name: '' }));
-              }}
-              placeholder={t('nameEnglishPlaceholder')}
-              className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formErrors.name ? 'border-destructive' : 'border-border'}`}
-            />
-            {formErrors.name && (
-              <p className="mt-1 text-xs text-destructive-ink">{formErrors.name}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              {t('nameArabic')}
-            </label>
-            <input
-              type="text"
-              lang="ar"
-              dir="rtl"
-              value={form.nameAr}
-              onChange={e => onFormChange(prev => ({ ...prev, nameAr: e.target.value }))}
-              placeholder={t('nameArabicPlaceholder')}
-              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
+          {arFirst ? [arabicName, englishName] : [englishName, arabicName]}
         </div>
 
         <div>
@@ -283,23 +307,27 @@ export function CategoryForm({
               <p className="text-xs text-muted-foreground">{t('seoSubheading')}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => generateSeo('fill-empty')}
                 disabled={seoGenerating}
-                className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="gap-2 font-semibold"
               >
                 <span aria-hidden>✨</span>
                 {seoGenerating ? t('seoGenerating') : t('seoFillEmpty')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => generateSeo('overwrite')}
                 disabled={seoGenerating}
-                className="inline-flex items-center gap-2 rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="gap-2 font-semibold"
               >
                 {t('seoRegenerateAll')}
-              </button>
+              </Button>
             </div>
           </div>
           {seoMessage && <p className="mb-2 text-xs text-muted-foreground">{seoMessage}</p>}
@@ -409,20 +437,12 @@ export function CategoryForm({
         )}
 
         <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-foreground border border-border rounded-lg hover:bg-muted"
-          >
+          <Button type="button" onClick={onClose} variant="outline">
             {t('cancel')}
-          </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-          >
+          </Button>
+          <Button type="submit" disabled={isSaving} variant="default">
             {isSaving ? t('saving') : editingId ? t('updateCategory') : t('createCategory')}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

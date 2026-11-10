@@ -3,6 +3,7 @@
 import { useT } from '@/i18n/useT';
 import { minorToMajor } from '@/lib/format';
 import { formatFils, type Affiliate } from './types';
+import { Button } from '@/components/ui/Button';
 
 interface PayoutsHistoryProps {
   affiliate: Affiliate;
@@ -42,10 +43,12 @@ export function PayoutsHistory({
       <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-semibold text-foreground">{t('title')}</h2>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
             type="button"
             onClick={onClose}
-            className="p-2 text-muted-foreground hover:text-foreground"
             aria-label={t('close')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,7 +59,7 @@ export function PayoutsHistory({
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={onSubmit} className="p-6 space-y-4">
@@ -113,23 +116,15 @@ export function PayoutsHistory({
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
-            >
+            <Button variant="outline" size="md" type="button" onClick={onClose}>
               {t('cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !amount}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
-            >
+            </Button>
+            <Button variant="default" size="md" type="submit" disabled={saving || !amount}>
               {saving && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
               )}
               {t('confirm')}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

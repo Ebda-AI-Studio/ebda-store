@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useT } from '@/i18n/useT';
+import { Button } from '@/components/ui/Button';
 
 export type DecisionKind = 'approve' | 'reject' | 'revoke';
 
@@ -98,21 +99,18 @@ export function ApplicationDecisionModal({
         )}
 
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="min-h-11 rounded-md border px-4 text-sm md:min-h-9"
-          >
+          <Button variant="outline" size="md" type="button" onClick={onCancel}>
             {t('cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="default"
+            size="md"
             type="button"
             onClick={() => void submit()}
             disabled={busy || noGroups || (kind === 'approve' && !groupId)}
-            className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50 md:min-h-9"
           >
             {busy ? t('working') : t(`${kind}Confirm`)}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

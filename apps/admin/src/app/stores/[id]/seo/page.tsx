@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, unwrapObject } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -459,7 +460,6 @@ export default function StoreSeoPage() {
           <Button
             type="button"
             variant="outline"
-            className="min-h-11"
             onClick={() => handleGenerate('fill-empty')}
             disabled={isGenerating || isSaving}
             isLoading={isGenerating}

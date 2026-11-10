@@ -9,6 +9,7 @@ import { ImageUpload } from '../../../../../components/ImageUpload';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { AdminSkeletonDetail } from '../../../../../components/AdminSkeleton';
 import { useT } from '@/i18n/useT';
+import { Button } from '@/components/ui/Button';
 
 interface BlogPost {
   id: string;
@@ -318,13 +319,9 @@ export default function BlogPostEditorPage({
             >
               {t('cancel')}
             </Link>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-            >
+            <Button variant="default" size="md" type="submit" disabled={isSaving}>
               {isSaving ? t('saving') : isNew ? t('createPost') : t('saveChanges')}
-            </button>
+            </Button>
           </div>
         </form>
       )}

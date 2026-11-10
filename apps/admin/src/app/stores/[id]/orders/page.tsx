@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { buttonVariants, cn, useToast } from '@ebda/ui';
+import { cn, useToast } from '@ebda/ui';
+import { buttonVariants } from '@/components/ui/Button';
 import { RowActions } from '../../../../components/RowActions';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../components/DateRangePicker';

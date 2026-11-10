@@ -22,6 +22,7 @@ import { ZeroResultSearchesCard } from './_components/ZeroResultSearchesCard';
 import { resolveDateRange } from './_components/types';
 import type { ChartType, Period, ResolvedDateRange } from './_components/types';
 import { useAnalytics } from './_hooks/useAnalytics';
+import { Button } from '@/components/ui/Button';
 
 export default function AnalyticsPage() {
   const params = useParams();
@@ -83,13 +84,9 @@ export default function AnalyticsPage() {
               title={tErrors('loadFailedTitle')}
               description={error || tErrors('loadFailedBody')}
               action={
-                <button
-                  type="button"
-                  onClick={refetch}
-                  className="text-xs font-medium underline underline-offset-2 cursor-pointer"
-                >
+                <Button variant="link" size="sm" type="button" onClick={refetch}>
                   {tErrors('retry')}
-                </button>
+                </Button>
               }
             />
           )}

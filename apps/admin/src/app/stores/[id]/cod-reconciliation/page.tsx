@@ -11,6 +11,7 @@ import { useT } from '@/i18n/useT';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { formatMoney } from '../orders/[orderId]/_components/format';
+import { Button } from '@/components/ui/Button';
 
 type ReconStatus = 'awaiting' | 'partial' | 'settled' | 'over_remitted' | 'mismatch';
 
@@ -241,14 +242,16 @@ export default function CodReconciliationPage() {
               aria-label={t('paste')}
               className="mt-3 w-full px-3 py-2 border border-input rounded-lg text-xs font-mono"
             />
-            <button
+            <Button
+              variant="default"
+              size="md"
+              className="mt-3"
               type="button"
               onClick={doImport}
               disabled={importing || !csv.trim()}
-              className="mt-3 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {t('import')}
-            </button>
+            </Button>
             {result && (
               <div className="mt-3 text-sm text-foreground" role="status">
                 <p>
@@ -378,22 +381,24 @@ export default function CodReconciliationPage() {
               <div className="mt-3 flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{t('page', { page, pages })}</span>
                 <div className="flex gap-2">
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-3 py-1.5 border border-border rounded-lg disabled:opacity-50"
                   >
                     {t('previous')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     onClick={() => setPage(p => Math.min(pages, p + 1))}
                     disabled={page === pages}
-                    className="px-3 py-1.5 border border-border rounded-lg disabled:opacity-50"
                   >
                     {t('next')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

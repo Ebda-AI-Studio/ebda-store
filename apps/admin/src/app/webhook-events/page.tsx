@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Button, Badge } from '@ebda/ui';
+import { Badge } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
@@ -194,15 +195,14 @@ export default function WebhookEventsPage() {
 
         <div className="mb-4 flex flex-wrap gap-2">
           {STATUS_FILTERS.map(s => (
-            <button
+            <Button
+              variant={status === s ? 'soft' : 'ghost'}
+              size="sm"
               key={s || 'all'}
               onClick={() => setStatus(s)}
-              className={`rounded-full px-3 py-1 text-sm ${
-                status === s ? 'bg-foreground text-background' : 'bg-muted text-foreground'
-              }`}
             >
               {s || t('statusAll')}
-            </button>
+            </Button>
           ))}
         </div>
 

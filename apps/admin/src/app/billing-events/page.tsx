@@ -19,7 +19,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button } from '@ebda/ui';
+import { Badge } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatMoney, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
@@ -323,15 +324,14 @@ function LedgerPanel({
         <div key={label} className="mb-3 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{t(label)}</span>
           {options.map(o => (
-            <button
+            <Button
+              variant={current === o ? 'soft' : 'ghost'}
+              size="sm"
               key={o || 'all'}
               onClick={() => set(o)}
-              className={`rounded-full px-3 py-1 text-sm ${
-                current === o ? 'bg-foreground text-background' : 'bg-muted text-foreground'
-              }`}
             >
               {o ? t(`${ns}.${o}`) : t('all')}
-            </button>
+            </Button>
           ))}
         </div>
       ))}

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { PACKING_SLIP_MAX } from '../../../../../components/orders/PackingSlipViewer';
 
+import { Button } from '@/components/ui/Button';
 interface OrdersBulkBarProps {
   /** With `selectedIds`, enables "print packing slips" for the selection. */
   storeId?: string;
@@ -32,14 +33,16 @@ export function OrdersBulkBar({
       <span className="text-sm font-medium text-foreground">
         {t('selected', { count: selectedCount })}
       </span>
-      <button
+      <Button
         type="button"
         onClick={onMarkPaid}
         disabled={isProcessing}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        variant="default"
+        size="sm"
+        className="gap-1.5"
       >
         {isProcessing ? t('processing') : t('markPaid')}
-      </button>
+      </Button>
       {storeId && selectedIds.length > 0 && (
         <span className="inline-flex items-center gap-2">
           {selectedIds.length > PACKING_SLIP_MAX ? (
@@ -56,13 +59,15 @@ export function OrdersBulkBar({
           )}
         </span>
       )}
-      <button
+      <Button
         type="button"
         onClick={onClearSelection}
-        className="text-xs text-muted-foreground hover:text-foreground"
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground"
       >
         {t('clearSelection')}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { localDayRange, reportRangeParams, withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
+import { Button } from '@/components/ui/Button';
 
 interface LoyaltyTransaction {
   id: string;
@@ -288,12 +289,9 @@ export default function LoyaltyTransactionsPage() {
               aria-label={t('customerIdAriaLabel')}
               className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
-            <button
-              type="submit"
-              className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
+            <Button variant="default" size="md" type="submit">
               {t('searchButton')}
-            </button>
+            </Button>
           </form>
         </div>
 
@@ -343,22 +341,24 @@ export default function LoyaltyTransactionsPage() {
               })}
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="rounded border border-border px-3 py-1 text-sm disabled:opacity-50 hover:bg-card"
               >
                 {t('previous')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
                 disabled={page >= meta.totalPages}
-                className="rounded border border-border px-3 py-1 text-sm disabled:opacity-50 hover:bg-card"
               >
                 {t('next')}
-              </button>
+              </Button>
             </div>
           </div>
         )}

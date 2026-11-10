@@ -10,6 +10,7 @@ import { useLocale } from 'next-intl';
 import { apiPost } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+import { Button } from '@/components/ui/Button';
 interface Proposal {
   categories: Array<{
     name: string;
@@ -101,15 +102,17 @@ export function CategorySuggestionPanel({
             {error}
           </p>
         )}
-        <button
+        <Button
           type="button"
           onClick={() => void ask()}
           disabled={busy !== null}
           data-testid="category-suggest-ask"
-          className="mt-3 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          variant="default"
+          size="sm"
+          className="mt-3 font-semibold"
         >
           {busy === 'ask' ? t('asking') : t('ask')}
-        </button>
+        </Button>
       </section>
     );
 
@@ -171,13 +174,15 @@ export function CategorySuggestionPanel({
                 ))}
               </ul>
             </details>
-            <button
+            <Button
               type="button"
               onClick={() => setDrafts(ds => (ds ? ds.filter(x => x.key !== d.key) : ds))}
-              className="mt-2 text-xs text-destructive-ink hover:underline"
+              variant="link"
+              size="sm"
+              className="mt-2 text-destructive-ink"
             >
               {t('remove')}
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
@@ -192,23 +197,26 @@ export function CategorySuggestionPanel({
         </p>
       )}
       <div className="mt-3 flex gap-2">
-        <button
+        <Button
           type="button"
           onClick={() => void apply()}
           disabled={busy !== null || drafts.every(d => !d.name.trim())}
           data-testid="category-suggest-apply"
-          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          variant="default"
+          size="sm"
+          className="font-semibold"
         >
           {busy === 'apply' ? t('creating') : t('create')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => setDrafts(null)}
           disabled={busy !== null}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+          variant="outline"
+          size="sm"
         >
           {t('discard')}
-        </button>
+        </Button>
       </div>
     </section>
   );

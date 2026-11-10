@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountNode {
@@ -198,22 +199,13 @@ export default function AccountsPage() {
       <div className="max-w-4xl space-y-6">
         {/* Actions: seed COA + add custom account */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSeed}
-            disabled={seeding}
-            className="bg-primary text-primary-foreground rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-60"
-          >
+          <Button type="button" onClick={handleSeed} disabled={seeding} variant="default">
             {seeding ? t('seeding') : t('seedButton')}
-          </button>
+          </Button>
           {total > 0 && parentOptions.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowCreate(v => !v)}
-              className="rounded-lg border border-border px-3 py-2 text-sm font-medium"
-            >
+            <Button type="button" onClick={() => setShowCreate(v => !v)} variant="outline">
               {t('createButton')}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -276,20 +268,12 @@ export default function AccountsPage() {
             </div>
             {createErr && <p className="text-red-600 text-sm">{createErr}</p>}
             <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={creating}
-                className="bg-primary text-primary-foreground rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-60"
-              >
+              <Button type="submit" disabled={creating} variant="default">
                 {creating ? t('creating') : t('createSubmit')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowCreate(false)}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-medium"
-              >
+              </Button>
+              <Button type="button" onClick={() => setShowCreate(false)} variant="outline">
                 {t('cancel')}
-              </button>
+              </Button>
             </div>
           </form>
         )}

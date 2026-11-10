@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminSkeletonPage } from './AdminSkeleton';
 import { ErrorState } from './ErrorState';
 

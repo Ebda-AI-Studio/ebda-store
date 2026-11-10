@@ -32,6 +32,7 @@ import { useFeatures } from '@/hooks/useFeatures';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ArrowStart } from '@/components/ArrowStart';
 
+import { Button } from '@/components/ui/Button';
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -230,13 +231,14 @@ export default function OrderDetailPage() {
         {error && !isLoading && (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
             <p className="text-sm text-destructive-ink">{error}</p>
-            <button
+            <Button
               type="button"
               onClick={fetchOrder}
-              className="mt-3 inline-flex items-center justify-center rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-destructive/10 cursor-pointer"
+              variant="outline"
+              className="mt-3 justify-center text-destructive-ink"
             >
               {tList('errors.retry')}
-            </button>
+            </Button>
           </div>
         )}
 

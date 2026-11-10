@@ -113,6 +113,7 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
         );
       })}
       <button
+        data-ui="nav"
         type="button"
         onClick={onOpenMore}
         aria-label={t('more')}

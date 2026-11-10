@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Badge, Modal, ModalBody, ModalFooter, Input, Label } from '@ebda/ui';
+import { Badge, Modal, ModalBody, ModalFooter, Input, Label } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { apiGet, apiPost } from '../../lib/api';

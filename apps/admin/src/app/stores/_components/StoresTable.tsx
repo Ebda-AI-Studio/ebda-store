@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { getStoreDisplayUrl } from '@/lib/store-url';
 import { RowActions } from '@/components/RowActions';
@@ -87,7 +87,7 @@ export function StoresTable({ stores, onDelete }: StoresTableProps) {
           menuLabel={t('rowMenuLabel', { name: store.name })}
           primary={
             <Link href={`/stores/${store.id}`}>
-              <Button variant="outline" size="sm" className="rounded-xl">
+              <Button variant="outline" size="sm">
                 {t('view')}
               </Button>
             </Link>

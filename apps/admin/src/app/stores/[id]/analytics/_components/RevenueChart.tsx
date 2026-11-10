@@ -9,6 +9,7 @@ import {
   type SalesData,
   type SalesGranularity,
 } from './types';
+import { Button } from '@/components/ui/Button';
 
 interface SimpleBarChartProps {
   data: SalesData[];
@@ -110,28 +111,22 @@ export function RevenueChart({
           </p>
         </div>
         <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
-          <button
+          <Button
+            variant={chartType === 'revenue' ? 'soft' : 'ghost'}
+            size="sm"
             type="button"
             onClick={() => onChartTypeChange('revenue')}
-            className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-all duration-200 ${
-              chartType === 'revenue'
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
           >
             {t('revenue')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={chartType === 'orders' ? 'soft' : 'ghost'}
+            size="sm"
             type="button"
             onClick={() => onChartTypeChange('orders')}
-            className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-all duration-200 ${
-              chartType === 'orders'
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
           >
             {t('orders')}
-          </button>
+          </Button>
         </div>
       </div>
       {hasSales ? (

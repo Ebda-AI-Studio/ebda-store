@@ -13,6 +13,7 @@
  *
  * Below `lg` the side panes become toggleable drawers over the canvas.
  */
+import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
@@ -631,13 +632,15 @@ export function BuilderEditor({
       <div className="grid h-screen place-items-center bg-background p-6 text-center">
         <div>
           <p className="text-sm text-destructive-ink">{t('loadError')}</p>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={() => void b.reload()}
-            className="mt-3 rounded-lg border border-border px-3 py-1.5 text-sm"
+            className="mt-3"
           >
             {t('retry')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -698,18 +701,20 @@ export function BuilderEditor({
         className="min-h-0 flex-1 overflow-y-auto"
       >
         {tab === 'sections' && (
-          <button
+          <Button
+            variant={!selection ? 'soft' : 'outline'}
+            size="sm"
             type="button"
             onClick={() => {
               setSelection(null);
               setDrawer(d => (d === 'start' ? 'end' : d));
             }}
             aria-current={!selection ? 'true' : undefined}
-            className={`mx-2 mt-2 block w-[calc(100%-1rem)] rounded-lg border border-border px-2 py-1.5 text-start text-xs font-medium hover:bg-muted ${!selection ? 'bg-primary/15 ring-1 ring-primary' : ''}`}
+            className="mx-2 mt-2 w-[calc(100%-1rem)] justify-start"
             data-testid="open-page-settings"
           >
             {t('pageSettings.open')}
-          </button>
+          </Button>
         )}
         {tab === 'sections' && (
           <SectionTree
@@ -879,17 +884,19 @@ export function BuilderEditor({
         {announcement}
       </div>
       <div className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:start-2 focus-within:top-2 focus-within:z-50 focus-within:flex focus-within:gap-2 focus-within:rounded-lg focus-within:bg-background focus-within:p-2 focus-within:shadow-lg">
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
           onClick={() => {
             setDrawer('end');
             requestAnimationFrame(() => document.getElementById('builder-settings')?.focus());
           }}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold"
+          className="font-semibold"
           data-testid="skip-to-settings"
         >
           {t('skip.settings')}
-        </button>
+        </Button>
       </div>
       <h1 className="sr-only">{`${t('title')}: ${storeName}`}</h1>
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-1 lg:h-14 lg:flex-nowrap lg:py-0">
@@ -910,22 +917,24 @@ export function BuilderEditor({
           onPreviewSlug={setPreviewSlug}
         />
         <div className="ms-2 flex lg:hidden">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={() => setDrawer(d => (d === 'start' ? null : 'start'))}
-            className="rounded px-2 py-1 text-xs hover:bg-muted max-lg:min-h-11 max-lg:px-3"
             aria-expanded={drawer === 'start'}
           >
             {t('panes.start')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={() => setDrawer(d => (d === 'end' ? null : 'end'))}
-            className="rounded px-2 py-1 text-xs hover:bg-muted max-lg:min-h-11 max-lg:px-3"
             aria-expanded={drawer === 'end'}
           >
             {t('panes.end')}
-          </button>
+          </Button>
         </div>
         <div
           role="radiogroup"
@@ -948,28 +957,31 @@ export function BuilderEditor({
             </button>
           ))}
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           onClick={b.undo}
           disabled={!b.canUndo}
           aria-label={t('undo')}
           title={t('undo')}
-          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30 max-lg:ms-auto max-lg:min-h-11 max-lg:min-w-11"
+          className="max-lg:ms-auto"
           data-testid="undo"
         >
           ↶
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           onClick={b.redo}
           disabled={!b.canRedo}
           aria-label={t('redo')}
           title={t('redo')}
-          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30 max-lg:min-h-11 max-lg:min-w-11"
           data-testid="redo"
         >
           ↷
-        </button>
+        </Button>
         <span
           role="status"
           className="hidden w-24 text-xs text-muted-foreground md:inline"
@@ -979,7 +991,9 @@ export function BuilderEditor({
           {statusText[b.saveState]}
         </span>
         {isHome && (
-          <button
+          <Button
+            variant={lookOpen ? 'soft' : 'outline'}
+            size="sm"
             type="button"
             onClick={() => {
               setLookOpen(o => !o);
@@ -987,22 +1001,22 @@ export function BuilderEditor({
               setDrawer(d => (d === 'end' ? d : 'end'));
             }}
             aria-pressed={lookOpen}
-            className={`rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted max-lg:min-h-11 ${lookOpen ? 'bg-muted' : 'bg-background'}`}
             data-testid="open-look-switch"
             data-setting-id="builder.look-switch"
           >
             {t('look.open')}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          size="sm"
           type="button"
           onClick={() => void publish()}
           disabled={b.publishing || b.saveState === 'conflict'}
-          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 max-lg:min-h-11"
+          className="font-semibold"
           data-testid="publish"
         >
           {b.publishing ? t('publishing') : t('publish')}
-        </button>
+        </Button>
       </header>
 
       {patchPreview && !lookPreview && (
@@ -1013,23 +1027,25 @@ export function BuilderEditor({
         >
           <span className="flex-1">{t('aiPatch.bar')}</span>
           {patchPreview.changes.length > 0 && (
-            <button
+            <Button
+              size="sm"
               type="button"
               onClick={() => void applyAiPatchNow()}
               disabled={patchBusy !== null}
-              className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+              className="font-semibold"
             >
               {patchBusy === 'apply' ? t('aiPatch.applying') : t('aiPatch.apply')}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={() => setPatchPreview(null)}
             disabled={patchBusy !== null}
-            className="rounded-lg border border-border bg-background px-3 py-1 text-xs font-medium disabled:opacity-50"
           >
             {t('aiPatch.discard')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1044,24 +1060,26 @@ export function BuilderEditor({
               look: getLook(lookPreview.look)?.name[locale === 'ar' ? 'ar' : 'en'] ?? '',
             })}
           </span>
-          <button
+          <Button
+            size="sm"
             type="button"
             onClick={() => void applyLookNow()}
             disabled={lookBusy !== null}
-            className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            className="font-semibold"
             data-testid="look-bar-apply"
           >
             {lookBusy === 'apply' ? t('look.applying') : t('look.apply')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={() => setLookPreview(null)}
             disabled={lookBusy !== null}
-            className="rounded-lg border border-border bg-background px-3 py-1 text-xs font-medium disabled:opacity-50"
             data-testid="look-bar-keep"
           >
             {t('look.keepEditing')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1087,20 +1105,17 @@ export function BuilderEditor({
           data-testid="conflict-banner"
         >
           <span className="flex-1">{t('conflict.message')}</span>
-          <button
-            type="button"
-            onClick={b.takeTheirs}
-            className="rounded-lg border border-border bg-background px-3 py-1 text-xs font-medium"
-          >
+          <Button variant="outline" size="sm" type="button" onClick={b.takeTheirs}>
             {t('conflict.takeTheirs')}
-          </button>
-          <button
+          </Button>
+          <Button
+            size="sm"
             type="button"
             onClick={() => void b.keepMine()}
-            className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
+            className="font-semibold"
           >
             {t('conflict.keepMine')}
-          </button>
+          </Button>
         </div>
       )}
 

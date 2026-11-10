@@ -13,7 +13,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Input, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
+import { Badge, Input, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
@@ -169,9 +170,9 @@ function PlansInner() {
     return (
       <div className="rounded-xl border bg-card p-6 text-center">
         <p className="text-sm text-destructive-ink">{t('loadError')}</p>
-        <button type="button" onClick={load} className="mt-3 text-sm text-primary hover:underline">
+        <Button variant="link" size="sm" type="button" onClick={load} className="mt-3">
           {tCommon('retry')}
-        </button>
+        </Button>
       </div>
     );
   }

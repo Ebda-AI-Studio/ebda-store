@@ -15,6 +15,7 @@ import { formatPrice } from '../../../../../lib/format';
 import { RateAttribution } from './RateAttribution';
 import type { RateView } from './types';
 
+import { Button } from '@/components/ui/Button';
 interface ConfirmItem {
   karat: GoldKarat;
   jumpBps: number | null;
@@ -134,21 +135,17 @@ export function RateEditor({
       )}
       {canEdit && (
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
+          <Button
             type="button"
             disabled={saving}
             onClick={() => void submit(false)}
-            className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            variant="default"
           >
             {t('save')}
-          </button>
-          <button
-            type="button"
-            onClick={fillFrom24}
-            className="min-h-11 rounded-md border px-4 text-sm"
-          >
+          </Button>
+          <Button type="button" onClick={fillFrom24} variant="outline">
             {t('fillFrom24')}
-          </button>
+          </Button>
         </div>
       )}
       {feedEnabled && <RateAttribution className="mt-3" />}
@@ -179,21 +176,17 @@ export function RateEditor({
               ))}
             </ul>
             <div className="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirm(null)}
-                className="min-h-11 rounded-md border px-4 text-sm"
-              >
+              <Button type="button" onClick={() => setConfirm(null)} variant="outline">
                 {t('back')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={saving}
                 onClick={() => void submit(true)}
-                className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                variant="default"
               >
                 {t('confirmApply')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../components/AdminLayout';
 import { apiGet } from '../lib/api';
 import { useStore } from '../contexts/StoreContext';
@@ -85,16 +85,15 @@ export default function DashboardPage() {
       <AdminLayout title={t('title')} subtitle={t('subtitleAll')}>
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <p className="text-muted-foreground mb-4">{t('loadFailed')}</p>
-          <button
+          <Button
             type="button"
             onClick={() => {
               setHasError(false);
               setIsLoading(true);
             }}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors cursor-pointer"
           >
             {t('retry')}
-          </button>
+          </Button>
         </div>
       </AdminLayout>
     );

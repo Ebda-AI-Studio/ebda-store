@@ -8,6 +8,7 @@
  * bucket's public URL (Ebda: STORAGE_BUCKET=ebda-media,
  * STORAGE_PUBLIC_URL=https://media.ebda.app).
  */
+import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
@@ -92,13 +93,9 @@ export function MediaPicker({
               onChange={e => void onFile(e.target.files?.[0])}
             />
           </label>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-2 py-1 text-sm hover:bg-muted"
-          >
+          <Button variant="ghost" size="sm" type="button" onClick={onClose}>
             {t('close')}
-          </button>
+          </Button>
         </div>
       </div>
       {hint && (
@@ -120,6 +117,7 @@ export function MediaPicker({
           {items.map((it, i) => (
             <li key={it.key}>
               <button
+                data-ui="tile"
                 type="button"
                 onClick={() => onPick(it.url)}
                 // The thumbnail is decorative (alt=""), so without this the button has no name.
@@ -138,13 +136,15 @@ export function MediaPicker({
           ))}
         </ul>
         {cursor && (
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={() => void load(cursor)}
-            className="mt-3 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted"
+            className="mt-3"
           >
             {t('more')}
-          </button>
+          </Button>
         )}
         {state === 'loading' && (
           <p className="mt-3 text-sm text-muted-foreground">{t('loading')}</p>

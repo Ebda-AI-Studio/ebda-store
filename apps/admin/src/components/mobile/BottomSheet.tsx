@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, type ReactNode } from 'react';
 import { useT } from '@/i18n/useT';
 
@@ -80,6 +81,7 @@ export function BottomSheet({
         {/* Drag handle — visual only on mobile. The whole header is
             tappable so a customer can dismiss without aiming. */}
         <button
+          data-ui="handle"
           type="button"
           onClick={onClose}
           aria-label={t('close')}
@@ -89,11 +91,13 @@ export function BottomSheet({
         {title && (
           <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
             <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-            <button
+            <Button
+              variant="ghost"
+              size="icon-sm"
               type="button"
               onClick={onClose}
               aria-label={t('close')}
-              className="-me-2 inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="-me-2 justify-center text-muted-foreground"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -103,7 +107,7 @@ export function BottomSheet({
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-            </button>
+            </Button>
           </div>
         )}
 

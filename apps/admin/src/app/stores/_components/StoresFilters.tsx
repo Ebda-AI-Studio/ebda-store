@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { StatusFilterPills } from '@/components/StatusFilterPills';
 
@@ -60,7 +60,7 @@ export function StoresFilters({
             className="force-input ps-11"
           />
         </div>
-        <Button type="submit" variant="outline" size="sm" className="rounded-xl px-6">
+        <Button type="submit" variant="outline" size="sm">
           {t('search')}
         </Button>
       </form>
@@ -92,14 +92,11 @@ export function StoresFilters({
 
         {/* View Toggle */}
         <div className="flex items-center gap-1 rounded-xl bg-muted/50 p-1">
-          <button
+          <Button
+            variant={viewMode === 'grid' ? 'soft' : 'ghost'}
+            size="icon-sm"
             type="button"
             onClick={() => setViewMode('grid')}
-            className={`touch-target rounded-lg transition-all ${
-              viewMode === 'grid'
-                ? 'bg-card text-primary shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
             title={t('gridView')}
             aria-label={t('gridView')}
           >
@@ -111,15 +108,12 @@ export function StoresFilters({
                 d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
               />
             </svg>
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'soft' : 'ghost'}
+            size="icon-sm"
             type="button"
             onClick={() => setViewMode('table')}
-            className={`touch-target rounded-lg transition-all ${
-              viewMode === 'table'
-                ? 'bg-card text-primary shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
             title={t('tableView')}
             aria-label={t('tableView')}
           >
@@ -131,7 +125,7 @@ export function StoresFilters({
                 d="M4 6h16M4 10h16M4 14h16M4 18h16"
               />
             </svg>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

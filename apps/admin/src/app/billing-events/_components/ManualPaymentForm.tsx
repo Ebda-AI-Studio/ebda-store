@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Input, Modal, Select } from '@ebda/ui';
+import { Input, Modal, Select } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { minorToDecimalString, tryToMinor } from '@ebda/shared';
 import { apiGet, apiPost } from '../../../lib/api';
 import { useLocale } from 'next-intl';

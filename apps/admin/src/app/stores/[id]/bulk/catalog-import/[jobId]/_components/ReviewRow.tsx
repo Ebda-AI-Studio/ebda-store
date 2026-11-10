@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Input, Label } from '@ebda/ui';
+import { Input, Label } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import {
   BLOCKING_FLAGS,
@@ -90,13 +91,15 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
             {t.has(`flags.${f}`) ? t(`flags.${f}`) : f}
           </span>
         ))}
-        <button
+        <Button
+          variant="link"
+          size="sm"
+          className="ms-auto"
           type="button"
           onClick={() => onOpenSource(item.fileId)}
-          className="ms-auto min-h-11 text-xs font-medium text-primary hover:underline sm:min-h-0"
         >
           {t('openSource')}
-        </button>
+        </Button>
       </div>
 
       {item.sourceText && (

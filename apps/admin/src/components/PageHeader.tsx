@@ -1,7 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Button, buttonVariants, cn } from '@ebda/ui';
+import { cn } from '@ebda/ui';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { RowActions, type RowActionItem } from './RowActions';
 
@@ -44,7 +45,6 @@ function ActionButton({
   return (
     <Button
       variant={variant}
-      className="min-h-11"
       onClick={action.onClick}
       disabled={action.disabled}
       isLoading={action.isLoading}

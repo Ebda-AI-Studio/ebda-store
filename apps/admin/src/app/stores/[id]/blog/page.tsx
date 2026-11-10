@@ -10,6 +10,7 @@ import { RowActions } from '../../../../components/RowActions';
 import { useConfirm } from '../../../../hooks/useConfirm';
 import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 interface BlogPost {
   id: string;
@@ -150,14 +151,15 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
               <p className="font-semibold text-warning-ink">{t('disabledTitle')}</p>
               <p className="mt-1 text-muted-foreground">{t('disabledBody')}</p>
             </div>
-            <button
+            <Button
+              variant="default"
+              size="md"
               type="button"
               onClick={enableBlog}
               disabled={togglingBlog}
-              className="min-h-11 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               {t('enableBlog')}
-            </button>
+            </Button>
           </div>
         )}
 

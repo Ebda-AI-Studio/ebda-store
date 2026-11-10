@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Input } from '@ebda/ui';
+import { Input } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { ImageUpload } from '../../../components/ImageUpload';
 import { apiPost } from '../../../lib/api';
 import { egpToPiastres } from '../../../lib/onboarding-validation';

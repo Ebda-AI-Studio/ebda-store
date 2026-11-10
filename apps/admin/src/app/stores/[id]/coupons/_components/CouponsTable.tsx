@@ -6,6 +6,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
 import type { Coupon } from './types';
+import { Button } from '@/components/ui/Button';
 
 interface CouponsTableProps {
   coupons: Coupon[];
@@ -144,13 +145,9 @@ export function CouponsTable({
           <RowActions
             menuLabel={tActions('menu', { code: coupon.code })}
             primary={
-              <button
-                type="button"
-                onClick={() => onEdit(coupon)}
-                className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-muted"
-              >
+              <Button variant="outline" size="sm" type="button" onClick={() => onEdit(coupon)}>
                 {tActions('edit')}
-              </button>
+              </Button>
             }
             items={[
               {
@@ -196,13 +193,9 @@ export function CouponsTable({
         </div>
         <p className="font-semibold text-foreground">{tEmpty('title')}</p>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">{tEmpty('description')}</p>
-        <button
-          type="button"
-          onClick={onCreateFirst}
-          className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-        >
+        <Button variant="default" size="md" className="mt-4" type="button" onClick={onCreateFirst}>
           {tEmpty('createFirst')}
-        </button>
+        </Button>
       </div>
     </div>
   );

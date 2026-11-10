@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { cn } from '@ebda/ui';
@@ -83,7 +84,9 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
       {primary}
       {ordered.length > 0 && (
         <div className="relative" ref={rootRef} onKeyDown={open ? onMenuKey : undefined}>
-          <button
+          <Button
+            variant="outline"
+            size="icon"
             ref={triggerRef}
             type="button"
             aria-haspopup="menu"
@@ -91,14 +94,14 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
             aria-controls={open ? menuId : undefined}
             aria-label={menuLabel ?? t('more')}
             onClick={() => setOpen(o => !o)}
-            className="flex h-11 w-11 items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            className="justify-center text-muted-foreground"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <circle cx="5" cy="12" r="1.6" />
               <circle cx="12" cy="12" r="1.6" />
               <circle cx="19" cy="12" r="1.6" />
             </svg>
-          </button>
+          </Button>
           {open && (
             <div
               id={menuId}

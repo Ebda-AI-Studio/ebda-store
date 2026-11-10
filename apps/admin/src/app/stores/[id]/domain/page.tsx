@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Badge, Input, Label } from '@ebda/ui';
+import { Badge, Input, Label } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useConfirm } from '../../../../hooks/useConfirm';
 import { Alert } from '../../../../components/Alert';
@@ -424,17 +425,19 @@ export default function StoreDomainPage() {
                         <span className="flex-1 min-w-0 select-all font-mono text-xs break-all">
                           {record.value}
                         </span>
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0"
                           type="button"
                           onClick={() => {
                             void navigator.clipboard.writeText(record.value);
                           }}
-                          className="max-md:min-h-11 max-md:min-w-11 shrink-0 rounded border border-border bg-background px-2 py-0.5 max-md:px-3 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                           aria-label={t('copyValueAriaLabel', { type: record.type })}
                           title={t('copy')}
                         >
                           {t('copy')}
-                        </button>
+                        </Button>
                       </div>
                     ),
                   },
@@ -508,7 +511,6 @@ export default function StoreDomainPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="min-h-11"
                             onClick={() => void copyAllRecords(dnsRows)}
                           >
                             {copiedAll ? t('copiedAll') : t('copyAll')}

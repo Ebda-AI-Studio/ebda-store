@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
 import { apiGet, apiFetch } from '../../../../lib/api';
@@ -497,7 +498,10 @@ export default function StoreCustomersPage() {
               <p className="font-semibold">{tPrivacy('erasedCrmReviewTitle')}</p>
               <p className="mt-1">{tPrivacy('erasedCrmAmbiguous')}</p>
             </div>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
               type="button"
               onClick={() => {
                 const qs = new URLSearchParams(searchParams?.toString() ?? '');
@@ -505,10 +509,9 @@ export default function StoreCustomersPage() {
                 const q = qs.toString();
                 if (pathname) router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
               }}
-              className="shrink-0 rounded-md border border-warning/40 px-2 py-1 text-xs font-medium hover:bg-warning/10"
             >
               {tc('close')}
-            </button>
+            </Button>
           </div>
         )}
 

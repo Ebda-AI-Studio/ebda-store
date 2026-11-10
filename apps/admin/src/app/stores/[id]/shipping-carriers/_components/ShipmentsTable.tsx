@@ -7,6 +7,7 @@ import { SHIPMENT_COLORS } from './types';
 import type { Shipment } from './types';
 import { withNumerals } from '@ebda/shared';
 
+import { Button } from '@/components/ui/Button';
 interface ShipmentsTableProps {
   shipments: Shipment[];
   total: number;
@@ -180,22 +181,24 @@ export function ShipmentsTable({
             {t('pagination.summary', { page, pages, total })}
           </p>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => onPageChange(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="outline"
+              size="sm"
             >
               {t('pagination.previous')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => onPageChange(p => Math.min(pages, p + 1))}
               disabled={page === pages}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="outline"
+              size="sm"
             >
               {t('pagination.next')}
-            </button>
+            </Button>
           </div>
         </div>
       )}

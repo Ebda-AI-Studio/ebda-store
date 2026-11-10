@@ -1,4 +1,5 @@
 'use client';
+import { Button } from '@/components/ui/Button';
 
 // NOTE: This is Next.js's last-resort error boundary — it replaces the entire
 // <html> shell when the root layout itself fails. NextIntlClientProvider lives
@@ -60,13 +61,9 @@ export default function GlobalError({
             {error.message || t.unknown}
           </p>
           <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={reset}
-              className="cursor-pointer rounded-lg border-none bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
+            <Button type="button" onClick={reset}>
               {t.retry}
-            </button>
+            </Button>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error has no Next.js context */}
             <a
               href="/"

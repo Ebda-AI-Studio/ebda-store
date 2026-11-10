@@ -6,6 +6,7 @@ import { formatAddressLines, formatDateTime, type AddressLabels } from './format
 import type { OrderDetail } from './types';
 import { useMessageCustomerHref } from './useMessageCustomer';
 
+import { Button } from '@/components/ui/Button';
 interface DeliveryCardProps {
   order: OrderDetail;
   locale: string;
@@ -53,11 +54,7 @@ export function DeliveryCard({ order, locale, onEdit }: DeliveryCardProps) {
           {t('delivery')}
         </h2>
         {onEdit && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline cursor-pointer"
-          >
+          <Button type="button" onClick={onEdit} variant="link" className="gap-1.5">
             <svg
               className="h-4 w-4"
               fill="none"
@@ -73,7 +70,7 @@ export function DeliveryCard({ order, locale, onEdit }: DeliveryCardProps) {
               />
             </svg>
             {t('editDeliveryStatus')}
-          </button>
+          </Button>
         )}
       </div>
 

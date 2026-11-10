@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowEnd, ArrowStart } from '../../../components/ArrowStart';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import type { Pagination } from './types';
 
@@ -27,7 +27,6 @@ export function StoresPagination({ pagination, onPageChange }: StoresPaginationP
         <Button
           variant="outline"
           size="sm"
-          className="rounded-xl"
           disabled={pagination.page === 1}
           onClick={() => onPageChange(pagination.page - 1)}
         >
@@ -37,7 +36,6 @@ export function StoresPagination({ pagination, onPageChange }: StoresPaginationP
         <Button
           variant="outline"
           size="sm"
-          className="rounded-xl"
           disabled={pagination.page === pagination.totalPages}
           onClick={() => onPageChange(pagination.page + 1)}
         >

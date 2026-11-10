@@ -7,6 +7,7 @@ import { apiPost, apiPut } from '../../../../../lib/api';
 import { formatPrice } from '../../../../../lib/format';
 import type { GoldDisagreement, PendingRate, RateView } from './types';
 
+import { Button } from '@/components/ui/Button';
 /**
  * The two automatic sources disagree: the STORE OWNER decides (Ruling GOLD-DISAGREE-MERCHANT-1). Shows both
  * values and the gap, and offers the four ways out, all on the existing paths: apply the first source =
@@ -86,36 +87,36 @@ export function DisagreementBanner({
       </dl>
       {canEdit && (
         <div className="mt-4 flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
             disabled={busy}
             onClick={() => void run(() => decideAll('confirm'))}
-            className="min-h-11 rounded-md bg-primary px-4 font-medium text-primary-foreground"
+            variant="default"
           >
             {t('applyPrimary')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={busy}
             onClick={() => void run(applyFallback)}
-            className="min-h-11 rounded-md bg-primary px-4 font-medium text-primary-foreground"
+            variant="default"
           >
             {t('applyFallback')}
-          </button>
+          </Button>
           <a
             href="#gold-rate-editor"
             className="inline-flex min-h-11 items-center rounded-md border px-4"
           >
             {t('manual')}
           </a>
-          <button
+          <Button
             type="button"
             disabled={busy}
             onClick={() => void run(() => decideAll('reject'))}
-            className="min-h-11 rounded-md border px-4"
+            variant="outline"
           >
             {t('keep')}
-          </button>
+          </Button>
         </div>
       )}
       {error && (

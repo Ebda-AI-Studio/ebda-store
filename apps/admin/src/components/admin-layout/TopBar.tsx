@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { NotificationBell } from '../NotificationBell';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { DocumentTitle } from '../DocumentTitle';
@@ -58,10 +58,12 @@ export function TopBar({
           actions strip needs without clipping wrapped buttons. */}
       <div className="flex h-14 items-center justify-between gap-2 px-4 lg:h-16 lg:px-6">
         <div className="flex min-w-0 items-center gap-2 lg:gap-4">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             type="button"
             onClick={onOpenSidebar}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+            className="shrink-0 justify-center text-muted-foreground lg:hidden"
             aria-label={t('openSidebar')}
             aria-expanded={isSidebarOpen}
             aria-controls="admin-mobile-sidebar"
@@ -80,12 +82,14 @@ export function TopBar({
                 d="M4 6h16M4 12h16M4 18h16"
               />
             </svg>
-          </button>
+          </Button>
           {showBackButton && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               type="button"
               onClick={onBack}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="shrink-0 justify-center text-muted-foreground"
               aria-label={t('goBack')}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,7 +100,7 @@ export function TopBar({
                   d="M15 19l-7-7 7-7"
                 />
               </svg>
-            </button>
+            </Button>
           )}
           <div className="min-w-0">
             {parent && (
@@ -125,7 +129,7 @@ export function TopBar({
 
           {viewStoreUrl && (
             <Link href={viewStoreUrl} target="_blank" className="hidden sm:block">
-              <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+              <Button variant="outline" size="sm" className="gap-2">
                 <svg
                   className="h-4 w-4"
                   fill="none"

@@ -4,6 +4,7 @@
  * "Generate with AI" for a section's kicker and subtitle (bilingual). Calls /ai/section-content;
  * the caller decides what to keep (the page builder and the editor only fill EMPTY fields).
  */
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
@@ -54,11 +55,13 @@ export function AiSectionFillButton({
     }
   };
   return (
-    <button
+    <Button
+      variant="outline"
+      size="sm"
       type="button"
       onClick={generate}
       disabled={busy}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
+      className="gap-1.5"
     >
       <svg
         className="h-3.5 w-3.5"
@@ -75,6 +78,6 @@ export function AiSectionFillButton({
         />
       </svg>
       {busy ? t('aiSectionFill.generating') : t('aiSectionFill.generateWithAi')}
-    </button>
+    </Button>
   );
 }

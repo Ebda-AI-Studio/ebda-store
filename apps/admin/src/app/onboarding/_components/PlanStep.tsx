@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatMoney } from '@ebda/shared';
 import { apiPut } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -68,18 +68,17 @@ export function PlanStep({
       )}
       <div className="inline-flex rounded-full bg-muted p-1 text-sm" role="group">
         {(['monthly', 'yearly'] as const).map(k => (
-          <button
+          <Button
+            variant={selection.interval === k ? 'soft' : 'ghost'}
+            size="sm"
             key={k}
             type="button"
             aria-pressed={selection.interval === k}
             onClick={() => setSelection(s => ({ ...s, interval: k }))}
-            className={`rounded-full px-3 py-1 max-md:min-h-9 ${
-              selection.interval === k ? 'bg-foreground text-background' : ''
-            }`}
           >
             {t(k === 'monthly' ? 'monthly' : 'yearly')}
             {k === 'yearly' ? ` · ${t('saveBadge')}` : ''}
-          </button>
+          </Button>
         ))}
       </div>
       <div role="radiogroup" aria-label={t('title')} className="grid gap-3 md:grid-cols-3">

@@ -3,6 +3,7 @@
 import { useT } from '@/i18n/useT';
 import type { Pagination } from './types';
 
+import { Button } from '@/components/ui/Button';
 const PER_PAGE_OPTIONS = [10, 25, 50, 100] as const;
 
 interface OrdersPaginationProps {
@@ -49,22 +50,24 @@ export function OrdersPagination({
         )}
       </div>
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
-          className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={pagination.page <= 1}
           onClick={() => onPageChange(p => p - 1)}
+          variant="outline"
+          size="sm"
         >
           {t('previous')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={pagination.page >= pagination.totalPages}
           onClick={() => onPageChange(p => p + 1)}
+          variant="outline"
+          size="sm"
         >
           {t('next')}
-        </button>
+        </Button>
       </div>
     </div>
   );

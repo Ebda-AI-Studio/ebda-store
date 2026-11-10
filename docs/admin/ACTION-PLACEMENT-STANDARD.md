@@ -18,21 +18,24 @@ One rule set for where buttons live on every admin page. Source: the 2026-11-04 
 
 ## Components (apps/admin/src/components, hooks)
 
-| Need                                     | Use                                                                                                                                        |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
-| Page title + primary + secondary + "..." | `<PageHeader title subtitle? primary? secondary? overflow? />`                                                                             |
-| Long edit form                           | `<StickySaveBar dirty onSave onReset saving />` (renders nothing while clean)                                                              |
-| Create form                              | `<FormFooter primaryLabel cancelHref onPrimary? saving? />`                                                                                |
-| Row / header overflow menu               | `<RowActions primary? items=[{label, onSelect                                                                                              | href, destructive?}] />` (destructive sorted last) |
-| Confirm a destructive step               | `const confirm = useConfirm(); if (await confirm({ object, consequence, confirmLabel, tone })) ...` (the host is mounted by `AdminLayout`) |
-| Loading / error / empty                  | `<PageState loading error empty onRetry>` (a failed fetch is never shown as empty or zero)                                                 |
-| Back / next glyph                        | `<ArrowStart/>`, `<ArrowEnd/>` (flip in RTL; no `←` `→` inside strings)                                                                    |
-| Plan names in copy                       | `PLAN_LABELS_AR` / `planLabel(code, locale)` via a `{plan}` placeholder; the word is "باقة"                                                |
-| API error text                           | nothing to do: `apiRequest` applies `ERROR_AR` by `error.code`; the server's `details.messageAr` wins                                      |
+| Need                                     | Use                                                                                                                                                                                                                                                                   |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Any button (size, variant, radius)       | `<Button variant size>` / `buttonVariants()` from `components/ui/Button.tsx`: sm 32 · md 40 (44 on phones) · lg 44 · icon-sm/icon/icon-lg; one radius (`rounded-md`); default · outline · secondary · ghost · soft (selected) · destructive · link (Ruling ADM-BTN-1) |
+| Page title + primary + secondary + "..." | `<PageHeader title subtitle? primary? secondary? overflow? />`                                                                                                                                                                                                        |
+| Long edit form                           | `<StickySaveBar dirty onSave onReset saving />` (renders nothing while clean)                                                                                                                                                                                         |
+| Create form                              | `<FormFooter primaryLabel cancelHref onPrimary? saving? />`                                                                                                                                                                                                           |
+| Row / header overflow menu               | `<RowActions primary? items=[{label, onSelect                                                                                                                                                                                                                         | href, destructive?}] />` (destructive sorted last) |
+| Confirm a destructive step               | `const confirm = useConfirm(); if (await confirm({ object, consequence, confirmLabel, tone })) ...` (the host is mounted by `AdminLayout`)                                                                                                                            |
+| Loading / error / empty                  | `<PageState loading error empty onRetry>` (a failed fetch is never shown as empty or zero)                                                                                                                                                                            |
+| Back / next glyph                        | `<ArrowStart/>`, `<ArrowEnd/>` (flip in RTL; no `←` `→` inside strings)                                                                                                                                                                                               |
+| Plan names in copy                       | `PLAN_LABELS_AR` / `planLabel(code, locale)` via a `{plan}` placeholder; the word is "باقة"                                                                                                                                                                           |
+| API error text                           | nothing to do: `apiRequest` applies `ERROR_AR` by `error.code`; the server's `details.messageAr` wins                                                                                                                                                                 |
 
 ## Enforcement
 
 `tests/unit/admin-action-placement.test.ts` ratchets two rules: no `backToSettings|backToStore` and no native `confirm()/alert()`. Pages that still break them are listed in `admin-action-placement-known-debt.json`; the list may only shrink (a listed file that is clean fails the test). The owner track of each page removes its entries as it adopts the components.
+
+`tests/unit/admin-button-system.test.ts` (Ruling ADM-BTN-1) fails on a raw `<button>` that styles its own height, padding, type size, radius, fill or border, on a `<Button>` className that overrides the scale, and on the storefront `Button` from `@ebda/ui` imported in admin. A control that is not a button (switch, swatch, tile, list row, nav item, editor canvas, drag handle) is exempt only through its true ARIA role or `data-ui="swatch|tile|row|nav|canvas|handle"`. Measure what renders with `node scripts/visual/admin-button-styles.mjs`.
 
 ## Hubs
 

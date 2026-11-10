@@ -12,7 +12,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
+import { Badge, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import type { TaxProfileStatusValue } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
