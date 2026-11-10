@@ -124,7 +124,9 @@ export function demoEdgeKey(request: Request): string | null {
   return `https://${host}${path}${q ? `?${q}` : ''}`;
 }
 
-const demoVerdict = new Map<string, { demo: boolean; until: number }>();
+const demoVerdict = new Map<string, { demo: boolean; until: number; at: number }>();
+/** Ruling RESOLVE-BULLETPROOF-1: a transient error keeps the last verdict only this long after the last real answer. */
+export const DEMO_VERDICT_STALE_MAX_MS = 10 * 60_000;
 
 /**
  * True only when the API's store resolver says `host` is an ACTIVE `isDemo` store. Fails closed.
@@ -144,9 +146,13 @@ export async function isDemoStoreHost(
       headers: { 'x-store-domain': host },
     });
     // Ruling RESOLVE-BULLETPROOF-1: a 429/5xx is "could not ask", not "not a demo": keep the last verdict.
-    if (known && !res.ok && res.status !== 404) {
-      demoVerdict.set(host, { demo: known.demo, until: now + 300_000 });
+    if (known && !res.ok && res.status !== 404 && now - known.at < DEMO_VERDICT_STALE_MAX_MS) {
+      demoVerdict.set(host, { demo: known.demo, until: now + 60_000, at: known.at });
       return known.demo;
+    }
+    if (!res.ok && res.status !== 404) {
+      demoVerdict.set(host, { demo: false, until: now + 60_000, at: known?.at ?? 0 });
+      return false;
     }
     if (res.ok) {
       const store = (
@@ -155,13 +161,14 @@ export async function isDemoStoreHost(
       demo = store?.isDemo === true && store?.status === 'active';
     }
   } catch {
-    if (known) {
-      demoVerdict.set(host, { demo: known.demo, until: now + 300_000 });
+    if (known && now - known.at < DEMO_VERDICT_STALE_MAX_MS) {
+      demoVerdict.set(host, { demo: known.demo, until: now + 60_000, at: known.at });
       return known.demo;
     }
-    demo = false;
+    demoVerdict.set(host, { demo: false, until: now + 60_000, at: known?.at ?? 0 });
+    return false;
   }
-  demoVerdict.set(host, { demo, until: now + 300_000 });
+  demoVerdict.set(host, { demo, until: now + 300_000, at: now });
   return demo;
 }
 

@@ -22,8 +22,9 @@
  * epoch. Residuals: the 2 s epoch memo (EPOCH_MEMO_MS, NZ-D3) and, during an outage only, a copy up to 24 h old when no
  * purge happened in between. Theme/content fields ride the same payload and are BOUNDED-stale at 60 s.
  * No R2 (next dev / next start / tests): no cross-isolate invalidation exists, so the memory TTLs drop to 8 s / 15 s.
+ * R2 bound but unreadable: a copy is served only while under 8 s old (the pre-PR window); older -> API, else 503.
  */
-import { isEntryCurrent, type R2Like } from '../../store-edge-cache';
+import { entryEpochState, type R2Like } from '../../store-edge-cache';
 import { StoreTemporarilyUnavailableError } from './store-unavailable';
 
 export const HIT_TTL_MS = 60_000;
@@ -61,10 +62,17 @@ function idOf(value: unknown): string {
   return typeof id === 'string' && id ? id : '-';
 }
 
-/** True when no purge newer than the entry exists. No R2 = nothing can purge, so TTL alone decides. */
-async function current(deps: ResolveDeps, host: string, e: Entry<unknown>): Promise<boolean> {
+/**
+ * May this copy be served? `current` (no newer purge) = yes. `purged` = never. `unknown` (R2 unreadable) = only while
+ * younger than {@link LOCAL_HIT_TTL_MS}: the same 8 s window the resolver had before R2 epochs existed, so an R2 outage
+ * does not send every render to the API (where the limiter would 429 and every store would 503), and the NEVER-stale
+ * budget is the pre-epoch 8 s, not the copy's 60 s / 24 h. No R2 binding at all = nothing can purge, TTL decides.
+ */
+async function usable(deps: ResolveDeps, host: string, e: Entry<unknown>): Promise<boolean> {
   if (!deps.r2) return true;
-  return isEntryCurrent(deps.r2, { at: e.at, host, id: idOf(e.value) }, deps.now());
+  const state = await entryEpochState(deps.r2, { at: e.at, host, id: idOf(e.value) }, deps.now());
+  if (state === 'current') return true;
+  return state === 'unknown' && deps.now() - e.at < LOCAL_HIT_TTL_MS;
 }
 
 function freshFor(deps: ResolveDeps, e: Entry<unknown>): number {
@@ -135,7 +143,7 @@ export async function resolveResilient<T>(
 ): Promise<T | null> {
   const now = deps.now();
   const mem = memory.get(key) as Entry<T> | undefined;
-  if (mem && now - mem.at < freshFor(deps, mem) && (await current(deps, host, mem)))
+  if (mem && now - mem.at < freshFor(deps, mem) && (await usable(deps, host, mem)))
     return mem.value;
 
   const pending = inflight.get(key) as Promise<T | null> | undefined;
@@ -145,7 +153,7 @@ export async function resolveResilient<T>(
     if (
       durable &&
       deps.now() - durable.at < freshFor(deps, durable) &&
-      (await current(deps, host, durable))
+      (await usable(deps, host, durable))
     ) {
       remember(key, durable);
       return durable.value;
@@ -177,7 +185,7 @@ export async function resolveResilient<T>(
         .filter((c): c is Entry<T> => !!c && deps.now() - c.at < MAX_STALE_MS)
         .sort((a, b) => b.at - a.at);
       for (const c of copies) {
-        if (await current(deps, host, c)) {
+        if (await usable(deps, host, c)) {
           console.warn(
             `[resolve] serving stale copy for ${key} (${Math.round((deps.now() - c.at) / 1000)}s old)`
           );

@@ -23,6 +23,14 @@ Decision:
    the edge to 503 + `Retry-After: 30`, `private, no-store` (`apps/web/resolve-unavailable-edge.ts`, wired in
    `serveDemoEdge`); edge HTML caches store only 200s.
 6. Edge verdicts (`storeVerdict`, `isDemoStoreHost`) keep their last verdict on a 429/5xx/network error.
+   6b. Review follow-ups (#519, 2026-11-11): (a) R2 unreadable is not a purge: a copy is served only while under 8 s old
+   (the pre-PR window, so the NEVER-stale budget during an R2 outage is the old 8 s, not 60 s / 24 h), older goes to
+   the API and, failing that, 503; before this an R2 outage would have sent every render to the API. (b) The API
+   retries a purge that did not land (network, timeout, 429, 5xx except 503) twice, 1 s and 4 s apart, kept alive with
+   `cfWaitUntil` (17 s worst case inside the 30 s grace); 401/503 config faults are not retried; a purge still lost
+   after that logs `purge LOST after retries` (error). (c) Edge verdicts keep their last answer through an outage only
+   while the last real answer is under 10 min old. (d) A client navigation's RSC 500 (`text/x-component`) gets the
+   503 too. (e) A purge that lands while a fetch is in flight rejects that answer (entries are stamped at fetch start).
 7. Alert: >= 10 upstream resolve failures per isolate per 60 s -> one `[resolve-degraded]` console.error (Workers logs
    / logpush) + `Sentry.captureMessage` (error) per window.
 
@@ -32,7 +40,9 @@ Local `next start` + mock API at the incident limit (30/min global, 10 % 503s): 
 loads, 0 failures, 287 resolve calls.
 
 Residuals: the 2 s epoch memo (NZ-D3); during an outage a copy up to 24 h old is served when no purge happened in
-between (a purge the API failed to deliver is then invisible for that window); a never-seen host has nothing to fall
+between (a purge the API still failed to deliver after its 3 bounded attempts, or one Next rejected so the Worker wrote no
+epoch, is then invisible for that window; there is no durable purge outbox: a queue-backed purge is the next step if
+`purge LOST` ever fires); a never-seen host has nothing to fall
 back on, so a drained bucket still answers it 503 (layer 1, PR #514, removes the shared bucket); the alert is per
 isolate and its delivery to a pager depends on the Sentry alert rules (not verified here). Out of scope, same dummy
 tagCache: the crawler/feed routes `sitemap.ts`, `robots.ts`, `llms.txt`, `feeds/products.json` and

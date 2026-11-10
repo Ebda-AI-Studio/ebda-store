@@ -5,7 +5,7 @@
  * A page body that cannot resolve its store throws StoreTemporarilyUnavailableError (digest
  * `STORE_TEMPORARILY_UNAVAILABLE`, src/lib/store-unavailable.ts) into `app/error.tsx`, and Next answers that render with
  * HTTP 500. Next cannot set a status from an error boundary, so the edge rewrites it: only a 500 HTML response is read
- * (the happy path costs nothing), and only one carrying that digest becomes a 503. The body (the retry page) is kept.
+ * (the happy path costs nothing); a client-side navigation's RSC response (`text/x-component`) gets the same treatment, and only one carrying that digest becomes a 503. The body (the retry page) is kept.
  * `Cache-Control: no-store`, and the edge HTML caches store only a 200 (`isStorableHtml`), so the transient answer is
  * cached nowhere. Wired into `serveDemoEdge`, the outermost wrapper every storefront page passes through.
  */
@@ -13,7 +13,9 @@ export const STORE_UNAVAILABLE_MARKER = 'STORE_TEMPORARILY_UNAVAILABLE';
 export const UNAVAILABLE_RETRY_AFTER_S = 30;
 
 export async function retryableUnavailable(res: Response): Promise<Response> {
-  if (res.status !== 500 || !(res.headers.get('content-type') ?? '').includes('text/html'))
+  const type = res.headers.get('content-type') ?? '';
+  // A full page (text/html) or a client navigation's RSC payload (text/x-component) carry the same digest.
+  if (res.status !== 500 || !(type.includes('text/html') || type.includes('text/x-component')))
     return res;
   const body = await res.text();
   const headers = new Headers(res.headers);

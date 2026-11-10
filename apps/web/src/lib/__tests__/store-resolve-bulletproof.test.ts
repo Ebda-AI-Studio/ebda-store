@@ -8,8 +8,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const hoisted = vi.hoisted(() => {
   class NotFoundError extends Error {}
   const objects = new Map<string, string>();
+  const state = { r2Down: false };
   const r2 = {
-    get: async (k: string) => (objects.has(k) ? { text: async () => objects.get(k)! } : null),
+    get: async (k: string) => {
+      if (state.r2Down) throw new Error('R2 unavailable');
+      return objects.has(k) ? { text: async () => objects.get(k)! } : null;
+    },
     put: async (k: string, v: string) => void objects.set(k, v),
   };
   return {
@@ -19,6 +23,7 @@ const hoisted = vi.hoisted(() => {
     }),
     objects,
     r2,
+    state,
     cf: { on: true },
   };
 });
@@ -72,6 +77,7 @@ beforeEach(() => {
   hoisted.objects.clear();
   hoisted.notFound.mockClear();
   hoisted.cf.on = true;
+  hoisted.state.r2Down = false;
   cache.__resetResolveCacheForTest();
   resetEpochMemo();
 });
@@ -275,6 +281,90 @@ describe('NEVER-stale invalidation reaches every layer', () => {
     clock += 9_000;
     await resolveHost(host);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('review follow-ups (#519)', () => {
+  it('a purge landing while the fetch is in flight rejects that answer (memory and durable)', async () => {
+    const host = uniq('inflight');
+    let release!: () => void;
+    fetchMock.mockImplementationOnce(() => new Promise(r => (release = () => r(store(host)))));
+    const pending = resolveHost(host);
+    await flush();
+    clock += 2_000;
+    await bumpEpochs(hoisted.r2, [`store-domain:${host}`], clock); // suspend lands mid-fetch
+    clock += 3_000;
+    release();
+    await pending;
+    await flush();
+    // memory copy (stamped at fetch START) is older than the purge -> refetch
+    fetchMock.mockResolvedValueOnce(store(host, 'suspended'));
+    expect((await resolveHost(host)).status).toBe('suspended');
+    // and the pre-purge durable copy can never stand in during an outage
+    hoisted.objects.delete(`resolve-lkg/${host}`);
+    await bumpEpochs(hoisted.r2, [`store-domain:${host}`], clock + 1_500);
+    clock += 4_000;
+    cache.clearResolveMemory();
+    fetchMock.mockResolvedValue(json({}, 429));
+    await expect(resolveHost(host)).rejects.toBeInstanceOf(StoreTemporarilyUnavailableError);
+  });
+
+  it('R2 down: a memory hit under 8 s still serves; older + API 429 -> unavailable (503), never a stale copy', async () => {
+    const host = uniq('r2down');
+    fetchMock.mockResolvedValueOnce(store(host));
+    await resolveHost(host);
+    await flush();
+    hoisted.state.r2Down = true;
+    resetEpochMemo();
+    clock += 3_000;
+    expect((await resolveHost(host)).id).toBe(`id-${host}`);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    clock += 10_000; // 13 s old
+    fetchMock.mockResolvedValue(json({}, 429));
+    await expect(resolveHost(host)).rejects.toBeInstanceOf(StoreTemporarilyUnavailableError);
+  });
+
+  it('R2 down but API healthy: resolution keeps working', async () => {
+    hoisted.state.r2Down = true;
+    const host = uniq('r2down-ok');
+    fetchMock.mockResolvedValue(store(host));
+    expect((await resolveHost(host)).id).toBe(`id-${host}`);
+  });
+
+  it('a client navigation (text/x-component) gets the 503 too', async () => {
+    const res = await retryableUnavailable(
+      new Response('0:{"digest":"STORE_TEMPORARILY_UNAVAILABLE"}', {
+        status: 500,
+        headers: { 'content-type': 'text/x-component' },
+      })
+    );
+    expect(res.status).toBe(503);
+    expect(res.headers.get('retry-after')).toBe('30');
+  });
+
+  it('edge verdicts are not extended forever during an outage (10 min cap)', async () => {
+    resetStoreVerdicts();
+    const f = vi.fn().mockResolvedValueOnce(store('cap.example'));
+    expect((await storeVerdict('cap.example', 'https://api', f as never, 0)).ok).toBe(true);
+    f.mockResolvedValue(json({}, 503));
+    expect((await storeVerdict('cap.example', 'https://api', f as never, 61_000)).ok).toBe(true);
+    expect((await storeVerdict('cap.example', 'https://api', f as never, 9 * 60_000)).ok).toBe(
+      true
+    );
+    expect((await storeVerdict('cap.example', 'https://api', f as never, 11 * 60_000)).ok).toBe(
+      false
+    );
+
+    resetDemoVerdicts();
+    const d = vi
+      .fn()
+      .mockResolvedValueOnce(json({ data: { store: { isDemo: true, status: 'active' } } }));
+    expect(await isDemoStoreHost('capd.example', 'https://api', d as never, 0)).toBe(true);
+    d.mockRejectedValue(new TypeError('fetch failed'));
+    expect(await isDemoStoreHost('capd.example', 'https://api', d as never, 301_000)).toBe(true);
+    expect(await isDemoStoreHost('capd.example', 'https://api', d as never, 11 * 60_000)).toBe(
+      false
+    );
   });
 });
 

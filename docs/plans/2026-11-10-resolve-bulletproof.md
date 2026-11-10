@@ -48,6 +48,12 @@ replacing it with "no" (stale-if-error); a definitive answer is cached as before
 Fix: `bustStoreCaches` purged only the CURRENT slug/domain on the storefront and left the old domain's API resolve
 key to its 120 s TTL; it now busts `previous.slug`/`previous.domain` (Redis resolve key, CORS, storefront tags).
 
+## Review follow-ups (2026-11-11)
+
+R2 unreadable -> serve only copies < 8 s old (`entryEpochState` = `unknown`); API purge retried 2x (1 s, 4 s) under
+`cfWaitUntil`; edge verdicts capped at 10 min past the last real answer; RSC (`text/x-component`) 500 -> 503 too;
+mid-fetch purge rejects the answer (stamp = fetch start). Ruling RESOLVE-BULLETPROOF-1 §6b.
+
 ## Alert
 
 `noteResolveFailure()` counts upstream 429/5xx/network per isolate per 60 s; at 10 it emits one
