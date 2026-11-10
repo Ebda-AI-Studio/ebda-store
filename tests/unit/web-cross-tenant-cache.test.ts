@@ -17,6 +17,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { middleware } from '../../apps/web/middleware';
+import { redirectTarget } from '../../apps/web/studio-host';
 
 const NOT_FOUND = vi.hoisted(() => new Error('NEXT_NOT_FOUND'));
 const headerBag = vi.hoisted(() => ({ value: new Map<string, string>() }));
@@ -141,6 +142,46 @@ describe('middleware — the Host alone picks the store', () => {
     expect(res.headers.get('location')).toBe(target);
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(forwarded(res, 'x-store-domain')).toBeNull();
+  });
+
+  // Not an open redirect: whatever the path, the 301 stays on wa.ebda.app (a `//host` path must never become the origin)
+  it.each(['whatsapp.ebda.app', 'chat.ebda.app'])('%s: hostile paths stay on wa.ebda.app', host => {
+    for (const path of [
+      '//evil.com',
+      '//evil.com/x',
+      '/\\evil.com',
+      '/%2F%2Fevil.com',
+      '/..//evil.com',
+      '///evil.com/x?y=1',
+      '/inbox?x=1',
+    ]) {
+      const res = middleware(at(host, path));
+      expect(res.status, path).toBe(301);
+      const loc = new URL(res.headers.get('location')!);
+      expect(loc.host, path).toBe('wa.ebda.app');
+      expect(loc.protocol, path).toBe('https:');
+    }
+    expect(middleware(at(host, '/inbox?x=1')).headers.get('location')).toBe(
+      'https://wa.ebda.app/inbox?x=1'
+    );
+  });
+
+  it('redirectTarget never leaves the fixed host, even for raw (unparsed) hostile paths', () => {
+    for (const p of [
+      '//evil.com',
+      '/\\evil.com',
+      '\\\\evil.com',
+      '/%2F%2Fevil.com',
+      '/..//evil.com',
+      '//',
+      '',
+      'evil.com',
+    ]) {
+      const loc = new URL(redirectTarget('wa.ebda.app', p, '?q=1'));
+      expect(loc.host, p).toBe('wa.ebda.app');
+      expect(loc.protocol, p).toBe('https:');
+    }
+    expect(redirectTarget('wa.ebda.app', '/inbox', '?x=1')).toBe('https://wa.ebda.app/inbox?x=1');
   });
 
   // SUBDOMAIN-SOON-2: every coming-soon software product has its page, named as in BRAND.comingProducts. invite/ads/quote

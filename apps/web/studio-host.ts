@@ -21,14 +21,34 @@ export function studioLabel(hostname: string): string | null {
 }
 
 /**
+ * The redirect target on `host`, built so the request can only supply a path and a query, never an origin: the URL
+ * starts from `https://<host>/`, the path is set through the `pathname` setter after collapsing any leading `/` or
+ * `\` run (so `//evil.com`, `/\evil.com` stay paths on `host`), and the host is checked again before answering.
+ * Anything that does not stay on `host` falls back to its root. Not an open redirect (Ruling WHATSAPP-HOST-REDIRECT-1).
+ */
+export function redirectTarget(host: string, pathname: string, search: string): string {
+  const root = `https://${host}/`;
+  try {
+    const u = new URL(root);
+    u.pathname = '/' + pathname.replace(/^[/\\]+/, '');
+    u.search = search;
+    return u.host === host && u.protocol === 'https:' ? u.toString() : root;
+  } catch {
+    return root;
+  }
+}
+
+/**
  * The branded studio response for a host nobody serves, or `null` when it is not a studio label. A label that
- * names a live product elsewhere (`whatsapp` → wa.ebda.app) is a 301 there, keeping `pathAndSearch`.
+ * names a live product elsewhere (`whatsapp` → wa.ebda.app) is a 301 there, keeping the path and query; the target
+ * host is FIXED (see `redirectTarget`), so a request path can never steer the redirect to another site.
  */
 export function studioHostResponse(
   hostname: string,
   acceptLanguage: string | null,
   queryLang: string | null,
-  pathAndSearch = '/'
+  pathname = '/',
+  search = ''
 ): { response: NextResponse; plan: StudioHostPlan } | null {
   const label = studioLabel(hostname);
   if (label === null) return null;
@@ -37,7 +57,7 @@ export function studioHostResponse(
     const response = new NextResponse(null, {
       status: 301,
       headers: {
-        Location: new URL(pathAndSearch, `https://${plan.host}`).toString(),
+        Location: redirectTarget(plan.host, pathname, search),
         'Cache-Control': 'no-store',
       },
     });

@@ -505,7 +505,8 @@ function unservedHostResponse(request: NextRequest, hostname: string): NextRespo
     hostname,
     request.headers.get('accept-language'),
     request.nextUrl.searchParams.get('lang'),
-    request.nextUrl.pathname + request.nextUrl.search
+    request.nextUrl.pathname,
+    request.nextUrl.search
   );
   return studio ? studio.response : notFoundResponse();
 }
