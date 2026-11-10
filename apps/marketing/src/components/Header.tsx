@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import {
   SITE_NAV_ICONS,
   productBar,
@@ -26,7 +26,7 @@ import { absoluteUrl, productOfPage, pagePath, type Locale, type PageSlug } from
 type Page = PageSlug;
 
 /**
- * One link of the shared nav data (packages/shared/src/brand): a marketing page routes client-side with next/link,
+ * One link of the shared nav data (packages/shared/src/brand): a marketing page routes client-side through PageLink (a file path such as security.txt is a plain anchor),
  * everything else (help, docs, status, the apps) is a plain anchor. Product-app links stay in the same tab.
  */
 function NavA({
@@ -42,9 +42,9 @@ function NavA({
 }) {
   const aria = current ? ({ 'aria-current': 'page' } as const) : {};
   return l.path ? (
-    <Link href={l.path} className={className} {...aria}>
+    <PageLink href={l.path} className={className} {...aria}>
       {l.label}
-    </Link>
+    </PageLink>
   ) : (
     <SiteLink href={l.href} locale={locale} className={className} {...aria}>
       {l.label}
@@ -134,10 +134,10 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
   return (
     <header className="site-header">
       <div className="wrap header-row">
-        <Link href={home.path!} className="wordmark" aria-label={home.label}>
+        <PageLink href={home.path!} className="wordmark" aria-label={home.label}>
           <img src="/icon.svg" alt="" width={28} height={28} />
           <span className="wm-name">{home.label}</span>
-        </Link>
+        </PageLink>
         <nav aria-label={t.nav} className="nav">
           <ul className="nav-links">
             <li className="nav-products">
@@ -146,7 +146,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 <ul>
                   {products.map(p => (
                     <li key={p.id}>
-                      <Link href={p.path!}>
+                      <PageLink href={p.path!}>
                         <span className="np-ico">
                           <ProductIcon id={p.id} mirror={locale === 'ar' && p.id === 'whatsapp'} />
                         </span>
@@ -154,7 +154,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                           <b>{p.label}</b>
                           <span>{p.blurb}</span>
                         </span>
-                      </Link>
+                      </PageLink>
                     </li>
                   ))}
                   {soon.map(it => (
@@ -177,12 +177,12 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                   <ul>
                     {services.map(sv => (
                       <li key={sv.id}>
-                        <Link href={sv.path!} aria-current={svcCur(sv) ? 'page' : undefined}>
+                        <PageLink href={sv.path!} aria-current={svcCur(sv) ? 'page' : undefined}>
                           <span className="np-txt">
                             <b>{sv.label}</b>
                             <span>{sv.blurb}</span>
                           </span>
-                        </Link>
+                        </PageLink>
                       </li>
                     ))}
                   </ul>
@@ -281,9 +281,9 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
                 </ul>
               </li>
               <li className="menu-lang">
-                <Link href={pagePath(other, page)} hrefLang={other} lang={other}>
+                <PageLink href={pagePath(other, page)} hrefLang={other} lang={other}>
                   {c.nav.switchTo}
-                </Link>
+                </PageLink>
               </li>
               <li className="menu-actions">
                 <NavA locale={locale} l={bar ? bar.cta : primary} className="nav-cta menu-start" />
@@ -294,7 +294,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
         </nav>
         <div className="header-actions">
           <HeaderSearch locale={locale} />
-          <Link
+          <PageLink
             href={pagePath(other, page)}
             hrefLang={other}
             lang={other}
@@ -302,7 +302,7 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
             aria-label={c.nav.switchLabel}
           >
             {c.nav.switchTo}
-          </Link>
+          </PageLink>
           {login.items.length === 1 ? (
             <NavA
               locale={locale}
@@ -330,13 +330,13 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page; off
       {bar && (
         <div className="product-bar">
           <div className="wrap product-row">
-            <Link
+            <PageLink
               href={bar.chip.path!}
               className="product-chip"
               aria-current={cur(bar.chip) ? 'page' : undefined}
             >
               {bar.chip.label}
-            </Link>
+            </PageLink>
             <ul className="product-links">
               {bar.links.map(l => (
                 <li key={l.id}>

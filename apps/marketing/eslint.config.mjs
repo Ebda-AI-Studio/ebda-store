@@ -19,7 +19,21 @@ export default [
       'react/no-unescaped-entities': 'off',
       '@next/next/no-img-element': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
+      // Every same-site link goes through components/PageLink: next/link sends a FILE path (security.txt, sitemap.xml)
+      // through the client router, which with trailingSlash rewrote /.well-known/security.txt to a 404.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'next/link',
+              message: 'Use PageLink from components/PageLink (file paths must be plain anchors).',
+            },
+          ],
+        },
+      ],
     },
     settings: { react: { version: 'detect' } },
   },
+  { files: ['src/components/PageLink.tsx'], rules: { 'no-restricted-imports': 'off' } },
 ];

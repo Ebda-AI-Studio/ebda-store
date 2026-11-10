@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { serviceLineJsonLd } from '../lib/seo';
@@ -76,7 +76,7 @@ export function ServiceLinePage({ locale, id }: { locale: Locale; id: LineId }) 
           <div className="wrap sv-hero-grid">
             <div className="sv-hero-copy">
               <p className="sv-crumb">
-                <Link href={`${pagePath(locale, 'services')}/`}>{u.back}</Link>
+                <PageLink href={`${pagePath(locale, 'services')}/`}>{u.back}</PageLink>
                 <span aria-hidden="true"> / </span>
                 <span>{name}</span>
               </p>
@@ -84,9 +84,9 @@ export function ServiceLinePage({ locale, id }: { locale: Locale; id: LineId }) 
               <h1 id="sv-h1">{c.hero.h1}</h1>
               <p className="sv-lead">{c.hero.lead}</p>
               <p className="actions">
-                <Link href={contactHref} className="btn btn-primary btn-lg sv-cta">
+                <PageLink href={contactHref} className="btn btn-primary btn-lg sv-cta">
                   {c.hero.cta}
-                </Link>
+                </PageLink>
               </p>
             </div>
             <Photo id="sv-hero-img" name={site.images.hero} alt={c.alt.hero} locale={locale} hero />
@@ -205,9 +205,9 @@ export function ServiceLinePage({ locale, id }: { locale: Locale; id: LineId }) 
 
         <p className="wrap sv-powered muted small" data-powered={id}>
           {LINE_POWERED[locale][id].text}{' '}
-          <Link href={`${pagePath(locale, '')}${locale === 'ar' ? '' : '/'}#products`}>
+          <PageLink href={`${pagePath(locale, '')}${locale === 'ar' ? '' : '/'}#products`}>
             {LINE_POWERED[locale][id].link}
-          </Link>
+          </PageLink>
         </p>
 
         <section className={`ab-sec ${MOTIFS[3]} faq`} aria-labelledby="sv-faq-h" id="faq">
@@ -235,9 +235,9 @@ export function ServiceLinePage({ locale, id }: { locale: Locale; id: LineId }) 
               <h2 id="sv-close-h">{c.closer.h}</h2>
               <p className="sv-lead">{c.closer.p}</p>
               <p className="actions">
-                <Link href={contactHref} className="btn btn-primary btn-lg sv-cta">
+                <PageLink href={contactHref} className="btn btn-primary btn-lg sv-cta">
                   {u.contactCta}
-                </Link>
+                </PageLink>
               </p>
               <p className="sv-mail">
                 {u.emailLead}{' '}
