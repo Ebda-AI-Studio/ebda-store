@@ -202,8 +202,10 @@ describe('job data classification', () => {
     expect(src).not.toMatch(/\bprisma\b/);
     // the one Postgres write left is the pg branch of the disarm, reached only when storeMoney() is null
     expect(src.match(/withStore\(/g)).toHaveLength(1);
-    expect(src.indexOf('fanoutDisarm(')).toBeLessThan(src.indexOf('withStore('));
   });
+
+  // The disarm ordering (DO money op for a DO order, withStore only for a Postgres one) is a behaviour test:
+  // tests/unit/order-status-fanout-sweep-disarm.test.ts.
 });
 
 describe('with JOBS_ON_DO off (today) nothing changes', () => {
