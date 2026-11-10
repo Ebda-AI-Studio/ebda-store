@@ -529,7 +529,7 @@ export default function ReturnsClient() {
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">
-            {t('Returns & Refunds', 'المرتجعات واسترداد الفلوس')}
+            {t('Returns & Refunds', 'المرتجعات واسترداد الأموال')}
           </h1>
           <p className="mt-2 text-muted-foreground">
             {t('Our hassle-free return policy', 'سياسة إرجاع سهلة')}
