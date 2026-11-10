@@ -1,5 +1,6 @@
 // Re-hashes the rendered markup of every dated page and bumps the lastmod date of the pages that changed.
 //   npm run lastmod -w apps/marketing
+import './no-css'; // first: the pages import stylesheets
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
