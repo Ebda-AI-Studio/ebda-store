@@ -1,5 +1,6 @@
 import { it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { parse } from 'yaml';
 
 it('web deploy passes SHOW_DEMO_STORE_LINK from the repo variable, default false (Ruling B1-18)', () => {
   const y = readFileSync('.github/workflows/cf-web-deploy.yml', 'utf8');
@@ -19,7 +20,23 @@ it('web deploy turns language-in-the-URL on for every store host, overridable by
   expect(y).toContain('node ../../scripts/ci/populate-r2-cache.mjs');
   expect(y).toContain('OPEN_NEXT_DEPLOY=true npx wrangler deploy "${VARS[@]}"');
   expect(y).not.toContain('opennextjs-cloudflare deploy');
-  expect(y.indexOf('node ../../scripts/ci/populate-r2-cache.mjs')).toBeLessThan(
-    y.indexOf('OPEN_NEXT_DEPLOY=true npx')
+  // Order, structurally. A workflow cannot run in a unit test (GitHub runner, Cloudflare credentials), so parse the YAML,
+  // take the `deploy` job's step that holds the deploy command, and compare the EXECUTABLE lines of its `run` script:
+  // comments are dropped (a comment mentioning the command is not a call) and the populate must be an unconditional,
+  // top-level command, not an indented `if` branch.
+  const wf = parse(y) as {
+    jobs: { deploy: { steps: Array<{ name?: string; run?: string }> } };
+  };
+  const steps = wf.jobs.deploy.steps.filter(s => s.run?.includes('wrangler deploy "${VARS[@]}"'));
+  expect(steps).toHaveLength(1);
+  const lines = steps[0]
+    .run!.split('\n')
+    .filter(l => l.trim() !== '' && !l.trimStart().startsWith('#'));
+  const populate = lines.findIndex(l =>
+    l.startsWith('node ../../scripts/ci/populate-r2-cache.mjs')
   );
+  const deploy = lines.findIndex(l => l.startsWith('OPEN_NEXT_DEPLOY=true npx wrangler deploy'));
+  expect(populate).toBeGreaterThan(-1);
+  expect(deploy).toBeGreaterThan(-1);
+  expect(populate).toBeLessThan(deploy);
 });

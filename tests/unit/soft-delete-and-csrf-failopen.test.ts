@@ -8,12 +8,109 @@
  * executed. These three run on every request, every order, and every
  * checkout respectively.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Request, Response, NextFunction } from 'express';
 
 const ROOT = join(__dirname, '../..');
+
+// ── fakes for the soft-delete behaviour tests below ────────────────────────
+// A tiny in-memory product table that HONOURS the `where` it is given (id, id
+// in, storeId, status, deletedAt: null). Whether a soft-deleted product is
+// returned therefore depends on the production query's filter, not on the mock.
+const productTable = vi.hoisted(() => {
+  const gone = {
+    id: 'prod-gone',
+    storeId: 'store-1',
+    status: 'active', // soft delete leaves status untouched (the premise)
+    deletedAt: new Date('2026-01-01'),
+  };
+  const live = { id: 'prod-live', storeId: 'store-1', status: 'active', deletedAt: null };
+  const base = {
+    name: 'P',
+    nameAr: null,
+    price: 1000,
+    sku: null,
+    moq: null,
+    costPrice: null,
+    trackInventory: true,
+    inventory: 50,
+    allowBackorder: false,
+    personalisation: null,
+    audience: 'public',
+    variants: [],
+    categories: [],
+    _count: { variants: 0 },
+  };
+  const rows = [gone, live].map(r => ({ ...base, ...r }));
+  const matches = (where: any, r: any) =>
+    (where.id === undefined ||
+      (typeof where.id === 'string' ? where.id === r.id : where.id.in.includes(r.id))) &&
+    (where.storeId === undefined || where.storeId === r.storeId) &&
+    (where.status === undefined || where.status === r.status) &&
+    (where.deletedAt === undefined || where.deletedAt === r.deletedAt);
+  return {
+    findFirst: async ({ where }: any) => rows.find(r => matches(where, r)) ?? null,
+    findMany: async ({ where }: any) => rows.filter(r => matches(where, r)),
+  };
+});
+
+vi.mock('@ebda/database', () => {
+  const prisma: any = {
+    cart: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn().mockResolvedValue({}) },
+    cartItem: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({}),
+      update: vi.fn(),
+    },
+    product: productTable,
+    productVariant: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    user: { findFirst: vi.fn() },
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    $executeRawUnsafe: vi.fn(),
+    $transaction: async (fn: (tx: unknown) => unknown) => fn(prisma),
+  };
+  return {
+    prisma,
+    Prisma: {
+      TransactionIsolationLevel: { Serializable: 'Serializable', ReadCommitted: 'ReadCommitted' },
+    },
+    hasTenantContext: () => false,
+    runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+    withMoneyTx: (_c: unknown, fn: (t: unknown) => unknown) => fn({}),
+    OrderStatus: {},
+  };
+});
+vi.mock('@api/services/feature.service', () => ({
+  featureService: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
+}));
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertOrderAllowed: vi.fn().mockResolvedValue(undefined),
+  noteOrderCreated: vi.fn(),
+}));
+vi.mock('@api/services/gold-rate/gate', () => ({
+  assertGoldLinesPriceable: async () => ({ snapshots: new Map(), rateIds: new Map() }),
+  assertSameRates: async () => undefined,
+  goldQuotesForLines: async () => new Map(),
+  goldQuoteKey: (p: string, v: string | null) => `${p}|${v ?? ''}`,
+}));
+vi.mock('@api/services/gold-rate/public', () => ({
+  publicGoldPricingForLines: async () => new Map(),
+  publicGoldFields: async () => ({ goldPricing: null }),
+}));
+vi.mock('@api/services/fiscal-document.service', () => ({ FiscalDocumentService: {} }));
+vi.mock('@api/lib/inngest/client', () => ({
+  inngest: { send: vi.fn().mockResolvedValue({ ids: [] }), createFunction: vi.fn(() => ({})) },
+}));
+vi.mock('@api/services/socket.service', () => ({
+  socketService: { newOrderNotification: vi.fn(), orderStatusNotification: vi.fn() },
+}));
+vi.mock('@api/services/email.service', () => ({ EmailService: {} }));
+vi.mock('@api/lib/logger', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 
 // ── #1530 · csrfProtection failed OPEN on an unparsed request ──────────────
 //
@@ -132,11 +229,13 @@ describe('product soft-delete is honoured everywhere a customer can reach', () =
     expect(block).not.toMatch(/status:\s*'(archived|draft)'/);
   });
 
-  it('CartService excludes soft-deleted products', () => {
-    const src = readFileSync(join(ROOT2, 'apps/api/src/services/cart.service.ts'), 'utf8');
-    const i = src.indexOf("where: { id: { in: productIds }, storeId, status: 'active'");
-    expect(i, 'the cart product lookup moved — re-point this test').toBeGreaterThan(-1);
-    expect(src.slice(i, i + 140)).toMatch(/deletedAt:\s*null/);
+  it('CartService excludes soft-deleted products (bulk lookup)', async () => {
+    const { CartService } = await import('@api/services/cart.service');
+    const { prisma } = await import('@ebda/database');
+    vi.spyOn(CartService, 'getOrCreate').mockResolvedValue({ id: 'cart-1', items: [] } as never);
+    (prisma.cartItem.create as ReturnType<typeof vi.fn>).mockClear();
+    await CartService.addItems('store-1', 'sess-1', [{ productId: 'prod-gone', quantity: 1 }]);
+    expect(prisma.cartItem.create).not.toHaveBeenCalled();
   });
 });
 
@@ -152,22 +251,52 @@ describe('soft-deleted products are excluded on EVERY path that can reach a cust
   const cart = readFileSync(join(R, 'apps/api/src/services/cart.service.ts'), 'utf8');
   const order = readFileSync(join(R, 'apps/api/src/services/order.service.ts'), 'utf8');
 
-  it('primary add-to-cart (CartService.addItem)', () => {
-    const i = cart.indexOf("where: { id: productId, storeId, status: 'active'");
-    expect(i, 'the addItem product lookup moved — re-point this test').toBeGreaterThan(-1);
-    expect(cart.slice(i, i + 120)).toMatch(/deletedAt:\s*null/);
+  const R_cart = async () => {
+    const { CartService } = await import('@api/services/cart.service');
+    const { prisma } = await import('@ebda/database');
+    vi.spyOn(CartService, 'getOrCreate').mockResolvedValue({ id: 'cart-1', items: [] } as never);
+    return { CartService, create: prisma.cartItem.create as ReturnType<typeof vi.fn> };
+  };
+  beforeEach(() => vi.clearAllMocks());
+
+  it('primary add-to-cart (CartService.addItem)', async () => {
+    const { CartService, create } = await R_cart();
+    await expect(CartService.addItem('store-1', 'sess-1', 'prod-gone', 1)).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'NOT_FOUND',
+    });
+    expect(create).not.toHaveBeenCalled();
+    // control: the live product on the same path is added.
+    await CartService.addItem('store-1', 'sess-1', 'prod-live', 1);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it('bulk add-to-cart (CartService.addItems)', () => {
-    const i = cart.indexOf("where: { id: { in: productIds }, storeId, status: 'active'");
-    expect(i, 'the addItems product lookup moved — re-point this test').toBeGreaterThan(-1);
-    expect(cart.slice(i, i + 140)).toMatch(/deletedAt:\s*null/);
+  it('bulk add-to-cart (CartService.addItems)', async () => {
+    const { CartService, create } = await R_cart();
+    await CartService.addItems('store-1', 'sess-1', [
+      { productId: 'prod-gone', quantity: 1 },
+      { productId: 'prod-live', quantity: 1 },
+    ]);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ productId: 'prod-live' }) })
+    );
   });
 
-  it('admin manual order (OrderService.createManual) — hydrates price AND decrements stock', () => {
-    const i = order.indexOf("where: { id: { in: productIds }, storeId, status: 'active'");
-    expect(i, 'the createManual product lookup moved — re-point this test').toBeGreaterThan(-1);
-    expect(order.slice(i, i + 140)).toMatch(/deletedAt:\s*null/);
+  it('admin manual order (OrderService.createAdminOrder) — hydrates price AND decrements stock', async () => {
+    const { OrderService } = await import('@api/services/order.service');
+    await expect(
+      OrderService.createAdminOrder(
+        'store-1',
+        'admin-1',
+        {
+          items: [{ productId: 'prod-gone', quantity: 1 }],
+          customerName: 'X',
+          customerEmail: 'x@example.com',
+        } as never,
+        { role: 'store_admin' }
+      )
+    ).rejects.toMatchObject({ statusCode: 404, code: 'PRODUCT_NOT_FOUND' });
   });
 
   it('checkout refusal carries ids in `details`, not interpolated into the message', () => {

@@ -347,14 +347,5 @@ describe('every other queue consumer (email, sms, CI, WhatsApp store events, DLQ
     expect(b.messages[0].ack).not.toHaveBeenCalled();
     expect(b.messages[0].retry).toHaveBeenCalledTimes(1);
   });
-
-  it('the Worker queue() entry parks BEFORE any consumer runs', () => {
-    const src = readFileSync(new URL('../../apps/api/src/worker.ts', import.meta.url), 'utf8');
-    const q = src.slice(src.indexOf('async function queue('));
-    const body = q.slice(0, q.indexOf('\n}\n'));
-    expect(body.indexOf('parkIfFrozen')).toBeGreaterThan(-1);
-    expect(body.indexOf('parkIfFrozen')).toBeLessThan(body.indexOf('handleQueueBatch'));
-    expect(body.indexOf('parkIfFrozen')).toBeLessThan(body.indexOf('handleStoreEventsBatch'));
-    expect(body.indexOf('parkIfFrozen')).toBeLessThan(body.indexOf('handleCiEventsBatch'));
-  });
+  // The Worker queue() entry parking BEFORE any consumer is a behaviour test: tests/unit/worker-queue-freeze.test.ts.
 });
