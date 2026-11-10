@@ -132,15 +132,22 @@ const event = (
   provider: string,
   refundId: string,
   amount: number | null,
-  status = 'completed'
-) => ({ ...A, provider, refund: { refundId, status, amount }, now: NOW });
+  status = 'completed',
+  reference?: string
+) => ({
+  ...A,
+  provider,
+  refund: { refundId, status, amount, ...(reference !== undefined ? { reference } : {}) },
+  now: NOW,
+});
 const apply = async (
   provider: string,
   refundId: string,
   amount: number | null,
-  status = 'completed'
+  status = 'completed',
+  reference?: string
 ) => {
-  const s = await settleRefundEvent(event(provider, refundId, amount, status));
+  const s = await settleRefundEvent(event(provider, refundId, amount, status, reference));
   if (!s.seen && s.decision) {
     const d = s.decision;
     if (d.heldOpenClaimIdUnverified || d.heldUnaccountedEvent)
@@ -273,7 +280,10 @@ describe('absorb only a COMPLETED event; one claim, one notice', () => {
     ]) {
       beforeEachReset();
       claim('c1', 1000);
-      for (const who of order) await apply(who === 'refresh' ? 'paymob' : 'paymob', 'R1', 1000);
+      // The two callers send different shapes: the refresh route (order.routes.ts) has no provider reference, the
+      // webhook (payment.factory.ts) carries one. Both must land on the same refund.
+      for (const who of order)
+        await apply('paymob', 'R1', 1000, 'completed', who === 'webhook' ? 'PMB-REF-1' : undefined);
       expect(db.payment.refundedAmount).toBe(1500);
       expect(types('refund_webhook_absorbed')).toHaveLength(1);
     }

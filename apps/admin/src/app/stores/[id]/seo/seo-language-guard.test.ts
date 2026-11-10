@@ -57,7 +57,7 @@ describe('seo language guard', () => {
       swapped: false,
     });
     const { next, filled } = applyAiSeoSuggestion(
-      {},
+      {} as SeoMetaFields,
       {
         title: 'Qamar قمر — Evening Dresses',
         titleAr: 'قمر — فساتين سهرة',
