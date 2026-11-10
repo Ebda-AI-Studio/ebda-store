@@ -245,13 +245,20 @@ describe('store-resolver — per-host store cache', () => {
     expect((await resolver.getStoreOrNotFound()).id).toBe('store-a');
   });
 
-  it('a 404 is never cached as a store: a host that appears later resolves at once', async () => {
+  it('a 404 is never cached as a store: a host that appears later resolves once the miss window ends', async () => {
+    // Ruling RESOLVE-BULLETPROOF-1: a definitive miss IS remembered briefly (unknown hosts must not drain the API).
+    // On Cloudflare a domain add bumps the host purge epoch and the miss is dropped at once
+    // (store-resolve-bulletproof.test.ts "domain added"); here, without R2, it lasts LOCAL_MISS_TTL_MS.
+    const { LOCAL_MISS_TTL_MS } = await import('../../apps/web/src/lib/store-resolve-cache');
     asHost('newshop.ebda.app');
     await expect(resolver.getStoreOrNotFound()).rejects.toBe(NOT_FOUND);
     STORES['newshop.ebda.app'] = { id: 'store-new', slug: 'newshop', name: 'New' };
+    const t0 = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => t0 + LOCAL_MISS_TTL_MS + 1);
     try {
       expect((await resolver.getStoreOrNotFound()).id).toBe('store-new');
     } finally {
+      clock.mockRestore();
       delete STORES['newshop.ebda.app'];
     }
   });
@@ -288,11 +295,13 @@ describe('store-resolver — per-host store cache', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('the Next data-cache fetch is tagged and keyed per host', async () => {
+  it('the resolve fetch bypasses the Next data cache and is keyed per host', async () => {
     asHost('demo-boutique.ebda.app');
     await resolver.getStoreOrNotFound();
     const [, init] = fetchMock.mock.calls[0];
-    expect(init.next.tags).toEqual(['store-domain:demo-boutique.ebda.app']);
+    // Ruling RESOLVE-BULLETPROOF-1: OpenNext's tagCache is "dummy", so a tag purge never reached that cache.
+    expect(init.cache).toBe('no-store');
+    expect(init.next).toBeUndefined();
     expect(init.headers['x-store-domain']).toBe('demo-boutique.ebda.app');
   });
 });
