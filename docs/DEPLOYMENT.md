@@ -1,5 +1,7 @@
 # Ebda Store - Production Deployment Guide
 
+> **2026-11-10 update:** the Railway API, Neon, the Axiom log drain and UptimeRobot named in older sections below are retired (Postgres retired 2026-11-05). Today: every app is a Cloudflare Worker, data is D1 + Durable Objects + R2, logs are Workers Logs + Logpush to R2 `ebda-logs` (section 7), availability is probed by status.ebda.app with Telegram alerts. Incident triage: `docs/INCIDENT.md`; escalation: `docs/ops/escalation.md`.
+
 > **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
 >
 > **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed by GitHub Actions via `wrangler deploy` (Ebda: only the API workflow `.github/workflows/cf-api-deploy.yml` exists, manual `workflow_dispatch` on `main`; there is no `cf-deploy.yml` for web/admin/orders yet) — `ebda-web` / `ebda-admin` / `ebda-orders`, serving `store.ebda.app` / `store.ebda.app` / `orders.ebda.app`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
@@ -491,7 +493,7 @@ Sentry / Axiom / PostHog each have their own native notification channels (email
 Replaces the Axiom drain (section 5) at cutover: once the API is no longer on Railway nothing writes to that transport.
 
 - **Workers Logs (searchable, short retention):** `observability: { enabled: true, head_sampling_rate: 1 }` (**0.1 on `ebda-api` and `ebda-web`, the public high-traffic Workers, since the launch sampling change (PERF-SAMPLING): Workers Logs keep 1 in 10 invocations; the Logpush archive below and Sentry error capture are separate pipelines. Inferred from Cloudflare's docs, not measured: confirm the archive volume after the first launch day**) and `"logpush": true` on all NINE Ebda Workers: `ebda-api`, `ebda-web`, `ebda-admin`, `ebda-marketing`, `ebda-orders`, `ebda-accounts` (identity), `ebda-help`, `ebda-docs`, `ebda-status` (`apps/*/wrangler.jsonc`; the OpenNext generator `scripts/cf-setup-local.sh` emits the same for web/admin/orders, which it regenerates at every deploy). Query them in the dashboard: Workers & Pages, the Worker, Logs. The assets-only Workers (marketing, help, docs) run no script for static hits, so those produce no log lines; the flags keep config parity. `tests/unit/ops/worker-logs-config.test.ts` fails a PR that drops either setting on any of the nine.
-- **Logpush (30 days, in our bucket):** ONE account-level job **`ebda-workers-trace`** (id 1986363, dataset `workers_trace_events`, filter `ScriptName in [the nine]`) writes gzip NDJSON to R2 bucket **`ebda-logs`**, objects `workers/<YYYYMMDD>/<start>_<end>_<id>.log.gz` (plus `workers/00010101/test.txt.gz`, Logpush's ownership check). A lifecycle rule deletes objects after 30 days (created and read back 2026-10-24). Verified 2026-10-25: the job has `last_complete` set with no `last_error`, and real log files were listed with the bucket-scoped read key. Logs carry `console.log` lines and uncaught exceptions, never request bodies; the PII masking rules of section 5 still apply to what we log.
+- **Logpush (30 days, in our bucket):** ONE account-level job **`ebda-workers-trace`** (id 1986363, dataset `workers_trace_events`, filter `ScriptName in [the nine ebda-store Workers + ebda-wa + ebda-os-brain]`, fields incl. `CPUTimeMs`/`WallTimeMs`/`Entrypoint`/`EventType`; `scripts/ops/cf-logs-setup.sh` is the source of both lists) writes gzip NDJSON to R2 bucket **`ebda-logs`**, objects `workers/<YYYYMMDD>/<start>_<end>_<id>.log.gz` (plus `workers/00010101/test.txt.gz`, Logpush's ownership check). A lifecycle rule deletes objects after 30 days (created and read back 2026-10-24). Verified 2026-10-25: the job has `last_complete` set with no `last_error`, and real log files were listed with the bucket-scoped read key. Logs carry `console.log` lines and uncaught exceptions, never request bodies; the PII masking rules of section 5 still apply to what we log.
 - **Which token can do what (never print them):**
 
   | Token / file                                                  | Scope                                                                                      | Used for                                                                                                                     |
@@ -502,7 +504,8 @@ Replaces the Axiom drain (section 5) at cutover: once the API is no longer on Ra
   | wrangler OAuth login                                          | Workers, D1, KV, Queues; no R2, Logs or Notifications                                      | deploys only                                                                                                                 |
 
 - **Setup / re-run (idempotent, verify-then-skip):** `bash scripts/ops/cf-logs-setup.sh`. It sources the logpush env file when `CF_API_TOKEN` is unset. Each step reads the live state and writes only when it differs; a token that cannot read R2 reports "cannot verify with this token" instead of failing. If the job's filter differs from the nine names it updates it.
-- **Reading old logs:** `rclone` with the bucket-scoped read key against `ebda-logs`, then `zcat | jq`; or the Mac pull's copy.
+- **Reading old logs:** `node os/ops/ebda-logs.mjs --since 2h [--script ebda-web] [--status 5xx|429] [--path /store/resolve] [--callers ebda-api:429] [--minutes ebda-web]` from ebda-foundation (installed to `~/.claude/scripts/`): lists + reads the objects through api.cloudflare.com only (works from Egypt, where `wrangler tail` cannot connect) and prints aggregates, paced under the API's 1200 req / 5 min. Or `rclone` with the bucket-scoped read key against `ebda-logs`, then `zcat | jq`. Asset-only Workers (marketing, help, docs) write no records while their assets answer.
+- **Alerting on them:** ebda-foundation `.github/workflows/prod-watch.yml` (GitHub-hosted, every 10 min): probes + the last Logpush window -> Telegram P1s + one daily digest.
 - **Sentry stays** as the error tracker (the one non-Cloudflare dependency besides payment, shipping and Meta providers). Alert route unchanged: Sentry, then the alert bridge (section 6), then Telegram.
 
 ### Verifying end-to-end
@@ -516,13 +519,13 @@ curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
 # 2. Confirm API health
 curl https://api.ebda.app/health
 
-# 3. Trigger UptimeRobot manually: dashboard → monitor → "Test" → expect OK within 30s
+# 3. Check the external probes: https://status.ebda.app (every component green; an incident there pages Telegram)
 
 # 4. Trigger Sentry from the storefront (paste into browser console on demo-merchant.com):
 #    throw new Error("sentry-storefront-smoke-test");
 #    Issue should appear in Sentry dashboard within ~30s.
 
-# 5. Trigger PostHog event capture from the admin (paste into browser console):
+# 5. Trigger PostHog event capture from the admin (accept analytics in the cookie banner first: the admin PostHog is consent-gated; then paste into the browser console):
 #    window.posthog?.capture('admin_smoke_test', {at: new Date().toISOString()});
 #    Event lands in PostHog → Live Events within ~5s.
 ```

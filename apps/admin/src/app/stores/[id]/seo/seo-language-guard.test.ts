@@ -6,6 +6,7 @@ import {
   applyAiSeoSuggestion,
   arabicInEnglishFields,
   hasArabicScript,
+  isMostlyArabic,
   normalizeLanguagePair,
   type SeoMetaFields,
 } from './language-guard';
@@ -38,6 +39,54 @@ describe('seo language guard', () => {
     expect(normalizeLanguagePair('متجر', 'متجر الأمل')).toMatchObject({ en: '', ar: 'متجر الأمل' });
     // both English: the Arabic slot cannot hold it
     expect(normalizeLanguagePair('Amal', 'Amal Store')).toMatchObject({ en: 'Amal', ar: '' });
+  });
+
+  it('Arabic text = more than half of the letters are Arabic (digits, spaces, punctuation do not count)', () => {
+    expect(isMostlyArabic('متجر الأمل')).toBe(true);
+    expect(isMostlyArabic('متجر الأمل Amal')).toBe(true); // 9 Arabic letters of 13
+    expect(isMostlyArabic('Qamar | قمر — Dresses')).toBe(false); // 3 of 15: English naming the brand
+    expect(isMostlyArabic('قمر Qam')).toBe(false); // exactly half is not more than half
+    expect(isMostlyArabic('٢٠٢٦ - 2026 !')).toBe(false); // no letters at all
+    expect(isMostlyArabic('')).toBe(false);
+  });
+
+  it('keeps an English AI title that carries the Arabic brand name, whole (PR #512 review)', () => {
+    expect(normalizeLanguagePair('Qamar قمر — Evening Dresses', 'قمر — فساتين سهرة')).toEqual({
+      en: 'Qamar قمر — Evening Dresses',
+      ar: 'قمر — فساتين سهرة',
+      swapped: false,
+    });
+    const { next, filled } = applyAiSeoSuggestion(
+      {} as SeoMetaFields,
+      {
+        title: 'Qamar قمر — Evening Dresses',
+        titleAr: 'قمر — فساتين سهرة',
+        description: 'Handmade dresses from قمر in Cairo',
+        descriptionAr: 'فساتين مصنوعة يدويًا من قمر في القاهرة',
+      },
+      'fill-empty'
+    );
+    expect(next.metaTitle).toBe('Qamar قمر — Evening Dresses');
+    expect(next.metaDescription).toBe('Handmade dresses from قمر in Cairo');
+    expect(filled).toEqual(['metaTitle', 'metaTitleAr', 'metaDescription', 'metaDescriptionAr']);
+  });
+
+  it('still drops an English AI title that is mostly Arabic, and swaps a pair whose Arabic slot is English', () => {
+    expect(normalizeLanguagePair('متجر الأمل Amal', 'متجر الأمل للهدايا')).toMatchObject({
+      en: '',
+      ar: 'متجر الأمل للهدايا',
+    });
+    // the Arabic slot holds English with one Arabic word: that is the English title, so the pair is swapped
+    expect(normalizeLanguagePair('فساتين سهرة', 'Qamar قمر Evening Dresses')).toEqual({
+      en: 'Qamar قمر Evening Dresses',
+      ar: 'فساتين سهرة',
+      swapped: true,
+    });
+  });
+
+  it('the manual save accepts an English title naming the brand in Arabic, refuses a mostly Arabic one', () => {
+    expect(arabicInEnglishFields({ metaTitle: 'Qamar | قمر — Dresses' })).toEqual([]);
+    expect(arabicInEnglishFields({ metaTitle: 'متجر الأمل Amal' })).toEqual(['metaTitle']);
   });
 
   it('names the English fields that hold Arabic, in form order', () => {

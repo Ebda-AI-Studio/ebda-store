@@ -133,6 +133,12 @@ function isWritable(obj: object, key: string | number): boolean {
   return !d || d.writable === true || typeof d.set === 'function';
 }
 
+const SCRUBBED_HEADERS = new Set([
+  SEARCH_QUERY_HEADER_NAME,
+  'x-hop-timing',
+  'x-ebda-client-ip',
+  'x-ebda-ssr-auth',
+]);
 function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {
   if (typeof value === 'string') return redactSensitiveQuery(value);
   if (!value || typeof value !== 'object' || depth > MAX_DEPTH) return value;
@@ -161,10 +167,9 @@ function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unkno
     // The typed search term rides in this request header (Ruling SEARCH-URL-1 / SEARCH-P2-9);
     // an SDK that records request headers must not carry it to Sentry or PostHog.
     // `x-hop-timing` carries the operator token (HOP_TIMING_TOKEN) of the API's per-hop timing log.
-    if (
-      (key.toLowerCase() === SEARCH_QUERY_HEADER_NAME || key.toLowerCase() === 'x-hop-timing') &&
-      obj[key]
-    ) {
+    // `x-ebda-client-ip` / `x-ebda-ssr-auth`: the shopper address a storefront render forwards and its HMAC
+    // (Ruling RL-SSR-IP-6); the API's Sentry wrapper sees the raw request before worker.ts strips them.
+    if (SCRUBBED_HEADERS.has(key.toLowerCase()) && obj[key]) {
       out = put(out, key, REDACTED_QUERY_VALUE, obj);
       continue;
     }

@@ -1628,8 +1628,12 @@ export function doStoreDelegate(
 
   const read = async (args: any): Promise<any | null> => {
     const a = args ?? {};
-    if (a.include)
+    // `include: { owner }` is served (the DO record carries `ownerId`, the account is the platform's); it means "every scalar +
+    // the owner". Any other relation in `include` is still refused loudly.
+    const includeKeys = a.include ? Object.keys(a.include).filter(k => a.include[k]) : [];
+    if (includeKeys.some(k => k !== 'owner'))
       throw new AppError(501, 'STORE_READ_UNSUPPORTED', 'Store include is not served by the DO');
+    const includeOwner = includeKeys.includes('owner');
     const { id, ...rest } = (a.where ?? {}) as Record<string, any>;
     if (id !== undefined && id !== storeId) return null;
     const requested: string[] | undefined = a.select
@@ -1637,7 +1641,7 @@ export function doStoreDelegate(
       : undefined;
     // `owner` is the only relation served here: the DO record carries `ownerId`, the account is the platform's (D1). Any other
     // relation is refused by the DO record, and the refusal now carries its message (see StoreDO.storeRecord).
-    const wantsOwner = !!requested?.includes('owner');
+    const wantsOwner = !!requested?.includes('owner') || includeOwner;
     const selected = requested?.filter(k => k !== 'owner');
     const need = selected
       ? [...new Set([...selected, ...Object.keys(rest), ...(wantsOwner ? ['ownerId'] : [])])]
@@ -1662,11 +1666,14 @@ export function doStoreDelegate(
       Object.assign(rec, d1);
     }
     if (!matches(rec, rest)) return null;
-    if (!selected) return rec;
-    const out: Record<string, any> = Object.fromEntries(selected.map(k => [k, rec[k]]));
+    const out: Record<string, any> = selected
+      ? Object.fromEntries(selected.map(k => [k, rec[k]]))
+      : rec;
     if (wantsOwner) {
       const acc = rec.ownerId ? await getAccountState(String(rec.ownerId)) : null;
-      const sub = a.select.owner as { select?: Record<string, boolean> } | true;
+      const sub = (a.select?.owner ?? a.include?.owner) as
+        | { select?: Record<string, boolean> }
+        | true;
       const ownerSel = typeof sub === 'object' && sub.select ? sub.select : undefined;
       const full = acc
         ? { id: acc.id, email: acc.email, firstName: acc.firstName, lastName: acc.lastName }

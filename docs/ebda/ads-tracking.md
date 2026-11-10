@@ -69,6 +69,6 @@ CAPI sends run in the `ebda-ads-conversion` Inngest function (never in the reque
 
 ## Known limits
 
-- The pre-existing operator PostHog provider in `apps/admin` is always-on and not consent-gated (it predates this work); the funnel events here use a separate consent-gated `ebda` instance.
+- The operator PostHog providers in `apps/admin` and `apps/orders` are consent-gated too since 2026-11-10 (Ruling ICEBERG-ADM-CONSENT-1): `posthog-js` is not imported until the shared `ebda_consent` cookie says `analytics: true`, and a later decline (the banner fires `ebda:consent-change`) opts capture out. A merchant who never answered the banner sends no analytics. The funnel events here use a separate `ebda` instance.
 - No Conversions API `Lead`/`PageView` (browser-only by design).
 - `Purchase` is per store (first paid payment of that store), not per owner.

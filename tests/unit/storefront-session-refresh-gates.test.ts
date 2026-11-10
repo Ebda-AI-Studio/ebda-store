@@ -234,18 +234,45 @@ describe('#2164 / #2157 — one evidence-free session probe per tab', () => {
   });
 
   it('sessionProbeSpent: false until the tab has asked once and been told there is no session', async () => {
+    // Two different answers, so the test can tell the two requests apart: the profile read says 401,
+    // and the one refresh it spends says "no refresh token" (the API's real no-session answer).
     const fetchMock = vi.fn(async (url: unknown) =>
       String(url).includes('/auth/refresh')
-        ? res(401, { success: false })
-        : res(401, { success: false })
+        ? res(400, NO_TOKEN_400)
+        : res(401, { success: false, error: { code: 'UNAUTHORIZED', message: 'x' } })
     );
     globalThis.fetch = fetchMock as never;
-    const { api, sessionProbeSpent } = await import('@web/lib/api');
+    const { api, sessionProbeSpent, hasSessionHint } = await import('@web/lib/api');
 
     expect(sessionProbeSpent()).toBe(false);
-    await api.getProfile();
+    const result = await api.getProfile();
+    expect(result.success).toBe(false);
+    expect(urls(fetchMock).filter(u => u.endsWith('/auth/me'))).toHaveLength(1);
     expect(refreshes(fetchMock)).toHaveLength(1);
     expect(sessionProbeSpent()).toBe(true);
+    expect(hasSessionHint()).toBe(false); // spent probe + no hint = a guest
+  });
+
+  it('the probe that finds a session (refresh succeeds) retries the read and leaves the session hint', async () => {
+    let meCalls = 0;
+    const fetchMock = vi.fn(async (url: unknown) => {
+      if (String(url).includes('/auth/refresh')) {
+        return res(200, { success: true, data: { refreshed: true, csrfToken: 'c2' } });
+      }
+      meCalls += 1;
+      return meCalls === 1 ? res(401, { success: false }) : res(200, ME_OK);
+    });
+    globalThis.fetch = fetchMock as never;
+    const { api, hasSessionHint } = await import('@web/lib/api');
+
+    const result = await api.getProfile();
+    expect(result.success).toBe(true);
+    expect(meCalls).toBe(2);
+    expect(refreshes(fetchMock)).toHaveLength(1);
+    // A server that rotated the session is proof one exists: the marker is written, so this customer is
+    // never mistaken for a guest by the spent-probe check.
+    expect(local.getItem('hadSession')).toBe('1');
+    expect(hasSessionHint()).toBe(true);
   });
 
   it('sessionProbeSpent: no sessionStorage → false, so the caller keeps asking (never a silent guest)', async () => {

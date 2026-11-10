@@ -7,12 +7,15 @@
 import { withUser } from '@ebda/database';
 import type { AccountState } from '../cf/bindings';
 import { getAccountState } from '../lib/identity-client';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 import { AppError } from '../middleware/error-handler';
 
 export async function reconcileShadowUser(userId: string): Promise<AccountState> {
   const st = await getAccountState(userId);
   if (!st) throw new AppError(401, 'TOKEN_INVALID', 'Account not found');
   if (st.status !== 'active') throw new AppError(401, 'TOKEN_REVOKED', 'Account is not active');
+  // NZ-D23: no Postgres profile table on the Worker; the identity service is the whole account.
+  if (postgresRemovedOnThisWorker()) return st;
   await withUser(userId, async tx => {
     const exists = await tx.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (exists) {

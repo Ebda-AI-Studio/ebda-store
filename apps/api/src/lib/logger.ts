@@ -43,6 +43,7 @@ function pinoLogger(): pino.Logger {
         'req.headers.authorization',
         'req.headers.cookie',
         'req.headers["x-csrf-token"]',
+        'req.headers["x-ebda-ssr-auth"]',
         'req.body.password',
         'req.body.currentPassword',
         'req.body.newPassword',
