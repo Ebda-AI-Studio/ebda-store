@@ -1,12 +1,14 @@
-# Ebda CI: lean lanes and the minutes budget
+# Ebda CI: lanes and the minutes budget
 
-Ebda is a private repo on GitHub Free: **2,000 GitHub-hosted Actions minutes per
-month**, Linux 1x. Ahmad's decision: CI is lean from the first commit; pull
-requests run only lint, typecheck and unit tests for the paths that changed;
-integration, E2E and mutation tests run on main or nightly. Nothing depends on
-Umbra (Ebda Store's self-hosted runner): every job is `runs-on: ubuntu-latest`, and
-`tests/unit/workflow-hosted-runners-only.test.ts` fails the build if a
-self-hosted label, `vars.USE_SELF_HOSTED` or `SCHEDULED_ON_CLOUD` reappears.
+The `Ebda-AI-Studio` org is on **GitHub Enterprise: 50,000 GitHub-hosted Actions minutes per month** (the old
+"GitHub Free, 2,000 minutes" premise is stale since 2026-11-05). Ruling CI-FULL-MAIN-1 (2026-11-10): pull requests
+stay fast (lint, typecheck and unit tests for the paths that changed, plus the guards and the workerd boot smoke),
+and **main always carries a recent full run**: every push to main, a nightly cron and the Sunday cron run the full
+lane (build, integration, the whole workerd suite, e2e, audit), mutation on Sundays. A red full lane on main opens
+or updates ONE GitHub issue labelled `ci-main-red` (plus the Telegram alert); the next green full run closes it.
+Every `runs-on` reads `vars.EBDA_RUNS_ON` and falls back to hosted `ubuntu-24.04`
+(`tests/unit/workflow-hosted-runners-only.test.ts`); schedules run whether or not that variable is set (the
+CI-HOSTED-1 scheduled no-op is retired).
 
 > **Integration on pull requests (2026-10-25, #227).** The integration tier is still a main-lane job, but a PR now runs it
 > when `scripts/ci-affected.mjs` selects it: a changed `tests/integration/*.test.ts` runs that file; a changed file under
@@ -23,13 +25,13 @@ workflow after labelling (`labeled` is not a trigger, so label changes cost no m
 
 ## Lanes
 
-| Trigger                     | Runs                                                                                                                                                                                                                                          |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pull_request` to main      | `changes`, `guards` (migration order, action pins, client secret scan, no-Ebda Store-branding test, prettier on changed files), `lint`, `typecheck`, `unit` (affected paths), `worker-dry-run` (see below); plus gitleaks, blast-radius       |
-| push to `main`              | `guards` only (lite: no install) and gitleaks. The merge commit already passed its PR.                                                                                                                                                        |
-| nightly cron, Mon-Sat 01:17 | ebda_app strict-RLS proof (`test-rls-ebda-app`, the R-EBDA-001 gate)                                                                                                                                                                          |
-| weekly cron, Sun 01:17      | everything in the full lane: `build` (full lint, typecheck, format, build), `test-unit` (full, with coverage), `orphan-tests`, `test-integration`, RLS proof, `test-rls-payload-parity`, `test-e2e`, `security`, `mutation`; semgrep at 01:47 |
-| `workflow_dispatch`         | the full lane; mutation only if the `mutation` input is ticked                                                                                                                                                                                |
+| Trigger                     | Runs                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pull_request` to main      | `changes`, `guards` (migration order, action pins, client secret scan, no-Ebda Store-branding test, prettier on changed files), `lint`, `typecheck`, `unit` (affected paths), `worker-dry-run` (see below); plus gitleaks, blast-radius                                                                                                                                                       |
+| push to `main`              | the FULL lane except mutation: `guards`, `build` (full lint, typecheck, format, build), `test-unit` (full, with coverage), `orphan-tests`, `test-integration`, `api-workerd-smoke` (the whole `apps/api/workers-test` suite, route-sweep included), `workerd-integration`, `test-e2e`, `builder-e2e`, `security`, `notify-failure`; a newer push cancels a superseded main run; plus gitleaks |
+| nightly cron, Mon-Sat 01:17 | the full lane (same as a main push)                                                                                                                                                                                                                                                                                                                                                           |
+| weekly cron, Sun 01:17      | the full lane + `mutation`; semgrep at 01:47                                                                                                                                                                                                                                                                                                                                                  |
+| `workflow_dispatch`         | the full lane; mutation only if the `mutation` input is ticked                                                                                                                                                                                                                                                                                                                                |
 
 `scripts/ci-affected.mjs` decides what a PR touches. A changed file maps to its
 workspace plus every workspace that depends on it (from `package.json`); a
@@ -45,67 +47,61 @@ relative imports), or the root manifest, lockfile and `cf-*` scripts. It costs a
 is not run for ordinary source edits. Apps without a wrangler config (apps/api
 today) are skipped, not failed.
 
-### Deviation from "main push runs the heavy suite"
+### Main push runs the heavy suite (Ruling CI-FULL-MAIN-1)
 
-The first draft put build, integration, RLS, e2e and audit on every main push.
-At 60 merges a month that alone is about 3,400 minutes, so it cannot fit.
-The heavy tiers therefore run on a cadence, not a trigger: nightly for the RLS
-gate, weekly for the rest. The cost is detection latency: a break that only a
-heavy tier sees (an integration regression, a semantic merge conflict between
-two PRs) is found within a day (RLS) or a week (the rest), not at the merge.
-Turn on "Require branches to be up to date before merging" in branch protection
-to shrink the semantic-conflict window. To run a tier on every push instead,
-change its job `if:` and re-check the budget below.
+Until 2026-11-10 a main push ran only the guards and the heavy tiers ran weekly, to fit 2,000 minutes. With the
+`EBDA_RUNS_ON` variable unset the weekly run was a silent no-op (Ruling CI-HOSTED-1), so no full or e2e run passed
+on main between at least 2026-10-27 and 2026-11-10. With 50,000 Enterprise minutes the full lane now runs on every
+main push (one concurrency group, `cancel-in-progress`, so a burst of merges runs the newest commit only) and
+nightly. Residual: a cancelled superseded main run also skips that commit's post-merge migration-order arm; the
+newer commit's guards and every PR's own guard still check ordering.
 
 ## Minutes budget
 
-All figures are **estimates, not measurements**. Assumptions: `ubuntu-latest`
-(2 vCPU) on a private repo, 1x multiplier, every job rounded up to a whole
-minute, warm npm cache (`setup-node` `cache: npm`), the unit suite at about
-2.5 minutes of vitest (the 6,100-test `tests/unit` took about 3 minutes
-single-core locally). Replace them with real numbers after the first week
-(Settings, Billing, Actions usage).
+Budget: **50,000 Actions minutes/month** (GitHub Enterprise on the `Ebda-AI-Studio` org; Linux 1x; private-repo
+hosted runners are 2 vCPU).
 
-Billed minutes per run:
+**Full lane, measured** (run 42827770627, 2026-11-10, the first GREEN full run, hosted `ubuntu-24.04`, wall time
+per job; jobs run in parallel after `build`, so the run takes about 34 minutes end to end while billing about 95):
 
-| Run                                                    | Jobs (billed min)                                                                                      | Total |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ----- |
-| PR, docs-only                                          | changes 1, guards 3, gitleaks 1                                                                        | 5     |
-| PR, typical code change (one app or package)           | docs-only 5, blast-radius 1, lint 3, typecheck 4, unit 6                                               | 19    |
-| PR, Worker config change (one Next app)                | typical 19, worker-dry-run 9                                                                           | 28    |
-| PR, shared / database / root config (all workspaces)   | docs-only 5, blast-radius 1, lint 6, typecheck 6, unit 7                                               | 25    |
-| PR, root `package.json` or lockfile (all, all Workers) | all 25, worker-dry-run: 3 Next apps x 9, marketing 6, status 3                                         | 61    |
-| Push to main                                           | guards-lite 1, gitleaks 1                                                                              | 2     |
-| Nightly, Mon-Sat                                       | RLS proof 6                                                                                            | 6     |
-| Weekly, Sunday (full lane)                             | build 12, unit 6, orphan 5, integration 10, RLS 6, parity 5, e2e 7, security 6, semgrep 4, mutation 25 | 86    |
+| Job                       | Wall (measured)                                    | Billed (rounded up) |
+| ------------------------- | -------------------------------------------------- | ------------------- |
+| guards                    | 1m32s                                              | 2                   |
+| security                  | 1m45s                                              | 2                   |
+| api-workerd-smoke (whole) | 4m16s                                              | 5                   |
+| workerd-integration       | 2m09s                                              | 3                   |
+| build                     | 9m18s                                              | 10                  |
+| test-unit                 | 20m05s (28m39s in the next green run, 42829048643) | 21-29               |
+| test-integration          | 24m26s                                             | 25                  |
+| orphan-tests              | 1m53s                                              | 2                   |
+| test-e2e                  | 2m19s                                              | 3                   |
+| builder-e2e               | 20m03s                                             | 21                  |
+| notify-failure            | 0m03s                                              | 1                   |
+| **Full lane**             |                                                    | **95**              |
+| mutation (Sundays only)   | not measured                                       | 25 (old estimate)   |
 
-Monthly total at **60 PRs, 60 main pushes, 25 nightlies, 5 Sundays**:
+Monthly arithmetic (estimates built on the measured per-run number):
 
-| Item                                  | Calculation | Minutes   |
-| ------------------------------------- | ----------- | --------- |
-| 15 docs-only PRs                      | 15 x 5      | 75        |
-| 32 typical code PRs                   | 32 x 19     | 608       |
-| 5 Worker-config PRs                   | 5 x 28      | 140       |
-| 5 shared / database / root-config PRs | 5 x 25      | 125       |
-| 3 manifest or lockfile PRs            | 3 x 61      | 183       |
-| 60 pushes to main                     | 60 x 2      | 120       |
-| 25 nightly RLS runs                   | 25 x 6      | 150       |
-| 5 weekly full runs                    | 5 x 86      | 430       |
-| **Total**                             |             | **1,831** |
+| Item                                      | Calculation        | Minutes   |
+| ----------------------------------------- | ------------------ | --------- |
+| nightly Mon-Sat + Sunday full lane        | 30 x 95            | 2,850     |
+| Sunday mutation                           | 4.3 x 25           | ~110      |
+| full lane per main push, 60 merges/month  | 60 x 95            | 5,700     |
+| full lane per main push, 351 merges/month | 351 x 95 (ceiling) | 33,345    |
+| PR lane + deploys + other workflows       | measured           | see below |
 
-That is 92% of 2,000: it fits, but with about 170 minutes of headroom, not
-"comfortably". Sensitivity and levers:
+Measured context: the org used **9,050 Actions minutes from 2026-11-05 to 2026-11-10** (billing usage API;
+8,646 of them on ebda-store, 5,120 on 2026-11-09 alone), during the pre-launch merge burst of **351 merged PRs in
+the 30 days to 2026-11-10**. So:
 
-- Each extra typical PR costs about 19 minutes; break-even is about 69 PRs a month.
-- Mutation is the biggest guess (5 x 25 = 125). Making it manual-only
-  (`mutation` input) gives 1,706.
-- Cheapest further savings: run semgrep monthly, drop `blast-radius` (about 45),
-  fold `lint`, `typecheck` and `unit` into one PR job (shares one install, saves
-  about 3 minutes per code PR but loses parallelism).
-- If usage trends past 1,700 by mid-month, stop the Sunday full lane for a week
-  rather than letting PR checks start failing for lack of minutes.
-- Artifacts (coverage, e2e results, 7-day retention) count against the separate
-  500 MB storage quota, not minutes.
+- At a post-launch pace of about 60 merges a month the new lanes add **about 8,700 minutes/month** on top of the PR
+  lane and deploys: it fits with wide headroom.
+- At the pre-launch burst rate the per-push full lane alone could reach **about 33,300/month** (ceiling: docs-only
+  pushes skip the workflow, and a newer main push cancels the superseded run, so bursts of merges bill one run),
+  which together with the PR lane can approach the 50,000 cap. Watch Settings, Billing, Actions usage weekly.
+- Lever if usage trends past 40,000 by mid-month: move the per-push full lane to an hourly cron that runs only when
+  main moved (keeps "a recent full run" within an hour), and keep the nightly. Do not drop the nightly.
+- Artifacts (coverage, e2e results, 7-day retention) count against storage, not minutes.
 
 ## Making the workflows run at all
 

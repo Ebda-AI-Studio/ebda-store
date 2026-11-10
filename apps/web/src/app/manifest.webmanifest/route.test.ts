@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,7 +48,7 @@ describe('/manifest.webmanifest route', () => {
     const appDir = join(__dirname, '..');
     for (const name of ['manifest.ts', 'manifest.tsx', 'manifest.js', 'manifest.json'])
       expect(existsSync(join(appDir, name)), name).toBe(false);
-    // The layout is the only thing that links the manifest now; it has to name it.
-    expect(readFileSync(join(appDir, 'layout.tsx'), 'utf8')).toContain('manifestHref(');
+    // The layout is the only thing that links the manifest now. That link is asserted on the RENDERED
+    // <link rel="manifest"> per locale in tests/unit/storefront-head-metadata.test.ts, not by grepping source.
   });
 });

@@ -1,12 +1,12 @@
 # Docs index
 
-Single index of everything under `docs/`. One line per doc, grouped by area. Rulings: [rulings/README.md](rulings/README.md) (one file per ruling, one table). Rules and invariants live in the repo-root `CLAUDE.md`; sizing baselines in the repo-root `design.md`.
+Single index of everything under `docs/`. One line per doc, grouped by area. Rulings: [rulings/README.md](rulings/README.md) (one file per ruling; the folder is the index, no table). Rules and invariants live in the repo-root `CLAUDE.md`; sizing baselines in the repo-root `design.md`.
 
 `tests/unit/docs-index.test.ts` fails when a doc under `docs/` is missing from this page.
 
 ## Rulings
 
-- [Rulings index](rulings/README.md) - every ruling, ID, one-line decision, date, file link. The old `RULINGS.md` is a pointer to it.
+- [Rulings index](rulings/README.md) - one file per ruling in `docs/rulings/`; add a ruling by adding its file only (no table row, no count). The old `RULINGS.md` is a pointer to it.
 
 ## Top level - Operations and platform references
 
@@ -106,6 +106,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
 - [cf/neon-zero-integration.md](cf/neon-zero-integration.md) - NEON-ZERO integration branch: every merge conflict between the twelve PRs and its resolution
 - [cf/neon-zero-remaining.md](cf/neon-zero-remaining.md) - NEON-ZERO route sweep with Postgres dead: routes still failing, by owner PR
+- [cf/jobs-postgres-removed-sweep.md](cf/jobs-postgres-removed-sweep.md) - background jobs vs the removed Postgres: every job call path classified (ported / unreachable / fails) with fixes
 - [cf/neon-zero-routes-b.md](cf/neon-zero-routes-b.md) - NEON-ZERO routes group B (per-store admin): sweep before/after and what is left
 - [cf/orders-on-do.md](cf/orders-on-do.md) - Orders on the store Durable Object: create, confirm, cancel, expire hold (INFRA-CF-1 PR D2b-2)
 - [cf/loyalty-do-migration.md](cf/loyalty-do-migration.md) - Loyalty on Durable Object stores: one-off ledger migration (Ruling FP-2)
@@ -232,6 +233,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 - [observability/slo.md](observability/slo.md) - Service Level Objectives (SLOs) — Ebda Store
 
+## ops - Operations
+
+- [ops/escalation.md](ops/escalation.md) - Escalation: who is contacted for P0/P1, payment and data incidents, channels, response targets
+
 ## perf - Performance
 
 - [perf/index-audit-2026-05.md](perf/index-audit-2026-05.md) - Index Audit — 2026-05-01
@@ -315,6 +320,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-26-barcode-1.md](plans/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
 - [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
 - [plans/2026-11-10-store-miss-counts-unverified-store-only.md](plans/2026-11-10-store-miss-counts-unverified-store-only.md) - LAUNCH-RL-MISS-3: a dead product or blog link inside a verified store is not a store-miss
+- [plans/2026-11-10-ssr-client-address.md](plans/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
 - [plans/2026-11-10-services-header-actions.md](plans/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
 - [plans/2026-11-10-accounts-standalone-signin.md](plans/2026-11-10-accounts-standalone-signin.md) - ACCOUNTS-PAGE-1: accounts.ebda.app/login as a standalone Ebda AI Studio sign-in page over the same /login and /login/mfa, allowlisted return
 
@@ -422,4 +428,6 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [uat/storefront-design-save.md](uat/storefront-design-save.md) - UAT: Storefront Design Save — Smart Palette & Page Builder
 - [uat/tax-reports.md](uat/tax-reports.md) - UAT — Tax Reports (accounting.tax_reports)
 - [plans/2026-11-10-preqa-p2-batch.md](plans/2026-11-10-preqa-p2-batch.md) - Pre-QA sweep P2 batch: JSON-LD on every marketing page, brand name in legal copy, guest auth calls, menu vs cookie bar, look preview colour, checkout selects, returns register, /en manifest (2026-11-10)
+- [plans/2026-11-10-review-followups.md](plans/2026-11-10-review-followups.md) - the #510/#511/#512 review fix-after items and the R20 template cleanup: four tests made to fail on the real defect, the Menu start button CSS, the SEO majority-Arabic rule, D1 0009 / StoreDO 0004 (SEO-LANG-SHARE-1, SKIN-DEL-9, REVIEW-FU-1)
 - [plans/2026-11-10-qa-p2-admin-batch.md](plans/2026-11-10-qa-p2-admin-batch.md) - QA P2-1..10 status on main, F6 onboarding look name + i18n guards, F2 search (already fixed), storefront auth refusals in Arabic (2026-11-10)
+- [plans/2026-11-10-ci-full-lane-on-main.md](plans/2026-11-10-ci-full-lane-on-main.md) - CI-FULL-MAIN-1: every push to main and a nightly run the full CI lane (build, integration, workerd incl. route-sweep, e2e, audit); a red main opens the ci-main-red issue (2026-11-10)

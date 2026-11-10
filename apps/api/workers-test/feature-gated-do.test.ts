@@ -72,7 +72,7 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
       method: init.method ?? 'GET',
       headers: {
         ...h,
-        'x-forwarded-for': freshIp(),
+        'cf-connecting-ip': freshIp(),
         ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}),
       },
       ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
@@ -146,7 +146,7 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     expect(reg.ok, JSON.stringify(reg)).toBe(true);
     const verified = await e.API.fetch(`${BASE}/auth/verify-email`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-forwarded-for': freshIp() },
+      headers: { 'content-type': 'application/json', 'cf-connecting-ip': freshIp() },
       body: JSON.stringify({ token: vtoken }),
     });
     expect(verified.status).toBe(200);
@@ -370,7 +370,7 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
       form.set('file', new File([csv], 'jan.csv', { type: 'text/csv' }));
       return e.API.fetch(`${BASE}/stores/${storeId}/finance/bank-statements`, {
         method: 'POST',
-        headers: { ...h, 'x-forwarded-for': freshIp() },
+        headers: { ...h, 'cf-connecting-ip': freshIp() },
         body: form,
       });
     };
@@ -459,13 +459,13 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     const shopper = { 'x-store-id': storeId, 'x-session-id': session };
     const add = await e.API.fetch(`${BASE}/public/cart/items`, {
       method: 'POST',
-      headers: { ...shopper, 'content-type': 'application/json', 'x-forwarded-for': freshIp() },
+      headers: { ...shopper, 'content-type': 'application/json', 'cf-connecting-ip': freshIp() },
       body: JSON.stringify({ productId, quantity: 2 }),
     });
     expect(add.status, await add.clone().text()).toBeLessThan(300);
     const placed = await e.API.fetch(`${BASE}/public/orders`, {
       method: 'POST',
-      headers: { ...shopper, 'content-type': 'application/json', 'x-forwarded-for': freshIp() },
+      headers: { ...shopper, 'content-type': 'application/json', 'cf-connecting-ip': freshIp() },
       body: JSON.stringify({
         paymentMethod: 'cod',
         shippingAddress: {
@@ -521,7 +521,7 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     expect(ac.status, ac.text).toBe(200);
     expect(ac.json.data.guestCheckout).toBe(true);
     const feed = await e.API.fetch(`${BASE}/public/feed/products.json`, {
-      headers: { 'x-store-id': storeId, 'x-forwarded-for': freshIp() },
+      headers: { 'x-store-id': storeId, 'cf-connecting-ip': freshIp() },
     });
     expect(feed.status, await feed.clone().text()).toBe(200);
     expect(await pgReaches(true)).toEqual([]);
@@ -531,13 +531,13 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
     const shopper = { 'x-store-id': storeId, 'x-session-id': 'sess-fg-bo' };
     const add = await e.API.fetch(`${BASE}/public/cart/items`, {
       method: 'POST',
-      headers: { ...shopper, 'content-type': 'application/json', 'x-forwarded-for': freshIp() },
+      headers: { ...shopper, 'content-type': 'application/json', 'cf-connecting-ip': freshIp() },
       body: JSON.stringify({ productId: boProductId, quantity: 3 }),
     });
     expect(add.status, await add.clone().text()).toBeLessThan(300);
     const placed = await e.API.fetch(`${BASE}/public/orders`, {
       method: 'POST',
-      headers: { ...shopper, 'content-type': 'application/json', 'x-forwarded-for': freshIp() },
+      headers: { ...shopper, 'content-type': 'application/json', 'cf-connecting-ip': freshIp() },
       body: JSON.stringify({
         paymentMethod: 'cod',
         shippingAddress: {
@@ -619,7 +619,7 @@ describe.skipIf(e.E2E_DB === '1')('feature-gated subsystems on a DO store, Postg
         authorization: `Bearer ${su}`,
         'x-store-id': storeId,
         'content-type': 'application/json',
-        'x-forwarded-for': freshIp(),
+        'cf-connecting-ip': freshIp(),
       },
       body: JSON.stringify({ reason: 'another reason' }),
     });

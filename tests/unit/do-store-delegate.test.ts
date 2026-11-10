@@ -116,10 +116,10 @@ describe('doStoreDelegate', () => {
       statusCode: 404,
     });
   });
-  it('include and unknown filter shapes are refused loudly (501), a missing profile is null', async () => {
+  it('a non-owner include and unknown filter shapes are refused loudly (501), a missing profile is null', async () => {
     const d = make(stub());
     await expect(
-      d.findUnique({ where: { id: S }, include: { owner: true } })
+      d.findUnique({ where: { id: S }, include: { products: true } })
     ).rejects.toMatchObject({ statusCode: 501 });
     await expect(
       d.findFirst({ where: { id: S, name: { contains: 'x' } }, select: { id: true } })

@@ -9,32 +9,39 @@ const rulingFiles = readdirSync(DIR)
   .filter(f => f.endsWith('.md') && f !== 'README.md')
   .map(f => f.slice(0, -3));
 const index = readFileSync(path.join(DIR, 'README.md'), 'utf8');
-const rows = [...index.matchAll(/^\|\s*(.+?)\s*\|.*\|\s*\[([^\]]+)\.md\]\(([^)]+)\)\s*\|$/gm)].map(
-  m => ({
-    id: m[1],
-    file: m[2],
-    href: m[3],
-  })
-);
 
-describe('rulings index (docs/rulings/README.md)', () => {
+// Ruling RULINGS-INDEX-1: the folder IS the index. README.md is static (no table, no count), so two
+// PRs that each add a ruling touch disjoint files and never conflict.
+describe('rulings index (docs/rulings/)', () => {
   it('scans real data (not an empty-set pass)', () => {
     expect(rulingFiles.length).toBeGreaterThan(1000);
-    expect(rows.length).toBeGreaterThan(1000);
   });
 
-  it('every docs/rulings/*.md is listed in the index', () => {
-    const listed = new Set(rows.map(r => r.file));
-    expect(rulingFiles.filter(f => !listed.has(f))).toEqual([]);
+  it('every entry in docs/rulings/ is a ruling markdown file with a safe <ID>.md name', () => {
+    const others = readdirSync(DIR).filter(f => !f.endsWith('.md'));
+    expect(others).toEqual([]);
+    expect(rulingFiles.filter(id => !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id))).toEqual([]);
   });
 
-  it('every index row links an existing ruling file, once', () => {
+  it('every ruling file has content', () => {
     expect(
-      rows.filter(r => r.href !== `${r.file}.md` || !existsSync(path.join(DIR, r.href)))
+      rulingFiles.filter(id => readFileSync(path.join(DIR, `${id}.md`), 'utf8').trim() === '')
     ).toEqual([]);
+  });
+
+  it('ruling IDs are unique, case-insensitively (case-folding checkouts)', () => {
     const seen = new Set<string>();
-    const dup = rows.filter(r => (seen.has(r.file) ? true : (seen.add(r.file), false)));
+    const dup = rulingFiles.filter(id => {
+      const k = id.toLowerCase();
+      return seen.has(k) ? true : (seen.add(k), false);
+    });
     expect(dup).toEqual([]);
+  });
+
+  it('README.md stays static: no table rows and no hand-typed count (the shared edit stays gone)', () => {
+    expect(index.split('\n').filter(l => /^\s*\|/.test(l))).toEqual([]);
+    expect(index).not.toMatch(/^\s*\d+\s+rulings?\b/im);
+    expect(index).toContain('RULINGS-INDEX-1');
   });
 
   it('the legacy ledger stays a pointer (new rulings never append to it)', () => {

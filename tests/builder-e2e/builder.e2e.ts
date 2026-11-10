@@ -377,6 +377,8 @@ test('section design: typography and dividers are editors in the panel, never a 
   await page.getByTestId('tree-select-categories').click();
   await settings(page);
   await page.getByRole('tab', { name: L('التصميم', 'Design') }).click();
+  // typography and dividers sit in the collapsed "Advanced" group of the design tab (#397): open it
+  await page.getByTestId('advanced-design').locator('summary').click();
   await expect(page.getByTestId('section-typography-field')).toBeVisible();
   await expect(page.getByTestId('dividers-field')).toBeVisible();
   await expect(page.locator('a[href*="page-builder"]')).toHaveCount(0);
@@ -455,6 +457,8 @@ test('fonts and typography zones are draft edits: they reach the draft, and noth
         }
       | undefined;
 
+  // fonts + zones live in the collapsed "Advanced" group of the 3-tier theme pane (#397): open it first
+  await page.getByTestId('theme-advanced').locator('summary').click();
   // add a Google font: the whole library goes into the draft
   await page.getByRole('button', { name: M.fonts.addGoogleFont }).click();
   await page.getByLabel(M.fonts.familyNameLabel).fill('Tajawal');
@@ -664,7 +668,8 @@ test('no horizontal document overflow on any editor panel (EDITOR-MOBILE-1)', as
   await startTabs.nth(1).click();
   await expect(page.getByTestId('theme-settings')).toBeVisible();
   await noOverflow('theme panel');
-  await startTabs.nth(2).click();
+  // tabs are sections, theme, ai, history (AI tab since #271): history is the 4th
+  await page.locator('#builder-tab-history').click();
   await expect(page.getByTestId('revisions-panel')).toBeVisible();
   await noOverflow('history panel');
   await startTabs.nth(0).click();
@@ -707,7 +712,9 @@ test('cart page: sections only, the main block is pinned, the canvas loads /cart
   await expect(recs.getByRole('button', { name: /^(إخفاء|Hide) /u })).toHaveCount(1);
   await expect(recs.getByRole('button', { name: /^(حذف|Remove) /u })).toHaveCount(1);
   // the theme belongs to the home document only
-  await expect(page.getByRole('tab')).toHaveCount(2);
+  // (sections, ai, history: the AI tab exists since #271) and no theme tab
+  await expect(page.getByRole('tab')).toHaveCount(3);
+  await expect(page.locator('#builder-tab-theme')).toHaveCount(0);
   // the real storefront cart is what the canvas frames
   await expect(page.getByTestId('builder-canvas')).toHaveAttribute('src', /\/cart\?_preview=/);
 });

@@ -292,8 +292,12 @@ describe('Order Flow', () => {
           paymentMethod: 'cod',
         });
 
-      expect(res.status).toBe(500);
+      // A missing cart session is the CLIENT's error: order.routes.ts throws AppError(400, 'MISSING_SESSION').
+      // This used to pin 500, which asserted a server crash as the contract; the full lane never ran it
+      // between 2026-10-27 and 2026-11-10, so the stale pin went unnoticed (Ruling CI-FULL-MAIN-1).
+      expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('MISSING_SESSION');
     });
   });
 

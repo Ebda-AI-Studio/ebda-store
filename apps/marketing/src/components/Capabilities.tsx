@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { WhatsAppTeaser } from './WhatsAppPage';
 import { CAPABILITIES, FEATURES_PAGE, type CardId } from '../lib/capabilities';
 import { COMING_LABEL, REGISTRY } from '../lib/capability-registry';
@@ -68,9 +68,9 @@ export function HomeCapabilities({ locale }: { locale: Locale }) {
     <>
       <p className="lead">{p.homeLead}</p>
       <p className="cap-more">
-        <Link href={pagePath(locale, 'features')} className="btn btn-ghost">
+        <PageLink href={pagePath(locale, 'features')} className="btn btn-ghost">
           {p.homeAll}
-        </Link>
+        </PageLink>
       </p>
       <WhatsAppTeaser locale={locale} />
     </>

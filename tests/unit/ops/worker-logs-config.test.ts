@@ -67,4 +67,23 @@ describe('Workers Logs + Logpush config (G7)', () => {
     expect(blocks?.[1]).toContain('"head_sampling_rate": 1 }');
     expect(gen).not.toMatch(/"observability": \{ "enabled": true \}\n/);
   });
+
+  it('the Logpush job ships every app here plus ebda-wa and ebda-os-brain, with CPU + wall time', () => {
+    const sh = readFileSync(join(ROOT, 'scripts/ops/cf-logs-setup.sh'), 'utf8');
+    const workers = JSON.parse(/^WORKERS='(.+)'$/m.exec(sh)?.[1] ?? '[]') as string[];
+    for (const app of WORKERS) expect(workers).toContain(`ebda-${app}`);
+    expect(workers).toEqual(expect.arrayContaining(['ebda-wa', 'ebda-os-brain']));
+    const fields = JSON.parse(/^FIELDS='(.+)'$/m.exec(sh)?.[1] ?? '[]') as string[];
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        'ScriptName',
+        'Event',
+        'Outcome',
+        'Exceptions',
+        'Logs',
+        'CPUTimeMs',
+        'WallTimeMs',
+      ])
+    );
+  });
 });

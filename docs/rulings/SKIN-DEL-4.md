@@ -1,1 +1,3 @@
 Ruling SKIN-DEL-4 - `qa-walk-store-1010` is never modified (standing rule), by this PR or by any script. It holds `template = 'modern'` and `look = null`, so it renders as the mapped Ebda template through `normalizeLegacyTemplate` at READ time with no database write, and never 500s. `scripts/skins/preflight.sql` excludes it from the gate count and lists it for Ahmad. Evidence: prod SQL, read-only, 2026-10-25 (Ahmad's measurement). Cost if wrong: the QA store looks different from its last screenshots; its data is untouched.
+
+Partly superseded 2026-11-10 by SKIN-DEL-9 (owner instruction R20, pre-launch): D1 migration 0009 moves this store's `template` from `modern` to `souq`, the template it already renders as. Nothing else about the store changes.

@@ -1,5 +1,7 @@
 # Horizontal Scaling Guide — Ebda Store API
 
+> **RETIRED STACK (2026-11-10 note).** This document describes the Railway-hosted Express API on Neon Postgres, retired 2026-11-05 (NEON-ZERO; the API is the `ebda-api` Cloudflare Worker on D1 + Durable Objects). Kept as history only. Live runbooks: `docs/INCIDENT.md`, `docs/ROLLBACK.md`, `docs/DB-BACKUP-RESTORE.md`, `docs/observability/slo.md`.
+
 This document covers both vertical and horizontal scaling for the Railway-hosted Express API
 (`apps/api`). The code changes that make horizontal scaling safe are on branch
 `feature/horizontal-scaling` (PR from that branch).

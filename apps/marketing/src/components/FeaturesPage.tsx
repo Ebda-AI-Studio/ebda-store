@@ -1,5 +1,5 @@
 import { SiteLink } from './SiteLink';
-import Link from 'next/link';
+import { PageLink } from './PageLink';
 import { featuresFaq, FEATURES_PAGE, MORE, THEMES, THEME_COPY } from '../lib/capabilities';
 import { COPY } from '../lib/content';
 import { COMPARE } from '../lib/compare';
@@ -74,7 +74,9 @@ export function FeaturesPage({ locale }: { locale: Locale }) {
               const slug = page.split('/')[1] as keyof typeof COMPARE;
               return (
                 <li key={page}>
-                  <Link href={pagePath(locale, page)}>{COMPARE[slug][locale].linkText}</Link>
+                  <PageLink href={pagePath(locale, page)}>
+                    {COMPARE[slug][locale].linkText}
+                  </PageLink>
                 </li>
               );
             })}

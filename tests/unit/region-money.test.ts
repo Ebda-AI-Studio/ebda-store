@@ -372,8 +372,9 @@ function refundEverythingPiecewise(opts: {
       refunded += a.cashCredit;
       revenue += a.revenueDebit;
       taxBack += a.taxThis;
-      // the journal entry and the cash refund are the same number by construction
-      expect(a.revenueDebit + (opts.inclusive ? a.taxThis : a.taxThis)).toBe(a.cashCredit);
+      // the journal entry and the cash refund are the same number by construction, inclusive or exclusive VAT alike
+      // (the old `inclusive ? taxThis : taxThis` ternary had the same value on both branches)
+      expect(a.revenueDebit + a.taxThis).toBe(a.cashCredit);
       prevQty.set(line.id, (prevQty.get(line.id) ?? 0) + 1);
     }
   }

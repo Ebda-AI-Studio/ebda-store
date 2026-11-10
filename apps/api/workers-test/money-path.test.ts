@@ -122,7 +122,7 @@ const api = (path: string, init: RequestInit & { headers?: Record<string, string
     ...init,
     redirect: 'manual',
     headers: {
-      'x-forwarded-for': freshIp(),
+      'cf-connecting-ip': freshIp(),
       ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}),
       ...init.headers,
     },
