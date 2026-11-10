@@ -24,6 +24,16 @@ API fetch. Design:
   No `REVALIDATE_SECRET` on the API = nothing trusted, one `console.error` per isolate.
 - `publicLimiter` and `storeResolveLimiter` key explicitly on the address and skip a request with none
   (`noClientIp`), instead of pooling it. Every limit, window and 429 body is unchanged; no new secret or binding.
+- Cache safety (launch load): Next's patched fetch puts request headers into its data-cache key
+  (`IncrementalCache.generateCacheKey`, next 16.4.3). The wrapper is installed at Worker-entry module scope; on workerd
+  Next patches `globalThis.fetch` only inside the server function OpenNext imports on the first request, so Next's cache
+  layer wraps ours and keys the caller's init without the forward headers. Measured on a local OpenNext preview:
+  `nextOuter=true` on every forwarded fetch, and shoppers .51 / .52 reused the `/public/categories` and
+  `/public/stores/:id/layout` entries shopper .31 had filled (no refetch). If Next has already patched when the entry
+  loads, the wrapper refuses to install (forwards nothing). Unit-tested both ways.
+- API-origin fetches leave with `redirect: 'manual'` unless the caller set `redirect`, so the signed headers never
+  follow a 3xx to another host. The shared Sentry scrubber redacts both headers (the API's Sentry wrapper sees the raw
+  request before `worker.ts` strips them).
 - Residual: storefront reads outside the two render routers (`/stores/public/*` manifest + bundles, wholesale,
   campaign / SMS unsubscribe pages) keep the Worker's address. A captured signed pair can be replayed only for
   that same address on the same read list (server-to-server, never exposed to a browser).

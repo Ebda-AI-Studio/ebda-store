@@ -212,6 +212,95 @@ describe('storefront: API-origin fetches carry the signed shopper address (apps/
       expect(s.headers.has(SSR_AUTH_HEADER)).toBe(false);
     }
   });
+
+  it('does not follow a redirect with the signed headers unless the caller asked to', async () => {
+    const shopper = new Request('https://storedemo.ebda.app/', {
+      headers: { 'cf-connecting-ip': '203.0.113.7' },
+    });
+    await withClientAddress(shopper, SECRET, async () => {
+      await fetch(`${API}/api/v1/public/products`);
+      await fetch(new Request(`${API}/api/v1/public/categories`));
+      await fetch(`${API}/api/v1/public/tags`, { redirect: 'follow' });
+      await fetch('https://cdn.example.com/x.png');
+    });
+    expect(seen.map(s => s.init?.redirect)).toEqual(['manual', 'manual', 'follow', undefined]);
+  });
+});
+
+describe("storefront wrapper sits BELOW Next's fetch cache (the forward headers never enter its key)", () => {
+  const NEXT_PATCH = Symbol.for('next-patch');
+  const realFetch = globalThis.fetch;
+  const net: Headers[] = [];
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete (globalThis as Record<symbol, unknown>)[NEXT_PATCH];
+    resetStorefront();
+    net.length = 0;
+  });
+  const fakeNetwork = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    net.push(new Headers(init?.headers));
+    return new Response('ok');
+  }) as typeof fetch;
+
+  it('the forward headers WOULD split the cache key if Next saw them (why the order matters)', async () => {
+    const { IncrementalCache } = await import('next/dist/server/lib/incremental-cache');
+    const key = (headers: Record<string, string>) =>
+      IncrementalCache.prototype.generateCacheKey.call(
+        { fetchCacheKeyPrefix: '' },
+        `${API}/api/v1/public/products`,
+        {
+          headers,
+        }
+      );
+    const a = await signClientIp(SECRET, '203.0.113.1');
+    const b = await signClientIp(SECRET, '203.0.113.2');
+    expect(await key({ [CLIENT_IP_HEADER]: '203.0.113.1', [SSR_AUTH_HEADER]: a })).not.toBe(
+      await key({ [CLIENT_IP_HEADER]: '203.0.113.2', [SSR_AUTH_HEADER]: b })
+    );
+  });
+
+  it("Next's real patchFetch, applied after our install (as on workerd), wraps us: Next keys the caller's init, the network gets the headers", async () => {
+    globalThis.fetch = fakeNetwork;
+    expect(installApiFetchForwarding(API)).toBe(true);
+    const ours = globalThis.fetch;
+    // patchFetch() = createPatchedFetcher(createDedupeFetch(globalThis.fetch)); the dedupe layer needs React's
+    // server build, so the test applies the cache layer itself, over whatever globalThis.fetch is at that moment.
+    const { createPatchedFetcher } = await import('next/dist/server/lib/patch-fetch');
+    const noStore = { getStore: () => undefined };
+    globalThis.fetch = createPatchedFetcher(globalThis.fetch, {
+      workAsyncStorage: noStore,
+      workUnitAsyncStorage: noStore,
+    } as never) as typeof fetch;
+    const nextFetch = globalThis.fetch as typeof fetch & { _nextOriginalFetch?: unknown };
+    expect(nextFetch).not.toBe(ours); // Next is the outer layer
+    expect(typeof nextFetch._nextOriginalFetch).toBe('function');
+    const { IncrementalCache } = await import('next/dist/server/lib/incremental-cache');
+    const keys: string[] = [];
+    for (const ip of ['203.0.113.1', '203.0.113.2']) {
+      const shopper = new Request('https://storedemo.ebda.app/', {
+        headers: { 'cf-connecting-ip': ip },
+      });
+      const init: RequestInit = { headers: { 'x-store-id': 's1' } };
+      await withClientAddress(shopper, SECRET, () => fetch(`${API}/api/v1/public/products`, init));
+      // What Next keys on is the caller's init at its own layer: the same for both shoppers.
+      keys.push(
+        await IncrementalCache.prototype.generateCacheKey.call(
+          { fetchCacheKeyPrefix: '' },
+          `${API}/api/v1/public/products`,
+          init
+        )
+      );
+    }
+    expect(keys[0]).toBe(keys[1]);
+    expect(net.map(h => h.get(CLIENT_IP_HEADER))).toEqual(['203.0.113.1', '203.0.113.2']);
+  });
+
+  it('refuses to install (forwards nothing) when Next has already patched fetch', async () => {
+    globalThis.fetch = fakeNetwork;
+    (globalThis as Record<symbol, unknown>)[NEXT_PATCH] = true;
+    expect(installApiFetchForwarding(API)).toBe(false);
+    expect(globalThis.fetch).toBe(fakeNetwork);
+  });
 });
 
 describe('limiters key on the resolved address', () => {

@@ -16,6 +16,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 export const CLIENT_IP_HEADER = 'x-ebda-client-ip';
 export const SSR_AUTH_HEADER = 'x-ebda-ssr-auth';
 const SIGNING_CONTEXT = 'ebda-ssr-client-ip.v1\n';
+/** next/dist/server/lib/patch-fetch-symbol.js */
+const NEXT_PATCH_SYMBOL = Symbol.for('next-patch');
 
 interface Forward {
   ip: string;
@@ -55,8 +57,19 @@ let installedFor: string | null = null;
  * Wrap `globalThis.fetch` once per isolate. Requests to `apiOrigin` made inside `withClientAddress`
  * carry the signed address; every other fetch is passed through untouched (same arguments).
  */
-export function installApiFetchForwarding(apiOrigin: string): void {
-  if (installedFor !== null) return;
+export function installApiFetchForwarding(apiOrigin: string): boolean {
+  if (installedFor !== null) return true;
+  // Next's patched fetch keys its data cache on the request headers it is handed. Our wrapper must sit BELOW it
+  // (Next computes the key, then calls down into us), or every shopper would get their own cache entry. On workerd
+  // Next patches lazily, inside the server function OpenNext imports on the first request, so installing at module
+  // scope puts us underneath. If Next has somehow patched first, forward nothing (the old shared bucket) rather
+  // than split the cache.
+  if ((globalThis as Record<symbol, unknown>)[NEXT_PATCH_SYMBOL] === true) {
+    console.error(
+      'SSR client address OFF: fetch was already patched by Next when the Worker entry loaded, so the forward headers would enter its cache key (Ruling RL-SSR-IP-6)'
+    );
+    return false;
+  }
   installedFor = apiOrigin;
   const inner = globalThis.fetch;
   const wrapped = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -66,10 +79,12 @@ export function installApiFetchForwarding(apiOrigin: string): void {
     const headers = new Headers(base);
     headers.set(CLIENT_IP_HEADER, fwd.ip);
     headers.set(SSR_AUTH_HEADER, fwd.auth);
-    // Keep every other init field (Next's `next: { revalidate, tags }` included).
-    return inner(input, { ...init, headers });
+    // Keep every other init field (Next's `next: { revalidate, tags }` included). A redirect is NOT followed unless the
+    // caller asked for it: the signed address must never be carried to whatever host a 3xx names.
+    return inner(input, { ...init, headers, redirect: init?.redirect ?? 'manual' });
   };
   globalThis.fetch = wrapped as typeof fetch;
+  return true;
 }
 
 /** Run `fn` with this request's client address available to the fetch wrapper. */
