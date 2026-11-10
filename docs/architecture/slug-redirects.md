@@ -94,8 +94,10 @@ case) and returns the final slug, or `null` on a miss.
   `x-store-domain`), then calls `resolveSlugRedirect` → `200 { toSlug }` on a
   hit, `200 { toSlug: null }` on no redirect. A store that does not resolve is
   still `400 STORE_NOT_RESOLVED`. "No redirect" was a `404` until 2026-11-10;
-  the public router's per-IP store-miss limiter counts every 404, so one dead
-  product link cost a shopper two misses (the product 404 plus this lookup).
+  the public router's per-IP store-miss limiter counted every 404 then, so one
+  dead product link cost a shopper two misses (the product 404 plus this
+  lookup). Since Ruling LAUNCH-RL-MISS-3 the product 404 itself is not counted
+  inside a store the resolver verified; this lookup stays a `200`.
   The storefront reads only `toSlug`, so it handles both answers.
 
 ## Storefront consumer — redirect-on-miss

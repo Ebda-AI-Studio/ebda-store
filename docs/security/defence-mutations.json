@@ -2322,6 +2322,46 @@
       "test": "tests/unit/store-miss-limiter.test.ts"
     },
     {
+      "id": "store-miss-exempt-needs-verified-store",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "a 404 on a listed route is left uncounted without the resolver having verified a store, so a request that names no real store can probe the catalogue routes outside the store-miss limit (LAUNCH-RL-MISS-3, condition 1)",
+      "source": "apps/api/src/middleware/catalogue-miss.ts",
+      "find": "  const flagged = Boolean(verified);",
+      "replace": "  const flagged = true;",
+      "test": "tests/unit/store-miss-catalogue-exempt.test.ts"
+    },
+    {
+      "id": "store-miss-exempt-needs-listed-route",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "every 404 on a verified store is left uncounted, not only a dead product or blog link, so order, cart, page and location lookups on a real store fall outside the store-miss limit (LAUNCH-RL-MISS-3, condition 2)",
+      "source": "apps/api/src/middleware/catalogue-miss.ts",
+      "find": "  const listed = mark !== undefined && LISTED.has(mark.route);",
+      "replace": "  const listed = true;",
+      "test": "tests/unit/store-miss-catalogue-exempt.test.ts"
+    },
+    {
+      "id": "store-miss-exempt-needs-same-store",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "a caller who names one real store in the header probes any other store id in the blog path uncounted, so store ids can be enumerated outside the store-miss limit (LAUNCH-RL-MISS-3, condition 3)",
+      "source": "apps/api/src/middleware/catalogue-miss.ts",
+      "find": "  const sameStore = (mark?.pathStoreId ?? verified) === verified;",
+      "replace": "  const sameStore = true;",
+      "test": "tests/unit/store-miss-catalogue-exempt.test.ts"
+    },
+    {
+      "id": "store-miss-unverified-store-is-counted",
+      "domain": "rate limiting",
+      "tier": "unit",
+      "why": "a 404 for a store the resolver never verified is no longer counted, so unknown-store probing is unlimited again (LAUNCH-RL-MISS-3: the exemption must fail closed)",
+      "source": "apps/api/src/middleware/catalogue-miss.ts",
+      "find": "  return flagged && listed && sameStore;",
+      "replace": "  return !flagged || (listed && sameStore);",
+      "test": "tests/unit/store-miss-catalogue-exempt.test.ts"
+    },
+    {
       "id": "public-unknown-store-reaches-the-limiters",
       "domain": "rate limiting",
       "tier": "unit",

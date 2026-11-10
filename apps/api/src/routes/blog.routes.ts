@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { BlogService } from '../services/blog.service';
 import { writeLimiter } from '../middleware/security';
 import { tenantContext } from '../middleware/tenant-context';
+import { catalogueMissRoute } from '../middleware/catalogue-miss';
 import { storeDb } from '../lib/repo-factory';
 
 /**
@@ -94,6 +95,7 @@ router.get('/public/:storeId/blog', async (req: Request, res: Response, next: Ne
 // ==========================================
 router.get(
   '/public/:storeId/blog/:slug',
+  catalogueMissRoute('GET /public/:storeId/blog/:slug'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, slug } = req.params;
