@@ -388,21 +388,7 @@ describe('freeze-window inbox callbacks are deduped against Postgres', () => {
     expect(db.prepare('SELECT COUNT(*) n FROM webhook_events').get()).toEqual({ n: 2 });
   });
 
-  it('the payment consumer THROWS on an inbox miss instead of returning', () => {
-    const src = fs.readFileSync(
-      new URL(
-        '../../apps/api/src/lib/inngest/functions/payment-webhook-process.ts',
-        import.meta.url
-      ),
-      'utf8'
-    );
-    const step = src.slice(
-      src.indexOf("step.run('load-inbox'"),
-      src.indexOf('shouldProcessInboxRow(row.status)')
-    );
-    expect(step).toMatch(/throw new Error\(/);
-    expect(step).not.toMatch(/nothing to process/);
-  });
+  // The inbox-miss throw of the payment consumer is proved by running the job: tests/unit/payment-webhook-inbox-miss-throws.test.ts
 });
 
 describe('platform VAT setting guard (Ruling TAX-8) on D1', () => {

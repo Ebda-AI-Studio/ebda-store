@@ -74,12 +74,5 @@ describe('flatten script cache purge (issue 2351)', () => {
     expect(src).toMatch(/const bust = !process\.argv\.includes\('--no-bust-caches'\)/);
   });
 
-  it('the tag list stays in step with invalidateStoreProductCaches', () => {
-    const src = readFileSync(join(__dirname, '../../apps/api/src/lib/public-cache.ts'), 'utf8');
-    const block = src.slice(src.indexOf('export async function invalidateStoreProductCaches'));
-    const tags = [
-      ...block.slice(0, block.indexOf('});')).matchAll(/`([a-z]+):\$\{storeId\}`/g),
-    ].map(m => `${m[1]}:store-1`);
-    expect(tags).toEqual(cachePurgeList('store-1').tags);
-  });
+  // The tag list vs invalidateStoreProductCaches check is behavioural: flatten-purge-tags-match-invalidator.test.ts
 });

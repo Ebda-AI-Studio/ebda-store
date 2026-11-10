@@ -3,6 +3,8 @@
  * the visitor consented, and the schema bounds what a client may send.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import ts from 'typescript';
+import { parseRel, findAll, callsTo, props, nameOf } from './helpers/ts-ast';
 
 const { updates } = vi.hoisted(() => ({
   updates: [] as Array<{ where: unknown; data: Record<string, unknown> }>,
@@ -111,10 +113,23 @@ describe('signup persists acquisition', () => {
 });
 
 describe('erasure clears acquisition', () => {
-  it('eraseAccount nulls users.acquisition in the anonymising write', async () => {
-    const { readFileSync } = await import('node:fs');
-    const src = readFileSync('apps/api/src/services/auth.service.ts', 'utf8');
-    const write = src.slice(src.indexOf('const erased = await tx.user.update'));
-    expect(write.slice(0, 900)).toContain('acquisition: Prisma.DbNull');
+  it('eraseAccount nulls users.acquisition in the anonymising write', () => {
+    // AST: the `erased` variable's `tx.user.update(...)` call, its `data` object, its
+    // `acquisition` property. (Running eraseAccount needs the whole account/session rig, and a
+    // text window after the call also matched a comment or a later statement.)
+    const sf = parseRel('apps/api/src/services/auth.service.ts');
+    const decl = findAll(
+      sf,
+      (n): n is ts.VariableDeclaration =>
+        ts.isVariableDeclaration(n) && n.name.getText() === 'erased'
+    )[0];
+    expect(decl, 'the anonymising `erased` write moved').toBeDefined();
+    const update = callsTo(decl, 'tx.user.update')[0];
+    expect(update, '`erased` is no longer a tx.user.update').toBeDefined();
+    const data = props(update.arguments[0], 'data')[0].initializer as ts.ObjectLiteralExpression;
+    const acquisition = data.properties.find(
+      (p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && nameOf(p) === 'acquisition'
+    );
+    expect(acquisition?.initializer.getText()).toBe('Prisma.DbNull');
   });
 });

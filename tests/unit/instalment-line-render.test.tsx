@@ -8,6 +8,8 @@ import React from 'react';
 import { render, cleanup } from '@testing-library/react';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
+import { parseSource, findAll } from './helpers/ts-ast';
 
 const ctx = vi.hoisted(() => ({
   settings: undefined as unknown,
@@ -117,12 +119,33 @@ describe('PDP only', () => {
     expect(offenders).toEqual([]);
   });
   it('the PDP renders the line in the price row, after the compare-at price', () => {
-    const src = readFileSync(
-      path.join(SRC, 'web/src/app/products/[slug]/ProductDetailClient.tsx'),
-      'utf8'
+    // AST, not a text slice between two markers: the one <InstalmentLine/> element, its props,
+    // and its siblings in the price row (the parent JSX element). "After" is the child order of
+    // that row, so a comment or an unrelated `line-through` elsewhere cannot satisfy it.
+    const sf = parseSource(path.join(SRC, 'web/src/app/products/[slug]/ProductDetailClient.tsx'));
+    const lines = findAll(
+      sf,
+      (n): n is ts.JsxSelfClosingElement =>
+        ts.isJsxSelfClosingElement(n) && n.tagName.getText() === 'InstalmentLine'
     );
-    const row = src.slice(src.indexOf('{/* Price */}'), src.indexOf('<TaxInclusiveLabel'));
-    expect(row).toContain('<InstalmentLine priceMinor={displayPrice} buyable={buyableNow} />');
-    expect(row.indexOf('line-through')).toBeLessThan(row.indexOf('<InstalmentLine'));
+    expect(lines).toHaveLength(1);
+    const attrs = Object.fromEntries(
+      lines[0].attributes.properties
+        .filter(ts.isJsxAttribute)
+        .map(a => [a.name.getText(), a.initializer?.getText()])
+    );
+    expect(attrs).toEqual({ priceMinor: '{displayPrice}', buyable: '{buyableNow}' });
+    const row = lines[0].parent as ts.JsxElement;
+    expect(ts.isJsxElement(row)).toBe(true);
+    const kids = row.children;
+    const at = kids.indexOf(lines[0] as unknown as ts.JsxChild);
+    const struck = kids.findIndex(k =>
+      findAll(
+        k,
+        (n): n is ts.JsxAttribute => ts.isJsxAttribute(n) && n.name.getText() === 'className'
+      ).some(a => a.initializer?.getText().includes('line-through'))
+    );
+    expect(struck, 'the struck compare-at price is not in the same row').toBeGreaterThan(-1);
+    expect(struck).toBeLessThan(at);
   });
 });

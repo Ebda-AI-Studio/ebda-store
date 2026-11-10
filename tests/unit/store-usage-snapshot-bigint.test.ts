@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { Prisma } from '@ebda/database';
 import fs from 'node:fs';
 import path from 'node:path';
+import { callsIn, parseFile, strVal } from './helpers/ast-statements';
 
 const BIGINT_FIELDS = ['revenueFils', 'productViews', 'aiTokensIn', 'aiTokensOut', 'aiCostMicros'];
 
@@ -82,12 +83,20 @@ describe('collect step output survives Inngest step memoization (JSON round-trip
 });
 
 describe('the collect step returns JSON-safe rows', () => {
-  it('pipes its raw query result through toJsonSafeRows', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../../apps/api/src/lib/inngest/functions/store-usage-snapshot.ts'),
-      'utf-8'
+  // Behaviour is not practical: the Inngest handler needs a store directory, RLS-scoped raw SQL and a DO backend. The
+  // property is structural, so it is read off the parsed `step.run('collect', ...)` call, not a text window.
+  it('pipes every raw query result through toJsonSafeRows', () => {
+    const sf = parseFile('apps/api/src/lib/inngest/functions/store-usage-snapshot.ts');
+    const collect = callsIn(sf, 'step.run').filter(c => strVal(c.arguments[0]) === 'collect');
+    expect(collect).toHaveLength(1);
+    const cb = collect[0]!.arguments[1]!;
+    // the Postgres path: `<raw query>.then(toJsonSafeRows)`
+    const thens = callsIn(cb, /\.then$/).filter(
+      c => c.arguments.length === 1 && c.arguments[0]!.getText() === 'toJsonSafeRows'
     );
-    const collect = src.slice(src.indexOf("step.run('collect'"), src.indexOf('let written'));
-    expect(collect).toMatch(/\.then\(toJsonSafeRows\)/);
+    expect(thens.length).toBeGreaterThanOrEqual(1);
+    // the DO path: `toJsonSafeRows(await collectDoStoreUsage(...))`
+    const direct = callsIn(cb, 'toJsonSafeRows');
+    expect(direct).toHaveLength(1);
   });
 });

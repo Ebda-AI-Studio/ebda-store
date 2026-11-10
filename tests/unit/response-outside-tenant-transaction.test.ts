@@ -38,14 +38,23 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+import ts from 'typescript';
 
 const API_SRC = path.resolve(__dirname, '../../apps/api/src');
 const SCANNED_DIRS = ['routes', 'middleware'];
 
 /** Opens a tenant-scoped (or RLS-bypass) transaction whose callback runs handler code. */
-const TX_OPENER = /\b(runInTenantContext|withRlsBypass|withTenantContext)\s*(<[\s\S]*?>)?\s*\(/g;
+const TX_OPENERS = new Set(['runInTenantContext', 'withRlsBypass', 'withTenantContext']);
 /** Sends bytes to the Express client. */
-const RESPONSE_SEND = /\bres\.(json|send|end|sendFile|download|redirect|sendStatus)\s*\(/g;
+const RESPONSE_SENDS = new Set([
+  'json',
+  'send',
+  'end',
+  'sendFile',
+  'download',
+  'redirect',
+  'sendStatus',
+]);
 
 interface Finding {
   file: string;
@@ -74,43 +83,63 @@ function sourceFiles(): string[] {
   return out;
 }
 
-/** Index of the `)` closing the `(` at `open`, by paren depth. */
-function matchingParen(src: string, open: number): number {
-  let depth = 0;
-  for (let i = open; i < src.length; i++) {
-    if (src[i] === '(') depth++;
-    else if (src[i] === ')') {
-      depth--;
-      if (depth === 0) return i;
-    }
+/** Name a call is made through: `f(...)` -> f, `a.f(...)` -> f. */
+function calleeName(call: ts.CallExpression): string | undefined {
+  const e = call.expression;
+  if (ts.isIdentifier(e)) return e.text;
+  if (ts.isPropertyAccessExpression(e)) return e.name.text;
+  return undefined;
+}
+
+/** True when a call/property chain starts at the identifier `res` (`res.json`, `res.status(200).json`). */
+function startsAtRes(e: ts.Expression): boolean {
+  for (;;) {
+    if (ts.isCallExpression(e) || ts.isPropertyAccessExpression(e)) e = e.expression;
+    else if (ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e) || ts.isAsExpression(e))
+      e = e.expression;
+    else return ts.isIdentifier(e) && e.text === 'res';
   }
-  return src.length;
+}
+
+/**
+ * Structural, not textual: the source is PARSED, so a `)` inside a string, regex or comment cannot end
+ * a transaction callback early (the old paren counter did), a `res.json(` named in a comment is not a
+ * send, and a chained send (`res.status(201).json(...)`) is seen. Behaviour is not practical: the
+ * property is "no handler under routes/ or middleware/ has this shape", over every route.
+ */
+function findingsIn(src: string, file: string): Finding[] {
+  const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true);
+  const findings: Finding[] = [];
+  const sends = (n: ts.Node, opener: string): void => {
+    if (
+      ts.isCallExpression(n) &&
+      ts.isPropertyAccessExpression(n.expression) &&
+      RESPONSE_SENDS.has(n.expression.name.text) &&
+      startsAtRes(n.expression.expression)
+    )
+      findings.push({
+        file,
+        line: sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1,
+        opener,
+        send: `res.${n.expression.name.text}(`,
+      });
+    ts.forEachChild(n, c => sends(c, opener));
+  };
+  const visit = (n: ts.Node): void => {
+    if (ts.isCallExpression(n)) {
+      const name = calleeName(n);
+      if (name && TX_OPENERS.has(name)) for (const arg of n.arguments) sends(arg, name);
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return findings;
 }
 
 function scan(): Finding[] {
-  const findings: Finding[] = [];
-  for (const file of sourceFiles()) {
-    const src = fs.readFileSync(file, 'utf-8');
-    TX_OPENER.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = TX_OPENER.exec(src)) !== null) {
-      const open = src.indexOf('(', m.index + m[1].length);
-      if (open === -1) continue;
-      const close = matchingParen(src, open);
-      const body = src.slice(open, close);
-      RESPONSE_SEND.lastIndex = 0;
-      let s: RegExpExecArray | null;
-      while ((s = RESPONSE_SEND.exec(body)) !== null) {
-        findings.push({
-          file: path.relative(API_SRC, file),
-          line: src.slice(0, open + s.index).split('\n').length,
-          opener: m[1],
-          send: s[0],
-        });
-      }
-    }
-  }
-  return findings;
+  return sourceFiles().flatMap(file =>
+    findingsIn(fs.readFileSync(file, 'utf-8'), path.relative(API_SRC, file))
+  );
 }
 
 describe('no response is sent from inside a tenant transaction', () => {
@@ -137,10 +166,14 @@ describe('no response is sent from inside a tenant transaction', () => {
         res.json({ ok: payment.id });
       });
     `;
-    RESPONSE_SEND.lastIndex = 0;
-    const open = bad.indexOf('(', bad.indexOf('runInTenantContext'));
-    const body = bad.slice(open, matchingParen(bad, open));
-    expect(RESPONSE_SEND.test(body)).toBe(true);
+    expect(findingsIn(bad, 'bad.ts').map(f => f.send)).toEqual(['res.json(']);
+    // the chained form, and a `)` inside a string before the send, are seen too
+    expect(
+      findingsIn(
+        `await withRlsBypass(async () => { log(')'); res.status(201).json({}); });`,
+        'bad2.ts'
+      )
+    ).toHaveLength(1);
   });
 
   it('does not fire on a response sent AFTER the transaction resolves', () => {
@@ -153,9 +186,13 @@ describe('no response is sent from inside a tenant transaction', () => {
       });
       res.status(payload.status).json(payload.body);
     `;
-    RESPONSE_SEND.lastIndex = 0;
-    const open = good.indexOf('(', good.indexOf('runInTenantContext'));
-    const body = good.slice(open, matchingParen(good, open));
-    expect(RESPONSE_SEND.test(body)).toBe(false);
+    expect(findingsIn(good, 'good.ts')).toEqual([]);
+    // a send named only in a comment inside the callback is not a send
+    expect(
+      findingsIn(
+        `await runInTenantContext(id, async () => { /* res.json(x) */ return 1; });`,
+        'c.ts'
+      )
+    ).toEqual([]);
   });
 });

@@ -19,6 +19,8 @@ import React from 'react';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import ts from 'typescript';
+import { code, nodesOf, parseText, stringText } from './helpers/ast-query';
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
@@ -196,69 +198,69 @@ describe('R-05: no Latin-only literal name on a storefront element', () => {
       if (statSync(p).isDirectory()) return walk(p);
       return /\.tsx$/.test(n) && !/\.test\./.test(n) ? [p] : [];
     });
-  // aria-label="Log out", title="Copy to clipboard", aria-label={`Rate ${n} out of 5`}, alt="photo".
-  const LITERAL =
-    /\b(?:aria-label|title|alt|placeholder)=(?:"([^"{]*[A-Za-z][^"{]*)"|\{\s*[`'"]([^`'"]*[A-Za-z][^`'"]*)[`'"]\s*\})/g;
-
-  /** Is the attribute at `idx` on an intrinsic element (`<button`, `<img`), not a component prop? */
-  const onIntrinsic = (src: string, idx: number) =>
-    /^<[a-z]/.test(src.slice(src.lastIndexOf('<', idx)));
-  /** Text a reader hears: template expressions (`${n}`) are values, not words. */
-  const words = (v: string) => v.replace(/\$\{[^}]*\}/g, ' ');
   const NOT_A_WORD = /^[\w.+-]+@[\w.-]+$/; // an email example ("you@example.com")
+  const NAME_ATTRS = new Set(['aria-label', 'title', 'alt', 'placeholder']);
+  const latinOnly = (v: string) => {
+    const w = v.trim();
+    return /[A-Za-z]/.test(w) && !ARABIC.test(w) && !NOT_A_WORD.test(w);
+  };
+  /** A string, `{'x'}`, `{`x ${n}`}` -> its words (substitutions become a space); null when not a literal. */
+  const literalOf = (n: ts.Node): string | null => stringText(n, ' ');
+  type Hit = { file: string; line: number; text: string };
 
-  it('no intrinsic element carries a Latin-only literal name', () => {
-    const hits = walk(join(ROOT, 'apps/web/src')).flatMap(f => {
-      const src = readFileSync(f, 'utf8');
-      return [...src.matchAll(LITERAL)]
-        .filter(m => {
-          const v = words(m[1] ?? m[2] ?? '').trim();
-          return (
-            onIntrinsic(src, m.index!) &&
-            /[A-Za-z]/.test(v) &&
-            !ARABIC.test(v) &&
-            !NOT_A_WORD.test(v)
-          );
-        })
-        .map(m => `${relative(ROOT, f)}:${src.slice(0, m.index).split('\n').length}: ${m[0]}`);
-    });
-    expect(hits).toEqual([]);
-  });
+  /**
+   * AST scan (JSX attributes, not text positions): a Latin-only literal name on an INTRINSIC element
+   * (`<button`, `<img`, lowercase tag; a component prop like `<Carousel title=...>` is not a name), and a name
+   * that picks between two Latin-only literals (`{wishlisted ? 'Remove' : 'Add'}`, any element).
+   */
+  function scanNames(text: string, file: string): Hit[] {
+    const sf = parseText(text, file.endsWith('.tsx') ? file : 'snippet.tsx');
+    const hits: Hit[] = [];
+    for (const n of nodesOf(sf)) {
+      if (!ts.isJsxAttribute(n) || !NAME_ATTRS.has(code(n.name)) || !n.initializer) continue;
+      const tag = (n.parent.parent as ts.JsxOpeningLikeElement).tagName;
+      const intrinsic = ts.isIdentifier(tag) && /^[a-z]/.test(tag.text);
+      const init = ts.isJsxExpression(n.initializer) ? n.initializer.expression : n.initializer;
+      if (!init) continue;
+      const lone = literalOf(init);
+      const branches = ts.isConditionalExpression(init)
+        ? [literalOf(init.whenTrue), literalOf(init.whenFalse)]
+        : null;
+      const bad =
+        (lone !== null && intrinsic && latinOnly(lone)) ||
+        (branches !== null && branches.every(b => b !== null && latinOnly(b)));
+      if (bad)
+        hits.push({
+          file,
+          line: sf.getLineAndCharacterOfPosition(n.getStart()).line + 1,
+          text: code(n),
+        });
+    }
+    return hits;
+  }
+  const scanTree = () =>
+    walk(join(ROOT, 'apps/web/src')).flatMap(f =>
+      scanNames(readFileSync(f, 'utf8'), f).map(h => `${relative(ROOT, f)}:${h.line}: ${h.text}`)
+    );
 
-  // aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}: both branches Latin.
-  const LATIN_TERNARY =
-    /\b(?:aria-label|title|alt|placeholder)=\{[\w.!\s]+\?\s*(['"`])([^'"`]*)\1\s*:\s*(['"`])([^'"`]*)\3\s*\}/g;
-  const latinPair = (m: RegExpMatchArray) =>
-    [m[2], m[4]].every(v => /[A-Za-z]/.test(words(v)) && !ARABIC.test(v));
-
-  it('no name picks between two Latin-only literals', () => {
-    const hits = walk(join(ROOT, 'apps/web/src')).flatMap(f => {
-      const src = readFileSync(f, 'utf8');
-      return [...src.matchAll(LATIN_TERNARY)]
-        .filter(latinPair)
-        .map(m => `${relative(ROOT, f)}:${src.slice(0, m.index).split('\n').length}: ${m[0]}`);
-    });
-    expect(hits).toEqual([]);
-    const probe = "aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}";
-    expect([...probe.matchAll(LATIN_TERNARY)].filter(latinPair)).toHaveLength(1);
-    const ok = "aria-label={isRtl ? 'بحث' : 'Search'}";
-    expect([...ok.matchAll(LATIN_TERNARY)].filter(latinPair)).toHaveLength(0);
+  it('no intrinsic element carries a Latin-only literal name, and no name picks between two Latin-only literals', () => {
+    expect(scanTree()).toEqual([]);
   });
 
   it('the static matcher catches the old shapes (self-test)', () => {
-    const scan = (src: string) =>
-      [...src.matchAll(LITERAL)].filter(m => {
-        const v = words(m[1] ?? m[2] ?? '').trim();
-        return (
-          onIntrinsic(src, m.index!) && /[A-Za-z]/.test(v) && !ARABIC.test(v) && !NOT_A_WORD.test(v)
-        );
-      }).length;
-    expect(scan('<button aria-label="Log out">')).toBe(1);
-    expect(scan('<button\n  title="Copy to clipboard"\n>')).toBe(1);
-    expect(scan('<button aria-label={`Rate ${star} out of 5`}>')).toBe(1);
-    expect(scan('<div aria-label={`${full} of 5 stars`}>')).toBe(1);
+    const scan = (jsx: string) => scanNames(`const x = (${jsx});`, 'snippet.tsx').length;
+    expect(scan('<button aria-label="Log out" />')).toBe(1);
+    expect(scan('<button\n  title="Copy to clipboard"\n/>')).toBe(1);
+    expect(scan('<button aria-label={`Rate ${star} out of 5`} />')).toBe(1);
+    expect(scan('<div aria-label={`${full} of 5 stars`} />')).toBe(1);
     expect(scan('<Carousel title="You May Also Like" titleAr="قد يعجبك" />')).toBe(0);
-    expect(scan('<span aria-label={`${i + 1} / ${count}`}>')).toBe(0);
+    expect(scan('<span aria-label={`${i + 1} / ${count}`} />')).toBe(0);
     expect(scan('<input placeholder="you@example.com" />')).toBe(0);
+    // the old text scanner lost the tag when an earlier `<` sat inside the same opening tag
+    expect(scan('<button onClick={() => n < 3} aria-label="Log out" />')).toBe(1);
+    expect(
+      scan("<button aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'} />")
+    ).toBe(1);
+    expect(scan("<button aria-label={isRtl ? 'بحث' : 'Search'} />")).toBe(0);
   });
 });

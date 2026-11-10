@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { parseSource, findFunction, callsTo } from './helpers/ts-ast';
 
 const calls = vi.hoisted(() => ({ del: [] as string[], bump: [] as string[] }));
 vi.mock('../../apps/api/src/services/redis.service', () => ({
@@ -59,18 +60,24 @@ describe('demo layout cache is purged on publish', () => {
       'utf8'
     );
     expect(routes).toMatch(/await publishDraft\(/);
-    const svc = readFileSync(
-      path.resolve(__dirname, '../../apps/api/src/services/page-builder.service.ts'),
-      'utf8'
+    // AST call-chain: publishDraft -> applyPublishedLayout -> purgePublishedCaches -> bustStoreCaches.
+    // The functions are real declarations and the calls real CallExpressions inside them, so a
+    // comment, or a call sitting in a different function, cannot satisfy a link. Behaviour is not
+    // practical: publishDraft needs the page-builder DB rig, and the purge end itself is already
+    // exercised above through bustStoreCaches.
+    const sf = parseSource(
+      path.resolve(__dirname, '../../apps/api/src/services/page-builder.service.ts')
     );
-    const start = svc.indexOf('export async function publishDraft(');
-    const body = svc.slice(start, svc.indexOf('\nexport ', start + 10));
-    expect(body).toContain('applyPublishedLayout(');
-    const a = svc.indexOf('async function applyPublishedLayout(');
-    const applyBody = svc.slice(a, svc.indexOf('\nexport ', a));
-    expect(applyBody).toContain('purgePublishedCaches(');
-    expect(svc).toMatch(
-      /function purgePublishedCaches[\s\S]{0,400}bustStoreCaches\(storeId, slug, domain\)/
+    const calls = (fn: string, callee: string) => {
+      const decl = findFunction(sf, fn);
+      expect(decl, `${fn} not found`).toBeDefined();
+      return callsTo(decl!, callee);
+    };
+    expect(calls('publishDraft', 'applyPublishedLayout').length).toBeGreaterThan(0);
+    expect(calls('applyPublishedLayout', 'purgePublishedCaches').length).toBeGreaterThan(0);
+    const bust = calls('purgePublishedCaches', 'bustStoreCaches');
+    expect(bust.map(c => c.arguments.map(a => a.getText()).join(','))).toContain(
+      'storeId,slug,domain'
     );
   });
 });

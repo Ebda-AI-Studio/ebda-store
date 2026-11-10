@@ -294,6 +294,11 @@ describe('GET /public/store/resolve — host → store', () => {
     'orders.ebda.app',
     'docs.ebda.app',
     'whatsapp.ebda.app',
+    'invite.ebda.app', // coming-soon page (SUBDOMAIN-SOON-2)
+    'ads.ebda.app',
+    'quote.ebda.app',
+    'quote-studio.ebda.app',
+    'chat.ebda.app', // 301 to wa.ebda.app
     'store.ebda.app',
     'app.ebda.app', // retired label: never served, never a store
     'mail.ebda.app',

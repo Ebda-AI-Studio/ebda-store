@@ -5,16 +5,14 @@
  * ("١٤ يوم"). One helper, two tables.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import ts from 'typescript';
+import { parseRel, findAll, callsTo } from './helpers/ts-ast';
 import { countText, DAYS_FORMAL } from '../../apps/web/src/lib/plural';
 import {
   returnPolicyCopy,
   termsReturnSentence,
   faqReturnAnswer,
 } from '../../apps/web/src/lib/return-policy-text';
-
-const ROOT = join(__dirname, '../..');
 
 describe('formal day counts in legal text (I6)', () => {
   it('DAYS_FORMAL declines the formal way', () => {
@@ -32,11 +30,26 @@ describe('formal day counts in legal text (I6)', () => {
   });
 
   it('DAYS_FORMAL is used only inside a legal-register fence', () => {
-    const src = readFileSync(join(ROOT, 'apps/web/src/lib/return-policy-text.ts'), 'utf8');
-    const start = src.indexOf('legal-register:start');
-    const end = src.indexOf('legal-register:end');
-    const uses = [...src.matchAll(/formalDaysPhrase\(/g)].map(m => m.index ?? 0);
+    // AST: the fence markers are real COMMENT tokens (a mention in prose or a string does not
+    // open a fence) and the uses are real CALL nodes (a comment naming the helper is not a use).
+    const sf = parseRel('apps/web/src/lib/return-policy-text.ts');
+    const text = sf.getFullText();
+    const fences = new Map<string, number>();
+    const seen = new Set<number>();
+    for (const node of findAll(sf, () => true)) {
+      if (seen.has(node.pos)) continue;
+      seen.add(node.pos);
+      for (const c of ts.getLeadingCommentRanges(text, node.pos) ?? []) {
+        const m = text.slice(c.pos, c.end).match(/^\/\/\s*legal-register:(start|end)\b/);
+        if (m) fences.set(m[1], c.pos);
+      }
+    }
+    expect(fences.has('start') && fences.has('end'), 'legal-register fence markers moved').toBe(
+      true
+    );
+    const uses = callsTo(sf, 'formalDaysPhrase').map(c => c.getStart());
     expect(uses.length).toBeGreaterThan(1);
-    for (const at of uses.slice(1)) expect(at > start && at < end, String(at)).toBe(true);
+    for (const at of uses)
+      expect(at > fences.get('start')! && at < fences.get('end')!, String(at)).toBe(true);
   });
 });

@@ -16,10 +16,10 @@
 // To verify what IS deployed, read the worker's bindings, not this file.
 
 import { defineCloudflareConfig } from '@opennextjs/cloudflare';
-import r2IncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache';
+import { createSharedFetchCache } from './shared-fetch-cache'; // Ruling WEB-COLD-2; the deploy bakes in the real contract hash
 
 // R2-backed ISR/SSG incremental cache (bucket already exists: ebda-web-isr-cache,
 // bound as NEXT_INC_CACHE_R2_BUCKET in wrangler.jsonc). Without this, OpenNext
 // falls back to an in-memory cache that's cold on every Worker isolate restart —
 // every ISR/SSG page revalidates from origin instead of serving from cache.
-export default defineCloudflareConfig({ incrementalCache: r2IncrementalCache });
+export default defineCloudflareConfig({ incrementalCache: createSharedFetchCache('local-dev') });
