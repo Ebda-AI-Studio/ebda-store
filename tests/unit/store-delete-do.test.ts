@@ -5,6 +5,8 @@
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import ts from 'typescript';
+import { all, callsIn, calleeText, hasAncestor, parseFile } from './helpers/ast-statements';
 import { setCfBindings, clearCfBindings } from '../../apps/api/src/cf/bindings';
 
 const state = vi.hoisted(() => ({
@@ -151,23 +153,45 @@ describe('the atomic close wrappers (Ruling NZ-D17)', () => {
 });
 
 describe('StoreService.delete ordering and no wipe (static)', () => {
+  // Behaviour is not practical here: StoreService.delete threads the identity service, billing family, a raw-SQL money
+  // transaction and the DO close; one rig per path would re-implement the service. The ORDER is therefore pinned on the
+  // parsed AST (real call nodes in source order: a comment or string holding the name cannot satisfy it).
   const read = (f: string) => fs.readFileSync(f, 'utf8');
   const del = () => {
-    const src = read('apps/api/src/services/store.service.ts');
-    return src.slice(src.indexOf('static async delete('));
+    const sf = parseFile('apps/api/src/services/store.service.ts');
+    const cls = all(sf, ts.isClassDeclaration).find(c => c.name?.text === 'StoreService')!;
+    const m = cls.members.find(
+      x => ts.isMethodDeclaration(x) && x.name.getText() === 'delete'
+    ) as ts.MethodDeclaration;
+    expect(m, 'StoreService.delete not found').toBeTruthy();
+    return m;
   };
   it('closes the DO FIRST (after the billing-parent refusal), before the Postgres transaction; reopens in the catch; finishes after', () => {
     const d = del();
-    const close = d.indexOf('closeDoIfNoMoney(storeId)');
-    expect(close).toBeGreaterThan(d.indexOf('STORE_IS_BILLING_PARENT'));
-    expect(close).toBeLessThan(d.indexOf('withMoneyTx'));
-    expect(d.indexOf('reopenDoAfterFailedDelete(storeId, doClose.token)')).toBeGreaterThan(
-      d.indexOf('withMoneyTx')
-    );
-    expect(d.indexOf('reopenDoAfterFailedDelete(storeId, doClose.token)')).toBeLessThan(
-      d.indexOf('finishStoreDeletion(')
-    );
-    expect(d.indexOf('finishStoreDeletion(')).toBeGreaterThan(d.indexOf('withMoneyTx'));
+    const only = (name: string) => {
+      const c = callsIn(d, name);
+      expect(c, name).toHaveLength(1);
+      return c[0]!;
+    };
+    const refusal = all(d, ts.isStringLiteral).find(l => l.text === 'STORE_IS_BILLING_PARENT');
+    expect(refusal, 'billing-parent refusal').toBeTruthy();
+    const close = only('closeDoIfNoMoney');
+    const tx = only('withMoneyTx');
+    const reopen = only('reopenDoAfterFailedDelete');
+    const finish = only('finishStoreDeletion');
+    expect(close.getStart()).toBeGreaterThan(refusal!.getStart());
+    expect(close.getStart()).toBeLessThan(tx.getStart());
+    expect(reopen.getStart()).toBeGreaterThan(tx.getStart());
+    expect(
+      hasAncestor(reopen, a => ts.isCatchClause(a)),
+      'reopen is in a catch'
+    ).toBe(true);
+    expect(reopen.getStart()).toBeLessThan(finish.getStart());
+    expect(finish.getStart()).toBeGreaterThan(tx.getStart());
+    expect(
+      hasAncestor(finish, a => ts.isCatchClause(a)),
+      'finish is not only in a catch'
+    ).toBe(false);
   });
   it('the delete flow never calls deleteAll / eraseSubject / a teardown', () => {
     for (const f of [
@@ -175,7 +199,18 @@ describe('StoreService.delete ordering and no wipe (static)', () => {
       'apps/api/src/services/store-closure.service.ts',
     ])
       expect(read(f), f).not.toMatch(/deleteAll|eraseSubject|tearDown|__unseal/);
-    expect(del().slice(0, 14000)).not.toMatch(/deleteAll|eraseSubject|tearDown/);
+    const d = del();
+    expect(callsIn(d, /deleteAll|tearDown/).map(calleeText)).toEqual([]);
+    // The only eraseSubject is the PDPL anonymisation (Ruling FOLD-ERASURE-2): an eraseDo port handed to
+    // anonymiseDeletedStore, which runs AFTER the delete is committed (the DO stays, closed). Never a wipe in the flow itself.
+    const finish = callsIn(d, 'finishStoreDeletion')[0]!;
+    for (const c of callsIn(d, /eraseSubject$/)) {
+      expect(
+        hasAncestor(c, a => ts.isCallExpression(a) && calleeText(a) === 'anonymiseDeletedStore'),
+        'eraseSubject only inside anonymiseDeletedStore'
+      ).toBe(true);
+      expect(c.getStart()).toBeGreaterThan(finish.getStart());
+    }
   });
   it('the closure module deletes no store data (only its own flag rows)', () => {
     const t = read('packages/repo/src/do/closure.ts');

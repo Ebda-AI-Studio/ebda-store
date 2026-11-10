@@ -14,9 +14,10 @@
  * have to stub out just to reach a column-definition object literal — the
  * defect is entirely in that literal's shape.
  */
-import { readFileSync } from 'fs';
+import ts from 'typescript';
 import { join } from 'path';
 import { describe, it, expect } from 'vitest';
+import { parseSource, findAll, nameOf } from './helpers/ts-ast';
 
 const PAGE_PATH = join(
   process.cwd(),
@@ -24,24 +25,38 @@ const PAGE_PATH = join(
 );
 
 describe('customer order-history table — refund column is not a mobile badge', () => {
-  const source = readFileSync(PAGE_PATH, 'utf8');
+  // AST: each column is the object literal that carries `header: t('<key>')`, so its
+  // `mobileBadge` is read off that literal's own property. (A text slice between two headers
+  // also swallowed comments and a neighbouring column's literal.)
+  const sf = parseSource(PAGE_PATH);
+  const column = (key: string) => {
+    const found = findAll(
+      sf,
+      (n): n is ts.ObjectLiteralExpression =>
+        ts.isObjectLiteralExpression(n) &&
+        n.properties.some(
+          p =>
+            ts.isPropertyAssignment(p) &&
+            nameOf(p) === 'header' &&
+            p.initializer.getText() === `t('${key}')`
+        )
+    );
+    expect(found, `column ${key}`).toHaveLength(1);
+    return found[0];
+  };
+  const mobileBadge = (col: ts.ObjectLiteralExpression) =>
+    col.properties.some(
+      p =>
+        ts.isPropertyAssignment(p) &&
+        nameOf(p) === 'mobileBadge' &&
+        p.initializer.kind === ts.SyntaxKind.TrueKeyword
+    );
 
   it('colStatus stays a mobileBadge (the status pill belongs in the title row)', () => {
-    const statusColumn = source.slice(
-      source.indexOf("header: t('colStatus')"),
-      source.indexOf("header: t('colPayment')")
-    );
-    expect(statusColumn).toMatch(/mobileBadge:\s*true/);
+    expect(mobileBadge(column('colStatus'))).toBe(true);
   });
 
   it('colPayment (carries the refund amount/provider/date/reason text) is NOT a mobileBadge', () => {
-    const paymentColumnStart = source.indexOf("header: t('colPayment')");
-    expect(paymentColumnStart).toBeGreaterThan(-1);
-    // Look only within this column's object literal, up to the next
-    // top-level column boundary, so a LATER column's mobileBadge (if any)
-    // can never make this assertion pass for the wrong reason.
-    const nextColumnBoundary = source.indexOf('\n    {', paymentColumnStart + 1);
-    const paymentColumn = source.slice(paymentColumnStart, nextColumnBoundary);
-    expect(paymentColumn).not.toMatch(/mobileBadge:\s*true/);
+    expect(mobileBadge(column('colPayment'))).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { AutoplayToggle } from '../../apps/web/src/templates/shared/AutoplayToggle';
 import { smoothScrollLeftBy, smoothScrollLeftTo } from '../../apps/web/src/lib/smooth-scroll';
+import { getLook } from '../../packages/shared/src/looks/registry';
 import { StickyHeaderOffset } from '../../apps/web/src/components/StickyHeaderOffset';
 
 afterEach(() => {
@@ -175,24 +176,24 @@ describe('STOP-2 re-audit minors (R1, R2, M3, price, chip, stage)', () => {
   });
 
   it('Showroom keeps a card action on every card (no `quiet` mode that hides it on a sized product)', () => {
-    const reg = read('packages/shared/src/looks/registry.ts');
-    const start = reg.indexOf("id: 'souq.showroom'");
-    const showroom = reg.slice(start, reg.indexOf("id: 'jasmine.apothecary'", start));
-    expect(showroom).not.toMatch(/cardCta:\s*'quiet'/);
+    // The look registry object itself, walked for any `cardCta: 'quiet'` (no text window over registry.ts).
+    const showroom = getLook('souq.showroom');
+    expect(showroom, 'souq.showroom is registered').toBeDefined();
+    const quiet: string[] = [];
+    const walk = (v: unknown, at: string): void => {
+      if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${at}[${i}]`));
+      else if (v && typeof v === 'object')
+        for (const [k, x] of Object.entries(v)) {
+          if (k === 'cardCta' && x === 'quiet') quiet.push(`${at}.${k}`);
+          walk(x, `${at}.${k}`);
+        }
+    };
+    walk(showroom, 'souq.showroom');
+    expect(quiet).toEqual([]);
     expect(read('apps/web/src/styles/globals.css')).toContain(
       "[data-look='souq.showroom'] article :is(a, button).mt-auto.w-full"
     );
   });
 
-  it('M3: the prominent search form follows the logo link in the DOM, before the nav and the actions', () => {
-    const src = read('apps/web/src/templates/base/Header.tsx');
-    const logo = src.indexOf('data-zone="storeName"');
-    const form = src.indexOf('data-zone="souq-search"');
-    const nav = src.indexOf('Desktop nav');
-    const actions = src.indexOf('{/* Actions */}');
-    expect(logo).toBeGreaterThan(0);
-    expect(form).toBeGreaterThan(logo);
-    expect(form).toBeLessThan(nav);
-    expect(form).toBeLessThan(actions);
-  });
+  // M3 (search form after the logo in the DOM, before nav and actions): tests/unit/souq-header-dom-order.test.tsx renders the Header.
 });

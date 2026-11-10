@@ -248,8 +248,130 @@ describe.skipIf(e.E2E_DB === '1')('new merchant journey on the Postgres-less Wor
           }
         );
       await call('variants list', `/stores/${storeId}/products/${productId}/variants`, { token });
+      // 2026-11-10 P1: the product edit page (a variant product, the whole form sent on every save) answered 500
+      // DataCloneError on a DO store, so a merchant could create a product but never edit it. Same body shape as
+      // apps/admin/src/app/stores/[id]/products/[productId]/edit/page.tsx.
+      const cat2 = await call('categories create (second)', `/stores/${storeId}/categories`, {
+        method: 'POST',
+        token,
+        body: { name: 'Rings', nameAr: 'خواتم' },
+      });
+      await call('product update (edit page save)', `/stores/${storeId}/products/${productId}`, {
+        method: 'PUT',
+        token,
+        body: {
+          name: 'Linen dress, sand',
+          nameAr: 'فستان كتان رملي',
+          description: '<p>Soft linen.</p>',
+          descriptionAr: '<p>كتان ناعم.</p>',
+          excerpt: null,
+          excerptAr: null,
+          price: 125000,
+          compareAtPrice: null,
+          costPrice: null,
+          inventory: 0,
+          status: 'active',
+          isFeatured: false,
+          isNew: false,
+          isBestSeller: false,
+          metaTitle: 'Linen dress',
+          metaTitleAr: null,
+          metaDescription: null,
+          metaDescriptionAr: null,
+          metaDescriptionAeo: null,
+          metaDescriptionAeoAr: null,
+          images: [{ url: 'https://cdn.ebda.app/stores/x/dress.jpg', position: 0 }],
+          leadTimeDays: null,
+          personalisation: null,
+          sizeChartId: null,
+          ...(cat2.json?.data?.id ? { categories: [cat2.json.data.id] } : {}),
+        },
+      });
+      await call('product update (status only)', `/stores/${storeId}/products/${productId}`, {
+        method: 'PUT',
+        token,
+        body: { status: 'draft' },
+      });
+      const after = await call('product read back', `/stores/${storeId}/products/${productId}`, {
+        token,
+      });
+      const p = after.json?.data?.product ?? after.json?.data;
+      expect(p?.name, 'updated name').toBe('Linen dress, sand');
+      expect(p?.descriptionAr, 'updated Arabic description').toBe('<p>كتان ناعم.</p>');
     }
     await call('products list', `/stores/${storeId}/products`, { token });
+
+    // 5b. the product photo (onboarding step 5). 2026-11-10 P1: POST /uploads/image answered 500 POSTGRES_REMOVED
+    // ($transaction): the route wrapped the upload in runInTenantContext, which opens a Prisma transaction.
+    // a valid 1x1 PNG: the routes sniff the bytes, not the declared type
+    const png = new File(
+      [
+        Uint8Array.from(
+          atob(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+          ),
+          c => c.charCodeAt(0)
+        ),
+      ],
+      'dress.png',
+      { type: 'image/png' }
+    );
+    // a minimal GLB: 12-byte header + one JSON chunk (one mesh), padded to a multiple of 4 bytes
+    const glbJson = new TextEncoder().encode(
+      '{"asset":{"version":"2.0"},"meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}],"accessors":[{"count":3,"type":"VEC3","componentType":5126}]}'.padEnd(
+        148,
+        ' '
+      )
+    );
+    const glbBytes = new Uint8Array(20 + glbJson.byteLength);
+    const glbView = new DataView(glbBytes.buffer);
+    glbView.setUint32(0, 0x46546c67, true);
+    glbView.setUint32(4, 2, true);
+    glbView.setUint32(8, glbBytes.byteLength, true);
+    glbView.setUint32(12, glbJson.byteLength, true);
+    glbView.setUint32(16, 0x4e4f534a, true);
+    glbBytes.set(glbJson, 20);
+    const glb = new File([glbBytes], 'dress.glb', { type: 'model/gltf-binary' });
+    const upload = async (
+      name: string,
+      path: string,
+      field = 'file',
+      file: File = png
+    ): Promise<void> => {
+      const form = new FormData();
+      form.append(field, file);
+      const res = await e.API.fetch(`${API}${path}`, {
+        method: 'POST',
+        headers: {
+          origin: ADMIN_ORIGIN,
+          'cf-connecting-ip': '203.0.113.91',
+          authorization: `Bearer ${token}`,
+        },
+        body: form,
+      });
+      const body = await res.text();
+      steps.push({ name, status: res.status, body: body.slice(0, 400) });
+      console.log(
+        `[journey] ${res.status} ${name}${res.status >= 400 ? ` :: ${body.slice(0, 300)}` : ''}`
+      );
+    };
+    await upload(
+      'uploads/image (product photo)',
+      `/uploads/image?folder=products&storeId=${storeId}`
+    );
+    await upload(
+      'uploads/images (batch)',
+      `/uploads/images?folder=products&storeId=${storeId}`,
+      'files'
+    );
+    if (productId) {
+      await upload(
+        'product 3D model upload',
+        `/stores/${storeId}/product-models/${productId}/glb`,
+        'file',
+        glb
+      );
+    }
 
     // 6. settings, domain, orders
     await call('store settings GET', `/stores/${storeId}`, { token });
@@ -284,9 +406,16 @@ describe.skipIf(e.E2E_DB === '1')('new merchant journey on the Postgres-less Wor
       'onboarding go-live',
       'categories create',
       'products create (image)',
+      'uploads/image (product photo)',
+      'uploads/images (batch)',
+      'product 3D model upload',
       'product option create',
       'variant create',
       'variant update (stock)',
+      'categories create (second)',
+      'product update (edit page save)',
+      'product update (status only)',
+      'product read back',
       'billing/payment-method instapay',
       'store settings GET',
       'store settings PUT',

@@ -22,6 +22,7 @@ const h = vi.hoisted(() => ({
     accountTotals: vi.fn(),
     ciOrderStamp: vi.fn(),
   },
+  noMoney: { on: false },
   sendAlert: vi.fn(async () => 'sent'),
   aiSuggest: vi.fn(),
   invalidate: vi.fn(async () => undefined),
@@ -93,7 +94,7 @@ vi.mock('@api/lib/repo-factory', () => ({
   }),
   storeDb: async () => h.doBox.current.db,
   storeWriter: async () => h.doBox.current.writer,
-  storeMoney: async () => h.money,
+  storeMoney: async () => (h.noMoney.on ? null : h.money),
   storeUpdate: vi.fn(async () => ({})),
   runInJobRepoScope: <T>(fn: () => T) => fn(),
 }));
@@ -707,9 +708,28 @@ describe('the ported sources do not touch a store-do model through `prisma`', ()
     expect(hits.map(m => m[0]).length, hits.map(m => m[0]).join(', ')).toBe(PG_BRANCH[f] ?? 0);
   });
 
-  it('the one allowed Postgres write is the pg branch of the CI stamp, reached only without a money client', () => {
-    const src = api('lib/ci/source.ts');
-    expect(src.indexOf('money.ciOrderStamp')).toBeLessThan(src.indexOf('prisma.order.updateMany'));
-    expect(src).toMatch(/if \(money\) \{[\s\S]*?return;/);
+  it('the one allowed Postgres write is the pg branch of the CI stamp, reached only without a money client', async () => {
+    // Behaviour, not text order: run the real stampOrder. With a money client it is the named DO
+    // op and the Postgres stand-in (which THROWS for store-do models, `order` included) is never
+    // touched; without one it takes its own pg branch, which hits that stand-in.
+    const { prismaCiSource } = await import('@api/lib/ci/source');
+    const v = { areaKey: 'a', buyerKey: 'b' } as never;
+    h.money.ciOrderStamp.mockClear();
+    await prismaCiSource.stampOrder(DO_STORE, 'o1', v);
+    expect(h.money.ciOrderStamp).toHaveBeenCalledWith({
+      orderId: 'o1',
+      areaKey: 'a',
+      buyerKey: 'b',
+    });
+    h.noMoney.on = true;
+    try {
+      h.money.ciOrderStamp.mockClear();
+      await expect(prismaCiSource.stampOrder(DO_STORE, 'o1', v)).rejects.toThrow(
+        'Postgres touched: prisma.order'
+      );
+      expect(h.money.ciOrderStamp).not.toHaveBeenCalled();
+    } finally {
+      h.noMoney.on = false;
+    }
   });
 });

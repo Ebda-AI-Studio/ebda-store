@@ -122,7 +122,8 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
                     data?.error?.code,
                     data?.error?.message ||
                       tUpload('errors.uploadFailedWithCode', { code: xhr.status }),
-                    data?.error?.details
+                    data?.error?.details,
+                    xhr.status
                   )
                 )
               );

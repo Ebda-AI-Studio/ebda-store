@@ -38,13 +38,16 @@ describe('marketing 404', () => {
     }
   });
 
-  it('maps the site by product and marks WhatsApp, CRM and ERP as coming soon (not links)', () => {
+  it('maps the site by product, Ebda Chat as LIVE (linked), and marks CRM and ERP as coming soon (not links)', () => {
     for (const label of ['ابدأ ستور', 'Ebda Store', 'ابدأ شات', 'Ebda CRM', 'Ebda ERP']) {
       expect(html).toContain(label);
     }
     expect(html).toContain('قريباً');
     expect(html).toContain('Coming soon');
     expect(html).not.toMatch(/<a [^>]*>Ebda (CRM|ERP|WhatsApp)<\/a>/);
+    // Ebda Chat is live at wa.ebda.app (WHATSAPP-HOST-REDIRECT-1): linked, and never inside a coming-soon item
+    expect(html).toContain('href="https://wa.ebda.app/"');
+    expect(html).not.toMatch(/(Ebda Chat|ابدأ شات)(<!-- -->|\s)*<b>\s*(Coming soon|قريباً)/);
     for (const href of [
       'https://help.ebda.app',
       'https://docs.ebda.app',
