@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { STORE_DO_REGISTRY } from '../../apps/api/src/cf/erasure/registry';
+import { eraseShopper } from '../../packages/repo/src/do/erase-shopper';
 
 type Verdict =
   | { how: 'handled'; pg: string; do: string }
@@ -138,13 +139,36 @@ describe('shopper erasure parity (registry vs Postgres eraseAccount)', () => {
   });
 
   it('a campaign recipient is never deleted without the in-window anonymise running first', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../../packages/repo/src/do/erase-shopper.ts'),
-      'utf8'
-    );
-    expect(src.indexOf('UPDATE campaign_recipients')).toBeGreaterThan(-1);
-    expect(src.indexOf('UPDATE campaign_recipients')).toBeLessThan(
-      src.indexOf('DELETE FROM campaign_recipients')
-    );
+    // Behaviour: run the real engine over a recording SyncSql whose campaign_recipients SELECT finds one recipient sent
+    // inside the cap window, and read back the statements in the order they executed.
+    const executed: string[] = [];
+    const db = {
+      all: (sql: string) => {
+        executed.push(sql);
+        return /FROM campaign_recipients WHERE/.test(sql) ? [{ id: 'r1' }] : [];
+      },
+      run: (sql: string) => {
+        executed.push(sql);
+        return { changes: 1 };
+      },
+      transactionSync: <T>(fn: () => T) => fn(),
+    };
+    eraseShopper(db, {
+      storeId: 's1',
+      userId: 'u1',
+      role: 'customer',
+      email: 'Shopper@Example.com',
+      phone: null,
+      smsPhoneKey: null,
+      provenBuyerKey: null,
+      actorId: 'u1',
+      capWindowMs: 86_400_000,
+      now: Date.UTC(2026, 10, 1),
+    });
+    const anonymise = executed.findIndex(q => /UPDATE campaign_recipients SET email/.test(q));
+    const del = executed.findIndex(q => /DELETE FROM campaign_recipients/.test(q));
+    expect(anonymise).toBeGreaterThan(-1);
+    expect(del).toBeGreaterThan(-1);
+    expect(anonymise).toBeLessThan(del);
   });
 });
