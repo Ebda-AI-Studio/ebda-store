@@ -348,7 +348,7 @@ Names only. "Set" says where it lives: wrangler var (committed in the Worker's `
 | `STORE_DIRECTORY`, `MAILER`            | `ebda-accounts` Service Bindings               | `ebda-api` entrypoints (`StoreDirectory`, `IdentityMailer`): the stores a user may act on, and the Store's platform mailer for the one-time codes.                                                                                                                                                        |
 | `ebda-api` entrypoint `WhatsAppBridge` | Service Binding in ebda-whatsapp's config ONLY | `listStoreMembers(storeId, asUserId)` and `memberRole(storeId, userId)` (identity contract v1.4, Ruling ID-19): live-membership reads authorised by the calling user, fail closed.                                                                                                                        |
 
-- **Allowed browser origins** (`ALLOWED_ORIGINS`, exact match, https, no wildcard): `store.ebda.app`, `orders.ebda.app`, `wa.ebda.app` (Ebda Chat, product audience `whatsapp`). `PASSKEY_ORIGINS` stays the Store hosts only.
+- **Allowed browser origins** (`ALLOWED_ORIGINS`, exact match, https, no wildcard): `store.ebda.app`, `orders.ebda.app`, `wa.ebda.app` (Ebda Chat, product audience `whatsapp`), and `accounts.ebda.app` itself (its own sign-in page at `/login` posts same-origin to `/login` and `/login/mfa`, Ruling ACCOUNTS-PAGE-1). `PASSKEY_ORIGINS` stays the Store hosts only (the accounts page links to the Store sign-in for passkeys).
 
 ### Identity secrets: where they live and how to rotate (no values here)
 
@@ -389,7 +389,7 @@ Merging the stage-3 PR deploys ebda-api (legacy login, refresh and session issue
 5. Verify live: `/health`, `/.well-known/jwks.json`, one real login and token.
 6. ONLY THEN merge the PR. Every merchant re-logs in once (refresh rows are copied but can never match, Ruling ID-5).
 
-Each browser origin may only request ITS product audience (`ORIGIN_PRODUCTS`): store and orders get `store` tokens, `wa.ebda.app` only `whatsapp`.
+Each browser origin may only request ITS product audience (`ORIGIN_PRODUCTS`): store, orders and the accounts sign-in page (`https://accounts.ebda.app`) get `store` tokens, `wa.ebda.app` only `whatsapp`. The accounts page discards the token it is handed; what it leaves behind is the `__Host-ebda_rt` session cookie, from which each product then asks `/token` for its own audience.
 
 ### Platform administrators (Ruling ID-15)
 
