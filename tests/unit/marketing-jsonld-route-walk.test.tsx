@@ -79,6 +79,15 @@ describe('pageJsonLd', () => {
     expect(page.dateModified).toBe('2026-10-20');
   });
 
+  it('names the registered entity on a legal document only (Ruling AR-STUDIO-NAME-1)', () => {
+    for (const locale of ['ar', 'en'] as const) {
+      const plain = nodesOf(pageJsonLd(locale, 'contact', 'a', 'b', { type: 'ContactPage' }));
+      const legal = nodesOf(pageJsonLd(locale, 'legal', 'a', 'b', { legalEntity: true }));
+      expect(plain.find(n => n['@type'] === 'Organization')).not.toHaveProperty('legalName');
+      expect(legal.find(n => n['@type'] === 'Organization')?.legalName).toBeTruthy();
+    }
+  });
+
   it('every id a node points at is defined in the same graph', () => {
     const nodes = nodesOf(pageJsonLd('ar', 'credits', 'ا', 'ب'));
     const defined = new Set(nodes.map(n => n['@id']));

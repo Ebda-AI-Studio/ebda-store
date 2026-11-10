@@ -45,6 +45,7 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | 
       <JsonLd
         data={pageJsonLd(locale, page, doc.title, doc.sections[0].p[0].slice(0, 160), {
           dateModified: current.publishedAt,
+          legalEntity: true,
         })}
       />
       <Header locale={locale} page={page} />

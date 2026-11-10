@@ -419,7 +419,12 @@ export function pageJsonLd(
   page: Page,
   name: string,
   description: string,
-  opts: { type?: 'WebPage' | 'ContactPage' | 'CollectionPage'; dateModified?: string } = {}
+  opts: {
+    type?: 'WebPage' | 'ContactPage' | 'CollectionPage';
+    dateModified?: string;
+    /** Only a legal document names the registered entity (Ruling AR-STUDIO-NAME-1: never on /contact). */
+    legalEntity?: boolean;
+  } = {}
 ) {
   const org = `${SITE_URL}/#organization`;
   const site = `${SITE_URL}/#website`;
@@ -436,7 +441,9 @@ export function pageJsonLd(
         logo: `${SITE_URL}/icon-512.png`,
         address: officePostalAddress(),
         ...orgServices(locale),
-        legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
+        ...(opts.legalEntity && {
+          legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
+        }),
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
       },
