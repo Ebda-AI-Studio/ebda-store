@@ -3,39 +3,16 @@ import { getStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import { pickMetaDescription } from '../lib/seo/meta-description';
 import { resolveStorefrontLocale } from '../lib/seo/resolve-locale';
-import { hslToHex, BRAND } from '@ebda/shared';
+import { hslToHex, BRAND, storePwaManifestSchema, type StorePwaManifest } from '@ebda/shared';
 
-/**
- * Shape of the per-store manifest returned by the API. Mirrors what
- * `apps/api/src/services/pwa.service.ts::generateManifest` builds. Kept
- * loose because the API can evolve fields independently and Next.js
- * `MetadataRoute.Manifest` already enforces the contract for the response.
- */
 type ManifestIconPurpose = 'any' | 'maskable' | 'monochrome';
 
-interface ApiManifestIcon {
-  src: string;
-  sizes: string;
-  type: string;
-  purpose?: string;
-}
+/** The per-store manifest the API builds, after it passed `storePwaManifestSchema` (@ebda/shared). */
+type ApiManifest = StorePwaManifest;
+type ApiManifestIcon = NonNullable<ApiManifest['icons']>[number];
 
-interface ApiManifest {
-  name?: string;
-  short_name?: string;
-  description?: string;
-  /** Arabic identity members emitted by generateManifest (#2194). */
-  name_ar?: string;
-  short_name_ar?: string;
-  description_ar?: string;
-  theme_color?: string;
-  background_color?: string;
-  display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser';
-  orientation?: 'any' | 'portrait' | 'landscape';
-  start_url?: string;
-  scope?: string;
-  icons?: ApiManifestIcon[];
-}
+/** A manifest is never worth holding a render for: past this the generic manifest is served instead. */
+const MANIFEST_FETCH_TIMEOUT_MS = 3000;
 
 /**
  * Coerce an icon's `purpose` into the strict union the Next.js manifest type
@@ -57,86 +34,68 @@ function normalizeIcon(icon: ApiManifestIcon): {
 }
 
 /**
- * Try to fetch the per-store manifest assembled by the API from the admin's
- * PWA settings. Returns `null` if PWA is disabled for this store, the store
- * id is unknown (demo fallback), or the fetch fails — callers should then
- * fall back to the basic manifest derived from generic store fields.
+ * Try to fetch the PWA settings the merchant SAVED, as the API emits them: only saved members, nothing filled in
+ * (Ruling PWA-MANIFEST-1). A store that never saved any answers `{}`. Returns `null` when the plan has no PWA, the
+ * store id is unknown (demo fallback), the fetch fails or times out, or the answer fails `storePwaManifestSchema`.
+ * The caller then serves the generic manifest built from the store's own fields, so a broken merchant manifest is
+ * never worse than no merchant manifest.
  */
 async function fetchStoreManifest(storeId: string): Promise<ApiManifest | null> {
   if (!storeId || storeId === 'demo') return null;
   try {
-    const res = await fetch(`${API_URL}/public/${storeId}/manifest.json`, {
+    // The PWA router is mounted at `/stores` (apps/api/src/routes/index.ts). `/public/<id>/manifest.json` is no route at
+    // all: it answered 404 on every render, so the per-store manifest never applied and each miss was charged to the
+    // per-IP store-miss budget on the public router.
+    const res = await fetch(`${API_URL}/stores/public/${storeId}/manifest.json`, {
       // Tagged so an icon/settings write (PWAService.updateSettings) can bust
       // this immediately via revalidateStorefront({tags:[`pwa:<storeId>`]})
       // instead of merchants waiting out the 300s TTL — same pattern as the
       // products/categories tags this fetch's siblings use.
       next: { revalidate: 300, tags: [`pwa:${storeId}`] },
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(MANIFEST_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
-    return (await res.json()) as ApiManifest;
+    // Merchant input, read at the edge: start_url/scope must stay on the store's own origin, every icon must be an
+    // absolute https URL, colours must be hex. One bad field refuses the whole manifest rather than serving half of it.
+    const parsed = storePwaManifestSchema.safeParse(await res.json());
+    if (!parsed.success) {
+      console.warn(
+        'Per-store PWA manifest refused, serving the generic one:',
+        storeId,
+        parsed.error.issues.map(issue => issue.path.join('.')).join(', ')
+      );
+      return null;
+    }
+    return parsed.data;
   } catch (error) {
     console.error('Failed to fetch per-store PWA manifest:', error);
     return null;
   }
 }
 
-export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  const store = await getStore();
+type ResolvedStore = Awaited<ReturnType<typeof getStore>>;
+type Locale = 'en' | 'ar';
+
+/** The store's Arabic name, when it has one. */
+const arabicStoreName = (store: ResolvedStore) => store.nameAr?.trim() || undefined;
+
+/**
+ * The manifest built from the store's own fields alone. It is the WHOLE manifest of a store that saved no PWA
+ * settings, and the fallback for every member a merchant left unsaved (`withSavedSettings`): one builder, so the two
+ * can never drift apart.
+ */
+function genericManifest(store: ResolvedStore, locale: Locale): MetadataRoute.Manifest {
   const primaryColor = store.theme?.primaryColor || BRAND.colors.gold;
   const fallbackThemeColor = hslToHex(primaryColor);
   // `DEFAULT_STORE` sentinel (store-resolver.ts): no merchant resolved → platform.
   const isPlatformDefault = store.id === 'demo' && !store.favicon;
-  const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
-    ?.defaultLanguage as string | undefined;
-  const locale = await resolveStorefrontLocale(storeDefaultLanguage);
   // Arabic locale reads the merchant's Arabic name when present (issue
   // #1857) — else this fallback description interpolates the English name
   // under `<html lang="ar">`.
-  const localizedStoreName = locale === 'ar' ? store.nameAr?.trim() || store.name : store.name;
+  const localizedStoreName = locale === 'ar' ? arabicStoreName(store) || store.name : store.name;
   const localizedStoreDescriptionFallback =
     locale === 'ar' ? `تسوق في ${localizedStoreName}` : `Shop at ${localizedStoreName}`;
-
-  // When the admin has enabled PWA and saved app-name / icons / theme color
-  // for the store, the API returns a manifest already shaped for that store.
-  // We forward those fields verbatim so the install prompt and home-screen
-  // icon use the per-tenant branding instead of the generic defaults below.
-  const apiManifest = await fetchStoreManifest(store.id);
-
-  if (apiManifest) {
-    // Under `ar` the API's Arabic members win (#2194), then the API's own
-    // (English) value, then the localized store name (#2195) — so a merchant
-    // who typed an Arabic app name gets it, and one who did not still never
-    // gets a half-localized install prompt from the fallback.
-    const isAr = locale === 'ar';
-    return {
-      name: (isAr && apiManifest.name_ar) || apiManifest.name || localizedStoreName,
-      short_name:
-        (isAr && apiManifest.short_name_ar) || apiManifest.short_name || localizedStoreName,
-      description:
-        (isAr && apiManifest.description_ar) ||
-        (isAr ? localizedStoreDescriptionFallback : apiManifest.description) ||
-        localizedStoreDescriptionFallback,
-      start_url: apiManifest.start_url || '/',
-      display: apiManifest.display || 'standalone',
-      orientation: apiManifest.orientation || 'any',
-      background_color: apiManifest.background_color || '#ffffff',
-      theme_color: apiManifest.theme_color || fallbackThemeColor,
-      scope: apiManifest.scope || '/',
-      icons:
-        apiManifest.icons && apiManifest.icons.length > 0
-          ? apiManifest.icons.map(normalizeIcon)
-          : store.favicon
-            ? [
-                { src: store.favicon, sizes: '192x192', type: 'image/png' },
-                { src: store.favicon, sizes: '512x512', type: 'image/png' },
-              ]
-            : [
-                { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-                { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-              ],
-    };
-  }
 
   return {
     // Localized like the description below (#2195): an Arabic storefront's
@@ -179,4 +138,53 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
           ]),
     ],
   };
+}
+
+/**
+ * The generic manifest with each member the merchant SAVED laid over it. A saved member wins; a member that was never
+ * saved keeps exactly the generic value, so `saved = {}` returns the generic manifest unchanged.
+ *
+ * Under `ar` (#2194, #2195) the order for the two names is: the saved Arabic member, then the store's own Arabic name
+ * (the generic value), and only for a store with no Arabic name the saved English member. The description never
+ * crosses languages: under `ar` it is the saved Arabic description or the generic one, never the saved English text.
+ */
+function withSavedSettings(
+  generic: MetadataRoute.Manifest,
+  saved: ApiManifest,
+  locale: Locale,
+  storeHasArabicName: boolean
+): MetadataRoute.Manifest {
+  const isAr = locale === 'ar';
+  const savedEnglish = (value: string | undefined) =>
+    isAr && storeHasArabicName ? undefined : value;
+  return {
+    ...generic,
+    name: (isAr && saved.name_ar) || savedEnglish(saved.name) || generic.name,
+    short_name:
+      (isAr && saved.short_name_ar) || savedEnglish(saved.short_name) || generic.short_name,
+    description: (isAr ? saved.description_ar : saved.description) || generic.description,
+    start_url: saved.start_url || generic.start_url,
+    display: saved.display || generic.display,
+    background_color: saved.background_color || generic.background_color,
+    theme_color: saved.theme_color || generic.theme_color,
+    // The generic manifest names neither of these two, so they exist only when saved.
+    ...(saved.orientation ? { orientation: saved.orientation } : {}),
+    ...(saved.scope ? { scope: saved.scope } : {}),
+    icons: saved.icons && saved.icons.length > 0 ? saved.icons.map(normalizeIcon) : generic.icons,
+  };
+}
+
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const store = await getStore();
+  const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
+    ?.defaultLanguage as string | undefined;
+  const locale = await resolveStorefrontLocale(storeDefaultLanguage);
+  const generic = genericManifest(store, locale);
+
+  // What the merchant saved in the admin PWA tab (app name, colours, icons...), and nothing else: the API fills in no
+  // default, so every member it leaves out keeps the generic value above.
+  const saved = await fetchStoreManifest(store.id);
+  return saved
+    ? withSavedSettings(generic, saved, locale, Boolean(arabicStoreName(store)))
+    : generic;
 }

@@ -6,7 +6,8 @@ import { resolvedStoreId } from '../utils/resolved-store';
 export function publicTenantKey(req: Request): string {
   // The RESOLVED store id wins: a raw header or param value is attacker-controlled, so rotating
   // fake tenant values must not buy a fresh bucket. (publicStoreContext resolves before the
-  // limiters run; an unresolvable value is a 404 there, so it never reaches a limiter.)
+  // limiters run. A request whose store did not resolve still reaches them, so that an unknown
+  // store is limited and counted: it is refused right after, `refuseUnknownPublicStore`.)
   const resolved = resolvedStoreId(req);
   if (resolved) return `t:${resolved}`;
   // Route-level usages (coupons/validate, promotions/preview) carry the

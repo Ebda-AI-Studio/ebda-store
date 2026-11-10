@@ -98,13 +98,16 @@ describe('GET /public/redirects/resolve', () => {
     expect(res.body).toEqual({ toSlug: 'new-post' });
   });
 
-  it('404s a slug that was never redirected', async () => {
+  // "No redirect" is an answer about a store that exists: 200 with a null `toSlug`. It was a 404, which the public
+  // router's per-IP store-miss limiter counted, so one dead product link cost a shopper two misses.
+  it('answers 200 with a null toSlug for a slug that was never redirected', async () => {
     const res = await request(app)
       .get('/public/redirects/resolve')
       .query({ type: 'product', slug: 'never-existed' })
       .set('X-Store-ID', testStoreId!);
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ toSlug: null });
   });
 
   it('400s an invalid type', async () => {

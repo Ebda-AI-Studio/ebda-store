@@ -3,6 +3,7 @@ import { runInStoreScope, runInTenantContext, runInUserScope } from '@ebda/datab
 import { platformUserScopeIsLazy } from '../services/platform/cutover';
 import { withDeferredWork } from '../lib/after-tenant-commit';
 import { backendFor } from '../lib/store-backend';
+import { AppError } from './error-handler';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import { runRequestInTransaction } from './request-transaction';
 import { skipsRequestTransaction } from './public-read-limit';
@@ -557,6 +558,9 @@ function openUserTransaction(
   }
 }
 
+const UNKNOWN_PUBLIC_STORE = Symbol('ebda.unknownPublicStore');
+const PATH_STORE_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
+
 /**
  * Store scope for the PUBLIC (storefront) routes, where the store is not in a
  * `/stores/:storeId` path param but in the `X-Store-ID` / `x-store-domain`
@@ -578,9 +582,17 @@ function openUserTransaction(
  * that identify the store themselves (`/stores/:slugOrId`, `/store/resolve`, the
  * SMS opt-out) read only the un-scoped `stores` table or enter a scope after
  * they resolve it (`readInStoreContext`), which joins this one when it matches.
+ *
+ * A store id in the path that is in no directory (`backendFor`: 404
+ * STORE_NOT_FOUND) is NOT answered from here. This middleware runs before the
+ * public router's limiters, so answering here sent that 404 past all of them:
+ * no per-IP limit, no store-miss count (production 2026-11-10:
+ * `/public/<random uuid>/pages/privacy` answered 404 with no RateLimit header,
+ * and the caller's miss budget stayed at 20). The refusal is kept on the
+ * response and raised by `refuseUnknownPublicStore`, mounted right after the
+ * limiters, so an unknown store id is limited and counted like an unknown slug.
+ * Nothing between the two reads store data.
  */
-const PATH_STORE_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
-
 export function publicStoreContext(req: Request, res: Response, next: NextFunction): void {
   void (async () => {
     let storeId: string | undefined;
@@ -603,14 +615,28 @@ export function publicStoreContext(req: Request, res: Response, next: NextFuncti
     // The context middlewares read `req.params.storeId`; Express rewrites
     // `req.params` for every later layer, so setting it here cannot leak.
     req.params = { ...req.params, storeId };
+    // An unknown store is refused behind the public limiters, not here in front of them (see above).
+    const opened: NextFunction = err => {
+      if (err instanceof AppError && err.statusCode === 404 && err.code === 'STORE_NOT_FOUND') {
+        (res as unknown as Record<symbol, AppError>)[UNKNOWN_PUBLIC_STORE] = err;
+        next();
+        return;
+      }
+      next(err);
+    };
     // Ruling LAZY-TX-1: cached catalogue reads open NO request transaction and no tenant scope.
     // Fail closed: with no ambient scope the tenant guard throws on any tenant-model query and RLS
     // returns nothing, so the only DB access on this path is the handler's own
     // `readInStoreContext` (a short, store-scoped transaction on a cache miss).
     if (resolved && skipsRequestTransaction(req)) next();
-    else if (SAFE_METHODS.has(req.method)) tenantContext(req, res, next);
-    else storeScopeContext(req, res, next);
+    else if (SAFE_METHODS.has(req.method)) tenantContext(req, res, opened);
+    else storeScopeContext(req, res, opened);
   })();
+}
+
+/** Raises the 404 `publicStoreContext` held back. Mounted on the public router right after its limiters. */
+export function refuseUnknownPublicStore(_req: Request, res: Response, next: NextFunction): void {
+  next((res as unknown as Record<symbol, AppError | undefined>)[UNKNOWN_PUBLIC_STORE]);
 }
 
 /**

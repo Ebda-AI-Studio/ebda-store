@@ -91,8 +91,12 @@ case) and returns the final slug, or `null` on a miss.
   resolving the store id (avoids a DB round-trip on malformed input) → `400`
   on invalid input.
 - Resolves the store via `getStoreIdFromRequest` (X-Store-ID header or
-  `x-store-domain`), then calls `resolveSlugRedirect` → `404` on no redirect,
-  `200 { toSlug }` on a hit.
+  `x-store-domain`), then calls `resolveSlugRedirect` → `200 { toSlug }` on a
+  hit, `200 { toSlug: null }` on no redirect. A store that does not resolve is
+  still `400 STORE_NOT_RESOLVED`. "No redirect" was a `404` until 2026-11-10;
+  the public router's per-IP store-miss limiter counts every 404, so one dead
+  product link cost a shopper two misses (the product 404 plus this lookup).
+  The storefront reads only `toSlug`, so it handles both answers.
 
 ## Storefront consumer — redirect-on-miss
 

@@ -29,6 +29,16 @@ const e = env as unknown as {
     prepare(sql: string): { bind(...v: unknown[]): { run(): Promise<unknown> } };
   };
   TEST_PLATFORM_MIGRATIONS: unknown[];
+  STORE_DO: {
+    idFromName(n: string): unknown;
+    get(id: unknown): {
+      authOp(
+        storeId: string,
+        op: string,
+        argsJson: string
+      ): Promise<{ ok: true; json: string } | { ok: false; code: string }>;
+    };
+  };
   /** Test-worker bindings (vitest.workers.config.mts): the host's env does not reach workerd's `process.env`. */
   SWEEP_STRICT?: string;
   SWEEP_FILTER?: string;
@@ -660,10 +670,51 @@ describe.skipIf(e.E2E_DB === '1')(
         expect(stranger?.status).toBe(404);
         const anon = await track('anonymous', storeId, placedId, h);
         expect(anon?.status).toBe(401);
-        await hit('FLOW', 'POST', '/auth/login', `${BASE}/auth/login`, h, {
-          email: 'sweep-customer@exit-test.invalid',
-          password: 'Sweep-Passw0rd!x',
+        // Sign-in needs a VERIFIED customer (an unverified one is refused 403 EMAIL_NOT_VERIFIED before any session is issued,
+        // so the session-issue path would go unswept). `/auth/register` mails its token and returns none, so this customer is
+        // written to the store's DO with a known token and verified through the real route.
+        const verifyToken = `${storeId}~${'c'.repeat(64)}`;
+        const tokenHash = [
+          ...new Uint8Array(
+            await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifyToken))
+          ),
+        ]
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        const seededCustomer = await e.STORE_DO.get(e.STORE_DO.idFromName(storeId)).authOp(
+          storeId,
+          'register',
+          JSON.stringify({
+            id: 'sweep-verified',
+            email: 'sweep-verified@exit-test.invalid',
+            // bcrypt cost 4 of the password below (test fixture only)
+            passwordHash: '$2b$04$jYDlZaJj/X/kmBmzPXDwsOP4.aIZ2IBm.rDUDGyiC8iKKUZPb/Rzm',
+            firstName: 'Sweep',
+            lastName: 'Verified',
+            verification: {
+              tokenHash,
+              expiresAt: Date.now() + 3_600_000,
+              rowId: 'v-sweep-verified',
+            },
+          })
+        );
+        expect(seededCustomer.ok, JSON.stringify(seededCustomer)).toBe(true);
+        const verifiedEmail = await hit(
+          'FLOW',
+          'POST',
+          '/auth/verify-email',
+          `${BASE}/auth/verify-email`,
+          h,
+          { token: verifyToken }
+        );
+        const signedIn = await hit('FLOW', 'POST', '/auth/login', `${BASE}/auth/login`, h, {
+          email: 'sweep-verified@exit-test.invalid',
+          password: 'Passw0rd!xyz',
+          storeId,
         });
+        // `hit` answers undefined when SWEEP_FILTER leaves the route out
+        if (verifiedEmail) expect(verifiedEmail.status).toBe(200);
+        if (signedIn) expect(signedIn.status).toBe(200);
         await hit('FLOW', 'POST', '/auth/forgot-password', `${BASE}/auth/forgot-password`, h, {
           email: 'sweep-customer@exit-test.invalid',
         });
