@@ -7,9 +7,11 @@ import {
   eraseIdentityUser,
   exportIdentityUser,
   forgotIdentityPassword,
+  getAccountState,
   getAccountsBrief,
   revokeIdentityIfManaged,
 } from '../lib/identity-client';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 import { hubOnD1, hubOwnedStores } from '../lib/platform-hub';
 import { eraseHubUserData, exportHubUserPlatform } from './platform/hub-user-data';
 import crypto from 'crypto';
@@ -1556,6 +1558,27 @@ export class AuthService {
       const u = await route.client.call<DoCustomer | null>('getProfile', { userId });
       if (!u) throw new AppError(404, 'NOT_FOUND', 'User not found');
       return CustomerAuthFlows.toProfile(u);
+    }
+    // NZ-D23: the Worker has no Postgres `users` table. A merchant, staff member or platform admin (the admin namespace)
+    // IS their identity-service account, so the profile is read from there. 2026-11-10 P1: a new merchant's first
+    // `POST /auth/session` fell through to `user.findUnique` here and answered 500 POSTGRES_REMOVED.
+    if (postgresRemovedOnThisWorker()) {
+      const st = await getAccountState(userId);
+      if (!st) throw new AppError(404, 'NOT_FOUND', 'User not found');
+      return {
+        id: st.id,
+        email: st.email,
+        firstName: st.firstName,
+        lastName: st.lastName,
+        phone: st.phone,
+        role: st.role,
+        avatar: null,
+        emailVerified: st.emailVerified,
+        mfaEnabled: st.mfaEnabled,
+        mfaEnrolledAt: st.mfaEnrolledAt ? new Date(st.mfaEnrolledAt) : null,
+        createdAt: null,
+        updatedAt: null,
+      };
     }
     const user = await withUser(userId, tx =>
       tx.user.findUnique({

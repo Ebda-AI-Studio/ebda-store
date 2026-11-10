@@ -15,4 +15,4 @@ Ruling CI-FULL-MAIN-1. Launch is 2026-11-11.
 4. Concurrency: one group for main pushes (`cancel-in-progress`), PR per ref, cron/manual per run.
 5. `notify-failure`: also needs the workerd jobs; on a main failure opens/updates the `ci-main-red` issue; a green main full run closes it.
 6. Tests: `tests/unit/ci-lean-structure.test.ts` evaluates each job's `if:` per event (push = full lane minus mutation; nightly; Sunday + mutation); merge-gate required list unchanged.
-7. Docs: header comment, `docs/ebda/ci.md` (Enterprise 50k minutes, measured timings, monthly estimate), ruling + README row.
+7. Docs: header comment, `docs/ebda/ci.md` (Enterprise 50k minutes, measured timings, monthly estimate), ruling file (no README row: Ruling RULINGS-INDEX-1).

@@ -15,6 +15,7 @@
 import { BRAND } from '../brand';
 import {
   EBDA_CONSENT_COOKIE,
+  EBDA_CONSENT_EVENT,
   EBDA_CONSENT_MAX_AGE_DAYS,
   hasAnyConsent,
   parseConsent,
@@ -259,6 +260,11 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
 
   function setConsent(choice: { analytics: boolean; marketing: boolean }): void {
     writeCookie(win, EBDA_CONSENT_COOKIE, serializeConsent(choice), EBDA_CONSENT_MAX_AGE_DAYS);
+    try {
+      win.dispatchEvent(new CustomEvent(EBDA_CONSENT_EVENT));
+    } catch {
+      // no CustomEvent (very old browser): listeners re-read the cookie on their next mount
+    }
     const c = readConsent();
     const replay = held.splice(0);
     if (!hasAnyConsent(c)) return;

@@ -81,7 +81,7 @@ describe.skipIf(e.E2E_DB === '1')('wholesale approve / revoke on a DO store, Pos
       authorization: `Bearer ${owner}`,
       'x-store-id': storeId,
       'content-type': 'application/json',
-      'x-forwarded-for': freshIp(),
+      'cf-connecting-ip': freshIp(),
       ...extra,
     });
 
@@ -119,7 +119,7 @@ describe.skipIf(e.E2E_DB === '1')('wholesale approve / revoke on a DO store, Pos
     expect(reg.ok, JSON.stringify(reg)).toBe(true);
     const verified = await e.API.fetch(`${BASE}/auth/verify-email`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-forwarded-for': freshIp() },
+      headers: { 'content-type': 'application/json', 'cf-connecting-ip': freshIp() },
       body: JSON.stringify({ token: vtoken }),
     });
     expect(verified.status).toBe(200);
@@ -132,7 +132,7 @@ describe.skipIf(e.E2E_DB === '1')('wholesale approve / revoke on a DO store, Pos
         authorization: `Bearer ${buyer}`,
         'x-store-id': storeId,
         'content-type': 'application/json',
-        'x-forwarded-for': freshIp(),
+        'cf-connecting-ip': freshIp(),
       },
       body: JSON.stringify({ businessName: 'Acme Trading', phone: '+201000000001', consent: true }),
     });

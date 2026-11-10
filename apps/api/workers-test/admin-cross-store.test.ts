@@ -29,7 +29,7 @@ let ip = 0;
 const get = (path: string, token?: string) =>
   e.API.fetch(BASE + path, {
     headers: {
-      'x-forwarded-for': `10.8.0.${ip++ & 255}`,
+      'cf-connecting-ip': `10.8.0.${ip++ & 255}`,
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
   });

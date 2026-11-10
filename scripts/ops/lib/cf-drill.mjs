@@ -4,6 +4,7 @@ import {
   DERIVED_QUEUE_TABLES,
   DO_MOVED_TABLES,
   fetchBackupSet,
+  IDENTITY_ARTIFACT,
   parseStoreDump,
   compareTables,
 } from './cf-backup.mjs';
@@ -216,6 +217,7 @@ export async function apiChecksForStore(http, { store, productCount }) {
 /**
  * The drill. targets = {
  *   decrypt(buf), loadD1(sqlText) -> { tables, stores: [{id,slug,domain,owner_id}] },
+ *   loadIdentity(sqlText) -> { tables }       // D1 ebda-identity restored into a SCRATCH D1 (never the live one)
  *   post(path, body, ctype) -> json,           // StoreDO admin surface of the LOCAL worker
  *   apiChecks?(store, productCount) -> checks[] // omitted for the CI fixture drill
  * }
@@ -256,6 +258,38 @@ export async function runDrill({ io, targets, tier = 'daily', day, now = () => D
         .join('; '),
       ms: 0,
     });
+  }
+
+  // ebda-identity (Ruling ICEBERG-BK-1): a v2+ manifest must carry it; a v1 manifest predates it and is reported, not failed.
+  const idEntry = manifest.artifacts[IDENTITY_ARTIFACT];
+  if (!idEntry)
+    checks.push({
+      name: 'D1 ebda-identity present in the backup set',
+      ok: (manifest.version ?? 1) < 2,
+      detail:
+        (manifest.version ?? 1) < 2
+          ? 'older (v1) backup taken before identity was backed up'
+          : 'MISSING from a v2 manifest',
+      ms: 0,
+    });
+  else {
+    const idn = await step('restore D1 ebda-identity into a scratch D1', async () =>
+      targets.loadIdentity(files[IDENTITY_ARTIFACT].toString('utf8'))
+    );
+    if (idn) {
+      const cmp = compareTables(idEntry.tables, idn.tables);
+      const bad = cmp.filter(c => !c.ok);
+      const rows = cmp.reduce((a, c) => a + (c.got ?? 0), 0);
+      checks.push({
+        name: `D1 identity: ${cmp.length - bad.length}/${cmp.length} tables equal (count + content digest), ${rows} rows`,
+        ok: bad.length === 0,
+        detail: bad
+          .slice(0, 5)
+          .map(b => `${b.table} want ${b.want} got ${b.got}`)
+          .join('; '),
+        ms: 0,
+      });
+    }
   }
 
   const byId = new Map((d1?.stores ?? []).map(s => [s.id, s]));
