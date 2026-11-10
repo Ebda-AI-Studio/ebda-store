@@ -390,7 +390,8 @@ function arabicLetterShare(
 /**
  * BE:F-4: `title` / `description` must be English and the `*Ar` pair Arabic. A field with no letters is not judged. The
  * thresholds are loose on purpose (brand names and product codes stay Latin inside Arabic copy and vice versa): English
- * fields at most 30% Arabic letters, Arabic fields at least 25%, after dropping the words of `names` (product / store).
+ * fields at most 30% Arabic letters, Arabic fields at least 25%, after dropping the words of `names` (product / store)
+ * from both (a field made only of those words is judged whole).
  */
 export function seoLanguagesOk(
   s: { title: string; titleAr: string; description: string; descriptionAr: string },
@@ -403,7 +404,10 @@ export function seoLanguagesOk(
       .map(w => w.toLowerCase())
   );
   for (const en of [s.title, s.description]) {
-    const share = arabicLetterShare(en);
+    // The same name words are not judged in the English fields either: an English title that carries the store's
+    // Arabic name ("Qamar قمر — Evening Dresses") is English (PR #512 review). A field that is NOTHING but those
+    // words is judged whole, so an Arabic-only English title still fails.
+    const share = arabicLetterShare(en, ignore) ?? arabicLetterShare(en);
     if (share !== null && share > 0.3) return false;
   }
   for (const ar of [s.titleAr, s.descriptionAr]) {
