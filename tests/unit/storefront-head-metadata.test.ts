@@ -12,10 +12,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const state = {
   store: {} as Record<string, unknown>,
   cookieLang: undefined as string | undefined,
+  urlLang: undefined as string | undefined,
 };
 
 vi.mock('next/headers', () => ({
-  headers: async () => ({ get: (k: string) => (k === 'host' ? 'shop.example' : null) }),
+  headers: async () => ({
+    get: (k: string) =>
+      k === 'host' ? 'shop.example' : k === 'x-locale-path' ? (state.urlLang ?? null) : null,
+  }),
   cookies: async () => ({
     get: (k: string) =>
       k === 'force-language' && state.cookieLang ? { value: state.cookieLang } : undefined,
@@ -49,6 +53,7 @@ const BASE = {
 beforeEach(() => {
   state.store = { ...BASE };
   state.cookieLang = undefined;
+  state.urlLang = undefined;
 });
 
 describe('root layout generateMetadata', () => {
@@ -84,6 +89,38 @@ describe('root layout generateMetadata', () => {
     const { generateMetadata } = await import('../../apps/web/src/app/layout');
     const meta = await generateMetadata();
     expect((meta.openGraph as { locale?: string }).locale).toBe('en_US');
+  });
+});
+
+describe('the manifest link follows the language in the URL (Ruling PWA-MANIFEST-2)', () => {
+  const meta = async () =>
+    (await import('../../apps/web/src/app/layout')).generateMetadata() as Promise<{
+      manifest?: unknown;
+    }>;
+
+  it('a /en page links the English manifest, a /ar page the Arabic one, whatever the cookie says', async () => {
+    state.urlLang = 'en';
+    state.cookieLang = 'ar';
+    expect((await meta()).manifest).toBe('/en/manifest.webmanifest');
+    state.urlLang = 'ar';
+    state.cookieLang = 'en';
+    expect((await meta()).manifest).toBe('/ar/manifest.webmanifest');
+  });
+
+  it('a page with no language in its URL links the shared manifest', async () => {
+    expect((await meta()).manifest).toBe('/manifest.webmanifest');
+    state.cookieLang = 'ar';
+    expect((await meta()).manifest).toBe('/manifest.webmanifest');
+  });
+
+  it('every branch keeps a manifest link: an unreachable store and the platform 404 too', async () => {
+    state.urlLang = 'en';
+    state.store = { ...BASE, transientResolveFailure: true };
+    expect((await meta()).manifest).toBe('/en/manifest.webmanifest');
+    state.store = { ...BASE, id: 'demo', slug: 'demo', domain: undefined };
+    expect((await meta()).manifest).toBe('/en/manifest.webmanifest');
+    state.urlLang = undefined;
+    expect((await meta()).manifest).toBe('/manifest.webmanifest');
   });
 });
 

@@ -79,8 +79,10 @@ describe('platform root redirect', () => {
     expect(src).toMatch(/robots: \{ index: false, follow: false \}/);
     // It must short-circuit BEFORE the storefront builder, not after.
     const sentinel = src.indexOf("store.id === 'demo'");
-    const builder = src.indexOf('return buildStorefrontMetadata');
+    // The call, not the import: the builder's result is now spread with the manifest link (Ruling PWA-MANIFEST-2).
+    const builder = src.indexOf('buildStorefrontMetadata(');
     expect(sentinel).toBeGreaterThan(-1);
+    expect(builder).toBeGreaterThan(-1);
     expect(sentinel).toBeLessThan(builder);
   });
 });

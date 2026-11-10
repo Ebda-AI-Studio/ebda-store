@@ -105,6 +105,7 @@ export function EmptyStateKit({
               <li key={c.id}>
                 <Link
                   href={storeUrl(`/products?category=${encodeURIComponent(c.slug)}`)}
+                  prefetch={false}
                   className="inline-flex min-h-11 items-center rounded-full border border-input px-4 text-sm hover:border-primary hover:text-primary"
                 >
                   {isRtl ? c.nameAr || c.name : c.name}

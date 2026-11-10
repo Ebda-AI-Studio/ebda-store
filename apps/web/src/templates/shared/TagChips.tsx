@@ -35,6 +35,7 @@ export function TagChips({
             <li key={tg.id} className="shrink-0 snap-start">
               <Link
                 href={`${urlPrefix}/products?tag=${encodeURIComponent(tg.name)}`}
+                prefetch={false}
                 className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[var(--radius)] border border-input px-4 text-sm text-foreground hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span lang={l.lang}>{l.text}</span>

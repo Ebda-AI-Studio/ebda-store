@@ -202,7 +202,7 @@ export const translations = {
   Company: 'الشركة',
   FAQ: 'الأسئلة الشائعة',
   'Shipping Info': 'معلومات الشحن',
-  'Returns & Refunds': 'المرتجعات واسترداد الفلوس',
+  'Returns & Refunds': 'المرتجعات واسترداد الأموال',
   'Privacy Policy': 'سياسة الخصوصية',
   'Terms of Service': 'الشروط والأحكام',
   'About Us': 'من نحن',

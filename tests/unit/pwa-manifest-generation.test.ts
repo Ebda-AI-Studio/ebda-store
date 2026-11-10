@@ -170,7 +170,7 @@ describe('PWAService.generateManifest', () => {
 });
 
 // Ruling PWA-MANIFEST-1 (the alternative, taken 2026-11-10): the public manifest carries ONLY what the merchant saved.
-// The storefront (apps/web/src/app/manifest.ts) fills every other member with the value its generic manifest uses, so
+// The storefront (apps/web/src/lib/pwa/store-manifest.ts) fills every other member with the value its generic manifest uses, so
 // a store that never saved PWA settings keeps the manifest it had. Anything invented here (a store name, `Shop at X`,
 // `تسوق في X`, a default colour, display, orientation, start URL or scope) would override the storefront's better
 // value: the store's theme colour and its own description.

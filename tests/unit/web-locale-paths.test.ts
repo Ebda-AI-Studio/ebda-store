@@ -8,6 +8,7 @@ import {
   localePathsOn,
   localizeHref,
   localizeJsonLdUrls,
+  manifestHref,
   parseLocalePathStores,
   pendingRedirect,
   prefixedPath,
@@ -70,6 +71,33 @@ describe('locale path rules (pure)', () => {
     expect(splitLocalePrefix('/en/products/x')).toEqual({ locale: 'en', rest: '/products/x' });
     for (const p of ['/', '/products', '/arabic', '/ar-eg/x', '/fr/products', '/cart'])
       expect(splitLocalePrefix(p)).toBeNull();
+  });
+
+  it('the app manifest under a language prefix is its own decision, never a redirect to the shared URL (Ruling PWA-MANIFEST-2)', () => {
+    const decide = (pathname: string, method = 'GET') =>
+      decideLocalePath({ pathname, search: '', method });
+    for (const l of ['ar', 'en'] as const) {
+      expect(decide(`/${l}/manifest.webmanifest`)).toEqual({ kind: 'manifest', locale: l });
+      expect(decide(`/${l}/manifest.webmanifest`, 'HEAD')).toEqual({ kind: 'manifest', locale: l });
+      expect(decide(`/${l}/manifest.webmanifest`, 'POST')).toEqual({ kind: 'none' });
+    }
+    // The shared URL keeps the store's default language: nothing to decide.
+    expect(decide('/manifest.webmanifest')).toEqual({ kind: 'none' });
+    // Only the exact path. Anything else under a prefix keeps its old answer.
+    expect(decide('/en/manifest.webmanifest/x').kind).toBe('redirect');
+    expect(decide('/en//manifest.webmanifest')).toEqual({ kind: 'none' });
+    expect(decide('/en/cart')).toEqual({ kind: 'redirect', location: '/cart' });
+  });
+
+  it('a page links the manifest of its own URL language', () => {
+    expect(manifestHref('en')).toBe('/en/manifest.webmanifest');
+    expect(manifestHref('ar')).toBe('/ar/manifest.webmanifest');
+    expect(manifestHref(null)).toBe('/manifest.webmanifest');
+    for (const l of ['ar', 'en'] as const)
+      expect(decideLocalePath({ pathname: manifestHref(l), search: '', method: 'GET' })).toEqual({
+        kind: 'manifest',
+        locale: l,
+      });
   });
 
   it('only the indexable roots carry a prefix', () => {
@@ -352,6 +380,35 @@ describe('middleware: language in the URL', () => {
     expect(fwd(r, 'x-locale-pending')).toBeNull();
     // the URL decides: the cookie follows it
     expect(r.cookies.get('force-language')?.value).toBe('en');
+  });
+
+  it('serves the manifest of a /ar|/en page in that language: one route, the language on the request, no cookie (Ruling PWA-MANIFEST-2)', () => {
+    on();
+    for (const l of ['ar', 'en']) {
+      const r = middleware(sub(`/${l}/manifest.webmanifest`));
+      expect(r.status).toBe(200);
+      expect(r.headers.get('location')).toBeNull();
+      expect(r.headers.get('x-middleware-rewrite')).toBe(
+        'https://demo-boutique.ebda.app/manifest.webmanifest'
+      );
+      expect(fwd(r, 'x-locale-path')).toBe(l);
+      expect(fwd(r, 'x-store-domain')).toBe('demo-boutique.ebda.app');
+      expect(fwd(r, 'x-locale-pending')).toBeNull();
+      // A browser fetches a manifest without cookies and ignores a cookie on the answer; the page sets it.
+      expect(r.cookies.get('force-language')).toBeUndefined();
+    }
+    // The shared URL is not rewritten and carries no URL language: the store default decides.
+    const plain = middleware(sub('/manifest.webmanifest'));
+    expect(plain.headers.get('x-middleware-rewrite')).toBeNull();
+    expect(plain.headers.get('location')).toBeNull();
+    expect(fwd(plain, 'x-locale-path')).toBeNull();
+  });
+
+  it('a store without language-in-the-URL keeps one manifest: the prefixed path is not rewritten', () => {
+    on();
+    const r = middleware(req('someone-else.ebda.app', '/en/manifest.webmanifest'));
+    expect(r.headers.get('x-middleware-rewrite')).toBeNull();
+    expect(fwd(r, 'x-locale-path')).toBeNull();
   });
 
   it('does not touch the cookie when it already matches', () => {

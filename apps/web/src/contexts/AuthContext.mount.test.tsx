@@ -33,6 +33,14 @@ vi.stubGlobal('localStorage', {
   removeItem: (k: string) => void store.delete(k),
   clear: () => store.clear(),
 });
+// Same for sessionStorage: the once-per-tab probe flag (`authProbe`, lib/api.ts) is real state too.
+const tab = new Map<string, string>();
+vi.stubGlobal('sessionStorage', {
+  getItem: (k: string) => tab.get(k) ?? null,
+  setItem: (k: string, v: string) => void tab.set(k, v),
+  removeItem: (k: string) => void tab.delete(k),
+  clear: () => tab.clear(),
+});
 vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
 
 import { AuthProvider, useAuth } from './AuthContext';
@@ -56,6 +64,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 describe('AuthProvider mount check', () => {
@@ -178,6 +187,32 @@ describe('AuthProvider asks only when it can matter (audit 2026-11-03 #15)', () 
     );
     await act(async () => {});
     expect(mocks.getProfileWithMountRetries).toHaveBeenCalledTimes(1);
+  });
+
+  // Pre-QA sweep 2026-11-10 #7: once this tab has asked and been told "no session" (the probe is
+  // spent), a guest's later cart / checkout / returns views repeat nothing: no 401 in the console.
+  it.each(['/ar/cart', '/en/checkout', '/ar/returns', '/s/shop/ar/track'])(
+    'a guest whose tab already spent its probe makes NO call on %s and is not loading',
+    async p => {
+      localStorage.clear();
+      sessionStorage.setItem('authProbe', '1');
+      pathname = p;
+      mount();
+      await act(async () => {});
+      expect(mocks.getProfileWithMountRetries).not.toHaveBeenCalled();
+      expect(latest!.isLoading).toBe(false);
+      expect(latest!.user).toBeNull();
+    }
+  );
+
+  it('a spent probe never silences a browser that holds a session hint', async () => {
+    sessionStorage.setItem('authProbe', '1');
+    mocks.getProfileWithMountRetries.mockResolvedValue(CUSTOMER);
+    pathname = '/ar/cart';
+    mount();
+    await act(async () => {});
+    expect(mocks.getProfileWithMountRetries).toHaveBeenCalledTimes(1);
+    expect(latest!.user?.id).toBe('u1');
   });
 
   it('a browser WITH a hint checks on a content page too, as before', async () => {
