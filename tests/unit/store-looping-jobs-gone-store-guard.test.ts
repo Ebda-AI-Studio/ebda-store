@@ -42,11 +42,26 @@ describe('gone-store handling (shared helper)', () => {
       .map(x => x.rel);
     expect(bad).toEqual([]);
   });
-  it('no cron loop asks the directory for deleted stores', () => {
-    const bad = files
-      .filter(f => !EXEMPT.has(f.slice(root.length + 1)))
-      .filter(f => /includeDeleted:\s*true/.test(readFileSync(f, 'utf8')));
-    expect(bad.map(f => f.slice(root.length + 1))).toEqual([]);
+  it('every sweep over DELETED stores (includeDeleted) skips a gone store via storeHasNoDataHere', () => {
+    // Soft-deleted stores are still in the directory with includeDeleted; qa-merchant-test is one and answers 410 on a Worker.
+    const all: string[] = [];
+    const walk = (d: string) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const f = join(d, e.name);
+        if (e.isDirectory()) walk(f);
+        else if (f.endsWith('.ts') && !f.endsWith('.test.ts')) all.push(f);
+      }
+    };
+    walk(root);
+    const sweepsDeleted = (src: string) =>
+      /storeDirectory\([\s\S]{0,120}?includeDeleted:\s*true/.test(src);
+    const bad = all
+      .filter(f => sweepsDeleted(readFileSync(f, 'utf8')))
+      .filter(f => !/storeHasNoDataHere/.test(readFileSync(f, 'utf8')))
+      .map(f => f.slice(root.length + 1))
+      // reconcile reads the Postgres side on purpose (postgresOnly) and is Node-only.
+      .filter(r => r !== 'lib/store-directory-reconcile.ts');
+    expect(bad).toEqual([]);
   });
   it('the billing entry points that the daily job calls use the helper', () => {
     for (const f of ['subscription-billing.service.ts', 'reminders.service.ts'])
