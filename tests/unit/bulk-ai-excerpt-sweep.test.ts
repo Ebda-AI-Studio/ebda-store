@@ -36,6 +36,11 @@ vi.mock('../../apps/api/src/lib/ai/product-excerpt-generator', () => ({
 const mockFindUniqueStore = vi.fn();
 const mockFindManyProduct = vi.fn();
 const mockUpdateProduct = vi.fn();
+// #620: the sweep writes through the one guarded fill-only layer, not product.update
+const mockWriteBulk = vi.fn().mockResolvedValue(['excerpt']);
+vi.mock('../../apps/api/src/services/ai-autofill.service', () => ({
+  writeBulkProductFields: (...args: unknown[]) => mockWriteBulk(...args),
+}));
 const mockFindUniqueJob = vi.fn();
 const mockUpdateJob = vi.fn();
 
@@ -80,6 +85,7 @@ beforeEach(async () => {
   mockFindUniqueStore.mockReset();
   mockFindManyProduct.mockReset();
   mockUpdateProduct.mockReset();
+  mockWriteBulk.mockClear();
   mockFindUniqueJob.mockReset();
   mockUpdateJob.mockReset();
 
@@ -140,15 +146,12 @@ describe('bulk-ai-excerpt sweep', () => {
 
     await runSweep({ jobId: 'job-1', storeId: 'store-1' });
 
-    expect(mockUpdateProduct).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'p1', storeId: 'store-1' },
-        data: expect.objectContaining({
-          excerpt: 'Short excerpt.',
-          excerptAr: 'ملخص قصير.',
-          aiFieldSources: expect.objectContaining({ excerpt: 'ai', excerptAr: 'ai' }),
-        }),
-      })
+    expect(mockWriteBulk).toHaveBeenCalledWith(
+      'store-1',
+      'p1',
+      expect.objectContaining({ excerpt: null }),
+      { excerpt: 'Short excerpt.', excerptAr: 'ملخص قصير.' },
+      { overwrite: false }
     );
     const finalCall = mockUpdateJob.mock.calls[mockUpdateJob.mock.calls.length - 1][0];
     expect(finalCall.data.filled).toBe(1);
@@ -175,10 +178,12 @@ describe('bulk-ai-excerpt sweep', () => {
     await runSweep({ jobId: 'job-1', storeId: 'store-1', force: true });
 
     expect(mockGenerateProductExcerpt).toHaveBeenCalledTimes(1);
-    expect(mockUpdateProduct).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ excerpt: 'Fresh excerpt.' }),
-      })
+    expect(mockWriteBulk).toHaveBeenCalledWith(
+      'store-1',
+      'p1',
+      expect.anything(),
+      expect.objectContaining({ excerpt: 'Fresh excerpt.' }),
+      { overwrite: true }
     );
   });
 

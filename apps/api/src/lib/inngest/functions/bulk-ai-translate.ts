@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { writeBulkProductFields } from '../../../services/ai-autofill.service';
 import { storeWriter } from '../../../lib/repo-factory';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
@@ -274,9 +275,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
               if (Object.keys(updates).length > 0) {
                 try {
-                  await (
-                    await storeWriter(storeId)
-                  ).product.update({ where: { id: p.id, storeId }, data: updates });
+                  await writeBulkProductFields(storeId, p.id, p, updates);
                   bProductsWritten++;
                 } catch (err) {
                   await recordError({

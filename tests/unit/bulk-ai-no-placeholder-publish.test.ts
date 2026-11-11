@@ -164,6 +164,18 @@ function writesOfColumn(root: ts.Node, key: string): ts.CallExpression[] {
   return out;
 }
 
+/** `writeBulkProductFields(storeId, id, baseline, { <key>: ... })`: the guarded product write of that column (#620). */
+function bulkWritesOfColumn(root: ts.Node, key: string): ts.CallExpression[] {
+  const out: ts.CallExpression[] = [];
+  walk(root, n => {
+    if (!ts.isCallExpression(n) || n.expression.getText() !== 'writeBulkProductFields') return;
+    const c = n.arguments[3];
+    if (c && ts.isObjectLiteralExpression(c) && c.properties.some(pr => pr.name?.getText() === key))
+      out.push(n);
+  });
+  return out;
+}
+
 const unparen = (e: ts.Expression): ts.Expression =>
   ts.isParenthesizedExpression(e) ? unparen(e.expression) : e;
 function operands(e: ts.Expression, op: ts.SyntaxKind): ts.Expression[] {
@@ -264,7 +276,14 @@ describe('bulk-ai-aeo.ts: every live write site rejects placeholder output befor
   it('bulk-ai-meta-aeo guards the store/product/category metaDescriptionAeo writes', () => {
     const fn = functionNode(sf, 'bulk-ai-meta-aeo');
     // Three write sites (store, product, category), each behind its own guard.
-    expectGuardedWrites(writesOfColumn(fn, 'metaDescriptionAeo'), 3, 'metaDescriptionAeo');
+    expectGuardedWrites(
+      [
+        ...writesOfColumn(fn, 'metaDescriptionAeo'),
+        ...bulkWritesOfColumn(fn, 'metaDescriptionAeo'),
+      ],
+      3,
+      'metaDescriptionAeo'
+    );
   });
 });
 
@@ -284,7 +303,7 @@ describe('bulk-ai-geo.ts: every live write site rejects placeholder output befor
 
   it('bulk-ai-citation-copy guards Product.citationCopy', () => {
     const fn = functionNode(sf, 'bulk-ai-citation-copy');
-    expectGuardedWrites(writesOfColumn(fn, 'citationCopy'), 1, 'Product.citationCopy');
+    expectGuardedWrites(bulkWritesOfColumn(fn, 'citationCopy'), 1, 'Product.citationCopy');
   });
 });
 

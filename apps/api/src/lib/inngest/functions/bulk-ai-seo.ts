@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { writeBulkProductFields } from '../../../services/ai-autofill.service';
 import { storeWriter } from '../../../lib/repo-factory';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
@@ -377,16 +378,11 @@ const bulkAiSeoFn = inngest.createFunction(
                     }),
                   `seo:product:${p.id}`
                 );
-                await (
-                  await storeWriter(storeId)
-                ).product.update({
-                  where: { id: p.id, storeId },
-                  data: {
-                    metaTitle: p.metaTitle?.trim() || r.suggestion.title,
-                    metaTitleAr: p.metaTitleAr?.trim() || r.suggestion.titleAr,
-                    metaDescription: p.metaDescription?.trim() || r.suggestion.description,
-                    metaDescriptionAr: p.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
-                  },
+                await writeBulkProductFields(storeId, p.id, p, {
+                  metaTitle: r.suggestion.title,
+                  metaTitleAr: r.suggestion.titleAr,
+                  metaDescription: r.suggestion.description,
+                  metaDescriptionAr: r.suggestion.descriptionAr,
                 });
                 bFilled++;
                 // Throttle to stay under the free-tier 15 RPM. Only sleep

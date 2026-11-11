@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { writeBulkProductFields } from '../../../services/ai-autofill.service';
 import { storeWriter } from '../../../lib/repo-factory';
 import { lazyStoreDb, lazyStoreWriter, withStoreDb } from '../../jobs/store-db';
 import { prisma, runInStoreScope, withStore } from '@ebda/database';
@@ -1167,15 +1168,13 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                   `meta-aeo:product:${p.id}`
                 );
                 if (generated.en && !isPlaceholderText(generated.en)) {
-                  await (
-                    await storeWriter(storeId)
-                  ).product.update({
-                    where: { id: p.id, storeId },
-                    data: {
-                      metaDescriptionAeo: generated.en,
-                      metaDescriptionAeoAr: generated.ar || p.metaDescriptionAeoAr || null,
-                    },
-                  });
+                  await writeBulkProductFields(
+                    storeId,
+                    p.id,
+                    p,
+                    { metaDescriptionAeo: generated.en, metaDescriptionAeoAr: generated.ar },
+                    { overwrite: force }
+                  );
                   bFilled++;
                 } else {
                   bSkipped++;

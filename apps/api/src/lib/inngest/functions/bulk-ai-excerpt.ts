@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { writeBulkProductFields } from '../../../services/ai-autofill.service';
 import { storeWriter } from '../../../lib/repo-factory';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { runInStoreScope } from '@ebda/database';
@@ -227,20 +228,13 @@ const bulkAiExcerptFn = inngest.createFunction(
               if (!result.excerpt.trim() && !result.excerptAr.trim()) {
                 bSkipped++;
               } else {
-                await (
-                  await storeWriter(storeId)
-                ).product.update({
-                  where: { id: product.id, storeId },
-                  data: {
-                    excerpt: result.excerpt || product.excerpt,
-                    excerptAr: result.excerptAr || product.excerptAr,
-                    aiFieldSources: {
-                      ...sources,
-                      ...(result.excerpt ? { excerpt: 'ai' } : {}),
-                      ...(result.excerptAr ? { excerptAr: 'ai' } : {}),
-                    },
-                  },
-                });
+                await writeBulkProductFields(
+                  storeId,
+                  product.id,
+                  product,
+                  { excerpt: result.excerpt, excerptAr: result.excerptAr },
+                  { overwrite: force && hasExcerpt }
+                );
                 bFilled++;
               }
             } catch (err) {

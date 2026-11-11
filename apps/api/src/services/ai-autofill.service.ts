@@ -518,6 +518,33 @@ export async function writeAiFieldsGuarded(
   return result;
 }
 
+/**
+ * The ONE write path for the bulk-ai-* jobs (issue #620, Ruling NEVER-OVERWRITE-1). A job reads the row, waits on the AI
+ * (seconds, throttled), then calls this with that read as `baseline`: a field is written only when it is still the value
+ * the job read, is not 'human'-stamped, and (unless `overwrite`, the merchant's own "force") is empty. A merchant edit made
+ * during the AI call therefore wins. Stamps the written fields 'ai'. Returns the fields actually written.
+ */
+export async function writeBulkProductFields(
+  storeId: string,
+  productId: string,
+  baseline: Record<string, string | null | undefined>,
+  candidates: Record<string, string | null | undefined>,
+  opts: { overwrite?: boolean; reindexReason?: string } = {}
+): Promise<string[]> {
+  const writes: Record<string, string> = {};
+  for (const [field, value] of Object.entries(candidates)) {
+    if (typeof value !== 'string' || !value.trim()) continue;
+    if (!opts.overwrite && (baseline[field] ?? '').trim()) continue;
+    writes[field] = value;
+  }
+  if (Object.keys(writes).length === 0) return [];
+  const { written } = await writeAiFieldsGuarded(storeId, productId, baseline, writes, {
+    overwrite: opts.overwrite,
+    reindexReason: opts.reindexReason ?? 'bulk-ai',
+  });
+  return written;
+}
+
 /** Phase 3 — WRITE (short transaction, guarded per field). Idempotent: a retry re-checks. */
 export async function applyFill(plan: FillPlan, gen: FillGeneration): Promise<{ filled: number }> {
   const { storeId, productId } = plan;

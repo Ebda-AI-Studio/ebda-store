@@ -1,4 +1,5 @@
 import type { JobDef } from '../../jobs/types';
+import { writeBulkProductFields } from '../../../services/ai-autofill.service';
 import { storeWriter } from '../../../lib/repo-factory';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
@@ -544,15 +545,16 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
                 parsed.en.trim() &&
                 !isPlaceholderText(parsed.en)
               ) {
-                await (
-                  await storeWriter(storeId)
-                ).product.update({
-                  where: { id: p.id, storeId },
-                  data: {
+                await writeBulkProductFields(
+                  storeId,
+                  p.id,
+                  p,
+                  {
                     citationCopy: parsed.en.trim().slice(0, 500),
-                    citationCopyAr: parsed.ar?.trim().slice(0, 500) || p.citationCopyAr || null,
+                    citationCopyAr: parsed.ar?.trim().slice(0, 500),
                   },
-                });
+                  { overwrite: force }
+                );
                 bFilled++;
               } else {
                 bSkipped++;

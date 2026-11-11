@@ -49,11 +49,7 @@ const REVIEWED: Record<string, { sites: number; via: Via[] }> = {
   'apps/api/src/routes/ai.routes.ts': { sites: 1, via: ['requestStoreReindex'] },
   // CSV/XLSX import create + update (`...productFields`), soft bulk delete, bulk status.
   'apps/api/src/services/bulk.service.ts': { sites: 4, via: ['requestStoreReindex'] },
-  // Catalogue translation sweep (`data: updates` = name/nameAr/description/descriptionAr).
-  'apps/api/src/lib/inngest/functions/bulk-ai-translate.ts': {
-    sites: 1,
-    via: ['requestStoreReindex'],
-  },
+  // bulk-ai-translate and the other bulk-ai-* sweeps now write through writeBulkProductFields (#620) -> writeAiFieldsGuarded.
 };
 
 function listTs(dir: string, out: string[] = []): string[] {
