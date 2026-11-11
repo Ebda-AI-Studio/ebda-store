@@ -28,7 +28,7 @@ import logger from './logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from '../cf/bindings';
 import { syncStoreDirectoryFromPg } from './store-directory-sync';
-import { storeDb } from './repo-factory';
+import { copyStoreSettings, storeDb } from './repo-factory';
 
 interface D1Row {
   id: string;
@@ -41,6 +41,10 @@ interface D1Row {
   has_pending_domain: number;
   deleted: number;
   backend: string;
+  name: string;
+  name_ar: string | null;
+  template: string | null;
+  look: string | null;
 }
 interface D1Like {
   prepare(sql: string): {
@@ -89,24 +93,68 @@ export interface ReconcileReport {
 }
 
 /** One `do` store's DO record, or null when the DO has none. Throws when the DO cannot be read. */
-type DoRecord = (id: string) => Promise<{ slug: string; status: string } | null>;
+type DoRecord = (id: string) => Promise<{
+  slug: string;
+  status: string;
+  /** The mirror columns D1 and the DO's `store_profile` both carry (Ruling NZ-D8). Absent = not compared. */
+  name?: string;
+  nameAr?: string | null;
+  template?: string | null;
+  look?: string | null;
+} | null>;
 const readDoRecord: DoRecord = async id => {
   const r = await (
     await storeDb(id)
-  ).store.findUnique({ where: { id }, select: { slug: true, status: true } });
-  return r ? { slug: r.slug, status: String(r.status) } : null;
+  ).store.findUnique({
+    where: { id },
+    select: { slug: true, status: true, name: true, nameAr: true, template: true, look: true },
+  });
+  return r
+    ? {
+        slug: r.slug,
+        status: String(r.status),
+        name: r.name,
+        nameAr: r.nameAr ?? null,
+        template: r.template ? String(r.template) : null,
+        look: r.look ?? null,
+      }
+    : null;
 };
+
+/**
+ * D1 `stores` owns template / look / name / nameAr of a `do` store and the DO's `store_profile` holds a COPY (Ruling NZ-D8:
+ * one writer, `storeUpdateOnDo` writes D1 first, then the DO). A DO copy that failed leaves D1 ahead and fails the request
+ * (the retry converges), but nothing detected a copy nobody retried. Push D1's value to the DO and report it.
+ */
+type MirrorRepair = (id: string, fields: Record<string, unknown>) => Promise<void>;
+export function mirrorDrift(
+  row: Pick<D1Row, 'name' | 'name_ar' | 'template' | 'look'>,
+  rec: NonNullable<Awaited<ReturnType<DoRecord>>>
+): Record<string, string | null> {
+  const drift: Record<string, string | null> = {};
+  if (rec.name !== undefined && rec.name !== row.name) drift.name = row.name;
+  if (rec.nameAr !== undefined && (rec.nameAr ?? null) !== (row.name_ar ?? null))
+    drift.nameAr = row.name_ar ?? null;
+  if (rec.template !== undefined && (rec.template ?? null) !== (row.template ?? null))
+    drift.template = row.template;
+  if (rec.look !== undefined && (rec.look ?? null) !== (row.look ?? null))
+    drift.look = row.look ?? null;
+  return drift;
+}
 
 /** D1 vs each live `do` store's own DO (the only reconciliation possible without Postgres). */
 async function reconcileDoSide(
   d1: D1Like,
   rows: D1Row[],
   report: ReconcileReport,
-  doRecord: DoRecord
+  doRecord: DoRecord,
+  repair: MirrorRepair,
+  /** In the Postgres tick the status of a `do` row is already reconciled against Postgres: the DO side only checks the mirror. */
+  mirrorOnly = false
 ): Promise<void> {
   for (const row of rows) {
     if (row.backend !== 'do' || row.deleted) continue;
-    report.checked++;
+    if (!mirrorOnly) report.checked++;
     let rec: Awaited<ReturnType<DoRecord>>;
     try {
       rec = await doRecord(row.id);
@@ -121,6 +169,22 @@ async function reconcileDoSide(
       report.alertOnly.push({ id: row.id, why: 'do store has no StoreDO record' });
       continue;
     }
+    const drift = mirrorDrift(row, rec);
+    if (Object.keys(drift).length > 0) {
+      try {
+        await repair(row.id, drift);
+        report.corrected.push({
+          id: row.id,
+          why: `DO copy re-pushed from D1 (${Object.keys(drift).join(', ')})`,
+        });
+      } catch (err) {
+        report.alertOnly.push({
+          id: row.id,
+          why: `DO copy differs from D1 (${Object.keys(drift).join(', ')}) and could not be repaired: ${(err as Error).message}`,
+        });
+      }
+    }
+    if (mirrorOnly) continue;
     if (rec.slug !== row.slug) {
       report.alertOnly.push({ id: row.id, why: `slug differs (D1 ${row.slug}, DO ${rec.slug})` });
     }
@@ -156,8 +220,10 @@ export async function reconcileStoreDirectory(
     /** Postgres domain / pending_domain VALUES of one store, read back only for a store that has one (Ruling NZ-D18). */
     pgDomains?: (id: string) => Promise<{ domain: string | null; pendingDomain: string | null }>;
     alert?: (title: string, body: string) => Promise<unknown> | unknown;
-    /** Test seam: one `do` store's StoreDO record (slug, status). */
+    /** Test seam: one `do` store's StoreDO record (slug, status, mirror columns). */
     doRecord?: DoRecord;
+    /** Test seam: push D1's mirror values to the store's DO (default: `copyStoreSettings`). */
+    repairMirror?: MirrorRepair;
   } = {}
 ): Promise<ReconcileReport> {
   const d1 =
@@ -198,7 +264,7 @@ export async function reconcileStoreDirectory(
   };
   const pgLive = deps.pgLive ?? (async () => storeDirectory(undefined, { postgresOnly: true }));
   const d1Select = `SELECT id, slug, status, plan, lower(domain) AS domain, lower(pending_domain) AS pending_domain, (domain IS NOT NULL) AS has_domain, (pending_domain IS NOT NULL) AS has_pending_domain,
-              (deleted_at IS NOT NULL) AS deleted, storage_backend AS backend FROM stores`;
+              (deleted_at IS NOT NULL) AS deleted, storage_backend AS backend, name, name_ar, template, look FROM stores`;
   let all: Awaited<ReturnType<typeof pgAll>>;
   let live: Awaited<ReturnType<typeof pgLive>>;
   try {
@@ -217,7 +283,13 @@ export async function reconcileStoreDirectory(
       );
     report.postgresSkipped = true;
     const { results: d1Rows } = await d1.prepare(d1Select).bind().all<D1Row>();
-    await reconcileDoSide(d1, d1Rows ?? [], report, deps.doRecord ?? readDoRecord);
+    await reconcileDoSide(
+      d1,
+      d1Rows ?? [],
+      report,
+      deps.doRecord ?? readDoRecord,
+      deps.repairMirror ?? copyStoreSettings
+    );
     await finish(report, alert);
     return report;
   }
@@ -284,6 +356,15 @@ export async function reconcileStoreDirectory(
     report.corrected.push({ id, why: 'in D1, gone from Postgres' });
   }
 
+  // Postgres is stale by design for a `do` store, so the mirror columns are checked against the DO, never against Postgres.
+  await reconcileDoSide(
+    d1,
+    [...d1ById.values()].filter(r => r.backend === 'do'),
+    report,
+    deps.doRecord ?? readDoRecord,
+    deps.repairMirror ?? copyStoreSettings,
+    true
+  );
   await finish(report, alert);
   return report;
 }
