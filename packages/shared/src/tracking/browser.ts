@@ -156,6 +156,10 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
       s.src = META_SRC;
       doc.head.appendChild(s);
     }
+    // No automatic button-click / microdata events (they would scrape page content), and no
+    // advanced matching: init takes the id only, never an email or phone.
+    w.fbq('set', 'autoConfig', false, config.metaPixelId);
+    w.fbq('consent', 'grant');
     w.fbq('init', config.metaPixelId);
   }
 
@@ -253,6 +257,9 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
     }
     const c = readConsent();
     const replay = held.splice(0);
+    // Marketing withdrawn after the pixel was loaded: fire() already stops on the cookie; also tell the
+    // library so it queues nothing further. It is not reloaded on later navigations (start() checks consent).
+    if (metaLoaded && !c?.marketing) w.fbq?.('consent', 'revoke');
     if (!hasAnyConsent(c)) return;
     start();
     for (const h of replay) fire(h.step, h.opts, c!);

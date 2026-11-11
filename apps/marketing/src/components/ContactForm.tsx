@@ -137,6 +137,8 @@ export function ContactForm({
       } | null;
       if (res.ok && body?.success) {
         setStatus('sent');
+        // Lead, no PII: the tracker only sends it with marketing consent.
+        void import('../lib/tracker').then(m => m.getTracker()?.track('contact_submitted'));
         return;
       }
       setStatus('idle');

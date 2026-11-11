@@ -66,8 +66,12 @@ describe('consent gate', () => {
     ]);
     const fbq = (window as unknown as { fbq: { queue: unknown[][] } }).fbq;
     const calls = fbq.queue.map(a => [...a]);
-    expect(calls[0]).toEqual(['init', '123456789']);
-    expect(calls[1]).toEqual(['track', 'PageView', {}, undefined]);
+    expect(calls.slice(0, 2)).toEqual([
+      ['set', 'autoConfig', false, '123456789'],
+      ['consent', 'grant'],
+    ]);
+    expect(calls[2]).toEqual(['init', '123456789']);
+    expect(calls[3]).toEqual(['track', 'PageView', {}, undefined]);
   });
 
   it('marketing-only consent loads Meta but not PostHog', () => {
@@ -316,5 +320,61 @@ describe('posthogAssetsHost', () => {
   it('maps the ingest host to the assets host', () => {
     expect(posthogAssetsHost('https://eu.i.posthog.com')).toBe('https://eu-assets.i.posthog.com');
     expect(posthogAssetsHost('https://us.i.posthog.com')).toBe('https://us-assets.i.posthog.com');
+  });
+});
+
+describe('marketing Meta Pixel: consent, withdrawal, one init, Lead (no PII)', () => {
+  const fbqOf = () =>
+    (window as unknown as { fbq: { queue: unknown[][] } }).fbq.queue.map(a => [...a]);
+  const inits = () => fbqOf().filter(a => a[0] === 'init');
+
+  it('no consent yet: no fbq, no Meta script, nothing fired for page views or Lead', () => {
+    const t = createTracker(CFG, window);
+    t.start();
+    t.pageView();
+    t.track('contact_submitted');
+    expect((window as unknown as { fbq?: unknown }).fbq).toBeUndefined();
+    expect(scripts().some(s => s.includes('facebook'))).toBe(false);
+  });
+
+  it('accepting marketing loads fbevents.js once, inits once, PageView once, advanced matching off', () => {
+    const t = createTracker(CFG, window);
+    t.pageView(); // held while undecided
+    t.setConsent({ analytics: false, marketing: true });
+    t.start();
+    t.start();
+    expect(scripts().filter(s => s.includes('connect.facebook.net'))).toHaveLength(1);
+    expect(inits()).toEqual([['init', '123456789']]); // id only: no email/phone user data
+    expect(fbqOf().filter(a => a[0] === 'track' && a[1] === 'PageView')).toHaveLength(1);
+    expect(fbqOf()).toContainEqual(['set', 'autoConfig', false, '123456789']);
+  });
+
+  it('Lead carries no props; a later SPA route PageView is fired once per call, never re-inits', () => {
+    setConsent(false, true);
+    const t = createTracker(CFG, window);
+    t.start();
+    t.track('contact_submitted');
+    t.pageView();
+    t.pageView();
+    expect(fbqOf()).toContainEqual(['track', 'Lead', {}, undefined]);
+    expect(fbqOf().filter(a => a[1] === 'PageView')).toHaveLength(2);
+    expect(inits()).toHaveLength(1);
+  });
+
+  it('withdrawing marketing consent stops every later event and revokes; it does not reload', () => {
+    setConsent(false, true);
+    const t = createTracker(CFG, window);
+    t.start();
+    t.pageView();
+    const before = fbqOf().length;
+    t.setConsent({ analytics: false, marketing: false });
+    const afterRevoke = fbqOf().length;
+    expect(fbqOf()).toContainEqual(['consent', 'revoke']);
+    t.start();
+    t.pageView();
+    t.track('contact_submitted');
+    expect(fbqOf().length).toBe(afterRevoke);
+    expect(afterRevoke).toBe(before + 1);
+    expect(scripts().filter(s => s.includes('connect.facebook.net'))).toHaveLength(1);
   });
 });
