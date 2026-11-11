@@ -4527,10 +4527,9 @@ export class OrderService {
     });
     const orderNumber = generateOrderNumber();
 
-    // Create the order + items in one transaction. Inventory is NOT
-    // decremented for admin orders by default — the merchant
-    // confirms physical availability before placing. The mark-paid
-    // path elsewhere decrements as needed when payment lands.
+    // Create the order + items in one transaction. Stock IS taken here, in the same transaction (owner decision 2026-11-11,
+    // Ruling STOCK-SYMMETRY-1 superseded): a short line refuses 422 INSUFFICIENT_STOCK unless a store admin overrode with a
+    // reason. Nothing else decrements an admin order's stock later (mark-paid does not), so a second decrement would be a bug.
     let stockOverridden = false;
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // Ruling B5-17: the gold rates the lines were priced from must still be the current ones.

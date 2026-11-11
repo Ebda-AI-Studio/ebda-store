@@ -1048,6 +1048,51 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(t.state.orders).toHaveLength(1); // the refused and rejected attempts created nothing
   });
 
+  it('admin order: staff cannot override a stock shortage, and an override without a (non-blank) reason is refused, on both backends', async () => {
+    const t = await parity(2, async w => {
+      const item = [{ productId: w.product, quantity: 5 }];
+      const out: Record<string, unknown> = {};
+      out.staffWithReason = await settle(() =>
+        admin(w, item, { overrideStock: true, stockOverrideReason: 'phone deal' }, 'staff')
+      );
+      out.staffNoReason = await settle(() => admin(w, item, { overrideStock: true }, 'staff'));
+      out.noRole = await settle(() =>
+        OrderService.createAdminOrder(
+          STORE,
+          ownerId,
+          {
+            shippingAddress: adminAddr(1),
+            items: item,
+            overrideStock: true,
+            stockOverrideReason: 'phone deal',
+          } as never,
+          {}
+        )
+      );
+      out.adminNoReason = await settle(() => admin(w, item, { overrideStock: true }));
+      out.adminBlankReason = await settle(() =>
+        admin(w, item, { overrideStock: true, stockOverrideReason: '   ' })
+      );
+      return out;
+    });
+    const o = t.out.ok;
+    expect(o.staffWithReason.err).toMatchObject({ status: 403, code: 'STOCK_OVERRIDE_FORBIDDEN' });
+    expect(o.staffNoReason.err).toMatchObject({ status: 403, code: 'STOCK_OVERRIDE_FORBIDDEN' });
+    expect(o.noRole.err).toMatchObject({ status: 403, code: 'STOCK_OVERRIDE_FORBIDDEN' });
+    expect(o.adminNoReason.err).toMatchObject({
+      status: 400,
+      code: 'STOCK_OVERRIDE_REASON_REQUIRED',
+    });
+    expect(o.adminBlankReason.err).toMatchObject({
+      status: 400,
+      code: 'STOCK_OVERRIDE_REASON_REQUIRED',
+    });
+    // every refusal happened before any write: no order, stock untouched, no ledger row
+    expect(t.state.orders).toEqual([]);
+    expect(t.state.products[0].inventory).toBe(2);
+    expect(t.state.history).toEqual([]);
+  });
+
   it('admin order: a legacy order that carries the stock_not_taken marker (took nothing) still restocks nothing on cancel', async () => {
     const t = await parity(10, async w => {
       const o = await admin(w, [{ productId: w.product, quantity: 3 }]);
