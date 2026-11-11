@@ -25,6 +25,14 @@ export const NO_SHOPPER_ADDRESS = 'none';
  * app.ts reads this marker and leaves `req.ip` empty, so the per-address limiters skip it (`noClientIp`).
  */
 export const NO_CLIENT_ADDRESS_HEADER = 'x-ebda-no-client-address';
+/**
+ * Ruling DO-BUDGET-2: set by this module ONLY when the storefront's HMAC verified (never copied from a caller: an inbound copy
+ * is always removed). app.ts turns it into membership of {@link trustedSsrRequests} and deletes the header. See
+ * `isTrustedSsr` (middleware/public-limiter-keys.ts) for what a trusted render skips and why a caller cannot get there.
+ */
+export const TRUSTED_SSR_HEADER = 'x-ebda-trusted-ssr';
+/** Express requests whose storefront signature verified (set by app.ts from {@link TRUSTED_SSR_HEADER}, Workers only). */
+export const trustedSsrRequests = new WeakSet<object>();
 const SIGNING_CONTEXT = 'ebda-ssr-client-ip.v1\n';
 const PUBLIC_PREFIX = '/api/v1/public';
 
@@ -140,6 +148,7 @@ export async function resolveClientAddress(
   headers.delete(CLIENT_IP_HEADER);
   headers.delete(SSR_AUTH_HEADER);
   headers.delete(NO_CLIENT_ADDRESS_HEADER);
+  headers.delete(TRUSTED_SSR_HEADER);
 
   let ip = seen;
   let forwarded = false;
@@ -157,6 +166,7 @@ export async function resolveClientAddress(
         // per-store limits still apply. Never the storefront Worker's egress address, which every store would share.
         ip = claimed === NO_SHOPPER_ADDRESS ? null : claimed;
         forwarded = true;
+        headers.set(TRUSTED_SSR_HEADER, '1');
       }
     } catch {
       // a WebCrypto failure is a "no": the address Cloudflare saw stands
@@ -165,8 +175,9 @@ export async function resolveClientAddress(
   const hadInternal =
     incoming.headers.has(CLIENT_IP_HEADER) ||
     incoming.headers.has(SSR_AUTH_HEADER) ||
-    incoming.headers.has(NO_CLIENT_ADDRESS_HEADER);
-  if (ip && !hadInternal && incoming.headers.get('x-forwarded-for') === ip) {
+    incoming.headers.has(NO_CLIENT_ADDRESS_HEADER) ||
+    incoming.headers.has(TRUSTED_SSR_HEADER);
+  if (ip && !hadInternal && !forwarded && incoming.headers.get('x-forwarded-for') === ip) {
     return { request: incoming, ip, forwarded };
   }
   if (ip) {

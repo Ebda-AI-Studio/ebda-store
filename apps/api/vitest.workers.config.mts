@@ -46,6 +46,8 @@ const apiVars = {
   DEMO_SEED_TOKEN: 'workers-test-demo-seed-token-0123456789',
   // Ruling NZ-MONEY-2: the index-retry alarm floor (30 s in production), short so money-path.test.ts watches a retry drain.
   STORE_DO_INDEX_RETRY_MS: '500',
+  // Ruling DO-BUDGET-2: the storefront HMAC secret (workers-test/public-do-calls.test.ts signs a render with it).
+  REVALIDATE_SECRET: 'workers-test-revalidate-secret',
   // The alerts webhook bridge fails closed without a token; a sweep request carries none, so it answers 401, not 503.
   ALERTS_WEBHOOK_TOKEN: 'workers-test-alerts-token',
 };

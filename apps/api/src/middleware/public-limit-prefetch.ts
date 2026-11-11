@@ -5,7 +5,12 @@ import { authStateAvailable } from '../cf/auth-state-client';
 import { prefetchHits, releaseUnconsumed, runWithPrefetchedHits } from '../cf/rate-limit-store';
 import { isWorkers } from '../lib/runtime';
 import { resolvedStoreId } from '../utils/resolved-store';
-import { publicIpKey, publicTenantKey, skipPublicLimiters } from './public-limiter-keys';
+import {
+  isTrustedSsr,
+  publicIpKey,
+  publicTenantKey,
+  skipPublicLimiters,
+} from './public-limiter-keys';
 import { isAnonymousPublicRead } from './public-read-limit';
 import { hasSearchTerm } from './security';
 
@@ -37,7 +42,8 @@ export function plannedPublicHits(req: Request): { hits: string[]; peeks: string
     isAnonymousPublicRead(req) &&
     Boolean(b?.PUBLIC_IP_LIMITER && b.PUBLIC_TENANT_LIMITER) &&
     Boolean(resolvedStoreId(req));
-  if (!native)
+  // Ruling DO-BUDGET-2: a verified storefront render spends no public read bucket; only the store-miss peek remains.
+  if (!native && !isTrustedSsr(req))
     keys.push(`rl:public:${publicIpKey(req)}`, `rl:public-tenant:${publicTenantKey(req)}`);
   if (req.ip) {
     const ip = ipKeyGenerator(req.ip);

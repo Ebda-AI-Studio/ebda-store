@@ -1,6 +1,7 @@
 import type { Request } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { resolvedStoreId } from '../utils/resolved-store';
+import { trustedSsrRequests } from '../cf/ssr-client-ip';
 
 /** The publicTenantLimiter bucket key (also the native anonymous-read limiter's tenant key). */
 export function publicTenantKey(req: Request): string {
@@ -37,4 +38,20 @@ export function publicIpKey(req: Request): string {
 export function skipPublicLimiters(req: Request): boolean {
   const expected = process.env.LOAD_TEST_BYPASS_TOKEN;
   return Boolean(expected) && req.header('x-load-test-token') === expected;
+}
+
+/**
+ * Ruling DO-BUDGET-2: a storefront server render (ebda-web) is not a shopper hitting the API, so it does not spend the shopper's
+ * per-IP / per-store / store-resolve read buckets (each is an AuthState Durable Object round trip, 39% of all DO requests).
+ *
+ * Why a caller cannot fake it: trust is membership of a WeakSet that only `app.ts` fills, from a header that only `worker.ts`
+ * sets, and only after `resolveClientAddress` verified `x-ebda-ssr-auth` = HMAC-SHA256(REVALIDATE_SECRET, address) in constant
+ * time (WebCrypto `verify`) on a GET/HEAD of an anonymous storefront read. The secret exists only in ebda-web and ebda-api;
+ * both forward headers (and this marker) are stripped from every inbound request first, so a spoofed header, X-Forwarded-For
+ * or Host value is simply deleted. No secret on the API = nothing is ever trusted (the limiters run as before).
+ * Residual: the shopper is then bounded by Cloudflare's edge in front of ebda-web, the store-miss limiter (kept: it still
+ * peeks and counts 404s per shopper address) and the per-store caches, not by the public read buckets.
+ */
+export function isTrustedSsr(req: Request): boolean {
+  return trustedSsrRequests.has(req);
 }

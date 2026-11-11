@@ -68,7 +68,11 @@ import { serverTiming } from './lib/request-timing';
 import { localizeRateLimited } from './lib/localized-error';
 import { skipGlobalRateLimit } from './middleware/global-rate-limit-skip';
 import { repoScope } from './lib/repo-factory';
-import { NO_CLIENT_ADDRESS_HEADER } from './cf/ssr-client-ip';
+import {
+  NO_CLIENT_ADDRESS_HEADER,
+  TRUSTED_SSR_HEADER,
+  trustedSsrRequests,
+} from './cf/ssr-client-ip';
 assertBillingConfigAtBoot();
 {
   // M-032: an UNSET provider in production is loud (P1 + error log) but does not stop an InstaPay-only API.
@@ -135,6 +139,11 @@ app.use((req, _res, next) => {
   if (req.headers[NO_CLIENT_ADDRESS_HEADER] !== undefined) {
     delete req.headers[NO_CLIENT_ADDRESS_HEADER];
     if (isWorkers) Object.defineProperty(req, 'ip', { value: undefined, configurable: true });
+  }
+  // Ruling DO-BUDGET-2: the Worker sets this only after the storefront HMAC verified; Node never trusts it.
+  if (req.headers[TRUSTED_SSR_HEADER] !== undefined) {
+    delete req.headers[TRUSTED_SSR_HEADER];
+    if (isWorkers) trustedSsrRequests.add(req);
   }
   next();
 });

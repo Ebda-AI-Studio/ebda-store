@@ -16,12 +16,15 @@ import {
   NO_CLIENT_ADDRESS_HEADER,
   SSR_AUTH_HEADER,
   SSR_FORWARD_ROUTES,
+  TRUSTED_SSR_HEADER,
+  trustedSsrRequests,
   __resetSsrClientIpForTests,
   isForwardableRead,
   resolveClientAddress,
   shouldWarnNoSecret,
 } from '@api/cf/ssr-client-ip';
 import { publicLimiter, storeResolveLimiter } from '@api/middleware/security';
+import { isTrustedSsr } from '@api/middleware/public-limiter-keys';
 import {
   __resetForTests as resetStorefront,
   installApiFetchForwarding,
@@ -449,5 +452,68 @@ describe('limiters key on the resolved address (real storefront wrapper -> API r
     expect(res.status).toBe(200);
     expect(res.headers.has('ratelimit-remaining')).toBe(false);
     await new Promise<void>(r => srv.close(() => r()));
+  });
+});
+
+describe('Ruling DO-BUDGET-2: only a storefront render with a VERIFIED signature skips the public read buckets', () => {
+  const addr = '203.0.113.7';
+  it('marks a verified forward as trusted (marker set by the Worker only)', async () => {
+    const auth = await signClientIp(SECRET, addr);
+    const r = await resolveClientAddress(
+      apiRequest('/api/v1/public/store/resolve', {
+        'cf-connecting-ip': WORKER_EGRESS,
+        [CLIENT_IP_HEADER]: addr,
+        [SSR_AUTH_HEADER]: auth,
+      }),
+      SECRET
+    );
+    expect(r.request.headers.get(TRUSTED_SSR_HEADER)).toBe('1');
+  });
+
+  it.each([
+    ['a typed marker alone', {}],
+    ['a typed marker + claimed address, no signature', { [CLIENT_IP_HEADER]: addr }],
+    [
+      'a typed marker + wrong signature',
+      { [CLIENT_IP_HEADER]: addr, [SSR_AUTH_HEADER]: 'ab'.repeat(32) },
+    ],
+    ['a typed marker + x-forwarded-for', { 'x-forwarded-for': addr }],
+  ])('never trusts %s from the internet, and removes the typed marker', async (_l, extra) => {
+    const r = await resolveClientAddress(
+      apiRequest('/api/v1/public/store/resolve', {
+        'cf-connecting-ip': '198.51.100.50',
+        [TRUSTED_SSR_HEADER]: '1',
+        ...extra,
+      }),
+      SECRET
+    );
+    expect(r.request.headers.has(TRUSTED_SSR_HEADER)).toBe(false);
+  });
+
+  it('a valid signature on a WRITE or with no API secret is not trusted', async () => {
+    const auth = await signClientIp(SECRET, addr);
+    const h = {
+      'cf-connecting-ip': WORKER_EGRESS,
+      [CLIENT_IP_HEADER]: addr,
+      [SSR_AUTH_HEADER]: auth,
+    };
+    const write = await resolveClientAddress(
+      apiRequest('/api/v1/public/store/resolve', h, 'POST'),
+      SECRET
+    );
+    expect(write.request.headers.has(TRUSTED_SSR_HEADER)).toBe(false);
+    const noSecret = await resolveClientAddress(
+      apiRequest('/api/v1/public/store/resolve', h),
+      undefined
+    );
+    expect(noSecret.request.headers.has(TRUSTED_SSR_HEADER)).toBe(false);
+  });
+
+  it('isTrustedSsr is WeakSet membership: a header on the Express request means nothing', () => {
+    const forged = { headers: { [TRUSTED_SSR_HEADER]: '1' } } as never;
+    expect(isTrustedSsr(forged)).toBe(false);
+    const ok = {} as never;
+    trustedSsrRequests.add(ok);
+    expect(isTrustedSsr(ok)).toBe(true);
   });
 });
