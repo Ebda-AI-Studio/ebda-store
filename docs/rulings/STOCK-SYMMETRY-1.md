@@ -20,3 +20,11 @@ orders created before this change have no marker, so cancelling one still restoc
 test stores only). Evidence: `do-stock-ops.test.ts` (#632, 2 cases) and `do-order-ops.test.ts`
 (#633, 2 cases), all red on main. Cost if wrong: a merchant who restocks a warehouse while
 another warehouse holds the sold units sees the deficit taken from the default warehouse first.
+
+**Addendum (2026-11-11, main CI red after #693).** #693 shipped the marker on the DO backend only, so the
+Postgres `OrderService.createAdminOrder` wrote no `stock_not_taken` event and `repo-factory-orders-contract`
+(DO vs Postgres parity) went red on every main commit from 97d67ef9f. The Postgres path had the same #633 bug
+(cancel / refund restocked a phone order's lines). It now writes the same event in the order transaction, and
+`order-refunded.ts` (whole-order and partial-return restock) skips those units via `lib/stock-not-taken.ts`.
+Proof: a new parity case cancels an admin order and expects inventory unchanged on both backends (13, not 10,
+with the Postgres skip removed).
