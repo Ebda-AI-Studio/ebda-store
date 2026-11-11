@@ -181,7 +181,7 @@ describe('returnCreate: a GUEST return (Ruling GUEST-RET-1)', () => {
         items: [{ orderItemId: 'i1', productId: 'p1', productName: 'Tee', quantity: 1 }],
       }).returnId as string;
     const id = guest(null);
-    expect(f.ret(id)).toMatchObject({ status: 'pending', refund_amount: 10000, customer_id: '' });
+    expect(f.ret(id)).toMatchObject({ status: 'pending', refund_amount: 10000, customer_id: null });
     // a request is no refund: no ledger line, no wallet row, no claim
     expect(f.ret(id).refunded_at).toBeNull();
     expect(f.one('SELECT count(*) n FROM wallet_transactions').n).toBe(0);

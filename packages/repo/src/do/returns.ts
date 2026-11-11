@@ -455,7 +455,7 @@ function computeLineAdjustments(
 export interface ReturnCreateArgs {
   storeId: string;
   orderId: string;
-  /** null = a GUEST return (Ruling GUEST-RET-1): the order has no customer. Stored as '' (the column is NOT NULL on a DO already deployed). */
+  /** null = a GUEST return (Ruling GUEST-RET-1): the order has no customer. Stored as NULL (cf-0005 made the column nullable on every StoreDO). */
   customerId: string | null;
   type: string;
   reason: string;
@@ -648,7 +648,7 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
         returnId,
         storeId,
         o.id,
-        a.customerId ?? '',
+        a.customerId,
         returnNumber(now),
         a.type,
         reason,
