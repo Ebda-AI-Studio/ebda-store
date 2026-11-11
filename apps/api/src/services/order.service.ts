@@ -3754,6 +3754,18 @@ export class OrderService {
     orderId: string,
     input: { method: string; reference: string | null; actorId: string | null }
   ): Promise<void> {
+    // A Durable Object store records it in one DO section, bounded by the order's one refundable balance (#624): the
+    // Prisma path below cannot run in the Worker (no Postgres since NZ-D23) and had no cross-channel ceiling.
+    const money = await storeMoney(storeId);
+    if (money) {
+      await money.manualRefundRecord({
+        orderId,
+        method: input.method,
+        reference: input.reference,
+        actorUserId: input.actorId,
+      });
+      return;
+    }
     const payments = await prisma.payment.findMany({
       where: {
         orderId,

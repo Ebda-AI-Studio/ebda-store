@@ -715,6 +715,12 @@ export interface MoneyClient {
     actorUserId: string;
     orderId?: string;
   }): Promise<{ result: 'matched' | 'already_matched' }>;
+  manualRefundRecord(a: {
+    orderId: string;
+    method: string;
+    reference: string | null;
+    actorUserId: string | null;
+  }): Promise<{ recorded: number; payments: number }>;
   instapayRefundRecord(a: {
     orderId: string;
     referenceKey: string;
@@ -1553,6 +1559,7 @@ export function makeMoneyClient(
     refundRelease: (a, key) => call('refundRelease', a, key),
     refundMatchClaim: a => call('refundMatchClaim', a),
     instapayRefundRecord: a => call('instapayRefundRecord', a),
+    manualRefundRecord: a => call('manualRefundRecord', a),
     refundIndeterminate: (a, key) => call('refundIndeterminate', a, key),
     refundBook: (a, key) => call('refundBook', a, key),
     journalSale: (a, key) => call('journalSale', a, key),
@@ -1772,7 +1779,10 @@ async function doClients(
   const callMoney = async (op: string, args: unknown, key?: string) => {
     const r = await stub.moneyOp(storeId, op, encodeRpc(args), key);
     if (!r.ok) throw new AppError(r.status, r.code, r.message, r.meta);
-    return decodeRpc<any>(r.json);
+    const out = decodeRpc<any>(r.json);
+    if (Array.isArray(out?.moneyAlerts) && out.moneyAlerts.length > 0)
+      void sendMoneyAlerts(storeId, op, out.moneyAlerts);
+    return out;
   };
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);
   return {
@@ -1901,6 +1911,33 @@ function scopedPg(storeId: string, singleArgTransaction = false): object {
 /** pg writer: the store-scoped `prisma` client, minus the DO-only second argument of `$transaction`. */
 function pgWriter(storeId: string): StoreWrites {
   return scopedPg(storeId, true) as unknown as StoreWrites;
+}
+
+/**
+ * Money alerts a DO operation raised and COMMITTED (a wallet give-back trimmed by the one refundable balance, #659 B2):
+ * a store-scoped P1 to the platform channel. The merchant sees the same fact on the order's payment timeline. Never
+ * throws into the caller: the money state is already committed and recorded for review.
+ */
+export async function sendMoneyAlerts(
+  storeId: string,
+  op: string,
+  alerts: Array<{ kind: string; orderId: string; body: string; context?: Record<string, unknown> }>
+): Promise<void> {
+  try {
+    const { sendAlert } = await import('../services/alerts.service.js');
+    for (const a of alerts)
+      await sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store: { id: storeId, name: storeId },
+        source: `money.${op}.${a.kind}`,
+        title: `Refund needs review: ${a.kind}`,
+        body: a.body,
+        context: { storeId, orderId: a.orderId, ...(a.context ?? {}) },
+      }).catch(() => undefined);
+  } catch {
+    /* the review event is already on the payment timeline */
+  }
 }
 
 async function resolve(storeId: string, _req: RequestLike): Promise<StoreRepo> {
