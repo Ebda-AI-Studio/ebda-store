@@ -30,6 +30,8 @@ const NOT_ON_COMPLETION = new Set([
   'RETURN_WINDOW_CLOSED',
   // Create-path only (Ruling B5-19): an exchange request that includes a gold-rate line is refused.
   'GOLD_EXCHANGE_UNSUPPORTED',
+  // Guest return create path (GUEST-RET-1): the one identical identity-miss answer.
+  'GUEST_RETURN_NOT_FOUND',
 ]);
 
 describe('return completion refusals are all translated (issue 2033)', () => {
