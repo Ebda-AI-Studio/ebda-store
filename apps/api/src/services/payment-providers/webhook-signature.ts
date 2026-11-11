@@ -14,6 +14,7 @@
 import { KASHIER_SIGNATURE_HEADER } from './kashier.provider';
 import { PAYMOB_HMAC_HEADER, paymobCanonicalState } from './paymob.provider';
 import type { WebhookHeaders } from './types';
+import { moneyFromGateway } from './gateway-http';
 
 export interface WebhookRefs {
   /** Inbox dedupe key; null when the body does not carry what is needed to build one. */
@@ -110,8 +111,21 @@ export function webhookRefs(provider: string, payload: Record<string, unknown>):
     }
     case 'fawry': {
       const ref = str(payload.fawryRefNumber);
+      // #626: the SAME signed fields as the adapter's eventId (ref + status + amount + paymentRefrenceNumber). Status alone
+      // made every PARTIALLY_REFUNDED notice of one order share a key, so the 2nd partial refund was acked as a duplicate
+      // and never booked. An identical redelivery still lands on the same key.
+      let amount = '';
+      try {
+        amount = String(moneyFromGateway(payload.paymentAmount, 'paymentAmount'));
+      } catch {
+        amount = typeof payload.paymentAmount === 'string' ? payload.paymentAmount : '';
+      }
+      const prn =
+        typeof payload.paymentRefrenceNumber === 'string' ? payload.paymentRefrenceNumber : '';
       return {
-        idempotencyKey: ref ? `fawry_${ref}_${str(payload.orderStatus) ?? ''}` : null,
+        idempotencyKey: ref
+          ? `fawry_${ref}_${str(payload.orderStatus) ?? ''}_${amount}_${prn}`
+          : null,
         transactionId: str(payload.merchantRefNumber),
         invoiceId: ref,
       };
