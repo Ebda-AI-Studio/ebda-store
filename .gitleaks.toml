@@ -131,3 +131,15 @@ description = "Ruling SEC-SCAN-2: deleted Supabase project, two historical commi
 condition = "AND"
 commits = ["d83b18988f7231f5522ae8ea2b190eb269a21eed", "acdd9ebb0c18542e6762f91c687bc85a2faea6f8"]
 paths = ['''^test-db\.js$''']
+
+# Ruling SEC-SCAN-3 (2026-11-11): gitleaks' built-in generic-api-key flags docs/DEPLOYMENT.md:362 in commit d63861efa.
+# That line is a list of resource names (an R2 bucket name and an Axiom dataset name), not a key. Scoped to exactly that
+# commit AND that path, appended to the built-in rule (same id merges into the default ruleset); anything else still fires.
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Ruling SEC-SCAN-3: resource-name list in one historical commit of docs/DEPLOYMENT.md"
+condition = "AND"
+commits = ["d63861efa81416e7f7b37c8e4c8ec057351d83e3"]
+paths = ['''^docs/DEPLOYMENT\.md$''']
