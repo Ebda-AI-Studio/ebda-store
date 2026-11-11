@@ -70,7 +70,7 @@ export default defineConfig({
         statements: 23,
       },
     },
-    setupFiles: ['./tests/setup.ts', './tests/setup-e2e.ts'],
+    setupFiles: ['./tests/setup-git-env.ts', './tests/setup.ts', './tests/setup-e2e.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,
     // Run integration tests sequentially to avoid port conflicts

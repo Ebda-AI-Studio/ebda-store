@@ -4,6 +4,7 @@ import nextPlugin from '@next/eslint-plugin-next';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
+import { slopRules } from '../../eslint.slop.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -43,4 +44,5 @@ export default [
       },
     },
   },
+  ...slopRules,
 ];

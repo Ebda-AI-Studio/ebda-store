@@ -1,0 +1,17 @@
+{
+  "src/components/OneSignalInit.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/lib/auth.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/pwa/register-sw.ts": {
+    "no-console": {
+      "count": 1
+    }
+  }
+}

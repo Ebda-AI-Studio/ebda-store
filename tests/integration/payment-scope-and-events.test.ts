@@ -41,10 +41,15 @@ const paymob = new PaymobStub();
 const idleTxAtGatewayCall: number[] = [];
 let paymobServer: ServedStub;
 
+// The code under test's own connections carry this name, so the idle-transaction probe counts ONLY them: CI's serial
+// lane shares the database with the API server on :4000 (also ebda_app), whose transactions are not this test's subject
+// (main run 42994749985 counted 5 of them and went red with this file's code path untouched).
+const APP_NAME = `scope-${run}`;
 function appUrl(): string {
   const u = new URL(OWNER_URL);
   u.username = 'ebda_app';
   u.password = APP_PASSWORD;
+  u.searchParams.set('application_name', APP_NAME);
   return u.toString();
 }
 const asApp = <T>(fn: () => Promise<T>) =>
@@ -65,10 +70,13 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
   const storeIds: string[] = [];
   const userIds: string[] = [];
 
+  // `uniq` per call: CI's --retry=1 re-runs a test with the same `run`, and a fixed email/slug collided (P2002), so the
+  // retry could never pass and hid the first failure behind a unique-constraint error.
+  let uniq = 0;
   async function mkUser(tag: string, role: 'store_admin' | 'customer' | 'super_admin') {
     const u = await owner.user.create({
       data: {
-        email: `scope-${tag}-${run}@test.local`,
+        email: `scope-${tag}-${run}-${++uniq}@test.local`,
         passwordHash: 'x',
         firstName: 'S',
         lastName: tag,
@@ -84,8 +92,8 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
     const admin = await mkUser(`adm-${tag}`, 'store_admin');
     const store = await owner.store.create({
       data: {
-        name: `scope-${tag}-${run}`,
-        slug: `scope-${tag}-${run}`,
+        name: `scope-${tag}-${run}-${++uniq}`,
+        slug: `scope-${tag}-${run}-${uniq}`,
         ownerId: admin.id,
         status: 'active',
       },
@@ -96,7 +104,7 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
       data: {
         storeId: store.id,
         name: 'Tee',
-        slug: `tee-${tag}-${run}`,
+        slug: `tee-${tag}-${run}-${uniq}`,
         price: TOTAL,
         inventory: 50,
         status: 'active',
@@ -173,7 +181,8 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
   const idleAppTransactions = async (): Promise<number> => {
     const rows = await owner.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*)::bigint AS n FROM pg_stat_activity
-      WHERE usename = 'ebda_app' AND datname = current_database() AND state = 'idle in transaction'`;
+      WHERE usename = 'ebda_app' AND datname = current_database() AND application_name = ${APP_NAME}
+        AND state = 'idle in transaction'`;
     return Number(rows[0]?.n ?? 0);
   };
 

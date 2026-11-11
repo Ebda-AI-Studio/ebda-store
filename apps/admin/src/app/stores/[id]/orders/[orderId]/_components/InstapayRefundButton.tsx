@@ -80,18 +80,20 @@ export function InstapayRefundButton({
     };
     const endpoint = `/api/v1/stores/${storeId}/orders/${orderId}/instapay-refund`;
     setSaving(true);
-    let result: { duplicate: boolean } | null = null;
+    let res: { data: { duplicate: boolean } | null; error: { code: string } | null };
     if (file) {
       const form = new FormData();
       for (const [k, v] of Object.entries(fields)) form.append(k, String(v));
       form.append('file', file);
-      result = (await postMultipart<{ duplicate: boolean }>(endpoint, form)).data;
+      res = await postMultipart<{ duplicate: boolean }>(endpoint, form);
     } else {
-      result = (await apiPost<{ duplicate: boolean }>(endpoint, fields)).data;
+      res = await apiPost<{ duplicate: boolean }>(endpoint, fields);
     }
     setSaving(false);
+    const result = res.data;
     if (!result) {
-      toastError(t('failed'));
+      // the one refundable balance (#659): earlier refunds already cover this, say so instead of a generic failure
+      toastError(res.error?.code === 'REFUND_EXCEEDS_ORDER' ? t('exceedsOrder') : t('failed'));
       return;
     }
     toastSuccess(result.duplicate ? t('duplicate') : t('done'));

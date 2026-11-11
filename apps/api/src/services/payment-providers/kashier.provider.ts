@@ -321,6 +321,7 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
     return {
       amountsKnown,
       st: {
+        amountsKnown,
         status,
         amountMinor,
         capturedMinor: amountsKnown && paid ? captured || amountMinor : 0,

@@ -1,0 +1,27 @@
+{
+  "src/app.ts": {
+    "no-console": {
+      "count": 4
+    }
+  },
+  "src/clients.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/data.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/mfa-keys.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/whatsapp-otp.ts": {
+    "no-console": {
+      "count": 2
+    }
+  }
+}

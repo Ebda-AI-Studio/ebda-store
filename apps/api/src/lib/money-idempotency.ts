@@ -5,7 +5,9 @@
  * The claim is one atomic `SET NX EX` on the strongly consistent store (`redis.service`: the AuthState Durable Object on the
  * Worker). States: `pending` while the first request runs, then the JSON answer. A request that FAILED before any money moved
  * releases the key (a retry may try again); a failure after which the money MAY have moved keeps it `pending`, so a retry is
- * refused 409 and a human checks the provider (the same rule as `REFUND_ALREADY_ISSUED`). No key = the old behaviour.
+ * refused 409 and a human checks the provider (the same rule as `REFUND_ALREADY_ISSUED`). No key = the old behaviour, except
+ * for a scope called with `{ required: true }` (a refund to a payment provider, #628): there a missing key is a 400 and
+ * nothing runs, because a keyless retry after an indeterminate failure is exactly the double refund this exists to stop.
  * Staleness: a done answer is kept 24 h; after that the key is free again (the refund's own CAS still caps the total).
  */
 import { createHash } from 'node:crypto';
@@ -36,8 +38,15 @@ export async function withIdempotencyKey<T>(
   scope: string,
   key: string | undefined,
   fn: () => Promise<T>,
-  mayHaveExecuted: (err: unknown) => boolean
+  mayHaveExecuted: (err: unknown) => boolean,
+  opts: { required?: boolean } = {}
 ): Promise<{ replayed: boolean; value: T }> {
+  if (!key && opts.required)
+    throw new AppError(
+      400,
+      'IDEMPOTENCY_KEY_REQUIRED',
+      'This refund needs an Idempotency-Key header (one per refund attempt). Nothing was done.'
+    );
   if (!key) return { replayed: false, value: await fn() };
   const client = redis.getClient();
   if (!client || !redis.isAvailable())

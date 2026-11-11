@@ -13,7 +13,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@ebda/database';
 import { config } from '@api/config';
@@ -22,8 +21,11 @@ import { redis } from '@api/services/redis.service';
 import { planService } from '@api/services/plan.service';
 import { errorHandler } from '@api/middleware/error-handler';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { safeRun } from '../helpers/safe-run';
 
-const run = crypto.randomUUID().slice(0, 8);
+// safeRun, not hex: a hex suffix can normalise into a protected brand and the create answers 400 SLUG_PROTECTED
+// (PR #703's run: 400 instead of 429, same class as 3b34aae6e)
+const run = safeRun();
 const userIds: string[] = [];
 
 function token(userId: string, role: 'store_admin' | 'super_admin') {
@@ -34,10 +36,12 @@ function token(userId: string, role: 'store_admin' | 'super_admin') {
   });
 }
 
+// `uniq` per call: CI's --retry=1 re-runs a test with the same `run`, and a fixed email collided (P2002)
+let uniq = 0;
 async function mkUser(tag: string, role: 'store_admin' | 'super_admin' = 'store_admin') {
   const u = await prisma.user.create({
     data: {
-      email: `abuse-${tag}-${run}@test.local`,
+      email: `abuse-${tag}-${run}-${++uniq}@test.local`,
       passwordHash: 'x',
       firstName: 'Abuse',
       lastName: tag,

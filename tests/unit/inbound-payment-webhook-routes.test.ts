@@ -46,8 +46,9 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
   },
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: m.audit }));
+const alerts = vi.hoisted(() => ({ sendAlert: vi.fn() }));
 vi.mock('@api/services/alerts.service', () => ({
-  sendAlert: vi.fn().mockResolvedValue(undefined),
+  sendAlert: (...a: unknown[]) => (alerts.sendAlert(...a), Promise.resolve(undefined)),
 }));
 vi.mock('@api/services/redis.service', () => ({ redis: { incrementRateLimit: m.incr } }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: m.inngestSend } }));
@@ -457,5 +458,66 @@ describe('payment callback redirect (GET /payment/callback)', () => {
     // no store: no status read at all (it could only be a Postgres lookup), the pending page polls
     expect(m.getStatus).not.toHaveBeenCalled();
     expect(res.headers.location).toContain('/checkout/pending');
+  });
+});
+
+describe('Ruling FAWRY-REFUND-DEDUPE-1: a repeated Fawry refund notice through the signed route raises a P1', () => {
+  const refund = (over: Record<string, unknown> = {}) => ({
+    fawryRefNumber: 'f1',
+    merchantRefNumber: 'fm1',
+    orderStatus: 'PARTIALLY_REFUNDED',
+    paymentAmount: '200.00',
+    messageSignature: 'abc123',
+    ...over,
+  });
+  const send = (body: Record<string, unknown>) =>
+    request(app)
+      .post('/api/v1/webhooks/payment/fawry')
+      .set('content-type', 'application/json')
+      .send(JSON.stringify(body));
+
+  it.each([
+    ['with no reference number', {}],
+    [
+      'WITH a reference number (nothing proves it changes per refund)',
+      { paymentRefrenceNumber: 'RF-1' },
+    ],
+  ])('%s: still acked 200, not processed, and a P1 names the order', async (_n, over) => {
+    alerts.sendAlert.mockClear();
+    m.findOrder.mockResolvedValue({
+      orderId: 'o1',
+      storeId: STORE,
+      webhookProcessedAt: new Date(),
+    });
+    const res = await send(refund(over));
+    expect(res.status).toBe(200);
+    expect(res.body.data.message).toBe('Webhook already processed');
+    expect(m.verify).toHaveBeenCalled(); // the delivery was authenticated before the duplicate check
+    expect(m.handleWebhook).not.toHaveBeenCalled();
+    expect(alerts.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'p1',
+        source: 'payment.webhook.fawry_refund_repeat',
+        context: expect.objectContaining({
+          merchantRefNumber: 'fm1',
+          orderStatus: 'PARTIALLY_REFUNDED',
+        }),
+      })
+    );
+  });
+
+  it('a repeated Fawry PAYMENT notice raises nothing; an unsigned refund notice is refused before any alert', async () => {
+    alerts.sendAlert.mockClear();
+    m.findOrder.mockResolvedValue({
+      orderId: 'o1',
+      storeId: STORE,
+      webhookProcessedAt: new Date(),
+    });
+    await send(refund({ orderStatus: 'PAID' }));
+    expect(alerts.sendAlert).not.toHaveBeenCalled();
+    const { messageSignature: _s, ...unsigned } = refund();
+    const res = await send(unsigned);
+    expect(res.status).toBe(401);
+    expect(alerts.sendAlert).not.toHaveBeenCalled();
   });
 });

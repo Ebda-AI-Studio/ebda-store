@@ -72,6 +72,23 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
   PaymentService: { refund: (...a: unknown[]) => paymentServiceRefund(...a) },
 }));
 
+// the AuthState-backed SET NX client withIdempotencyKey uses (#628), as an in-memory double
+const kv = new Map<string, string>();
+vi.mock('@api/services/redis.service', () => ({
+  redis: {
+    isAvailable: () => true,
+    getClient: () => ({
+      set: async (k: string, v: string, ...rest: unknown[]) => {
+        if (rest.includes('NX') && kv.has(k)) return null;
+        kv.set(k, v);
+        return 'OK';
+      },
+      get: async (k: string) => kv.get(k) ?? null,
+      del: async (k: string) => (kv.delete(k) ? 1 : 0),
+    }),
+  },
+}));
+
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -121,6 +138,7 @@ describe('POST /:orderId/refund-via-provider', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    kv.clear();
   });
 
   it('returns non-2xx (via next(err)) when PaymentService.refund fails — not swallowed to 200', async () => {
@@ -129,6 +147,7 @@ describe('POST /:orderId/refund-via-provider', () => {
 
     const res = await request(app)
       .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refund-via-provider`)
+      .set('Idempotency-Key', `key-${Math.random().toString(36).slice(2, 12)}`)
       .send({});
 
     expect(res.status).not.toBe(200);
@@ -147,6 +166,7 @@ describe('POST /:orderId/refund-via-provider', () => {
 
     const res = await request(app)
       .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refund-via-provider`)
+      .set('Idempotency-Key', `key-${Math.random().toString(36).slice(2, 12)}`)
       .send({});
 
     expect(res.status).toBe(200);
@@ -168,9 +188,66 @@ describe('POST /:orderId/refund-via-provider', () => {
 
     await request(app)
       .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refund-via-provider`)
+      .set('Idempotency-Key', `key-${Math.random().toString(36).slice(2, 12)}`)
       .send({});
 
     const where = orderFindFirst.mock.calls[0][0].include.payments.where;
     expect(where.status).toEqual({ in: ['completed', 'partially_refunded'] });
+  });
+
+  // #628: no key = no refund (a keyless retry after a timeout is the double refund)
+  it('refuses a request without an Idempotency-Key with 400 and never calls the provider', async () => {
+    mockOrderWithCompletedPayment();
+    const res = await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refund-via-provider`)
+      .send({ amount: 30000 });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+    expect(paymentServiceRefund).not.toHaveBeenCalled();
+  });
+
+  it('same key: the first answer comes back and the provider is called once; the key reaches the DO as attemptKey', async () => {
+    mockOrderWithCompletedPayment();
+    paymentServiceRefund.mockResolvedValue({
+      refundId: 'rf_9',
+      amount: 30000,
+      provider: 'kashier',
+      status: 'completed',
+    });
+    const send = () =>
+      request(app)
+        .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refund-via-provider`)
+        .set('Idempotency-Key', 'dialog-key-0001')
+        .send({ amount: 30000 });
+    const a = await send();
+    const b = await send();
+    expect(a.status).toBe(200);
+    expect(b.body.data.refundId).toBe('rf_9');
+    expect(paymentServiceRefund).toHaveBeenCalledTimes(1);
+    expect(paymentServiceRefund.mock.calls[0][0].attemptKey).toMatch(/^refund-via-provider:/);
+  });
+
+  it('a retry after an indeterminate failure (money may have moved) is refused 409, never a second refund', async () => {
+    mockOrderWithCompletedPayment();
+    const { markRefundMayHaveExecuted } =
+      await import('@api/services/payment-providers/refund-outcome');
+    const { AppError } = await import('@api/middleware/error-handler');
+    paymentServiceRefund.mockRejectedValue(
+      markRefundMayHaveExecuted(
+        new AppError(502, 'PROVIDER_REFUND_INDETERMINATE', 'the provider did not confirm')
+      )
+    );
+    const send = () =>
+      request(app)
+        .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refund-via-provider`)
+        .set('Idempotency-Key', 'dialog-key-0002')
+        .send({ amount: 30000 });
+    const a = await send();
+    expect(a.status).toBe(502);
+    expect(a.body.error.code).toBe('PROVIDER_REFUND_INDETERMINATE');
+    const b = await send();
+    expect(b.status).toBe(409);
+    expect(b.body.error.code).toBe('IDEMPOTENCY_IN_PROGRESS');
+    expect(paymentServiceRefund).toHaveBeenCalledTimes(1);
   });
 });
