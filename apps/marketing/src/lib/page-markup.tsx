@@ -7,6 +7,7 @@ import { ServicesIndexPage } from '../components/ServicesIndexPage';
 import { ComparePage } from '../components/ComparePage';
 import { ContactPage } from '../components/ContactPage';
 import { CreditsPage } from '../components/CreditsPage';
+import { SupportPage } from '../components/SupportPage';
 import { FeaturesPage } from '../components/FeaturesPage';
 import { Home } from '../components/Home';
 import { StudioHomePage } from '../components/StudioHome';
@@ -42,6 +43,7 @@ export const DATED_PAGES: readonly PageSlug[] = [
   'about',
   'contact',
   'credits',
+  'support',
 ];
 
 const render = (page: PageSlug, locale: Locale): ReactElement => {
@@ -55,6 +57,7 @@ const render = (page: PageSlug, locale: Locale): ReactElement => {
   if (page === 'about') return <AboutPage locale={locale} />;
   if (page === 'contact') return <ContactPage locale={locale} />;
   if (page === 'credits') return <CreditsPage locale={locale} />;
+  if (page === 'support') return <SupportPage locale={locale} />;
   if (page.startsWith('for/'))
     return <VerticalPage locale={locale} slug={page.split('/')[1] as ForSlug} />;
   if (page.startsWith('compare/'))

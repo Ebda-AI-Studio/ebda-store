@@ -196,6 +196,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 ## launch - Launch readiness
 
 - [launch/marketing-assets-needed.md](launch/marketing-assets-needed.md) - Assets the marketing site still needs from Ahmad (marketing-levelup P2)
+- [launch/support-page.md](launch/support-page.md) - The /support page (24/7, assistant first, a person for money and security), the home cost line and the 360px check (audit M-033, M-031, M-039)
 - [launch/marketing-launch-checklist.md](launch/marketing-launch-checklist.md) - Marketing site: launch-day checklist (P12)
 
 ## legal - Legal
