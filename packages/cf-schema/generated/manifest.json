@@ -654,12 +654,6 @@
     },
     {
       "kind": "check",
-      "name": "billing_reminders_kind_check",
-      "table": "billing_reminders",
-      "disposition": "d1:billing_reminders"
-    },
-    {
-      "kind": "check",
       "name": "store_page_revisions_status_check",
       "table": "store_page_revisions",
       "disposition": "store-do:store_page_revisions"
@@ -1305,6 +1299,12 @@
       "name": "catalog_import_items_len_chk",
       "table": "catalog_import_items",
       "disposition": "store-do:catalog_import_items"
+    },
+    {
+      "kind": "check",
+      "name": "billing_reminders_kind_check",
+      "table": "billing_reminders",
+      "disposition": "d1:billing_reminders"
     },
     {
       "kind": "index",
