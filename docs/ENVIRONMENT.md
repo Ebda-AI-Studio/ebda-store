@@ -292,6 +292,7 @@ Names only. "Set" says where it lives: wrangler var (committed in the Worker's `
 - `AI_DAILY_TOKEN_BUDGET_PER_STORE`, `AI_DAILY_INTERACTIVE_RESERVE`, `AI_STORE_DAILY_REQUEST_CAP` — optional AI spend caps (`config/index.ts`, `lib/ai-quota.ts`). Set: Worker var.
 - `APP_VERSION` — optional; version string surfaced in tracing/health. Set: wrangler var.
 - `CF_DEPLOYMENT_ID`, `CF_VERSION_METADATA` — read-only, platform; deployment identity / version-metadata binding surfaced on `/health` (`lib/build-identity.ts`, `worker.ts`).
+- `MEDIA_BUCKET` — R2 bucket of merchant images (`ebda-media`); read only by the account-closure erasure wiring (`account-closure.wiring.ts`, M024-1), absent = 503 `ERASURE_BINDING_MISSING`.
 - `STORE_DO`, `STORE_REALTIME`, `STORE_BACKUPS`, `RATE_LIMITER` — Cloudflare bindings (there is no `HYPERDRIVE` any more, NEON-ZERO N-17; Durable Objects, R2 bucket, rate-limit binding) declared in `apps/api/wrangler.jsonc`.
 - `DB_CLIENT_CONCURRENCY`, `DB_CLIENT_QUEUE`, `DB_CLIENT_WAIT_MS`, `DB_REQUEST_CONNECTIONS` — optional DB client tuning for the Worker (`worker.ts`). Set: wrangler var.
 - `CACHEGEN_DO_NAME`, `CACHEGEN_LOCATION_HINT` — optional; AuthState Durable Object name / location hint (`cf/auth-state-client.ts`). Set: wrangler var.
