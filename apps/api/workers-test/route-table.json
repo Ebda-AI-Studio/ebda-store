@@ -856,7 +856,6 @@
   "PUT /stores/:storeId/tax/profile",
   "PUT /stores/:storeId/tax/rates/:id",
   "PUT /stores/:storeId/tax/settings",
-  "PUT /stores/:storeId/typography/",
   "PUT /stores/:storeId/warehouses/:warehouseId",
   "PUT /stores/:storeId/warehouses/:warehouseId/stock",
   "PUT /stores/stores/:id/features",
