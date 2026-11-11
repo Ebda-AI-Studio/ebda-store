@@ -50,6 +50,7 @@ import {
 import { semanticSearchEnabled } from '../lib/search/embedding-provider';
 import { storeDb, storeRepo, storeStock, storeWriter } from '../lib/repo-factory';
 import { getAccountsBrief } from '../lib/identity-client';
+import { visibleToShoppers } from '../lib/storefront-categories';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -2739,11 +2740,15 @@ export class ProductService {
       }),
     ]);
 
-    const realCategories = categories.map(c => ({
-      ...c,
-      productCount: c._count.products,
-      _count: undefined,
-    }));
+    // Empty categories are hidden from shoppers everywhere (QA-B2, lib/storefront-categories.ts).
+    const realCategories = visibleToShoppers(
+      categories.map(c => ({
+        ...c,
+        productCount: c._count.products,
+        _count: undefined,
+      })),
+      c => c.productCount
+    );
 
     // Virtual Best Sellers entry. Always first in the list — that's the
     // merchant's flagship surface and where shoppers expect to land
@@ -3088,7 +3093,15 @@ export class ProductService {
     const categories = await (
       await storeDb(storeId)
     ).category.findMany({
-      where: { storeId, deletedAt: null, id: { in: categoryIds } },
+      where: {
+        storeId,
+        deletedAt: null,
+        id: { in: categoryIds },
+        // A suggestion that opens an empty page is a dead end (QA-B2, lib/storefront-categories.ts).
+        products: {
+          some: { product: { status: 'active', deletedAt: null, audience: 'public' } },
+        },
+      },
       select: {
         id: true,
         name: true,
@@ -3112,12 +3125,13 @@ export class ProductService {
   static async getFilterOptions(storeId: string) {
     const [categories, tags, priceRange] = await Promise.all([
       (await storeDb(storeId)).category.findMany({
-        where: { storeId },
+        where: { storeId, deletedAt: null, isActive: true },
         select: {
           id: true,
           name: true,
           nameAr: true,
           slug: true,
+          parentId: true,
           _count: {
             select: {
               products: {
@@ -3158,7 +3172,7 @@ export class ProductService {
     ]);
 
     return {
-      categories: categories.filter(c => c._count.products > 0),
+      categories: visibleToShoppers(categories, c => c._count.products),
       tags: tags.filter(t => t._count.products > 0),
       priceRange: {
         min: priceRange._min.price || 0,

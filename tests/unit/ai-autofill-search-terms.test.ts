@@ -177,18 +177,15 @@ describe('fillProductFields — searchTerms', () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  it('refreshes AI-owned words when a source changes', async () => {
+  it('does NOT refresh AI-owned words when a source changes (fill-only, NEVER-OVERWRITE-1)', async () => {
     productRow = {
       ...baseProduct,
       searchTerms: 'old, words',
       aiFieldSources: { ...humanSources, searchTerms: 'ai' },
     };
     await fillProductFields('s1', 'p1', { op: 'update', changedFields: ['descriptionAr'] });
-    expect(updateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ searchTerms: 'جزمه, gazma, shoes' }),
-      })
-    );
+    expect(generateProductSearchTerms).not.toHaveBeenCalled();
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 
   it('leaves AI-owned words alone when no source changed', async () => {

@@ -125,6 +125,23 @@ describe('whatsapp.cod_outcome', () => {
     expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled');
   });
 
+  it('the order moved on between the read and the change (a refused transition): not acted, audited, never a retry', async () => {
+    const { AppError } = await import('@api/middleware/error-handler');
+    h.updateStatus.mockRejectedValueOnce(new AppError(400, 'INVALID_STATUS_TRANSITION', 'shipped'));
+    await expect(handleStoreEvent(cod('refused'))).resolves.toBe('ignored');
+    expect(h.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'order.cod_outcome',
+        details: expect.objectContaining({ acted: false, refused: 'INVALID_STATUS_TRANSITION' }),
+      })
+    );
+  });
+
+  it('any other failure of the change still throws (the queue retries it)', async () => {
+    h.updateStatus.mockRejectedValueOnce(new Error('DO unreachable'));
+    await expect(handleStoreEvent(cod('refused'))).rejects.toThrow('DO unreachable');
+  });
+
   it('no_reply: recorded, nothing changes', async () => {
     expect(await handleStoreEvent(cod('no_reply'))).toBe('applied');
     expect(h.updateStatus).not.toHaveBeenCalled();

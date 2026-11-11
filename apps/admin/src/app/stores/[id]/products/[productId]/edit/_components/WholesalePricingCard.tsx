@@ -369,6 +369,7 @@ export function WholesalePricingCard(props: Props) {
           <Button type="button" onClick={() => void saveRules()} disabled={busy} variant="outline">
             {t('saveRules')}
           </Button>
+          <p className="mt-1 text-xs text-muted-foreground">{t('rulesScopeHint')}</p>
         </div>
       </fieldset>
     </div>

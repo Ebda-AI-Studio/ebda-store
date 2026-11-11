@@ -221,6 +221,44 @@ export function classifySegment(params: {
 // Cohort rollup
 // ---------------------------------------------------------------------------
 
+/** Paid orders read per query by the rollups (was: every paid order in one query — M-048). */
+export const ROLLUP_ORDER_PAGE = 1000;
+
+type PagedOrder = {
+  id: string;
+  customerId: string | null;
+  shippingAddress: unknown;
+  createdAt: Date;
+  total: number;
+};
+
+/**
+ * Walks the store's paid orders in keyset pages (createdAt, id ascending; `cursor` + `skip: 1`)
+ * and hands each page to `onPage`, so memory is bounded by the page, not the order count. Works on
+ * Postgres and on a Durable Object store alike (`db` is `storeDb(storeId)`).
+ */
+export async function forEachPaidOrderPage(
+  db: Awaited<ReturnType<typeof storeDb>>,
+  storeId: string,
+  onPage: (page: PagedOrder[]) => void,
+  pageSize = ROLLUP_ORDER_PAGE
+): Promise<void> {
+  let cursor: string | undefined;
+  for (;;) {
+    const page = (await db.order.findMany({
+      where: { storeId, paymentStatus: 'paid', deletedAt: null },
+      select: { id: true, customerId: true, shippingAddress: true, createdAt: true, total: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: pageSize,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    })) as PagedOrder[];
+    if (page.length === 0) return;
+    onPage(page);
+    if (page.length < pageSize) return;
+    cursor = page[page.length - 1]!.id;
+  }
+}
+
 /**
  * For each cohort month (from store's oldest paid order to current month),
  * computes the retention matrix and writes CustomerCohortSnapshot rows.
@@ -247,29 +285,8 @@ export async function runCohortRollup(storeId: string): Promise<number> {
   const currentYm = toYearMonth(new Date());
   const cohortMonths = monthRange(launchYm, currentYm);
 
-  // Step 2: load ALL paid orders for this store (customerId + shipping contact + createdAt + total)
-  // We pull the minimum required fields to build cohort memberships in memory.
-  type RawOrder = {
-    id: string;
-    customerId: string | null;
-    shippingAddress: unknown;
-    createdAt: Date;
-    total: number;
-  };
-
-  const allOrders = await db.order.findMany({
-    where: { storeId, paymentStatus: 'paid', deletedAt: null },
-    select: {
-      id: true,
-      customerId: true,
-      shippingAddress: true,
-      createdAt: true,
-      total: true,
-    },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  // Step 3: derive customer key per order
+  // Step 2/3: stream paid orders in pages and keep only what the cohort maths needs per order
+  // (customer key + createdAt + total) — never the full order rows (M-048).
   type CustomerOrder = {
     key: string; // customerId or GUEST:<hash>
     createdAt: Date;
@@ -277,11 +294,13 @@ export async function runCohortRollup(storeId: string): Promise<number> {
   };
 
   const customerOrders: CustomerOrder[] = [];
-  for (const o of allOrders as RawOrder[]) {
-    const key = orderCustomerKey(o);
-    if (!key) continue; // guest with no contact info — skip
-    customerOrders.push({ key, createdAt: o.createdAt, total: o.total });
-  }
+  await forEachPaidOrderPage(db, storeId, page => {
+    for (const o of page) {
+      const key = orderCustomerKey(o);
+      if (!key) continue; // guest with no contact info — skip
+      customerOrders.push({ key, createdAt: o.createdAt, total: o.total });
+    }
+  });
 
   if (customerOrders.length === 0) {
     logger.info({ storeId }, 'cohort-rollup: no keyed orders — skip');
@@ -597,29 +616,6 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
   const db = await storeDb(storeId);
   const sw = await storeWriter(storeId);
-  // Step 1: load all paid orders for this store (same fields as cohort rollup)
-  type RawOrder = {
-    customerId: string | null;
-    shippingAddress: unknown;
-    createdAt: Date;
-    total: number;
-  };
-
-  const allOrders = await db.order.findMany({
-    where: { storeId, paymentStatus: 'paid', deletedAt: null },
-    select: {
-      customerId: true,
-      shippingAddress: true,
-      createdAt: true,
-      total: true,
-    },
-  });
-
-  if (allOrders.length === 0) {
-    logger.info({ storeId }, 'rfm-rollup: no paid orders — skip');
-    return 0;
-  }
-
   // Step 2: aggregate per customer key
   type CustomerStats = {
     key: string;
@@ -631,25 +627,32 @@ export async function runRfmRollup(storeId: string): Promise<number> {
 
   const statsMap = new Map<string, CustomerStats>();
 
-  for (const o of allOrders as RawOrder[]) {
-    const key = orderCustomerKey(o);
-    if (!key) continue;
+  await forEachPaidOrderPage(db, storeId, page => {
+    for (const o of page) {
+      const key = orderCustomerKey(o);
+      if (!key) continue;
 
-    const isGuest = !o.customerId;
-    const existing = statsMap.get(key);
-    if (existing) {
-      if (o.createdAt > existing.lastPaidAt) existing.lastPaidAt = o.createdAt;
-      existing.paidCount++;
-      existing.totalPaidFils += o.total;
-    } else {
-      statsMap.set(key, {
-        key,
-        isGuest,
-        lastPaidAt: o.createdAt,
-        paidCount: 1,
-        totalPaidFils: o.total,
-      });
+      const isGuest = !o.customerId;
+      const existing = statsMap.get(key);
+      if (existing) {
+        if (o.createdAt > existing.lastPaidAt) existing.lastPaidAt = o.createdAt;
+        existing.paidCount++;
+        existing.totalPaidFils += o.total;
+      } else {
+        statsMap.set(key, {
+          key,
+          isGuest,
+          lastPaidAt: o.createdAt,
+          paidCount: 1,
+          totalPaidFils: o.total,
+        });
+      }
     }
+  });
+
+  if (statsMap.size === 0) {
+    logger.info({ storeId }, 'rfm-rollup: no paid orders — skip');
+    return 0;
   }
 
   const customers = Array.from(statsMap.values());
