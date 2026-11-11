@@ -75,6 +75,15 @@ const api = (path: string, init: RequestInit & { headers?: Record<string, string
       ...init.headers,
     },
   });
+/** Poll until `fn` is truthy (a write applied off the request). */
+async function until<T>(fn: () => Promise<T | null>, ms = 10_000): Promise<T | null> {
+  const t0 = Date.now();
+  for (;;) {
+    const v = await fn();
+    if (v || Date.now() - t0 > ms) return v;
+    await new Promise(r => setTimeout(r, 150));
+  }
+}
 /** The Postgres reaches since the last reset, as readable lines (label + the first app frame). */
 const reachReport = (r: Array<{ label: string; stack: string }>) =>
   r.map(x => `${x.label} @ ${x.stack.split('\n').find(l => l.includes('/src/')) ?? ''}`).join('\n');
@@ -177,11 +186,13 @@ describe.skipIf(e.E2E_DB === '1')(
         .bind(storeId)
         .run();
       // the merchant switched on the basic books (the performance + cash-flow cards gate on it)
-      await e.PLATFORM_DB.prepare(
-        'INSERT OR REPLACE INTO store_features (id, store_id, feature_key, enabled, enabled_at) VALUES (?1, ?2, ?3, 1, ?4)'
-      )
-        .bind('orders-do-accounting', storeId, 'accounting.basic', Date.now())
-        .run();
+      // and the features the merchant screens below gate on
+      for (const key of ['accounting.basic', 'inventory.multi_warehouse', 'coupons'])
+        await e.PLATFORM_DB.prepare(
+          'INSERT OR REPLACE INTO store_features (id, store_id, feature_key, enabled, enabled_at) VALUES (?1, ?2, ?3, 1, ?4)'
+        )
+          .bind(`orders-do-${key}`, storeId, key, Date.now())
+          .run();
       for (const u of [owner, customerId])
         await authState(`user:tv:${u}`, [['set', `user:tv:${u}`, '0', {}]]);
       const sa = await accessToken({
@@ -326,5 +337,323 @@ describe.skipIf(e.E2E_DB === '1')(
 
       expect(reachReport(await pgReaches(true))).toBe('');
     }, 60_000);
+    // soft assertions: a red run lists EVERY path that still reaches Postgres, not only the first
+    it('merchant writes and reads that touched Postgres now land in the DO (Ruling NZ-MERCHANT-1)', async () => {
+      await pgReaches(true);
+      const steps: string[] = [];
+      const call = async (
+        name: string,
+        path: string,
+        init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}
+      ) => {
+        const r = await api(path, {
+          method: init.method ?? 'GET',
+          headers: init.headers ?? merchant,
+          ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+        });
+        const text = await r.text();
+        steps.push(`${r.status} ${name} ${r.status >= 400 ? text.slice(0, 200) : ''}`);
+        let json: any = null;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          /* not json */
+        }
+        return { status: r.status, json };
+      };
+      const S = `/stores/${storeId}`;
+
+      // 1. a variant that holds stock is disabled, then re-enabled: two stock-history rows (variant.service updateVariant)
+      const pv = crypto.randomUUID();
+      const v1 = crypto.randomUUID();
+      const seeded = await e.API.fetch(`${BASE}/internal/store-do/${storeId}/seed`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer workers-test-seed-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          products: [
+            {
+              id: pv,
+              storeId,
+              name: 'Ring sizes',
+              slug: 'orders-do-sizes',
+              price: 7000,
+              hasVariants: true,
+              status: 'active',
+            },
+          ],
+          variants: [
+            { id: v1, productId: pv, sku: 'RING-S7', price: 7000, inventory: 4, isActive: true },
+          ],
+        }),
+      });
+      expect(seeded.status, await seeded.clone().text()).toBe(200);
+      const off = await call('variant disable', `${S}/products/${pv}/variants/${v1}`, {
+        method: 'PUT',
+        body: { isActive: false },
+      });
+      const on = await call('variant re-enable', `${S}/products/${pv}/variants/${v1}`, {
+        method: 'PUT',
+        body: { isActive: true },
+      });
+      expect.soft([off.status, on.status], steps.join('\n')).toEqual([200, 200]);
+      const hist = await doRead<Array<{ quantity: number; previousStock: number }>>(
+        storeId,
+        'InventoryHistory',
+        { where: { reference: `variant:${v1}` } }
+      );
+      expect.soft(hist.map(h => [h.quantity, h.previousStock])).toEqual([
+        [0, 4],
+        [0, 4],
+      ]);
+
+      // 2. the SKU search of the warehouse stock list (product-search searchVariantIdsBySku)
+      const whs = await call('warehouse create', `${S}/warehouses`, {
+        method: 'POST',
+        body: { name: 'Main', code: 'MAIN', isDefault: true },
+      });
+      const wh = whs.json?.data?.id ?? whs.json?.data?.warehouse?.id;
+      expect(wh, steps.join('\n')).toBeTruthy();
+      {
+        const st = await call(
+          'warehouse stock search by sku',
+          `${S}/warehouses/${wh}/stock?search=ring-s7`
+        );
+        expect.soft(st.status, steps.join('\n')).toBe(200);
+      }
+
+      // 3. a first-order coupon check for a guest phone that already ordered (promotion-resolver order.count, JSON path)
+      const coupon = await call('coupon create', `${S}/coupons`, {
+        method: 'POST',
+        body: {
+          code: 'WELCOME10',
+          name: 'Welcome',
+          type: 'percentage',
+          value: 10,
+          isActive: true,
+          firstOrderOnly: true,
+        },
+      });
+      expect.soft(coupon.status, steps.join('\n')).toBeLessThan(300);
+      const validate = await call(
+        'coupon validate (guest phone)',
+        `/stores/public/${storeId}/coupons/validate`,
+        {
+          method: 'POST',
+          headers: { 'x-store-id': storeId },
+          body: {
+            code: 'WELCOME10',
+            orderTotal: 10_000,
+            phone: '+201000000202',
+            cartItems: [{ productId: productIds[0], quantity: 2, lineTotal: 10_000 }],
+          },
+        }
+      );
+      // that phone already ordered twice: the first-order-only code is refused (400), never a Postgres 500
+      expect
+        .soft(validate.status, `${steps.join('\n')}\n${JSON.stringify(validate.json)}`)
+        .toBe(400);
+
+      const fresh = await call(
+        'coupon validate (new phone)',
+        `/stores/public/${storeId}/coupons/validate`,
+        {
+          method: 'POST',
+          headers: { 'x-store-id': storeId },
+          body: {
+            code: 'WELCOME10',
+            orderTotal: 10_000,
+            phone: '+201000000999',
+            cartItems: [{ productId: productIds[0], quantity: 2, lineTotal: 10_000 }],
+          },
+        }
+      );
+      expect.soft(fresh.status, `${steps.join('\n')}\n${JSON.stringify(fresh.json)}`).toBe(200);
+
+      // 4. a carrier configuration: save, make default, rotate the webhook secret, delete (shipping-carrier.service)
+      const put = await call('carrier config save', `${S}/shipping-carriers/configs/bosta`, {
+        method: 'PUT',
+        body: { settings: { pickupNotes: 'back door' } },
+      });
+      expect.soft(put.status, steps.join('\n')).toBe(200);
+      const def = await call(
+        'carrier default (not enabled: 409)',
+        `${S}/shipping-carriers/default/bosta`,
+        {
+          method: 'POST',
+          body: {},
+        }
+      );
+      expect.soft(def.status, steps.join('\n')).toBe(409);
+      const del = await call('carrier config delete', `${S}/shipping-carriers/configs/bosta`, {
+        method: 'DELETE',
+      });
+      expect.soft(del.status, steps.join('\n')).toBeLessThan(300);
+      const carriers = await doRead<unknown[]>(storeId, 'ShippingCarrierConfig', {
+        where: { storeId },
+      });
+      expect.soft(carriers).toEqual([]);
+
+      // 5. pickups of a shipment (shipment-pickup.service): the state read, and a cancel of an unknown pickup is a 404
+      const shipmentId = crypto.randomUUID();
+      const orders = await doRead<Array<{ id: string }>>(storeId, 'Order', { where: { storeId } });
+      const ship = await stub(storeId).mutate(storeId, {
+        ops: [
+          {
+            model: 'Shipment',
+            op: 'create',
+            args: {
+              data: {
+                id: shipmentId,
+                storeId,
+                orderId: orders[0].id,
+                carrier: 'bosta',
+                status: 'created',
+                trackingNumber: 'TRK-ORDERS-DO-1',
+                pickupAddress: { city: 'Cairo' },
+                deliveryAddress: { city: 'Giza' },
+              },
+            },
+          },
+        ],
+      });
+      expect(ship.ok, JSON.stringify(ship)).toBe(true);
+      const pick = await call('pickup state', `${S}/shipments/${shipmentId}/pickup`);
+      expect.soft(pick.status, steps.join('\n')).toBe(200);
+      const cancel = await call(
+        'pickup cancel (unknown)',
+        `${S}/shipments/${shipmentId}/pickup/${crypto.randomUUID()}/cancel`,
+        { method: 'POST', body: {} }
+      );
+      expect.soft(cancel.status, steps.join('\n')).toBe(404);
+
+      // 6. a dead-stock flag accepted as a clearance coupon: the coupon and the flag move together; a second click is a 409
+      const flagId = crypto.randomUUID();
+      const flag = await stub(storeId).mutate(storeId, {
+        ops: [
+          {
+            model: 'DeadStockFlag',
+            op: 'create',
+            args: {
+              data: {
+                id: flagId,
+                storeId,
+                productId: productIds[1],
+                status: 'open',
+                suggestedDiscountBps: 2500,
+                daysSinceSale: 120,
+                stockOnHand: 100,
+                clearanceCopyEn: 'Last pieces',
+              },
+            },
+          },
+        ],
+      });
+      expect(flag.ok, JSON.stringify(flag)).toBe(true);
+      const clr = await call('clearance coupon', `${S}/stock/deadstock-flags/${flagId}/clearance`, {
+        method: 'POST',
+        body: {},
+      });
+      expect.soft(clr.status, steps.join('\n')).toBeLessThan(300);
+      const again = await call(
+        'clearance coupon again',
+        `${S}/stock/deadstock-flags/${flagId}/clearance`,
+        {
+          method: 'POST',
+          body: {},
+        }
+      );
+      expect.soft(again.status, steps.join('\n')).toBe(409);
+      const flags = await doRead<Array<{ status: string; couponCode: string | null }>>(
+        storeId,
+        'DeadStockFlag',
+        { where: { id: flagId } }
+      );
+      expect.soft(flags[0].status).toBe('accepted_clearance');
+
+      // 7. a CSV import that carries a barcode (bulk.service: the advisory barcode lock is Postgres-only)
+      const imp = await call('bulk import with a barcode', `${S}/bulk/import`, {
+        method: 'POST',
+        body: {
+          csvData: 'name,price,barcode\nPearl studs,3500,6221234567891\n',
+          options: {},
+        },
+      });
+      expect.soft(imp.status, steps.join('\n')).toBeLessThan(300);
+      // the import runs as a job (202, `bulk-import/started`); the harness does not execute event jobs, so the job body (where
+      // the barcode lock sits) runs inline through `/__dev/run-event`, then its product must carry the barcode
+      const queued = await doRead<Array<{ id: string; status: string }>>(storeId, 'BulkImportJob', {
+        where: { storeId },
+      });
+      expect.soft(queued.map(j => j.status)).toEqual(['queued']);
+      const ran = await e.API.fetch('https://api.ebda.app/__dev/run-event', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'bulk-import/started',
+          data: { jobId: queued[0].id, storeId },
+        }),
+      });
+      const ranBody = await ran.text();
+      expect.soft(ran.status, ranBody).toBe(200);
+      expect
+        .soft(
+          JSON.parse(ranBody).jobs.every((j: { ok: boolean }) => j.ok),
+          ranBody
+        )
+        .toBe(true);
+      const done = await doRead<Array<{ status: string; created: number }>>(
+        storeId,
+        'BulkImportJob',
+        {
+          where: { id: queued[0].id },
+        }
+      );
+      expect.soft([done[0].status, done[0].created], ranBody).toEqual(['completed', 1]);
+      const imported = await doRead<Array<{ barcode: string | null }>>(storeId, 'Product', {
+        where: { storeId, name: 'Pearl studs' },
+      });
+      expect.soft(imported[0]?.barcode).toBe('6221234567891');
+
+      // 8. the super admin suspends and reactivates the store: both audit rows land in the DO (store.routes status)
+      await authState('user:tv:super-orders-do', [['set', 'user:tv:super-orders-do', '0', {}]]);
+      const su = await accessToken({
+        userId: 'super-orders-do',
+        jti: 'j-orders-do-su',
+        role: 'super_admin',
+      });
+      const suH = { authorization: `Bearer ${su}` };
+      const sus = await call('store suspend', `/stores/${storeId}/status`, {
+        method: 'PATCH',
+        headers: suH,
+        body: { status: 'suspended' },
+      });
+      const act = await call('store reactivate', `/stores/${storeId}/status`, {
+        method: 'PATCH',
+        headers: suH,
+        body: { status: 'active' },
+      });
+      expect.soft([sus.status, act.status], steps.join('\n')).toEqual([200, 200]);
+      const audits = await until(async () => {
+        const rows = await doRead<Array<{ action: string }>>(storeId, 'AuditLog', {
+          where: { storeId, resourceType: 'store' },
+        });
+        return rows.length >= 2 ? rows : null;
+      });
+      expect
+        .soft((audits ?? []).map(a => a.action).sort())
+        .toEqual(['store.reactivate', 'store.suspend']);
+
+      // 9. the payment events of the merchant's mark-paid (payment-event.service recordPaymentEvent, swallowed before)
+      const events = await doRead<Array<{ eventType: string }>>(storeId, 'PaymentEvent', {
+        where: { storeId },
+      });
+      expect
+        .soft(events.length, 'mark-paid records a payment event per order')
+        .toBeGreaterThanOrEqual(5);
+
+      expect.soft(reachReport(await pgReaches(true)), steps.join('\n')).toBe('');
+    }, 120_000);
   }
 );
