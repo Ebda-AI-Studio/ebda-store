@@ -78,13 +78,25 @@ describe('issue 664: a refused address never claims an account slot', () => {
     expect(seen[0][2].results).toEqual([]); // no account slot was claimed, not even briefly
   });
 
-  it('one locked-out address firing 100 parallel requests leaves the account its capacity', async () => {
+  it('one locked-out address firing 100 parallel requests never takes an account slot, MEASURED DURING the burst', async () => {
     for (let i = 0; i < 5; i++) await hit(env.DB, key, '203.0.113.9', LOGIN);
     const before = await acctRows();
+    // The old code inserted a slot per refused request and removed it only after the batch, so the END state looks
+    // clean. What shows the defect is the slots the batches HANDED OUT while the burst ran: count them per batch result.
+    let slotsHandedOut = 0;
+    const spy = {
+      prepare: (q: string) => env.DB.prepare(q),
+      batch: async (st: D1PreparedStatement[]) => {
+        const r = (await env.DB.batch(st)) as unknown as Array<{ results: unknown[] }>;
+        if (r[2]?.results.length) slotsHandedOut++;
+        return r;
+      },
+    } as unknown as D1Database;
     const res = await Promise.all(
-      Array.from({ length: 100 }, () => hit(env.DB, key, '203.0.113.9', LOGIN))
+      Array.from({ length: 100 }, () => hit(spy, key, '203.0.113.9', LOGIN))
     );
     expect(res.every(a => !a.ok)).toBe(true);
+    expect(slotsHandedOut).toBe(0); // old code: up to ACCOUNT_CAP slots were claimed by refused requests
     expect(await acctRows()).toBe(before);
     expect((await hit(env.DB, key, '198.51.100.30', LOGIN)).ok).toBe(true); // the owner is not locked out
   });
