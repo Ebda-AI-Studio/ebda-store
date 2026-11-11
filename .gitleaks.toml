@@ -120,3 +120,14 @@ regexes = [
   # placeholder passwords: 1-2 chars, the usual words, all-x, or an UPPER_CASE token (PASSWORD, USER_PASS)
   '''://[^:@\s]+:(?:[^@\s]{1,2}|pass|password|pwd|secret|test|changeme|x+|X+|[A-Z][A-Z0-9_]*)@''',
 ]
+
+# Ruling SEC-SCAN-2 (2026-11-11): the Supabase project `avvugheaifhfrskwcrlq` is deleted. Evidence:
+# `dig @8.8.8.8 avvugheaifhfrskwcrlq.supabase.co` returns NXDOMAIN while `supabase.co` resolves, and test-db.js is not in
+# the main tree. Cost if wrong: a live leaked DB password in private-repo history goes unflagged.
+# Scoped to exactly the two historical commits AND the path test-db.js (never the password literal, never a broad regex):
+# the same URL in any other commit or file still fires.
+[[rules.allowlists]]
+description = "Ruling SEC-SCAN-2: deleted Supabase project, two historical commits of test-db.js only"
+condition = "AND"
+commits = ["d83b18988f7231f5522ae8ea2b190eb269a21eed", "acdd9ebb0c18542e6762f91c687bc85a2faea6f8"]
+paths = ['''^test-db\.js$''']
