@@ -20,7 +20,7 @@ export default defineConfig({
     include: ['tests/unit/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/stryker-tmp/**'],
     // Only load global setup — NOT setup-e2e.ts (which blocks without TEST_DATABASE_URL)
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./tests/setup-git-env.ts', './tests/setup.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,
     pool: 'forks',

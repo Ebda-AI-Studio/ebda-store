@@ -47,7 +47,14 @@ import {
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { StorageService } from './storage.service';
-import { BYTES_PER_MB, cachedStoreBytes } from '../lib/storage-usage';
+import {
+  BYTES_PER_MB,
+  cachedStoreBytes,
+  NO_RESERVATION,
+  releaseStoreBytes,
+  type StorageReservation,
+  reserveStoreBytes,
+} from '../lib/storage-usage';
 import { storeRepo, storeDb } from '../lib/repo-factory';
 import { backendFor } from '../lib/store-backend';
 import { onAccessD1 } from './platform/access-d1';
@@ -73,8 +80,40 @@ async function storageUsageMb(storeId: string): Promise<number> {
 }
 
 /** S3-X8: gate an upload of `bytes` on the plan's storage ceiling (402 PLAN_LIMIT_REACHED; null = unlimited). */
-export async function assertStorageRoom(storeId: string, bytes: number): Promise<void> {
+export async function assertStorageRoom(
+  storeId: string,
+  bytes: number
+): Promise<StorageReservation> {
+  // #630: the check and the reservation are ONE synchronous step on the cached usage (`reserveStoreBytes`), so a
+  // burst inside the 60 s TTL sees the earlier uploads. The caller hands the result to `releaseOnFailure(res, ...)`,
+  // which gives the bytes back when the request fails. GUARANTEE IS PER ISOLATE: each Worker isolate has its own
+  // cache, so N isolates can each admit up to the headroom inside one TTL (the 20/min upload limit still caps it).
+  const e = await getEntitlements(storeId);
+  const limit = e?.limits.maxStorageMb;
+  if (e && typeof limit === 'number') {
+    await storageUsageMb(storeId); // warm the cache; a listing failure fails open inside it
+    const r = reserveStoreBytes(storeId, bytes, limit);
+    if (r) {
+      if (!r.ok)
+        throw limitError(
+          e,
+          'maxStorageMb',
+          limit,
+          Math.ceil(r.usedBytes / BYTES_PER_MB),
+          bytes / BYTES_PER_MB
+        );
+      let released = false; // idempotent: a second call (finish + close) must not subtract twice
+      return {
+        release: () => {
+          if (released) return;
+          released = true;
+          releaseStoreBytes(storeId, bytes, r.gen);
+        },
+      };
+    }
+  }
   await assertWithinLimit(storeId, 'maxStorageMb', { delta: bytes / BYTES_PER_MB });
+  return NO_RESERVATION;
 }
 
 /** Current usage for a limit, or null when the platform does not track it yet. */

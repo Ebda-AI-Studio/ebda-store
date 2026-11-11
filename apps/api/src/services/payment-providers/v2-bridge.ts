@@ -92,6 +92,10 @@ export class V2ProviderBridge implements IPaymentProvider {
 
   async getPaymentStatus(transactionId: string): Promise<PaymentStatusResponse> {
     const st = await this.adapter.getStatus(transactionId, this.creds);
+    // #625: an answer with no amounts reports them as UNKNOWN (undefined), never 0. A 0 here was read downstream as "paid
+    // nothing", so a captured Kashier order was held as underpaid forever; unknown lets the confirm path use the amount
+    // the payment was created for (a server-side status query is authoritative for the state, CF-PAY rubric #12).
+    const known = st.amountsKnown !== false;
     return {
       success: true,
       provider: this.name,
@@ -99,11 +103,11 @@ export class V2ProviderBridge implements IPaymentProvider {
       status: st.status,
       amount: st.amountMinor,
       currency: st.currency,
-      paidAmount: st.capturedMinor,
-      paidCurrency: st.currency,
+      paidAmount: known ? st.capturedMinor : undefined,
+      paidCurrency: known ? st.currency : undefined,
       paymentMethod: st.method,
       paidAt: st.paidAt,
-      refundedAmount: st.refundedMinor,
+      refundedAmount: known ? st.refundedMinor : undefined,
     };
   }
 

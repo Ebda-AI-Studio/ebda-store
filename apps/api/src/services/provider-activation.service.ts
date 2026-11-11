@@ -308,7 +308,7 @@ export async function listAllRequests(
         (await Promise.all(batch.map(s => withStore(s.id, () => forStore(s.id))))).flat()
       );
     }
-  } else rows = await acrossStoresFlat(forStore);
+  } else rows = await acrossStoresFlat(forStore, { abortOnError: true });
   return rows.sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
 }
 

@@ -60,10 +60,10 @@ describe('host-lock.sh', () => {
 
   it('a killed holder frees the lock (the kernel drops it)', async () => {
     const f = fresh();
-    const holder = spawn('bash', [SCRIPT, 'sleep', '60'], { env: env(f) });
+    // detached = its own process group, so killing -pid takes down bash + lockf + sleep that THIS test started and nothing else
+    const holder = spawn('bash', [SCRIPT, 'sleep', '60'], { env: env(f), detached: true });
     await new Promise(r => setTimeout(r, 800));
-    holder.kill('SIGKILL');
-    spawnSync('pkill', ['-f', 'sleep 60']);
+    process.kill(-holder.pid!, 'SIGKILL');
     await new Promise(r => setTimeout(r, 500));
     const r = spawnSync('bash', [SCRIPT, 'echo', 'ran'], {
       env: env(f, { HOST_LOCK_MAX_WAIT_S: '5' }),
@@ -91,7 +91,10 @@ describe('host-lock.sh', () => {
     expect(hook).not.toContain('host-lock.sh bash scripts/ci/pre-push-gate.sh');
     // every vitest invocation in the gate is wrapped in the lock; the related run is capped
     expect(gate).toMatch(/host-lock\.sh npx vitest related/);
-    expect(gate).toMatch(/host-lock\.sh npx vitest run/);
+    // PREPUSH-5: scanners use the 4-slot semaphore + tree-hash cache, never the host-wide heavy lock
+    expect(gate).toMatch(/prepush-slot\.sh npx vitest run/);
+    expect(gate).not.toMatch(/host-lock\.sh npx vitest run/);
+    expect(gate).toContain('prepush-scanner-cache.sh check');
     expect(gate).toContain('PREPUSH_RELATED_MAX');
     for (const heavy of [
       'npm run lint',

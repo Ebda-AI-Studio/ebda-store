@@ -74,13 +74,22 @@ async function lockedOrder(storeId: string, orderId: string) {
  * The status change of a COD outcome / an erasure cancel. A transition the order state machine refuses (the order moved on
  * between the read and this call: shipped, already cancelled) is "not acted", never a retry loop.
  */
+/** The states a WhatsApp "refused" may cancel from: before the order left the store (Fixes #614). */
+const REFUSE_CANCELS_FROM = ['pending', 'confirmed'];
+/** Past those, a refusal is a delivery exception for the merchant: noted on the order, never a cancel or a restock. */
+const REFUSAL_EXCEPTION_FROM = ['processing', 'shipped', 'delivered'];
+const REFUSAL_EXCEPTION_NOTE =
+  'تنبيه توصيل: العميل رفض الطلب على واتساب بعد ما الطلب خرج للتجهيز أو الشحن. الطلب ما اتلغاش والمخزون ما رجعش، كلّم العميل أو شركة الشحن. ' +
+  '(Delivery exception: the customer refused this COD order on WhatsApp after it left for preparation or shipping; it was not cancelled or restocked.)';
+
 async function transition(
   storeId: string,
   orderId: string,
-  to: 'confirmed' | 'cancelled'
+  to: 'confirmed' | 'cancelled',
+  opts: { onlyFrom?: string[]; exceptionNote?: string } = {}
 ): Promise<{ acted: boolean; refused?: string }> {
   try {
-    await OrderService.updateStatus(storeId, orderId, to);
+    await OrderService.updateStatus(storeId, orderId, to, opts);
     return { acted: true };
   } catch (err) {
     if (err instanceof AppError && (err.statusCode === 400 || err.statusCode === 409))
@@ -122,9 +131,15 @@ export async function applyCodOutcome(
           ({ acted, refused } = await transition(storeId, orderId, 'confirmed'));
         } else if (
           outcome === 'refused' &&
-          (order.status === 'pending' || order.status === 'confirmed')
+          (REFUSE_CANCELS_FROM.includes(order.status) ||
+            REFUSAL_EXCEPTION_FROM.includes(order.status))
         ) {
-          ({ acted, refused } = await transition(storeId, orderId, 'cancelled'));
+          // The DO decides in ONE section (the status read above may be stale, #614): it cancels only from a pre-ship
+          // state; a ship that landed first leaves the order as it is with the delivery-exception note.
+          ({ acted, refused } = await transition(storeId, orderId, 'cancelled', {
+            onlyFrom: REFUSE_CANCELS_FROM,
+            exceptionNote: REFUSAL_EXCEPTION_NOTE,
+          }));
         }
       }
       await auditLog({
@@ -163,7 +178,13 @@ async function applyOrderAfterErasure(
       let acted = false;
       let refused: string | undefined;
       if (order.status === 'pending' || order.status === 'confirmed')
-        ({ acted, refused } = await transition(storeId, orderId, 'cancelled'));
+        // same atomic guard as a refusal (#614's class): a ship that landed after the read is never cancelled
+        ({ acted, refused } = await transition(storeId, orderId, 'cancelled', {
+          onlyFrom: REFUSE_CANCELS_FROM,
+          exceptionNote:
+            'تنبيه: الطلب ده من محادثة لعميل اتمسحت بياناته، والطلب كان خرج بالفعل فما اتلغاش. ' +
+            '(Notice: this chat order belongs to an erased buyer; it had already left the store, so it was not cancelled.)',
+        }));
       await auditLog({
         action: 'order.cancelled_after_erasure',
         resourceType: 'order',
