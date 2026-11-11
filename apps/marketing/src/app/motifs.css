@@ -264,3 +264,26 @@ body:has(.wa-head) #features::after {
   height: 2px;
   background: url(/motifs/foil.svg) 0 0 / 256px 256px;
 }
+
+/* ---------- W2 editorial pacing (UI audit 2026-11-11, Apple band rhythm) ----------
+   Five cream sections in a row read as one page-long list. The products band is the one that has to land, so it takes
+   the night ground (night + gold, the Ebda surface) and the neighbours stay cream: cream, cream, NIGHT, cream, cream.
+   It re-points the shared neutrals, so every component inside keeps using --fg/--muted/--line and nothing is restyled. */
+.studio-home #products {
+  --canvas: #0a0b0c;
+  --panel: #15140f;
+  --raise: #1a1916;
+  --line: #2c2a26;
+  --line-strong: #8a8579;
+  --fg: #efe9dd;
+  --muted: #b3ad9f;
+  --accent-text: var(--lift);
+  background: var(--canvas);
+  color: var(--fg);
+  color-scheme: dark;
+}
+.studio-home #products .btn-ghost,
+.studio-home #products .btn-outline {
+  color: var(--fg);
+  border-color: var(--line-strong);
+}

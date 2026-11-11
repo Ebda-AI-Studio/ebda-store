@@ -58,7 +58,7 @@ export function SidebarFooter({
               />
             </svg>
             <span className="flex-1 text-start">{t('focusMode.enterFocusMode')}</span>
-            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-ink">
               {t('focusMode.ordersOnly')}
             </span>
           </Button>

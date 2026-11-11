@@ -5,6 +5,7 @@ import { revalidateStorefront } from './revalidate-storefront';
 import { retryTransientRead } from './db-retry';
 import { isWorkers } from './runtime';
 import { dropEdgeGensMemo } from './edge-gens-memo';
+import { cfWaitUntil } from '../cf/bindings';
 
 /**
  * Public-route response cache. Used by the storefront-facing endpoints
@@ -170,18 +171,27 @@ export async function getCached<T>(
     });
 
     const cacheable = opts.cacheIf ? opts.cacheIf(data) : true;
-    if (cacheable && sharedBefore !== null && (await readSharedGens(genNames)) === sharedBefore) {
-      try {
-        await redis.set(key, JSON.stringify(data), ttlSeconds);
-        // An invalidation that bumped between the check above and this write
-        // has already run (or is running) its delete; take our entry back out.
-        if ((await readSharedGens(genNames)) !== sharedBefore) {
-          await redis.delete(key);
+    if (cacheable && sharedBefore !== null) {
+      const writeBack = async () => {
+        if ((await readSharedGens(genNames)) !== sharedBefore) return;
+        try {
+          await redis.set(key, JSON.stringify(data), ttlSeconds);
+          // An invalidation that bumped between the check above and this write
+          // has already run (or is running) its delete; take our entry back out.
+          if ((await readSharedGens(genNames)) !== sharedBefore) {
+            await redis.delete(key);
+          }
+        } catch {
+          // Redis failed mid-fill: nothing is cached this time (memory is only
+          // written when Redis was already down at the start of the fill).
         }
-      } catch {
-        // Redis failed mid-fill: nothing is cached this time (memory is only
-        // written when Redis was already down at the start of the fill).
-      }
+      };
+      // API-HANG-1: on Workers the write-back (generation check -> KV put -> re-check, two AuthState round trips + a KV
+      // write) runs after the response, in waitUntil, instead of in front of it: same order, same checks, so the
+      // NEVER-stale guarantee is unchanged, and waitUntil outlives a disconnecting client where the request path did not.
+      // Node keeps awaiting it (its tests read the cache right after the fill).
+      if (isWorkers) cfWaitUntil(writeBack());
+      else await writeBack();
     }
     // Memory only when the shared layer is down (FIX-002), and never with a
     // value a local invalidation has superseded since the fetch began.

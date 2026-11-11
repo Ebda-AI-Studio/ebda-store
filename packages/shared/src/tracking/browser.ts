@@ -12,6 +12,7 @@
  *   - marketing allowed        -> Meta Pixel + first-touch attribution cookie
  * No pixel id / PostHog key configured -> that provider never loads, no error.
  */
+import { CONSENT_UI } from './consent-ui';
 import { BRAND } from '../brand';
 import {
   EBDA_CONSENT_COOKIE,
@@ -96,22 +97,7 @@ export function posthogAssetsHost(apiHost: string): string {
   return apiHost.replace('.i.posthog.com', '-assets.i.posthog.com');
 }
 
-const COPY = {
-  ar: {
-    text: 'بنستخدم كوكيز عشان نعرف الناس بتوصل لـ ابدأ ستور منين وإعلاناتنا شغالة ولا لأ. توافق أو ترفض، والموقع بيشتغل زي بعضه في الحالتين.',
-    accept: 'موافق',
-    decline: 'لا، شكرًا',
-    more: 'تفاصيل أكتر',
-    label: 'إعدادات الكوكيز',
-  },
-  en: {
-    text: 'We use cookies to learn where visitors find Ebda Store and whether our ads work. Accept or decline: the site works the same either way.',
-    accept: 'Accept',
-    decline: 'Decline',
-    more: 'Learn more',
-    label: 'Cookie settings',
-  },
-} as const;
+const COPY = CONSENT_UI;
 
 export function createTracker(config: TrackerConfig, win: Window): Tracker {
   const doc = win.document;
@@ -282,24 +268,31 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
     bar.setAttribute('role', 'dialog');
     bar.setAttribute('aria-label', t.label);
     bar.dir = lang === 'ar' ? 'rtl' : 'ltr';
-    // Phones (<= 600px) get a compact bar: it is fixed over the content, so every pixel of height hides the page
-    // (Ruling MKT-IMPECCABLE-3). Same copy and the same 44px buttons, side by side instead of wrapped.
+    // COOKIE-UI-1: the same bar as the store (words and order from consent-ui.ts). On a phone it is one compact
+    // bar (<= 12% of the viewport): a short sentence with the Customize link, then Reject and Accept as equals.
     const compact =
       typeof win.matchMedia === 'function' && win.matchMedia('(max-width:600px)').matches;
     bar.style.cssText =
       `position:fixed;inset-inline:${compact ? 8 : 16}px;bottom:${compact ? 8 : 16}px;z-index:2147483000;max-width:640px;margin-inline:auto;` +
       `background:${BRAND.colors.night};color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:12px;` +
-      `padding:${compact ? '10px 12px' : '16px'};font:${compact ? '13px/1.5' : '14px/1.6'} ${BRAND.fonts.stacks.arabic};box-shadow:0 8px 32px rgba(0,0,0,.4)`;
+      `padding:${compact ? '8px 12px' : '16px'};font:${compact ? '12px/1.5' : '14px/1.6'} ${BRAND.fonts.stacks.arabic};box-shadow:0 8px 32px rgba(0,0,0,.4)`;
+    const linkCss = `color:${BRAND.colors.gold};text-decoration:underline;text-underline-offset:3px;background:none;border:0;padding:0;font:inherit;cursor:pointer`;
     const p = doc.createElement('p');
-    p.style.margin = compact ? '0 0 8px' : '0 0 12px';
+    p.style.margin = compact ? '0 0 6px' : '0 0 12px';
     p.textContent = `${t.text} `;
     if (config.privacyUrl) {
       const a = doc.createElement('a');
       a.href = config.privacyUrl;
       a.textContent = t.more;
-      a.style.color = BRAND.colors.gold;
+      a.style.cssText = linkCss;
       p.appendChild(a);
+      p.append(' · ');
     }
+    const custom = doc.createElement('button');
+    custom.type = 'button';
+    custom.textContent = t.customize;
+    custom.style.cssText = linkCss;
+    p.appendChild(custom);
     const row = doc.createElement('div');
     row.style.cssText = compact ? 'display:flex;gap:8px' : 'display:flex;gap:8px;flex-wrap:wrap';
     // The bar is fixed over the page, so page chrome that reaches the bottom of the screen (the
@@ -314,24 +307,44 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
     // Keeps the value true when the bar wraps differently (rotation, a font arriving late).
     const Observer = (win as Window & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
     const sizeWatch = typeof Observer === 'function' ? new Observer(publishHeight) : null;
-    const mk = (label: string, primary: boolean, choice: boolean) => {
+    const answer = (analytics: boolean, marketing: boolean) => {
+      setConsent({ analytics, marketing });
+      bar.remove();
+      sizeWatch?.disconnect();
+      root.style.removeProperty('--ebda-consent-h');
+    };
+    // Reject and Accept are the SAME control: same size, same fill, one tap each.
+    const btnCss = `min-height:44px;padding:0 ${compact ? 10 : 18}px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;${compact ? 'flex:1;' : ''}background:#efe9dd;color:${BRAND.colors.night};border:0`;
+    const mk = (label: string, choice: boolean) => {
       const b = doc.createElement('button');
       b.type = 'button';
       b.textContent = label;
-      b.style.cssText =
-        `min-height:44px;padding:0 ${compact ? 10 : 18}px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;${compact ? 'flex:1;' : ''}` +
-        (primary
-          ? `background:${BRAND.colors.gold};color:${BRAND.colors.night};border:0`
-          : `background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4)`);
-      b.addEventListener('click', () => {
-        setConsent({ analytics: choice, marketing: choice });
-        bar.remove();
-        sizeWatch?.disconnect();
-        root.style.removeProperty('--ebda-consent-h');
-      });
+      b.style.cssText = btnCss;
+      b.addEventListener('click', () => answer(choice, choice));
       return b;
     };
-    row.append(mk(t.accept, true, true), mk(t.decline, false, false));
+    row.append(mk(t.reject, false), mk(t.accept, true));
+    // Customize swaps the two buttons for one choice per purpose and a save button.
+    custom.addEventListener('click', () => {
+      const box = (label: string) => {
+        const l = doc.createElement('label');
+        l.style.cssText = 'display:flex;align-items:center;gap:8px;min-height:44px;flex:1 0 100%';
+        const i = doc.createElement('input');
+        i.type = 'checkbox';
+        i.style.cssText = 'width:20px;height:20px;accent-color:' + BRAND.colors.gold;
+        l.append(i, label);
+        return { l, i };
+      };
+      const an = box(t.analytics);
+      const mkt = box(t.marketing);
+      const save = doc.createElement('button');
+      save.type = 'button';
+      save.textContent = t.save;
+      save.style.cssText = btnCss + ';flex:1 0 100%';
+      save.addEventListener('click', () => answer(an.i.checked, mkt.i.checked));
+      row.replaceChildren(an.l, mkt.l, save);
+      custom.remove();
+    });
     bar.append(p, row);
     doc.body.appendChild(bar);
     publishHeight();

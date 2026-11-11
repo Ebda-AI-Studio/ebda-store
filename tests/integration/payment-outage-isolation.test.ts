@@ -57,10 +57,15 @@ const idleTxAtGatewayCall: number[] = [];
 let paymobServer: ServedStub;
 let kashierServer: ServedStub;
 
+// The CI Postgres is SHARED with every other integration file running in parallel, so counting every `ebda_app`
+// session that is `idle in transaction` also counted other files' open transactions (it failed #529's run). This
+// file's own request connections carry a unique application_name and the count is scoped to it.
+const APP_NAME = `payment-outage-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 function appUrl(): string {
   const u = new URL(OWNER_URL);
   u.username = 'ebda_app';
   u.password = APP_PASSWORD;
+  u.searchParams.set('application_name', APP_NAME);
   return u.toString();
 }
 const asApp = <T>(fn: () => Promise<T>) =>
@@ -199,11 +204,12 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
   const checkoutConfig = (s: { id: string }) =>
     asApp(async () => http().get('/api/v1/payments/config').set('x-store-id', s.id));
 
-  /** How many `ebda_app` sessions are sitting `idle in transaction` right now. */
+  /** How many of THIS file's `ebda_app` sessions (by application_name) are `idle in transaction` right now. */
   const idleAppTransactions = async (): Promise<number> => {
     const rows = await owner.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*)::bigint AS n FROM pg_stat_activity
-      WHERE usename = 'ebda_app' AND datname = current_database() AND state = 'idle in transaction'`;
+      WHERE usename = 'ebda_app' AND application_name = ${APP_NAME}
+        AND datname = current_database() AND state = 'idle in transaction'`;
     return Number(rows[0]?.n ?? 0);
   };
 

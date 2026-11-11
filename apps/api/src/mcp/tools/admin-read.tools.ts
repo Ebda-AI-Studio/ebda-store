@@ -200,7 +200,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
           featured: args.featured,
           page: args.page ?? 1,
           limit: args.limit ?? 25,
-        } as any)
+        } as Parameters<typeof ProductService.list>[1])
       );
       return ok({
         products: (result.products ?? []).map(productSummary),

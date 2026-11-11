@@ -149,23 +149,23 @@ describe('banner', () => {
     t.showBanner();
     const bar = document.getElementById('ebda-consent')!;
     expect(bar.dir).toBe('rtl');
-    expect(bar.textContent).toContain('كوكيز');
-    expect(bar.textContent).toContain('موافق');
+    expect(bar.textContent).toContain('ملفات');
+    expect(bar.textContent).toContain('قبول');
     expect(bar.querySelector('a')!.getAttribute('href')).toBe('/privacy/');
-    [...bar.querySelectorAll('button')].find(b => b.textContent === 'موافق')!.click();
+    [...bar.querySelectorAll('button')].find(b => b.textContent === 'قبول')!.click();
     expect(document.getElementById('ebda-consent')).toBeNull();
     expect(t.consent()).toEqual({ v: 1, analytics: true, marketing: true });
   });
-  it('English page gets English copy; Decline stores a refusal', () => {
+  it('English page gets English copy; Reject all stores a refusal', () => {
     document.documentElement.lang = 'en';
     const t = createTracker(CFG, window);
     t.showBanner();
     const bar = document.getElementById('ebda-consent')!;
     expect(bar.dir).toBe('ltr');
-    [...bar.querySelectorAll('button')].find(b => b.textContent === 'Decline')!.click();
+    [...bar.querySelectorAll('button')].find(b => b.textContent === 'Reject all')!.click();
     expect(t.consent()).toEqual({ v: 1, analytics: false, marketing: false });
   });
-  it('is compact on a phone (MKT-IMPECCABLE-3): tighter padding, 13px type, 44px buttons side by side', () => {
+  it('is compact on a phone (MKT-IMPECCABLE-3): tighter padding, 12px type, 44px buttons side by side', () => {
     const real = window.matchMedia;
     window.matchMedia = ((q: string) => ({
       matches: q === '(max-width:600px)',
@@ -173,9 +173,9 @@ describe('banner', () => {
     try {
       createTracker(CFG, window).showBanner();
       const bar = document.getElementById('ebda-consent')!;
-      expect(bar.style.padding).toBe('10px 12px');
+      expect(bar.style.padding).toBe('8px 12px');
       expect(bar.style.bottom).toBe('8px');
-      const buttons = [...bar.querySelectorAll('button')];
+      const buttons = [...(bar.querySelector('div') as HTMLElement).querySelectorAll('button')];
       expect(buttons).toHaveLength(2);
       for (const b of buttons) {
         expect(b.style.minHeight).toBe('44px');
@@ -185,6 +185,26 @@ describe('banner', () => {
     } finally {
       window.matchMedia = real;
     }
+  });
+  it('COOKIE-UI-1: Reject and Accept are equals; Customize is a link-style button that reveals per-purpose choices', () => {
+    const t = createTracker(CFG, window);
+    t.showBanner();
+    const bar = document.getElementById('ebda-consent')!;
+    const [reject, accept] = [
+      ...(bar.querySelector('div') as HTMLElement).querySelectorAll('button'),
+    ];
+    expect(reject!.style.cssText).toBe(accept!.style.cssText);
+    const custom = [...bar.querySelectorAll('p button')].find(
+      b => b.textContent === 'تخصيص'
+    ) as HTMLButtonElement;
+    expect(custom).toBeTruthy();
+    custom.click();
+    const boxes = [...bar.querySelectorAll('input[type=checkbox]')] as HTMLInputElement[];
+    expect(boxes).toHaveLength(2);
+    boxes[0]!.checked = true;
+    [...bar.querySelectorAll('button')].find(b => b.textContent === 'حفظ اختياراتي')!.click();
+    expect(document.getElementById('ebda-consent')).toBeNull();
+    expect(t.consent()).toEqual({ v: 1, analytics: true, marketing: false });
   });
   it('keeps the roomy desktop bar when the viewport is wide', () => {
     createTracker(CFG, window).showBanner();
@@ -201,7 +221,7 @@ describe('banner', () => {
       return { height: this.id === 'ebda-consent' ? 132.4 : 0 } as DOMRect;
     };
     try {
-      for (const label of ['موافق', 'لا، شكرًا']) {
+      for (const label of ['قبول', 'رفض الكل']) {
         clearCookies();
         expect(root.style.getPropertyValue('--ebda-consent-h')).toBe('');
         createTracker(CFG, window).showBanner();
@@ -244,7 +264,7 @@ describe('banner', () => {
       height = 152; // the copy wrapped onto one more line
       fire();
       expect(root.style.getPropertyValue('--ebda-consent-h')).toBe('152px');
-      bar.querySelector('button')!.click();
+      [...(bar.querySelector('div') as HTMLElement).querySelectorAll('button')][0]!.click();
       expect(seen.disconnected).toBe(true);
       expect(root.style.getPropertyValue('--ebda-consent-h')).toBe('');
     } finally {
