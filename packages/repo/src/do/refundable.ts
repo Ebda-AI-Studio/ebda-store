@@ -132,3 +132,77 @@ function exceeds(b: RefundableBalance, amount: number): MoneyError {
     { paid: b.paid, refunded: b.refunded, refundable: Math.max(0, b.refundable), requested: amount }
   );
 }
+
+// ---------------------------------------------------------------- trimmed give-backs (#659 review B2)
+
+/** A money fact the Worker must alert on after the operation commits (drained by `runMoneyOp`). */
+export interface MoneyAlert {
+  kind: string;
+  orderId: string;
+  body: string;
+  context?: Record<string, unknown>;
+}
+
+// The StoreDO runs one operation at a time, synchronously: this list only ever holds the CURRENT operation's alerts.
+// `runMoneyOp` empties it before the operation and hands it out only if the operation committed.
+const pendingAlerts: MoneyAlert[] = [];
+
+export function takeMoneyAlerts(): MoneyAlert[] {
+  return pendingAlerts.splice(0);
+}
+
+export const WALLET_TRIM_REASON = 'wallet_giveback_trimmed';
+
+/**
+ * The ceiling trimmed a wallet give-back the plan said the customer is owed (`planned`) to what the order had left
+ * (`credited`). Never silent: a `refund_reconcile_review` payment event on the order's newest payment (the merchant sees
+ * it on the order page's payment timeline, with planned / credited / short), and a store-scoped platform alert after
+ * the commit, so the difference is settled by a person.
+ */
+export function recordTrimmedCredit(
+  db: SyncSql,
+  a: {
+    storeId: string;
+    orderId: string;
+    planned: number;
+    credited: number;
+    source: 'order_reversal' | 'return_wallet_share';
+    now: number;
+  }
+): void {
+  const short = a.planned - a.credited;
+  if (short <= 0) return;
+  const details = {
+    reason: WALLET_TRIM_REASON,
+    source: a.source,
+    planned: a.planned,
+    credited: a.credited,
+    short,
+  };
+  const p = db.all(
+    `SELECT p.id, p.provider FROM payments p JOIN orders o ON o.id = p.order_id
+      WHERE o.store_id = ?1 AND p.order_id = ?2 ORDER BY p.created_at DESC, p.id DESC LIMIT 1`,
+    [a.storeId, a.orderId]
+  )[0];
+  if (p)
+    db.run(
+      `INSERT INTO payment_events (id, payment_id, store_id, order_id, event_type, from_status, to_status, provider, provider_payload, details, triggered_by_user_id, occurred_at, created_at)
+       VALUES (?, ?, ?, ?, 'refund_reconcile_review', NULL, NULL, ?, NULL, ?, NULL, ?, ?)`,
+      [
+        crypto.randomUUID(),
+        p.id,
+        a.storeId,
+        a.orderId,
+        p.provider ?? null,
+        JSON.stringify(details),
+        a.now,
+        a.now,
+      ]
+    );
+  pendingAlerts.push({
+    kind: WALLET_TRIM_REASON,
+    orderId: a.orderId,
+    body: `Order ${a.orderId}: a wallet give-back of ${a.planned} piastres was trimmed to ${a.credited} because the order's refunds already reach what the customer paid. ${short} piastres need a person to settle with the customer.`,
+    context: details,
+  });
+}

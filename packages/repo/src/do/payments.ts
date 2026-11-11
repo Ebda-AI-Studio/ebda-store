@@ -1381,6 +1381,25 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
   // only a COMPLETED refund is accounted: a pending / failed notice must not file its id (that would make the real, later
   // completed refund look already counted and it would never be added)
   const s = completed ? s0 : { ...s0, accountedThisEvent: false };
+  // #659 review B1: raise and record the provider's amount on the payment FIRST, in this same section, so the order
+  // reversal below (its wallet give-back reads the order's one refundable balance) sees the money that already left.
+  const next = {
+    ...meta,
+    refundId: r.refundId,
+    ...(s.accountedThisEvent || (completed && s.absorbedClaimId && !fawryAmountless)
+      ? { [REFUND_EVENT_IDS_KEY]: appendRefundEventId(meta, r.refundId) }
+      : {}),
+    refundStatus: r.status,
+    [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(meta, r.refundId, r.status),
+    refundReference: r.refundReference ?? (meta.refundReference as string | undefined) ?? null,
+    refundStatusUpdatedAt: new Date(now).toISOString(),
+  };
+  const raise = completed && p.status !== 'refunded';
+  const newStatus = raise ? (s.isFullRefund ? 'refunded' : 'partially_refunded') : p.status;
+  db.run(
+    'UPDATE payments SET metadata = ?, status = ?, refunded_amount = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(next), newStatus, raise ? s.settledTotal : p.refunded_amount, now, p.id]
+  );
   const orderAlreadyReversed = o.status === 'refunded';
   if (completed && !orderAlreadyReversed && s.isFullRefund) {
     // The gateway SAYS the money went back: that is an external fact, recorded and never rejected (CF-PAY-1). An order
@@ -1434,23 +1453,6 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
       now,
     });
   }
-  const next = {
-    ...meta,
-    refundId: r.refundId,
-    ...(s.accountedThisEvent || (completed && s.absorbedClaimId && !fawryAmountless)
-      ? { [REFUND_EVENT_IDS_KEY]: appendRefundEventId(meta, r.refundId) }
-      : {}),
-    refundStatus: r.status,
-    [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(meta, r.refundId, r.status),
-    refundReference: r.refundReference ?? (meta.refundReference as string | undefined) ?? null,
-    refundStatusUpdatedAt: new Date(now).toISOString(),
-  };
-  const raise = completed && p.status !== 'refunded';
-  const newStatus = raise ? (s.isFullRefund ? 'refunded' : 'partially_refunded') : p.status;
-  db.run(
-    'UPDATE payments SET metadata = ?, status = ?, refunded_amount = ?, updated_at = ? WHERE id = ?',
-    [JSON.stringify(next), newStatus, raise ? s.settledTotal : p.refunded_amount, now, p.id]
-  );
   addPaymentEvent(db, {
     storeId: input.storeId,
     paymentId: p.id,

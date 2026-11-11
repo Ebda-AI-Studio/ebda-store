@@ -20,6 +20,7 @@ import {
 } from './loyalty';
 import { placeOrder, quoteOrder, type CheckoutInput } from './checkout';
 import { cancelOrder, refundOrder } from './refund';
+import { takeMoneyAlerts } from './refundable';
 import {
   applyPaymentEventSync,
   beginRefund,
@@ -1179,7 +1180,17 @@ export function runMoneyOp(
     throw new MoneyError('MONEY_OP_NOT_ALLOWED', `money operation ${op}`, 400);
   if (!args || typeof args !== 'object' || Array.isArray(args))
     throw new MoneyError('BAD_ARGS', 'args', 400);
-  return runKeyed(db, TABLE, op, args, key, now, () =>
-    OPS[op as MoneyOpName](db, storeId, args as Args)
-  );
+  // money alerts raised inside the operation (a trimmed give-back, #659 B2) leave the DO only with a COMMITTED result
+  takeMoneyAlerts();
+  try {
+    return runKeyed(db, TABLE, op, args, key, now, () => {
+      const out = OPS[op as MoneyOpName](db, storeId, args as Args);
+      const moneyAlerts = takeMoneyAlerts();
+      return moneyAlerts.length > 0 && out && typeof out === 'object' && !Array.isArray(out)
+        ? { ...(out as Record<string, unknown>), moneyAlerts }
+        : out;
+    });
+  } finally {
+    takeMoneyAlerts();
+  }
 }

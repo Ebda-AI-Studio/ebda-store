@@ -11,6 +11,7 @@ import {
   assertRefundable,
   assertWithinPaid,
   MANUAL_RETURN_METHODS,
+  recordTrimmedCredit,
   refundableBalance,
 } from './refundable';
 import {
@@ -1278,8 +1279,20 @@ export function finishReturn(
     // the gateway already paid its leg (an external fact, never refused): the wallet share is capped at what is left
     const walletShare =
       plan.walletShare > 0 && plan.orderId
-        ? Math.min(plan.walletShare, refundableBalance(db, a.storeId, plan.orderId).refundable)
+        ? Math.max(
+            0,
+            Math.min(plan.walletShare, refundableBalance(db, a.storeId, plan.orderId).refundable)
+          )
         : 0;
+    if (plan.orderId && walletShare < plan.walletShare)
+      recordTrimmedCredit(db, {
+        storeId: a.storeId,
+        orderId: plan.orderId,
+        planned: plan.walletShare,
+        credited: walletShare,
+        source: 'return_wallet_share',
+        now,
+      });
     if (walletShare > 0 && plan.orderId) {
       applyWalletEntry(db, {
         storeId: a.storeId,

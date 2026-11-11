@@ -14,9 +14,13 @@ completed cash / bank_transfer / manual returns + merchant-booked partial amount
 partial store credit, `reverseOrderPayment` (wallet give-back capped), and the new
 `recordManualRefund` DO op (the Prisma version cannot run in the Worker since NZ-D23; it now
 records only what is left). Decisions inside it: (1) provider facts (completeRefund, settle
-webhooks) are never refused, they are recorded and flagged `review`; (2) a gateway return's
-wallet share, credited after the provider already paid, is capped at what is left rather than
-refused; (3) a partial-refund booking is recognised as provider money (already in
+webhooks) are never refused, they are recorded and flagged `review`; (2) a wallet give-back the ceiling cuts short (a gateway return's wallet share, or the
+whole-order wallet reversal) is credited only up to what is left, and the shortfall is never
+silent: a `refund_reconcile_review` payment event (planned / credited / short, shown on the
+order's payment timeline in en + ar) and a store-scoped P1 `sendAlert` after the operation
+commits (review B2); a provider's full-refund webhook raises `payments.refunded_amount` BEFORE
+the order reversal in the same section, so that wallet cap reads the money already gone (review
+B1); (3) a partial-refund booking is recognised as provider money (already in
 `payments.refunded_amount`) from the data: its refundKey is a provider refund id in that
 order's `payments.metadata.refundEventIds` (or it carries `external: true`), so events written
 before this change are classified exactly, with no backfill. Evidence:

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { openSqlite } from './diff-harness';
 import { nodeSyncSql } from './node-sync-sql';
 import { ensureMoneyOpsSchema, runMoneyOp } from '../src/do/money-ops';
+import { ensurePaymentSchema } from '../src/do/payments';
 import { refundableBalance } from '../src/do/refundable';
 import { MoneyError } from '../src/do/sync-sql';
 
@@ -14,6 +15,7 @@ function fixture(over: { walletAmount?: number; provider?: string; status?: stri
   const raw = openSqlite();
   const db = nodeSyncSql(raw);
   ensureMoneyOpsSchema(db);
+  ensurePaymentSchema(db);
   const x = (sql: string, ...p: unknown[]) => raw.prepare(sql).run(...(p as never[]));
   const one = (sql: string, ...p: unknown[]) => raw.prepare(sql).get(...(p as never[])) as any;
   const wallet = over.walletAmount ?? 0;
@@ -264,5 +266,99 @@ describe('refundableBalance: one ceiling, every channel (#624)', () => {
     // a merchant-booked amount (no provider refund id behind it) still counts
     f.op('refundBook', { orderId: 'o1', amount: 1000, refundKey: 'cash-1' });
     expect(refundableBalance(f.db, 's1', 'o1').refundable).toBe(TOTAL - 6000);
+  });
+
+  it('REVIEW B1: a dashboard full-refund webhook after a cash return never also hands back the wallet share (was 30780 on 25650)', () => {
+    const f = fixture({ walletAmount: 4000 }); // 4000 wallet + 21650 card
+    const r = f.returnFor([['i2', 'p2', 1]]);
+    f.op('returnClaim', { returnId: r, refundMethod: 'cash' });
+    f.op('returnFinish', { returnId: r, refundMethod: 'cash', userId: 'u1' });
+    expect(f.one(`SELECT refund_amount a FROM returns WHERE id = ?`, r).a).toBe(5130);
+    const out = f.op('paymentWebhook', {
+      input: {
+        storeId: 's1',
+        provider: 'paymob',
+        providerRef: 'pay1',
+        eventId: 'rw-dash-1',
+        kind: 'refund',
+        refund: { refundId: 'dash-1', status: 'completed', amount: TOTAL - 4000 },
+      },
+    });
+    // the provider's 21650 is an outside fact and is recorded; the 4000 wallet give-back is money WE start: not paid
+    expect(f.one(`SELECT refunded_amount r FROM payments WHERE id = 'pay1'`).r).toBe(TOTAL - 4000);
+    expect(
+      f.one(
+        `SELECT COALESCE(SUM(amount), 0) s FROM wallet_transactions WHERE order_id = 'o1' AND amount > 0`
+      ).s
+    ).toBe(0);
+    // ... and the trim is recorded for review and alerted (B2)
+    const ev = f.one(
+      `SELECT details FROM payment_events WHERE order_id = 'o1' AND event_type = 'refund_reconcile_review'`
+    );
+    expect(JSON.parse(ev.details)).toMatchObject({
+      reason: 'wallet_giveback_trimmed',
+      source: 'order_reversal',
+      planned: 4000,
+      credited: 0,
+      short: 4000,
+    });
+    expect(out.moneyAlerts).toEqual([
+      expect.objectContaining({ kind: 'wallet_giveback_trimmed', orderId: 'o1' }),
+    ]);
+  });
+
+  it('REVIEW B2: a gateway return whose wallet share is cut by the ceiling records the shortfall and alerts', () => {
+    const f = fixture({ walletAmount: 4000 });
+    const r = f.returnFor([['i2', 'p2', 1]]);
+    const plan = f.op('returnClaim', { returnId: r, refundMethod: 'original' });
+    expect(plan.walletShare).toBeGreaterThan(0);
+    const claim = f.op('refundBegin', {
+      paymentId: 'pay1',
+      amount: plan.partial.gatewayShare,
+      refundKey: `return:${r}`,
+      itemLevel: true,
+    });
+    f.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-ret' });
+    // an earlier give-back (recorded elsewhere) has used up all but 100 of the order
+    const left = refundableBalance(f.db, 's1', 'o1').refundable;
+    f.x(
+      `INSERT INTO wallet_transactions (id, store_id, wallet_id, customer_id, amount, balance_after, type, idempotency_key, order_id, created_at)
+       VALUES ('wt-other', 's1', 'w1', 'cust', ?, 0, 'refund_credit', 'return-credit:other', 'o1', ?)`,
+      left - 100,
+      Date.now()
+    );
+    const done = f.op('returnFinish', { returnId: r, refundMethod: 'original', userId: 'u1' });
+    expect(done.walletShareCredited).toBe(100);
+    expect(f.paidOut()).toBeLessThanOrEqual(TOTAL);
+    const ev = f.one(
+      `SELECT details FROM payment_events WHERE order_id = 'o1' AND event_type = 'refund_reconcile_review'`
+    );
+    expect(JSON.parse(ev.details)).toMatchObject({
+      source: 'return_wallet_share',
+      planned: plan.walletShare,
+      credited: 100,
+    });
+    expect(done.moneyAlerts).toHaveLength(1);
+  });
+
+  it('REVIEW B2: an alert raised inside an operation that rolls back never leaves the DO', () => {
+    const f = fixture({ walletAmount: 4000 });
+    // a give-back recorded elsewhere leaves 2650 of the order; the full reversal plans 4000 back to the wallet
+    f.x(
+      `INSERT INTO wallet_transactions (id, store_id, wallet_id, customer_id, amount, balance_after, type, idempotency_key, order_id, created_at)
+       VALUES ('wt-x', 's1', 'w1', 'cust', 23000, 0, 'refund_credit', 'manual-credit:x', 'o1', ?)`,
+      Date.now()
+    );
+    // a failing write after the trim inside the same section
+    f.x(
+      `CREATE TRIGGER boom BEFORE INSERT ON wallet_transactions WHEN NEW.type = 'order_payment_reversal' BEGIN SELECT RAISE(ABORT, 'boom'); END`
+    );
+    expect(() => f.op('refundBook', { orderId: 'o1' })).toThrow(/boom/);
+    f.x('DROP TRIGGER boom');
+    expect(
+      f.one(`SELECT count(*) n FROM payment_events WHERE event_type = 'refund_reconcile_review'`).n
+    ).toBe(0);
+    const out = f.op('refundBook', { orderId: 'o1' });
+    expect(out.moneyAlerts).toHaveLength(1); // the committed retry alerts once, not the rolled-back attempt as well
   });
 });

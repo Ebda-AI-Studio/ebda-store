@@ -1,7 +1,7 @@
 import { settleFiscalOnReversal } from './fiscal';
 import { postWalletMovementJournal } from './ledger';
 import { reverseEarnedPointsFromOrder, reverseRedeemedPointsFromOrder } from './loyalty';
-import { refundableBalance } from './refundable';
+import { recordTrimmedCredit, refundableBalance } from './refundable';
 import { recordMovement, restock } from './stock';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -201,10 +201,18 @@ export function reverseOrderPayment(
     )[0].s as number;
     // #624: never give back more than the order's one refundable balance leaves (a card / InstaPay / cash refund of the
     // same order may already have covered part of the wallet share)
-    const remaining = Math.min(
-      -(spend.amount as number) - returned - credited,
-      refundableBalance(db, a.storeId, a.orderId).refundable
-    );
+    const planned = -(spend.amount as number) - returned - credited;
+    const remaining = Math.min(planned, refundableBalance(db, a.storeId, a.orderId).refundable);
+    // a trimmed give-back is recorded for review + alerted, never silent (#659 review B2)
+    if (planned > 0 && remaining < planned)
+      recordTrimmedCredit(db, {
+        storeId: a.storeId,
+        orderId: a.orderId,
+        planned,
+        credited: Math.max(0, remaining),
+        source: 'order_reversal',
+        now: a.now ?? Date.now(),
+      });
     if (remaining <= 0) return null;
     const r = applyWalletEntry(db, {
       storeId: a.storeId,

@@ -6432,8 +6432,10 @@
         "expired": "Payment expired",
         "cancelled": "Payment cancelled",
         "completed": "Payment completed",
-        "failed": "Payment failed"
-      }
+        "failed": "Payment failed",
+        "refund_reconcile_review": "Refund needs review"
+      },
+      "walletTrimmed": "A wallet give-back of {planned} was cut to {credited}, because this order's refunds already reach what the customer paid. Settle the remaining {short} with the customer yourself."
     },
     "colorField": {
       "tokens": {
@@ -10581,7 +10583,8 @@
         "cancel": "Cancel",
         "done": "Refund recorded.",
         "duplicate": "This refund reference was already recorded. Nothing changed.",
-        "failed": "We could not record this refund."
+        "failed": "We could not record this refund.",
+        "exceedsOrder": "This would refund more than the customer paid for the order. Earlier refunds (card, InstaPay, store credit or a cash return) already cover part of it, so nothing was recorded."
       }
     }
   },
