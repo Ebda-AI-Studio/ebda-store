@@ -16,6 +16,46 @@ CI-HOSTED-1 scheduled no-op is retired).
 > fixture/helper or anything under `packages/database` runs the whole tier. Outputs `integration` and `integration_paths`
 > feed the `Integration Tests` job's `if` and its vitest targets. #227 merged four edited integration tests that never ran.
 
+## The Mac runner (Ruling CI-MAC-RUNNER-1, 2026-11-11)
+
+The org's 50,000 hosted minutes ran out on 2026-11-11 (ebda-store used 49,451) and paid add-ons are capped at $0, so
+Ahmad chose to run CI on his Mac. **`EBDA_RUNS_ON='["self-hosted","ebda-mac"]'`** (repo variable on ebda-store,
+ebda-whatsapp, ebda-foundation) routes every job to the org runners `ebda-mac-1` / `ebda-mac-2` (runner group
+`ebda-mac`: those three private repos only, no public repos; org fork-PR workflows for private repos are off).
+Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
+
+- **Runner install**: `~/actions-runner-ebda` and `~/actions-runner-ebda-2` (actions/runner v2.338.2, sha256 verified),
+  launchd user agents `actions.runner.Ebda-AI-Studio.ebda-mac-{1,2}` (`./svc.sh status|stop|start` in each dir). Their
+  `.path` is a clean Homebrew PATH (Homebrew bash 5 first: `/bin/bash` 3.2 breaks `"${arr[@]}"` under `set -u`); `.env` sets
+  `PLAYWRIGHT_BROWSERS_PATH=~/.ebda-ci/ms-playwright`, a browser cache ONLY the runners use (never the Actions cache, never
+  `~/Library/Caches/ms-playwright`: `playwright install` reads every install registered there, and one under `~/Desktop`
+  made the launchd runner block on a macOS privacy prompt for 15+ min, 2026-11-11) and `EBDA_NM_STORE=~/.ebda-ci/node-modules` (the npm-ci-reuse store, shared by both runners). Two instances, not
+  more: other orgs' runners on the same Mac count toward a host total of 3.
+- **Databases**: macOS runners cannot start service containers, so `services:` images are `''` when `EBDA_RUNS_ON`
+  names `ebda-mac` (the runner then skips the service). `scripts/ci/ci-services.sh up` gives the job its URLs
+  (`CI_PG_URL`, `CI_PG_APP_URL`, `CI_REDIS_URL`): on Linux from the service ports; on the Mac a database of its own on the
+  host's ONE Homebrew Postgres 17 + pgvector (shared with other repos), named `ebda_store_ci_<run>_<attempt>_<job>_<runner>`
+  and dropped by `ci-services.sh down` (`if: always()`); `up` also drops this repo's CI databases older than 3 h. Redis is a
+  logical DB reserved for Ebda CI on this host per runner instance (14 / 15; other tools use 0, 9, 11, 13). Host deviation: brew ships pgvector 0.8.7, CI's container pins 0.8.0.
+- **Heavy jobs one at a time**: the test jobs bind fixed ports (API 4000, web 3000/3001, workerd 8811-8813) and take most of
+  the 16 GB, so each heavy job (unit shards, integration, e2e, builder e2e, worker dry-run, workerd smoke/integration,
+  mutation) holds the host-wide lock `~/.claude/locks/heavy-test.lock` (`scripts/ci/heavy-lock.sh`, the same file
+  `host-lock.sh` uses for local suites) and releases it in its last `if: always()` step. Light jobs (changes, guards, lint,
+  typecheck, app builds, gitleaks, blast-radius) run in parallel on the two runners.
+- **Ruling CI-MAC-ROLE-1** - on the Mac the workflow never `ALTER`s the cluster-wide `ebda_app` role
+  (`ci-services.sh app-login` only checks it can log in, NOT superuser, NOT bypassrls); the host's pg_hba is `trust` on
+  localhost, so the password is not what authenticates. The integration suite's own `tests/helpers/app-role-login.ts` still
+  sets the same `ci-only-app-pw` the local dev scripts use (no other repo on this host uses `ebda_app`; GCC uses `horse_app`).
+  Cost if wrong: a different `ebda_app` password set by another tool on this host would be overwritten during an Ebda run.
+- **Runner security** - the Mac also runs the main-only deploy workflows, so it holds the Cloudflare deploy token while
+  same-repo PR jobs run on the same machine. Deploy secrets live only in the `production` environment, which accepts
+  deployments from `main` only (branch policy set 2026-11-11), so a PR-triggered job cannot read them even if a PR edits
+  a workflow. Residuals: an org secret visible to all workflows (`CLAUDE_CODE_OAUTH_TOKEN`) is readable by any same-repo PR
+  workflow, and a PR job can leave files on the host (node_modules store, npm cache) that a later main job reads.
+- Fixed `/tmp` paths are banned in every workflow and in the AI review/audit scripts (`$RUNNER_TEMP` instead; the AI
+  review's `CLAUDE_OUTPUT` and its CLI install live there, never `npm install --global`); gitleaks installs the darwin binary into
+  `$RUNNER_TEMP/bin` without sudo. Pinned by `tests/unit/ci-lean-structure.test.ts` ("the Mac runner shape").
+
 ## Per-PR runner routing (Ruling CI-ROUTE-1)
 
 A pull request labelled `ci-umbra` runs every job of every PR workflow on the Umbra runners; unlabelled PRs and all
