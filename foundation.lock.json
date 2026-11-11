@@ -1,13 +1,13 @@
 {
   "tag": "v0.1.0",
-  "commit": "151a6b427e3f9907680fad9b215f703709712404",
+  "commit": "c5bb667ee10250fe29f3d142e2fc88c8b5ef02a5",
   "dir": "packages/shared/src/foundation",
   "parity": "tests/unit/foundation-parity.test.ts",
   "files": {
     "packages/shared/src/foundation/brand.ts": "1df5441d2c0d727c75de9c97322bc6c2580e9f6ef0606145c47d5156f57d2bc4",
     "packages/shared/src/foundation/buyer.ts": "2d5434657f733827423796f5a3782ca1d6794d0e9e802332cf0f9a6778e455e8",
     "packages/shared/src/foundation/guards.ts": "46b7a67097ff6f7eb49246a01738a4845096e1eb01c828cbd73b48b02db801c6",
-    "packages/shared/src/foundation/package.json": "058a8eae4c2b4337ea655d8c0e7ae5fed5f704cc4974c423b2eae6a03e1b0a17",
+    "packages/shared/src/foundation/package.json": "0b66cdf7ec087deae30d4e22077d2777ecd33639de045df2d6dc128192becbf7",
     "packages/shared/src/foundation/phone.ts": "30d8982b7094b392d00795685fd7cb5d4f0b482d6ff564c7aec40d6eb67f5f97",
     "packages/shared/src/foundation/slugs.ts": "173ffba46dd5891b8ba19b4387274e5fb235914d3254cb8fa8b8e98087350c9c",
     "packages/shared/src/foundation/text.ts": "4c7f5a933b0054129b1bb5a23127ab4a635dab6ee2fbac66c5c2312ff16c29fb",
