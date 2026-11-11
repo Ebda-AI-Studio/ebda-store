@@ -597,6 +597,46 @@ describe('D1 stores vs DO store_profile mirror (template / look / name / nameAr,
     expect(r.corrected).toEqual([]);
   });
 
+  it('a merchant edit made mid-tick is never overwritten with the older D1 value, and raises no alert', async () => {
+    const pushed: Array<Record<string, unknown>> = [];
+    const alerts: string[] = [];
+    let reads = 0;
+    // First DO read (initial compare): DO is behind D1 'qamar'. Before the repair the merchant switches D1 to 'souq' and
+    // the DO copy converges to it (the live write path), so the re-read finds nothing to repair.
+    const r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => {
+        reads++;
+        if (reads === 1) return { ...inSync, template: 'jasmine' };
+        sqlite.prepare("UPDATE stores SET template='souq' WHERE id=?").run(A);
+        return { ...inSync, template: 'souq' };
+      },
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: t => void alerts.push(t),
+    });
+    expect(pushed).toEqual([]);
+    expect(r.corrected).toEqual([]);
+    expect(alerts).toEqual([]);
+  });
+
+  it('an edit that lands in D1 mid-tick repairs with the FRESH D1 value, not the stale one', async () => {
+    const pushed: Array<Record<string, unknown>> = [];
+    let reads = 0;
+    await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => {
+        reads++;
+        if (reads === 2) sqlite.prepare("UPDATE stores SET template='souq' WHERE id=?").run(A);
+        return { ...inSync, template: 'jasmine' };
+      },
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: () => undefined,
+    });
+    expect(pushed).toEqual([{ template: 'souq' }]);
+  });
+
   it('a repair that fails is alert-only, never thrown', async () => {
     const r = await reconcileStoreDirectory({
       pgAll: down,

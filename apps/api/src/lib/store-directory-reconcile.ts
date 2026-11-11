@@ -169,14 +169,27 @@ async function reconcileDoSide(
       report.alertOnly.push({ id: row.id, why: 'do store has no StoreDO record' });
       continue;
     }
-    const drift = mirrorDrift(row, rec);
+    let drift = mirrorDrift(row, rec);
     if (Object.keys(drift).length > 0) {
       try {
-        await repair(row.id, drift);
-        report.corrected.push({
-          id: row.id,
-          why: `DO copy re-pushed from D1 (${Object.keys(drift).join(', ')})`,
-        });
+        // The D1 snapshot is from the start of the tick: a merchant edit since then must not be overwritten on the DO with
+        // the older value (nor raise a false alert). Re-read the DO, then the ONE D1 row (the authority, read last), right before repairing and compare
+        // again; a changed or already-converged store is skipped. Residual: an edit between this re-read and the push.
+        const freshRec = await doRecord(row.id);
+        const { results: fresh } = await d1
+          .prepare(
+            'SELECT name, name_ar, template, look FROM stores WHERE id = ? AND deleted_at IS NULL'
+          )
+          .bind(row.id)
+          .all<Pick<D1Row, 'name' | 'name_ar' | 'template' | 'look'>>();
+        drift = fresh?.[0] && freshRec ? mirrorDrift(fresh[0], freshRec) : {};
+        if (Object.keys(drift).length > 0) {
+          await repair(row.id, drift);
+          report.corrected.push({
+            id: row.id,
+            why: `DO copy re-pushed from D1 (${Object.keys(drift).join(', ')})`,
+          });
+        }
       } catch (err) {
         report.alertOnly.push({
           id: row.id,
