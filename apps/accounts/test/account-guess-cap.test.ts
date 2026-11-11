@@ -88,4 +88,24 @@ describe('issue 664: a refused address never claims an account slot', () => {
     expect(await acctRows()).toBe(before);
     expect((await hit(env.DB, key, '198.51.100.30', LOGIN)).ok).toBe(true); // the owner is not locked out
   });
+
+  it('an admitted request always produces exactly one account row (never zero, never two)', async () => {
+    const k = 'exactly-one@example.com';
+    const rows = async () =>
+      (await env.DB.prepare(`SELECT count(*) AS n FROM login_attempts WHERE key = ?1`)
+        .bind(`a:login:${k}`)
+        .first<{ n: number }>())!.n;
+    for (let i = 1; i <= 4; i++) {
+      expect((await hit(env.DB, k, `192.0.${i}.9`, LOGIN)).ok).toBe(true);
+      expect(await rows()).toBe(i);
+    }
+    // a burst of admitted requests from distinct networks: each adds one row
+    const before = await rows();
+    const res = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => hit(env.DB, k, `192.1.${i}.9`, LOGIN))
+    );
+    const admitted = res.filter(a => a.ok).length;
+    expect(admitted).toBe(10);
+    expect(await rows()).toBe(before + admitted);
+  });
 });

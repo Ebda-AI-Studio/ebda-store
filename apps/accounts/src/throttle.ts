@@ -107,7 +107,7 @@ export async function hit(
   const sKey = budget.brake ? `s:${budget.name}:${key}|${addr}` : `s:${budget.name}:${key}`;
   const aKey = `a:${budget.name}:${key}`;
   const iKey = `i:${budget.name}:${addr}`;
-  const guarded = `INSERT INTO login_attempts (key, at) SELECT ?1, ?2 WHERE (SELECT count(*) FROM login_attempts WHERE key = ?1 AND at > ?3) < ?4 RETURNING rowid AS id`;
+  const guarded = `INSERT INTO login_attempts (key, at, nonce) SELECT ?1, ?2, ?5 WHERE (SELECT count(*) FROM login_attempts WHERE key = ?1 AND at > ?3) < ?4 RETURNING rowid AS id`;
   // A counter with no limit (MAX) is not kept at all: it would only grow into one hot global key under a flood.
   const skipKey = budget.perKey === Number.MAX_SAFE_INTEGER;
   const skipIp = budget.perIp === Number.MAX_SAFE_INTEGER;
@@ -115,23 +115,24 @@ export async function hit(
   // ONE batch = one transaction: admission is decided BEFORE the guarded work runs, so N parallel guesses are admitted
   // at most `cap` times in total and the rest are refused without being evaluated.
   //
-  // The row time carries a per-request fraction so the account statement can recognise THIS request's own address rows: an
-  // account slot is claimed only when this request's pair and address counters both admitted it (Issue 664). Otherwise a
-  // locked-out address firing parallel requests would fill the account cap and lock the owner out.
-  const rowAt = at + Math.random() * 0.99;
-  const acctGuarded = `INSERT INTO login_attempts (key, at) SELECT ?1, ?2 WHERE (?5 = 1 OR EXISTS (SELECT 1 FROM login_attempts WHERE key = ?6 AND at = ?2)) AND (?7 = 1 OR EXISTS (SELECT 1 FROM login_attempts WHERE key = ?8 AND at = ?2)) AND (SELECT count(*) FROM login_attempts WHERE key = ?1 AND at > ?3) < ?4 RETURNING rowid AS id`;
+  // Every row of this request carries one random nonce, so the account statement can recognise THIS request's own address
+  // rows exactly (no time or float comparison anywhere in the admit logic): an account slot is claimed only when this
+  // request's pair and address counters both admitted it (Issue 664). Otherwise a locked-out address firing parallel
+  // requests would fill the account cap and lock the owner out.
+  const nonce = crypto.randomUUID();
+  const acctGuarded = `INSERT INTO login_attempts (key, at, nonce) SELECT ?1, ?2, ?9 WHERE (?5 = 1 OR EXISTS (SELECT 1 FROM login_attempts WHERE key = ?6 AND nonce = ?9)) AND (?7 = 1 OR EXISTS (SELECT 1 FROM login_attempts WHERE key = ?8 AND nonce = ?9)) AND (SELECT count(*) FROM login_attempts WHERE key = ?1 AND at > ?3) < ?4 RETURNING rowid AS id`;
   const res = await db.batch([
     db
       .prepare(skipKey ? `SELECT NULL AS id WHERE 0` : guarded)
-      .bind(...(skipKey ? [] : [sKey, rowAt, since, budget.perKey])),
+      .bind(...(skipKey ? [] : [sKey, at, since, budget.perKey, nonce])),
     db
       .prepare(skipIp ? `SELECT NULL AS id WHERE 0` : guarded)
-      .bind(...(skipIp ? [] : [iKey, rowAt, since, budget.perIp])),
+      .bind(...(skipIp ? [] : [iKey, at, since, budget.perIp, nonce])),
     db
       .prepare(useAcct ? acctGuarded : `SELECT NULL AS id WHERE 0`)
       .bind(
         ...(useAcct
-          ? [aKey, rowAt, since, budget.perAccount, skipKey ? 1 : 0, sKey, skipIp ? 1 : 0, iKey]
+          ? [aKey, at, since, budget.perAccount, skipKey ? 1 : 0, sKey, skipIp ? 1 : 0, iKey, nonce]
           : [])
       ),
     // opportunistic cleanup keeps the table small
