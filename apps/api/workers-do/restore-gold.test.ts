@@ -41,4 +41,24 @@ describe('restoreFrom with gold-rate products', () => {
     expect(got.v).toEqual([{ id: 'gv1', price: 1200 }]);
     expect(got.f.every(r => r.value === 0)).toBe(true);
   });
+
+  it('a non-gold store restores with every table ok and no gold_reprice row left behind', async () => {
+    const S = 'rg-plain-src';
+    const src = stub(S);
+    await runInDurableObject(src, (_i, s) => {
+      s.storage.sql.exec(
+        `INSERT INTO products (id, store_id, name, slug, price, status) VALUES ('pp1', ?, 'Mug', 'mug', 500, 'active')`,
+        S
+      );
+    });
+    await runInDurableObject(src, (d: StoreDO) => d.backupNow(S));
+    const T = 'rg-plain-target';
+    const res = await stub(T).restoreFrom(S, day());
+    expect(res.ok).toBe(true);
+    if (res.ok) for (const [t, v] of Object.entries(res.data)) expect([t, v.ok]).toEqual([t, true]);
+    const f = await runInDurableObject(stub(T), (_i, s) =>
+      s.storage.sql.exec(`SELECT value FROM do_flags WHERE name = 'gold_reprice'`).toArray()
+    );
+    expect(f).toEqual([]);
+  });
 });

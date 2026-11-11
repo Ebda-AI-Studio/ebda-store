@@ -73,10 +73,22 @@ export function loadBackup(sql: SqlLike, files: Record<string, string>, tables: 
   // raise it for the load and clear it before commit (same as cf-migrate __import). do_flags rows are INSERT OR IGNOREd so the
   // backup's own gold_reprice row cannot collide with, or reset, the raised flag.
   const gold = tables.includes('products') || tables.includes('product_variants');
-  if (gold)
+  // The flag row's state after the load is the backup's own (a row the backup lacked is deleted again, so the restored do_flags
+  // re-export equals the manifest).
+  let backupFlag: unknown;
+  if (gold) {
+    const [fh, ...fl] = (files['do_flags.ndjson'] ?? '').split('\n').filter(Boolean);
+    if (fh) {
+      const cols = JSON.parse(fh) as string[];
+      for (const l of fl) {
+        const r = JSON.parse(l) as unknown[];
+        if (r[cols.indexOf('name')] === 'gold_reprice') backupFlag = r[cols.indexOf('value')];
+      }
+    }
     sql.exec(
       `INSERT INTO do_flags (name, value) VALUES ('gold_reprice', 1) ON CONFLICT (name) DO UPDATE SET value = 1`
     );
+  }
   for (const t of tables) {
     const body = files[`${t}.ndjson`];
     if (!body) throw new Error(`backup is missing ${t}.ndjson`);
@@ -89,7 +101,10 @@ export function loadBackup(sql: SqlLike, files: Record<string, string>, tables: 
         ...(JSON.parse(line) as unknown[])
       );
   }
-  if (gold) sql.exec(`UPDATE do_flags SET value = 0 WHERE name = 'gold_reprice'`);
+  if (gold) {
+    if (backupFlag === undefined) sql.exec(`DELETE FROM do_flags WHERE name = 'gold_reprice'`);
+    else sql.exec(`UPDATE do_flags SET value = ? WHERE name = 'gold_reprice'`, backupFlag);
+  }
 }
 
 export const backupKey = (storeId: string, day: string, file: string) =>
