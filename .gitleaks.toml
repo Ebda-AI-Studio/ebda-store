@@ -97,3 +97,26 @@ regexes = [
 # is the point: it forces a human/reviewer to look at it once instead of
 # blanket-exempting the whole tree forever.
 
+
+# Ruling CI-MAC-TRUFFLE-1 (2026-11-11): a Postgres URL with an inline password whose host is a real host. The built-in
+# ruleset has no such rule (measured: a committed Neon-shaped `postgresql://user:pass@ep-...neon.tech/db` URL gave
+# "no leaks found"), and trufflehog only fails on URLs it can VERIFY from the runner, so an unverifiable real URL passed
+# both. Silent for loopback hosts (localhost, 127.0.0.1, ::1), the reserved example/test domains (RFC 2606/6761) and
+# shell/template placeholders. Pinned by tests/unit/gitleaks-postgres-url-rule.test.ts (known-bad + known-good fixtures).
+[[rules]]
+id = "ebda-postgres-url-password"
+description = "Postgres connection URL with an inline password and a non-loopback host"
+regex = '''postgres(?:ql)?://[^:@\s/'"`]+:[^@\s/'"`]+@[^/:\s'"`?,)]+'''
+keywords = ["postgres://", "postgresql://"]
+
+[[rules.allowlists]]
+description = "loopback hosts, reserved example/test domains, and placeholders"
+regexTarget = "match"
+regexes = [
+  '''@(?:localhost|127\.0\.0\.1|\[::1\]|::1)$''',
+  '''@(?:[A-Za-z0-9-]+\.)*(?:example\.(?:com|org|net)|example|test|invalid|localhost)$''',
+  '''[$%{}<>\[\]]''',
+  '''\.\.\.''',
+  # placeholder passwords: 1-2 chars, the usual words, all-x, or an UPPER_CASE token (PASSWORD, USER_PASS)
+  '''://[^:@\s]+:(?:[^@\s]{1,2}|pass|password|pwd|secret|test|changeme|x+|X+|[A-Z][A-Z0-9_]*)@''',
+]

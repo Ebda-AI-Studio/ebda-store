@@ -1541,20 +1541,18 @@ jobs:
             curl -fsSL -o "$C/$T.part" "https://github.com/trufflesecurity/trufflehog/releases/download/v${V}/${T}" && mv "$C/$T.part" "$C/$T"; }
           echo "$SHA  $C/$T" | shasum -a 256 -c -
           mkdir -p "$RUNNER_TEMP/th" && tar -xz -C "$RUNNER_TEMP/th" -f "$C/$T" trufflehog
-          # The checkout is depth 1, so `before` is not in the clone and --since-commit alone scans the WHOLE tree. On the Mac
-          # that is wrong twice over: the host's Postgres trusts localhost, so every committed localhost/127.0.0.1 test URL
-          # whose database exists here "verifies" (main run 43112327669: 2 verified Postgres hits, all test fixtures).
-          # A push therefore fetches `before` and scans exactly before..after. A schedule / dispatch scans the branch without
-          # the Postgres detector on the Mac (the nightly gitleaks full scan still covers Postgres URLs).
-          extra=(); since=()
+          # The checkout is depth 1, so `before` is not in the clone and --since-commit alone scans the WHOLE tree. A push
+          # therefore deepens to `before` and scans exactly before..after, and fails rather than fall back to a whole-tree
+          # scan. Ruling CI-MAC-TRUFFLE-1: from the Mac, the `postgres://...@db.example.com` fixtures in
+          # tests/unit/skins-preflight.test.ts (lines 62-63) report as VERIFIED (main run 43112327669; earlier hosted main runs passed the same
+          # whole-tree scan), so .github/trufflehog-mac-exclude-paths.txt skips exactly that file here (pinned by a test). Postgres URLs
+          # trufflehog cannot verify are caught by gitleaks' ebda-postgres-url-password rule (.gitleaks.toml).
+          since=()
           if [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
             git fetch --no-tags --deepen=20 origin "$AFTER" && git merge-base --is-ancestor "$BEFORE" "$AFTER" || { echo "::error::before ($BEFORE) is not an ancestor within 20 commits; refusing a whole-tree scan"; exit 1; }
             since=(--since-commit "$BEFORE")
-          else
-            echo "::notice::Mac runner full-branch scan: Postgres detector excluded (localhost trust auth on the host)"
-            extra=(--exclude-detectors=postgres)
           fi
-          "$RUNNER_TEMP/th/trufflehog" git "file://$PWD" "${since[@]}" "${extra[@]}" --branch "$AFTER" --fail --no-update --github-actions --only-verified
+          "$RUNNER_TEMP/th/trufflehog" git "file://$PWD" "${since[@]}" --exclude-paths .github/trufflehog-mac-exclude-paths.txt --branch "$AFTER" --fail --no-update --github-actions --only-verified
 
   # Mutation tests: weekly (Sunday) or manual only (far too slow for a push or
   # a nightly).
