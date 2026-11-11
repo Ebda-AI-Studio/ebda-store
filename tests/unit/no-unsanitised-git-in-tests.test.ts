@@ -22,10 +22,30 @@ const SHELL_FORM = new RegExp(
   `(?:exec|execSync|spawn|spawnSync|execa|\\$)\\s*\\(?\\s*['"\`][^'"\`\\n]*\\bgit\\s+(?:-[A-Za-z]\\s+\\S+\\s+)*(?:${MUTATING})\\b`
 );
 const HELPER_IMPORT = /helpers\/git-env['"]/;
+// PREPUSH-5C: a file that scrubs the hook-exported GIT_* env itself (or runs via test-git-env.sh) is also safe.
+const SCRUBBED_ENV =
+  /startsWith\(\s*['"`]GIT_|delete\s+[\w.]+(?:\.GIT_|\[\s*['"`]GIT_)|GIT_DIR\s*:\s*undefined|test-git-env\.sh/;
+// git spawned through a child_process call whose argv is NOT a literal read-only verb (a spread, a variable, a
+// helper arg list: `spawnSync('git', ['-c', 'user.name=t', ...a])`) cannot be proven read-only, so it needs the helper
+// or a scrubbed env. Literal read-only verbs (ls-files, grep, diff, log, rev-parse, status, show, cat-file) stay allowed.
+const SPAWN_GIT =
+  /\b(?:execFileSync|execFile|spawnSync|spawn|execa|\$)\s*\(\s*['"`]git['"`]\s*,\s*([\s\S]{0,240})/g;
+const LITERAL_VERB =
+  /^\[?\s*(?:['"`]-[cC]['"`]\s*,\s*['"`][^'"`]*['"`]\s*,\s*)*['"`]([a-z][a-z-]*)['"`]/;
+const DYNAMIC_SHELL =
+  /\b(?:exec|execSync|spawn|spawnSync|execa|\$)\s*\(?\s*[`'"]git\s+(?:-[A-Za-z]\s+\S+\s+)*\$\{/;
+
+function dynamicGit(src: string): boolean {
+  for (const m of src.matchAll(SPAWN_GIT)) {
+    const v = LITERAL_VERB.exec(m[1]);
+    if (!v || new RegExp(`^(?:${MUTATING})$`).test(v[1])) return true;
+  }
+  return DYNAMIC_SHELL.test(src);
+}
 
 export function runsUnsanitisedMutatingGit(src: string): boolean {
-  if (HELPER_IMPORT.test(src)) return false;
-  return ARGV_FORM.test(src) || SHELL_FORM.test(src);
+  if (HELPER_IMPORT.test(src) || SCRUBBED_ENV.test(src)) return false;
+  return ARGV_FORM.test(src) || SHELL_FORM.test(src) || dynamicGit(src);
 }
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -62,6 +82,23 @@ describe('tests never run mutating git without the sanitised helper', () => {
     ).toBe(false);
     expect(runsUnsanitisedMutatingGit(`execSync("git grep -l foo -- 'scripts/*.sh'")`)).toBe(false);
     expect(runsUnsanitisedMutatingGit(`const msg = 'a git commit message'`)).toBe(false);
+    // PREPUSH-5C: argv the guard cannot read (spread/variable) is flagged unless the env is scrubbed
+    expect(runsUnsanitisedMutatingGit(`spawnSync('git', ['-c', 'a=b', ...args], { cwd })`)).toBe(
+      true
+    );
+    expect(runsUnsanitisedMutatingGit('execSync(`git ${args}`, { cwd })')).toBe(true);
+    expect(runsUnsanitisedMutatingGit(`spawnSync('git', args, { cwd })`)).toBe(true);
+    expect(
+      runsUnsanitisedMutatingGit(
+        `for (const k of Object.keys(e)) if (k.startsWith('GIT_')) delete e[k];\nspawnSync('git', args, { env: e })`
+      )
+    ).toBe(false);
+    expect(runsUnsanitisedMutatingGit(`spawnSync('git', ['ls-files'], { cwd })`)).toBe(false);
+  });
+
+  it('the #651 cache test (unscrubbed temp-repo git, the 2026-11-11 incident) is flagged', () => {
+    const bad = readFileSync(join(__dirname, '__fixtures__/unscrubbed-git-spawn.bad.txt'), 'utf8');
+    expect(runsUnsanitisedMutatingGit(bad)).toBe(true);
   });
 
   it('finds test files to scan (the guard is not vacuous)', () => {
