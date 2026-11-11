@@ -8,11 +8,11 @@ import { expectThrows, migrationFiles } from './helpers';
  * (same transaction as the past_due decision) rolls the decision back and an unpaid store is never suspended.
  */
 const files = migrationFiles('platform');
-const M10 = files.find(f => f.endsWith('0010_billing_reminders_grace_kinds.sql'))!;
+const M10 = files.find(f => f.endsWith('0013_billing_reminders_grace_kinds.sql'))!;
 const OLD_CHECK = `CHECK ("kind" IN ('d7', 'd3', 'd1', 'd0', 'suspended'))`;
 const NEW_CHECK_RE = /CHECK \("kind" IN \('d7', 'd3', 'd1', 'd0', 'suspended'[^)]*\)\)/;
 
-/** Production's D1: 0001 as it was applied (old CHECK) and every migration before 0010. */
+/** Production's D1: 0001 as it was applied (old CHECK) and every migration before 0013. */
 function production(): DatabaseSync {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
@@ -36,13 +36,13 @@ const claim = (db: DatabaseSync, kind: string) =>
     )
     .run(`${kind}-${Math.random()}`, kind);
 
-describe('D1 0010: billing_reminders accepts the grace stages (BILL-NOTICE-1)', () => {
-  it('exists, after 0009', () => {
+describe('D1 0013: billing_reminders accepts the grace stages (BILL-NOTICE-1)', () => {
+  it('exists, after 0011 (0012 is reserved for the template contract step)', () => {
     expect(M10).toBeTruthy();
     expect(files.indexOf(M10)).toBe(files.length - 1);
   });
 
-  it('production before 0010 REJECTS a grace stage (the defect: it rolls the past_due decision back)', () => {
+  it('production before 0013 REJECTS a grace stage (the defect: it rolls the past_due decision back)', () => {
     const db = production();
     expectThrows(() => claim(db, 'grace_start'), /CHECK constraint failed/);
     // the whole past_due transaction is undone with it
@@ -58,7 +58,7 @@ describe('D1 0010: billing_reminders accepts the grace stages (BILL-NOTICE-1)', 
     });
   });
 
-  it('after 0010 every stage claims once, a second claim is a no-op, and the past_due -> suspension path commits', () => {
+  it('after 0013 every stage claims once, a second claim is a no-op, and the past_due -> suspension path commits', () => {
     const db = production();
     claim(db, 'd7');
     db.exec(

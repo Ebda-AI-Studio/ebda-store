@@ -4,8 +4,8 @@
  * stage leaves its `billing_reminders` row. Drives the real `runBillingCycle` / `sendGraceEndingNotice` / `claimGraceStage`
  * over the routed `prisma` proxy on node:sqlite wrapped as D1 (the same rig as platform-billing-d1.test.ts).
  *
- * Without platform migration 0010 production's `billing_reminders_kind_check` rejects `grace_start`/`grace_d1`: the claim
- * throws, the cycle reports an error and no stage is recorded or sent. The second test runs it on the pre-0010 schema.
+ * Without platform migration 0013 production's `billing_reminders_kind_check` rejects `grace_start`/`grace_d1`: the claim
+ * throws, the cycle reports an error and no stage is recorded or sent. The second test runs it on the pre-0013 schema.
  */
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -54,7 +54,7 @@ const files = fs
   .readdirSync(DIR)
   .filter(f => f.endsWith('.sql'))
   .sort();
-const M10 = files.find(f => f.startsWith('0010_billing_reminders_grace_kinds'))!;
+const M10 = files.find(f => f.startsWith('0013_billing_reminders_grace_kinds'))!;
 const OLD_CHECK = `CHECK ("kind" IN ('d7', 'd3', 'd1', 'd0', 'suspended'))`;
 const NEW_CHECK_RE = /CHECK \("kind" IN \('d7', 'd3', 'd1', 'd0', 'suspended'[^)]*\)\)/;
 
@@ -63,7 +63,7 @@ const SUB = 'sub-1';
 const DAY = 86_400_000;
 const PERIOD_END = new Date('2026-11-01T00:00:00Z');
 
-/** Production's D1 as deployed: every migration before 0010 with the OLD kind CHECK, then 0010 only if `migrated`. */
+/** Production's D1 as deployed: every migration before 0013 with the OLD kind CHECK, then 0013 only if `migrated`. */
 function rig(migrated: boolean) {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
@@ -132,7 +132,7 @@ beforeEach(() => {
 });
 
 describe('InstaPay grace -> suspension through the billing cycle (BILL-NOTICE-1)', () => {
-  it('with 0010: overdue -> grace_start; one day left -> grace_d1; grace over -> store suspended + suspended stage', async () => {
+  it('with 0013: overdue -> grace_start; one day left -> grace_d1; grace over -> store suspended + suspended stage', async () => {
     const db = rig(true);
     const day1 = new Date(PERIOD_END.getTime() + 1000);
 
@@ -159,7 +159,7 @@ describe('InstaPay grace -> suspension through the billing cycle (BILL-NOTICE-1)
     expect(kinds(db)).toHaveLength(3);
   });
 
-  it('WITHOUT 0010 (production today) every grace notice claim violates the CHECK: errors, no stage rows, no notice', async () => {
+  it('WITHOUT 0013 (production today) every grace notice claim violates the CHECK: errors, no stage rows, no notice', async () => {
     const db = rig(false);
     const day1 = new Date(PERIOD_END.getTime() + 1000);
     const first = await runBillingCycle(day1, undefined, { subscriptionIds: [SUB] });
