@@ -23,7 +23,9 @@ function fakeD1(settings: Record<string, string>, liveIds: string[]) {
             async all<T>() {
               if (sql.includes('FROM stores'))
                 return {
-                  results: (v as string[]).filter(id => liveIds.includes(id)).map(id => ({ id })),
+                  results: (v as string[])
+                    .filter(id => liveIds.includes(id))
+                    .map(id => ({ id })) as T[],
                 };
               return {
                 results: Object.entries(settings).map(([key, value]) => ({ key, value })) as T[],
