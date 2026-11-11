@@ -120,3 +120,13 @@ describe('admin consumes the foundation tokens', () => {
     expect(layout).toContain("subsets: ['arabic', 'latin']");
   });
 });
+
+describe('shared field classes', () => {
+  it('FIELD_CLASSES sit on the control scale: 44 on phones, 40 from sm, control radius, 16px text on phones', async () => {
+    const { FIELD_CLASSES } = await import('../../apps/admin/src/components/ui/tokens');
+    expect(FIELD_CLASSES).toContain(`h-${CONTROL.mdPhone / 4}`);
+    expect(FIELD_CLASSES).toContain(`sm:h-${CONTROL.md / 4}`);
+    expect(FIELD_CLASSES).toContain('rounded-md');
+    expect(FIELD_CLASSES).toContain('text-base');
+  });
+});

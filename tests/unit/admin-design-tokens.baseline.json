@@ -55,7 +55,6 @@
     "app/stores/[id]/webhooks/page.tsx": 8,
     "app/stores/_components/types.ts": 5,
     "app/users/[id]/page.tsx": 7,
-    "components/OrderStatusBadge.tsx": 15,
     "components/admin-layout/SidebarHeader.tsx": 4,
     "components/payment-events/PaymentEventsTimeline.tsx": 8,
     "components/section-design/FontsCard.tsx": 4

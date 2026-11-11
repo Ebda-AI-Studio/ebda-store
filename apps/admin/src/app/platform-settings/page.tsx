@@ -122,7 +122,12 @@ function PlatformSettingsInner() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Toggle checked={enabled} onChange={setEnabled} disabled={saving} />
+          <Toggle
+            checked={enabled}
+            onChange={setEnabled}
+            disabled={saving}
+            label={t('vat.enabled')}
+          />
           <span className="text-sm text-foreground">{t('vat.enabled')}</span>
         </div>
 

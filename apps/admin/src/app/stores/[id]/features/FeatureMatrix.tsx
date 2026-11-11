@@ -165,6 +165,7 @@ function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureR
           enabled={isEffectivelyOn}
           onChange={() => onAction(def.key, state)}
           disabled={inFlight}
+          label={def.nameAr || def.name}
         />
       </div>
     </div>

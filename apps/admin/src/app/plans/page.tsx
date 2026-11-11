@@ -298,6 +298,7 @@ function PlansInner() {
                   <Toggle
                     checked={form.isPublic}
                     onChange={v => setForm(f => ({ ...f, isPublic: v }))}
+                    label={t('form.isPublic')}
                   />
                   <span className="text-sm">{t('form.isPublic')}</span>
                 </div>
@@ -373,6 +374,7 @@ function PlansInner() {
                       <Toggle
                         checked={limits[k]}
                         onChange={v => setLimits(l => (l ? { ...l, [k]: v } : l))}
+                        label={t(`limits.${k}`)}
                       />
                       <span className="text-sm">{t(`limits.${k}`)}</span>
                     </div>

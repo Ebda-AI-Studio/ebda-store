@@ -271,6 +271,7 @@ export function SettingsPanel({
                         hidden: on ? undefined : true,
                       })
                     }
+                    label={t(`viewport.${v}`)}
                   />
                 </label>
               );
@@ -609,7 +610,11 @@ export function Field({
       return (
         <label className="flex items-center justify-between text-sm">
           <span>{label}</span>
-          <Toggle checked={valueOf(def.id) === true} onChange={on => onChange(def.id, on)} />
+          <Toggle
+            checked={valueOf(def.id) === true}
+            onChange={on => onChange(def.id, on)}
+            label={label}
+          />
         </label>
       );
     case 'category':

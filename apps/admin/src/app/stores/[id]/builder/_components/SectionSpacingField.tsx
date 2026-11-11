@@ -94,7 +94,7 @@ export function SectionSpacingField({
       <legend className="text-xs font-semibold text-muted-foreground">{t('spacing.title')}</legend>
       <label className="flex items-center justify-between gap-3 text-sm">
         <span>{t('spacing.sameOnAll')}</span>
-        <Toggle checked={!split} onChange={setSame} />
+        <Toggle checked={!split} onChange={setSame} label={t('spacing.sameOnAll')} />
       </label>
       {split && (
         <div

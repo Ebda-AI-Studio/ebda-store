@@ -15,6 +15,7 @@ import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
 import { UnverifiedProviderNotice } from '../../../../../components/UnverifiedProviderNotice';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /** One saved-credential hint: secrets only say they are set (+ last 4), non-secrets echo the value. */
 type CredentialHint = { set: true; last4?: string; value?: string };
@@ -56,8 +57,7 @@ interface Props {
   onChanged: () => Promise<void> | void;
 }
 
-const inputClass =
-  'w-full rounded-lg border border-input bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
+const inputClass = FIELD_CLASSES;
 const btnPrimary = buttonVariants({ size: 'sm' });
 const btnOutline = buttonVariants({ variant: 'outline', size: 'sm' });
 

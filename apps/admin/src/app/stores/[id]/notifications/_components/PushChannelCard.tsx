@@ -65,7 +65,11 @@ export function PushChannelCard({
           <span className="text-sm text-muted-foreground">
             {config.enabled ? tShared('enabled') : tShared('disabled')}
           </span>
-          <Toggle checked={config.enabled} onChange={val => onConfigChange({ enabled: val })} />
+          <Toggle
+            checked={config.enabled}
+            onChange={val => onConfigChange({ enabled: val })}
+            label={t('title')}
+          />
         </div>
       </div>
 

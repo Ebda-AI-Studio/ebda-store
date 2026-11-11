@@ -106,7 +106,7 @@ export function PersonalisationCard({ value, onChange }: Props) {
 
       <label className="flex items-center justify-between gap-4">
         <span className="text-sm font-medium text-foreground">{t('allow')}</span>
-        <Toggle checked={value.enabled} onChange={enabled => set({ enabled })} />
+        <Toggle checked={value.enabled} onChange={enabled => set({ enabled })} label={t('allow')} />
       </label>
 
       {value.enabled && (

@@ -523,6 +523,7 @@ export default function StoreCategoriesPage() {
             type="button"
             role="switch"
             aria-checked={showBestSellersTile}
+            aria-label={t('showBestSellersCardTitle')}
             disabled={savingShowBestSellersTile}
             onClick={() => saveShowBestSellersTile(!showBestSellersTile)}
             className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${

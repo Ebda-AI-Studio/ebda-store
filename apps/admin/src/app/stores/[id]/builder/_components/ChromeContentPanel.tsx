@@ -310,6 +310,7 @@ export function ChromeContentPanel({ storeId, kind, chrome, liveVersion, onChang
               <Toggle
                 checked={current?.utilityBar?.enabled ?? liveUtility.enabled !== false}
                 onChange={on => utility({ enabled: on })}
+                label={t('chromeUtilityEnabled')}
               />
             </label>
             <LinkList
@@ -351,6 +352,7 @@ export function ChromeContentPanel({ storeId, kind, chrome, liveVersion, onChang
                 current?.footerLinks?.newsletterEnabled ?? liveFooter.newsletterEnabled !== false
               }
               onChange={on => footer({ newsletterEnabled: on })}
+              label={t('chromeNewsletter')}
             />
           </label>
         </>

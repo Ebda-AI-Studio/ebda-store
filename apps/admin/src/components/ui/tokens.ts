@@ -61,6 +61,13 @@ export const ELEVATION = {
 } as const;
 export const ELEVATION_VALUES = FDN_ELEVATION;
 
+/**
+ * A text field / select on the control scale: 44px on phones, 40px from sm (CONTROL.mdPhone / CONTROL.md), control radius,
+ * 16px text on phones (no iOS zoom). Hand-built inputs at 30-42px with other radii were audit P1-1; use this or `@ebda/ui` Input.
+ */
+export const FIELD_CLASSES =
+  'h-11 w-full rounded-md border border-input bg-background px-3 text-base sm:h-10 sm:text-sm placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60';
+
 export type NavKind = 'sidebar' | 'tab' | 'rail';
 
 const NAV_BASE =

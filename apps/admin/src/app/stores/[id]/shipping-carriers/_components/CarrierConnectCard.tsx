@@ -22,6 +22,7 @@ import {
   type CarrierConfigRow,
   type CarrierSettings,
 } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface TestOutcome {
   ok: boolean;
@@ -43,8 +44,7 @@ interface Props {
   onChanged: () => Promise<void> | void;
 }
 
-const inputClass =
-  'w-full rounded-lg border border-border bg-background px-3 py-1.5 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60';
+const inputClass = FIELD_CLASSES;
 const btnPrimary = buttonVariants({ size: 'sm' });
 const btnOutline = buttonVariants({ variant: 'outline', size: 'sm' });
 

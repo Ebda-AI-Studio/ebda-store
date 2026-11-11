@@ -20,7 +20,7 @@ export function RowToggle({
   return (
     <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm">
       <span className="text-foreground">{label}</span>
-      <Toggle checked={checked} onChange={onChange} />
+      <Toggle checked={checked} onChange={onChange} label={label} />
     </label>
   );
 }

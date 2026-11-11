@@ -6,32 +6,7 @@ import type { AbandonedCartConfig } from './types';
 
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
-interface ToggleProps {
-  checked: boolean;
-  onChange: (val: boolean) => void;
-  disabled?: boolean;
-}
-
-function Toggle({ checked, onChange, disabled }: ToggleProps) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => !disabled && onChange(!checked)}
-      disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 ${
-        checked ? 'bg-primary' : 'bg-muted'
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1'
-        }`}
-      />
-    </button>
-  );
-}
+import { Toggle } from '@/components/Toggle';
 
 interface StepRowProps {
   title: string;
@@ -58,7 +33,7 @@ function StepRow({
     <div className="border border-border rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-medium text-foreground">{title}</h3>
-        <Toggle checked={enabled} onChange={onEnabledChange} />
+        <Toggle checked={enabled} onChange={onEnabledChange} label={title} />
       </div>
       <div className="flex items-center gap-2">
         <label className="text-sm text-muted-foreground">{sendAfterLabel}</label>
@@ -137,6 +112,7 @@ export function RecoveryCampaignForm({
               <Toggle
                 checked={config.autoCouponEnabled}
                 onChange={val => onPatch({ autoCouponEnabled: val })}
+                label={t('autoCoupon.title')}
                 disabled={!config.step3Enabled}
               />
             </div>
@@ -211,6 +187,7 @@ export function RecoveryCampaignForm({
             <Toggle
               checked={config.emailEnabled}
               onChange={val => onPatch({ emailEnabled: val })}
+              label={t('email.title')}
             />
           </div>
           <p className="text-sm text-muted-foreground mb-3">{t('email.description')}</p>

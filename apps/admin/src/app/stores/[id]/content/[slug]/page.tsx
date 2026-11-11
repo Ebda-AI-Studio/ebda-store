@@ -394,6 +394,7 @@ export default function ContentEditorPage() {
                 <Toggle
                   checked={data.isPublished}
                   onChange={v => setData(d => ({ ...d, isPublished: v }))}
+                  label={t('fieldShowOnStorefront')}
                 />
               </div>
             </SectionCard>
