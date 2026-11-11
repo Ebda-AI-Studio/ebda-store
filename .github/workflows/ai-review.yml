@@ -29,7 +29,7 @@ concurrency:
 jobs:
   classify:
     name: AI review classify
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft && github.event.action != 'labeled'
     outputs:
@@ -70,7 +70,7 @@ jobs:
   review:
     name: AI review
     needs: classify
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'labeled' && needs.classify.outputs.risky == 'true'
     steps:
@@ -136,7 +136,7 @@ jobs:
   # newest run on this head (green) supersedes the red one. Passes only while the label is really on the PR.
   manual-pass:
     name: AI review
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     if: github.event.action == 'labeled' && github.event.label.name == 'ai-review-passed' && github.event.pull_request.head.repo.full_name == github.repository
     steps:
@@ -154,7 +154,7 @@ jobs:
   fork-gate:
     # fork-guard-exempt: this job IS the fork handler; it runs only gh label/view commands from the base workflow and never touches PR content
     name: AI review
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     if: github.event.pull_request.head.repo.full_name != github.repository
     steps:
