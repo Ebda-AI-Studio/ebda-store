@@ -1,0 +1,66 @@
+name: PR quality
+
+# Anti-slop gate. Copy of ebda-foundation/.github/workflows/pr-quality.yml with `on:` = pull_request_target (foundation Ruling AIR-3 applies:
+# switch to `uses:` once the foundation's Actions access is `organization`). Everything under `jobs:` must stay identical.
+# Runs from the base branch and judges the PR against the base's baseline and eslint suppressions (foundation PRQ-3). Forks are checked, not skipped (PRQ-5).
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: pr-quality-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pr-body:
+    name: PR body sections
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    # fork-guard-exempt: forks must be checked too (a skipped check is a pass); only the base branch's scripts run, the PR body is data
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Check Verified / Not verified / Cost-if-wrong, fix and review-finding rules (warn-only until bodyCheckEnforceFrom)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_QUALITY_CONFIG: .pr-quality.json
+        run: |
+          set -euo pipefail
+          CHANGED_FILES="$(gh pr diff "$PR" --name-only)"
+          export CHANGED_FILES
+          node .github/pr-quality/pr-body-check.mjs
+
+  slop-baselines:
+    name: Slop baselines
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
+    # fork-guard-exempt: forks must be checked too (a skipped check is a pass); the PR is only scanned as data, symlinks are never followed
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: no-any, no-console, todo-no-issue, emoji-copy, duplicate-helper, unused-export (baseline may only shrink, judged against the base)
+        run: node base/.github/pr-quality/slop-guard.mjs --root pr --base-root base
