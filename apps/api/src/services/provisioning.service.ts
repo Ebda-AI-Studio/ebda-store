@@ -596,7 +596,7 @@ export class ProvisioningService {
             ]);
             return { products, orders };
           },
-          { storeIds: pageStores.map(s => s.id) }
+          { storeIds: pageStores.map(s => s.id), abortOnError: true }
         )
       ).map(r => [r.storeId, r.value])
     );

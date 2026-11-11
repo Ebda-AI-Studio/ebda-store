@@ -52,7 +52,7 @@ export async function pageAcrossStores<T>(args: {
   // NEON-ZERO (Ruling NZ-C-4): no Postgres directory once the platform families are on D1 - the store list is D1's (capped).
   const storeIds =
     args.storeIds ?? ((await hubOnD1()) ? (await hubFanoutStoreIds()).ids : undefined);
-  const parts = await acrossStores(() => args.fetch(window), { storeIds });
+  const parts = await acrossStores(() => args.fetch(window), { storeIds, abortOnError: true });
   const rows = dedupeById(parts.flatMap(p => p.value.rows));
   const key = (r: T): number => {
     const k = args.orderKey(r);
@@ -91,7 +91,9 @@ export async function sweepAcrossStores<T>(args: {
   desc?: boolean;
   storeIds?: string[];
 }): Promise<T[]> {
-  const rows = dedupeById(await acrossStoresFlat(args.fetch, { storeIds: args.storeIds }));
+  const rows = dedupeById(
+    await acrossStoresFlat(args.fetch, { storeIds: args.storeIds, abortOnError: true })
+  );
   const key = (r: T): number => {
     const k = args.orderKey(r);
     return k instanceof Date ? k.getTime() : k;

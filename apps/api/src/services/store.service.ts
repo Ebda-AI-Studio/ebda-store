@@ -523,7 +523,7 @@ export class StoreService {
             products: await (await storeDb(storeId)).product.count({ where: { storeId } }),
             orders: await prisma.order.count({ where: { storeId } }),
           }),
-          { storeIds: stores.map(st => st.id) }
+          { storeIds: stores.map(st => st.id), abortOnError: true }
         )
       ).map(r => [r.storeId, r.value])
     );
