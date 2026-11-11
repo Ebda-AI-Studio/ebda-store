@@ -37,6 +37,7 @@ const ci = yaml.load(raw) as {
 const MAIN_LANE = [
   'build',
   'test-unit',
+  'test-unit-shard',
   'orphan-tests',
   'test-e2e',
   'builder-e2e',
@@ -49,6 +50,7 @@ const PR_LANE = [
   'lint',
   'typecheck',
   'unit',
+  'unit-gate',
   'worker-dry-run',
   'api-workerd-smoke',
   'workerd-integration',
@@ -94,13 +96,12 @@ describe('ci.yml triggers', () => {
 
   it('cancels superseded PR runs and superseded main pushes, never a cron or manual run', () => {
     expect(ci.concurrency.group).toMatch(/^ci-/);
-    // PR runs group per ref, every main push shares one group, anything else is alone (run_id)
+    // PR runs group per ref, every main push has a group per merge sha, anything else is alone (run_id)
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && 'main-push' || github.run_id) }}"
+      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || github.run_id) }}"
     );
-    expect(ci.concurrency['cancel-in-progress']).toBe(
-      "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}"
-    );
+    // Ruling CI-MAIN-SHA-1: only PR runs are cancelled; a main push (own group per sha) always completes.
+    expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}");
   });
 
   it('uses Node 22 (wrangler >= 4.110) and caches npm (hosted runners only) in every setup-node that installs', () => {
@@ -193,7 +194,7 @@ describe('ci.yml lanes', () => {
     };
     return Object.keys(ci.jobs).filter(run).sort();
   };
-  const PR_ONLY = ['changes', 'lint', 'typecheck', 'unit', 'app-build', 'app-builds'];
+  const PR_ONLY = ['changes', 'lint', 'typecheck', 'unit', 'unit-gate', 'app-build', 'app-builds'];
   const FULL_LANE = Object.keys(ci.jobs)
     .filter(j => !PR_ONLY.includes(j) && j !== 'mutation')
     .sort();
@@ -537,7 +538,11 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
 describe('app-build is one-at-a-time and heavy-lane (guest memory)', () => {
   const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   const job = ci.slice(ci.indexOf('\n  app-build:\n'), ci.indexOf('\n  app-builds:\n'));
-  it('runs one production build at a time', () => expect(job).toMatch(/max-parallel: 1/));
+  it('runs one production build at a time on a shared Umbra guest, in parallel on hosted runners', () => {
+    expect(job).toMatch(
+      /max-parallel: \$\{\{ \(vars\.EBDA_RUNS_ON == '' && [^}]*\) && 6 \|\| 1 \}\}/
+    );
+  });
   it('is not a light-lane job id (umbra DefaultLightJobs globs)', () => {
     const light = [
       'notify-failure*',
