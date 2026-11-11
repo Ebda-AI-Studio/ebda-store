@@ -93,9 +93,10 @@ describe('late columns (declared once, applied once)', () => {
     );
     expect(counts).toEqual(manifest.databases.d1.columnCounts);
     for (const c of late) {
-      const names = (
-        db.prepare('PRAGMA table_info("billing_events")').all() as { name: string }[]
-      ).map(x => x.name);
+      const table = c.model === 'Store' ? 'stores' : 'billing_events';
+      const names = (db.prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]).map(
+        x => x.name
+      );
       expect(
         names.filter(n => n === c.column),
         c.column

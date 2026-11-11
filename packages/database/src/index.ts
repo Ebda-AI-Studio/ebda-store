@@ -990,12 +990,24 @@ export interface AcrossStoresOptions {
   /** Stores processed at once, each in its own transaction. Default 4. */
   concurrency?: number;
   /**
-   * Called when `fn` throws for one store. When given, that store is skipped and
-   * the sweep carries on (a cron must not die on one bad tenant); when omitted
-   * the first error rejects the whole call.
+   * Called when `fn` throws for one store (per-store hook, e.g. to count). Isolation does not depend on it: the DEFAULT is
+   * that one store's error never stops the sweep (issue #619).
    */
   onStoreError?: (storeId: string, err: unknown) => void;
+  /**
+   * EXPLICIT opt-in to the old all-or-nothing behaviour: the first error rejects the whole call. Only for a caller that
+   * would return a WRONG answer from a partial result (an admin total, a reference set an orphan sweep deletes against).
+   * Guarded by tests/unit/across-stores-isolation.test.ts. A cron must not set it: it starves every store after the bad one.
+   */
+  abortOnError?: true;
+  /** Start offset into the store list. Default: rotates with the wall-clock minute so no store is always last (#619). */
+  startOffset?: number;
 }
+
+type AcrossStoresResult<T> = Array<{ storeId: string; value: T }> & {
+  /** Stores whose `fn` threw (isolated mode). Empty when every store succeeded. */
+  failures: Array<{ storeId: string; err: unknown }>;
+};
 
 /**
  * Run `fn` once per store, each inside its OWN tenant transaction for that
@@ -1003,6 +1015,10 @@ export interface AcrossStoresOptions {
  * or a super-admin dashboard reads or writes "across tenants" without any
  * bypass: the database only ever shows `fn` the rows of the store it is
  * currently scoped to.
+ *
+ * Isolation (issue #619): a store whose `fn` throws is recorded in `result.failures` and the sweep CARRIES ON; one summary
+ * line with the counts is logged per call (never one per store). The visiting order is ROTATED each tick, so a store that
+ * always fails or is slow cannot starve the ones behind it; the returned array stays in directory order.
  *
  * Result-shape contract: `fn` sees only ONE store's rows, so a global
  * `take`/`orderBy`/`count` becomes per-store. The caller merges (sum the
@@ -1013,34 +1029,57 @@ export interface AcrossStoresOptions {
 export async function acrossStores<T>(
   fn: (storeId: string) => Promise<T>,
   opts: AcrossStoresOptions = {}
-): Promise<Array<{ storeId: string; value: T }>> {
+): Promise<AcrossStoresResult<T>> {
   // The list is the FULL directory (`storeDirectory`: D1 where bound, never capped, paged inside the resolver): a cron that
   // visits "every store" must not silently stop at a hub cap (Ruling NZ-PG-3).
   const storeIds = opts.storeIds
     ? dropHiddenStores(opts.storeIds, id => id, 'acrossStores')
     : (await storeDirectory(opts.filter)).map(s => s.id);
 
-  const out: Array<{ storeId: string; value: T } | undefined> = new Array(storeIds.length);
+  const total = storeIds.length;
+  const offset = total
+    ? (((opts.startOffset ?? Math.floor(Date.now() / 60_000)) % total) + total) % total
+    : 0;
+  const out: Array<{ storeId: string; value: T } | undefined> = new Array(total);
+  const failures: Array<{ storeId: string; err: unknown }> = [];
   let next = 0;
-  let failure: { err: unknown } | undefined;
+  let abort: { err: unknown } | undefined;
   const worker = async () => {
-    while (!failure) {
-      const i = next++;
-      if (i >= storeIds.length) return;
+    while (!abort) {
+      const k = next++;
+      if (k >= total) return;
+      const i = (k + offset) % total;
       const storeId = storeIds[i];
       try {
         if (await skipStoreNoData(storeId)) continue;
         out[i] = { storeId, value: await runInStoreTx(storeId, () => fn(storeId)) };
       } catch (err) {
-        if (opts.onStoreError) opts.onStoreError(storeId, err);
-        else failure = { err };
+        if (opts.abortOnError) {
+          abort = { err };
+          continue;
+        }
+        failures.push({ storeId, err });
+        opts.onStoreError?.(storeId, err);
       }
     }
   };
-  const n = Math.max(1, Math.min(opts.concurrency ?? 4, storeIds.length || 1));
+  const n = Math.max(1, Math.min(opts.concurrency ?? 4, total || 1));
   await Promise.all(Array.from({ length: n }, worker));
-  if (failure) throw failure.err;
-  return out.filter((r): r is { storeId: string; value: T } => r !== undefined);
+  if (abort) throw abort.err;
+  if (failures.length > 0 && !opts.onStoreError) {
+    // ONE line per call with counts (not per store); the log-drain error watch alerts on it.
+    const sample = failures
+      .slice(0, 5)
+      .map(f => `${f.storeId}:${(f.err as { code?: string })?.code ?? 'error'}`)
+      .join(',');
+    console.error(
+      `[acrossStores] ${failures.length} of ${total} stores failed; sweep carried on (${sample})`
+    );
+  }
+  return Object.assign(
+    out.filter((r): r is { storeId: string; value: T } => r !== undefined),
+    { failures }
+  );
 }
 
 /** `acrossStores` for a per-store LIST: the lists concatenated in store order. */

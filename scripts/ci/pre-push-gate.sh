@@ -3,8 +3,8 @@
 # This keeps ONLY the fast checks (a few seconds): the action-pin check, gitleaks on the push range, and prettier on
 # the files this push changed, plus `vitest related` on the changed source files (unit tier only, no full suite).
 # Lint, typecheck, prisma generate, package builds and the full suite run in CI, not here.
-# .husky/pre-push still runs this inside one hold of the host lock (scripts/ci/host-lock.sh). NEVER call host-lock.sh
-# from inside this script (not re-entrant). Planner kept for reference: scripts/ci/pre-push-plan.mjs (unused here).
+# Only the `vitest related` step takes the host lock (scripts/ci/host-lock.sh, PREPUSH-4); NEVER call host-lock.sh
+# from inside this script (not re-entrant). The scanner step uses a 4-slot semaphore + pass cache instead (PREPUSH-5). Planner kept for reference: scripts/ci/pre-push-plan.mjs (unused here).
 set -euo pipefail
 
 # Mirrors CI's client-secret-scan job: every `uses:` pinned to a 40-hex SHA (#1517).
@@ -52,16 +52,32 @@ if [ "$MODE" = "affected" ]; then
   fi
 fi
 
-# SCANNER-1 (Ruling PREPUSH-3): the repo-scanning unit tests ALWAYS run, whatever the diff. `vitest related` only follows
+# SCANNER-1 (Ruling PREPUSH-3, speed PREPUSH-5): the repo-scanning unit tests ALWAYS run, whatever the diff. `vitest related` only follows
 # imports, so it misses a gate that walks the whole tree (a banned string in apps/admin, a route-table walk, a git grep):
 # those used to go green here and red in CI. The list is derived by content (scripts/ci/pre-push-plan.mjs SCANNER_RULE), not
 # kept by hand. Same environment guard as the related step (built shared packages).
 SCANNERS=$(field scanners)
 if [ -n "$SCANNERS" ]; then
   if [ -d packages/database/dist ] && [ -d packages/shared/dist ]; then
-    echo "-> vitest scanners ($(printf '%s\n' $SCANNERS | wc -l | tr -d ' ') repo-scanning tests, always run)"
+    # PREPUSH-5: scanners are light (about 100 s CPU, 0.5 GB, measured), so they do NOT take the host-wide heavy lock.
+    # Two layers keep a push at about 2 min with 8 agents pushing: (1) a pass cache keyed by the git TREE hash of HEAD
+    # plus the scanner list, used ONLY on a clean working tree (scanners read the working directory, so a dirty tree
+    # always runs; a re-push of a clean identical tree costs 0 s); (2) a 4-slot semaphore (prepush-slot.sh) with a fixed --maxWorkers=2.
+    # CI still runs every scanner; this cache lives only on this Mac and only ever records a PASS (ignored inputs are in the key).
+    # PREPUSH-5b: the key is computed BEFORE the run and the pass is recorded under that pre-run key, so a rebuild or an
+    # edit during the scan can never be cached as a pass for the post-scan state. Empty key = dirty tree = no cache.
     # shellcheck disable=SC2086
-    bash scripts/ci/host-lock.sh npx vitest run --passWithNoTests --maxWorkers=50% $SCANNERS
+    KEY=$(bash scripts/ci/prepush-scanner-cache.sh key $SCANNERS 2>/dev/null || true)
+    # shellcheck disable=SC2086
+    if [ -n "$KEY" ] && PREPUSH_CACHE_KEY="$KEY" bash scripts/ci/prepush-scanner-cache.sh check $SCANNERS; then
+      echo "-> vitest scanners: this exact clean tree + list already passed locally; cache hit, skipped (CI still runs them)"
+    else
+      echo "-> vitest scanners ($(printf '%s\n' $SCANNERS | wc -l | tr -d ' ') repo-scanning tests, always run on a cache miss or dirty tree)"
+      # shellcheck disable=SC2086
+      bash scripts/ci/prepush-slot.sh npx vitest run --passWithNoTests --maxWorkers=2 $SCANNERS
+      # shellcheck disable=SC2086
+      if [ -n "$KEY" ]; then PREPUSH_CACHE_KEY="$KEY" bash scripts/ci/prepush-scanner-cache.sh record $SCANNERS || true; fi
+    fi
   else
     echo "! scanner tests skipped (packages not built); CI runs them"
   fi

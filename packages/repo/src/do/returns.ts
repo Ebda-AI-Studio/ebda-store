@@ -8,6 +8,13 @@ import {
 } from './return-adjustment';
 import { applyWalletEntry, refundOrder, reverseOrderEffects } from './refund';
 import {
+  assertRefundable,
+  assertWithinPaid,
+  MANUAL_RETURN_METHODS,
+  recordTrimmedCredit,
+  refundableBalance,
+} from './refundable';
+import {
   addPaymentEvent,
   REFUND_CLAIM_EVENT,
   REFUND_EXECUTED_EVENT,
@@ -1091,6 +1098,7 @@ export function claimReturn(db: SyncSql, a: ReturnClaimArgs): ReturnPlan {
     if (ret.status !== 'received' && ret.status !== 'inspecting')
       throw new MoneyError('INVALID_STATUS', 'Return must be received before completing', 400);
     if (ret.order_id) assertOrderNotBusy(db, a.storeId, ret.order_id as string, a.returnId);
+    if (ret.order_id) assertOrderNotRefunded(db, a.storeId, ret.order_id as string);
     // ATOMIC CLAIM: `refunded_at` null -> now, exactly one caller wins (a double click is a 409, never a second refund)
     if (ret.refunded_at !== null && ret.refunded_at !== undefined)
       throw new MoneyError(
@@ -1106,12 +1114,39 @@ export function claimReturn(db: SyncSql, a: ReturnClaimArgs): ReturnPlan {
       overridesOf(a.refundOverrides),
       a.walletFeature === true
     );
+    // #624: what THIS return pays out outside the provider must fit the order's one refundable balance (the provider leg is
+    // capped by beginRefund). Early refusal for the merchant; finishReturn re-checks in its own section.
+    if (plan.orderId)
+      assertRefundable(db, a.storeId, plan.orderId, nonProviderPayout(plan, method, ret));
     db.run(
       `UPDATE returns SET refunded_at = ?1, updated_at = ?1 WHERE id = ?2 AND store_id = ?3 AND refunded_at IS NULL`,
       [now, a.returnId, a.storeId]
     );
     return plan;
   });
+}
+
+/** A return cannot pay out again on an order that is already refunded in full (#624). */
+function assertOrderNotRefunded(db: SyncSql, storeId: string, orderId: string): void {
+  const o = db.all('SELECT status FROM orders WHERE id = ?1 AND store_id = ?2', [
+    orderId,
+    storeId,
+  ])[0];
+  if (o?.status === 'refunded')
+    throw new MoneyError(
+      'ORDER_ALREADY_REFUNDED',
+      'This order is already refunded in full, so this return cannot refund the customer again.',
+      409
+    );
+}
+
+/** The money a return completion pays out through the DO itself (store credit, a cash/bank/manual payout, a wallet share). */
+function nonProviderPayout(plan: ReturnPlan, method: string, ret: Row): number {
+  if (plan.isGatewayRefund) return plan.walletShare;
+  if (method === 'store_credit') return plan.walletCreditAmount ?? 0;
+  if ((MANUAL_RETURN_METHODS as readonly string[]).includes(method))
+    return plan.allocatedAmount ?? num(ret.refund_amount);
+  return 0;
 }
 
 /** `complete()`'s catch: release the claim, only while the return is still un-completed. */
@@ -1171,6 +1206,7 @@ export function finishReturn(
       overridesOf(a.refundOverrides),
       a.walletFeature === true
     );
+    const before = plan.orderId ? refundableBalance(db, a.storeId, plan.orderId) : null;
     // what the customer is owed: the partial allocation, else (full gateway) what the gateway was sent, else the estimate stays
     const refundAmount =
       plan.allocatedAmount ?? (plan.isGatewayRefund ? (a.gatewayAmount ?? null) : null);
@@ -1240,19 +1276,39 @@ export function finishReturn(
       });
       walletCredited = plan.walletCreditAmount;
     }
-    if (plan.walletShare > 0 && plan.orderId) {
+    // the gateway already paid its leg (an external fact, never refused): the wallet share is capped at what is left
+    const walletShare =
+      plan.walletShare > 0 && plan.orderId
+        ? Math.max(
+            0,
+            Math.min(plan.walletShare, refundableBalance(db, a.storeId, plan.orderId).refundable)
+          )
+        : 0;
+    if (plan.orderId && walletShare < plan.walletShare)
+      recordTrimmedCredit(db, {
+        storeId: a.storeId,
+        orderId: plan.orderId,
+        planned: plan.walletShare,
+        credited: walletShare,
+        source: 'return_wallet_share',
+        now,
+      });
+    if (walletShare > 0 && plan.orderId) {
       applyWalletEntry(db, {
         storeId: a.storeId,
         customerId: plan.customerId,
-        amount: plan.walletShare,
+        amount: walletShare,
         type: 'refund_credit',
         idempotencyKey: `${RETURN_WALLET_SHARE_KEY_PREFIX}${a.returnId}`,
         orderId: plan.orderId,
         returnId: a.returnId,
         now,
       });
-      walletShareCredited = plan.walletShare;
+      walletShareCredited = walletShare;
     }
+    // #624: a store-credit / cash / manual completion must leave refunds <= paid, or the whole section rolls back
+    if (!plan.isGatewayRefund && plan.orderId && before)
+      assertWithinPaid(db, a.storeId, plan.orderId, before);
     return {
       returnId: a.returnId,
       replayed: false,

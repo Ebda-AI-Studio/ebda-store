@@ -875,5 +875,125 @@ describe.skipIf(e.E2E_DB === '1')(
 
       expect.soft(reachReport(await pgReaches(true)), steps.join('\n')).toBe('');
     }, 120_000);
+    it('a COD "refused" racing the merchant ship never cancels or restocks a shipped order (Fixes #614)', async () => {
+      await pgReaches(true);
+      const steps: string[] = [];
+      const pid = crypto.randomUUID();
+      const seeded = await e.API.fetch(`${BASE}/internal/store-do/${storeId}/seed`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer workers-test-seed-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          products: [
+            {
+              id: pid,
+              storeId,
+              name: 'Race ring',
+              slug: 'race-ring',
+              price: 4000,
+              inventory: 50,
+              status: 'active',
+            },
+          ],
+        }),
+      });
+      expect(seeded.status, await seeded.clone().text()).toBe(200);
+      const status = async (orderId: string, to: string) => {
+        const r = await api(`/stores/${storeId}/orders/${orderId}/status`, {
+          method: 'PUT',
+          headers: merchant,
+          body: JSON.stringify({ status: to }),
+        });
+        const text = await r.text();
+        steps.push(
+          `${r.status} ${to} ${orderId.slice(0, 8)} ${r.status >= 300 ? text.slice(0, 160) : ''}`
+        );
+        return r.status;
+      };
+      const refuse = async (orderId: string) => {
+        const r = await e.API.fetch('https://api.ebda.app/__dev/wa-store-event', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: crypto.randomUUID(),
+            v: 1,
+            storeId,
+            occurredAt: new Date().toISOString(),
+            type: 'whatsapp.cod_outcome',
+            data: { orderId, outcome: 'refused', source: 'whatsapp' },
+          }),
+        });
+        const text = await r.text();
+        steps.push(`${r.status} refused ${orderId.slice(0, 8)} ${text.slice(0, 120)}`);
+        return text;
+      };
+      const order = async (orderId: string) =>
+        (
+          await doRead<Array<{ status: string; notes: string | null }>>(storeId, 'Order', {
+            where: { id: orderId },
+          })
+        )[0];
+      const stock = async () =>
+        (await doRead<Array<{ inventory: number }>>(storeId, 'Product', { where: { id: pid } }))[0]
+          .inventory;
+
+      // 1. deterministic: shipped first, then the refusal: nothing moves but the merchant's note
+      const first = await paidCodOrder({ phone: '+201000000801' }, pid, { markPaid: false });
+      expect(await status(first, 'confirmed'), steps.join('\n')).toBeLessThan(300);
+      expect(await status(first, 'shipped'), steps.join('\n')).toBeLessThan(300);
+      const before = await stock();
+      await refuse(first);
+      const o1 = await order(first);
+      expect.soft(o1.status, steps.join('\n')).toBe('shipped');
+      expect
+        .soft(o1.notes ?? '', 'the refusal is a delivery exception for the merchant')
+        .toContain('Delivery exception');
+      expect.soft(await stock(), 'no restock of a shipped order').toBe(before);
+
+      // 1b. the stale read, made deterministic: the consumer read 'confirmed', then the ship landed, then its cancel reached
+      //     the DO. The DO op itself must refuse in its own section (the Worker-side read cannot protect this).
+      const stale = await paidCodOrder({ phone: '+201000000802' }, pid, { markPaid: false });
+      expect(await status(stale, 'confirmed'), steps.join('\n')).toBeLessThan(300);
+      expect(await status(stale, 'shipped'), steps.join('\n')).toBeLessThan(300);
+      const beforeStale = await stock();
+      const op = await stub(storeId).moneyOp(
+        storeId,
+        'cancel',
+        JSON.stringify({
+          orderId: stale,
+          onlyFrom: ['pending', 'confirmed'],
+          exceptionNote: 'Delivery exception: refused after it shipped',
+        })
+      );
+      steps.push(`do cancel onlyFrom on shipped: ${JSON.stringify(op).slice(0, 200)}`);
+      expect.soft((await order(stale)).status, steps.join('\n')).toBe('shipped');
+      expect.soft(await stock(), 'the DO guard: no restock').toBe(beforeStale);
+
+      // 2. race: the ship and the refusal sent at the same moment, five times. Whichever the DO runs first wins:
+      //    cancelled (and restocked) OR shipped with the note (and NOT restocked), never shipped AND restocked.
+      const ids: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const id = await paidCodOrder({ phone: `+20100000090${i}` }, pid, { markPaid: false });
+        expect(await status(id, 'confirmed'), steps.join('\n')).toBeLessThan(300);
+        ids.push(id);
+      }
+      const start = await stock();
+      await Promise.all(ids.flatMap(id => [status(id, 'shipped'), refuse(id)]));
+      let cancelled = 0;
+      for (const id of ids) {
+        const o = await order(id);
+        if (o.status === 'cancelled') cancelled++;
+        else {
+          expect.soft(o.status, steps.join('\n')).toBe('shipped');
+          expect
+            .soft(o.notes ?? '', `${id} shipped: noted, not cancelled`)
+            .toContain('Delivery exception');
+        }
+      }
+      // every order holds 2 units: only the cancelled ones came back to stock
+      expect.soft(await stock(), steps.join('\n')).toBe(start + 2 * cancelled);
+      expect.soft(reachReport(await pgReaches(true)), steps.join('\n')).toBe('');
+    }, 120_000);
   }
 );

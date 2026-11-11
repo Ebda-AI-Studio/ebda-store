@@ -1,4 +1,6 @@
+import { runBuyerKeyBackfill, MAX_BUDGET } from '../lib/wa/buyer-key-backfill';
 import { backfillImageVariants } from '../services/image-variants.service';
+import { AppError } from '../middleware/error-handler';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
@@ -123,6 +125,53 @@ router.post(
         resourceType: 'store',
         resourceId: body.storeId,
         details: { ...r, dryRun: !!body.dryRun },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: r });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+const buyerKeyBackfillBody = z
+  .object({
+    /** DEFAULT TRUE: nothing is written unless the caller says `dryRun: false`. */
+    dryRun: z.boolean().default(true),
+    cursor: z.string().max(2048).optional(),
+    budget: z.number().int().min(1).max(MAX_BUDGET).optional(),
+    storeId: z.string().uuid().optional(),
+  })
+  .strict();
+
+// POST /admin/wa/buyer-key-backfill: stamp orders.buyer_key on orders that have a phone but no key (Ruling WA-BRIDGE-BIND-3), before
+// WA_BRIDGE_REQUIRE_BUYER_PROOF=1. Idempotent, dry-run by default, resumable (`nextCursor`), skips gone stores.
+router.post(
+  '/wa/buyer-key-backfill',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = parseInput(buyerKeyBackfillBody, req.body);
+      const secret = process.env.SUITE_BUYER_KEY_SECRET ?? '';
+      if (secret.length < 32)
+        throw new AppError(
+          503,
+          'BUYER_KEY_SECRET_MISSING',
+          'SUITE_BUYER_KEY_SECRET is not set on this Worker'
+        );
+      const r = await runBuyerKeyBackfill({ ...body, secret });
+      await auditLog({
+        action: 'wa.buyer_key_backfill',
+        userId: req.user!.userId,
+        resourceType: 'platform',
+        resourceId: body.storeId ?? 'all',
+        details: {
+          dryRun: r.dryRun,
+          totals: r.totals,
+          resumed: !!body.cursor,
+          done: r.nextCursor === null,
+        },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
