@@ -238,7 +238,10 @@ async function handleMerchantMcpPost(req: Request, res: Response): Promise<void>
     import('../mcp/merchant-mcp-server.js'),
   ]);
   const server = buildMerchantMcpServer(store);
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
+  });
   res.on('close', () => {
     void transport.close();
     void server.close();
