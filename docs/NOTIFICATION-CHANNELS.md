@@ -31,11 +31,8 @@ Source: code on `main` (2026-11-11) + production logs for order ORD-TOBCT4-DRHWY
 
 Enforcement: `validRecipients` (Zod email) in `lib/undeliverable-email.ts` runs in `emailQueue.enqueue` (the single choke point for every queued email: order, status, invoice, abandoned cart, back-in-stock, review, lifecycle, provider activation) and in `sendMail` via `deliverableOnly` (every direct send).
 
-## Ruling NOTIF-SMS-1 (for Ahmad)
+## Ruling NOTIF-SMS-1 - no SMS provider; email is the only shopper channel until WhatsApp
 
-An SMS provider exists: Unifonic, per-store merchant credentials. Ebda has no platform-owned SMS sender, so a shopper gets no SMS unless the merchant configured Unifonic. No provider was added. Options:
+Ruling NOTIF-SMS-1 - Ahmad decided (2026-11-11): Ebda adds NO SMS provider. Shopper order messages (placed / shipped / delivered) wait for WhatsApp through Ebda Chat (`ebda-whatsapp`), once Meta business verification is done. Until then email is the only shopper channel, and it is sent only when a valid address exists (guests may leave it empty; nothing is queued then). The existing per-store bring-your-own Unifonic code is unchanged and is not a platform channel. Cost if wrong: shoppers who give a phone but no email get no order notice until WhatsApp is live.
 
-1. Keep BYO-Unifonic (status quo, zero cost to Ebda; most merchants will have no SMS).
-2. Platform-owned Egypt SMS gateway (e.g. Vodafone/Etisalat A2P or an aggregator): per-SMS cost passed to merchants; needs sender-ID registration.
-3. Wait for WhatsApp via Ebda Chat (needs Meta verification) and skip SMS in Egypt.
-   Default taken: option 1. Cost if wrong: Egyptian shoppers without email get no order notice until 2 or 3 lands.
+Shopper channel table above is read with this ruling: the SMS row is "merchant-configured only, not offered by Ebda"; the WhatsApp row is "planned, blocked on Meta verification".
