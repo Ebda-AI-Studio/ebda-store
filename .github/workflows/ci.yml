@@ -399,7 +399,7 @@ jobs:
   unit-gate:
     name: Unit Tests (affected)
     needs: [changes, unit]
-    if: always() && github.event_name == 'pull_request'
+    if: always() && !cancelled() && github.event_name == 'pull_request'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     steps:
@@ -655,7 +655,7 @@ jobs:
   app-builds:
     name: App builds (affected)
     needs: [changes, app-build]
-    if: always() && github.event_name == 'pull_request'
+    if: always() && !cancelled() && github.event_name == 'pull_request'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     steps:

@@ -642,6 +642,13 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     expect(wf.match(/CLAUDE_OUTPUT: \$\{\{ runner\.temp \}\}\/claude-out\.json/g)?.length).toBe(2);
     expect(wf).toContain('> "$CLAUDE_OUTPUT"');
   });
+  it('PR aggregator jobs skip on a cancelled run (else they hold a scarce runner after every superseded push)', () => {
+    for (const name of ['unit-gate', 'app-builds']) {
+      expect((parsed.jobs[name] as unknown as { if: string }).if).toMatch(
+        /^always\(\) && !cancelled\(\) && /
+      );
+    }
+  });
   it('the Mac path never ALTERs the shared ebda_app role (Ruling CI-MAC-ROLE-1)', () => {
     const steps = parsed.jobs['test-integration'].steps;
     expect(steps.find(st => /ALTER ROLE ebda_app/.test(st.run ?? ''))?.if).toBe(
