@@ -238,6 +238,11 @@ export function brandName(locale?: string | null): string {
   return locale && locale.toLowerCase().startsWith('ar') ? BRAND.nameAr : BRAND.name;
 }
 
+/** Tagline for a locale (`ar*` gets the Arabic line), so an Arabic page never carries the English meta description. */
+export function brandTagline(locale?: string | null): string {
+  return locale && locale.toLowerCase().startsWith('ar') ? BRAND.taglineAr : BRAND.tagline;
+}
+
 /** Product name for merchant/store surfaces, separate from the company identity. */
 export function productName(locale?: string | null): string {
   return locale?.toLowerCase().startsWith('ar') ? BRAND.product.nameAr : BRAND.product.nameEn;

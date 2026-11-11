@@ -6,7 +6,7 @@ import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { Providers } from './providers';
 import { intlFormats } from '../i18n/formats';
 import '../styles/globals.css';
-import { BRAND } from '@ebda/shared';
+import { brandTagline } from '@ebda/shared';
 import { productName } from '../lib/product-name';
 import { THEME_INIT_SCRIPT } from '@/lib/auth-theme';
 
@@ -24,13 +24,14 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const name = productName(await getLocale());
+  const locale = await getLocale();
+  const name = productName(locale);
   return {
     title: {
       default: name,
       template: `%s · ${name}`,
     },
-    description: BRAND.tagline,
+    description: brandTagline(locale),
     // Tell every crawler to skip this domain entirely. Belt-and-suspenders
     // with `apps/admin/public/robots.txt` and the X-Robots-Tag header in
     // next.config.js — any one of these layers is enough but Google
