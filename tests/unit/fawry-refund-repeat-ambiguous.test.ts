@@ -1,9 +1,10 @@
 /**
- * Ruling FAWRY-REFUND-DEDUPE-1: a repeated Fawry refund notice with no payment reference number cannot be told apart from a
- * second partial refund of the same amount; the route raises a P1 on it instead of dropping it silently.
+ * Ruling FAWRY-REFUND-DEDUPE-1: EVERY repeated Fawry refund notice raises a P1 (with or without a reference number), since
+ * nothing proves the reference changes per refund and the refund amount is unsigned. A payment notice and other providers
+ * do not.
  */
 import { describe, expect, it } from 'vitest';
-import { isAmbiguousRefundRepeat } from '@api/services/payment-providers/webhook-signature';
+import { isFawryRefundNotice } from '@api/services/payment-providers/webhook-signature';
 
 const n = (over: Record<string, unknown> = {}) => ({
   fawryRefNumber: '999',
@@ -13,16 +14,15 @@ const n = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-describe('isAmbiguousRefundRepeat', () => {
-  it('a Fawry refund / partial refund notice with no reference number is ambiguous', () => {
-    expect(isAmbiguousRefundRepeat('fawry', n())).toBe(true);
-    expect(isAmbiguousRefundRepeat('fawry', n({ orderStatus: 'refunded' }))).toBe(true);
-    expect(isAmbiguousRefundRepeat('fawry', n({ paymentRefrenceNumber: '  ' }))).toBe(true);
+describe('isFawryRefundNotice', () => {
+  it('any Fawry refund or partial refund notice, with or without a reference number', () => {
+    expect(isFawryRefundNotice('fawry', n())).toBe(true);
+    expect(isFawryRefundNotice('fawry', n({ orderStatus: 'refunded' }))).toBe(true);
+    expect(isFawryRefundNotice('fawry', n({ paymentRefrenceNumber: 'RF-1' }))).toBe(true);
   });
-  it('a reference number, a payment notice, or another provider is a plain redelivery', () => {
-    expect(isAmbiguousRefundRepeat('fawry', n({ paymentRefrenceNumber: 'RF-1' }))).toBe(false);
-    expect(isAmbiguousRefundRepeat('fawry', n({ orderStatus: 'PAID' }))).toBe(false);
-    expect(isAmbiguousRefundRepeat('paymob', n())).toBe(false);
-    expect(isAmbiguousRefundRepeat('kashier', n())).toBe(false);
+  it('a payment notice, or another provider, is not one', () => {
+    expect(isFawryRefundNotice('fawry', n({ orderStatus: 'PAID' }))).toBe(false);
+    expect(isFawryRefundNotice('paymob', n())).toBe(false);
+    expect(isFawryRefundNotice('kashier', n())).toBe(false);
   });
 });
