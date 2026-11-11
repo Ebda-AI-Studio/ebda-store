@@ -100,7 +100,15 @@ export async function backupD1(
 
 export interface SweepReport {
   day: string;
-  stores: { armed: number; missingYesterday: string[]; errors: string[] };
+  stores: {
+    armed: number;
+    missingYesterday: string[];
+    errors: string[];
+    /** Stores whose missing backup was taken by the bounded in-sweep retry (no P1 for these). */
+    recovered: string[];
+    /** Stores this tick did not reach (deadline / cap); the next tick starts at `cursor`. */
+    deferred: number;
+  };
   d1: Record<string, { ok: boolean; tables?: number; rows?: number; error?: string }>;
   ok: boolean;
 }
@@ -109,44 +117,47 @@ export interface SweepDeps {
   listStoreIds: (env: SweepEnv) => string[] | Promise<string[]>;
   alert: (title: string, body: string) => Promise<unknown>;
   now?: Date;
+  /** Wall-clock budget for the per-store loop (default 10 min; the cron invocation limit is 15). */
+  budgetMs?: number;
+  /** Per-store ceiling on subrequest-heavy work (3-4 each; default 250 keeps one tick under the 1,000 subrequest cap). */
+  maxStores?: number;
+  /** One hung StoreDO must not eat the whole budget (default 60 s). */
+  storeTimeoutMs?: number;
+  /** Upper bound of `backupNow` retries per tick (default 25). */
+  maxRetries?: number;
+  clock?: () => number;
 }
+
+export const SWEEP_CURSOR_KEY = 'ops-reports/backup-sweep/cursor.json';
 
 const dayOf = (d: Date) => d.toISOString().slice(0, 10);
 
+const withTimeout = <T>(p: Promise<T>, ms: number, what: string): Promise<T> => {
+  let t: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, rej) => {
+    t = setTimeout(() => rej(new Error(`${what} timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(t));
+};
+
 export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<SweepReport> {
   const now = deps.now ?? new Date();
+  const clock = deps.clock ?? Date.now;
+  const started = clock();
+  const budgetMs = deps.budgetMs ?? 10 * 60_000;
+  const maxStores = deps.maxStores ?? 250;
+  const storeTimeoutMs = deps.storeTimeoutMs ?? 60_000;
   const r2 = env.STORE_BACKUPS as R2PutGet | undefined;
   if (!r2) throw new Error('STORE_BACKUPS binding missing: nothing can be backed up');
   const yesterday = dayOf(new Date(now.getTime() - 86_400_000));
   const report: SweepReport = {
     day: dayOf(now),
-    stores: { armed: 0, missingYesterday: [], errors: [] },
+    stores: { armed: 0, missingYesterday: [], errors: [], recovered: [], deferred: 0 },
     d1: {},
     ok: true,
   };
 
-  for (const id of await deps.listStoreIds(env)) {
-    try {
-      const ns = env.STORE_DO;
-      if (!ns) throw new Error('STORE_DO binding missing');
-      const stub = ns.get(ns.idFromName(id)) as unknown as StoreStub;
-      await stub.ensureBackupAlarm();
-      report.stores.armed++;
-      if (!(await r2.get(storeBackupManifestKey(id, yesterday)))) {
-        // A store that has NEVER been backed up is new: its first alarm is armed above for +24h, so yesterday's manifest
-        // cannot exist (Amelia, created 2026-11-10, false P1 2026-11-11). Take its baseline backup now instead of
-        // flagging it; a failure there lands in `errors`. A store WITH history but no yesterday means the alarm failed.
-        const hasHistory =
-          !r2.list ||
-          (await r2.list({ prefix: `store-do-backups/${id}/`, limit: 1 })).objects.length > 0;
-        if (hasHistory) report.stores.missingYesterday.push(id);
-        else await stub.backupNow(id);
-      }
-    } catch (e) {
-      report.stores.errors.push(`${id}: ${(e as Error).message}`);
-    }
-  }
-
+  // D1 FIRST (P2-5): the account-level export is the part a slow or hung StoreDO must never starve.
   for (const name of D1_BINDINGS) {
     const db = env[name] as D1Like | undefined;
     if (!db) continue;
@@ -163,9 +174,89 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
     }
   }
 
+  const stubOf = (id: string) => {
+    const ns = env.STORE_DO;
+    if (!ns) throw new Error('STORE_DO binding missing');
+    return ns.get(ns.idFromName(id)) as unknown as StoreStub;
+  };
+
+  // Bounded loop: ids in a stable order, resuming after the last tick's cursor, stopping at the deadline or the cap.
+  const all = [...(await deps.listStoreIds(env))].sort();
+  let start = 0;
+  try {
+    const cur = await r2.get(SWEEP_CURSOR_KEY);
+    const next = cur
+      ? ((JSON.parse(await cur.text()) as { next?: string | null }).next ?? null)
+      : null;
+    if (next)
+      start = Math.max(
+        0,
+        all.findIndex(id => id >= next)
+      );
+  } catch {
+    // an unreadable cursor restarts from the top: never skips a store
+  }
+  const order = [...all.slice(start), ...all.slice(0, start)];
+  let done = 0;
+  const missing: string[] = [];
+  for (const id of order) {
+    if (done >= maxStores || clock() - started > budgetMs) break;
+    done++;
+    try {
+      await withTimeout(
+        (async () => {
+          const stub = stubOf(id);
+          await stub.ensureBackupAlarm();
+          report.stores.armed++;
+          if (!(await r2.get(storeBackupManifestKey(id, yesterday)))) {
+            // A store that has NEVER been backed up is new: its first alarm is armed above for +24h, so yesterday's manifest
+            // cannot exist (Amelia, created 2026-11-10, false P1 2026-11-11). Take its baseline backup now instead of
+            // flagging it; a failure there lands in `errors`. A store WITH history but no yesterday means the alarm failed.
+            const hasHistory =
+              !r2.list ||
+              (await r2.list({ prefix: `store-do-backups/${id}/`, limit: 1 })).objects.length > 0;
+            if (hasHistory) missing.push(id);
+            else await stub.backupNow(id);
+          }
+        })(),
+        storeTimeoutMs,
+        `store ${id}`
+      );
+    } catch (e) {
+      report.stores.errors.push(`${id}: ${(e as Error).message}`);
+    }
+  }
+  report.stores.deferred = order.length - done;
+  const nextId = report.stores.deferred > 0 ? order[done] : null;
+  try {
+    await r2.put(SWEEP_CURSOR_KEY, JSON.stringify({ day: report.day, next: nextId }));
+  } catch (e) {
+    report.stores.errors.push(`cursor: ${(e as Error).message}`);
+  }
+
+  // One bounded retry (P2-5): a store with history but no yesterday manifest gets `backupNow` once, now, instead of waiting a
+  // full night for the next alarm. Still failing = stays in `missingYesterday` and in `errors`.
+  const maxRetries = deps.maxRetries ?? 25;
+  let retried = 0;
+  for (const id of missing) {
+    if (retried >= maxRetries || clock() - started > budgetMs) {
+      report.stores.missingYesterday.push(id);
+      continue;
+    }
+    retried++;
+    try {
+      await withTimeout(stubOf(id).backupNow(id), storeTimeoutMs, `backupNow ${id}`);
+      report.stores.recovered.push(id);
+    } catch (e) {
+      report.stores.missingYesterday.push(id);
+      report.stores.errors.push(`${id}: retry backupNow failed: ${(e as Error).message}`);
+    }
+  }
+
   report.ok =
     report.stores.errors.length === 0 &&
     report.stores.missingYesterday.length === 0 &&
+    report.stores.deferred === 0 &&
     Object.values(report.d1).every(v => v.ok);
   await r2.put(`ops-reports/backup-sweep/${report.day}.json`, JSON.stringify(report, null, 2));
   if (!report.ok)
@@ -175,6 +266,8 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
         {
           missingYesterday: report.stores.missingYesterday,
           storeErrors: report.stores.errors,
+          deferredStores: report.stores.deferred,
+          recovered: report.stores.recovered,
           d1: report.d1,
         },
         null,

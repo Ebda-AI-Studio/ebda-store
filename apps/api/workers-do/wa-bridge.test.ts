@@ -522,6 +522,10 @@ describe('WA-RPC-8: replay completes the order (#616) and refusals are typed (#6
       code: 'SOMETHING_NEW',
     });
     expect(refusalOf({ code: 'DB_BUSY', statusCode: 503, message: 'm' }, [])).toBeNull();
+    // #662: a pricing invariant breach (status 500) is a bug, not a refusal; any listed code carrying a 5xx is not a refusal
+    expect(refusalOf({ code: 'NEGATIVE_TOTAL', status: 500, message: 'm' }, [])).toBeNull();
+    expect(refusalOf({ code: 'BAD_ARGS', status: 500, message: 'm' }, [])).toBeNull();
+    expect(refusalOf({ code: 'OUT_OF_STOCK', status: 500, message: 'm' }, ['v1'])).toBeNull();
     expect(refusalOf(new Error('boom'), [])).toBeNull();
   });
 });
