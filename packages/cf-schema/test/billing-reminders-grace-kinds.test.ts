@@ -39,7 +39,9 @@ const claim = (db: DatabaseSync, kind: string) =>
 describe('D1 0013: billing_reminders accepts the grace stages (BILL-NOTICE-1)', () => {
   it('exists, after 0011 (0012 is reserved for the template contract step)', () => {
     expect(M10).toBeTruthy();
-    expect(files.indexOf(M10)).toBe(files.length - 1);
+    expect(files.indexOf(M10)).toBe(
+      files.findIndex(f => f.endsWith('0009_store_template_current.sql')) + 1
+    );
   });
 
   it('production before 0013 REJECTS a grace stage (the defect: it rolls the past_due decision back)', () => {

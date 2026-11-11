@@ -9,7 +9,7 @@
  * job that missed days does not replay the older reminders.
  */
 import { prisma, withStore, type Prisma } from '@ebda/database';
-import { acrossBilling } from '../platform/billing-d1';
+import { acrossBilling, d1All, d1Run, onD1 } from '../platform/billing-d1';
 import { config } from '../../config';
 import { getEntityStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';
@@ -19,14 +19,16 @@ import { socketService } from '../socket.service';
 import {
   FREE_PLAN_CODE,
   GRANTED_PLAN_CODES,
+  INSTAPAY_GRACE_DAYS,
   REMINDER_OFFSETS,
+  addDays,
   isInterval,
   priceFor,
 } from './period';
 import { instapayHandle, supportContact } from './manual-config';
 import { chargeFor, ledgerVat } from './charge-amount';
 import { isBillableStoreId } from './account.service';
-import { runBillingEffects } from './billing-notify';
+import { deliverBillingEffect, type BillingEffect } from './billing-notify';
 
 const DAY = 86_400_000;
 export type ReminderKind = 'd7' | 'd3' | 'd1' | 'd0';
@@ -204,6 +206,102 @@ export async function claimGraceStage(
   return count === 1;
 }
 
+type StageKey = { storeId: string; subscriptionId: string; dueAt: Date; kind: GraceStage };
+type OutboxRow = StageKey & { id: string; createdAt: Date };
+
+/*
+ * `billing_reminders.notice_sent_at` is a D1-only column (platform migration 0011): it is not in the Prisma model, so the outbox
+ * state is read and written with raw D1 SQL (billing-d1.ts). Off D1 (no such column) the outbox is a no-op and a stage is
+ * as before: claimed, sent once.
+ */
+const stampSql = `UPDATE billing_reminders SET notice_sent_at = ?1
+  WHERE store_id = ?2 AND subscription_id = ?3 AND due_at = ?4 AND kind = ?5 AND notice_sent_at IS NULL`;
+const stampSent = async (r: StageKey, at = new Date()) =>
+  (await onD1()) &&
+  (await d1Run(stampSql, at.getTime(), r.storeId, r.subscriptionId, r.dueAt.getTime(), r.kind)) > 0;
+
+/**
+ * Ruling BILL-NOTICE-3 (outbox): the claim row IS the outbox entry (`notice_sent_at` NULL). Send the stage's notice, and only a
+ * confirmed delivery stamps `notice_sent_at`; a run killed (or an effect that failed) between the claim and the send leaves it
+ * NULL for `resendUnsentGraceNotices` to finish. At-least-once by design, deduplicated by the stamp. (No provider-side
+ * idempotency key: `EmailService` and the bell take none.)
+ */
+export async function deliverGraceStage(stage: StageKey, effect: BillingEffect): Promise<boolean> {
+  if (!(await deliverBillingEffect(effect))) return false;
+  await stampSent(stage);
+  return true;
+}
+
+/** A claimed-but-unsent stage is re-sent only after this long (the first run is still in its send), and not forever. */
+export const RESEND_AFTER_MS = 5 * 60_000;
+export const RESEND_GIVE_UP_MS = 2 * DAY;
+const GRACE_STAGES = ['grace_start', 'grace_d1', 'suspended'] as const;
+
+/**
+ * Re-send every grace stage claimed but not confirmed sent (see `deliverGraceStage`). A lease (bumping `created_at` from the
+ * value read, so one worker wins) keeps two workers from re-sending the same row. A stage whose moment has passed (the store
+ * paid, so the subscription is no longer past_due) is stamped without sending. Returns how many notices went out.
+ */
+export async function resendUnsentGraceNotices(now: Date = new Date()): Promise<number> {
+  if (!(await onD1())) return 0;
+  const found = await d1All<{
+    id: string;
+    store_id: string;
+    subscription_id: string;
+    due_at: number;
+    kind: GraceStage;
+    created_at: number;
+  }>(
+    `SELECT id, store_id, subscription_id, due_at, kind, created_at FROM billing_reminders
+     WHERE kind IN (${GRACE_STAGES.map(() => '?').join(', ')}) AND notice_sent_at IS NULL AND created_at BETWEEN ? AND ?
+     ORDER BY created_at LIMIT 200`,
+    ...GRACE_STAGES,
+    now.getTime() - RESEND_GIVE_UP_MS,
+    now.getTime() - RESEND_AFTER_MS
+  );
+  let sent = 0;
+  for (const f of found) {
+    const row: OutboxRow = {
+      id: f.id,
+      storeId: f.store_id,
+      subscriptionId: f.subscription_id,
+      dueAt: new Date(f.due_at),
+      kind: f.kind,
+      createdAt: new Date(f.created_at),
+    };
+    try {
+      const leased = await d1Run(
+        `UPDATE billing_reminders SET created_at = ?1 WHERE id = ?2 AND notice_sent_at IS NULL AND created_at = ?3`,
+        now.getTime(),
+        row.id,
+        f.created_at
+      );
+      if (leased !== 1) continue;
+      const sub = await withStore(row.storeId, tx =>
+        tx.storeSubscription.findUnique({
+          where: { id: row.subscriptionId, storeId: row.storeId },
+        })
+      );
+      if (!sub || sub.status !== 'past_due') {
+        await stampSent(row, now);
+        continue;
+      }
+      const suspendAt = sub.nextRetryAt ?? addDays(row.dueAt, INSTAPAY_GRACE_DAYS);
+      const effect: BillingEffect =
+        row.kind === 'grace_start'
+          ? { kind: 'grace_started', storeId: row.storeId, suspendAt }
+          : row.kind === 'grace_d1'
+            ? { kind: 'grace_ending', storeId: row.storeId, suspendAt }
+            : { kind: 'store_suspended', storeId: row.storeId, applied: true };
+      if (await deliverGraceStage(row, effect)) sent++;
+    } catch (err) {
+      if (!isStoreGoneError(err))
+        logger.error({ err, reminderId: row.id }, '[billing] grace resend failed');
+    }
+  }
+  return sent;
+}
+
 /** InstaPay subscriptions in grace whose suspension is within the next day. */
 export async function findGraceEndingCandidates(now: Date): Promise<string[]> {
   return scanSubscriptionIds(
@@ -243,11 +341,14 @@ export async function sendGraceEndingNotice(
         dueAt: sub.currentPeriodEnd,
         kind: 'grace_d1',
       });
-      return { won, suspendAt: sub.nextRetryAt };
+      return { won, suspendAt: sub.nextRetryAt, dueAt: sub.currentPeriodEnd };
     });
     if (!claimed) return { sent: false, reason: 'no_window' };
     if (!claimed.won) return { sent: false, reason: 'already_sent' };
-    await runBillingEffects([{ kind: 'grace_ending', storeId, suspendAt: claimed.suspendAt }]);
+    await deliverGraceStage(
+      { storeId, subscriptionId, dueAt: claimed.dueAt, kind: 'grace_d1' },
+      { kind: 'grace_ending', storeId, suspendAt: claimed.suspendAt }
+    );
     return { sent: true, kind: 'd1' };
   } catch (err) {
     if (!isStoreGoneError(err)) throw err;

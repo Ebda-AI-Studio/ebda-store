@@ -15,8 +15,18 @@ const h = vi.hoisted(() => ({ suspend: null as null | ((id: string) => Promise<b
 vi.mock('../../apps/api/src/services/alerts.service', () => ({
   sendAlert: vi.fn(async () => undefined),
 }));
+const h2 = vi.hoisted(() => ({
+  sent: [] as Array<{ kind: string; applied?: boolean }>,
+  killOn: null as null | string,
+}));
 vi.mock('../../apps/api/src/services/billing/billing-notify', () => ({
   runBillingEffects: vi.fn(async () => undefined),
+  // the notice sender: records what went out; `killOn` simulates the process dying right before that send
+  deliverBillingEffect: vi.fn(async (e: { kind: string; applied?: boolean }) => {
+    if (h2.killOn === e.kind) throw new Error(`KILLED before sending ${e.kind}`);
+    h2.sent.push(e);
+    return true;
+  }),
 }));
 vi.mock('../../apps/api/src/lib/definer', () => ({
   getEntityStoreId: async () => '11111111-1111-4111-8111-111111111111',
@@ -125,6 +135,8 @@ const subRow = (db: DatabaseSync) =>
     .get(SUB) as { status: string; retry: number | null };
 
 beforeEach(() => {
+  h2.sent.length = 0;
+  h2.killOn = null;
   resetCutoverCache();
   clearCfBindings();
   setModelRouter(null as never);
@@ -222,13 +234,83 @@ describe('a failure mid-suspension is finished by the next cycle (BILL-NOTICE-2:
     });
     expect(kinds(db)).toContain('suspended');
     expect(subRow(db).retry).toBeNull();
-    const effects = vi
-      .mocked(
-        (await import('../../apps/api/src/services/billing/billing-notify')).runBillingEffects
-      )
-      .mock.calls.flatMap(c => c[0]) as Array<{ kind: string; applied?: boolean }>;
-    expect(effects.filter(e => e.kind === 'store_suspended' && e.applied === true)).toHaveLength(1);
+    expect(h2.sent.filter(e => e.kind === 'store_suspended' && e.applied === true)).toHaveLength(1);
     // and a third run is a no-op
     expect((await runBillingCycle(after, undefined, { subscriptionIds: [SUB] })).suspended).toBe(0);
+  });
+});
+
+describe('the notice is an outbox: claimed, sent, then stamped (BILL-NOTICE-3)', () => {
+  // the claim row's created_at is the real wall clock; these tests run on a simulated one, so pin it to the claim's moment
+  const claimedAt = (db: DatabaseSync, at: Date) =>
+    db
+      .prepare(`UPDATE billing_reminders SET created_at = ? WHERE notice_sent_at IS NULL`)
+      .run(at.getTime());
+  const sentAt = (db: DatabaseSync, kind: string) =>
+    (
+      db
+        .prepare(
+          `SELECT notice_sent_at AS s FROM billing_reminders WHERE subscription_id = ? AND kind = ?`
+        )
+        .get(SUB, kind) as { s: number | null } | undefined
+    )?.s;
+
+  it('a run killed after the claim and before the send is finished by a later run, which sends exactly once', async () => {
+    const db = rig(true);
+    const day1 = new Date(PERIOD_END.getTime() + 1000);
+    h2.killOn = 'grace_started';
+    expect((await runBillingCycle(day1, undefined, { subscriptionIds: [SUB] })).errors).toBe(1);
+    expect(kinds(db)).toEqual(['grace_start']); // claimed ...
+    expect(sentAt(db, 'grace_start')).toBeNull(); // ... not sent
+    expect(h2.sent).toHaveLength(0);
+    claimedAt(db, day1);
+
+    h2.killOn = null;
+    // too soon: the first run may still be in its send
+    await runBillingCycle(new Date(day1.getTime() + 60_000));
+    expect(h2.sent).toHaveLength(0);
+    // later: the full cycle (not the per-subscription one) re-sends
+    const later = new Date(day1.getTime() + 6 * 60_000);
+    await runBillingCycle(later);
+    expect(h2.sent.map(e => e.kind)).toEqual(['grace_started']);
+    expect(sentAt(db, 'grace_start')).not.toBeNull();
+    // exactly once: every further run sends nothing more
+    await runBillingCycle(new Date(later.getTime() + 10 * 60_000));
+    await runBillingCycle(new Date(later.getTime() + 20 * 60_000));
+    expect(h2.sent.map(e => e.kind)).toEqual(['grace_started']);
+  });
+
+  it('killed before the suspended notice: the store is already suspended and the next cycle sends the notice once', async () => {
+    const db = rig(true);
+    await runBillingCycle(new Date(PERIOD_END.getTime() + 1000), undefined, {
+      subscriptionIds: [SUB],
+    });
+    const after = new Date(subRow(db).retry! + 60_000);
+    h2.sent.length = 0;
+    h2.killOn = 'store_suspended';
+    await runBillingCycle(after, undefined, { subscriptionIds: [SUB] });
+    expect(storeStatus(db).status).toBe('suspended');
+    expect(sentAt(db, 'suspended')).toBeNull();
+    claimedAt(db, after);
+    h2.killOn = null;
+    await runBillingCycle(new Date(after.getTime() + 6 * 60_000));
+    await runBillingCycle(new Date(after.getTime() + 20 * 60_000));
+    expect(h2.sent.filter(e => e.kind === 'store_suspended')).toHaveLength(1);
+    expect(sentAt(db, 'suspended')).not.toBeNull();
+  });
+
+  it('a failed send (effect returns false) is not stamped; a store that paid meanwhile is stamped without a send', async () => {
+    const db = rig(true);
+    const day1 = new Date(PERIOD_END.getTime() + 1000);
+    const { deliverBillingEffect } =
+      await import('../../apps/api/src/services/billing/billing-notify');
+    vi.mocked(deliverBillingEffect).mockResolvedValueOnce(false);
+    await runBillingCycle(day1, undefined, { subscriptionIds: [SUB] });
+    expect(sentAt(db, 'grace_start')).toBeNull();
+    claimedAt(db, day1);
+    db.prepare(`UPDATE store_subscriptions SET status = 'active' WHERE id = ?`).run(SUB);
+    await runBillingCycle(new Date(day1.getTime() + 6 * 60_000));
+    expect(h2.sent).toHaveLength(0);
+    expect(sentAt(db, 'grace_start')).not.toBeNull();
   });
 });

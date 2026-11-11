@@ -51,6 +51,12 @@ const snapshot = (db: DatabaseSync) => ({
   ).map(r => `${r.type}:${r.name}`),
 });
 
+/** The D1 table of each model that declares a late column. */
+const LATE_TABLE: Record<string, string> = {
+  BillingEvent: 'billing_events',
+  BillingReminder: 'billing_reminders',
+};
+
 const late = Object.entries(
   extraColumns as Record<string, Array<{ column: string; cfSince?: number }>>
 ).flatMap(([model, cols]) =>
@@ -93,10 +99,11 @@ describe('late columns (declared once, applied once)', () => {
     );
     expect(counts).toEqual(manifest.databases.d1.columnCounts);
     for (const c of late) {
-      const table = c.model === 'Store' ? 'stores' : 'billing_events';
-      const names = (db.prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]).map(
-        x => x.name
-      );
+      const names = (
+        db.prepare(`PRAGMA table_info("${LATE_TABLE[c.model] ?? 'billing_events'}")`).all() as {
+          name: string;
+        }[]
+      ).map(x => x.name);
       expect(
         names.filter(n => n === c.column),
         c.column

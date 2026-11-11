@@ -53,6 +53,7 @@ export const LATE_COLUMN_MIGRATIONS = {
   3: 'late_columns',
   7: 'billing_eta_fields',
   10: 'store_template_original',
+  11: 'billing_reminder_notice_sent',
 };
 
 export const extraColumns = {
@@ -108,6 +109,13 @@ export const extraColumns = {
       optional: true,
       since: 7,
       note: 'ETA rejection text for a rejected submission; an operator reads it',
+    }),
+  ],
+  BillingReminder: [
+    f('noticeSentAt', 'DateTime', {
+      optional: true,
+      since: 11,
+      note: 'BILL-NOTICE-3 outbox: NULL = claimed, notice not yet confirmed sent',
     }),
   ],
   Store: [

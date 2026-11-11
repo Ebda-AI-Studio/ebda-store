@@ -96,7 +96,13 @@ import {
 } from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
-import { claimGraceStage, findReminderCandidates, sendDueReminder } from './reminders.service';
+import {
+  claimGraceStage,
+  deliverGraceStage,
+  findReminderCandidates,
+  resendUnsentGraceNotices,
+  sendDueReminder,
+} from './reminders.service';
 import {
   chargeFor,
   ledgerVat,
@@ -1169,7 +1175,10 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
       });
     }
     if (claimed) {
-      await runBillingEffects([{ kind: 'grace_started', storeId: sub.storeId, suspendAt }]);
+      await deliverGraceStage(
+        { storeId: sub.storeId, subscriptionId: sub.id, dueAt: periodEnd, kind: 'grace_start' },
+        { kind: 'grace_started', storeId: sub.storeId, suspendAt }
+      );
     }
     return {
       action: 'skipped',
@@ -1211,7 +1220,11 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
     return { action: 'skipped', reason: 'already_advanced' };
   }
   // `applied` = this run owns the notice (the stage row is claimed once), even when a previous run did the suspension.
-  await runBillingEffects([{ kind: 'store_suspended', storeId: sub.storeId, applied: claimed }]);
+  if (claimed)
+    await deliverGraceStage(
+      { storeId: sub.storeId, subscriptionId: sub.id, dueAt: periodEnd, kind: 'suspended' },
+      { kind: 'store_suspended', storeId: sub.storeId, applied: true }
+    );
   return { action: 'suspended' };
 }
 
@@ -1422,6 +1435,15 @@ export async function runBillingCycle(
         summary.errors++;
         logger.error({ err, subscriptionId: id }, '[billing] reminder threw');
       }
+    }
+  }
+  if (!only) {
+    // BILL-NOTICE-3: finish grace notices claimed by a run that died (or failed) before sending them.
+    try {
+      summary.reminders += await resendUnsentGraceNotices(now);
+    } catch (err) {
+      summary.errors++;
+      logger.error({ err }, '[billing] grace notice resend threw');
     }
   }
   if (!only) {

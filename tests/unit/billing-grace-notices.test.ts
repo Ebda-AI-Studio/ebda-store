@@ -25,6 +25,10 @@ vi.mock('@api/services/billing/billing-notify', () => ({
   runBillingEffects: async (e: Array<Record<string, unknown>>) => {
     h.effects.push(...e);
   },
+  deliverBillingEffect: async (e: Record<string, unknown>) => {
+    h.effects.push(e);
+    return true;
+  },
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: vi.fn() }));
 
@@ -65,7 +69,12 @@ vi.mock('@ebda/database', () => ({
   acrossStores: vi.fn(),
   storeDirectory: vi.fn(),
 }));
-vi.mock('@api/services/platform/billing-d1', () => ({ acrossBilling: async () => [] }));
+vi.mock('@api/services/platform/billing-d1', () => ({
+  acrossBilling: async () => [],
+  onD1: async () => false, // the outbox column is D1-only: covered in billing-grace-suspension-d1.test.ts
+  d1All: async () => [],
+  d1Run: async () => 0,
+}));
 
 import { renewSubscription } from '@api/services/billing/subscription-billing.service';
 import { sendGraceEndingNotice } from '@api/services/billing/reminders.service';

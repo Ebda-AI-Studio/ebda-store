@@ -95,6 +95,20 @@ export async function runBillingEffects(effects: BillingEffect[]): Promise<void>
   }
 }
 
+/**
+ * Like `runBillingEffects` for ONE effect, but says whether it was delivered (BILL-NOTICE-3 outbox): `false` = it threw
+ * (logged), so the caller must not mark the notice sent. An effect with nothing to send (store gone) counts as delivered.
+ */
+export async function deliverBillingEffect(effect: BillingEffect): Promise<boolean> {
+  try {
+    await runOne(effect);
+    return true;
+  } catch (err) {
+    logger.warn({ err, kind: effect.kind, storeId: effect.storeId }, '[billing] effect failed');
+    return false;
+  }
+}
+
 async function runOne(effect: BillingEffect): Promise<void> {
   const ctx = await storeContext(effect.storeId);
   if (!ctx) return;
