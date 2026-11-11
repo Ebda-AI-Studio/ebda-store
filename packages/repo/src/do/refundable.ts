@@ -15,8 +15,9 @@ import { MoneyError, type SyncSql } from './sync-sql';
  *   refundable = paid - refunded
  *
  *             + amounts the merchant booked on the order         partial-refund order events WITHOUT `external`
- * A provider/settlement booking's event carries `external: true`: its amount mirrors a `payments.refunded_amount` move,
- * so it is not counted twice. (Events written before #624 have no flag and are counted: conservative, pre-launch.) Callers read this INSIDE the same `transactionSync` as their write; the
+ * A provider/settlement booking's amount mirrors a `payments.refunded_amount` move, so it is not counted twice: it is
+ * recognised by its refundKey being a provider refund id on the order's payments (`metadata.refundEventIds`), or by the
+ * `external: true` flag new bookings also carry. Events written before #624 are therefore classified exactly. Callers read this INSIDE the same `transactionSync` as their write; the
  * StoreDO runs one section at a time, so two refunds racing at the boundary cannot both pass.
  */
 export const MANUAL_RETURN_METHODS = ['cash', 'bank_transfer', 'manual'] as const;
@@ -70,13 +71,18 @@ export function refundableBalance(
       [storeId, orderId, ...MANUAL_RETURN_METHODS]
     )[0]?.s
   );
-  // an amount the MERCHANT booked on the order (refundBook with `amount`, not a provider/settlement booking, which carries
-  // `external: true` because the same money is already on payments.refunded_amount)
+  // an amount the MERCHANT booked on the order (refundBook with `amount`). A provider/settlement booking is the SAME money
+  // as a `payments.refunded_amount` move, and is recognised from the data, not only from a flag: its refundKey is the
+  // provider refund id, which both writers (completeRefund, the settle webhook) append to that payment's
+  // `metadata.refundEventIds`. So events written before the `external` flag existed are classified exactly too.
   const bookedAmount = n(
     db.all(
-      `SELECT COALESCE(SUM(json_extract(metadata, '$.amount')), 0) AS s FROM order_events
-        WHERE store_id = ?1 AND order_id = ?2 AND to_status IN ('partial_return_restored', 'partial_refund_recorded')
-          AND json_extract(metadata, '$.external') IS NOT 1`,
+      `SELECT COALESCE(SUM(json_extract(e.metadata, '$.amount')), 0) AS s FROM order_events e
+        WHERE e.store_id = ?1 AND e.order_id = ?2 AND e.to_status IN ('partial_return_restored', 'partial_refund_recorded')
+          AND json_extract(e.metadata, '$.external') IS NOT 1
+          AND NOT EXISTS (
+            SELECT 1 FROM payments p, json_each(COALESCE(json_extract(p.metadata, '$.refundEventIds'), '[]')) j
+             WHERE p.order_id = e.order_id AND j.value = json_extract(e.metadata, '$.refundKey'))`,
       [storeId, orderId]
     )[0]?.s
   );

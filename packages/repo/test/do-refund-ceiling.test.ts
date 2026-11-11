@@ -246,4 +246,23 @@ describe('refundableBalance: one ceiling, every channel (#624)', () => {
     expect(rec()).toEqual({ recorded: 0, payments: 0 }); // replay
     expect(f.paidOut()).toBe(TOTAL);
   });
+
+  it('LEGACY: a provider partial refund booked before the external flag existed is not counted twice', () => {
+    const f = fixture();
+    const claim = f.op('refundBegin', { paymentId: 'pay1', amount: 5000 });
+    f.op('refundComplete', { claimId: claim.claimId, refundId: 'rf-legacy' });
+    // the booking event as a pre-#624 writer left it: no `external` flag
+    f.x(
+      `UPDATE order_events SET metadata = json_remove(metadata, '$.external') WHERE order_id = 'o1' AND to_status = 'partial_refund_recorded'`
+    );
+    expect(
+      f.one(
+        `SELECT count(*) n FROM order_events WHERE order_id = 'o1' AND to_status = 'partial_refund_recorded' AND json_extract(metadata, '$.refundKey') = 'rf-legacy'`
+      ).n
+    ).toBe(1);
+    expect(refundableBalance(f.db, 's1', 'o1').refundable).toBe(TOTAL - 5000);
+    // a merchant-booked amount (no provider refund id behind it) still counts
+    f.op('refundBook', { orderId: 'o1', amount: 1000, refundKey: 'cash-1' });
+    expect(refundableBalance(f.db, 's1', 'o1').refundable).toBe(TOTAL - 6000);
+  });
 });
