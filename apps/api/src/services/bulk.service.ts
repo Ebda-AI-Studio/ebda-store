@@ -843,11 +843,13 @@ export class BulkService {
       }
       if (wanted.size > 0) {
         const codes = [...wanted];
-        // Serialise with every other barcode writer in this store until the request commits.
-        await lockStoreBarcodes(
-          prisma as unknown as Parameters<typeof lockStoreBarcodes>[0],
-          storeId
-        );
+        // Serialise with every other barcode writer in this store until the request commits. A store on its Durable Object
+        // has no advisory lock (no Postgres): the partial unique barcode indexes refuse a duplicate (Ruling BARCODE-DO-1).
+        if (!money)
+          await lockStoreBarcodes(
+            prisma as unknown as Parameters<typeof lockStoreBarcodes>[0],
+            storeId
+          );
         const heldProducts = await db.product.findMany({
           where: { storeId, barcode: { in: codes }, deletedAt: null },
           select: { id: true, barcode: true },

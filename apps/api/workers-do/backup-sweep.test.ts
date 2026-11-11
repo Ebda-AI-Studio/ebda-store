@@ -136,6 +136,7 @@ describe('backup read-back (rule N11)', () => {
 describe('backup sweep (G8)', () => {
   it('arms the alarm, flags a store with no backup yesterday, alerts, and writes a report', async () => {
     await seedStore('sweep-a');
+    await e.STORE_BACKUPS.put(storeBackupManifestKey('sweep-a', '2026-10-30'), '{}');
     const alerts: string[] = [];
     const rep = await runBackupSweep(e, {
       listStoreIds: () => ['sweep-a'],
@@ -153,6 +154,32 @@ describe('backup sweep (G8)', () => {
       }
     );
     expect(await e.STORE_BACKUPS.get('ops-reports/backup-sweep/2026-11-02.json')).not.toBeNull();
+  });
+
+  it('a brand-new store (no backup history) gets a baseline backup, not a P1 flag', async () => {
+    await seedStore('sweep-new');
+    const alerts: string[] = [];
+    const rep = await runBackupSweep(e, {
+      listStoreIds: () => ['sweep-new'],
+      alert: async t => void alerts.push(t),
+      now: new Date('2026-11-03T03:00:00Z'),
+    });
+    expect(rep.stores.missingYesterday).toEqual([]);
+    expect(rep.stores.errors).toEqual([]);
+    expect(alerts).toHaveLength(0);
+    const listed = await e.STORE_BACKUPS.list({ prefix: 'store-do-backups/sweep-new/' });
+    expect(listed.objects.length).toBeGreaterThan(0);
+  });
+
+  it('a store with history but no backup yesterday is still flagged (alarm stopped)', async () => {
+    await seedStore('sweep-old');
+    await e.STORE_BACKUPS.put(storeBackupManifestKey('sweep-old', '2026-10-30'), '{}');
+    const rep = await runBackupSweep(e, {
+      listStoreIds: () => ['sweep-old'],
+      alert: async () => {},
+      now: new Date('2026-11-03T03:00:00Z'),
+    });
+    expect(rep.stores.missingYesterday).toEqual(['sweep-old']);
   });
 
   it('is green when yesterday has a manifest and D1 exports', async () => {

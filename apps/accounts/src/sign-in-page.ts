@@ -238,7 +238,7 @@ export const SIGN_IN_PAGE_HEADERS: Readonly<Record<string, string>> = {
 };
 
 export const SIGN_IN_CSS = `
-:root{color-scheme:dark;--night:${BRAND.colors.night};--gold:${BRAND.colors.gold};--lift:${BRAND.colors.lift};--fg:#f3f1ec;--muted:#a9a49b;--line:#2b2d2f;--panel:#121415;--bad:#f2b8b5}
+:root{color-scheme:dark;--night:${BRAND.colors.night};--gold:${BRAND.colors.gold};--lift:${BRAND.colors.lift};--fg:#f3f1ec;--muted:#a9a49b;--line:#2b2d2f;--field-line:#6f6a60;--panel:#121415;--bad:#f2b8b5}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;min-block-size:100dvh;background:var(--night);color:var(--fg);font:400 1rem/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI","IBM Plex Sans Arabic","Noto Sans Arabic",Tahoma,sans-serif;display:flex;flex-direction:column}
@@ -253,7 +253,7 @@ h1{margin:0 0 8px;font-size:clamp(1.6rem,6vw,2.1rem);line-height:1.25;font-weigh
 .hint{margin:0 0 24px;color:var(--muted)}
 form{display:flex;flex-direction:column;gap:6px}
 label{font-size:.9rem;font-weight:500;margin-block-start:10px}
-input{inline-size:100%;block-size:48px;padding-inline:14px;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;font:inherit;font-size:1rem}
+input{inline-size:100%;block-size:48px;padding-inline:14px;background:var(--panel);color:var(--fg);border:1px solid var(--field-line);border-radius:12px;font:inherit;font-size:1rem}
 input:focus{border-color:var(--gold);outline:2px solid var(--gold);outline-offset:0}
 .row{margin:6px 0 10px;font-size:.9rem}
 button[type=submit]{block-size:48px;margin-block-start:8px;background:var(--gold);color:var(--night);border:0;border-radius:12px;font:inherit;font-weight:600;cursor:pointer}

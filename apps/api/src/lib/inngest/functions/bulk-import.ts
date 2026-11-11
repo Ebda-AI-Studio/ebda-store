@@ -7,6 +7,7 @@ import { invalidateStoreProductCaches } from '../../public-cache';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { getEntityStoreId } from '../../definer';
+import { isStoreGoneError } from '../../jobs/store-gone';
 
 /**
  * True when a bulk import actually wrote/changed products and the public
@@ -61,11 +62,19 @@ export const bulkImportProducts: JobDef = inngest.createFunction(
     // replayed event without one is resolved by primary key through a definer)
     // and the job is read inside that store's scope.
     const jobStoreId = event.data.storeId ?? (await getEntityStoreId('bulk_import_job', jobId));
-    const job = jobStoreId
-      ? await readStoreDb(jobStoreId, db =>
-          db.bulkImportJob.findUnique({ where: { id: jobId, storeId: jobStoreId } })
-        )
-      : null;
+    let job;
+    try {
+      job = jobStoreId
+        ? await readStoreDb(jobStoreId, db =>
+            db.bulkImportJob.findUnique({ where: { id: jobId, storeId: jobStoreId } })
+          )
+        : null;
+    } catch (err) {
+      // A closed / removed store (410 / 404): a retry can never reopen it, so skip with a log (never fail the run).
+      if (!isStoreGoneError(err)) throw err;
+      logger.warn({ jobId, storeId: jobStoreId }, 'bulk-import: store gone; skipping');
+      return;
+    }
     if (!job) {
       logger.warn({ jobId }, 'bulk-import/started fired for missing job');
       return;

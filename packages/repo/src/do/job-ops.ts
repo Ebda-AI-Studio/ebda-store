@@ -168,7 +168,9 @@ export function ciOrderStampOp(
   const buyer =
     a.buyerKey === null || a.buyerKey === undefined ? null : str(a.buyerKey, 'buyerKey');
   const r = db.run(
-    'UPDATE orders SET area_key = ?1, buyer_key = ?2 WHERE id = ?3 AND store_id = ?4 AND area_key IS NULL AND buyer_key IS NULL',
+    // fills only what is still NULL (never overwrites a stamped value): the WhatsApp RPC stamps the buyer key at creation and the CI planner
+    // adds the area key later (Ruling WA-RPC-4)
+    'UPDATE orders SET area_key = COALESCE(area_key, ?1), buyer_key = COALESCE(buyer_key, ?2) WHERE id = ?3 AND store_id = ?4 AND (area_key IS NULL OR buyer_key IS NULL)',
     [area, buyer, orderId, storeId]
   );
   return { stamped: r.changes > 0 };

@@ -9,6 +9,7 @@ import { SizeChartSelect, type SizeChartOption } from '../../../../components/Si
 import { applyAiSeoSuggestion } from '../seo/language-guard';
 
 import { Button } from '@/components/ui/Button';
+import { SparkleIcon } from '@/components/SparkleIcon';
 interface CategoryFormData {
   name: string;
   nameAr: string;
@@ -315,7 +316,7 @@ export function CategoryForm({
                 size="sm"
                 className="gap-2 font-semibold"
               >
-                <span aria-hidden>✨</span>
+                <SparkleIcon />
                 {seoGenerating ? t('seoGenerating') : t('seoFillEmpty')}
               </Button>
               <Button

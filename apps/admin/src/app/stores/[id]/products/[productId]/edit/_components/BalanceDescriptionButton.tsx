@@ -5,6 +5,7 @@ import { apiPost } from '../../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 import { Button } from '@/components/ui/Button';
+import { BalanceIcon } from '@/components/BalanceIcon';
 /**
  * Per-product language balance / revert button pair.
  *
@@ -91,7 +92,7 @@ export function BalanceDescriptionButton({
           failedBalance ? 'text-destructive-ink' : balanced ? 'text-success-ink' : undefined
         }
       >
-        {busyBalance ? <SpinIcon /> : <span aria-hidden>⚖️</span>}
+        {busyBalance ? <SpinIcon /> : <BalanceIcon />}
         <span>
           {busyBalance
             ? '…'

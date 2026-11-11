@@ -15,7 +15,11 @@ const REQ = [
   'Detect affected workspaces',
   'Repo guards',
   'Scan for leaked secrets',
+  'Unit Tests (affected)',
 ];
+// The gate is bounded by POLL COUNT here, never by wall clock: under host load a wall-clock budget made merge
+// cases refuse (240 s runs at load 22). Merge cases need 3 polls; waiting cases give up after MAX_POLLS.
+const MAX_POLLS = 8;
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12';
 
 type Check = {
@@ -27,13 +31,20 @@ type Check = {
 };
 const run = (
   checks: Check[],
-  over: { head?: string; mergeable?: string; want?: string; polls?: string; derive?: boolean } = {}
+  over: {
+    head?: string;
+    mergeable?: string;
+    want?: string;
+    polls?: string;
+    derive?: boolean;
+  } = {}
 ) => {
   const dir = mkdtempSync(join(tmpdir(), 'mg-'));
   const view = join(dir, 'view.json');
   writeFileSync(
     view,
     JSON.stringify({
+      ...(over.state ? { state: over.state } : {}),
       headRefOid: over.head ?? SHA,
       mergeable: over.mergeable ?? 'MERGEABLE',
       statusCheckRollup: checks.map(c => ({
@@ -63,7 +74,8 @@ const run = (
         MERGE_GATE_VIEW_CMD: `cat ${view}`,
         // derive: the gate derives the list from the real workflows itself, as it does in production
         ...(over.derive ? {} : { MERGE_GATE_REQUIRED_JSON: JSON.stringify(REQ) }),
-        MERGE_GATE_MAX_WAIT_S: '1',
+        MERGE_GATE_MAX_WAIT_S: '86400',
+        MERGE_GATE_MAX_TICKS: String(MAX_POLLS),
       },
       encoding: 'utf8',
     }
@@ -78,7 +90,8 @@ const run = (
         MERGE_GATE_VIEW_CMD: `cat ${view}`,
         // derive: the gate derives the list from the real workflows itself, as it does in production
         ...(over.derive ? {} : { MERGE_GATE_REQUIRED_JSON: JSON.stringify(REQ) }),
-        MERGE_GATE_MAX_WAIT_S: '1',
+        MERGE_GATE_MAX_WAIT_S: '86400',
+        MERGE_GATE_MAX_TICKS: String(MAX_POLLS),
         MERGE_GATE_MERGE_CMD: `echo "$sha" > ${merged}`,
       },
       encoding: 'utf8',
@@ -209,6 +222,18 @@ describe('merge-gate.sh', () => {
       },
     ]);
     expect(r.status).toBe(2);
+    expect(r.merged).toBeNull();
+  });
+  it('PR already MERGED by someone else -> exit 0 "already merged", never polls to the deadline, never merges again', () => {
+    const r = run([], { state: 'MERGED' });
+    expect(r.status).toBe(0);
+    expect(r.out).toContain('already merged');
+    expect(r.merged).toBeNull();
+  });
+  it('PR CLOSED without merging -> refuses at once (non-zero), no merge', () => {
+    const r = run(green, { state: 'CLOSED' });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain('closed without merging');
     expect(r.merged).toBeNull();
   });
   it('head moved since review -> refuses at once', () => {

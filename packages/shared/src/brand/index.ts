@@ -910,6 +910,7 @@ export function siteFooter(lang: NavLang): {
         title: siteNavLabels(lang).resources,
         links: [
           ...resources,
+          m('support', L(lang, 'الدعم', 'Support'), '/support/'),
           m('credits', L(lang, 'حقوق الصور والموديلات', 'Credits'), '/credits/'),
         ],
       },

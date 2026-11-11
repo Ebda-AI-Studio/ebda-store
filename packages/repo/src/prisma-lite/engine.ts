@@ -151,6 +151,42 @@ export class Engine {
     return parts.length ? parts.join(' AND ') : '1';
   }
 
+  /**
+   * A Json path filter `{ path: ['phone'], equals: '+20…' }` (promotion-resolver's first-order check). Prisma on Postgres
+   * compares the JSON VALUE at the path: a string matches only a JSON string, a number only a JSON number. `equals` with a
+   * string or a finite number is the only form supported; keys are plain identifiers and the JSON path is a bound parameter.
+   */
+  private compileJsonPath(
+    f: ScalarField,
+    col: string,
+    ops: Record<string, unknown>,
+    params: unknown[]
+  ): string {
+    if (f.type !== 'Json' || f.list) throw new Error('prisma-lite: `path` is a Json filter');
+    const path = ops.path;
+    if (
+      !Array.isArray(path) ||
+      path.length === 0 ||
+      path.length > 8 ||
+      path.some(k => typeof k !== 'string' || !/^[A-Za-z0-9_]{1,64}$/.test(k))
+    )
+      throw new Error('prisma-lite: a Json path is 1-8 plain keys');
+    const rest = Object.keys(ops).filter(k => k !== 'path' && ops[k] !== undefined);
+    if (rest.length !== 1 || rest[0] !== 'equals')
+      throw new Error('prisma-lite: a Json path filter supports `equals` only');
+    const v = ops.equals;
+    const jp = `$.${(path as string[]).join('.')}`;
+    if (typeof v === 'string') {
+      params.push(jp, jp, v);
+      return `(json_type(${col}, ?) = 'text' AND json_extract(${col}, ?) = ?)`;
+    }
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      params.push(jp, jp, v);
+      return `(json_type(${col}, ?) IN ('integer', 'real') AND json_extract(${col}, ?) = ?)`;
+    }
+    throw new Error('prisma-lite: a Json path `equals` takes a string or a number');
+  }
+
   private compileScalarFilter(
     f: ScalarField,
     col: string,
@@ -170,6 +206,8 @@ export class Engine {
       return `${col} = ?`;
     }
     const ops = val as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(ops, 'path'))
+      return this.compileJsonPath(f, col, ops, params);
     const insensitive = ops.mode === 'insensitive';
     const out: string[] = [];
     const lc = (s: string) => (insensitive ? `lower(${s})` : s);

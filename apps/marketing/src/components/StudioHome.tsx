@@ -1,3 +1,4 @@
+import { heroSavingAr, heroSavingEn } from '../lib/positioning';
 import { PageLink } from './PageLink';
 import { BRAND, SITE_NAV_ICONS, type SiteNavProductId } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
@@ -87,6 +88,9 @@ export function StudioHomePage({ locale }: { locale: Locale }) {
                     {store}
                   </h2>
                   <p className="sh-win-p">{c.store.blurb}</p>
+                  <p className="sh-win-saving">
+                    {rtl ? heroSavingAr(BRAND.product.nameAr) : heroSavingEn()}
+                  </p>
                   <p className="actions">
                     <SiteLink href={SIGNUP_URL} locale={locale} className="btn btn-primary btn-lg">
                       {c.store.cta}

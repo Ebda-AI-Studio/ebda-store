@@ -31,7 +31,8 @@ export type DerivedSecretLabel =
   | 'ebda:order-view-mac:v1'
   | 'ebda:mcp-confirm-mac:v1'
   | 'ebda:search-searcher-salt:v1'
-  | 'ebda:barcode-key:v1';
+  | 'ebda:barcode-key:v1'
+  | 'ebda:wa-checkout-mac:v1';
 
 const SALT = 'ebda:derived-secret';
 

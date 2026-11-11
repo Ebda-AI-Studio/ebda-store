@@ -203,25 +203,17 @@ describe('the page document refuses a foreign font, on save, publish and rollbac
   });
 });
 
-describe('PUT /stores/:id/typography refuses a foreign font too', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    m.store.findUnique.mockResolvedValue({ typography: { fonts: [] } });
-    m.typographyUpdate.mockResolvedValue({ typography: {} });
-  });
-  it('store A sending store B`s font URL: 422, nothing stored', async () => {
-    const res = await request(typoApp())
-      .put('/stores/store-a/typography')
-      .send({ fonts: [FOREIGN], zones: {} });
-    expect(res.status).toBe(422);
-    expect(res.body.error.code).toBe('INVALID_FONT_URL');
+// Ruling TYPO-WRITER-1: the typography route no longer writes. A foreign font can only enter through the page
+// document, whose save/publish/rollback guard is covered above, so the old PUT must be gone, not merely guarded.
+describe('PUT /stores/:id/typography is gone (single writer = builder publish)', () => {
+  beforeEach(() => vi.clearAllMocks());
+  it('answers 404 for a foreign font and for its own font, and stores nothing', async () => {
+    for (const font of [FOREIGN, OWN]) {
+      const res = await request(typoApp())
+        .put('/stores/store-a/typography')
+        .send({ fonts: [font], zones: {} });
+      expect(res.status).toBe(404);
+    }
     expect(m.typographyUpdate).not.toHaveBeenCalled();
-  });
-  it('its own font is stored', async () => {
-    const res = await request(typoApp())
-      .put('/stores/store-a/typography')
-      .send({ fonts: [OWN], zones: {} });
-    expect(res.status).toBe(200);
-    expect(m.typographyUpdate).toHaveBeenCalledTimes(1);
   });
 });

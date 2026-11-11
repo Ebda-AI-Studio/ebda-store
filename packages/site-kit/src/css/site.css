@@ -561,3 +561,45 @@ th {
     flex: none;
   }
 }
+
+/*
+ * UI audit 2026-11-11 (P2 #15): at 390 px the header wrapped to three rows (wordmark, nav + search, language)
+ * and spent 105 px of the viewport on chrome. On a phone it is ONE row: the brand mark (its name stays in the
+ * accessibility tree), the menu, a flexible search field and the language link.
+ */
+@media (max-width: 640px) {
+  .header-row {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .wordmark span {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .top-nav {
+    flex: none;
+  }
+  .search {
+    flex: 1 1 0;
+    min-inline-size: 0;
+  }
+  .search input {
+    inline-size: 100%;
+    min-block-size: 44px;
+  }
+  .search button {
+    padding-inline: 10px;
+    min-block-size: 44px;
+  }
+  .lang-switch {
+    flex: none;
+    padding-inline: 8px;
+    min-block-size: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}

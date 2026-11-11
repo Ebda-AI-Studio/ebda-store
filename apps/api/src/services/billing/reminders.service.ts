@@ -13,6 +13,7 @@ import { acrossBilling } from '../platform/billing-d1';
 import { config } from '../../config';
 import { getEntityStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';
+import { isStoreGoneError } from '../../lib/jobs/store-gone';
 import { EmailService } from '../email.service';
 import { socketService } from '../socket.service';
 import {
@@ -84,10 +85,24 @@ export async function findReminderCandidates(now: Date): Promise<string[]> {
 
 export type ReminderResult = { sent: false; reason: string } | { sent: true; kind: ReminderKind };
 
+/** One reminder. A closed / removed store is skipped with a log, never thrown (it would fail the whole daily run). */
 export async function sendDueReminder(
   subscriptionId: string,
   now: Date = new Date()
 ): Promise<ReminderResult> {
+  try {
+    return await sendDueReminderInner(subscriptionId, now);
+  } catch (err) {
+    if (!isStoreGoneError(err)) throw err;
+    logger.warn(
+      { subscriptionId, code: (err as { code?: string }).code },
+      '[billing] store gone; reminder skipped'
+    );
+    return { sent: false, reason: 'store_gone' };
+  }
+}
+
+async function sendDueReminderInner(subscriptionId: string, now: Date): Promise<ReminderResult> {
   const storeId = await getEntityStoreId('store_subscription', subscriptionId);
   if (!storeId) return { sent: false, reason: 'not_found' };
   // A child store is included in its parent's plan: it is never asked to pay (EBDA-FUNNEL-18).

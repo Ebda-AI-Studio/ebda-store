@@ -224,6 +224,6 @@ describe('web POST /api/revalidate', () => {
     expect((await call(JSON.stringify({ secret: 'no', tags: ['a'] }))).status).toBe(401);
     const ok = await call(JSON.stringify({ secret: 'shh', tags: ['products:1'] }));
     expect(ok.status).toBe(200);
-    expect(m.revalidateTag).toHaveBeenCalledWith('products:1', 'max');
+    expect(m.revalidateTag).toHaveBeenCalledWith('products:1', { expire: 0 });
   });
 });

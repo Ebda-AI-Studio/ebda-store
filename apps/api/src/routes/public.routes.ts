@@ -1,3 +1,4 @@
+import { redeemWaCheckout } from '../lib/wa/bridge/redeem';
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod/v3';
@@ -1107,6 +1108,36 @@ router.post(
         return;
       }
       res.json({ success: true, data: { added: result.added } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /cart/from-wa - the Ebda Chat checkout link (Ruling WA-RPC-3): copy the signed token's lines into THIS session's cart.
+router.post(
+  '/cart/from-wa',
+  cartLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+      const { token } = z.object({ token: z.string().max(4000) }).parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
+      const result = await redeemWaCheckout(storeId, token, sessionId);
+      if (!result.redeemed) {
+        res
+          .status(400)
+          .json({ success: false, error: { code: 'CART_LINK_INVALID', message: 'Link expired' } });
+        return;
+      }
+      res.json({ success: true, data: { added: result.added, unavailable: result.unavailable } });
     } catch (error) {
       next(error);
     }

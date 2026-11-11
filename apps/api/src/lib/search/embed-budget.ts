@@ -179,7 +179,7 @@ export function queryBudgetSpent(storeId: string, now: Date = new Date()): boole
 export async function takeQueryEmbedResult(
   storeId: string,
   searcher: string | undefined
-): Promise<{ ok: true } | { ok: false; reason: QueryEmbedRefusal }> {
+): Promise<{ ok: true; settle?: () => Promise<void> } | { ok: false; reason: QueryEmbedRefusal }> {
   const now = new Date();
   if (queryBudgetSpent(storeId, now)) {
     const platform =
@@ -193,26 +193,36 @@ export async function takeQueryEmbedResult(
   const client = redis.getClient();
   if (!client || !redis.isAvailable()) return { ok: false, reason: 'no-redis' };
   try {
-    // 1. The searcher's per-minute limit FIRST, and alone: a client over its limit never touches
-    //    the shared daily budgets, so it cannot burn the store's or the platform's day.
+    // ONE parallel round trip (Ruling SEARCH-WARM-1): the searcher's per-minute counter and the three daily
+    // counters are INCRed together (they live on different AuthState shards, so the calls overlap) instead of
+    // searcher-then-daily-then-expire in series, which cost ~4 DO round trips on the timed storefront path.
+    // Semantics kept: the call is made only on `ok`, a refusal by ANY counter refunds ALL of them so each daily
+    // counter equals the provider calls actually made, and a crash can only over-count. A client over its own
+    // per-minute limit refunds the daily counters and never marks a budget "spent" (its transient INCR must not
+    // look like a spent day to everyone else).
     const sKey = searcherEmbedKey(searcher, now);
-    const sUsed = await client.incr(sKey);
-    if (sUsed === 1) await client.expire(sKey, SEARCHER_KEY_TTL_SECONDS);
-    if (sUsed > searcherPerMinuteCap()) return { ok: false, reason: 'searcher-limit' };
-    // 2. The daily budgets (INCR, then compare). A refusal by ANY of them refunds all three, so each
-    //    daily counter equals the provider calls actually made (a crash between the two steps
-    //    over-counts by one; it can never under-count).
     const keys = [
       embedCallBudgetKey(now),
       queryEmbedGlobalKey(now),
       queryEmbedStoreKey(storeId, now),
     ];
-    const used = await Promise.all(keys.map(k => client.incr(k)));
-    await Promise.all(
-      used.map((u, i) => (u === 1 ? client.expire(keys[i], DAY_TTL_SECONDS) : undefined))
-    );
-    if (used.every((u, i) => u <= daily[i])) return { ok: true };
+    const [sUsed, ...used] = await Promise.all([sKey, ...keys].map(k => client.incr(k)));
+    const ttls: Array<[string, number, number]> = [
+      [sKey, SEARCHER_KEY_TTL_SECONDS, sUsed],
+      ...keys.map((k, i): [string, number, number] => [k, DAY_TTL_SECONDS, used[i]]),
+    ];
+    // TTLs are set only on a counter's first INCR, OFF the timed path: the caller overlaps this with the embed.
+    const settle = async () => {
+      await Promise.all(ttls.filter(t => t[2] === 1).map(t => client.expire(t[0], t[1])));
+    };
+    if (sUsed > searcherPerMinuteCap()) {
+      await Promise.all(keys.map(k => client.decr(k)));
+      await settle();
+      return { ok: false, reason: 'searcher-limit' };
+    }
+    if (used.every((u, i) => u <= daily[i])) return { ok: true, settle };
     await Promise.all(keys.map(k => client.decr(k)));
+    await settle();
     // Mark the spent scope until the next Cairo day (no more round trips in this isolate).
     const platformSpent = used[0] > daily[0] || used[1] > daily[1];
     spentUntil.set(platformSpent ? PLATFORM : storeId, nextCairoDayStart(now));
@@ -234,9 +244,16 @@ export async function takeQueryEmbedResult(
 /** Boolean form of `takeQueryEmbedResult`. */
 export async function takeQueryEmbed(
   storeId: string,
-  searcher: string | undefined
+  searcher: string | undefined,
+  opts: { overlap?: (ttlWrites: Promise<void>) => void } = {}
 ): Promise<boolean> {
-  return (await takeQueryEmbedResult(storeId, searcher)).ok;
+  const r = await takeQueryEmbedResult(storeId, searcher);
+  if (r.ok && r.settle) {
+    // The caller may overlap the TTL writes with its own work (the query embed); default: finish them here.
+    if (opts.overlap) opts.overlap(r.settle().catch(() => undefined));
+    else await r.settle();
+  }
+  return r.ok;
 }
 
 /** One P1 per Cairo day when the account-wide ceiling is reached. */

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { bottomNavClasses } from '../ui/tokens';
 import { useT } from '@/i18n/useT';
 
 interface MobileBottomNavProps {
@@ -92,13 +93,7 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
       {tabs.map(tab => {
         const active = isActive(tab.href);
         return (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            className={`flex h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${
-              active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
+          <Link key={tab.key} href={tab.href} className={bottomNavClasses(active)}>
             <svg
               className="h-5 w-5"
               fill="none"
@@ -117,7 +112,7 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
         type="button"
         onClick={onOpenMore}
         aria-label={t('more')}
-        className="flex h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+        className={bottomNavClasses(false)}
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path

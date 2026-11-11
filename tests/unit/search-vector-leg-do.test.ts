@@ -49,7 +49,7 @@ vi.mock('@api/lib/logger', () => ({
 
 const { setEmbeddingProviderForTests, EMBED_MODEL } =
   await import('@api/lib/search/embedding-provider');
-const { rankedSearchWithMode, clearQueryVectorCacheForTests } =
+const { rankedSearchWithMode, clearQueryVectorCacheForTests, queryEmbedText } =
   await import('@api/services/product-search.service');
 
 const unit = (n: number) => Array.from({ length: 1024 }, () => n);
@@ -65,7 +65,7 @@ beforeEach(() => {
       matches: [
         { id: 'pA:d', score: 0.8 },
         { id: 'pA:w', score: 0.9 }, // pA's nearer vector wins
-        { id: 'pB:d', score: 0.7 },
+        { id: 'pB:d', score: 0.85 }, // within the 0.10 band of the best (0.9)
         { id: 'pFar:d', score: 0.2 }, // distance 0.8 > max
         { id: 'pHidden:d', score: 0.85 },
       ],
@@ -79,10 +79,9 @@ describe('the vector leg of a DO store (Ruling CF-VEC-1)', () => {
     h.visible = ['pA', 'pB', 'pFar'];
     const r = await rankedSearchWithMode(DO_STORE, 'brass lamp', { searcher: 'ip:1' });
     expect(r).toEqual({ ids: ['pA', 'pB'], degraded: false });
-    expect(h.index.query.mock.calls[0][1]).toMatchObject({
-      namespace: DO_STORE,
-      filter: { storeId: DO_STORE },
-    });
+    expect(h.index.query.mock.calls[0][1]).toMatchObject({ namespace: DO_STORE });
+    // production has no metadata index: a filter matches nothing (Ruling SEARCH-SEMANTIC-LIVE-2)
+    expect(h.index.query.mock.calls[0][1]).not.toHaveProperty('filter');
     // the DO is asked only about products inside the distance bound
     expect(h.visibleAsked[0].sort()).toEqual(['pA', 'pB', 'pHidden']);
   });
@@ -109,5 +108,42 @@ describe('the vector leg of a DO store (Ruling CF-VEC-1)', () => {
     h.lexical = ['kw1'];
     const r = await rankedSearchWithMode(DO_STORE, 'brass lamp', { searcher: 'ip:1' });
     expect(r).toEqual({ ids: ['kw1'], degraded: true });
+  });
+});
+
+// Measured on production bge-m3 against Amelia Aurum (2026-11-11, Ruling SEARCH-SEMANTIC-LIVE-3): top-3 cosine scores
+// of the embedded (folded + colloquial->standard) query. `relevant` = the answer a shopper expects.
+const MEASURED: Array<{ q: string; embed: string; top: number[]; relevant: boolean }> = [
+  { q: 'هدية لمراتي', embed: 'هديه لزوجتي', top: [0.47, 0.46, 0.46], relevant: true },
+  { q: 'حاجة للبحر', embed: 'شيء للبحر', top: [0.52, 0.51, 0.49], relevant: true },
+  { q: 'gift for my wife', embed: 'gift for my wife', top: [0.48, 0.46, 0.46], relevant: true },
+  {
+    q: 'something for the sea',
+    embed: 'something for the sea',
+    top: [0.54, 0.53, 0.52],
+    relevant: true,
+  },
+  { q: 'خاتم', embed: 'خاتم', top: [0.59, 0.55, 0.47], relevant: true },
+  { q: 'حلق', embed: 'حلق', top: [0.66, 0.61, 0.56], relevant: true },
+  { q: 'شاحن موبايل', embed: 'شاحن موبايل', top: [0.39, 0.38, 0.38], relevant: false },
+  { q: 'pizza', embed: 'pizza', top: [0.4, 0.4, 0.38], relevant: false },
+];
+
+describe('measured production scores (Ruling SEARCH-SEMANTIC-LIVE-3)', () => {
+  it.each(MEASURED)('$q', async ({ q, embed, top, relevant }) => {
+    expect(queryEmbedText(q)).toBe(embed);
+    h.index.query = vi.fn(async () => ({
+      matches: top.map((score, i) => ({ id: `p${i}:d`, score })),
+    }));
+    const r = await rankedSearchWithMode(DO_STORE, q, { searcher: 'ip:1' });
+    expect(r.ids.length > 0).toBe(relevant);
+  });
+
+  it('KNOWN RESIDUAL: "laptop charger" tops at 0.50, above the relevant «هدية لزوجتي» 0.47, so a score cut cannot drop it', async () => {
+    h.index.query = vi.fn(async () => ({
+      matches: [0.5, 0.43, 0.4].map((score, i) => ({ id: `p${i}:d`, score })),
+    }));
+    const r = await rankedSearchWithMode(DO_STORE, 'laptop charger', { searcher: 'ip:1' });
+    expect(r.ids).toEqual(['p0']); // one product (band), not three
   });
 });
