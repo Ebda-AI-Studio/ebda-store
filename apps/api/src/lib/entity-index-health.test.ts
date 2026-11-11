@@ -20,12 +20,14 @@ function fakeD1(settings: Record<string, string>, liveIds: string[]) {
       return {
         bind(...v: unknown[]) {
           return {
-            async all() {
+            async all<T>() {
               if (sql.includes('FROM stores'))
                 return {
                   results: (v as string[]).filter(id => liveIds.includes(id)).map(id => ({ id })),
                 };
-              return { results: Object.entries(settings).map(([key, value]) => ({ key, value })) };
+              return {
+                results: Object.entries(settings).map(([key, value]) => ({ key, value })) as T[],
+              };
             },
             async run() {
               if (sql.startsWith('DELETE')) deleted.push(String(v[0]));
@@ -48,10 +50,10 @@ describe('alertEntityIndexHealth', () => {
       },
       ['s1', 's2']
     );
-    const send = vi.fn(async () => 'sent' as const);
+    const send = vi.fn(async (_a: { body: string }) => 'sent' as const);
     const r = await alertEntityIndexHealth(d1, send as never, 1_000);
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send.mock.calls[0][0].body).toMatch(/4 entity-index row\(s\) in 2 store\(s\)/);
+    expect(send.mock.calls[0]![0].body).toMatch(/4 entity-index row\(s\) in 2 store\(s\)/);
     expect(r.alerted).toBe(4);
   });
 
@@ -63,7 +65,7 @@ describe('alertEntityIndexHealth', () => {
       },
       []
     );
-    const send = vi.fn(async () => 'sent' as const);
+    const send = vi.fn(async (_a: { body: string }) => 'sent' as const);
     await alertEntityIndexHealth(d1, send as never, 1_000);
     expect(send).not.toHaveBeenCalled();
     expect(deleted).toContain(`${INDEX_HEALTH_PREFIX}gone`);
