@@ -70,6 +70,8 @@ import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.se
 import { config } from '../config';
 import type { Currency, PaymentProvider } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
+import { idempotencyKeyOf, opKey, withIdempotencyKey } from '../lib/money-idempotency';
+import { refundMayHaveExecuted } from '../services/payment-providers/refund-outcome';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
   resolveRefundSettlement,
@@ -1975,6 +1977,11 @@ router.post(
  *   - order/refunded Inngest event → customer refund email + admin push
  *
  * Defaults to full refund. Partial refunds: pass `amount` (in piastres).
+ *
+ * #628: an `Idempotency-Key` header is REQUIRED (the admin makes one per dialog open). The same key returns the first
+ * answer; a retry while the first still runs, or after a failure that may have moved money (timeout / 5xx from the
+ * provider), is refused 409 and the claim stays open for reconciliation; the key is also the DO claim's attempt key, so a
+ * second claim under it is refused even if the key store lost it.
  */
 const refundViaProviderSchema = z.object({
   amount: z.number().int().positive().optional(),
@@ -1997,6 +2004,13 @@ router.post(
       const db = await storeDb(storeId);
       const user = getAuthUser(req);
       const data = refundViaProviderSchema.parse(req.body ?? {});
+      const idem = idempotencyKeyOf(req.header('idempotency-key'));
+      if (!idem)
+        throw new AppError(
+          400,
+          'IDEMPOTENCY_KEY_REQUIRED',
+          'This refund needs an Idempotency-Key header (one per refund attempt). Nothing was done.'
+        );
 
       const order = await db.order.findFirst({
         where: { id: orderId, storeId, deletedAt: null },
@@ -2058,19 +2072,36 @@ router.post(
       // the client as a real error.
       let result;
       try {
-        result = await runInStoreCtx(storeId, async () =>
-          // the store id selects the store's backend (a Durable Object store refunds through its own section)
-          PaymentService.refund(
-            {
-              transactionId: payment.transactionId!,
-              amount: data.amount,
-              reason: data.reason,
-            },
-            undefined,
-            storeId
+        const scope = `refund-via-provider:${storeId}:${orderId}`;
+        result = (
+          await withIdempotencyKey(
+            scope,
+            idem,
+            () =>
+              runInStoreCtx(storeId, async () =>
+                // the store id selects the store's backend (a Durable Object store refunds through its own section)
+                PaymentService.refund(
+                  {
+                    transactionId: payment.transactionId!,
+                    amount: data.amount,
+                    reason: data.reason,
+                    attemptKey: opKey(scope, idem),
+                  },
+                  undefined,
+                  storeId
+                )
+              ),
+            refundMayHaveExecuted,
+            { required: true }
           )
-        );
+        ).value;
       } catch (refundError) {
+        // a replay refusal / a may-have-executed failure keeps its own code (409 / 502): the admin must check, not retry
+        if (
+          refundError instanceof AppError &&
+          (refundError.statusCode < 500 || refundMayHaveExecuted(refundError))
+        )
+          throw refundError;
         const refundMessage =
           refundError instanceof Error ? refundError.message : 'Unknown refund error';
         logger.error(
