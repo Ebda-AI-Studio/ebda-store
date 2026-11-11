@@ -47,6 +47,9 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   localhost, so the password is not what authenticates. The integration suite's own `tests/helpers/app-role-login.ts` still
   sets the same `ci-only-app-pw` the local dev scripts use (no other repo on this host uses `ebda_app`; GCC uses `horse_app`).
   Cost if wrong: a different `ebda_app` password set by another tool on this host would be overwritten during an Ebda run.
+- **No docker on the Mac**: the trufflehog action runs in a container, so `Security Audit` runs it on Linux only and, on the Mac,
+  the same release (v3.99.8) natively from `~/.ebda-ci/tools` (checksum re-verified each run, downloaded only on a miss). The AI
+  review installs the claude CLI with `--ignore-scripts`, so it links the per-platform native binary itself.
 - **Runner security** - the Mac also runs the main-only deploy workflows, so it holds the Cloudflare deploy token while
   same-repo PR jobs run on the same machine. Deploy secrets live only in the `production` environment, which accepts
   deployments from `main` only (branch policy set 2026-11-11), so a PR-triggered job cannot read them even if a PR edits
