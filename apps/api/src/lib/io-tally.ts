@@ -29,6 +29,8 @@ export interface IoTally {
   ops?: string[];
   /** Test / local dev only (DEV_STATS=1): injected AuthState latency / stall (cf/auth-state-client.ts `call`). */
   authStateFault?: { delayMs: number; stall: string };
+  /** Test / local dev only (DEV_STATS=1): injected StoreDO round-trip latency (PERF-BATCH-1 measurements, `wrapCalls`). */
+  storeDoDelayMs?: number;
 }
 
 const als = new AsyncLocalStorage<IoTally>();
@@ -77,7 +79,11 @@ function wrapCalls<T extends object>(target: T, kind: IoKind, instance = ''): T 
       return (...args: unknown[]) =>
         tally(
           kind,
-          () => Reflect.apply(v, t, args),
+          () => {
+            const delay = kind === 'store-do' ? als.getStore()?.storeDoDelayMs : undefined;
+            if (!delay) return Reflect.apply(v, t, args);
+            return new Promise(r => setTimeout(r, delay)).then(() => Reflect.apply(v, t, args));
+          },
           `${instance ? `@${instance}:` : ''}${String(p)}:${labelArgs(args)}`
         );
     },

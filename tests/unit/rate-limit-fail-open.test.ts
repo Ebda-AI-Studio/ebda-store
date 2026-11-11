@@ -93,13 +93,17 @@ describe('rate-limiter failure posture — fail-open on store error', () => {
     expect(res.status).toBe(500);
   });
 
-  it('every rateLimit() config in security.ts and app.ts declares passOnStoreError: true', () => {
+  it('every rateLimit() / plannedRateLimit() config in security.ts and app.ts declares passOnStoreError: true', () => {
     for (const rel of ['apps/api/src/middleware/security.ts', 'apps/api/src/app.ts']) {
       const src = fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8');
       // Each `rateLimit({ ... })` block must contain the posture flag. Blocks
       // are delimited well enough by the next `});` at the call's nesting —
       // count occurrences instead of parsing: one flag per config.
-      const configs = src.match(/rateLimit\(\{/g)?.length ?? 0;
+      // PERF-BATCH-1: `plannedRateLimit('<name>', { ... })` configs count too; the helper's own
+      // `rateLimit({ ...options, ... })` forwards the caller's config and is not one.
+      const configs =
+        (src.match(/rateLimit\(\{(?! \.\.\.options)/g)?.length ?? 0) +
+        (src.match(/plannedRateLimit\(['`]/g)?.length ?? 0);
       const flags = src.match(/passOnStoreError: true/g)?.length ?? 0;
       expect(
         flags,
