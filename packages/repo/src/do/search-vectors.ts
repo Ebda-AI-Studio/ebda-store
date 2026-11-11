@@ -9,6 +9,7 @@
 // Vectorize read. External I/O (Workers AI, Vectorize) never happens inside a transaction: plan (sync) -> embed -> upsert
 // -> commit the state only if the product still hashes to what was embedded (an edit in between leaves it stale and the
 // next run re-embeds it; a product that became unindexable meanwhile has its fresh vectors deleted).
+import { isStoreClosed } from './closure';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 export const EMBED_MODEL = '@cf/baai/bge-m3';
@@ -403,6 +404,8 @@ export async function syncProductVectors(
     capped: false,
     retry: false,
   };
+  // A deleted store is CLOSED first (closeIfNoMoneyInFlight): never index into it, the deletion purges its vectors (audit P2-7).
+  if (isStoreClosed(db)) return result;
   const plan = planVectorWork(db, storeId, deps.batchLimit ?? 50, now);
 
   // orphans: remove the vectors first (an idempotent external call), then forget the state
@@ -490,6 +493,8 @@ export async function syncProductVectors(
   // upsert to Vectorize (external), then commit the state product by product against the CURRENT row
   const ready = work.filter(w => vectors.has(w.productId));
   if (ready.length === 0) return result;
+  // re-check at WRITE time: the store may have been deleted while the provider call was in flight (audit P2-7)
+  if (isStoreClosed(db)) return result;
   const upserts = ready.flatMap(w => {
     const v = vectors.get(w.productId)!;
     const meta = { storeId, productId: w.productId, model: EMBED_MODEL };

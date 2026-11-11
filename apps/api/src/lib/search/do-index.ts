@@ -7,6 +7,7 @@
  */
 import type { VectorizeLike, VectorWork } from '@ebda-src/repo';
 import { NonRetriableError } from '../jobs/errors';
+import { isStoreGoneError } from '../jobs/store-gone';
 import logger from '../logger';
 import { cfBindings } from '../../cf/bindings';
 import { storeMoney } from '../repo-factory';
@@ -73,7 +74,12 @@ export async function indexRoundsDo(
       const money = await storeMoney(storeId);
       if (!money)
         throw new NonRetriableError(`search-index: store ${storeId} is not on its Durable Object`);
-      return money.vectorPlan({ limit: DO_INDEX_BATCH, dailyCap: embedStoreDailyCap() });
+      try {
+        return await money.vectorPlan({ limit: DO_INDEX_BATCH, dailyCap: embedStoreDailyCap() });
+      } catch (e) {
+        if (isStoreGoneError(e)) return { work: [], orphans: [], capped: false }; // deleted / closed: nothing to index
+        throw e;
+      }
     })) as { work: VectorWork[]; orphans: string[]; capped: boolean };
     if (plan.work.length === 0 && plan.orphans.length === 0) {
       return plan.capped ? { embedded, capped: true } : { embedded, done: true };
@@ -147,6 +153,15 @@ export async function indexRoundsDo(
             : []),
         ];
       });
+      // WRITE-time guard (audit P2-7): a store deleted while the embeds were in flight is CLOSED (410 on every money op); a read
+      // of the DO answers that before a single vector lands, so the deletion's purge is not undone.
+      try {
+        await money.vectorStale({});
+      } catch (e) {
+        if (isStoreGoneError(e))
+          return { gone: true, embedded: 0, permanent: 0, temporary: 0, retry: false };
+        throw e;
+      }
       if (upserts.length > 0) await index.upsert(upserts); // a throw writes NO state: the whole batch stays stale
       if (plan.orphans.length > 0)
         await index.deleteByIds(plan.orphans.flatMap(id => [idOf(id, 'd'), idOf(id, 'w')]));
@@ -165,7 +180,14 @@ export async function indexRoundsDo(
         temporary: quarantine.filter(f => f.kind !== 'input' && f.kind !== 'shape').length,
         retry: batch.failures.some(f => f.retryable),
       };
-    })) as { embedded: number; permanent: number; temporary: number; retry: boolean };
+    })) as {
+      gone?: boolean;
+      embedded: number;
+      permanent: number;
+      temporary: number;
+      retry: boolean;
+    };
+    if (res.gone) return { embedded, skipped: 'store-gone' };
     counts.permanent += res.permanent;
     counts.temporary += res.temporary;
     embedded += res.embedded;

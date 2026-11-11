@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { openSqlite } from './diff-harness';
 import { nodeSyncSql } from './node-sync-sql';
 import { ensureSearchIndex } from '../src/do/search';
+import { closeStore } from '../src/do/closure';
 import {
   EMBED_DIMS,
   EMBED_MODEL,
@@ -172,6 +173,45 @@ describe('embed document', () => {
     );
     expect(src).toContain(`EMBED_MODEL = '${EMBED_MODEL}'`);
     expect(src).toContain(`EMBED_DIMS = ${EMBED_DIMS}`);
+  });
+});
+
+describe('a deleted (closed) store is never indexed (audit P2-7)', () => {
+  const ddl = (f: ReturnType<typeof fx>) =>
+    f.raw.exec('CREATE TABLE IF NOT EXISTS do_flags (name TEXT PRIMARY KEY, value INTEGER)');
+
+  it('a closed store writes nothing and calls no provider', async () => {
+    const f = fx();
+    ddl(f);
+    f.add('a', 'Gold ring', { desc: 'solid gold' });
+    closeStore(f.db);
+    const idx = fakeIndex();
+    const prov = fakeProvider();
+    expect(await syncProductVectors(f.db, 's1', { provider: prov, index: idx })).toMatchObject({
+      embedded: 0,
+    });
+    expect(idx.store.size).toBe(0);
+    expect(prov.calls.length).toBe(0);
+  });
+
+  it('an index job in flight when the store is deleted does not write the vectors back', async () => {
+    const f = fx();
+    ddl(f);
+    f.add('a', 'Gold ring', { desc: 'solid gold' });
+    const idx = fakeIndex();
+    const inner = fakeProvider();
+    const prov = {
+      ...inner,
+      async embed(texts: string[]) {
+        const out = await inner.embed(texts);
+        closeStore(f.db); // the deletion lands while the provider call is in flight
+        return out;
+      },
+    };
+    const r = await syncProductVectors(f.db, 's1', { provider: prov, index: idx });
+    expect(idx.store.size).toBe(0);
+    expect(r.embedded).toBe(0);
+    expect(f.state('a')).toBeUndefined();
   });
 });
 
