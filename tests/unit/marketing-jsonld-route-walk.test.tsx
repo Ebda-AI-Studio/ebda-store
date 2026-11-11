@@ -88,6 +88,21 @@ describe('pageJsonLd', () => {
     }
   });
 
+  it('only the Services index lists the offers; legal/contact/credits name the Organization by identity (MKT-LEGAL-HTML-BUDGET-2)', () => {
+    const org = (doc: unknown) => nodesOf(doc).find(n => n['@type'] === 'Organization')!;
+    for (const locale of ['ar', 'en'] as const) {
+      expect(
+        org(pageJsonLd(locale, 'privacy', 'a', 'b', { legalEntity: true }))
+      ).not.toHaveProperty('makesOffer');
+      expect(
+        org(pageJsonLd(locale, 'contact', 'a', 'b', { type: 'ContactPage' }))
+      ).not.toHaveProperty('knowsAbout');
+      expect(
+        org(pageJsonLd(locale, 'services', 'a', 'b', { type: 'CollectionPage' }))
+      ).toHaveProperty('makesOffer');
+    }
+  });
+
   it('every id a node points at is defined in the same graph', () => {
     const nodes = nodesOf(pageJsonLd('ar', 'credits', 'ا', 'ب'));
     const defined = new Set(nodes.map(n => n['@id']));
