@@ -15,7 +15,7 @@ import { lookupStore } from '../definer';
 import logger from '../logger';
 import { storeMoney, storeRepo } from '../repo-factory';
 
-export interface BackfillStoreReport {
+interface BackfillStoreReport {
   storeId: string;
   scanned: number;
   /** stamped (apply) or would be stamped (dry run) */
@@ -30,7 +30,7 @@ export interface BackfillStoreReport {
   skipped: 'gone' | 'not_do' | 'error' | null;
   done: boolean;
 }
-export interface BackfillResult {
+interface BackfillResult {
   dryRun: boolean;
   stores: BackfillStoreReport[];
   totals: {
@@ -54,8 +54,10 @@ interface Cursor {
 const PAGE = 200;
 export const MAX_BUDGET = 2000;
 
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-buyer-key-backfill.test.ts
 export const encodeCursor = (c: Cursor): string =>
   Buffer.from(JSON.stringify(c)).toString('base64url');
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-buyer-key-backfill.test.ts and apps/api/workers-do/wa-buyer-key-backfill.test.ts
 export function decodeCursor(raw: string | undefined): Cursor | null {
   if (!raw) return null;
   try {
@@ -66,7 +68,7 @@ export function decodeCursor(raw: string | undefined): Cursor | null {
   }
 }
 
-export interface BackfillOpts {
+interface BackfillOpts {
   secret: string;
   dryRun: boolean;
   cursor?: string;

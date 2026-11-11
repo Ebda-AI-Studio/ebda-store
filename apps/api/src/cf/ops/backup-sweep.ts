@@ -56,7 +56,7 @@ export interface SweepEnv {
 }
 export const D1_BINDINGS = ['PLATFORM_DB', 'IDENTITY_DB'] as const;
 /** A table of at most this many rows is read in one batch (one consistent read); a larger one is paged by primary key into parts. */
-export const D1_PAGE_ROWS = BACKUP_PART_ROWS;
+const D1_PAGE_ROWS = BACKUP_PART_ROWS;
 
 export const d1BackupKey = (name: string, day: string, file: string) =>
   `d1-backups/${name}/${day}/${file}`;

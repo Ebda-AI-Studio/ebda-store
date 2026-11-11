@@ -5,7 +5,7 @@
  */
 import { exportOrder, storeTables } from './tables';
 
-export interface BackupPart {
+interface BackupPart {
   file: string;
   rows: number;
   sha256: string;
@@ -52,7 +52,7 @@ export interface BackupOpts {
   partRows?: number;
 }
 
-export const partFile = (t: string, i: number) => `${t}.part-${String(i).padStart(4, '0')}.ndjson`;
+const partFile = (t: string, i: number) => `${t}.part-${String(i).padStart(4, '0')}.ndjson`;
 /** Every R2 file a table of a manifest lives in (legacy: the one file). */
 export const tableFiles = (t: string, tm: TableManifest): string[] =>
   tm.parts ? tm.parts.map(p => p.file) : [`${t}.ndjson`];
@@ -107,7 +107,7 @@ export function fitBytes(lines: string[], budget = BACKUP_PART_BYTES): number {
  * synchronous read; the consumer awaits R2 between pages. Yields at least one page (an empty table yields its header only) and
  * never a trailing empty page.
  */
-export function* pageTable(sql: SqlLike, t: string, partRows = BACKUP_PART_ROWS): Generator<Page> {
+function* pageTable(sql: SqlLike, t: string, partRows = BACKUP_PART_ROWS): Generator<Page> {
   const key = keyColumns(sql, t);
   const q = `"${t.replace(/"/g, '""')}"`;
   const order = key ? key.map(k => `"${k.replace(/"/g, '""')}"`).join(', ') : 'rowid';
