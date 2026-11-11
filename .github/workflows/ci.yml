@@ -458,17 +458,17 @@ jobs:
         run: npx playwright test -c playwright.builder.config.ts
         env:
           CI: 'true'
-
-      # `wrangler deploy --dry-run` for each changed Worker app, on the Node the
-      # deploy uses (a plain build never starts wrangler, so it passed while real
-      # deploys died on the Node floor, 2026-10-03). `changes` only lists apps that
-      # HAVE a wrangler config, so an app without one (apps/api today) is skipped.
-      # web/admin/orders ship through the pinned OpenNext adapter: this runs the
-      # same generator + assertion as cf-deploy.yml (issues 2089/2152/2154) so an
-      # adapter or `next` bump that breaks the DO/tag-cache overrides fails here.
       - name: Release the heavy-job host lock
         if: always()
         run: bash scripts/ci/heavy-lock.sh release
+
+  # `wrangler deploy --dry-run` for each changed Worker app, on the Node the
+  # deploy uses (a plain build never starts wrangler, so it passed while real
+  # deploys died on the Node floor, 2026-10-03). `changes` only lists apps that
+  # HAVE a wrangler config, so an app without one (apps/api today) is skipped.
+  # web/admin/orders ship through the pinned OpenNext adapter: this runs the
+  # same generator + assertion as cf-deploy.yml (issues 2089/2152/2154) so an
+  # adapter or `next` bump that breaks the DO/tag-cache overrides fails here.
   worker-dry-run:
     name: Worker dry-run (${{ matrix.app }})
     needs: [changes]
@@ -594,12 +594,12 @@ jobs:
           name: worker-startup-budget
           path: ${{ runner.temp }}/worker-startup-budget.json
           if-no-files-found: ignore
-
-      # OPS-2: the PRODUCTION build of every app whose dependency graph includes a changed workspace, with the same commands the
-      # cf-<app>-deploy.yml workflows run. #248 merged green and broke the storefront build because no PR check built the apps.
       - name: Release the heavy-job host lock
         if: always()
         run: bash scripts/ci/heavy-lock.sh release
+
+  # OPS-2: the PRODUCTION build of every app whose dependency graph includes a changed workspace, with the same commands the
+  # cf-<app>-deploy.yml workflows run. #248 merged green and broke the storefront build because no PR check built the apps.
   app-build:
     name: App build (${{ matrix.app }})
     needs: [changes]
@@ -728,14 +728,14 @@ jobs:
             # full lane: every workers-test file, route-sweep.test.ts included
             npm run cf:test -w apps/api
           fi
-
-      # G11 (Ruling INFRA-CF-1): the DB-less integration lane. The real StoreDO (SQLite), D1 and R2 bindings run on
-      # LOCAL workerd (Miniflare via @cloudflare/vitest-pool-workers), no Postgres and no built bundle, so it
-      # starts in seconds. Covers the backup sweep (DO + D1 -> R2) and the PDPL erasure/export surfaces. Only when
-      # a Worker is affected. No remote Actions cache on the self-hosted runner (see the header of this file).
       - name: Release the heavy-job host lock
         if: always()
         run: bash scripts/ci/heavy-lock.sh release
+
+  # G11 (Ruling INFRA-CF-1): the DB-less integration lane. The real StoreDO (SQLite), D1 and R2 bindings run on
+  # LOCAL workerd (Miniflare via @cloudflare/vitest-pool-workers), no Postgres and no built bundle, so it
+  # starts in seconds. Covers the backup sweep (DO + D1 -> R2) and the PDPL erasure/export surfaces. Only when
+  # a Worker is affected. No remote Actions cache on the self-hosted runner (see the header of this file).
   workerd-integration:
     name: Integration on local workerd (DO + D1 + R2)
     needs: [changes]
@@ -768,15 +768,15 @@ jobs:
         run: npm run db:generate
       - name: StoreDO / D1 / R2 integration tests
         run: npm run cf:test:do -w apps/api
-
-      # ---------------------------------------------------------------------------
-      # FULL lane. Never on a pull request.
-      #   FULL     = every push to main, every cron, a manual dispatch
-      #   MUTATION = the Sunday cron, or a manual dispatch with `mutation` ticked
-      # ---------------------------------------------------------------------------
       - name: Release the heavy-job host lock
         if: always()
         run: bash scripts/ci/heavy-lock.sh release
+
+  # ---------------------------------------------------------------------------
+  # FULL lane. Never on a pull request.
+  #   FULL     = every push to main, every cron, a manual dispatch
+  #   MUTATION = the Sunday cron, or a manual dispatch with `mutation` ticked
+  # ---------------------------------------------------------------------------
 
   build:
     name: Build
