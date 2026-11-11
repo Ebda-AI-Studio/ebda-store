@@ -5452,7 +5452,7 @@ model BillingReminder {
   storeId        String   @map("store_id")
   subscriptionId String   @map("subscription_id")
   dueAt          DateTime @map("due_at")
-  /// d7 | d3 | d1 | d0 | suspended
+  /// d7 | d3 | d1 | d0 | grace_start | grace_d1 | suspended (BILL-NOTICE-1: one row per stage)
   kind           String
   createdAt      DateTime @default(now()) @map("created_at")
 

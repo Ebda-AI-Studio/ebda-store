@@ -7,6 +7,8 @@ export type SubscriptionBillingNoticeKind =
   | 'downgraded'
   | 'payment_due'
   | 'store_suspended'
+  | 'grace_started'
+  | 'grace_ending'
   | 'payment_confirmed'
   | 'payment_rejected'
   | 'store_restored';
@@ -29,6 +31,8 @@ export interface SubscriptionBillingNoticeData {
   /** payment_due: the due date (ISO date text) and whole days left (0 = today). */
   dueOn?: string;
   daysLeft?: number;
+  /** grace_started / grace_ending: the date the store is paused if still unpaid (ISO date text). */
+  suspendOn?: string;
   /** payment_due / store_suspended: how this subscription is paid. */
   method?: 'card' | 'instapay';
   cardLast4?: string | null;
@@ -177,20 +181,28 @@ export const subscriptionBillingTemplate = {
       reviewSubject(d, 'en') ??
       (d.kind === 'payment_due'
         ? `${d.storeName}: your ${d.planName} payment is due ${d.daysLeft === 0 ? 'today' : `in ${d.daysLeft} day${d.daysLeft === 1 ? '' : 's'}`}`
-        : d.kind === 'store_suspended'
-          ? `${d.storeName}: your store is paused until payment`
-          : d.kind === 'payment_failed'
-            ? `${d.storeName}: we could not renew your ${d.planName} plan`
-            : `${d.storeName}: new orders are paused`),
+        : d.kind === 'grace_started'
+          ? `${d.storeName}: your payment is overdue, the store pauses on ${d.suspendOn}`
+          : d.kind === 'grace_ending'
+            ? `${d.storeName}: your store pauses tomorrow unless you pay`
+            : d.kind === 'store_suspended'
+              ? `${d.storeName}: your store is paused until payment`
+              : d.kind === 'payment_failed'
+                ? `${d.storeName}: we could not renew your ${d.planName} plan`
+                : `${d.storeName}: new orders are paused`),
     ar: (d: SubscriptionBillingNoticeData) =>
       reviewSubject(d, 'ar') ??
       (d.kind === 'payment_due'
         ? `${d.storeName}: ${d.daysLeft === 0 ? 'دفعة باقة ' + d.planName + ' مستحقة اليوم' : 'دفعة باقة ' + d.planName + ' مستحقة خلال ' + d.daysLeft + ' يوم'}`
-        : d.kind === 'store_suspended'
-          ? `${d.storeName}: تم إيقاف متجرك مؤقتًا لحين الدفع`
-          : d.kind === 'payment_failed'
-            ? `${d.storeName}: تعذّر تجديد باقة ${d.planName}`
-            : `${d.storeName}: الطلبات الجديدة متوقفة`),
+        : d.kind === 'grace_started'
+          ? `${d.storeName}: دفعتك متأخرة، والمتجر هيتوقف في ${d.suspendOn}`
+          : d.kind === 'grace_ending'
+            ? `${d.storeName}: متجرك هيتوقف بكرة لو الدفعة ما اتسجلتش`
+            : d.kind === 'store_suspended'
+              ? `${d.storeName}: تم إيقاف متجرك مؤقتًا لحين الدفع`
+              : d.kind === 'payment_failed'
+                ? `${d.storeName}: تعذّر تجديد باقة ${d.planName}`
+                : `${d.storeName}: الطلبات الجديدة متوقفة`),
   },
   en: (d: SubscriptionBillingNoticeData) =>
     reviewNotice(d, 'en') ??
@@ -202,22 +214,30 @@ export const subscriptionBillingTemplate = {
     ${instapayBlock(d, 'en')}
     <p><a href="${escapeHtml(d.billingUrl)}">Open billing</a></p>
     ${whatsappLine(d, 'en')}`
-      : d.kind === 'store_suspended'
+      : d.kind === 'grace_started' || d.kind === 'grace_ending'
         ? `
+    <h2>${d.kind === 'grace_started' ? 'Your payment is overdue' : 'Your store pauses tomorrow'}</h2>
+    <p>The payment for <strong>${escapeHtml(d.storeName)}</strong> has not been recorded. If it is not recorded by
+    <strong>${escapeHtml(d.suspendOn ?? '')}</strong>, the storefront will be paused for shoppers. Your admin keeps working and nothing is deleted.</p>
+    ${instapayBlock(d, 'en')}
+    <p><a href="${escapeHtml(d.billingUrl)}">Pay now</a></p>
+    ${whatsappLine(d, 'en')}`
+        : d.kind === 'store_suspended'
+          ? `
     <h2>Your store is paused</h2>
     <p>We have not received the payment for <strong>${escapeHtml(d.storeName)}</strong>, so its storefront is
     temporarily unavailable to shoppers. Your admin still works and nothing was deleted. The store comes back as soon as the payment is recorded.</p>
     ${instapayBlock(d, 'en')}
     <p><a href="${escapeHtml(d.billingUrl)}">Pay now</a></p>
     ${whatsappLine(d, 'en')}`
-        : d.kind === 'payment_failed'
-          ? `
+          : d.kind === 'payment_failed'
+            ? `
     <h2>We could not renew your plan</h2>
     <p>The ${escapeHtml(emailMoney(d.amountMinor, 'EGP', 'en'))} charge for the
     <strong>${escapeHtml(d.planName)}</strong> plan on <strong>${escapeHtml(d.storeName)}</strong> did not go through.
     We will try your card again on ${escapeHtml(d.retryOn ?? 'the next retry date')}. Your store keeps working meanwhile.</p>
     <p><a href="${escapeHtml(d.billingUrl)}">Update your payment method</a></p>`
-          : `
+            : `
     <h2>New orders are paused</h2>
     <p>The subscription of <strong>${escapeHtml(d.storeName)}</strong> ended without a payment, so the store takes no new
     orders. Nothing was deleted — your products, orders and settings are kept.</p>
@@ -232,22 +252,30 @@ export const subscriptionBillingTemplate = {
     ${instapayBlock(d, 'ar')}
     <p dir="rtl"><a href="${escapeHtml(d.billingUrl)}">افتح صفحة الفواتير</a></p>
     ${whatsappLine(d, 'ar')}`
-      : d.kind === 'store_suspended'
+      : d.kind === 'grace_started' || d.kind === 'grace_ending'
         ? `
+    <h2 dir="rtl">${d.kind === 'grace_started' ? 'دفعتك متأخرة' : 'متجرك هيتوقف بكرة'}</h2>
+    <p dir="rtl">دفعة متجر <strong>${escapeHtml(d.storeName)}</strong> لسه ما اتسجلتش. لو ما اتسجلتش قبل
+    <strong dir="ltr">${escapeHtml(d.suspendOn ?? '')}</strong> هنوقف واجهة المتجر أمام الزوار. لوحة التحكم هتفضل شغالة ومفيش حاجة هتتحذف.</p>
+    ${instapayBlock(d, 'ar')}
+    <p dir="rtl"><a href="${escapeHtml(d.billingUrl)}">ادفع الآن</a></p>
+    ${whatsappLine(d, 'ar')}`
+        : d.kind === 'store_suspended'
+          ? `
     <h2 dir="rtl">تم إيقاف متجرك مؤقتًا</h2>
     <p dir="rtl">لم نستلم دفعة متجر <strong>${escapeHtml(d.storeName)}</strong>، لذلك واجهة المتجر غير متاحة للزوار مؤقتًا.
     لوحة التحكم تعمل ولم يُحذف أي شيء، ويعود المتجر فور تسجيل الدفعة.</p>
     ${instapayBlock(d, 'ar')}
     <p dir="rtl"><a href="${escapeHtml(d.billingUrl)}">ادفع الآن</a></p>
     ${whatsappLine(d, 'ar')}`
-        : d.kind === 'payment_failed'
-          ? `
+          : d.kind === 'payment_failed'
+            ? `
     <h2 dir="rtl">تعذّر تجديد باقتك</h2>
     <p dir="rtl">لم تتم عملية الدفع بمبلغ ${escapeHtml(emailMoney(d.amountMinor, 'EGP', 'ar'))} لباقة
     <strong>${escapeHtml(d.planName)}</strong> الخاصة بمتجر <strong>${escapeHtml(d.storeName)}</strong>.
     سنحاول خصم المبلغ من بطاقتك مرة أخرى في ${escapeHtml(d.retryOn ?? 'موعد المحاولة التالية')}. يستمر متجرك في العمل خلال ذلك.</p>
     <p dir="rtl"><a href="${escapeHtml(d.billingUrl)}">حدّث وسيلة الدفع</a></p>`
-          : `
+            : `
     <h2 dir="rtl">الطلبات الجديدة متوقفة</h2>
     <p dir="rtl">اشتراك متجر <strong>${escapeHtml(d.storeName)}</strong> انتهى من غير دفع، فالمتجر مش هيستقبل طلبات جديدة.
     لم يُحذف أي شيء — منتجاتك وطلباتك وإعداداتك محفوظة.</p>

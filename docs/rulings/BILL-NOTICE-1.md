@@ -1,0 +1,5 @@
+# BILL-NOTICE-1
+
+> Section: S2-13 — grace-period notices (branch `fix/grace-end-notices`; foundation criterion 18: billing notices idempotent per stage)
+
+Ruling BILL-NOTICE-1 — An InstaPay merchant is told at three grace stages: `grace_start` (the payment went overdue; the store is paused at due + 3 days), `grace_d1` (one day or less before the pause) and `suspended` (the store was paused). Each is email + bell; the in-admin banner shows the overdue notice and, on the last day, the louder `graceEnding` wording (derived from `billing.overdue` + `billing.suspendAt`). Each stage is owned by whoever wins the INSERT of its `billing_reminders` row (UNIQUE subscription + period end + kind, kinds `grace_start | grace_d1 | suspended`) BEFORE anything is sent: `grace_start` and `suspended` are claimed in the same transaction as the compare-and-set that takes the decision, `grace_d1` in its own transaction from the daily job. No money moves, no migration (`kind` is free text). Cost if wrong: a crash between the claim and the send loses that one notice (at-most-once, by design: the banner and the bell page still show the state), never a duplicate email.

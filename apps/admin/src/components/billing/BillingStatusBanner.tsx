@@ -38,7 +38,8 @@ export function BillingStatusBanner({ storeId }: { storeId: string }) {
   if (!info || !kind) return null;
 
   const { title } = noticeText(kind, info, t, locale);
-  const urgent = kind === 'unpaid' || kind === 'overdue' || kind === 'overStoreLimit';
+  const urgent =
+    kind === 'unpaid' || kind === 'overdue' || kind === 'graceEnding' || kind === 'overStoreLimit';
   return (
     <div
       role={urgent ? 'alert' : 'status'}

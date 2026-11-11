@@ -9132,6 +9132,7 @@
       "overLimitBody": "Your plan includes fewer stores than you have. Upgrade to {plan} to edit all of them again.",
       "overdueTitle": "Your payment is overdue",
       "overdueBody": "We will pause your store on {date} if payment is not recorded.",
+      "graceEndingTitle": "Your store pauses within a day unless payment is recorded",
       "overdueBodyNoDate": "Your store will be paused if payment is not recorded soon.",
       "dueSoonTitle": "Payment due in {n} days",
       "chargeSoon": "We'll charge your card {card} on {date}",

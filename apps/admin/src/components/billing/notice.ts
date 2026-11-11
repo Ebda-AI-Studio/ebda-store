@@ -2,13 +2,17 @@ import { planLabel as soldPlanLabel } from '@/lib/plan-labels';
 import { cardLabel, fmtDate, type UiLocale } from './format';
 import type { BillingInfo } from './types';
 
-export type BillingNoticeKind = 'unpaid' | 'overStoreLimit' | 'overdue' | 'dueSoon';
+export type BillingNoticeKind = 'unpaid' | 'overStoreLimit' | 'overdue' | 'graceEnding' | 'dueSoon';
 
 /** Which billing notice (if any) the merchant must see, most severe first. */
 export function billingNotice(b: BillingInfo | null | undefined): BillingNoticeKind | null {
   if (!b) return null;
   if (b.suspension?.reason === 'unpaid') return 'unpaid';
   if (b.suspension?.reason === 'over_store_limit') return 'overStoreLimit';
+  // Ruling BILL-NOTICE-1: the last day of grace gets its own, louder wording.
+  if (b.overdue && b.suspendAt && new Date(b.suspendAt).getTime() - Date.now() <= 86_400_000) {
+    return 'graceEnding';
+  }
   if (b.overdue) return 'overdue';
   if (b.dueSoon && b.dueSoon.daysLeft <= 7) return 'dueSoon';
   return null;
@@ -37,6 +41,11 @@ export function noticeText(
         body: b.suspendAt
           ? t('overdueBody', { date: fmtDate(b.suspendAt, locale) })
           : t('overdueBodyNoDate'),
+      };
+    case 'graceEnding':
+      return {
+        title: t('graceEndingTitle'),
+        body: t('overdueBody', { date: fmtDate(b.suspendAt, locale) }),
       };
     case 'dueSoon': {
       const chargeAt = b.nextCharge?.at ?? b.dueSoon?.dueAt ?? null;

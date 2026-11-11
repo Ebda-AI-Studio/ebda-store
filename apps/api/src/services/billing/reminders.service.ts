@@ -26,6 +26,7 @@ import {
 import { instapayHandle, supportContact } from './manual-config';
 import { chargeFor, ledgerVat } from './charge-amount';
 import { isBillableStoreId } from './account.service';
+import { runBillingEffects } from './billing-notify';
 
 const DAY = 86_400_000;
 export type ReminderKind = 'd7' | 'd3' | 'd1' | 'd0';
@@ -174,4 +175,85 @@ async function sendDueReminderInner(subscriptionId: string, now: Date): Promise<
     ).catch(err => logger.warn({ err, storeId }, '[billing] reminder email failed'));
   }
   return { sent: true, kind };
+}
+
+/**
+ * Grace-period notice stages (Ruling BILL-NOTICE-1). Same `billing_reminders` table and unique key as the
+ * payment reminders, with three more kinds: `grace_start` (InstaPay payment went overdue), `grace_d1`
+ * (one day or less before the store is paused) and `suspended`. A stage is owned by WHOEVER WINS this insert,
+ * and it is won BEFORE anything is sent (inside the transaction that takes the decision where there is one),
+ * so a retry, a re-run or a second worker sends nothing twice. `dueAt` is the period end the grace counts from.
+ */
+export type GraceStage = 'grace_start' | 'grace_d1' | 'suspended';
+
+export async function claimGraceStage(
+  tx: Pick<typeof prisma, 'billingReminder'>,
+  args: { storeId: string; subscriptionId: string; dueAt: Date; kind: GraceStage }
+): Promise<boolean> {
+  const { count } = await tx.billingReminder.createMany({
+    data: [args],
+    skipDuplicates: true,
+  });
+  return count === 1;
+}
+
+/** InstaPay subscriptions in grace whose suspension is within the next day. */
+export async function findGraceEndingCandidates(now: Date): Promise<string[]> {
+  const horizon = new Date(now.getTime() + DAY);
+  const parts = await acrossBilling(
+    storeId =>
+      prisma.storeSubscription.findMany({
+        where: {
+          ...(storeId ? { storeId } : {}),
+          status: 'past_due',
+          billingMethod: 'instapay',
+          nextRetryAt: { gt: now, lte: horizon },
+        },
+        select: { id: true },
+      }),
+    {
+      onStoreError: (storeId, err) =>
+        logger.error({ err, storeId }, '[billing] grace-ending scan failed'),
+    }
+  );
+  return parts.flatMap(p => p.value.map(r => r.id));
+}
+
+/** The one-day-left notice for one subscription: claim `grace_d1`, then email + bell. */
+export async function sendGraceEndingNotice(
+  subscriptionId: string,
+  now: Date = new Date()
+): Promise<ReminderResult | { sent: false; reason: string }> {
+  try {
+    const storeId = await getEntityStoreId('store_subscription', subscriptionId);
+    if (!storeId) return { sent: false, reason: 'not_found' };
+    const claimed = await withStore(storeId, async tx => {
+      const sub = await tx.storeSubscription.findUnique({ where: { id: subscriptionId, storeId } });
+      if (
+        !sub ||
+        sub.status !== 'past_due' ||
+        sub.billingMethod !== 'instapay' ||
+        !sub.nextRetryAt ||
+        !sub.currentPeriodEnd ||
+        sub.nextRetryAt.getTime() <= now.getTime() ||
+        sub.nextRetryAt.getTime() - now.getTime() > DAY
+      ) {
+        return null;
+      }
+      const won = await claimGraceStage(tx, {
+        storeId,
+        subscriptionId,
+        dueAt: sub.currentPeriodEnd,
+        kind: 'grace_d1',
+      });
+      return { won, suspendAt: sub.nextRetryAt };
+    });
+    if (!claimed) return { sent: false, reason: 'no_window' };
+    if (!claimed.won) return { sent: false, reason: 'already_sent' };
+    await runBillingEffects([{ kind: 'grace_ending', storeId, suspendAt: claimed.suspendAt }]);
+    return { sent: true, kind: 'd1' };
+  } catch (err) {
+    if (!isStoreGoneError(err)) throw err;
+    return { sent: false, reason: 'store_gone' };
+  }
 }

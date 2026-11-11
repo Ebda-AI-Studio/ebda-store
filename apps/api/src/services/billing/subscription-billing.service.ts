@@ -91,7 +91,7 @@ import {
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
-import { findReminderCandidates, sendDueReminder } from './reminders.service';
+import { claimGraceStage, findReminderCandidates, sendDueReminder } from './reminders.service';
 import {
   chargeFor,
   ledgerVat,
@@ -1136,16 +1136,24 @@ type SubRow = NonNullable<Awaited<ReturnType<typeof loadSub>>>;
  */
 async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<RenewalResult> {
   if (sub.status !== 'past_due') {
-    const { count } = await withStore(sub.storeId, tx =>
-      tx.storeSubscription.updateMany({
+    const suspendAt = addDays(periodEnd, INSTAPAY_GRACE_DAYS);
+    // Ruling BILL-NOTICE-1: the grace-start notice stage is claimed in the SAME transaction as the
+    // past_due decision, BEFORE anything is sent; a re-run finds the row taken and sends nothing.
+    const { count, claimed } = await withStore(sub.storeId, async tx => {
+      const upd = await tx.storeSubscription.updateMany({
         where: { id: sub.id, storeId: sub.storeId, status: sub.status, billingMethod: 'instapay' },
-        data: {
-          status: 'past_due',
-          currentPeriodEnd: periodEnd,
-          nextRetryAt: addDays(periodEnd, INSTAPAY_GRACE_DAYS),
-        },
-      })
-    );
+        data: { status: 'past_due', currentPeriodEnd: periodEnd, nextRetryAt: suspendAt },
+      });
+      const won =
+        upd.count === 1 &&
+        (await claimGraceStage(tx, {
+          storeId: sub.storeId,
+          subscriptionId: sub.id,
+          dueAt: periodEnd,
+          kind: 'grace_start',
+        }));
+      return { count: upd.count, claimed: won };
+    });
     if (count === 1) {
       await auditLog({
         action: 'billing.manual_payment_overdue',
@@ -1155,6 +1163,9 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
         details: { dueAt: periodEnd.toISOString(), graceDays: INSTAPAY_GRACE_DAYS },
       });
     }
+    if (claimed) {
+      await runBillingEffects([{ kind: 'grace_started', storeId: sub.storeId, suspendAt }]);
+    }
     return {
       action: 'skipped',
       reason: count === 1 ? 'awaiting_manual_payment' : 'already_advanced',
@@ -1163,15 +1174,28 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
   if (!sub.nextRetryAt || sub.nextRetryAt.getTime() > now.getTime()) {
     return { action: 'skipped', reason: 'not_due' };
   }
-  const { count } = await withStore(sub.storeId, tx =>
-    tx.storeSubscription.updateMany({
+  // Ruling BILL-NOTICE-1: the suspension notice stage is claimed with the compare-and-set that clears
+  // the retry, so exactly one run owns the notice.
+  const { count, claimed } = await withStore(sub.storeId, async tx => {
+    const upd = await tx.storeSubscription.updateMany({
       where: { id: sub.id, storeId: sub.storeId, status: 'past_due', nextRetryAt: sub.nextRetryAt },
       data: { nextRetryAt: null },
-    })
-  );
+    });
+    const won =
+      upd.count === 1 &&
+      (await claimGraceStage(tx, {
+        storeId: sub.storeId,
+        subscriptionId: sub.id,
+        dueAt: periodEnd,
+        kind: 'suspended',
+      }));
+    return { count: upd.count, claimed: won };
+  });
   if (count === 0) return { action: 'skipped', reason: 'already_advanced' };
   const suspended = await suspendForBilling(sub.storeId, 'unpaid', now);
-  await runBillingEffects([{ kind: 'store_suspended', storeId: sub.storeId, applied: suspended }]);
+  await runBillingEffects([
+    { kind: 'store_suspended', storeId: sub.storeId, applied: suspended && claimed },
+  ]);
   return { action: 'suspended' };
 }
 

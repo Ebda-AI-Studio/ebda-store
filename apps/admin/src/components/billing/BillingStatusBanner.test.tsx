@@ -89,3 +89,12 @@ describe('billingNotice priority', () => {
     expect(billingNotice(null)).toBeNull();
   });
 });
+
+describe('last day of grace (BILL-NOTICE-1)', () => {
+  it('shows the louder grace-ending notice within a day of suspension, the plain overdue one before', () => {
+    const soon = new Date(Date.now() + 3_600_000).toISOString();
+    const later = new Date(Date.now() + 2 * 86_400_000).toISOString();
+    expect(billingNotice(billingFixture({ overdue: true, suspendAt: soon }))).toBe('graceEnding');
+    expect(billingNotice(billingFixture({ overdue: true, suspendAt: later }))).toBe('overdue');
+  });
+});
