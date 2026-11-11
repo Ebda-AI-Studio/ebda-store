@@ -210,7 +210,9 @@ describe('source contract', () => {
 
   it('the purge helper has call sites (an invalidate with zero callers is the same bug inverted)', () => {
     expect((svc.match(/purgePublishedCaches\(/g) ?? []).length).toBeGreaterThanOrEqual(2); // definition + call
-    expect(svc).toMatch(/deferAfterTenantCommit\('page-builder\.publish\.purge'/);
+    expect(svc).toMatch(/deferAfterTenantCommit\(\s*'page-builder\.publish\.purge'/);
+    // S5-12: the client must not get "published" before the purge ran.
+    expect(svc).toMatch(/holdResponse:\s*true/);
   });
 
   it('the public read never selects a draft', async () => {
