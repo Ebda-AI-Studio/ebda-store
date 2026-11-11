@@ -128,6 +128,38 @@ export interface Outcome {
   cardLast4?: string;
   cardBrand?: string;
   customerRef?: string;
+  /**
+   * #627, what the success is worth and who said so: `charge_request` = the gateway's direct answer to OUR charge call for
+   * the row's amount; `gateway` = a status lookup or signed webhook that STATED `amountMinor` / `currency`. A success
+   * with neither is never settled (`maySettle`): it is held for a person.
+   */
+  amountSource?: 'charge_request' | 'gateway';
+  amountMinor?: number | null;
+  currency?: string | null;
+}
+
+/** The marker a held charge carries on its own ledger row (`billing_events.failure_reason`), so NO settle path takes it. */
+export const HELD_ROW_PREFIX = 'held:';
+
+/**
+ * #627: THE one predicate every settle path goes through (settleInTx). A row with an open hold is never settled, either
+ * way (a person decides); a SUCCESS on a charge row must carry an amount we can check: from our own charge call, or one
+ * the gateway stated that equals the row in the row's currency. Anything else is a hold, never a settle on trust.
+ */
+export function maySettle(
+  row: { type: string; amountMinor: number; currency: string; failureReason: string | null },
+  o: Outcome
+): { ok: true } | { ok: false; reason: 'held' | HeldBillingWebhook['reason'] } {
+  if (row.failureReason?.startsWith(HELD_ROW_PREFIX)) return { ok: false, reason: 'held' };
+  if (o.status !== 'succeeded' || row.type === 'card_setup') return { ok: true };
+  if (o.amountSource === 'charge_request') return { ok: true };
+  if (o.amountSource !== 'gateway' || typeof o.amountMinor !== 'number')
+    return { ok: false, reason: 'amount_missing' };
+  if (!o.currency) return { ok: false, reason: 'currency_missing' };
+  if (o.amountMinor !== row.amountMinor) return { ok: false, reason: 'amount_mismatch' };
+  if (o.currency.toUpperCase() !== String(row.currency).toUpperCase())
+    return { ok: false, reason: 'currency_mismatch' };
+  return { ok: true };
 }
 
 interface LedgerRow {
@@ -535,12 +567,19 @@ export async function settleInTx(
   o: Outcome,
   now: Date,
   effects: BillingEffect[]
-): Promise<{ transitioned: boolean }> {
+): Promise<{ transitioned: boolean; refused?: 'held'; held?: HeldBillingWebhook }> {
   // Runs inside the event's store scope (inEventStore / the webhook's withStore).
   const row = await tx.billingEvent.findUnique({
     where: { id: eventId, storeId: currentStoreId() },
   });
   if (!row) return { transitioned: false };
+  const verdict = maySettle(row, o);
+  if (!verdict.ok) {
+    if (verdict.reason === 'held') return { transitioned: false, refused: 'held' };
+    // a success we cannot check: hold the row (no settle path will take it) and queue it for a person, same section
+    const info = await holdLedgerRow(tx, row, verdict.reason, o);
+    return { transitioned: false, held: info };
+  }
   const raw = (o.raw ?? undefined) as Prisma.InputJsonValue | undefined;
   if (o.status === 'succeeded' && row.type === 'card_setup' && !o.cardToken) {
     // "Saved" with no token saves nothing: the store must not pass the go-live gate.
@@ -641,12 +680,54 @@ export async function settleInTx(
   return { transitioned: true };
 }
 
+/**
+ * Mark a ledger row held (`failure_reason = held:<reason>`, status untouched) and add it to the ONE held queue (a
+ * `billing_webhook_events` row, outcome `held`, keyed `settle:<rowId>` so a repeat adds nothing), in the caller's section.
+ */
+async function holdLedgerRow(
+  tx: Tx,
+  row: { id: string; storeId: string; provider: string; amountMinor: number; currency: string },
+  reason: HeldBillingWebhook['reason'],
+  o: Outcome
+): Promise<HeldBillingWebhook> {
+  const info: HeldBillingWebhook = {
+    reason,
+    kind: `settle.${o.status}`,
+    storeId: row.storeId,
+    merchantOrderId: row.id,
+    providerRef: o.providerRef ?? null,
+    expectedMinor: row.amountMinor,
+    gotMinor: typeof o.amountMinor === 'number' ? o.amountMinor : null,
+    expectedCurrency: row.currency,
+    gotCurrency: o.currency ?? null,
+    occurredAt: new Date().toISOString(),
+  };
+  await tx.billingEvent.updateMany({
+    where: { id: row.id, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
+    data: { failureReason: `${HELD_ROW_PREFIX}${reason}` },
+  });
+  await tx.billingWebhookEvent.createMany({
+    data: [
+      {
+        provider: row.provider,
+        eventId: `settle:${row.id}`,
+        eventType: info.kind,
+        outcome: WEBHOOK_HELD,
+        detail: JSON.stringify(info),
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return info;
+}
+
 async function settleCharge(eventId: string, o: Outcome, now: Date) {
   const effects: BillingEffect[] = [];
   const res = await inEventStore(eventId, tx => settleInTx(tx, eventId, o, now, effects), {
     transitioned: false,
-  });
+  } as Awaited<ReturnType<typeof settleInTx>>);
   await runBillingEffects(effects);
+  if (res.held) await alertHeldBillingWebhook(res.held.kind, `settle:${eventId}`, res.held);
   return res;
 }
 
@@ -750,6 +831,8 @@ async function chargeAndSettle(args: {
       providerRef: res.chargeId,
       failureReason: res.failureReason,
       raw: res.raw,
+      // the gateway's direct answer to OUR charge of `args.amountMinor` for this row
+      amountSource: 'charge_request',
     },
     args.now
   );
@@ -1310,10 +1393,15 @@ export async function sweepStuckCharges(
           providerRef: res.chargeId,
           failureReason: res.failureReason,
           raw: res.raw,
+          // #627: a status lookup only counts when it STATES the amount; a bare SUCCESS is held, not settled
+          amountSource: 'gateway',
+          amountMinor: res.amountMinor ?? null,
+          currency: res.currency ?? null,
         },
         now
       );
       if (t.transitioned) out.settled++;
+      else if (t.held) stuck.push(r.id);
     } catch (err) {
       logger.warn(
         { err, eventId: r.id },
@@ -1624,6 +1712,7 @@ export async function applyWebhookEvent(
   }
   const scopedStoreId = webhookStoreId;
   const heldRef: { v: HeldBillingWebhook | null } = { v: null };
+  const heldRefused = { v: false };
   const applyInner = async (tx: Tx): Promise<WebhookResult> => {
     const ignore = async (detail: string): Promise<WebhookResult> => {
       await tx.billingWebhookEvent.updateMany({
@@ -1654,6 +1743,17 @@ export async function applyWebhookEvent(
         where: { provider: providerName, eventId: event.eventId },
         data: { outcome: WEBHOOK_HELD, detail: JSON.stringify(info) },
       });
+      // the ledger row (when there is one) carries the hold too, so NO other settle path (the stuck-charge sweep, a
+      // later delivery) can settle it while a person has not decided (maySettle)
+      if (event.merchantOrderId && scopedStoreId && UUID_RE.test(event.merchantOrderId))
+        await tx.billingEvent.updateMany({
+          where: {
+            id: event.merchantOrderId,
+            storeId: scopedStoreId,
+            status: { in: ['pending', 'failed'] },
+          },
+          data: { failureReason: `${HELD_ROW_PREFIX}${reason}` },
+        });
       heldRef.v = info;
       return { duplicate: false, outcome: 'held', detail: reason };
     };
@@ -1731,10 +1831,31 @@ export async function applyWebhookEvent(
         cardLast4: event.card?.last4,
         cardBrand: event.card?.brand,
         customerRef: event.customerRef,
+        amountSource: 'gateway',
+        amountMinor: event.amountMinor,
+        currency: event.currency,
       },
       now,
       effects
-    );
+    ).then(async r => {
+      // the shared predicate refused (an open hold on the row): the delivery is recorded as held, not processed
+      if (r.refused === 'held') heldRefused.v = true;
+      return r;
+    });
+    if (heldRefused.v) {
+      await tx.billingWebhookEvent.updateMany({
+        where: { provider: providerName, eventId: event.eventId },
+        data: {
+          outcome: WEBHOOK_HELD,
+          detail: JSON.stringify({
+            reason: 'row_already_held',
+            merchantOrderId: row.id,
+            storeId: scopedStoreId,
+          }),
+        },
+      });
+      return { duplicate: false, outcome: 'held', detail: 'row_already_held' };
+    }
     return { duplicate: false, outcome: 'processed' };
   };
   // The dedupe row is a CLAIM, not a receipt: it is inserted as `processing` and finalised after the settlement. On
@@ -1887,6 +2008,8 @@ export async function resolveHeldBillingWebhook(args: {
   actorId: string;
   action: 'credited' | 'refunded' | 'not_ours';
   note: string;
+  /** the audit row, written BEFORE anything changes: a resolve that cannot be audited changes nothing */
+  audit: () => Promise<void>;
 }): Promise<void> {
   const db = prisma as unknown as Tx;
   const row = await db.billingWebhookEvent.findFirst({
@@ -1904,6 +2027,7 @@ export async function resolveHeldBillingWebhook(args: {
   } catch {
     detail = { unparsed: row.detail };
   }
+  await args.audit();
   const done = await db.billingWebhookEvent.updateMany({
     where: { id: args.id, outcome: WEBHOOK_HELD },
     data: {
@@ -1925,6 +2049,21 @@ export async function resolveHeldBillingWebhook(args: {
       'HELD_PAYMENT_NOT_OPEN',
       'This held payment is already resolved or does not exist'
     );
+  // close the held ledger row so no settle path picks it up again (a person has decided); no dunning effects run
+  const rowId = typeof detail.merchantOrderId === 'string' ? detail.merchantOrderId : null;
+  const storeId = typeof detail.storeId === 'string' ? detail.storeId : null;
+  if (rowId && storeId && UUID_RE.test(rowId))
+    await withStore(storeId, async tx => {
+      const r = await tx.billingEvent.findFirst({
+        where: { id: rowId, storeId },
+        select: { failureReason: true, status: true },
+      });
+      if (r?.failureReason?.startsWith(HELD_ROW_PREFIX) && r.status !== 'succeeded')
+        await tx.billingEvent.updateMany({
+          where: { id: rowId, storeId, failureReason: r.failureReason },
+          data: { status: 'failed', failureReason: `held_resolved:${args.action}` },
+        });
+    });
 }
 
 /**

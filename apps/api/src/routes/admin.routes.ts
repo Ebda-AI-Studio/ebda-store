@@ -31,7 +31,7 @@ import { listGrants } from '../services/billing/grants.service';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { searchProductIds } from '../services/product-search.service';
-import { auditLog } from '../middleware/security';
+import { auditLog, auditLogStrict } from '../middleware/security';
 import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
 import {
   listHeldBillingWebhooks,
@@ -657,15 +657,22 @@ router.post(
           note: z.string().trim().min(3).max(500),
         })
         .parse(req.body);
-      await resolveHeldBillingWebhook({ id, actorId: req.user!.userId, action, note });
-      await auditLog({
-        action: 'billing.held_webhook_resolved',
-        userId: req.user!.userId,
-        resourceType: 'billing_webhook_event',
-        resourceId: id,
-        details: { action, note },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
+      // the audit row is written BEFORE the resolve changes anything (strict: a failed audit refuses the resolve)
+      await resolveHeldBillingWebhook({
+        id,
+        actorId: req.user!.userId,
+        action,
+        note,
+        audit: () =>
+          auditLogStrict({
+            action: 'billing.held_webhook_resolved',
+            userId: req.user!.userId,
+            resourceType: 'billing_webhook_event',
+            resourceId: id,
+            details: { action, note },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          }),
       });
       res.json({ success: true });
     } catch (error) {

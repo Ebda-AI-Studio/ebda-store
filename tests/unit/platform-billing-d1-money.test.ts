@@ -58,6 +58,8 @@ import {
   settleInTx,
   listHeldBillingWebhooks,
   resolveHeldBillingWebhook,
+  sweepStuckCharges,
+  maySettle,
 } from '../../apps/api/src/services/billing/subscription-billing.service';
 
 const MIG = ['0001_init.sql', '0002_invariants.sql']
@@ -231,7 +233,7 @@ describe('settle lease', () => {
     const out = await settleInTx(
       prisma as never,
       EV,
-      { status: 'succeeded', providerRef: 'r' } as never,
+      { status: 'succeeded', providerRef: 'r', amountSource: 'charge_request' } as never,
       new Date(),
       effects
     );
@@ -757,6 +759,7 @@ describe('#627: a paid subscription charge we cannot match is HELD, alerted and 
       actorId: 'admin-1',
       action: 'refunded',
       note: 'refunded at Kashier',
+      audit: async () => undefined,
     });
     expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
     const done = await listHeldBillingWebhooks({ status: 'resolved' });
@@ -764,7 +767,212 @@ describe('#627: a paid subscription charge we cannot match is HELD, alerted and 
       resolution: { action: 'refunded', by: 'admin-1', note: 'refunded at Kashier' },
     });
     await expect(
-      resolveHeldBillingWebhook({ id: open[0].id, actorId: 'a', action: 'credited', note: 'again' })
+      resolveHeldBillingWebhook({
+        id: open[0].id,
+        actorId: 'a',
+        action: 'credited',
+        note: 'again',
+        audit: async () => undefined,
+      })
     ).rejects.toMatchObject({ statusCode: 409, code: 'HELD_PAYMENT_NOT_OPEN' });
   });
 });
+
+describe('#627 review: ONE may-settle predicate on every settle path (a held charge never upgrades the plan later)', () => {
+  const OLD = new Date('2026-01-01T00:00:00Z');
+  const NOW = new Date('2026-01-02T00:00:00Z');
+  const renewal = (db: DatabaseSync, over: Record<string, unknown> = {}) => {
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'free', 'active')`
+    ).run(STORE);
+    ledger(db, { type: 'renewal', provider_ref: 'ref-1', created_at: OLD.getTime(), ...over });
+  };
+  const gateway = (answer: Record<string, unknown> | null) =>
+    ({
+      name: 'stub',
+      getChargeStatus: async () => answer,
+    }) as never;
+  const plan = (db: DatabaseSync) =>
+    (db.prepare('SELECT plan_code p FROM store_subscriptions').get() as { p: string }).p;
+  const status = (db: DatabaseSync) =>
+    db.prepare('SELECT status s, failure_reason f FROM billing_events WHERE id = ?').get(EV) as {
+      s: string;
+      f: string | null;
+    };
+
+  it('the reviewer repro: billed 1000, signed 900 -> held; the stuck-charge sweep then gets SUCCESS and does NOT upgrade', async () => {
+    const db = rig();
+    renewal(db);
+    const held = await applyWebhookEvent('stub', paid900());
+    expect(held).toMatchObject({ outcome: 'held', detail: 'amount_mismatch' });
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+    const out = await sweepStuckCharges(
+      NOW,
+      gateway({
+        status: 'succeeded',
+        chargeId: 'ref-1',
+        raw: {},
+        amountMinor: 1000,
+        currency: 'EGP',
+      })
+    );
+    expect(out.settled).toBe(0);
+    expect(plan(db)).toBe('free');
+    expect(status(db).s).toBe('pending');
+  });
+
+  it('the sweep never settles a SUCCESS that states no amount: the row is held and queued for a person', async () => {
+    const db = rig();
+    renewal(db);
+    vi.mocked(sendAlert).mockClear();
+    const out = await sweepStuckCharges(
+      NOW,
+      gateway({ status: 'succeeded', chargeId: 'ref-1', raw: {} })
+    );
+    expect(out.settled).toBe(0);
+    expect(plan(db)).toBe('free');
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_missing' });
+    const q = await listHeldBillingWebhooks({ status: 'open' });
+    expect(q).toEqual([expect.objectContaining({ reason: 'amount_missing', merchantOrderId: EV })]);
+    expect(sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'billing.webhook.held.amount_missing' })
+    );
+    // the next sweep tick does not queue it twice
+    await sweepStuckCharges(NOW, gateway({ status: 'succeeded', chargeId: 'ref-1', raw: {} }));
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+  });
+
+  it('the sweep still settles a SUCCESS whose stated amount and currency match the row', async () => {
+    const db = rig();
+    renewal(db);
+    const out = await sweepStuckCharges(
+      NOW,
+      gateway({
+        status: 'succeeded',
+        chargeId: 'ref-1',
+        raw: {},
+        amountMinor: 1000,
+        currency: 'EGP',
+      })
+    );
+    expect(out.settled).toBe(1);
+    expect(status(db).s).toBe('succeeded');
+  });
+
+  it('a FAILED settle (an unreadable card, a declined gateway lookup) never closes a held row either', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const r = await settleInTx(
+      prisma as never,
+      EV,
+      { status: 'failed', failureReason: 'payment_method_unreadable' },
+      NOW,
+      []
+    );
+    expect(r).toMatchObject({ transitioned: false, refused: 'held' });
+    expect(status(db)).toEqual({ s: 'pending', f: 'held:amount_mismatch' });
+  });
+
+  it('a later signed delivery on a held row is held too, never processed', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const again = await applyWebhookEvent(
+      'stub',
+      paid900({ eventId: 'wh-other', amountMinor: 1000 })
+    );
+    expect(again).toMatchObject({ outcome: 'held', detail: 'row_already_held' });
+    expect(plan(db)).toBe('free');
+  });
+
+  it('maySettle: the rules, one by one', () => {
+    const row = { type: 'renewal', amountMinor: 1000, currency: 'EGP', failureReason: null };
+    expect(maySettle(row, { status: 'succeeded', amountSource: 'charge_request' })).toEqual({
+      ok: true,
+    });
+    expect(maySettle(row, { status: 'succeeded' })).toEqual({
+      ok: false,
+      reason: 'amount_missing',
+    });
+    expect(
+      maySettle(row, { status: 'succeeded', amountSource: 'gateway', amountMinor: 1000 })
+    ).toEqual({ ok: false, reason: 'currency_missing' });
+    expect(
+      maySettle(row, {
+        status: 'succeeded',
+        amountSource: 'gateway',
+        amountMinor: 1000,
+        currency: 'egp',
+      })
+    ).toEqual({ ok: true });
+    expect(maySettle({ ...row, failureReason: 'held:x' }, { status: 'failed' })).toEqual({
+      ok: false,
+      reason: 'held',
+    });
+    expect(maySettle({ ...row, type: 'card_setup' }, { status: 'succeeded' })).toEqual({
+      ok: true,
+    });
+  });
+
+  it('resolve: the audit row is written FIRST (a failing audit changes nothing), then the held row is closed', async () => {
+    const db = rig();
+    renewal(db);
+    await applyWebhookEvent('stub', paid900());
+    const [h] = await listHeldBillingWebhooks({ status: 'open' });
+    await expect(
+      resolveHeldBillingWebhook({
+        id: h.id,
+        actorId: 'a',
+        action: 'refunded',
+        note: 'refunded at Kashier',
+        audit: async () => {
+          throw new Error('audit down');
+        },
+      })
+    ).rejects.toThrow('audit down');
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+    const order: string[] = [];
+    await resolveHeldBillingWebhook({
+      id: h.id,
+      actorId: 'a',
+      action: 'refunded',
+      note: 'refunded at Kashier',
+      audit: async () => {
+        order.push('audit');
+        expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(1);
+      },
+    });
+    expect(order).toEqual(['audit']);
+    expect(status(db)).toEqual({ s: 'failed', f: 'held_resolved:refunded' });
+    // and the sweep leaves a resolved row alone
+    await sweepStuckCharges(
+      NOW,
+      gateway({
+        status: 'succeeded',
+        chargeId: 'ref-1',
+        raw: {},
+        amountMinor: 1000,
+        currency: 'EGP',
+      })
+    );
+    expect(plan(db)).toBe('free');
+  });
+});
+
+function paid900(over: Record<string, unknown> = {}) {
+  return {
+    kind: 'charge.succeeded',
+    eventId: 'wh-900',
+    merchantOrderId: EV,
+    providerRef: 'ref-1',
+    amountMinor: 900,
+    currency: 'EGP',
+    occurredAt: new Date(),
+    failureReason: undefined,
+    raw: {},
+    customerRef: undefined,
+    card: undefined,
+    ...over,
+  } as never;
+}
