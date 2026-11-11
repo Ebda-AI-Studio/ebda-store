@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { env } from 'cloudflare:test';
 import { call, cookieOf, emailCodeFor, fakes, login, seedUser } from './helpers';
 import { totpAt } from '../src/totp';
-import { renderSignInPage, SIGN_IN_JS } from '../src/sign-in-page';
+import { renderSignInPage, SIGN_IN_JS, SIGN_IN_CSS } from '../src/sign-in-page';
 
 const PAGE = 'https://accounts.ebda.app';
 const DEFAULT = 'https://store.ebda.app/';
@@ -420,5 +420,22 @@ describe('every other route answers as before', () => {
     const nfJson = await call('/nope');
     expect(nfJson.status).toBe(404);
     expect(nfJson.headers.get('content-type')).toContain('application/json');
+  });
+});
+
+/** WCAG 1.4.11: a text field's edge is a UI component and needs 3:1 against the panel it sits on. */
+describe('sign-in field contrast', () => {
+  const lum = (hex: string) => {
+    const c = [1, 3, 5]
+      .map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+  };
+  it('input border is at least 3:1 against the panel', () => {
+    const line = /--field-line:(#[0-9a-f]{6})/.exec(SIGN_IN_CSS)![1]!;
+    const panel = /--panel:(#[0-9a-f]{6})/.exec(SIGN_IN_CSS)![1]!;
+    const [a, b] = [lum(line), lum(panel)].sort((x, y) => y - x);
+    expect((a! + 0.05) / (b! + 0.05)).toBeGreaterThanOrEqual(3);
+    expect(SIGN_IN_CSS).toMatch(/input\{[^}]*border:1px solid var\(--field-line\)/);
   });
 });

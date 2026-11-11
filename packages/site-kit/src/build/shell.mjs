@@ -125,6 +125,9 @@ const tokensCss = () =>
  * @param {boolean} [p.noHeaderSearch]  omit the header search box (a page that carries its own, e.g. the 404)
  */
 export function renderPage(p) {
+  // UI audit 2026-11-11 (P1): display=swap re-flowed docs/help text when Geist arrived (CLS 0.17 on docs at 1280).
+  // optional never swaps mid-page: a cold first view keeps the system face, every later page uses the cached brand face.
+  const fontsUrl = BRAND.fonts.googleFontsUrl.replace('display=swap', 'display=optional');
   const dir = p.lang === 'ar' ? 'rtl' : 'ltr';
   const alts = (p.alternates ?? [])
     .map(a => `<link rel="alternate" hreflang="${a.hreflang}" href="${esc(a.href)}">`)
@@ -151,8 +154,8 @@ ${socialHead(p)}
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>${tokensCss()}</style>
 <link rel="stylesheet" href="/assets/site.css">
-<script>var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(BRAND.fonts.googleFontsUrl)};document.head.appendChild(l);</script>
-<noscript><link rel="stylesheet" href="${esc(BRAND.fonts.googleFontsUrl)}"></noscript>
+<script>var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(fontsUrl)};document.head.appendChild(l);</script>
+<noscript><link rel="stylesheet" href="${esc(fontsUrl)}"></noscript>
 </head>
 <body>
 <a class="skip" href="#main">${esc(p.skipLabel)}</a>
