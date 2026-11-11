@@ -11,7 +11,7 @@
 import { cfBindings } from '../cf/bindings';
 import { sendAlert } from '../services/alerts.service';
 
-export type SuperAdminInvariant = 'ok' | 'none-active' | 'none-ready' | 'unmeasured';
+type SuperAdminInvariant = 'ok' | 'none-active' | 'none-ready' | 'unmeasured';
 
 export async function checkSuperAdminInvariant(): Promise<SuperAdminInvariant> {
   const accounts = cfBindings()?.ACCOUNTS;
