@@ -85,16 +85,22 @@ describe('M6: the password login budget is enforced under a parallel burst', () 
       Array.from({ length: 15 }, (_, i) =>
         call('/login', {
           json: { email: u.email, password: `wrong-${i}` },
-          headers: { 'cf-connecting-ip': `198.19.${i}.1` },
+          headers: { 'cf-connecting-ip': '198.19.0.1' },
         })
       )
     );
     const codes = res.map(r => r.status);
     expect(codes.filter(c => c === 401).length).toBeLessThanOrEqual(5);
     expect(codes.filter(c => c === 429).length).toBeGreaterThanOrEqual(10);
-    expect((await call('/login', { json: { email: u.email, password: u.password } })).status).toBe(
-      429
-    );
+    // one address: refused. (M-066: other addresses are NOT locked out, see targeted-lockout.test.ts.)
+    expect(
+      (
+        await call('/login', {
+          json: { email: u.email, password: u.password },
+          headers: { 'cf-connecting-ip': '198.19.0.1' },
+        })
+      ).status
+    ).toBe(429);
   });
 });
 

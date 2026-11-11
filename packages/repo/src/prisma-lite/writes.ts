@@ -706,9 +706,10 @@ export class WriteEngine extends Engine {
     const out: Row = {};
     const shape: [string, string, string][] = [];
     if (args._count) {
+      // Prisma: `_count: true` answers a NUMBER (`_count: 5`), `_count: { _all: true }` an object (`{ _all: 5 }`); '' marks the scalar
       if (args._count === true) {
         parts.push('count(*) AS "_count__all"');
-        shape.push(['_count', '_all', '_count__all']);
+        shape.push(['_count', '', '_count__all']);
       } else
         for (const [f, on] of Object.entries(args._count)) {
           if (!on) continue;
@@ -741,6 +742,10 @@ export class WriteEngine extends Engine {
       params
     )[0];
     for (const [fn, f, alias] of shape) {
+      if (fn === '_count' && f === '') {
+        out._count = Number(row[alias]);
+        continue;
+      }
       const bucket = (out[fn] ??= {}) as Row;
       const raw = row[alias];
       if (fn === '_count') bucket[f] = Number(raw);
@@ -778,8 +783,9 @@ export class WriteEngine extends Engine {
     const sel = by.map((b, i) => `${byCols[i]} AS ${q(`k__${b}`)}`);
     const shape: [string, string, string][] = [];
     if (args._count) {
+      // `_count: true` answers a number per group, as Prisma does (see aggregate)
       if (args._count === true)
-        (sel.push('count(*) AS "_count___all"'), shape.push(['_count', '_all', '_count___all']));
+        (sel.push('count(*) AS "_count___all"'), shape.push(['_count', '', '_count___all']));
       else
         for (const [f, on] of Object.entries(args._count)) {
           if (!on) continue;
@@ -844,6 +850,10 @@ export class WriteEngine extends Engine {
       const o: Row = {};
       for (const b of by) o[b] = rawToJs(this.scalar(m, b), r[`k__${b}`]);
       for (const [fn, f, alias] of shape) {
+        if (fn === '_count' && f === '') {
+          o._count = Number(r[alias]);
+          continue;
+        }
         const bucket = (o[fn] ??= {}) as Row;
         const raw = r[alias];
         if (fn === '_count') bucket[f] = Number(raw);

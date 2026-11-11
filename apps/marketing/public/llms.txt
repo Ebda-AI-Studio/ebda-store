@@ -13,7 +13,7 @@ Five templates (Qamar for fashion, Souq for electronics and retail, Jasmine for 
 Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on orders on every plan. Full plan comparison (orders, team, stores, winning back abandoned carts, removing the Ebda Store badge, running the store from an AI assistant, 3D product models, analytics, support) is on the home page.
 
 ## What Ebda AI Studio does
-Besides its two products, Ebda AI Studio offers services in three categories (wording pending a match to the company registration papers): software (full software development); artificial intelligence; consulting and training (AI adoption workshops, training teams on AI tools and automation, technical and architecture advisory). Details: https://ebda.app/en/ (section "What we do") and https://ebda.app/en/about/. Enquiries: https://ebda.app/en/contact/
+Besides its two products, Ebda AI Studio offers services in three categories: software (full software development); artificial intelligence; consulting and training (AI adoption workshops, training teams on AI tools and automation, technical and architecture advisory). Details: https://ebda.app/en/ (section "What we do") and https://ebda.app/en/about/. Enquiries: https://ebda.app/en/contact/
 
 ## Pages
 - [Features (Arabic)](https://ebda.app/features/) ([English](https://ebda.app/en/features/)): every capability Ebda Store has today, with the plans that include it, and a FAQ
@@ -89,5 +89,6 @@ Ebda Store is a newer platform than Zid or Shopify, with fewer integrations.
 - Payments: cash on delivery, InstaPay, and card/wallet payments through Paymob, Kashier and FawryPay.
 - Shipping: Bosta, ShipBlu, Mylerz and Aramex, or the merchant's own delivery.
 - Also: VAT for registered merchants, a dashboard installable on the phone with order notifications, analytics, wa.me WhatsApp order buttons.
+- Founder: Ahmad Sharaf (https://mypovonai.com).
 - Sign up: https://store.ebda.app/signup
 - Contact: ahlan@ebda.app, WhatsApp +20 151 419 1411 (https://wa.me/201514191411); privacy and data-protection requests: privacy@ebda.app; security reports: security@ebda.app

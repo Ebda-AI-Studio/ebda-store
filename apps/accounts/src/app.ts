@@ -443,7 +443,7 @@ async function bearerAuth(
 
 /** Step-up for sensitive changes: the account password again, throttled like a login (a bearer token alone must not allow free guessing). */
 async function requirePassword(c: C, user: UserRow, password: unknown): Promise<void> {
-  const a = await hit(c.env.DB, user.id, clientIp(c), { ...LOGIN, name: 'pw' });
+  const a = await hit(c.env.DB, user.id, clientIp(c), { ...LOGIN, name: 'pw', brake: false });
   if (!a.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
   if (typeof password !== 'string' || !(await verifyPassword(password, user.password_hash)))
     throw err(403, 'STEP_UP_REQUIRED');
@@ -1310,7 +1310,7 @@ export function createApp() {
     originAudience(c, aud);
     const ip = clientIp(c);
     // per client: a global key would let anyone lock every passkey sign-in
-    const attempt = await hit(c.env.DB, ip, ip, { ...LOGIN, name: 'passkey' });
+    const attempt = await hit(c.env.DB, ip, ip, { ...LOGIN, name: 'passkey', brake: false });
     if (!attempt.ok) throw err(429, 'TOO_MANY_ATTEMPTS');
     const res = await passkeys.finishAuthentication(
       c.env.DB,
