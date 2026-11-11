@@ -106,8 +106,14 @@ export interface SweepReport {
     errors: string[];
     /** Stores whose missing backup was taken by the bounded in-sweep retry (no P1 for these). */
     recovered: string[];
-    /** Stores this tick did not reach (deadline / cap); the next tick starts at `cursor`. */
+    /** Stores this tick did not reach (deadline / cap); the next tick starts at `cursor`. Normal above the cap: not an alert by itself. */
     deferred: number;
+    /** Nights the current walk over the fleet has been running (1 = it started tonight). */
+    walkNights: number;
+    /** True only when deferral is abnormal: the walk is older than `maxDeferredNights`, or this tick made no progress. */
+    deferredAlert: boolean;
+    /** Stores whose backup alarm did not fire (no yesterday manifest) even though the in-sweep retry then recovered them. */
+    alarmMissed: string[];
   };
   d1: Record<string, { ok: boolean; tables?: number; rows?: number; error?: string }>;
   ok: boolean;
@@ -125,6 +131,8 @@ export interface SweepDeps {
   storeTimeoutMs?: number;
   /** Upper bound of `backupNow` retries per tick (default 25). */
   maxRetries?: number;
+  /** A walk over the whole fleet may span this many nights before a still-deferred store pages (default 3). */
+  maxDeferredNights?: number;
   clock?: () => number;
 }
 
@@ -152,7 +160,16 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   const yesterday = dayOf(new Date(now.getTime() - 86_400_000));
   const report: SweepReport = {
     day: dayOf(now),
-    stores: { armed: 0, missingYesterday: [], errors: [], recovered: [], deferred: 0 },
+    stores: {
+      armed: 0,
+      missingYesterday: [],
+      errors: [],
+      recovered: [],
+      deferred: 0,
+      walkNights: 1,
+      deferredAlert: false,
+      alarmMissed: [],
+    },
     d1: {},
     ok: true,
   };
@@ -183,11 +200,11 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   // Bounded loop: ids in a stable order, resuming after the last tick's cursor, stopping at the deadline or the cap.
   const all = [...(await deps.listStoreIds(env))].sort();
   let start = 0;
+  let prev: { day?: string; next?: string | null; nights?: number; visited?: number } = {};
   try {
     const cur = await r2.get(SWEEP_CURSOR_KEY);
-    const next = cur
-      ? ((JSON.parse(await cur.text()) as { next?: string | null }).next ?? null)
-      : null;
+    if (cur) prev = JSON.parse(await cur.text()) as typeof prev;
+    const next = prev.next ?? null;
     if (next)
       start = Math.max(
         0,
@@ -195,6 +212,7 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
       );
   } catch {
     // an unreadable cursor restarts from the top: never skips a store
+    prev = {};
   }
   const order = [...all.slice(start), ...all.slice(0, start)];
   let done = 0;
@@ -228,8 +246,29 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   }
   report.stores.deferred = order.length - done;
   const nextId = report.stores.deferred > 0 ? order[done] : null;
+  // A walk over a fleet bigger than one tick's cap legitimately spans several nights (the next tick resumes at the cursor), so
+  // deferral alone never pages. It pages when the walk is older than N nights, or when a tick reached no store at all.
+  // The cursor carries the state of ONE walk: nights it has run and stores visited since it began. The walk is complete once it has
+  // visited the whole fleet; the counters then reset, so a fleet that always needs 3 nights never pages and a stuck walk does.
+  const prevNights = prev.nights ?? 0;
+  const nights = prevNights + (prev.day === report.day && prevNights > 0 ? 0 : 1);
+  const visited = (prev.visited ?? 0) + done;
+  const complete = visited >= all.length;
+  report.stores.walkNights = nights;
+  report.stores.deferredAlert =
+    !complete &&
+    report.stores.deferred > 0 &&
+    (nights > (deps.maxDeferredNights ?? 3) || done === 0);
   try {
-    await r2.put(SWEEP_CURSOR_KEY, JSON.stringify({ day: report.day, next: nextId }));
+    await r2.put(
+      SWEEP_CURSOR_KEY,
+      JSON.stringify({
+        day: report.day,
+        next: nextId,
+        nights: complete ? 0 : nights,
+        visited: complete ? 0 : visited,
+      })
+    );
   } catch (e) {
     report.stores.errors.push(`cursor: ${(e as Error).message}`);
   }
@@ -247,6 +286,8 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
     try {
       await withTimeout(stubOf(id).backupNow(id), storeTimeoutMs, `backupNow ${id}`);
       report.stores.recovered.push(id);
+      // The retry fixed tonight's backup, not the alarm that missed yesterday's: record it and page anyway.
+      report.stores.alarmMissed.push(id);
     } catch (e) {
       report.stores.missingYesterday.push(id);
       report.stores.errors.push(`${id}: retry backupNow failed: ${(e as Error).message}`);
@@ -256,7 +297,8 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   report.ok =
     report.stores.errors.length === 0 &&
     report.stores.missingYesterday.length === 0 &&
-    report.stores.deferred === 0 &&
+    !report.stores.deferredAlert &&
+    report.stores.alarmMissed.length === 0 &&
     Object.values(report.d1).every(v => v.ok);
   await r2.put(`ops-reports/backup-sweep/${report.day}.json`, JSON.stringify(report, null, 2));
   if (!report.ok)
@@ -267,6 +309,9 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
           missingYesterday: report.stores.missingYesterday,
           storeErrors: report.stores.errors,
           deferredStores: report.stores.deferred,
+          deferredAlert: report.stores.deferredAlert,
+          walkNights: report.stores.walkNights,
+          alarmMissedRecoveredByRetry: report.stores.alarmMissed,
           recovered: report.stores.recovered,
           d1: report.d1,
         },
