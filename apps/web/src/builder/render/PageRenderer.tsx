@@ -737,6 +737,14 @@ export function PageRenderer({
                   subtitle={isRtl ? heroSubtitleArVal || heroSubtitleEn : heroSubtitleEn}
                   ctaText={isRtl ? heroCtaArVal : heroCtaEn}
                   ctaLink={heroCtaLink}
+                  echoesBrand={[store.name, store.nameAr].some(
+                    n =>
+                      !!n &&
+                      n.trim().toLowerCase() ===
+                        (isRtl ? heroTitleArVal : heroTitleEn || heroTitleArVal)
+                          ?.trim()
+                          .toLowerCase()
+                  )}
                   bg={
                     layout.hero.bgColor === INVERSE_SURFACE
                       ? undefined
