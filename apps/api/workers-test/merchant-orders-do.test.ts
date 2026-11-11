@@ -33,6 +33,7 @@ const e = env as unknown as {
     get(id: unknown): {
       mutate(storeId: string, m: unknown): Promise<DoAnswer>;
       query(storeId: string, q: unknown[]): Promise<DoAnswer>;
+      moneyOp(storeId: string, op: string, argsJson: string, key?: string): Promise<DoAnswer>;
     };
   };
 };
@@ -99,7 +100,12 @@ describe.skipIf(e.E2E_DB === '1')(
     let nSession = 0;
 
     /** A real storefront checkout (cart line, POST /public/orders, COD payment row), then the merchant marks it paid. */
-    async function paidCodOrder(buyer: { bearer?: string; phone: string }, productId: string) {
+    async function paidCodOrder(
+      buyer: { bearer?: string; phone: string },
+      productId: string,
+      opts: { method?: 'cod' | 'instapay'; markPaid?: boolean } = {}
+    ) {
+      const method = opts.method ?? 'cod';
       const h: Record<string, string> = {
         'x-store-id': storeId,
         'x-session-id': `sess-orders-do-${++nSession}`,
@@ -115,7 +121,7 @@ describe.skipIf(e.E2E_DB === '1')(
         method: 'POST',
         headers: h,
         body: JSON.stringify({
-          paymentMethod: 'cod',
+          paymentMethod: method,
           shippingAddress: {
             firstName: 'Nour',
             lastName: 'Buyer',
@@ -133,9 +139,10 @@ describe.skipIf(e.E2E_DB === '1')(
       const pay = await api('/payments/create', {
         method: 'POST',
         headers: h,
-        body: JSON.stringify({ orderId, provider: 'cod' }),
+        body: JSON.stringify({ orderId, provider: method }),
       });
       expect(pay.status, await pay.clone().text()).toBe(200);
+      if (opts.markPaid === false || method !== 'cod') return orderId;
       const paid = await api(`/stores/${storeId}/orders/${orderId}/mark-paid`, {
         method: 'POST',
         headers: merchant,
@@ -217,6 +224,22 @@ describe.skipIf(e.E2E_DB === '1')(
                 isDefault: true,
                 testMode: true,
                 displayName: 'cod',
+              },
+            },
+          },
+          {
+            model: 'PaymentConfig',
+            op: 'create',
+            args: {
+              data: {
+                id: crypto.randomUUID(),
+                storeId,
+                provider: 'instapay',
+                isEnabled: true,
+                isDefault: false,
+                testMode: true,
+                displayName: 'instapay',
+                settings: { handle: 'orders@instapay', expiryHours: 24 },
               },
             },
           },
@@ -652,6 +675,191 @@ describe.skipIf(e.E2E_DB === '1')(
       expect
         .soft(events.length, 'mark-paid records a payment event per order')
         .toBeGreaterThanOrEqual(5);
+
+      expect.soft(reachReport(await pgReaches(true)), steps.join('\n')).toBe('');
+    }, 120_000);
+    it('money: InstaPay refund record, refund match-claim, WhatsApp COD outcome on a DO store (Ruling NZ-MONEY-6)', async () => {
+      await pgReaches(true);
+      const steps: string[] = [];
+      const S = `/stores/${storeId}`;
+      const post = async (name: string, path: string, body: unknown) => {
+        const r = await api(path, {
+          method: 'POST',
+          headers: merchant,
+          body: JSON.stringify(body),
+        });
+        const text = await r.text();
+        steps.push(`${r.status} ${name} ${r.status >= 400 ? text.slice(0, 200) : ''}`);
+        let json: any = null;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          /* not json */
+        }
+        return { status: r.status, json };
+      };
+      const payRow = async (orderId: string) =>
+        (
+          await doRead<Array<{ status: string; refundedAmount: number; amount: number }>>(
+            storeId,
+            'Payment',
+            {
+              where: { orderId, provider: 'instapay' },
+            }
+          )
+        )[0];
+      const orderOf = async (orderId: string) =>
+        (
+          await doRead<Array<{ status: string; paymentStatus: string }>>(storeId, 'Order', {
+            where: { id: orderId },
+          })
+        )[0];
+
+      // 1. an InstaPay order the merchant confirmed (the confirm is the DO op the confirm route calls)
+      const ipOrder = await paidCodOrder({ phone: '+201000000404' }, productIds[0], {
+        method: 'instapay',
+      });
+      const conf = await stub(storeId).moneyOp(
+        storeId,
+        'confirmPayment',
+        JSON.stringify({ orderId: ipOrder })
+      );
+      expect(conf.ok, JSON.stringify(conf)).toBe(true);
+      const paid = await payRow(ipOrder);
+      expect(paid?.status).toBe('completed');
+      const refund = (reference: string, amountMinor: number) =>
+        post(
+          `instapay refund ${reference} ${amountMinor}`,
+          `${S}/orders/${ipOrder}/instapay-refund`,
+          {
+            reference,
+            refundDate: '2026-11-10',
+            refundTime: '12:00',
+            recipientName: 'N*** B***',
+            amountMinor,
+          }
+        );
+      const part = await refund('11112222', 1000);
+      expect.soft(part.status, steps.join('\n')).toBeLessThan(300);
+      const replay = await refund('11112222', 1000);
+      expect
+        .soft([replay.status < 300, replay.json?.data?.duplicate], steps.join('\n'))
+        .toEqual([true, true]);
+      expect
+        .soft((await payRow(ipOrder))?.refundedAmount, 'a replay never refunds twice')
+        .toBe(1000);
+      const over = await refund('33334444', paid.amount);
+      expect.soft(over.status, steps.join('\n')).toBe(400);
+      const rest = await refund('55556666', paid.amount - 1000);
+      expect.soft(rest.status, steps.join('\n')).toBeLessThan(300);
+      expect
+        .soft(await payRow(ipOrder))
+        .toMatchObject({ status: 'refunded', refundedAmount: paid.amount });
+      expect
+        .soft(await orderOf(ipOrder))
+        .toMatchObject({ status: 'refunded', paymentStatus: 'refunded' });
+      const done = await refund('77778888', 1);
+      expect.soft(done.status, steps.join('\n')).toBe(409);
+
+      // 2. refund match-claim with a claim that does not exist on this order: a refusal, never a Postgres 500
+      const match = await post(
+        'refund match-claim (unknown claim)',
+        `${S}/orders/${ipOrder}/refund-match-claim`,
+        {
+          claimId: crypto.randomUUID(),
+          providerRefundId: 'rf_unknown',
+        }
+      );
+      expect.soft([404, 409], steps.join('\n')).toContain(match.status);
+
+      // 3. WhatsApp COD answers on open COD orders: refused -> cancelled, confirmed -> confirmed; a chat order of an erased buyer -> cancelled
+      const wa = async (type: string, data: Record<string, unknown>) => {
+        const r = await e.API.fetch('https://api.ebda.app/__dev/wa-store-event', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: crypto.randomUUID(),
+            v: 1,
+            storeId,
+            occurredAt: new Date().toISOString(),
+            type,
+            data,
+          }),
+        });
+        const text = await r.text();
+        steps.push(`${r.status} wa ${type} ${text.slice(0, 200)}`);
+        return text;
+      };
+      const refusedOrder = await paidCodOrder({ phone: '+201000000505' }, productIds[1], {
+        markPaid: false,
+      });
+      const confirmedOrder = await paidCodOrder({ phone: '+201000000606' }, productIds[1], {
+        markPaid: false,
+      });
+      const erasedOrder = await paidCodOrder({ phone: '+201000000707' }, productIds[1], {
+        markPaid: false,
+      });
+      // the store is linked to Ebda Chat with an active package (an unlinked store's events are ignored by design)
+      const link = await stub(storeId).mutate(storeId, {
+        ops: [
+          {
+            model: 'StoreWhatsAppLink',
+            op: 'create',
+            args: {
+              data: {
+                storeId,
+                linked: true,
+                ownerUserId: owner,
+                linkedAt: new Date(),
+                entitlementVersion: 1,
+                entitlementPackageId: 'pkg-test',
+                entitlementAutomation: true,
+                entitlementStatus: 'active',
+                entitlementValidUntil: new Date(Date.now() + 30 * 24 * 3600_000),
+              },
+            },
+          },
+        ],
+      });
+      expect(link.ok, JSON.stringify(link)).toBe(true);
+      expect
+        .soft(
+          await wa('whatsapp.cod_outcome', {
+            orderId: refusedOrder,
+            outcome: 'refused',
+            source: 'whatsapp',
+          })
+        )
+        .toContain('applied');
+      expect
+        .soft(
+          await wa('whatsapp.cod_outcome', {
+            orderId: confirmedOrder,
+            outcome: 'confirmed',
+            source: 'whatsapp',
+          })
+        )
+        .toContain('applied');
+      expect
+        .soft(
+          await wa('whatsapp.order_after_erasure', {
+            orderId: erasedOrder,
+            buyerKey: 'a'.repeat(64),
+          })
+        )
+        .toContain('applied');
+      expect.soft((await orderOf(refusedOrder))?.status).toBe('cancelled');
+      expect.soft((await orderOf(confirmedOrder))?.status).toBe('confirmed');
+      expect.soft((await orderOf(erasedOrder))?.status).toBe('cancelled');
+      // a late "confirmed" on the cancelled order changes nothing
+      expect
+        .soft(
+          await wa('whatsapp.cod_outcome', {
+            orderId: refusedOrder,
+            outcome: 'confirmed',
+            source: 'whatsapp',
+          })
+        )
+        .toContain('ignored');
 
       expect.soft(reachReport(await pgReaches(true)), steps.join('\n')).toBe('');
     }, 120_000);
