@@ -2099,34 +2099,38 @@ function withImpersonator(entry: AuditLogEntry): Record<string, unknown> {
   return details;
 }
 
+/**
+ * The audit write that REPORTS failure. `auditLog` below swallows by design (a missing trail must not fail a
+ * request); a money path cannot accept that, because a swallowed failure is invisible: no alert, no retry. The
+ * refund route writes its intent row with this BEFORE money moves and refuses when it throws (M-128).
+ */
+export async function auditLogStrict(entry: AuditLogEntry): Promise<void> {
+  // Log to structured logger in development
+  if (process.env.NODE_ENV !== 'production') {
+    logger.info({ audit: entry }, '[AUDIT]');
+  }
+  // Store in database. Savepointed (issue 2215's class): route handlers call this inside the request's single
+  // tenant transaction, and an unguarded failure aborted that transaction.
+  //
+  // Through the append-only definer `ebda_audit_log_insert` (lib/definer.ts): `audit_logs` is store-scoped under
+  // strict RLS, but platform events carry no store, and a request may log against a store other than its own.
+  await withSavepoint(() =>
+    insertAuditLog({
+      action: entry.action,
+      userId: entry.userId,
+      storeId: entry.storeId,
+      resourceType: entry.resourceType,
+      resourceId: entry.resourceId,
+      details: withImpersonator(entry),
+      ip: entry.ip,
+      userAgent: entry.userAgent,
+    })
+  );
+}
+
 export async function auditLog(entry: AuditLogEntry) {
   try {
-    // Log to structured logger in development
-    if (process.env.NODE_ENV !== 'production') {
-      logger.info({ audit: entry }, '[AUDIT]');
-    }
-
-    // Store in database. Savepointed (issue 2215's class): route handlers
-    // call this AFTER their business write, inside the request's single
-    // tenant transaction, and the catch below swallows — an unguarded failure
-    // aborted that transaction, so the write the client was told succeeded
-    // rolled back at COMMIT.
-    //
-    // Through the append-only definer `ebda_audit_log_insert` (lib/definer.ts):
-    // `audit_logs` is store-scoped under strict RLS, but platform events carry
-    // no store, and a request may log against a store other than its own.
-    await withSavepoint(() =>
-      insertAuditLog({
-        action: entry.action,
-        userId: entry.userId,
-        storeId: entry.storeId,
-        resourceType: entry.resourceType,
-        resourceId: entry.resourceId,
-        details: withImpersonator(entry),
-        ip: entry.ip,
-        userAgent: entry.userAgent,
-      })
-    );
+    await auditLogStrict(entry);
   } catch (error) {
     // Don't fail the request if audit logging fails
     logger.error({ err: error }, '[AUDIT ERROR] Failed to write audit log');
