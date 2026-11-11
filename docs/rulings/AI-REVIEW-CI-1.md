@@ -7,3 +7,5 @@ Secret: `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`, then `gh secret set CLA
 Cost if wrong: while the secret is missing, every risky PR is red by design.
 
 Fork PRs are never skipped and never reviewed with secrets: the check is red until a maintainer adds the label `ai-review-passed` (foundation AIR-5).
+
+The label follows the reviewed DIFF, not the head commit (foundation AIR-6): a clean merge of main (`gh pr update-branch`) keeps `ai-review-passed`, any change to the PR's own diff strips it. `.github/ai-review/pass-marker.mjs` stores a `git patch-id` marker in a github-actions[bot] comment.
