@@ -31,6 +31,7 @@ import {
   selectOpenExecutedClaims,
 } from '../../../shared/src/refunds/refund-settlement';
 import { cancelOrder, refundOrder } from './refund';
+import { assertRefundable, refundableBalance } from './refundable';
 import { approveSubmittedReceipts, ensureReceiptSchema } from './instapay-receipts';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -433,6 +434,8 @@ export function beginRefund(
     paymentId: string;
     amount?: number;
     refundKey?: string;
+    /** the client request attempt (its Idempotency-Key, #628): an open claim under it refuses a second one */
+    attemptKey?: string;
     reason?: string;
     itemLevel?: boolean;
     claimId?: string;
@@ -459,27 +462,45 @@ export function beginRefund(
         'Refund amount exceeds the un-refunded balance of this payment.',
         400
       );
-    const amount = a.amount ?? remaining;
+    // #624: the order's ONE refundable balance (store credit, InstaPay, cash returns, other payments) caps this leg too
+    const orderLeft = refundableBalance(db, a.storeId, p.order_id).refundable;
+    const cap = Math.min(remaining, orderLeft);
+    if (cap <= 0 || (a.amount !== undefined && a.amount > cap))
+      throw err(
+        'REFUND_EXCEEDS_REMAINING',
+        'Refund amount exceeds what is left to refund on this order: earlier refunds (store credit, InstaPay or a cash return) already cover part of it.',
+        400,
+        { remaining: Math.max(0, cap) }
+      );
+    const amount = a.amount ?? cap;
     const isFull = amount >= remaining;
     const flipsOrder = isFull && !a.itemLevel;
     const o = loadOrder(db, a.storeId, p.order_id);
     if (flipsOrder) assertTransition(o.status, 'refunded');
     const claimId = a.claimId ?? crypto.randomUUID();
-    if (a.refundKey) {
-      const released = releasedClaims(db, p.id);
-      const open = db
-        .all(
-          `SELECT json_extract(details, '$.claimId') AS cid FROM payment_events WHERE payment_id = ? AND event_type = ? AND json_extract(details, '$.refundKey') = ?`,
-          [p.id, REFUND_CLAIM_EVENT, a.refundKey]
-        )
-        .map(r => r.cid as string)
-        .filter(cid => !released.has(cid));
-      if (open.length > 0)
+    // A retry must not pay twice: an OPEN claim (sent or indeterminate; a provider refusal releases it) under the same
+    // business key or the same client attempt refuses a second one. The attempt key is checked across the ORDER's payments.
+    for (const [field, value] of [
+      ['refundKey', a.refundKey],
+      ['attemptKey', a.attemptKey],
+    ] as const) {
+      if (!value) continue;
+      const rows = db.all(
+        `SELECT payment_id, json_extract(details, '$.claimId') AS cid FROM payment_events
+          WHERE store_id = ? AND order_id = ? AND event_type = ? AND json_extract(details, '$.${field}') = ?`,
+        [a.storeId, p.order_id, REFUND_CLAIM_EVENT, value]
+      );
+      const released = new Set(
+        [...new Set(rows.map(r => r.payment_id as string))].flatMap(pid => [
+          ...releasedClaims(db, pid),
+        ])
+      );
+      if (rows.some(r => !released.has(r.cid as string)))
         throw err(
           'REFUND_ALREADY_ISSUED',
           'A refund for this was already sent to the payment provider and may have gone through. Check the provider dashboard before refunding again.',
           409,
-          { refundKey: a.refundKey }
+          { [field]: value }
         );
     }
     const claimedStatus = isFull ? 'refunded' : 'partially_refunded';
@@ -505,6 +526,7 @@ export function beginRefund(
         claimId,
         amount,
         refundKey: a.refundKey ?? null,
+        attemptKey: a.attemptKey ?? null,
         reason: a.reason ?? null,
         flipsOrder,
         isFullRefund: isFull,
@@ -812,6 +834,12 @@ export interface PaymentWebhookInput {
     refundReference?: string | null;
   };
   rawPayload?: unknown;
+  /**
+   * #625: a STATUS POLL whose answer carried no amount: `amount` is the amount the payment was created for, not one the
+   * gateway stated. A `completed` with this flag confirms the order but marks the payment `amountUnverified` (metadata +
+   * a timeline event) until a signed webhook states the amount; a later short one raises the P1 `amount_mismatch`.
+   */
+  amountUnverified?: boolean;
   now?: number;
 }
 /** The gateway's own record of the transaction (confirm-before-apply). */
@@ -1077,6 +1105,9 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
           : Math.abs(p.amount - (input.amount as number)) > AMOUNT_TOLERANCE_FILS
             ? 'paid_amount_mismatch'
             : null;
+  // the order was already confirmed by a status-only poll at the full amount (#625): a short / other-currency signed
+  // webhook now means the customer was treated as paid in full when they were not
+  const confirmedByStatusOnly = p.status === 'completed' && meta.amountUnverified === true;
   if (mismatch) {
     addPaymentEvent(db, {
       storeId: input.storeId,
@@ -1113,13 +1144,16 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
       kind: 'amount_mismatch',
       paymentId: p.id,
       orderId: p.order_id,
-      body: `Order ${o.order_number}: ${input.provider} webhook reports paid ${amountGiven ? input.amount : 'no amount'} ${input.currency ?? '(no currency)'} but the amount due is ${p.amount} ${p.currency} (${mismatch}). NOT marked paid.`,
+      body: confirmedByStatusOnly
+        ? `Order ${o.order_number}: ${input.provider} webhook reports paid ${amountGiven ? input.amount : 'no amount'} ${input.currency ?? '(no currency)'} but the amount due is ${p.amount} ${p.currency} (${mismatch}). The order was ALREADY confirmed by a status-only check at the full amount: settle the difference with the customer before fulfilling.`
+        : `Order ${o.order_number}: ${input.provider} webhook reports paid ${amountGiven ? input.amount : 'no amount'} ${input.currency ?? '(no currency)'} but the amount due is ${p.amount} ${p.currency} (${mismatch}). NOT marked paid.`,
       context: {
         expected: p.amount,
         expectedCurrency: p.currency,
         paid: amountGiven ? input.amount : null,
         paidCurrency: input.currency ?? null,
         reason: mismatch,
+        confirmedByStatusOnly,
       },
     });
     return finish('held', mismatch);
@@ -1149,16 +1183,28 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
     blockedTransition = true;
   // the order was already settled by another path (pull-side confirm, an earlier event): no second fan-out
   const orderWasPaid = o.payment_status === 'paid';
+  // #625: a status-only confirmation is marked so a person can tell it apart; the first signed webhook that STATES the
+  // amount (and matched it, above) clears the mark
+  const unverified = status === 'completed' && input.amountUnverified === true;
+  const nextMeta: Record<string, unknown> = {
+    ...meta,
+    webhookEvent: input.event ?? null,
+    paymentMethod: input.paymentMethod ?? null,
+    paidCurrency: input.currency ?? null,
+    paidAmount: input.amount ?? null,
+  };
+  if (unverified && meta.amountUnverified !== false) {
+    nextMeta.amountUnverified = true;
+    nextMeta.amountSource = 'status_poll_expected';
+  } else if (status === 'completed' && !input.amountUnverified && meta.amountUnverified === true) {
+    nextMeta.amountUnverified = false;
+    nextMeta.amountSource = 'signed_webhook';
+    nextMeta.amountVerifiedAt = new Date(now).toISOString();
+  }
   db.run('UPDATE payments SET status = ?, paid_at = ?, metadata = ?, updated_at = ? WHERE id = ?', [
     status,
     input.paidAt ?? (status === 'completed' ? now : null),
-    JSON.stringify({
-      ...meta,
-      webhookEvent: input.event ?? null,
-      paymentMethod: input.paymentMethod ?? null,
-      paidCurrency: input.currency ?? null,
-      paidAmount: input.amount ?? null,
-    }),
+    JSON.stringify(nextMeta),
     now,
     p.id,
   ]);
@@ -1189,6 +1235,11 @@ function applyPaymentWebhook(c: Ctx & { status: WebhookPaymentStatus }): ApplyRe
       paymentMethod: input.paymentMethod ?? null,
       paidCurrency: input.currency ?? null,
       paidAmount: input.amount ?? null,
+      ...(unverified
+        ? { reason: 'confirmed_by_status_only', amountUnverified: true }
+        : nextMeta.amountSource === 'signed_webhook'
+          ? { reason: 'amount_verified_by_webhook' }
+          : {}),
     },
     now,
   });
@@ -1370,6 +1421,25 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
   // only a COMPLETED refund is accounted: a pending / failed notice must not file its id (that would make the real, later
   // completed refund look already counted and it would never be added)
   const s = completed ? s0 : { ...s0, accountedThisEvent: false };
+  // #659 review B1: raise and record the provider's amount on the payment FIRST, in this same section, so the order
+  // reversal below (its wallet give-back reads the order's one refundable balance) sees the money that already left.
+  const next = {
+    ...meta,
+    refundId: r.refundId,
+    ...(s.accountedThisEvent || (completed && s.absorbedClaimId && !fawryAmountless)
+      ? { [REFUND_EVENT_IDS_KEY]: appendRefundEventId(meta, r.refundId) }
+      : {}),
+    refundStatus: r.status,
+    [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(meta, r.refundId, r.status),
+    refundReference: r.refundReference ?? (meta.refundReference as string | undefined) ?? null,
+    refundStatusUpdatedAt: new Date(now).toISOString(),
+  };
+  const raise = completed && p.status !== 'refunded';
+  const newStatus = raise ? (s.isFullRefund ? 'refunded' : 'partially_refunded') : p.status;
+  db.run(
+    'UPDATE payments SET metadata = ?, status = ?, refunded_amount = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(next), newStatus, raise ? s.settledTotal : p.refunded_amount, now, p.id]
+  );
   const orderAlreadyReversed = o.status === 'refunded';
   if (completed && !orderAlreadyReversed && s.isFullRefund) {
     // The gateway SAYS the money went back: that is an external fact, recorded and never rejected (CF-PAY-1). An order
@@ -1423,23 +1493,6 @@ function applyRefundWebhook(c: Ctx & { confirmedRefund: boolean }): ApplyResult 
       now,
     });
   }
-  const next = {
-    ...meta,
-    refundId: r.refundId,
-    ...(s.accountedThisEvent || (completed && s.absorbedClaimId && !fawryAmountless)
-      ? { [REFUND_EVENT_IDS_KEY]: appendRefundEventId(meta, r.refundId) }
-      : {}),
-    refundStatus: r.status,
-    [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(meta, r.refundId, r.status),
-    refundReference: r.refundReference ?? (meta.refundReference as string | undefined) ?? null,
-    refundStatusUpdatedAt: new Date(now).toISOString(),
-  };
-  const raise = completed && p.status !== 'refunded';
-  const newStatus = raise ? (s.isFullRefund ? 'refunded' : 'partially_refunded') : p.status;
-  db.run(
-    'UPDATE payments SET metadata = ?, status = ?, refunded_amount = ?, updated_at = ? WHERE id = ?',
-    [JSON.stringify(next), newStatus, raise ? s.settledTotal : p.refunded_amount, now, p.id]
-  );
   addPaymentEvent(db, {
     storeId: input.storeId,
     paymentId: p.id,
@@ -1733,6 +1786,9 @@ export function matchRefundToClaim(
  * caller's next step (OrderService.updateStatus), resumable: a replay of a full refund on an order not yet `refunded`
  * tells the caller to run it.
  */
+/** The order-level key of a merchant-recorded InstaPay refund (DO marker and GL entry share it). */
+const instapayRefundKey = (referenceKey: string): string => `instapay:${referenceKey}`;
+
 export function recordInstapayRefund(
   db: SyncSql,
   a: {
@@ -1785,6 +1841,8 @@ export function recordInstapayRefund(
     if (remaining <= 0) throw err('ALREADY_REFUNDED', 'This payment is fully refunded', 409);
     if (a.amountMinor > remaining)
       throw err('INVALID_REFUND_AMOUNT', `Refund must be between 1 and ${remaining} piastres`, 400);
+    // #624: one refundable balance across every channel (a store credit already given counts)
+    assertRefundable(db, a.storeId, a.orderId, a.amountMinor);
     const full = a.amountMinor === remaining;
     const status = full ? 'refunded' : 'partially_refunded';
     db.run(
@@ -1805,6 +1863,19 @@ export function recordInstapayRefund(
         "UPDATE orders SET payment_status = 'refunded', updated_at = ? WHERE id = ? AND store_id = ?",
         [now, a.orderId, a.storeId]
       );
+    // #629: a PARTIAL InstaPay refund is booked on the order like a gateway partial (completeRefund): the amount-only
+    // marker, in this same section as the payment write, keyed on the bank reference (a replay above never reaches here).
+    // The merchant already sent the money (an external fact): recorded in full, a state or ceiling problem is `review`.
+    // The full refund keeps its own path (the caller flips the order to `refunded`, which runs the whole reversal).
+    if (!full)
+      refundOrder(db, {
+        storeId: a.storeId,
+        orderId: a.orderId,
+        amount: a.amountMinor,
+        refundKey: instapayRefundKey(a.referenceKey),
+        external: true,
+        now,
+      });
     addPaymentEvent(db, {
       storeId: a.storeId,
       paymentId: p.id,
@@ -1830,5 +1901,83 @@ export function recordInstapayRefund(
       refundedAmount: p.refunded_amount + a.amountMinor,
       orderStatus: order.status,
     };
+  });
+}
+
+/**
+ * A refund the merchant made OUTSIDE a payment provider (cash handed back, an InstaPay or bank transfer), recorded when
+ * they mark the order refunded (ruling MONEYB-5). Port of OrderService.recordManualRefund, which wrote through Prisma
+ * and so could not run on a Durable Object store at all. #624: what is recorded is bounded by the order's ONE refundable
+ * balance, so money already given back as store credit, a wallet give-back or another refund is not recorded twice:
+ * each captured payment is marked refunded for what is left on it, up to what is left on the order. A replay finds no
+ * captured payment left and writes nothing.
+ */
+export function recordManualRefund(
+  db: SyncSql,
+  a: {
+    storeId: string;
+    orderId: string;
+    method: string;
+    reference: string | null;
+    actorUserId: string | null;
+    now?: number;
+  }
+): { recorded: number; payments: number } {
+  need(a.orderId, 'orderId');
+  const now = a.now ?? Date.now();
+  return db.transactionSync(() => {
+    loadOrder(db, a.storeId, a.orderId);
+    const rows = db.all(
+      `SELECT p.id FROM payments p JOIN orders o ON o.id = p.order_id
+        WHERE o.store_id = ? AND p.order_id = ? AND p.status IN ('completed', 'partially_refunded')
+        ORDER BY p.created_at, p.id`,
+      [a.storeId, a.orderId]
+    );
+    let left = Math.max(0, refundableBalance(db, a.storeId, a.orderId).refundable);
+    let recorded = 0;
+    for (const r of rows) {
+      const p = loadPayment(db, a.storeId, r.id as string);
+      const amount = Math.min(Math.max(0, p.amount - p.refunded_amount), left);
+      left -= amount;
+      recorded += amount;
+      const meta = parse(p.metadata);
+      db.run(
+        "UPDATE payments SET status = 'refunded', refunded_amount = refunded_amount + ?, metadata = ?, updated_at = ? WHERE id = ?",
+        [
+          amount,
+          JSON.stringify({
+            ...meta,
+            refundMethod: a.method,
+            refundReference: a.reference,
+            refundRecordedBy: a.actorUserId,
+            refundRecordedAt: new Date(now).toISOString(),
+            refundSource: 'manual_record',
+            ...(amount < p.amount - p.refunded_amount
+              ? { refundCoveredElsewhere: p.amount - p.refunded_amount - amount }
+              : {}),
+          }),
+          now,
+          p.id,
+        ]
+      );
+      addPaymentEvent(db, {
+        storeId: a.storeId,
+        paymentId: p.id,
+        orderId: a.orderId,
+        eventType: 'status_change',
+        from: p.status,
+        to: 'refunded',
+        provider: p.provider,
+        details: { reason: 'manual_refund_recorded', method: a.method, amountMinor: amount },
+        userId: a.actorUserId,
+        now,
+      });
+    }
+    if (rows.length > 0)
+      db.run(
+        "UPDATE orders SET payment_status = 'refunded', updated_at = ? WHERE id = ? AND store_id = ?",
+        [now, a.orderId, a.storeId]
+      );
+    return { recorded, payments: rows.length };
   });
 }

@@ -11,7 +11,18 @@
  * The Mac pull (ops/backup-ebda-cloudflare.sh in the ops repo) re-verifies the same manifests off
  * Cloudflare. Pure functions over structural types so it runs on local workerd with miniflare bindings.
  */
-import { buildBackup, sha256Hex, type BackupManifest } from '../store-do/backup';
+import {
+  BACKUP_PART_BYTES,
+  BACKUP_PART_ROWS,
+  fitBytes,
+  sha256Hex,
+  tableDigest,
+  tableFiles,
+  writeTablePages,
+  type BackupManifest,
+  type Page,
+  type TableManifest,
+} from '../store-do/backup';
 
 export interface R2PutGet {
   put(key: string, value: string): Promise<unknown>;
@@ -20,7 +31,11 @@ export interface R2PutGet {
   list?(opts: { prefix: string; limit?: number }): Promise<{ objects: unknown[] }>;
 }
 export interface D1Like {
-  prepare(sql: string): { all(): Promise<{ results: Array<Record<string, unknown>> }> };
+  prepare(sql: string): {
+    all(): Promise<{ results: Array<Record<string, unknown>> }>;
+    /** Real D1 has it; only the paged (large table) path binds. */
+    bind?(...v: unknown[]): { all(): Promise<{ results: Array<Record<string, unknown>> }> };
+  };
   batch(
     stmts: Array<{ all(): Promise<unknown> }>
   ): Promise<Array<{ results: Array<Record<string, unknown>> }>>;
@@ -40,19 +55,106 @@ export interface SweepEnv {
   IDENTITY_DB?: unknown;
 }
 export const D1_BINDINGS = ['PLATFORM_DB', 'IDENTITY_DB'] as const;
-/** One table is read in one batch (one consistent read); above this the exporter must page. */
-export const D1_MAX_TABLE_ROWS = 100_000;
+/** A table of at most this many rows is read in one batch (one consistent read); a larger one is paged by primary key into parts. */
+const D1_PAGE_ROWS = BACKUP_PART_ROWS;
 
 export const d1BackupKey = (name: string, day: string, file: string) =>
   `d1-backups/${name}/${day}/${file}`;
 export const storeBackupManifestKey = (storeId: string, day: string) =>
   `store-do-backups/${storeId}/${day}/manifest.json`;
 
+const qid = (n: string) => `"${n.replace(/"/g, '""')}"`;
+
+/**
+ * One D1 table as pages. Small (<= pageRows): one batch of count + rows, asserted equal (one consistent read, as before).
+ * Large (P2-4b, was a throw above 100,000 rows): keyset pages by primary key, `WHERE (pk) > (last)`; a BLOB / non-scalar key (D1
+ * hands BLOBs back as arrays and cannot rebind them) falls back to LIMIT/OFFSET. D1 gives no snapshot across pages, so the total
+ * read must lie between the count taken before and after (rows that arrive during the export are not an error, a lost page is).
+ */
+async function* pageD1Table(
+  db: D1Like,
+  name: string,
+  t: string,
+  pageRows: number
+): AsyncGenerator<Page> {
+  const q = qid(t);
+  // count + a probe page in ONE batch (one transaction): small tables are decided from this single consistent read.
+  const [c, probe] = await db.batch([
+    db.prepare(`SELECT count(*) AS n FROM ${q}`) as never,
+    db.prepare(`SELECT * FROM ${q} LIMIT ${pageRows + 1}`) as never,
+  ]);
+  const count = c.results[0].n as number;
+  if (probe.results.length <= pageRows) {
+    if (probe.results.length !== count)
+      throw new Error(`D1 ${name}.${t}: read ${probe.results.length} rows, count said ${count}`);
+    const columns = probe.results.length ? Object.keys(probe.results[0]) : [];
+    yield {
+      columns,
+      lines: probe.results.map(row => JSON.stringify(columns.map(k => row[k]))),
+    };
+    return;
+  }
+  const info = await db.prepare(`PRAGMA table_info(${q})`).all();
+  const key = info.results
+    .filter(r => Number(r.pk) > 0)
+    .sort((a, b) => Number(a.pk) - Number(b.pk))
+    .map(r => String(r.name));
+  const order = key.length ? key.map(qid).join(', ') : 'rowid';
+  const bind = (sql: string, ...v: unknown[]) => {
+    const st = db.prepare(sql);
+    if (!st.bind) throw new Error(`D1 ${name}.${t}: statement cannot bind, cannot page`);
+    return st.bind(...v);
+  };
+  let after: unknown[] | null = null;
+  let offset = 0;
+  let total = 0;
+  const cutoff = pageRows;
+  for (;;) {
+    let sql: string;
+    let args: unknown[];
+    if (after) {
+      sql = key.length
+        ? `SELECT * FROM ${q} WHERE (${key.map(qid).join(', ')}) > (${key.map(() => '?').join(', ')}) ORDER BY ${order} LIMIT ?`
+        : `SELECT rowid AS "__rowid", * FROM ${q} WHERE rowid > ? ORDER BY rowid LIMIT ?`;
+      args = [...after, cutoff];
+    } else if (offset > 0) {
+      sql = `SELECT * FROM ${q} ORDER BY ${order} LIMIT ? OFFSET ?`;
+      args = [cutoff, offset];
+    } else {
+      sql = key.length
+        ? `SELECT * FROM ${q} ORDER BY ${order} LIMIT ?`
+        : `SELECT rowid AS "__rowid", * FROM ${q} ORDER BY rowid LIMIT ?`;
+      args = [cutoff];
+    }
+    const { results } = await bind(sql, ...args).all();
+    if (results.length === 0) break;
+    const columns = Object.keys(results[0]).filter(k => k !== '__rowid');
+    const all = results.map(row => JSON.stringify(columns.map(k => row[k])));
+    const kept = fitBytes(all, BACKUP_PART_BYTES);
+    total += kept;
+    yield { columns, lines: all.slice(0, kept) };
+    if (results.length < cutoff && kept === results.length) break;
+    const last = results[kept - 1];
+    const next = key.length ? key.map(k => last[k]) : [last.__rowid];
+    if (next.every(v => typeof v === 'string' || typeof v === 'number')) {
+      after = next;
+    } else {
+      after = null; // BLOB / null key: OFFSET paging from here on (static during a nightly export, bounded by the page size)
+      offset += kept;
+    }
+  }
+  const end = await db.prepare(`SELECT count(*) AS n FROM ${q}`).all();
+  const count2 = end.results[0].n as number;
+  if (total < Math.min(count, count2) || total > Math.max(count, count2))
+    throw new Error(`D1 ${name}.${t}: read ${total} rows, count said ${count} (then ${count2})`);
+}
+
 export async function backupD1(
   name: string,
   db: D1Like,
   r2: R2PutGet,
-  now = new Date()
+  now = new Date(),
+  pageRows = D1_PAGE_ROWS
 ): Promise<BackupManifest> {
   const { results: tableRows } = await db
     .prepare(
@@ -60,32 +162,26 @@ export async function backupD1(
     )
     .all();
   const tables = tableRows.map(r => r.name as string);
-  const dump: Record<string, { columns: string[]; lines: string[] }> = {};
-  for (const t of tables) {
-    const q = `"${t.replace(/"/g, '""')}"`;
-    // count + rows in ONE batch (one transaction): the assert below compares two reads of the same snapshot.
-    const [c, r] = await db.batch([
-      db.prepare(`SELECT count(*) AS n FROM ${q}`) as never,
-      db.prepare(`SELECT * FROM ${q}`) as never,
-    ]);
-    const count = c.results[0].n as number;
-    if (count > D1_MAX_TABLE_ROWS)
-      throw new Error(`D1 ${name}.${t}: ${count} rows exceeds ${D1_MAX_TABLE_ROWS}; add paging`);
-    if (r.results.length !== count)
-      throw new Error(`D1 ${name}.${t}: read ${r.results.length} rows, count said ${count}`);
-    const columns = r.results.length ? Object.keys(r.results[0]) : [];
-    dump[t] = { columns, lines: r.results.map(row => JSON.stringify(columns.map(k => row[k]))) };
-  }
-  const { manifest, files } = await buildBackup(`d1:${name}`, dump, now);
+  const day = now.toISOString().slice(0, 10);
+  const manifestTables: Record<string, TableManifest> = {};
+  // Parts are written as they are produced: one page (two at the seam) in memory, never the table.
+  for (const t of tables)
+    manifestTables[t] = await writeTablePages(t, pageD1Table(db, name, t, pageRows), (file, body) =>
+      r2.put(d1BackupKey(name, day, file), body)
+    );
+  const manifest: BackupManifest = {
+    version: 1,
+    storeId: `d1:${name}`,
+    takenAt: now.toISOString(),
+    tables: manifestTables,
+    ...(Object.values(manifestTables).some(x => x.parts) ? { partRows: pageRows } : {}),
+  };
   const { results: ddl } = await db
     .prepare(
       "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name"
     )
     .all();
-  const day = manifest.takenAt.slice(0, 10);
   await r2.put(d1BackupKey(name, day, 'schema.sql'), ddl.map(d => `${d.sql};`).join('\n') + '\n');
-  for (const [file, body] of Object.entries(files))
-    await r2.put(d1BackupKey(name, day, file), body);
   // Manifest last: a day folder without one is incomplete and ignored by the restore and the Mac pull.
   await r2.put(d1BackupKey(name, day, 'manifest.json'), JSON.stringify(manifest, null, 2));
   // Read-back: the stored manifest must parse and list every table with the counts we just computed.
@@ -93,7 +189,7 @@ export async function backupD1(
   if (!back) throw new Error(`D1 ${name}: manifest not readable after write`);
   const stored = JSON.parse(await back.text()) as BackupManifest;
   for (const t of tables)
-    if (stored.tables[t]?.rows !== dump[t].lines.length)
+    if (stored.tables[t]?.rows !== manifestTables[t].rows)
       throw new Error(`D1 ${name}.${t}: stored manifest row count differs`);
   return manifest;
 }
@@ -106,8 +202,14 @@ export interface SweepReport {
     errors: string[];
     /** Stores whose missing backup was taken by the bounded in-sweep retry (no P1 for these). */
     recovered: string[];
-    /** Stores this tick did not reach (deadline / cap); the next tick starts at `cursor`. */
+    /** Stores this tick did not reach (deadline / cap); the next tick starts at `cursor`. Normal above the cap: not an alert by itself. */
     deferred: number;
+    /** Nights the current walk over the fleet has been running (1 = it started tonight). */
+    walkNights: number;
+    /** True only when deferral is abnormal: the walk is older than `maxDeferredNights`, or this tick made no progress. */
+    deferredAlert: boolean;
+    /** Stores whose backup alarm did not fire (no yesterday manifest) even though the in-sweep retry then recovered them. */
+    alarmMissed: string[];
   };
   d1: Record<string, { ok: boolean; tables?: number; rows?: number; error?: string }>;
   ok: boolean;
@@ -125,6 +227,8 @@ export interface SweepDeps {
   storeTimeoutMs?: number;
   /** Upper bound of `backupNow` retries per tick (default 25). */
   maxRetries?: number;
+  /** A walk over the whole fleet may span this many nights before a still-deferred store pages (default 3). */
+  maxDeferredNights?: number;
   clock?: () => number;
 }
 
@@ -152,7 +256,16 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   const yesterday = dayOf(new Date(now.getTime() - 86_400_000));
   const report: SweepReport = {
     day: dayOf(now),
-    stores: { armed: 0, missingYesterday: [], errors: [], recovered: [], deferred: 0 },
+    stores: {
+      armed: 0,
+      missingYesterday: [],
+      errors: [],
+      recovered: [],
+      deferred: 0,
+      walkNights: 1,
+      deferredAlert: false,
+      alarmMissed: [],
+    },
     d1: {},
     ok: true,
   };
@@ -183,11 +296,11 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   // Bounded loop: ids in a stable order, resuming after the last tick's cursor, stopping at the deadline or the cap.
   const all = [...(await deps.listStoreIds(env))].sort();
   let start = 0;
+  let prev: { day?: string; next?: string | null; nights?: number; visited?: number } = {};
   try {
     const cur = await r2.get(SWEEP_CURSOR_KEY);
-    const next = cur
-      ? ((JSON.parse(await cur.text()) as { next?: string | null }).next ?? null)
-      : null;
+    if (cur) prev = JSON.parse(await cur.text()) as typeof prev;
+    const next = prev.next ?? null;
     if (next)
       start = Math.max(
         0,
@@ -195,6 +308,7 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
       );
   } catch {
     // an unreadable cursor restarts from the top: never skips a store
+    prev = {};
   }
   const order = [...all.slice(start), ...all.slice(0, start)];
   let done = 0;
@@ -228,8 +342,29 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   }
   report.stores.deferred = order.length - done;
   const nextId = report.stores.deferred > 0 ? order[done] : null;
+  // A walk over a fleet bigger than one tick's cap legitimately spans several nights (the next tick resumes at the cursor), so
+  // deferral alone never pages. It pages when the walk is older than N nights, or when a tick reached no store at all.
+  // The cursor carries the state of ONE walk: nights it has run and stores visited since it began. The walk is complete once it has
+  // visited the whole fleet; the counters then reset, so a fleet that always needs 3 nights never pages and a stuck walk does.
+  const prevNights = prev.nights ?? 0;
+  const nights = prevNights + (prev.day === report.day && prevNights > 0 ? 0 : 1);
+  const visited = (prev.visited ?? 0) + done;
+  const complete = visited >= all.length;
+  report.stores.walkNights = nights;
+  report.stores.deferredAlert =
+    !complete &&
+    report.stores.deferred > 0 &&
+    (nights > (deps.maxDeferredNights ?? 3) || done === 0);
   try {
-    await r2.put(SWEEP_CURSOR_KEY, JSON.stringify({ day: report.day, next: nextId }));
+    await r2.put(
+      SWEEP_CURSOR_KEY,
+      JSON.stringify({
+        day: report.day,
+        next: nextId,
+        nights: complete ? 0 : nights,
+        visited: complete ? 0 : visited,
+      })
+    );
   } catch (e) {
     report.stores.errors.push(`cursor: ${(e as Error).message}`);
   }
@@ -247,6 +382,8 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
     try {
       await withTimeout(stubOf(id).backupNow(id), storeTimeoutMs, `backupNow ${id}`);
       report.stores.recovered.push(id);
+      // The retry fixed tonight's backup, not the alarm that missed yesterday's: record it and page anyway.
+      report.stores.alarmMissed.push(id);
     } catch (e) {
       report.stores.missingYesterday.push(id);
       report.stores.errors.push(`${id}: retry backupNow failed: ${(e as Error).message}`);
@@ -256,7 +393,8 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   report.ok =
     report.stores.errors.length === 0 &&
     report.stores.missingYesterday.length === 0 &&
-    report.stores.deferred === 0 &&
+    !report.stores.deferredAlert &&
+    report.stores.alarmMissed.length === 0 &&
     Object.values(report.d1).every(v => v.ok);
   await r2.put(`ops-reports/backup-sweep/${report.day}.json`, JSON.stringify(report, null, 2));
   if (!report.ok)
@@ -267,6 +405,9 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
           missingYesterday: report.stores.missingYesterday,
           storeErrors: report.stores.errors,
           deferredStores: report.stores.deferred,
+          deferredAlert: report.stores.deferredAlert,
+          walkNights: report.stores.walkNights,
+          alarmMissedRecoveredByRetry: report.stores.alarmMissed,
           recovered: report.stores.recovered,
           d1: report.d1,
         },
@@ -308,20 +449,27 @@ export async function restoreD1FromBackup(
   if ((existing.results[0].n as number) !== 0) throw new Error('restore target must be empty');
   await target.exec((await schema.text()).split('\n').filter(Boolean).join(' '));
   for (const t of Object.keys(manifest.tables)) {
-    const f = await r2.get(d1BackupKey(name, day, `${t}.ndjson`));
-    if (!f) throw new Error(`missing ${t}.ndjson`);
-    const body = await f.text();
-    if ((await sha256Hex(body)) !== manifest.tables[t].sha256)
-      throw new Error(`${t}: file checksum differs from manifest`);
-    const [head, ...lines] = body.split('\n').filter(Boolean);
-    const cols = JSON.parse(head) as string[];
-    const ins = target.prepare(
-      `INSERT INTO "${t}" (${cols.map(c => `"${c}"`).join(',')}) VALUES (${cols.map(() => '?').join(',')})`
-    );
-    for (let i = 0; i < lines.length; i += 50)
-      await target.batch(
-        lines.slice(i, i + 50).map(l => ins.bind(...(JSON.parse(l) as unknown[]))) as never
+    const tm = manifest.tables[t];
+    // Legacy backups have one `<t>.ndjson`; paged ones list their parts. One part in memory at a time.
+    for (const file of tableFiles(t, tm)) {
+      const f = await r2.get(d1BackupKey(name, day, file));
+      if (!f) throw new Error(`missing ${file}`);
+      const body = await f.text();
+      const want = tm.parts ? tm.parts.find(p => p.file === file)!.sha256 : tm.sha256;
+      if ((await sha256Hex(body)) !== want)
+        throw new Error(`${t}: file checksum differs from manifest`);
+      const [head, ...lines] = body.split('\n').filter(Boolean);
+      const cols = JSON.parse(head) as string[];
+      const ins = target.prepare(
+        `INSERT INTO "${t}" (${cols.map(c => `"${c}"`).join(',')}) VALUES (${cols.map(() => '?').join(',')})`
       );
+      for (let i = 0; i < lines.length; i += 50)
+        await target.batch(
+          lines.slice(i, i + 50).map(l => ins.bind(...(JSON.parse(l) as unknown[]))) as never
+        );
+    }
+    if (tm.parts && (await tableDigest(tm.parts)) !== tm.sha256)
+      throw new Error(`${t}: part digest differs from manifest`);
   }
   const scratch = new Map<string, string>();
   const again = await backupD1(
@@ -331,7 +479,8 @@ export async function restoreD1FromBackup(
       put: async (k, v) => void scratch.set(k, v),
       get: async k => (scratch.has(k) ? { text: async () => scratch.get(k)! } : null),
     },
-    new Date(manifest.takenAt)
+    new Date(manifest.takenAt),
+    manifest.partRows ?? D1_PAGE_ROWS
   );
   const out: Record<string, { rows: number; ok: boolean }> = {};
   for (const [t, want] of Object.entries(manifest.tables)) {
