@@ -21,7 +21,7 @@ describe('privacy policy processor stack switch', () => {
       expect(t).not.toMatch(RETIRED);
       for (const name of ['Cloudflare', 'Meta', 'Kashier', 'Google Gemini', 'Workers AI'])
         expect(t, `${lang} ${name}`).toContain(name);
-      expect(t).toContain('InstaPay'.replace('InstaPay', lang === 'en' ? 'InstaPay' : 'إنستا باي')); // launch payment method
+      expect(t).toContain('InstaPay'.replace('InstaPay', lang === 'en' ? 'InstaPay' : 'إنستاباي')); // launch payment method
     }
   });
 
@@ -52,11 +52,12 @@ describe('privacy policy processor stack switch', () => {
 
   it('a cloudflare switch needs a material privacy entry of 1.2 or later (the policy changes the day the processors do)', () => {
     if (PRIVACY_STACK === 'cloudflare') {
-      const v = currentLegalVersion(LEGAL_POLICIES, 'privacy');
-      expect(Number(v.version.split('.')[1]) >= 2 || Number(v.version.split('.')[0]) >= 2).toBe(
-        true
-      );
-      expect(v.material).toBe(true);
+      // the switch itself shipped as a material entry >= 1.2; a later NON-material wording fix (e.g. 1.3,
+      // LEGAL-NAMES-1) may follow it, so look for the material switch entry in the history, not only at the tip
+      const atLeast12 = (v: { version: string }) =>
+        Number(v.version.split('.')[1]) >= 2 || Number(v.version.split('.')[0]) >= 2;
+      expect(LEGAL_POLICIES.privacy.history.some(v => atLeast12(v) && v.material)).toBe(true);
+      expect(atLeast12(currentLegalVersion(LEGAL_POLICIES, 'privacy'))).toBe(true);
     } else {
       expect(PRIVACY_STACK).toBe('current');
     }

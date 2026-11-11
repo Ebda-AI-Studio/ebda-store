@@ -7,10 +7,12 @@ const d = BRAND.domains;
 
 /**
  * The products the page groups components under (BRAND-ARCH-1: components per product). A product is listed here
- * when it is LIVE; Ebda Chat / CRM / ERP get a group (and their probes) the day they ship, never a placeholder.
+ * when it is LIVE; CRM / ERP get a group (and their probes) the day they ship, never a placeholder. Ebda Chat is live
+ * (wa.ebda.app, LAUNCH-SUITE-1), so it has its group and probe (content audit C6, 2026-11-10).
  */
 export const PRODUCTS: readonly { id: string; name: Localized }[] = [
   { id: 'store', name: { en: BRAND.product.nameEn, ar: BRAND.product.nameAr } },
+  { id: 'chat', name: { en: BRAND.productWhatsapp.nameEn, ar: BRAND.productWhatsapp.nameAr } },
   { id: 'studio', name: { en: BRAND.company.shortNameEn, ar: BRAND.company.shortNameAr } },
 ];
 
@@ -75,6 +77,15 @@ export const COMPONENTS: readonly ComponentConfig[] = [
     url: `https://storedemo-lamma${d.storeSuffix}/products/mahshi-koronb`,
     expectStatus: 200,
     expectBody: 'data-zone=',
+  },
+  {
+    id: 'chat',
+    product: 'chat',
+    name: { en: 'Ebda Chat app', ar: 'تطبيق ابدأ شات' },
+    // The Ebda Chat Worker's own health route (repo Ebda-AI-Studio/ebda-whatsapp): `{"ok":true,"status":"ok",...}`.
+    url: `https://${d.whatsappApp}/health`,
+    expectStatus: 200,
+    expectBody: '"status":\\s*"ok"',
   },
   {
     id: 'docs',

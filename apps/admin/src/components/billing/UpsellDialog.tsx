@@ -40,8 +40,14 @@ export function UpsellDialog() {
       if (!detail || HANDLED_INLINE.has(detail.code)) return;
       setEvent(detail);
     };
+    // A page that already shows its own upgrade card (PlanLockedCard) closes the modal: one upsell, not two.
+    const onCardShown = () => setEvent(null);
     window.addEventListener('ebda:upsell', onUpsell);
-    return () => window.removeEventListener('ebda:upsell', onUpsell);
+    window.addEventListener('ebda:upsell-card-shown', onCardShown);
+    return () => {
+      window.removeEventListener('ebda:upsell', onUpsell);
+      window.removeEventListener('ebda:upsell-card-shown', onCardShown);
+    };
   }, []);
 
   const close = useCallback(() => setEvent(null), []);

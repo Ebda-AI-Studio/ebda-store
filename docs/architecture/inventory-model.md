@@ -183,6 +183,15 @@ product.costPrice`. Order lines snapshot it at sale time
   (`reorder-scan.service.ts`, step 1b). The per-unit metrics (sales, on
   order, backlog) are per variant; the last-PO supplier and its lead time are
   product-level and looked up once per product per scan (issue 2344).
+- **Reorder rules have one writer** (M-107). `ReorderRule` (min qty, reorder
+  qty, lead time, safety days, preferred supplier) is created, edited and
+  deleted only through `reorder-rules.routes.ts`
+  (`/stores/:storeId/stock/reorder-rules`, admin page
+  `stock/reorder/rules`), via `storeWriter` (`ReorderRule` is in the DO write
+  allow-list). Unique per (store, product, variant): the service checks first
+  and answers 409 `REORDER_RULE_EXISTS`, because a NULL `variant_id` is
+  distinct in the DB unique index. Every write is audit-logged
+  (`reorder_rule.created|updated|deleted`); no money or stock effect.
 - **A product-scoped write aimed at a variant product must fail loud.**
   `InventoryService.adjustInventory` / `bulkAdjustInventory` return a 400
   (`VARIANT_PRODUCT`) rather than writing a column that moves no stock. The

@@ -256,6 +256,12 @@ export const PAGES: PageEntry[] = [
   page('/stock/reorder', 'stock.reorder.title', 'staff', {
     syn: { en: 'reorder point low stock', ar: 'نقطة اعادة الطلب مخزون منخفض' },
   }),
+  page('/stock/reorder/rules', 'stock.reorderRules.title', 'owner', {
+    syn: {
+      en: 'reorder rules minimum stock threshold restock',
+      ar: 'قواعد اعادة الطلب حد ادنى مخزون',
+    },
+  }),
   page('/stock/deadstock', 'stock.deadstock.title', 'staff', {
     syn: { en: 'slow moving unsold old stock', ar: 'راكد بضاعة قديمة' },
   }),

@@ -2,6 +2,7 @@
 
 import { Button, buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
+import { useEffect } from 'react';
 import { useT } from '@/i18n/useT';
 
 export default function Error({
@@ -12,6 +13,10 @@ export default function Error({
   reset: () => void;
 }) {
   const t = useT('common.errors.boundary');
+  // The JS message is for developers (console), never for the merchant.
+  useEffect(() => {
+    console.error('[admin] app crashed', error);
+  }, [error]);
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
       <div className="force-card max-w-lg w-full py-12 text-center">
@@ -37,9 +42,6 @@ export default function Error({
             {t('errorId', { id: error.digest })}
           </p>
         )}
-        <p className="mb-6 rounded-lg bg-muted px-3 py-2 text-start font-mono text-xs text-muted-foreground break-all">
-          {process.env.NODE_ENV === 'development' ? error.message || t('unknown') : t('generic')}
-        </p>
         <div className="flex justify-center gap-3">
           <Button type="button" onClick={reset}>
             {t('retry')}

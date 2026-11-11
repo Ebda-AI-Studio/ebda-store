@@ -29,8 +29,6 @@ const PUSH_STYLE_HOSTS = 'https://cdn.onesignal.com https://onesignal.com https:
 const PUSH_CONNECT_HOSTS = `${PUSH_HTTP_HOSTS} wss://*.onesignal.com`;
 
 const SCRIPT_HOSTS = [
-  'https://us-assets.i.posthog.com',
-  'https://us.i.posthog.com',
   'https://eu-assets.i.posthog.com',
   'https://eu.i.posthog.com',
   'https://static.cloudflareinsights.com',
@@ -71,7 +69,7 @@ export function buildAdminCsp({
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: https: blob:",
     "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
-    `connect-src 'self' ${api} ${accounts} https://media.ebda.app ${PUSH_CONNECT_HOSTS} https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
+    `connect-src 'self' ${api} ${accounts} https://media.ebda.app ${PUSH_CONNECT_HOSTS} https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com`,
     `frame-src ${PUSH_HTTP_HOSTS} ${framesForRoute}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",

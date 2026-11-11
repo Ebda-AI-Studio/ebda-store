@@ -2,6 +2,8 @@
 
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
+import { planGateFor } from '../lib/plan-gate-registry';
+import { PlanLockedCard } from './PlanLockedCard';
 
 interface ErrorStateProps {
   title?: string;
@@ -14,6 +16,9 @@ export function ErrorState({ title, message, onRetry, retryText }: ErrorStatePro
   const t = useT('components.errorState');
   const resolvedTitle = title ?? t('defaultTitle');
   const resolvedRetryText = retryText ?? t('defaultRetry');
+  // A plan refusal is an upgrade card, not an error with a retry that cannot succeed (lib/plan-gate-registry.ts).
+  const gate = planGateFor(message);
+  if (gate) return <PlanLockedCard info={gate} message={message} />;
   return (
     <div className="force-card py-16">
       <div className="flex flex-col items-center text-center">

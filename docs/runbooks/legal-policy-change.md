@@ -37,6 +37,11 @@ which you bump by hand in the same PR. They are served at `/legal/data-deletion/
 (+ `/en/`), listed in the sitemap with the legal date, and linked from the Legal notice. Data-protection requests go to
 `privacy@ebda.app` (Cloudflare Email Routing rule must exist); `ahlan@ebda.app` stays the general support address.
 
+2026-11-10 (Rulings LEGAL-FINAL-1, LEGAL-NAMES-1): the `PENDING LEGAL REVIEW: refunds` marker was removed from both
+`legal-source/*/whatsapp-terms.md` (the texts stand from launch), the English sources now link the English pages
+(`https://ebda.app/en/legal/…`), and all six files are version 1.2. Copy all six back into the ebda-whatsapp repo's
+`docs/legal/` before the next re-import, or the marker and the Arabic-page links return.
+
 ## 2. Merge and deploy
 
 Merge. `cf-marketing-deploy.yml` republishes ebda.app. The API must also run the new registry:

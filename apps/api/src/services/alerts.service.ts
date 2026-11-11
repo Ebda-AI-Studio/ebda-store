@@ -338,51 +338,57 @@ async function deliverAlert(opts: AlertOptions): Promise<AlertOutcome> {
   }
 
   const text = buildMessage(opts);
-  // mirror to the AI OS brain in parallel; never awaited by the Telegram path's outcome, never throws
-  void mirrorToBrain(opts, text);
+  // Mirror to the AI OS brain in parallel with Telegram. It is AWAITED before returning (it never throws and has its own 5 s cap):
+  // on Workers a fetch still pending when the request or cron handler finishes is cancelled, so a fire-and-forget mirror was lost
+  // (2026-11-11: the Sentry-bridge test alert reached Telegram but not the brain while the mirror was fire-and-forget). Its result never changes the outcome.
+  const mirror = mirrorToBrain(opts, text);
   const url = `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`;
 
-  try {
-    // Telegram occasionally hangs on the connection — cap with a 5s
-    // timeout so a P0 alert path doesn't block on a flaky network.
-    // The abort stays armed through the error-body read too (issue 2393): a
-    // non-2xx whose body stalls after the headers is the same hang.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
+  const outcome = await (async (): Promise<AlertOutcome> => {
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: config.telegramAlertChatId,
-          text,
-          disable_web_page_preview: true,
-        }),
-        signal: controller.signal,
-      });
+      // Telegram occasionally hangs on the connection — cap with a 5s
+      // timeout so a P0 alert path doesn't block on a flaky network.
+      // The abort stays armed through the error-body read too (issue 2393): a
+      // non-2xx whose body stalls after the headers is the same hang.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: config.telegramAlertChatId,
+            text,
+            disable_web_page_preview: true,
+          }),
+          signal: controller.signal,
+        });
 
-      if (!res.ok) {
-        const detail = await res.text().catch(() => '');
-        logger.error(
-          {
-            status: res.status,
-            level: opts.level,
-            title: opts.title,
-            detail: detail.slice(0, 500),
-          },
-          'alerts.service: Telegram sendMessage rejected'
-        );
-        return 'failed';
+        if (!res.ok) {
+          const detail = await res.text().catch(() => '');
+          logger.error(
+            {
+              status: res.status,
+              level: opts.level,
+              title: opts.title,
+              detail: detail.slice(0, 500),
+            },
+            'alerts.service: Telegram sendMessage rejected'
+          );
+          return 'failed';
+        }
+        return 'sent';
+      } finally {
+        clearTimeout(timer);
       }
-      return 'sent';
-    } finally {
-      clearTimeout(timer);
+    } catch (err) {
+      logger.error(
+        { err, level: opts.level, title: opts.title },
+        'alerts.service: Telegram sendMessage threw'
+      );
+      return 'failed';
     }
-  } catch (err) {
-    logger.error(
-      { err, level: opts.level, title: opts.title },
-      'alerts.service: Telegram sendMessage threw'
-    );
-    return 'failed';
-  }
+  })();
+  await mirror;
+  return outcome;
 }

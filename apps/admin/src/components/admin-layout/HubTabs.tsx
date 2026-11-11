@@ -6,6 +6,9 @@ import { useParams, usePathname } from 'next/navigation';
 import { navItemClasses } from '../ui/tokens';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '../../hooks/useFeatures';
+import { featureForStorePath } from '../../lib/route-feature-gates';
+import { navFeatureState } from '../../lib/nav-lock';
+import { LockBadge } from './LockBadge';
 import { useWholesalePending } from '../../hooks/useWholesalePending';
 
 export interface HubTab {
@@ -92,6 +95,15 @@ export function HubTabs({ items }: Props) {
               className={navItemClasses({ kind: 'tab', active: active === t.href })}
             >
               {t.label}
+              {navFeatureState(
+                // Tabs with their own `featureKey` are hidden outright when off (see HubTab.featureKey); the rest lock.
+                t.featureKey ? null : featureForStorePath(t.href, (params?.id as string) ?? ''),
+                {
+                  isEnabled,
+                  isLoading: featuresLoading,
+                  isSuperAdmin: false,
+                }
+              ) === 'locked' && <LockBadge />}
               {t.badgeKey === 'wholesalePending' && pendingCount > 0 ? (
                 <span
                   data-testid="wholesale-pending-badge"

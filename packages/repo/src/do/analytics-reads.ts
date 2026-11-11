@@ -278,3 +278,53 @@ export function analyticsCashflowOp(db: SyncSql, storeId: string, a: Record<stri
     )
     .map(r => ({ dayMs: num(r.day), net: num(r.net) }));
 }
+
+/**
+ * taxReportLines (NZ-ACCT-1): SQLite twin of the raw query in accounting/tax-report.service.ts. One row per posted /
+ * reversed `order` journal entry in [fromMs, toMs] that moved account 2100 (tax); base = account 4000 of the SAME entry.
+ * Order id = the source_id prefix before the first ':' (sale, reversal and partial-return adjustments share it).
+ * Customer name: the store's `customers` row of the order's customer (id or user_id), else the shipping-address
+ * snapshot (`json_type`-guarded), since `users` is not on the DO. Read-only; every table is filtered by `store_id`.
+ */
+export function taxReportLinesOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const from = intArg(a.fromMs, 'fromMs');
+  const to = intArg(a.toMs, 'toMs');
+  if (to < from) throw new MoneyError('BAD_ARGS', 'toMs', 400);
+  const snap = (key: string): string =>
+    `CASE WHEN json_type(o.shipping_address, '$.${key}') = 'text' THEN json_extract(o.shipping_address, '$.${key}') END`;
+  return db
+    .all(
+      `SELECT e.posted_at AS posted_at,
+              o.order_number AS order_number,
+              COALESCE(
+                (SELECT NULLIF(TRIM(c.first_name || ' ' || c.last_name), '') FROM customers c
+                  WHERE c.store_id = ?1 AND o.customer_id IS NOT NULL AND (c.id = o.customer_id OR c.user_id = o.customer_id)
+                  ORDER BY c.created_at ASC, c.id ASC LIMIT 1),
+                NULLIF(TRIM(COALESCE(${snap('firstName')}, '') || ' ' || COALESCE(${snap('lastName')}, '')), '')
+              ) AS customer_name,
+              COALESCE(SUM(CASE WHEN a.code = '2100' THEN l.credit - l.debit ELSE 0 END), 0) AS tax_delta,
+              COALESCE(SUM(CASE WHEN a.code = '4000' THEN l.credit - l.debit ELSE 0 END), 0) AS base_delta,
+              o.total AS order_total,
+              (e.source_id = o.id) AS is_sale
+         FROM journal_entries e
+         JOIN journal_lines l ON l.entry_id = e.id
+         JOIN accounts a ON a.id = l.account_id AND a.code IN ('2100', '4000') AND a.store_id = ?1
+         JOIN orders o ON o.id = substr(e.source_id, 1, instr(e.source_id || ':', ':') - 1) AND o.store_id = ?1
+        WHERE e.source = 'order' AND e.status IN ('posted', 'reversed')
+          AND e.posted_at >= ?2 AND e.posted_at <= ?3 AND e.store_id = ?1
+        GROUP BY e.id, e.posted_at, e.source_id, o.id, o.order_number, o.total, o.customer_id, o.shipping_address
+       HAVING SUM(CASE WHEN a.code = '2100' THEN l.credit - l.debit ELSE 0 END) <> 0
+        ORDER BY e.posted_at ASC, o.order_number ASC`,
+      [storeId, from, to]
+    )
+    .map(r => ({
+      postedAtMs: num(r.posted_at),
+      orderNumber: String(r.order_number),
+      customerName:
+        r.customer_name === null || r.customer_name === undefined ? null : String(r.customer_name),
+      taxDelta: num(r.tax_delta),
+      baseDelta: num(r.base_delta),
+      orderTotal: num(r.order_total),
+      isSale: num(r.is_sale) === 1,
+    }));
+}

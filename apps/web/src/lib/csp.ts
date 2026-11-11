@@ -24,8 +24,6 @@ const SCRIPT_HOSTS = [
   'https://s.pinimg.com',
   'https://cdn.onesignal.com',
   'https://*.onesignal.com',
-  'https://us-assets.i.posthog.com',
-  'https://us.i.posthog.com',
   'https://eu-assets.i.posthog.com',
   'https://eu.i.posthog.com',
   'https://static.cloudflareinsights.com',
@@ -77,7 +75,7 @@ export function buildStorefrontCsp(nonce: string): string {
     "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
     // media.ebda.app: the PDP 3D viewer fetch()es the product's .glb from it. ebda.app: the maintenance page and
     // bare-root redirect can trigger a preconnect. The Google hosts are the Ads conversion beacons.
-    "connect-src 'self' https://api.ebda.app https://*.r2.dev https://media.ebda.app https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com" +
+    "connect-src 'self' https://api.ebda.app https://*.r2.dev https://media.ebda.app https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com" +
       extraApiOrigins(),
     // /OneSignalSDKWorker.js registers as a service worker: Push API mandates same-origin worker scripts.
     "worker-src 'self' blob:",

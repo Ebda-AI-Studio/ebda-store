@@ -128,7 +128,7 @@ export const CAPABILITIES: Record<Locale, Record<CardId, CapabilityCopy>> = {
       d: 'اعرف إيه اللي بيتباع وإيراداتك، وسطرين بالعربي والإنجليزي فوق لوحة الأرقام بيشرحوا إيه اللي اتغيّر. والمنتجات اللي بتتباع مع بعض بتظهر للعميل في صفحة المنتج والسلة. مستوى التفاصيل بيزيد مع الباقة.',
     },
     instapay: {
-      t: 'إيصال إنستا باي بيتقري لوحده',
+      t: 'إيصال إنستاباي بيتقري لوحده',
       d: 'الإيصال اللي العميل بيرفعه بيتقري لوحده، فمحدش يضطر يكتب بيانات التحويل.',
     },
     seo: {
@@ -137,7 +137,7 @@ export const CAPABILITIES: Record<Locale, Record<CardId, CapabilityCopy>> = {
     },
     builder: {
       t: 'قوالب وأشكال جاهزة ومحرر صفحات',
-      d: 'اختار من خمس قوالب، وكل قالب فيه ثلاث أشكال جاهزة، وبعدين عدّل الألوان والصور وترتيب الأقسام من محرر صفحات بتشوف فيه التغيير قدامك على طول، من غير مبرمج.',
+      d: 'اختار من 5 قوالب، وكل قالب بـ3 أشكال جاهزة، وبعدين عدّل الألوان والصور وترتيب الأقسام من محرر صفحات بتشوف فيه التغيير قدامك على طول، من غير مبرمج.',
     },
     domain: {
       t: 'لينك مجاني ودومين خاص بيك',
@@ -338,7 +338,7 @@ const FAQ_ITEMS: Record<Locale, FeaturesFaqItem[]> = {
   ar: [
     {
       q: 'هل ابدأ ستور فيه قوالب وتصميمات جاهزة؟',
-      a: 'أيوه. فيه خمس قوالب، وكل قالب ليه ثلاث أشكال جاهزة، وتقدر تعدّل الألوان والصور والأقسام من محرر الصفحات.',
+      a: 'أيوه. فيه 5 قوالب، وكل قالب بـ3 أشكال جاهزة، وتقدر تعدّل الألوان والصور والأقسام من محرر الصفحات.',
     },
     {
       q: 'أقدر أربط دومين خاص بيا؟',
@@ -513,7 +513,7 @@ export const FEATURES_PAGE: Record<
     planLabel: 'متاح في',
     faqTitle: 'أسئلة عن المميزات',
     compareTitle: 'قارن ابدأ ستور بغيره',
-    cta: 'ابدأ دلوقتي',
+    cta: 'افتح متجرك',
     homeTitle: 'مش متجر بسيط وبس.',
     homeLead:
       'ده غير الدفع والشحن والسلات المتروكة ونقاط الولاء. كله في باقة واحدة وبصفر عمولة، وتفاصيل الباقات في اللي بعده.',
@@ -527,7 +527,7 @@ export const FEATURES_PAGE: Record<
     planLabel: 'Available on',
     faqTitle: 'Questions about features',
     compareTitle: 'Compare Ebda Store',
-    cta: 'Start now',
+    cta: 'Open your store',
     homeTitle: 'More than a simple store.',
     homeLead:
       'On top of payments and shipping, cart recovery and loyalty points. All of it in one plan, at 0% commission; the plans come next.',

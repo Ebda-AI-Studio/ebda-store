@@ -39,6 +39,7 @@ import {
   onD1,
   revokeGrantsD1,
 } from '../platform/billing-d1';
+import { onAccessD1, storeOwnerIdD1 } from '../platform/access-d1';
 
 export const FOUNDING_SLOTS = 20;
 export const REFERRER_MAX_GRANTS = 3;
@@ -514,8 +515,12 @@ export async function restoreRevokedGrants(now = new Date()): Promise<number> {
  * advisory/row lock taken there is released at once and the caps would not hold. The lock-then-count logic below
  * needs one transaction from the lock to the commit.
  */
-const inOwnTx = <T>(storeId: string, fn: (tx: Tx) => Promise<T>): Promise<T> =>
-  runInTenantContext(storeId, () => fn(prisma as unknown as Tx));
+const inOwnTx = async <T>(storeId: string, fn: (tx: Tx) => Promise<T>): Promise<T> => {
+  // NEON-ZERO (Ruling NZ-ACCT-1): billing is served from D1 and every atomic piece is one D1 statement/batch, so
+  // there is no Postgres transaction to open (the Worker has no Postgres: runInTenantContext would throw).
+  if (await onD1()) return fn(prisma as unknown as Tx);
+  return runInTenantContext(storeId, () => fn(prisma as unknown as Tx));
+};
 
 /** Create the grants a payment earns, then apply every pending grant of each side (separate stores, separate transactions). */
 export async function awardGrantsAfterPayment(
@@ -648,8 +653,11 @@ export async function sweepFreeMonthGrants(
 export async function recordReferral(referredStoreId: string, refSlug: string): Promise<boolean> {
   const referrerId = await resolveStoreId({ slug: refSlug });
   if (!referrerId || referrerId === referredStoreId) return false;
+  const ownerOnD1 = await onAccessD1();
   const ownerOf = (id: string) =>
-    withStore(id, tx => tx.store.findUnique({ where: { id }, select: { ownerId: true } }));
+    ownerOnD1
+      ? storeOwnerIdD1(id).then(ownerId => (ownerId ? { ownerId } : null))
+      : withStore(id, tx => tx.store.findUnique({ where: { id }, select: { ownerId: true } }));
   const [referrer, referred] = await Promise.all([ownerOf(referrerId), ownerOf(referredStoreId)]);
   if (!referrer || !referred || referred.ownerId === referrer.ownerId) return false; // same owner = self-referral
   const { count } = await prisma.billingReferral.createMany({

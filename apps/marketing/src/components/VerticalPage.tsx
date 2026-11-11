@@ -11,14 +11,14 @@ import { BRAND } from '@ebda/shared/brand';
 const K = {
   ar: {
     looks: 'ثلاثة أشكال جاهزة',
-    start: 'ابدأ دلوقتي',
+    start: 'افتح متجرك',
     demo: 'شوف متجر تجريبي',
     open: 'افتح الشكل',
     note: 'صور توضيحية',
   },
   en: {
     looks: 'Three ready looks',
-    start: 'Start now',
+    start: 'Open your store',
     demo: 'See a demo store',
     open: 'Open this look',
     note: 'Illustrative photos',
@@ -31,7 +31,7 @@ export function VerticalPage({ locale, slug }: { locale: Locale; slug: VerticalS
   const k = K[locale];
   const looks = verticalLooks(slug, locale);
   const demo = `https://${DEMO_STORES[VERTICALS[slug].template].host}${BRAND.domains.storeSuffix}/`;
-  const signup = `${SIGNUP_URL}?utm_source=ads&utm_campaign=for-${slug}`;
+  const signup = `${SIGNUP_URL}?utm_source=site&utm_medium=vertical&utm_campaign=for-${slug}`;
   return (
     <>
       <a href="#main" className="skip">

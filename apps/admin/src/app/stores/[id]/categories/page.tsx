@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
-import { recommendedSizeTextForTemplate, type TemplateId } from '@ebda/shared';
+import { recommendedSizeTextForTemplate, slugify, type TemplateId } from '@ebda/shared';
 import { arrayMove } from '@dnd-kit/sortable';
 import { type DragEndEvent } from '@dnd-kit/core';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -36,15 +36,6 @@ const emptyForm: CategoryFormData = {
   showOnHomeStrip: true,
   sizeChartId: '',
 };
-
-function slugify(text: string) {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9\u0600-\u06FF-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
 
 export default function StoreCategoriesPage() {
   const params = useParams();

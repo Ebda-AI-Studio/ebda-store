@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { slugify } from '@ebda/shared';
 import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
@@ -390,12 +391,7 @@ router.post(
       const data = createCategorySchema.parse(req.body);
       await assertSizeChartInStore(storeId, data.sizeChartId);
 
-      let baseSlug =
-        data.slug ||
-        data.name
-          .toLowerCase()
-          .replace(/[^a-z0-9\u0600-\u06FF]+/g, '-')
-          .replace(/(^-|-$)/g, '');
+      let baseSlug = data.slug || slugify(data.name, { max: 120 });
 
       // If slug is empty (e.g. pure symbols), use a fallback
       if (!baseSlug) {

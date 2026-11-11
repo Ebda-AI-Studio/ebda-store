@@ -26,8 +26,8 @@
  *                MCP is Growth + Business (`planIncludesMerchantMcp`), not `apiAccess`.
  *   analyticsTier  `requireAnalyticsTier` on the insights routes (see below)
  *   maxOrdersPerMonth  blocks after a seven-day grace; see `assertOrderAllowed`.
- *   maxStorageMb  declared + shown, not enforced: R2 usage per store is not
- *                 tracked yet (follow-up).
+ *   maxStorageMb  /uploads/{image,images,video,font} via `assertStorageRoom`; usage = R2
+ *                 listing under stores/<id>/ (lib/storage-usage.ts, 60 s BOUNDED-stale).
  */
 
 import { upgradePlanFor } from '@ebda/shared';
@@ -44,6 +44,8 @@ import {
   type GatedLimitKey,
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
+import { StorageService } from './storage.service';
+import { BYTES_PER_MB, cachedStoreBytes } from '../lib/storage-usage';
 import { storeRepo, storeDb } from '../lib/repo-factory';
 import { backendFor } from '../lib/store-backend';
 import { onAccessD1 } from './platform/access-d1';
@@ -55,6 +57,23 @@ import { ownerStores } from '../lib/store-create-do';
 import logger from '../lib/logger';
 
 type Tx = Prisma.TransactionClient;
+
+/** S3-X8: R2 bytes under the store's prefix, rounded UP to whole MB. */
+async function storageUsageMb(storeId: string): Promise<number> {
+  try {
+    const bytes = await cachedStoreBytes(storeId, c => StorageService.listStoreSizes(storeId, c));
+    return Math.ceil(bytes / BYTES_PER_MB);
+  } catch (err) {
+    // A plan ceiling is not worth refusing a merchant's upload because OUR bucket listing failed: fail OPEN, say so.
+    logger.warn({ err, storeId }, '[plan-limit] storage usage unavailable, allowing the upload');
+    return 0;
+  }
+}
+
+/** S3-X8: gate an upload of `bytes` on the plan's storage ceiling (402 PLAN_LIMIT_REACHED; null = unlimited). */
+export async function assertStorageRoom(storeId: string, bytes: number): Promise<void> {
+  await assertWithinLimit(storeId, 'maxStorageMb', { delta: bytes / BYTES_PER_MB });
+}
 
 /** Current usage for a limit, or null when the platform does not track it yet. */
 export async function countUsage(
@@ -95,7 +114,7 @@ export async function countUsage(
         return s?.domain ? 1 : 0;
       }
       case 'maxStorageMb':
-        return null; // not tracked yet
+        return storageUsageMb(storeId);
       default:
         return null; // automation flags are capabilities, not counts
     }

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { Geist, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { Providers } from './providers';
@@ -10,15 +10,11 @@ import { brandTagline } from '@ebda/shared';
 import { productName } from '../lib/product-name';
 import { THEME_INIT_SCRIPT } from '@/lib/auth-theme';
 
-const geist = Geist({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-});
-
+// DS-FONT-1: ONE family for every Ebda surface, Arabic and Latin from the same face (no Geist: a second Latin set
+// beside Arabic text mismatched x-height and digits).
 const ibmPlexArabic = IBM_Plex_Sans_Arabic({
-  subsets: ['arabic'],
-  variable: '--font-arabic',
+  subsets: ['arabic', 'latin'],
+  variable: '--font-sans',
   display: 'swap',
   weight: ['400', '500', '600', '700'],
 });
@@ -111,7 +107,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
       </head>
-      <body className={`${geist.variable} ${ibmPlexArabic.variable} font-sans antialiased`}>
+      <body className={`${ibmPlexArabic.variable} font-sans antialiased`}>
         <a
           href="#admin-main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:start-4 focus:z-[9999] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"

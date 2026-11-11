@@ -323,16 +323,16 @@ describe('marketing honesty', () => {
   it('footer ownership line, studio credit and Western digits everywhere', () => {
     // the studio's line moved off the home page to /about (MKT-1); the footer carries a one-line credit
     expect(renderToStaticMarkup(<AboutPage locale="ar" />)).toContain(
-      'ابدأ ستوديو — بابك لبدء مشروعك.'
+      'ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك.'
     );
     expect(renderToStaticMarkup(<AboutPage locale="en" />)).toContain(
-      'Ebda AI Studio — Your doorway to business.'
+      'Ebda AI Studio — Your doorway to starting your business.'
     );
     // one footer on every page: the studio's brand column and a (c) line, never a per-product ownership sentence
     const year = new Date().getUTCFullYear();
     expect(en).toContain(`© ${year} Ebda AI Studio. All rights reserved.`);
-    expect(ar).toContain(`© ${year} ابدأ ستوديو للذكاء الاصطناعي. جميع الحقوق محفوظة.`);
-    expect(en).toContain('<p class="sf-mission">Your doorway to business.</p>');
+    expect(ar).toContain(`© ${year} ابدأ ستوديو للذكاء الاصطناعي. كل الحقوق محفوظة.`);
+    expect(en).toContain('<p class="sf-mission">Your doorway to starting your business.</p>');
     // no Arabic-Indic digits anywhere on either home page or any legal page
     expect(ar).not.toMatch(/[٠-٩]/);
     expect(en).not.toMatch(/[٠-٩]/);
@@ -525,7 +525,7 @@ describe('marketing honesty', () => {
       expect(html).toContain(
         l === 'en'
           ? 'an Egyptian studio for AI and software'
-          : 'ستوديو مصري للذكاء الاصطناعي والبرمجيات'
+          : 'شركة مصرية للذكاء الاصطناعي والبرمجيات'
       );
       expect(html).toMatch(l === 'en' ? /One account opens both/ : /حساب واحد يفتح الاتنين/);
       expect(html).toContain(l === 'en' ? 'href="/en/store' : 'href="/store');

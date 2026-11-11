@@ -1,0 +1,5 @@
+# MKT-STUDIO-NAME-AR-1
+
+> Section: Launch-eve content consistency pass (2026-11-10, branch `fix/marketing-content-consistency`), from the ebda.app content audit (findings C1-C28)
+
+Ruling MKT-STUDIO-NAME-AR-1 - in Arabic body, legal and page copy the studio is always the FULL «ابدأ ستوديو للذكاء الاصطناعي» (BRAND.company.shortNameAr), never the truncated «ابدأ ستوديو» (audit C3, Ahmad 2026-11-10). The doubled «ابدأ ستوديو ستوديو مصري…» on /about now reads «ابدأ ستوديو للذكاء الاصطناعي شركة مصرية…». Where space is tight the nav and footer link says «عن الستوديو» (the Arabic of "About the studio"), so no truncated name is needed; the wordmark keeps its own short form. `tests/unit/marketing-content-consistency.test.ts` fails on any «ابدأ ستوديو» not followed by «للذكاء الاصطناعي» (or the legal entity «لتكنولوجيا المعلومات», or the product «للتسعير») in the marketing, brand, status, help, llms.txt and email-template sources. Cost if wrong: longer Arabic lines in a few headings and meta titles.

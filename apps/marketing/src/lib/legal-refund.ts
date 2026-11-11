@@ -3,15 +3,15 @@ import type { LegalDoc } from './legal-types';
 /**
  * The refund and cancellation policy (/refund/, BIZ-25 / M-034): it RESTATES what the Terms of Service (sections 4, 13)
  * and the Merchant Agreement (section 11) already say about Ebda Store's own subscriptions, and points at the Ebda Chat
- * terms for the wallet. It adds no new promise. It is published visibly provisional until counsel has read it
- * (the pending-review rule of docs/runbooks/legal-policy-change.md); change it together with the Terms, never alone.
+ * terms for the wallet. It adds no new promise. It stands as our policy from launch (Ahmad 2026-11-10, Ruling LEGAL-FINAL-1:
+ * no "provisional" note); change it together with the Terms, never alone.
  */
-const META = { version: '1.0', publishedAt: '2026-10-26' } as const;
+const META = { version: '1.1', publishedAt: '2026-11-10' } as const;
 
 export const REFUND_EN: LegalDoc = {
   title: 'Refund and cancellation policy',
   meta: META,
-  note: 'This policy restates the refund terms of the Terms of Service and the Merchant Agreement. It has not been reviewed by counsel yet and is provisional; if it differs from those documents, they prevail.',
+  note: 'This policy restates the refund terms of the Terms of Service and the Merchant Agreement. If it differs from those documents, they prevail.',
   sections: [
     {
       h: '1. Cancelling',
@@ -40,7 +40,7 @@ export const REFUND_EN: LegalDoc = {
     {
       h: '5. Ebda Chat wallet',
       p: [
-        'Wallet balances and refunds of Ebda Chat follow section 6.5 of the Ebda Chat Terms of Service (https://ebda.app/legal/whatsapp-terms/). [Provisional, under legal review] That clause is still under legal review and may change.',
+        'Wallet balances and refunds of Ebda Chat follow section 6.5 of the Ebda Chat Terms of Service (https://ebda.app/en/legal/whatsapp-terms/).',
       ],
     },
     {
@@ -61,7 +61,7 @@ export const REFUND_EN: LegalDoc = {
 export const REFUND_AR: LegalDoc = {
   title: 'سياسة الاسترداد والإلغاء',
   meta: META,
-  note: 'تعيد هذه السياسة صياغة أحكام الاسترداد الواردة في شروط الخدمة واتفاقية التاجر. لم يراجعها محامٍ بعد وهي مبدئية؛ وإذا اختلفت عن تلك الوثائق فالعبرة بها.',
+  note: 'تعيد هذه السياسة صياغة أحكام الاسترداد الواردة في شروط الخدمة واتفاقية التاجر. وإذا اختلفت عن تلك الوثائق فالعبرة بها.',
   sections: [
     {
       h: '1. الإلغاء',
@@ -90,7 +90,7 @@ export const REFUND_AR: LegalDoc = {
     {
       h: '5. محفظة ابدأ شات',
       p: [
-        'أرصدة محفظة ابدأ شات واستردادها وفق البند 6.5 من شروط خدمة ابدأ شات (https://ebda.app/legal/whatsapp-terms/). [مبدئي، قيد المراجعة القانونية] وهذا البند ما زال قيد المراجعة القانونية وقد يتغير.',
+        'أرصدة محفظة ابدأ شات واستردادها وفق البند 6.5 من شروط خدمة ابدأ شات (https://ebda.app/legal/whatsapp-terms/).',
       ],
     },
     {

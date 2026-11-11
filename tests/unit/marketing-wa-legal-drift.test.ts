@@ -19,12 +19,12 @@ const DOCS = [
   ['dpa', 'waDpa'],
 ] as const;
 const PINNED_SHA256: Record<string, string> = {
-  'ar/whatsapp-terms': 'adf8c6cefb1566f5bbe276f550a9fb3344674b2cb787cdc1de34ae9ad9fac052',
-  'ar/whatsapp-privacy': '641b1e66c8b1fc6d325a701bd0bcab574a47b9358c938749fe6c88388e3fd9c1',
-  'ar/whatsapp-dpa': '03b3d6fd5e963f7e2cce9113ca82e64fe6c33f2e76cec21204cc85745693cefa',
-  'en/whatsapp-terms': '64cc8c9fd48f1d626ca2ad9536c3842a3590777f1f3f2bbab54284f4fcacff0d',
-  'en/whatsapp-privacy': '555ed1b10626550dfaee37d394028de755143ad2daba551fb731497d57c91c7e',
-  'en/whatsapp-dpa': '689ae9647baa0bc03d6d22097bb6c61485bbc76aea14f1384acfd70d877f4269',
+  'ar/whatsapp-terms': 'c498024f8cc67030094f6a9c1a1e9b24f8e0aa9944125c5ecdc3ec8c07557f8c',
+  'ar/whatsapp-privacy': '31ab82572623b3c2babf14894b46af9df9dc1d5aedc337c90ad1c4519b6f1e61',
+  'ar/whatsapp-dpa': 'f094e4603a11de5c9d72ea0f0dca59f8d7921e4e30af6b642c6efe3563d65231',
+  'en/whatsapp-terms': '83163a51b281fc7d9f697bf49ffa9f169bb1a416a4e4bf5ca8945968cbc6ebcd',
+  'en/whatsapp-privacy': 'db96a6070a6d183cc2b59a031b5ba99c52f6d0c9b5738f9723d0107d9478622e',
+  'en/whatsapp-dpa': '80c68806be3e678bfb2234b6302b72ce9e0e803e561f005aad0dfee99fee9324',
 };
 const PREVAILS = /^(Arabic version prevails\.|النسخة العربية هي الحاكمة\.)$/;
 const tokens = (t: string) => t.match(/[\p{L}\p{N}]+/gu) ?? [];

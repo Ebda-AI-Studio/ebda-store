@@ -1180,7 +1180,7 @@
       "intro": "Let shoppers rotate the product, see it in each colour or metal, and place it in their room (AR). One self-contained .glb file, up to {mb} MB.",
       "disabled": "3D models are switched off for this store. Contact support to turn them on. You can still remove an existing model.",
       "chooseGlb": "Upload .glb model",
-      "formatHint": "Binary glTF (.glb) with textures embedded. Draco/KTX2 compression is not supported yet: use meshopt + WebP.",
+      "formatHint": "A .glb file with its textures inside. Special compression (Draco or KTX2) is not supported yet: export without it, or with meshopt, and use WebP images.",
       "replace": "Replace model",
       "remove": "Remove 3D model",
       "removeConfirm": "Remove this product's 3D model? Shoppers will see photos only.",
@@ -6278,6 +6278,18 @@
       "defaultRetry": "Try Again",
       "loadFailed": "Could not load this data. Please try again."
     },
+    "planLocked": {
+      "lockedBadge": "Locked",
+      "lockedAria": "Locked on your current plan",
+      "title": "This feature is locked on your plan",
+      "titleAnalyticsTier": "Advanced analytics",
+      "unlocksAnalyticsTierAdvanced": "Cohort retention, conversion funnels and customer segments, with deeper reports on your customers and sales.",
+      "unlocksAnalyticsTierStandard": "More detailed analytics reports on your sales and visitors.",
+      "unlocksGeneric": "This feature is not included in your current plan.",
+      "availableOn": "Available on the {plan} plan and above.",
+      "upgradeCta": "Upgrade to {plan}",
+      "seePlansCta": "See plans"
+    },
     "languageSwitcher": {
       "ariaLabel": "Language",
       "nativeEn": "English",
@@ -7318,7 +7330,11 @@
         "failed": "Could not draft PO"
       },
       "pagePrev": "Previous page",
-      "pageNext": "Next page"
+      "pageNext": "Next page",
+      "rules": {
+        "manage": "Reorder rules",
+        "emptyCta": "Set reorder rules"
+      }
     },
     "deadstock": {
       "title": "Dead Stock",
@@ -7426,6 +7442,41 @@
       "breadcrumb": "Warehouses",
       "pagePrev": "Previous page",
       "pageNext": "Next page"
+    },
+    "reorderRules": {
+      "title": "Reorder rules",
+      "description": "Tell the scan when each item needs restocking: the level that triggers a reorder and how much to order.",
+      "newButton": "New rule",
+      "empty": "No reorder rules yet. Add one so low-stock items show up as reorder suggestions.",
+      "col": {
+        "item": "Item",
+        "minQty": "Reorder at",
+        "reorderQty": "Order qty",
+        "supplier": "Supplier",
+        "active": "Active"
+      },
+      "rowMenu": "Options for rule {name}",
+      "deleteObject": "Reorder rule for \"{name}\"",
+      "deleteConsequence": "The item stops being checked against this rule. Stock and purchase orders are not changed.",
+      "deleteAction": "Delete rule",
+      "deleteFailed": "Could not delete the rule. Try again.",
+      "form": {
+        "createTitle": "New reorder rule",
+        "editTitle": "Edit reorder rule",
+        "product": "Product",
+        "variant": "Variant",
+        "wholeProduct": "Whole product",
+        "minQty": "Reorder when stock is at or below",
+        "reorderQty": "Quantity to order",
+        "leadTimeDays": "Lead time (days)",
+        "safetyStockDays": "Safety stock (days)",
+        "supplier": "Preferred supplier",
+        "noSupplier": "No preferred supplier",
+        "active": "Rule is active",
+        "invalid": "Pick a product and enter whole numbers (quantity to order at least 1).",
+        "duplicate": "This item already has a reorder rule. Edit the existing one.",
+        "saveFailed": "Could not save the rule. Try again."
+      }
     }
   },
   "insights": {
@@ -10082,7 +10133,7 @@
     },
     "conflict": {
       "message": "This page was changed in another tab or by another editor. Choose which version to keep.",
-      "takeTheirs": "Load their version",
+      "takeTheirs": "Discard my changes, load the latest",
       "keepMine": "Keep mine"
     },
     "live": {

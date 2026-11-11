@@ -3,7 +3,7 @@ import { LEGAL_POLICIES, currentLegalVersion, formatLegalDate } from '@ebda/shar
 import { COPY } from '../lib/content';
 import { HOME, pagePath, type LegalExtraSlug, type LegalSlug, type Locale } from '../lib/site';
 import type { LegalPages } from '../lib/legal-types';
-import { pageJsonLd } from '../lib/seo';
+import { pageJsonLd, snippet } from '../lib/seo';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { JsonLd } from './JsonLd';
@@ -43,7 +43,7 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug | 
   return (
     <>
       <JsonLd
-        data={pageJsonLd(locale, page, doc.title, doc.sections[0].p[0].slice(0, 160), {
+        data={pageJsonLd(locale, page, doc.title, snippet(doc.sections[0].p[0]), {
           dateModified: current.publishedAt,
           legalEntity: true,
         })}

@@ -83,8 +83,11 @@ export function AboutPage({ locale }: { locale: Locale }) {
             {c.about.paras.map(t => (
               <p key={t}>{t}</p>
             ))}
-            <p className="ab-close" lang="ar">
-              {c.about.close}
+            <p className="ab-close">
+              <span lang="ar">{c.about.close}</span>
+              {c.about.closeGloss ? (
+                <span className="ab-close-gloss"> {c.about.closeGloss}</span>
+              ) : null}
             </p>
           </div>
         </section>

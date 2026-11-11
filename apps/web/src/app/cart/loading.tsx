@@ -4,14 +4,14 @@ import { ShopChrome } from '../../components';
 export default function CartLoading() {
   return (
     <ShopChrome>
-      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto min-h-[70svh] w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
         <div className="h-9 w-48 animate-pulse rounded bg-muted" />
 
         <div className="mt-8 lg:grid lg:grid-cols-12 lg:gap-8">
           {/* Cart Items Skeleton */}
           <div className="lg:col-span-8">
             <div className="space-y-4">
-              {[1, 2, 3].map(i => (
+              {[1].map(i => (
                 <div key={i} className="flex gap-4 rounded-xl border bg-card p-4 shadow-sm">
                   <Skeleton className="h-24 w-24 rounded-lg" />
                   <div className="flex flex-1 flex-col gap-2">

@@ -567,7 +567,7 @@ export default function CartClient() {
 
             {cartItems.length === 0 && cartBundles.length === 0 ? (
               T?.EmptyState ? (
-                <div className="mt-6 sm:mt-16">
+                <div className="mt-6 min-h-[50svh] sm:mt-16">
                   <T.EmptyState
                     title="Your cart is empty"
                     titleAr="سلتك فاضية"

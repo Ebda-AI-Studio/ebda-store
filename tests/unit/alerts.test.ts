@@ -170,6 +170,30 @@ describe('sendAlert — configured', () => {
     }
   });
 
+  it('awaits the brain mirror before resolving (Workers cancel a fetch still pending at handler end)', async () => {
+    const cfg = mockState.configValue as Record<string, unknown>;
+    cfg.osBrainUrl = 'https://brain.test';
+    cfg.osIngestToken = 'ingest-k';
+    try {
+      let brainDone = false;
+      mockState.acquireLockMock.mockResolvedValueOnce(true);
+      mockState.fetchMock.mockImplementation(async (url: string) => {
+        if (String(url).startsWith('https://brain.test')) {
+          await new Promise(r => setTimeout(r, 30));
+          brainDone = true;
+          return new Response('{}', { status: 200 });
+        }
+        return new Response('{"ok":true}', { status: 200 });
+      });
+      const { sendAlert } = await loadService();
+      expect(await sendAlert({ level: 'p1', title: 'mirror awaited', body: 'x' })).toBe('sent');
+      expect(brainDone).toBe(true); // must fire: the mirror finished before sendAlert resolved
+    } finally {
+      cfg.osIngestToken = '';
+      mockState.fetchMock.mockReset();
+    }
+  });
+
   it('returns throttled when the lock is held', async () => {
     mockState.acquireLockMock.mockResolvedValueOnce(false);
 

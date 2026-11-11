@@ -49,6 +49,19 @@ const LOCK_KEY = 'abandoned-cart:processing';
 const LOCK_TTL_SECONDS = 60;
 const ABANDONMENT_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 const PRIME_CHUNK = 20; // stores per batched customer-auth marker read
+// SWEEP-BOUND-1: one tick never loads a whole platform. Per-store caps, newest abandonment first (an old cart is not worth a
+// reminder, and a DO store filters reachability in JS after the fetch, so oldest-first could starve behind unreachable rows);
+// reminders oldest-due first, and every processed row moves state (record created / nextStepAt advanced), so the next tick resumes.
+export const CANDIDATE_CAP_PER_STORE = 200;
+export const REMINDER_CAP_PER_STORE = 200;
+export const REMINDER_CAP_PER_TICK = 500;
+
+/** Oldest-due first, cut to the per-tick cap; the rest are picked up on the next tick. */
+export function capDueReminders<T extends { nextStepAt: Date | null }>(rows: T[]): T[] {
+  return [...rows]
+    .sort((a, b) => (a.nextStepAt?.getTime() ?? 0) - (b.nextStepAt?.getTime() ?? 0))
+    .slice(0, REMINDER_CAP_PER_TICK);
+}
 
 interface AbandonedCartConfigDefaults {
   step1Enabled: boolean;
@@ -393,7 +406,7 @@ class AbandonedCartService {
   async processReminders(correlationId?: string): Promise<void> {
     const now = new Date();
 
-    const pending = await acrossStoresFlat(async storeId => {
+    const due = await acrossStoresFlat(async storeId => {
       const where = {
         storeId,
         status: { in: ['pending', 'step1_sent', 'step2_sent'] },
@@ -407,9 +420,15 @@ class AbandonedCartService {
             store: { select: { id: true, name: true, domain: true, slug: true } },
             customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
           },
+          orderBy: { nextStepAt: 'asc' },
+          take: REMINDER_CAP_PER_STORE,
         });
       // a DO store: the rows come from its Durable Object, `store` and `customer` (platform tables) are attached
-      const rows = await repo.db.abandonedCart.findMany({ where });
+      const rows = await repo.db.abandonedCart.findMany({
+        where,
+        orderBy: { nextStepAt: 'asc' },
+        take: REMINDER_CAP_PER_STORE,
+      });
       if (rows.length === 0) return [];
       const store = await withStore(storeId, tx =>
         tx.store.findUnique({
@@ -419,6 +438,8 @@ class AbandonedCartService {
       );
       return (await withCustomers(storeId, rows)).map(r => ({ ...r, store: store! }));
     });
+
+    const pending = capDueReminders(due);
 
     logger.info(
       { correlationId, count: pending.length },
@@ -1017,6 +1038,8 @@ async function loadAbandonmentCandidates(storeId: string, cutoff: Date) {
         },
         ...CANDIDATE_INCLUDE,
       },
+      orderBy: { lastActivityAt: 'desc' },
+      take: CANDIDATE_CAP_PER_STORE,
     });
   }
   const found = await repo.db.cart.findMany({
@@ -1035,6 +1058,8 @@ async function loadAbandonmentCandidates(storeId: string, cutoff: Date) {
       ],
     },
     include: CANDIDATE_INCLUDE,
+    orderBy: { lastActivityAt: 'desc' },
+    take: CANDIDATE_CAP_PER_STORE,
   });
   const withUser = await withCustomers(storeId, found);
   return withUser.filter(

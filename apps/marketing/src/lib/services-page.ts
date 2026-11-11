@@ -1,22 +1,22 @@
 import { SERVICE_LINE_CONTENT, type LineId } from './service-lines-content';
 import type { Locale } from './site';
 
-/** Interface copy of the Services index and the line pages (the lines' own copy is in service-lines-content.ts). DRAFT until Ahmad approves the wording (SERVICES-IA-1). */
+/** Interface copy of the Services index and the line pages (the lines' own copy is in service-lines-content.ts). Wording approved by Ahmad 2026-11-10 (SERVICES-IA-1, SERVICES-COPY-APPROVED-1). */
 export const SERVICES_PAGE = {
   ar: {
     nav: 'الخدمات',
     meta: {
       title: 'الخدمات',
-      desc: 'ذكاء اصطناعي وبرمجيات واستشارات من ابدأ ستوديو، وخدمات فريقنا بينفذها على الأرض: تسويق وتصميم وتنفيذ البيوت وتنظيم فعاليات.',
+      desc: 'ذكاء اصطناعي وبرمجيات واستشارات من ابدأ ستوديو للذكاء الاصطناعي، وخدمات فريقنا بينفذها على الأرض: تسويق وتصميم وتنفيذ البيوت وتنظيم فعاليات.',
     },
     eyebrow: 'الخدمات',
     h1: 'قولنا محتاج إيه، وفريقنا بينفذه',
-    lead: 'ابدأ ستوديو فريق بيشتغل معاك. بنقدم خدمات الذكاء الاصطناعي والبرمجيات والاستشارات، وكمان خدمات بننفذها بنفسنا على الأرض: فعاليات وتسويق وتصميم وتنفيذ البيوت. البرامج اللي بنبنيها منتجات منفصلة، وليها مكانها.',
+    lead: 'ابدأ ستوديو للذكاء الاصطناعي فريق بيشتغل معاك. بنقدم خدمات الذكاء الاصطناعي والبرمجيات والاستشارات، وكمان خدمات بننفذها بنفسنا على الأرض: فعاليات وتسويق وتصميم وتنفيذ البيوت. البرامج اللي بنبنيها منتجات منفصلة، وليها مكانها.',
     coreH: 'الذكاء الاصطناعي والبرمجيات',
     coreLead: 'خدمات الأساس عندنا: فريقنا يبني ويشغّل ويدرّب.',
     linesH: 'خدمات على الأرض',
     linesLead:
-      'فريق بيجيلك، ويخطط وينفذ ويتابع معاك من أول مكالمة. كل خدمة لها صفحة، وتقدر تتواصل معانا منها مباشرة.',
+      'فريق بيجيلك، ويخطط وينفذ ويتابع معاك من أول مكالمة. كل خدمة لها صفحة، وتقدر تتواصل معنا منها مباشرة.',
     cardCta: 'شوف الخدمة',
     contactCta: 'احكيلنا عن شغلك',
     /** The header's own CTA on a service page: short, so it fits the bar and the Menu's pinned pair (Ruling NAV-CTA-2). */
@@ -52,12 +52,12 @@ export const LINE_UI = {
     whyH: 'ليه إحنا',
     faqH: 'أسئلة شائعة',
     faqLead: 'إجابات قصيرة على الأسئلة اللي بتتسأل كتير. لو سؤالك مش هنا، ابعتهولنا.',
-    contactH: 'تواصل معانا',
+    contactH: 'تواصل معنا',
     nextH: 'بعد ما تبعت',
     illustrative: 'صورة توضيحية',
     contactCta: 'ابعتلنا رسالة',
     emailLead: 'أو راسلنا على',
-    eyebrow: 'خدمة من ابدأ ستوديو',
+    eyebrow: 'خدمة من ابدأ ستوديو للذكاء الاصطناعي',
   },
   en: {
     back: 'All services',

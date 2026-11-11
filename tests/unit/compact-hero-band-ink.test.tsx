@@ -20,3 +20,19 @@ describe('CompactHeroBand ink', () => {
     expect(html).not.toMatch(/style=/);
   });
 });
+
+describe('echoesBrand (UI audit 2026-11-11)', () => {
+  const html = (extra: object) =>
+    renderToStaticMarkup(
+      <CompactHeroBand title="Amelia Aurum" ctaText="Shop" ctaLink="/products" {...extra} />
+    );
+  it('keeps the h1 for screen readers but hides it and shrinks the band when the title is the store name', () => {
+    const out = html({ echoesBrand: true });
+    expect(out).toMatch(/<h1[^>]*sr-only/);
+    expect(out).toContain('data-hero-quiet');
+  });
+  it('a subtitle keeps the title visible', () => {
+    const out = html({ echoesBrand: true, subtitle: 'Gold, handmade' });
+    expect(out).not.toMatch(/<h1[^>]*sr-only/);
+  });
+});

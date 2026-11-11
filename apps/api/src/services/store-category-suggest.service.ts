@@ -9,6 +9,7 @@
  * Every id the model returns is checked against the products we actually showed it.
  */
 import { randomUUID } from 'node:crypto';
+import { slugifyWithFallback } from '@ebda/shared';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
 import { AIService } from './ai.service';
@@ -113,11 +114,7 @@ export const applyStoreCategoriesSchema = z
   .strict();
 
 function baseSlug(name: string): string {
-  const s = name
-    .toLowerCase()
-    .replace(/[^a-z0-9؀-ۿ]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-  return s || `category-${Date.now()}`;
+  return slugifyWithFallback(name, 'category', { max: 120 });
 }
 
 export async function applyStoreCategories(args: {

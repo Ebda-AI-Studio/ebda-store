@@ -4,11 +4,13 @@ import { useT } from '@/i18n/useT';
 import type { Store } from './types';
 
 interface StoreOwnerCardProps {
-  owner: Store['owner'];
+  /** Absent when the API sent a store without its owner: the card is then omitted, never a crash. */
+  owner?: Store['owner'] | null;
 }
 
 export function StoreOwnerCard({ owner }: StoreOwnerCardProps) {
   const t = useT('stores.dashboard.owner');
+  if (!owner) return null;
   return (
     <div className="rounded-xl border bg-card shadow-sm">
       <div className="border-b p-4">
@@ -18,8 +20,8 @@ export function StoreOwnerCard({ owner }: StoreOwnerCardProps) {
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
             <span className="text-lg font-bold">
-              {owner.firstName[0]}
-              {owner.lastName[0]}
+              {owner.firstName?.[0]}
+              {owner.lastName?.[0]}
             </span>
           </div>
           <div>
