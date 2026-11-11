@@ -32,7 +32,7 @@ import {
 import { registerPlanGate } from './plan-gate-registry';
 import { AccountsError, accountsLogout, accountsToken, establishApiSession } from './accounts';
 import { armProactiveRefresh, disarmProactiveRefresh, grantExpiryMs } from './proactive-refresh';
-import { handleSessionEnded } from './session-ended';
+import { handleSessionEnded, handleStepUpRequired } from './session-ended';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -714,6 +714,9 @@ export async function apiRequest<T = unknown>(
       // only calls non-gated routes (/auth/me, /auth/mfa/*) so this can't loop.
       // The session was revoked server-side (password change, signed out elsewhere): end it visibly, once.
       if (typeof window !== 'undefined' && errCode === 'TOKEN_REVOKED') handleSessionEnded();
+      // TEN-4: the change needs a recent sign-in: one visible re-login, then back to this page.
+      if (typeof window !== 'undefined' && errCode === 'STEP_UP_REQUIRED')
+        void handleStepUpRequired(() => accountsLogout());
       if (
         typeof window !== 'undefined' &&
         errCode === 'MFA_SETUP_REQUIRED' &&

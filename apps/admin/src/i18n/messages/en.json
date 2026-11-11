@@ -5893,6 +5893,7 @@
   },
   "auth": {
     "login": {
+      "stepUpRequired": "To confirm this change, sign in again. We will bring you back to the page afterwards.",
       "sessionEnded": "Your session ended because the password was changed or you signed out on another device. Please sign in again.",
       "title": "Sign in",
       "subtitle": "Sign in and get back to your store.",

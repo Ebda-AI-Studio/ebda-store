@@ -39,7 +39,7 @@ import {
   revokeClient,
   rotateClient,
 } from './clients';
-import { jwks } from './keys';
+import { jwks, retiredKeysWithoutExp } from './keys';
 import { DUMMY_HASH, hashPassword, passwordPolicy, verifyPassword } from './password';
 import {
   CODE_GUESS,
@@ -858,14 +858,20 @@ export function createApp() {
   );
 
   // ---- discovery ----
-  app.get('/health', c =>
-    c.json({
+  app.get('/health', c => {
+    const noExp = retiredKeysWithoutExp(c.env);
+    if (noExp.length)
+      console.error(
+        JSON.stringify({ msg: 'JWT_PREVIOUS_PUBLIC_JWKS entry without exp', kids: noExp })
+      );
+    return c.json({
       status: 'ok',
+      ...(noExp.length ? { warning: 'retired_jwk_without_exp', retiredKeysWithoutExp: noExp } : {}),
       service: 'accounts',
       commit: c.env.BUILD_COMMIT_SHA || null,
       deploymentId: c.env.CF_VERSION_METADATA?.id ?? null,
-    })
-  );
+    });
+  });
   app.get('/.well-known/jwks.json', async c => {
     c.header('Cache-Control', 'public, max-age=300');
     return c.json(await jwks(c.env));

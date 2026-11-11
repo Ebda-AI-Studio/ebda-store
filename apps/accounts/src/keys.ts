@@ -32,6 +32,18 @@ export async function signingKey(raw: string | undefined): Promise<SigningKey> {
   return key;
 }
 
+/** Kids of retired keys that carry no numeric `exp` (ID-08): they are NOT published. Surfaced on /health so a deploy gets a warning. */
+export function retiredKeysWithoutExp(env: { JWT_PREVIOUS_PUBLIC_JWKS?: string }): string[] {
+  if (!env.JWT_PREVIOUS_PUBLIC_JWKS) return [];
+  try {
+    return (JSON.parse(env.JWT_PREVIOUS_PUBLIC_JWKS) as Array<{ kid?: string; exp?: unknown }>)
+      .filter(k => typeof k.exp !== 'number')
+      .map(k => k.kid ?? '(no kid)');
+  } catch {
+    return ['(unparseable JWT_PREVIOUS_PUBLIC_JWKS)'];
+  }
+}
+
 /** The published key set: current + retired public keys. Rejects anything carrying a private member. */
 export async function jwks(env: {
   JWT_PRIVATE_JWK: string;

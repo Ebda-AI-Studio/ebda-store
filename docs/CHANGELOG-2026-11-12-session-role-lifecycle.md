@@ -22,3 +22,7 @@
 - **ID-07** staff invite never answers 409 ROLE_CONFLICT: a super_admin / customer / unusable address gets the same 202
   `invitation_sent` as a real invite, with nothing mailed (audit row `staff.invite_refused`).
 - **ID-08** `JWT_PREVIOUS_PUBLIC_JWKS` entries need their own `exp` (unix s); expired or exp-less retired keys are not published. See ENVIRONMENT.md.
+- **TEN-4 admin UI**: `apiRequest` handles `STEP_UP_REQUIRED` once: signs out at the identity service and goes to `/login?returnTo=<page>&stepup=1`;
+  the login page shows an Egyptian-Arabic / English note (`auth.login.stepUpRequired`). Error text in `ERROR_AR` / `ERROR_EN`.
+- **ID-08 warning**: accounts `/health` adds `warning: retired_jwk_without_exp` + the kids (and logs loudly) while a retired key has no `exp`.
+  Check the production `JWT_PREVIOUS_PUBLIC_JWKS` secret before deploying.
