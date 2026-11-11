@@ -1,4 +1,5 @@
 import tseslint from 'typescript-eslint';
+import { slopRules } from '../../eslint.slop.mjs';
 
 export default [
   {
@@ -29,4 +30,5 @@ export default [
       ],
     },
   },
+  ...slopRules,
 ];
