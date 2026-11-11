@@ -142,6 +142,7 @@ describe('backup sweep (G8)', () => {
       listStoreIds: () => ['sweep-a'],
       alert: async (t, b) => void alerts.push(`${t}|${b}`),
       now: new Date('2026-11-02T03:00:00Z'),
+      maxRetries: 0, // the in-sweep retry (P2-5) has its own tests; here the alarm-stopped signal must still page
     });
     expect(rep.stores.armed).toBe(1);
     expect(rep.stores.missingYesterday).toEqual(['sweep-a']);
@@ -178,6 +179,7 @@ describe('backup sweep (G8)', () => {
       listStoreIds: () => ['sweep-old'],
       alert: async () => {},
       now: new Date('2026-11-03T03:00:00Z'),
+      maxRetries: 0,
     });
     expect(rep.stores.missingYesterday).toEqual(['sweep-old']);
   });
