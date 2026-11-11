@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'apps/accounts/**'
+      # The sign-in page validates `return` with the Store's allowlist (Ruling ACCOUNTS-PAGE-1): a change to it ships here too.
+      - 'apps/admin/src/lib/sign-in-return.ts'
       - 'package-lock.json'
       - '.github/workflows/cf-accounts-deploy.yml'
 permissions:

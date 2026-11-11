@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { runInTenantContext, runInStoreScope, withStore } from '@ebda/database';
+import { runInStoreTenantContext } from '../lib/store-scoped-read';
 import { insertAuditLog } from '../lib/definer';
 import { storeDb, storeRepo, type StoreWrites } from '../lib/repo-factory';
 import type { McpStore } from './resolve-store';
@@ -756,7 +757,7 @@ export async function auditAgentWrite(params: {
     if (outcome === 'failed' && context.grant === 'credential') {
       // A key-bearing caller's failed write — bounded by who holds a key, so
       // one row per attempt. See DENIAL_COALESCE_WINDOW_SECONDS (issue 2151).
-      await runInTenantContext(store.id, async () => {
+      await runInStoreTenantContext(store.id, async () => {
         await auditLog({
           action,
           resourceType: 'mcp_tool',

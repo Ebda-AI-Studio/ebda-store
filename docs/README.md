@@ -324,7 +324,9 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-11-10-ssr-client-address.md](plans/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
 - [plans/2026-11-11-nz-money-auth.md](plans/2026-11-11-nz-money-auth.md) - NZ money + auth: InstaPay refund record, refund match-claim, agent COD, WhatsApp COD outcome, grants, tax report, customer MFA, merchant e-mail flows on a Durable Object store
 - [plans/2026-11-10-services-header-actions.md](plans/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
+- [plans/2026-11-10-resolve-bulletproof.md](plans/2026-11-10-resolve-bulletproof.md) - Store resolution bulletproofing: epoch-checked caches, stale-if-error, 503 + Retry-After (Ruling RESOLVE-BULLETPROOF-1)
 - [plans/2026-11-10-storefront-cold-render.md](plans/2026-11-10-storefront-cold-render.md) - PERF-LATENCY: why a cold storefront render took 4-12 s (empty per-build data cache after every deploy), the build-independent fetch cache and the widened warm step (Ruling WEB-COLD-2)
+- [plans/2026-11-10-accounts-standalone-signin.md](plans/2026-11-10-accounts-standalone-signin.md) - ACCOUNTS-PAGE-1: accounts.ebda.app/login as a standalone Ebda AI Studio sign-in page over the same /login and /login/mfa, allowlisted return
 
 ## privacy - Privacy
 

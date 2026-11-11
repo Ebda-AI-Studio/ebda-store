@@ -436,13 +436,16 @@ jobs:
   worker-dry-run:
     name: Worker dry-run (${{ matrix.app }})
     needs: [changes]
-    if: needs.changes.outputs.has_workers == 'true'
+    # PR: only the Workers the PR touched. Full lane (main push, nightly, dispatch; `changes` is skipped there, hence
+    # always()): marketing, so its page-weight budget is proven on main too. It broke unseen on main on 2026-11-10
+    # because no main run measured it (Ruling MKT-LEGAL-HTML-BUDGET-2); the other Workers build in their deploy workflows.
+    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true')
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        app: ${{ fromJSON(needs.changes.outputs.workers) }}
+        app: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.workers || '["marketing"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -673,7 +676,7 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           if [ "$EVENT" = "pull_request" ]; then
-            npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/store-settings-do.test.ts workers-test/merchant-signup.test.ts workers-test/merchant-journey.test.ts workers-test/money-path.test.ts workers-test/merchant-orders-do.test.ts workers-test/account-books-do.test.ts workers-test/demo-home.test.ts workers-test/latency-budget.test.ts workers-test/failure-only-limiters.test.ts workers-test/pg-unreachable.test.ts workers-test/answer-engine-do.test.ts
+            npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/store-settings-do.test.ts workers-test/merchant-signup.test.ts workers-test/merchant-journey.test.ts workers-test/money-path.test.ts workers-test/merchant-orders-do.test.ts workers-test/account-books-do.test.ts workers-test/merchant-mcp-do.test.ts workers-test/demo-home.test.ts workers-test/latency-budget.test.ts workers-test/failure-only-limiters.test.ts workers-test/pg-unreachable.test.ts workers-test/answer-engine-do.test.ts
           else
             # full lane: every workers-test file, route-sweep.test.ts included
             npm run cf:test -w apps/api
@@ -1439,6 +1442,7 @@ jobs:
         builder-e2e,
         api-workerd-smoke,
         workerd-integration,
+        worker-dry-run,
         mutation,
       ]
     # Ruling CI-FULL-MAIN-1: a red full lane is LOUD. Runs after every non-PR run that was not cancelled (a superseded
@@ -1473,6 +1477,7 @@ jobs:
           BUILDER_E2E_RES: ${{ needs.builder-e2e.result }}
           WORKERD_RES: ${{ needs.api-workerd-smoke.result }}
           WORKERD_DO_RES: ${{ needs.workerd-integration.result }}
+          DRYRUN_RES: ${{ needs.worker-dry-run.result }}
           MUTATION_RES: ${{ needs.mutation.result }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
@@ -1483,7 +1488,7 @@ jobs:
           # Collect which jobs failed (vs which skipped vs passed) so Ahmad
           # can see what to look at without clicking through.
           FAILED_JOBS=""
-          for entry in "guards:$GUARDS_RES" "build:$BUILD_RES" "security:$SECURITY_RES" "unit:$UNIT_RES" "orphan-tests:$ORPHAN_RES" "integration:$INT_RES" "e2e:$E2E_RES" "builder-e2e:$BUILDER_E2E_RES" "workerd:$WORKERD_RES" "workerd-do:$WORKERD_DO_RES" "mutation:$MUTATION_RES"; do
+          for entry in "guards:$GUARDS_RES" "build:$BUILD_RES" "security:$SECURITY_RES" "unit:$UNIT_RES" "orphan-tests:$ORPHAN_RES" "integration:$INT_RES" "e2e:$E2E_RES" "builder-e2e:$BUILDER_E2E_RES" "workerd:$WORKERD_RES" "workerd-do:$WORKERD_DO_RES" "worker-dry-run:$DRYRUN_RES" "mutation:$MUTATION_RES"; do
             name="${entry%:*}"
             res="${entry#*:}"
             if [ "$res" = "failure" ]; then

@@ -36,6 +36,9 @@
  * the root manifest/lockfile and the cf-* scripts (which hit every Worker app).
  * Ordinary source changes are covered by lint/typecheck/unit; the deploy path
  * dry-runs the Worker itself.
+ * Exception: apps/marketing (a static export, no OpenNext build) dry-runs on any
+ * change to its src/public/scripts or the page-weight budget, so its budget gate
+ * runs on the PR that moves it.
  */
 import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -103,10 +106,15 @@ export const BASE_UNIT_PATHS = ['tests/unit'];
  */
 const WORKER_ENTRY = {
   'apps/web':
-    /^apps\/web\/((sentry-worker-entry|demo-edge-cache|store-edge-cache|edge-build-id|edge-html-lang|csp-nonce-renew|locale-redirect-edge|company-host-route|ssr-client-address)\.ts|src\/lib\/(demo-hosts|locale-paths)\.ts)$/,
+    /^apps\/web\/((sentry-worker-entry|demo-edge-cache|store-edge-cache|edge-build-id|edge-html-lang|csp-nonce-renew|locale-redirect-edge|company-host-route|ssr-client-address|resolve-unavailable-edge)\.ts|src\/lib\/(demo-hosts|locale-paths)\.ts)$/,
   'apps/status': /^apps\/status\/src\//,
   'apps/accounts': /^apps\/accounts\/src\//,
   'apps/api': /^apps\/api\//,
+  // marketing is a static export (a plain `next build`, no OpenNext): cheap enough to dry-run on any change that can
+  // move its page weight, so the page-weight budget fails the PR that grows it, not a later unrelated one (#511/#525
+  // pushed css over 16 KB unmeasured; Ruling MKT-LEGAL-HTML-BUDGET-2).
+  'apps/marketing':
+    /^(apps\/marketing\/(src|public|scripts)\/|scripts\/ci\/marketing-perf-budget\.(mjs|json)$)/,
 };
 const WORKER_CONFIG = dir =>
   new RegExp(
@@ -302,7 +310,9 @@ export function classify(files, workspaces) {
     // status runs on workerd, outside the root vitest config (npm run test:status)
     statusTests: all || direct.has('apps/status'),
     accountsTests: all || direct.has('apps/accounts'),
-    workers: ws.filter(w => workerTouched.has(w.dir) && w.hasWrangler).map(w => w.dir.slice(5)),
+    workers: workspaces
+      .filter(w => workerTouched.has(w.dir) && w.hasWrangler)
+      .map(w => w.dir.slice(5)),
     buildApps: ws.filter(w => BUILD_APPS.includes(w.dir)).map(w => w.dir.slice(5)),
     changedFiles: codeFiles,
   };

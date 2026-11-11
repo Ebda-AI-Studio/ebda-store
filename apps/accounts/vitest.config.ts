@@ -44,8 +44,9 @@ export default defineConfig(async () => {
               'base64'
             ),
             ORIGIN_PRODUCTS:
-              'https://store.ebda.app=store,https://orders.ebda.app=store,https://wa.ebda.app=whatsapp',
-            ALLOWED_ORIGINS: 'https://store.ebda.app,https://orders.ebda.app,https://wa.ebda.app',
+              'https://store.ebda.app=store,https://orders.ebda.app=store,https://wa.ebda.app=whatsapp,https://accounts.ebda.app=store',
+            ALLOWED_ORIGINS:
+              'https://store.ebda.app,https://orders.ebda.app,https://wa.ebda.app,https://accounts.ebda.app',
           },
         },
       }),

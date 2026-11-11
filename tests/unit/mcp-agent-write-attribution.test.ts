@@ -63,7 +63,12 @@ vi.mock('@api/services/order.service', () => ({
   OrderService: { create: vi.fn(), rollbackForPaymentFailure: vi.fn() },
 }));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
-  PaymentService: { getDefaultProvider: vi.fn(), createPayment: vi.fn() },
+  PaymentService: {
+    getDefaultProvider: vi.fn(),
+    createPayment: vi.fn(),
+    // the storefront COD service the agent path shares (Ruling NZ-MONEY-AGENT-1)
+    recordCodPayment: vi.fn().mockResolvedValue({ id: 'pay-1', replayed: false }),
+  },
 }));
 vi.mock('@api/services/payment-event.service', () => ({
   recordPaymentEvent: vi.fn().mockResolvedValue(undefined),
@@ -82,6 +87,7 @@ import { registerOrderTools } from '@api/mcp/tools/order.tools';
 import { registerCartTools } from '@api/mcp/tools/cart.tools';
 import { OrderService } from '@api/services/order.service';
 import { CartService } from '@api/services/cart.service';
+import { PaymentService } from '@api/services/payment-providers/payment.factory';
 
 function harness(register: (s: McpServer, store: never) => void) {
   const tools: Record<string, (input: unknown, extra?: unknown) => Promise<unknown>> = {};
@@ -253,7 +259,7 @@ describe('place_order (cod) — writes after the order commits', () => {
 
   it('rolls the committed order back when the cod_pending Payment write fails', async () => {
     const db = await import('@ebda/database');
-    vi.mocked(db.withTenantContext).mockRejectedValueOnce(new Error('P2028 tx closed'));
+    vi.mocked(PaymentService.recordCodPayment).mockRejectedValueOnce(new Error('P2028 tx closed'));
     const tools = harness(registerOrderTools);
 
     await expect(
@@ -275,7 +281,7 @@ describe('place_order (cod) — writes after the order commits', () => {
   // nothing, stranding a pending, stock-taken order.
   it('runs the COD payment-failure rollback INSIDE its own tenant wrap', async () => {
     const db = await import('@ebda/database');
-    vi.mocked(db.withTenantContext).mockRejectedValueOnce(new Error('P2028 tx closed'));
+    vi.mocked(PaymentService.recordCodPayment).mockRejectedValueOnce(new Error('P2028 tx closed'));
     let depth = 0;
     let rollbackDepth = -1;
     vi.mocked(db.runInTenantContext).mockImplementation((async (_s: string, fn: () => unknown) => {
@@ -305,9 +311,10 @@ describe('place_order (cod) — writes after the order commits', () => {
 
   it('returns the committed order (never agent.write.failed) when post-commit bookkeeping rejects', async () => {
     const db = await import('@ebda/database');
-    // 1st wrap = the order-create (issue 2059 tenant-scopes it); the 2nd is
-    // the post-commit bookkeeping this case makes reject.
+    // 1st wrap = the order-create (issue 2059 tenant-scopes it), 2nd = the COD payment; the 3rd is
+    // the post-commit audit bookkeeping this case makes reject.
     vi.mocked(db.runInTenantContext)
+      .mockImplementationOnce(((_s: string, fn: () => unknown) => fn()) as never)
       .mockImplementationOnce(((_s: string, fn: () => unknown) => fn()) as never)
       .mockRejectedValueOnce(new Error('P2024 pool timeout'));
     const tools = harness(registerOrderTools);
