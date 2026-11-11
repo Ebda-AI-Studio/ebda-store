@@ -11,13 +11,14 @@ export const UUID = z
   .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 export const chatPaymentMethod = z.enum(['cod', 'link', 'instapay']);
 export const buyerKey = z.string().regex(/^[0-9a-f]{64}$/);
+export const phoneE164 = z.string().regex(/^\+[1-9]\d{7,14}$/);
 export const orderLine = z.object({
   variantId: z.string().min(1).max(64),
   quantity: z.number().int().min(1).max(99),
 });
 export const buyer = z.object({
   buyerKey,
-  phoneE164: z.string().regex(/^\+[1-9]\d{7,14}$/),
+  phoneE164,
   name: z.string().max(120).nullable(),
   locale: z.enum(['ar', 'en']),
 });
@@ -49,9 +50,10 @@ export const args = {
     .refine(v => Boolean(v.addressId) !== Boolean(v.address), {
       message: 'exactly one of addressId / address',
     }),
-  getPaymentLink: z.object({ orderId: z.string().min(1).max(64) }),
+  getPaymentLink: z.object({ orderId: z.string().min(1).max(64), buyerKey: buyerKey.optional() }),
   recordCodOutcome: z.object({
     orderId: z.string().min(1).max(64),
+    buyerKey: buyerKey.optional(),
     outcome: z.enum(['confirmed', 'refused', 'no_reply']),
     at: z.string().datetime({ offset: true }),
     idempotencyKey: idemKey,
@@ -59,9 +61,18 @@ export const args = {
   attachPaymentProof: z.object({
     orderId: z.string().min(1).max(64),
     mediaUrl: z.string().url().max(2000).startsWith('https://'),
+    buyerKey: buyerKey.optional(),
   }),
-  buyerKey: z.object({ buyerKey }),
-  saveCustomerAddress: z.object({ buyerKey, address: newAddress }),
-  getOrderStatus: z.object({ orderNumber: z.string().min(1).max(40), buyerKey }),
-  listCustomerOrders: z.object({ buyerKey, limit: z.number().int().min(1).max(20) }),
+  buyerKey: z.object({ buyerKey, phoneE164: phoneE164.optional() }),
+  saveCustomerAddress: z.object({ buyerKey, phoneE164: phoneE164.optional(), address: newAddress }),
+  getOrderStatus: z.object({
+    orderNumber: z.string().min(1).max(40),
+    buyerKey,
+    phoneE164: phoneE164.optional(),
+  }),
+  listCustomerOrders: z.object({
+    buyerKey,
+    phoneE164: phoneE164.optional(),
+    limit: z.number().int().min(1).max(20),
+  }),
 };
