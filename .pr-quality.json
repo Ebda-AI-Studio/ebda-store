@@ -1,0 +1,5 @@
+{
+  "roots": ["apps", "packages"],
+  "locales": ["apps/admin/src/i18n/messages"],
+  "baseline": ".pr-quality-baseline.json"
+}

@@ -1,0 +1,54 @@
+name: PR quality
+
+# Anti-slop gate. Copy of ebda-foundation/.github/workflows/pr-quality.yml with `on:` = pull_request (foundation Ruling AIR-3 applies:
+# switch to `uses:` once the foundation's Actions access is `organization`). Everything under `jobs:` must stay identical.
+# Standard: foundation os/standard/pr-quality.md. `edited` re-runs the body check when the PR description changes.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: pr-quality-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pr-body:
+    name: PR body sections
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Check Verified / Not verified / Cost-if-wrong, fix and review-finding rules
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          CHANGED_FILES="$(gh pr diff "$PR" --name-only)"
+          export CHANGED_FILES
+          node .github/pr-quality/pr-body-check.mjs
+
+  slop-baselines:
+    name: Slop baselines
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: no-any, no-console, todo-no-issue, emoji-copy, duplicate-helper, unused-export (baseline may only shrink)
+        run: node .github/pr-quality/slop-guard.mjs
