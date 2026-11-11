@@ -176,4 +176,21 @@ describe('factsKaratMismatch', () => {
     expect(factsKaratMismatch([fact('Weight 18 grams')], 21)).toBeNull();
     expect(factsKaratMismatch([], 21)).toBeNull();
   });
+
+  it('store gold pricing OFF: a gold product shows the toggle OFF and disabled, with the explanation, and no spec form', async () => {
+    setup({ data: { ...RATES().data, settings: { enabled: false, roundingStep: 100 } } });
+    render(
+      <GoldPricingCard
+        storeId="s"
+        facts={[]}
+        onSaved={() => {}}
+        product={{ ...base, goldWeightMg: 4350 }}
+      />
+    );
+    await screen.findByTestId('gold-store-off');
+    const box = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    expect(box.disabled).toBe(true);
+    expect(screen.getByTestId('gold-store-off').textContent).toBe('featureOffSaved');
+  });
 });

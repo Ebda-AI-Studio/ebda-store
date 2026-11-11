@@ -118,6 +118,8 @@ export function GoldPricingCard({
     return { weightMg, makingValue, marginBps };
   }, [grams, making, margin]);
 
+  // The store switch owns gold pricing: while it is off the product toggle reflects OFF and cannot be used.
+  const storeOff = state !== null && !state.settings.enabled;
   const rate = state?.rates.find(r => r.karat === karat);
   const freshRate = rate?.ratePerGram && !rate.stale ? rate.ratePerGram : null;
   const preview = useMemo(() => {
@@ -201,18 +203,20 @@ export function GoldPricingCard({
       <label className="mt-4 flex min-h-11 items-center gap-3 text-sm">
         <input
           type="checkbox"
-          checked={gold}
-          disabled={saving || (state !== null && !state.settings.enabled && !gold)}
+          checked={gold && !storeOff}
+          disabled={saving || storeOff}
           onChange={e => (e.target.checked ? setGold(true) : void save(false))}
           className="h-5 w-5"
         />
         <span className="font-medium">{t('toggle')}</span>
       </label>
-      {state && !state.settings.enabled && !gold && (
-        <p className="text-xs text-muted-foreground">{t('featureOff')}</p>
+      {storeOff && (
+        <p className="text-xs text-muted-foreground" data-testid="gold-store-off">
+          {gold ? t('featureOffSaved') : t('featureOff')}
+        </p>
       )}
 
-      {gold && (
+      {gold && !storeOff && (
         <div className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
