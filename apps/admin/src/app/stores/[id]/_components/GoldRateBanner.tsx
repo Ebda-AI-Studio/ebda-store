@@ -33,9 +33,9 @@ export function GoldRateBanner({ storeId }: { storeId: string }) {
     };
   }, [storeId]);
 
-  if (!state || !state.settings.enabled || state.goldProductCount === 0) return null;
-  const stale = state.rates.some(r => r.ratePerGram === null || r.stale);
-  const pending = state.pending.length > 0;
+  if (!state?.settings?.enabled || !state.goldProductCount) return null;
+  const stale = (state.rates ?? []).some(r => r.ratePerGram === null || r.stale);
+  const pending = (state.pending ?? []).length > 0;
   if (!stale && !pending) return null;
 
   return (

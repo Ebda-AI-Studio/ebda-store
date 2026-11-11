@@ -6278,6 +6278,18 @@
       "defaultRetry": "Try Again",
       "loadFailed": "Could not load this data. Please try again."
     },
+    "planLocked": {
+      "lockedBadge": "Locked",
+      "lockedAria": "Locked on your current plan",
+      "title": "This feature is locked on your plan",
+      "titleAnalyticsTier": "Advanced analytics",
+      "unlocksAnalyticsTierAdvanced": "Cohort retention, conversion funnels and customer segments, with deeper reports on your customers and sales.",
+      "unlocksAnalyticsTierStandard": "More detailed analytics reports on your sales and visitors.",
+      "unlocksGeneric": "This feature is not included in your current plan.",
+      "availableOn": "Available on the {plan} plan and above.",
+      "upgradeCta": "Upgrade to {plan}",
+      "seePlansCta": "See plans"
+    },
     "languageSwitcher": {
       "ariaLabel": "Language",
       "nativeEn": "English",
