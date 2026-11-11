@@ -91,7 +91,10 @@ describe('host-lock.sh', () => {
     expect(hook).not.toContain('host-lock.sh bash scripts/ci/pre-push-gate.sh');
     // every vitest invocation in the gate is wrapped in the lock; the related run is capped
     expect(gate).toMatch(/host-lock\.sh npx vitest related/);
-    expect(gate).toMatch(/host-lock\.sh npx vitest run/);
+    // PREPUSH-5: scanners use the 4-slot semaphore + tree-hash cache, never the host-wide heavy lock
+    expect(gate).toMatch(/prepush-slot\.sh npx vitest run/);
+    expect(gate).not.toMatch(/host-lock\.sh npx vitest run/);
+    expect(gate).toContain('prepush-scanner-cache.sh check');
     expect(gate).toContain('PREPUSH_RELATED_MAX');
     for (const heavy of [
       'npm run lint',
