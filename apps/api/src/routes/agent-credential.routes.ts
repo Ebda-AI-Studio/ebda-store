@@ -35,7 +35,61 @@ import { featureService } from '../services/feature.service';
 import { AGENT_OPEN_WRITES_FEATURE } from '../mcp/agent-auth';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeDb, storeUpdate, storeWriter, storeWritesToDo } from '../lib/repo-factory';
+
+/**
+ * The agent key of a store. A store on its Durable Object keeps it in the DO's `store_credentials` row (Ruling NZ-AGENT-KEY-1):
+ * read through `storeDb`, written through `storeWriter` (ciphertext only); the row's `updatedAt` is the rotation time, because
+ * `Store.agentApiKeyRotatedAt` is not a DO column. A Postgres store keeps its relation write exactly as before.
+ */
+async function readCredential(storeId: string) {
+  if (await storeWritesToDo(storeId)) {
+    const row = await (
+      await storeDb(storeId)
+    ).storeCredential.findUnique({
+      where: { storeId },
+      select: { agentApiKey: true, updatedAt: true },
+    });
+    return {
+      exists: true,
+      agentApiKey: row?.agentApiKey ?? null,
+      rotatedAt: row?.updatedAt ?? null,
+    };
+  }
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { credentials: { select: { agentApiKey: true } }, agentApiKeyRotatedAt: true },
+  });
+  return {
+    exists: Boolean(store),
+    agentApiKey: store?.credentials?.agentApiKey ?? null,
+    rotatedAt: store?.agentApiKeyRotatedAt ?? null,
+  };
+}
+
+/** `ciphertext` null = revoke. */
+async function writeCredential(storeId: string, ciphertext: string | null): Promise<void> {
+  if (await storeWritesToDo(storeId)) {
+    const now = new Date();
+    await (
+      await storeWriter(storeId)
+    ).storeCredential.upsert({
+      where: { storeId },
+      create: { storeId, agentApiKey: ciphertext, createdAt: now, updatedAt: now },
+      update: { agentApiKey: ciphertext, updatedAt: now },
+    });
+    return;
+  }
+  await storeUpdate(prisma, {
+    where: { id: storeId },
+    data: {
+      agentApiKeyRotatedAt: new Date(),
+      credentials: {
+        upsert: { create: { agentApiKey: ciphertext }, update: { agentApiKey: ciphertext } },
+      },
+    },
+  });
+}
 
 const router = Router({ mergeParams: true });
 
@@ -62,11 +116,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
-      const store = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { credentials: { select: { agentApiKey: true } }, agentApiKeyRotatedAt: true },
-      });
-      if (!store) {
+      const store = await readCredential(storeId);
+      if (!store.exists) {
         res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
         return;
       }
@@ -86,8 +137,8 @@ router.get(
       res.json({
         success: true,
         data: {
-          hasKey: Boolean(store.credentials?.agentApiKey),
-          rotatedAt: store.agentApiKeyRotatedAt,
+          hasKey: Boolean(store.agentApiKey),
+          rotatedAt: store.rotatedAt,
           header: 'x-agent-key',
           openWrites,
         },
@@ -107,28 +158,14 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
-      const store = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { credentials: { select: { agentApiKey: true } } },
-      });
-      if (!store) {
+      const store = await readCredential(storeId);
+      if (!store.exists) {
         res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
         return;
       }
 
       const key = mintKey();
-      await storeUpdate(prisma, {
-        where: { id: storeId },
-        data: {
-          agentApiKeyRotatedAt: new Date(),
-          credentials: {
-            upsert: {
-              create: { agentApiKey: encryption.encrypt(key) },
-              update: { agentApiKey: encryption.encrypt(key) },
-            },
-          },
-        },
-      });
+      await writeCredential(storeId, encryption.encrypt(key));
 
       await auditLog({
         action: 'store.agent_key_issued',
@@ -138,7 +175,7 @@ router.post(
         storeId,
         ip: req.ip,
         userAgent: req.get('user-agent'),
-        details: { rotated: Boolean(store.credentials?.agentApiKey) },
+        details: { rotated: Boolean(store.agentApiKey) },
       });
 
       // The ONLY time the plaintext leaves the server. Rotating invalidates the
@@ -149,7 +186,7 @@ router.post(
         data: {
           apiKey: key,
           header: 'x-agent-key',
-          rotated: Boolean(store.credentials?.agentApiKey),
+          rotated: Boolean(store.agentApiKey),
           message:
             'Store this key now — it is shown once and cannot be retrieved again. ' +
             'Rotating issues a new key and immediately invalidates this one.',
@@ -170,24 +207,13 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
-      const store = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { credentials: { select: { agentApiKey: true } } },
-      });
-      if (!store) {
+      const store = await readCredential(storeId);
+      if (!store.exists) {
         res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
         return;
       }
 
-      await storeUpdate(prisma, {
-        where: { id: storeId },
-        data: {
-          agentApiKeyRotatedAt: new Date(),
-          credentials: {
-            upsert: { create: { agentApiKey: null }, update: { agentApiKey: null } },
-          },
-        },
-      });
+      await writeCredential(storeId, null);
 
       await auditLog({
         action: 'store.agent_key_revoked',
@@ -197,7 +223,7 @@ router.delete(
         storeId,
         ip: req.ip,
         userAgent: req.get('user-agent'),
-        details: { hadKey: Boolean(store.credentials?.agentApiKey) },
+        details: { hadKey: Boolean(store.agentApiKey) },
       });
 
       res.json({ success: true, data: { hasKey: false } });
