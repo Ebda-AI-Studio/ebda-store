@@ -119,8 +119,12 @@ export function makeFakePort() {
     codOutcome: async (_s, a) => {
       const o = orders.get(a.orderId);
       if (!o) return null;
-      if (!outcomes.has(a.idempotencyKey) && o.method === 'cod' && o.status === 'pending') {
-        if (a.outcome === 'confirmed') o.status = 'confirmed';
+      if (
+        !outcomes.has(a.idempotencyKey) &&
+        o.method === 'cod' &&
+        (o.status === 'pending' || o.status === 'confirmed')
+      ) {
+        if (a.outcome === 'confirmed' && o.status === 'pending') o.status = 'confirmed';
         if (a.outcome === 'refused') o.status = 'cancelled';
       }
       outcomes.set(a.idempotencyKey, a.outcome);
@@ -129,14 +133,19 @@ export function makeFakePort() {
     attachProof: async (_s, id) => orders.get(id)?.method === 'instapay',
     addresses: async (_s, k) => addresses.get(k) ?? [],
     saveAddress: async (_s, k, a) => {
-      if (!addresses.has(k)) return null;
+      if (!addresses.has(k)) addresses.set(k, []);
+      const list = addresses.get(k)!;
+      const same = list.find(
+        x => x.area === a.area && x.street === a.street && x.label === (a.label ?? null)
+      );
+      if (same) return same;
       const saved = {
-        id: `a${addresses.get(k)!.length + 1}`,
+        id: `a${list.length + 1}`,
         label: a.label ?? null,
         area: a.area,
         street: a.street,
       };
-      addresses.get(k)!.push(saved);
+      list.push(saved);
       return saved;
     },
     orderStatus: async (_s, num, k) => {

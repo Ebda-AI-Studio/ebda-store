@@ -180,7 +180,12 @@ export const CASES: Array<{ name: string; method: string; args: unknown[] }> = [
     args: [S, BK, { label: 'Work', area: 'Zamalek', street: '1 Brazil St' }],
   },
   {
-    name: 'save an address for a buyer with no customer yet is not_found',
+    name: 'save an address for a buyer with no customer yet creates it',
+    method: 'saveCustomerAddress',
+    args: [S, BK_OTHER, { area: 'Zamalek', street: '1 Brazil St' }],
+  },
+  {
+    name: 'saving the same address again is idempotent',
     method: 'saveCustomerAddress',
     args: [S, BK_OTHER, { area: 'Zamalek', street: '1 Brazil St' }],
   },

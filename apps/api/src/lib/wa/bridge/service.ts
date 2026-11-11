@@ -329,8 +329,8 @@ export function createBridge(deps: BridgeDeps) {
         { buyerKey, address },
         async (s, a) => {
           const saved = await port.saveAddress(s, a.buyerKey, a.address);
-          // A buyer with no order yet has no customer record to attach to (Ruling WA-RPC-4): pass the address with the order instead.
-          return saved ? ok({ address: saved }) : fail('not_found', 'no customer yet');
+          // Find-or-create by buyer key, idempotent (Ruling WA-RPC-4).
+          return saved ? ok({ address: saved }) : fail('unavailable', 'address not saved');
         }
       ),
 

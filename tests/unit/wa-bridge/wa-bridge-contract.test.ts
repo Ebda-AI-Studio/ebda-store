@@ -149,7 +149,7 @@ describe('WhatsAppBridge behaviour', () => {
     await b.listCatalog('22222222-2222-4222-8222-222222222222', null, 10);
     expect(spy).not.toHaveBeenCalled();
   });
-  it('a COD refusal after a confirmation does not flip the order back (replay with a new key is a no-op on state)', async () => {
+  it('a COD refusal after a confirmation cancels once; a later confirmation does not resurrect it', async () => {
     const { port, orders } = makeFakePort();
     const b = createBridge({ port, storefrontUrl: async () => 'https://x' });
     const placed = (await b.createOrderFromChat(S, {
@@ -171,6 +171,12 @@ describe('WhatsAppBridge behaviour', () => {
       at: '2026-11-11T10:01:00Z',
       idempotencyKey: 'idem-cod-xx3',
     });
-    expect(orders.get(placed.value.orderId)!.status).toBe('confirmed');
+    await b.recordCodOutcome(S, {
+      orderId: placed.value.orderId,
+      outcome: 'confirmed',
+      at: '2026-11-11T10:02:00Z',
+      idempotencyKey: 'idem-cod-xx4',
+    });
+    expect(orders.get(placed.value.orderId)!.status).toBe('cancelled');
   });
 });

@@ -137,6 +137,7 @@ const COUNTED_ON_ANY_STORE = [
   'POST /public/cart/acknowledge-prices',
   'POST /public/cart/bundles',
   'POST /public/cart/email-optin',
+  'POST /public/cart/from-wa',
   'POST /public/cart/items',
   'POST /public/cart/restore',
   'POST /public/cart/sync',
