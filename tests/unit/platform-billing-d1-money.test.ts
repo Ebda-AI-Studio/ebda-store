@@ -56,6 +56,8 @@ import {
   applyWebhookEvent,
   expireStaleCheckouts,
   settleInTx,
+  listHeldBillingWebhooks,
+  resolveHeldBillingWebhook,
 } from '../../apps/api/src/services/billing/subscription-billing.service';
 
 const MIG = ['0001_init.sql', '0002_invariants.sql']
@@ -155,7 +157,10 @@ const hook = (kind = 'charge.succeeded') =>
     eventId: 'wh-1',
     merchantOrderId: EV,
     providerRef: 'ref-1',
-    amountMinor: null,
+    // #627: a success carries its amount and currency (the ledger row bills 1000 EGP)
+    amountMinor: 1000,
+    currency: 'EGP',
+    occurredAt: new Date(),
     failureReason: undefined,
     raw: {},
     customerRef: undefined,
@@ -548,7 +553,7 @@ describe('webhooks during the freeze are deferred, not 503d, and applied exactly
     kind: 'charge.succeeded',
     merchantOrderId: EV,
     providerRef: 'ref-9',
-    amountMinor: null,
+    amountMinor: 1000,
     currency: 'EGP',
     failureReason: undefined,
     card: undefined,
@@ -674,5 +679,92 @@ describe('webhooks during the freeze are deferred, not 503d, and applied exactly
     expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
       status: 'succeeded',
     });
+  });
+});
+
+describe('#627: a paid subscription charge we cannot match is HELD, alerted and resolvable, never ignored', () => {
+  const paid = (over: Record<string, unknown> = {}) =>
+    ({ ...(hook() as unknown as Record<string, unknown>), ...over }) as never;
+
+  it.each([
+    ['amount_mismatch', { amountMinor: 900 }],
+    ['currency_mismatch', { currency: 'USD' }],
+    ['amount_missing', { amountMinor: null }],
+    ['currency_missing', { currency: null }],
+  ])(
+    '%s: held with the facts, the ledger row stays pending, a P1 alert goes out',
+    async (reason, over) => {
+      const db = rig();
+      ledger(db);
+      vi.mocked(sendAlert).mockClear();
+      const r = await applyWebhookEvent('stub', paid({ eventId: `wh-${reason}`, ...over }));
+      expect(r).toMatchObject({ duplicate: false, outcome: 'held', detail: reason });
+      expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
+        status: 'pending',
+      });
+      const row = db.prepare('SELECT outcome, detail FROM billing_webhook_events').get() as {
+        outcome: string;
+        detail: string;
+      };
+      expect(row.outcome).toBe('held');
+      expect(JSON.parse(row.detail)).toMatchObject({
+        reason,
+        kind: 'charge.succeeded',
+        merchantOrderId: EV,
+        expectedMinor: 1000,
+        expectedCurrency: 'EGP',
+      });
+      expect(sendAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'p1', source: `billing.webhook.held.${reason}` })
+      );
+      // a redelivery is a replay: the fact stays held, nothing applies
+      expect(
+        await applyWebhookEvent('stub', paid({ eventId: `wh-${reason}`, ...over }))
+      ).toMatchObject({
+        duplicate: true,
+      });
+    }
+  );
+
+  it('an unknown order is held too (the merchant paid; we have no row to settle)', async () => {
+    rig();
+    const r = await applyWebhookEvent(
+      'stub',
+      paid({ eventId: 'wh-unknown', merchantOrderId: '44444444-4444-4444-8444-444444444444' })
+    );
+    expect(r).toMatchObject({ outcome: 'held', detail: 'unknown_order' });
+  });
+
+  it('a FAILED charge that mismatches is still only ignored (no money moved)', async () => {
+    const db = rig();
+    ledger(db);
+    const r = await applyWebhookEvent(
+      'stub',
+      paid({ eventId: 'wh-fail', kind: 'charge.failed', amountMinor: 900 })
+    );
+    expect(r).toMatchObject({ outcome: 'ignored', detail: 'amount_mismatch' });
+  });
+
+  it('the super-admin queue lists it; resolving moves it out once, with who and why', async () => {
+    const db = rig();
+    ledger(db);
+    await applyWebhookEvent('stub', paid({ eventId: 'wh-q', amountMinor: 900 }));
+    const open = await listHeldBillingWebhooks({ status: 'open' });
+    expect(open).toHaveLength(1);
+    expect(open[0]).toMatchObject({ reason: 'amount_mismatch', gotMinor: 900, status: 'open' });
+    await resolveHeldBillingWebhook({
+      id: open[0].id,
+      actorId: 'admin-1',
+      action: 'refunded',
+      note: 'refunded at Kashier',
+    });
+    expect(await listHeldBillingWebhooks({ status: 'open' })).toHaveLength(0);
+    const done = await listHeldBillingWebhooks({ status: 'resolved' });
+    expect(done[0]).toMatchObject({
+      resolution: { action: 'refunded', by: 'admin-1', note: 'refunded at Kashier' },
+    });
+    await expect(
+      resolveHeldBillingWebhook({ id: open[0].id, actorId: 'a', action: 'credited', note: 'again' })
+    ).rejects.toMatchObject({ statusCode: 409, code: 'HELD_PAYMENT_NOT_OPEN' });
   });
 });

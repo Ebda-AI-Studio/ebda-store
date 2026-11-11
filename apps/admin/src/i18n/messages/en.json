@@ -9589,7 +9589,8 @@
       "ledger": "Ledger",
       "subscriptions": "Subscriptions",
       "claims": "Payment claims",
-      "grants": "Free months"
+      "grants": "Free months",
+      "held": "Held payments"
     },
     "manual": {
       "title": "Record manual payment for {store}",
@@ -9783,7 +9784,50 @@
       }
     },
     "refundObject": "Refund {amount}",
-    "refundAction": "Refund the payment"
+    "refundAction": "Refund the payment",
+    "held": {
+      "title": "Held payments",
+      "intro": "Subscription payments the provider reported as successful but that don't match what we billed. The merchant may have paid without being upgraded, so settle each one here.",
+      "loading": "Loading held payments...",
+      "failedToLoad": "Could not load the held payments.",
+      "empty": "No held payments.",
+      "statusFilter": "Show",
+      "statuses": {
+        "open": "Needs action",
+        "resolved": "Resolved"
+      },
+      "unknownAmount": "Not reported",
+      "columns": {
+        "date": "Received",
+        "reason": "Why it was held",
+        "expected": "We billed",
+        "got": "Provider reported",
+        "reference": "Reference",
+        "status": "Status",
+        "action": "Action"
+      },
+      "reasons": {
+        "unknown_order": "No matching bill",
+        "amount_mismatch": "Different amount",
+        "currency_mismatch": "Different currency",
+        "amount_missing": "No amount sent",
+        "currency_missing": "No currency sent",
+        "kind_mismatch": "Charge on a card-saving checkout"
+      },
+      "resolve": "Resolve",
+      "resolveTitle": "Resolve this held payment",
+      "actionLabel": "What did you do?",
+      "actions": {
+        "credited": "Activated the plan by hand",
+        "refunded": "Refunded it at the provider",
+        "not_ours": "Not our payment"
+      },
+      "note": "Note (at least 3 characters)",
+      "noteRequired": "Write a short note about what you did.",
+      "resolveSubmit": "Mark resolved",
+      "resolveFailed": "Could not resolve it. It may have been resolved already; refresh the list.",
+      "resolved": "The held payment was marked resolved."
+    }
   },
   "codReconciliation": {
     "title": "COD reconciliation",

@@ -1564,8 +1564,35 @@ export async function resumeSubscription(args: { storeId: string }): Promise<voi
 
 export interface WebhookResult {
   duplicate: boolean;
-  outcome: 'processed' | 'ignored' | 'deferred';
+  outcome: 'processed' | 'ignored' | 'deferred' | 'held';
   detail?: string;
+}
+
+/**
+ * #627: a signed `charge.succeeded` we cannot match to what we billed (unknown order, a different amount or currency, or no
+ * amount / currency at all) is MONEY THE MERCHANT PAID. It is never `ignored`: the dedupe row is kept as `held` with the
+ * facts in `detail` (JSON), a P1 alert goes out after the commit, and the super-admin billing page lists it until a person
+ * resolves it (`resolveHeldBillingWebhook`). The provider still gets 200: the fact is recorded, a retry adds nothing.
+ */
+export const WEBHOOK_HELD = 'held';
+export const WEBHOOK_HELD_RESOLVED = 'held_resolved';
+export interface HeldBillingWebhook {
+  reason:
+    | 'unknown_order'
+    | 'amount_mismatch'
+    | 'currency_mismatch'
+    | 'amount_missing'
+    | 'currency_missing'
+    | 'kind_mismatch';
+  kind: string;
+  storeId: string | null;
+  merchantOrderId: string | null;
+  providerRef: string | null;
+  expectedMinor: number | null;
+  gotMinor: number | null;
+  expectedCurrency: string | null;
+  gotCurrency: string | null;
+  occurredAt: string;
 }
 
 /**
@@ -1596,6 +1623,7 @@ export async function applyWebhookEvent(
     webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
   }
   const scopedStoreId = webhookStoreId;
+  const heldRef: { v: HeldBillingWebhook | null } = { v: null };
   const applyInner = async (tx: Tx): Promise<WebhookResult> => {
     const ignore = async (detail: string): Promise<WebhookResult> => {
       await tx.billingWebhookEvent.updateMany({
@@ -1606,6 +1634,30 @@ export async function applyWebhookEvent(
     };
 
     if (event.kind === 'ignored') return ignore('unhandled_event');
+    const hold = async (
+      reason: HeldBillingWebhook['reason'],
+      expected: { amountMinor: number; currency: string } | null
+    ): Promise<WebhookResult> => {
+      const info: HeldBillingWebhook = {
+        reason,
+        kind: event.kind,
+        storeId: scopedStoreId,
+        merchantOrderId: event.merchantOrderId,
+        providerRef: event.providerRef,
+        expectedMinor: expected?.amountMinor ?? null,
+        gotMinor: event.amountMinor,
+        expectedCurrency: expected?.currency ?? null,
+        gotCurrency: event.currency,
+        occurredAt: event.occurredAt.toISOString(),
+      };
+      await tx.billingWebhookEvent.updateMany({
+        where: { provider: providerName, eventId: event.eventId },
+        data: { outcome: WEBHOOK_HELD, detail: JSON.stringify(info) },
+      });
+      heldRef.v = info;
+      return { duplicate: false, outcome: 'held', detail: reason };
+    };
+    const isCharge = event.kind === 'charge.succeeded';
 
     // Refund confirmations (async refunds only; sync ones are settled by refundCharge).
     if (event.kind === 'refund.succeeded' || event.kind === 'refund.failed') {
@@ -1640,8 +1692,9 @@ export async function applyWebhookEvent(
         : null;
     if (!row || row.provider !== providerName || row.type === 'refund') {
       logger.warn({ providerName, eventId: event.eventId }, '[billing] webhook for unknown order');
-      return ignore('unknown_order');
+      return isCharge ? hold('unknown_order', null) : ignore('unknown_order');
     }
+    const expected = { amountMinor: row.amountMinor, currency: row.currency };
     // A card event settles ONLY a card_setup row, and a charge event never does:
     // otherwise a "card saved" delivery could activate a paid plan with no money,
     // or a charge could be booked against a no-charge setup.
@@ -1651,15 +1704,20 @@ export async function applyWebhookEvent(
         { eventId: event.eventId, kind: event.kind, rowType: row.type },
         '[billing] webhook kind does not match the ledger row'
       );
-      return ignore('kind_mismatch');
+      return isCharge ? hold('kind_mismatch', expected) : ignore('kind_mismatch');
     }
+    // a success MUST carry its amount and currency: a charge we cannot check is held, never settled on trust
+    if (isCharge && event.amountMinor === null) return hold('amount_missing', expected);
+    if (isCharge && !event.currency) return hold('currency_missing', expected);
     if (event.amountMinor !== null && event.amountMinor !== row.amountMinor) {
       logger.error(
         { eventId: event.eventId, expected: row.amountMinor, got: event.amountMinor },
-        '[billing] webhook amount mismatch — ignored'
+        '[billing] webhook amount mismatch'
       );
-      return ignore('amount_mismatch');
+      return isCharge ? hold('amount_mismatch', expected) : ignore('amount_mismatch');
     }
+    if (event.currency && event.currency.toUpperCase() !== String(row.currency).toUpperCase())
+      return isCharge ? hold('currency_mismatch', expected) : ignore('currency_mismatch');
     await settleInTx(
       tx,
       row.id,
@@ -1771,7 +1829,102 @@ export async function applyWebhookEvent(
     ? await withStore(webhookStoreId, apply)
     : await apply(prisma as unknown as Tx);
   await runBillingEffects(effects);
+  if (result.outcome === 'held' && heldRef.v)
+    await alertHeldBillingWebhook(providerName, event.eventId, heldRef.v);
   return result;
+}
+
+async function alertHeldBillingWebhook(
+  providerName: string,
+  eventId: string,
+  h: HeldBillingWebhook
+): Promise<void> {
+  const { sendAlert } = await import('../alerts.service.js');
+  await sendAlert({
+    level: 'p1',
+    ...(h.storeId ? { scope: 'store' as const, store: { id: h.storeId, name: h.storeId } } : {}),
+    source: `billing.webhook.held.${h.reason}`,
+    title: `Subscription payment held: ${h.reason}`,
+    body: `${providerName} reported a successful charge we could not match (${h.reason}): expected ${h.expectedMinor ?? '?'} ${h.expectedCurrency ?? ''}, got ${h.gotMinor ?? '?'} ${h.gotCurrency ?? ''}. The merchant may have paid without being upgraded. Resolve it on the super-admin billing page (Held payments).`,
+    context: { provider: providerName, eventId, ...h },
+  }).catch(err => logger.error({ err, eventId }, '[billing] held-webhook alert failed'));
+}
+
+/** Super-admin queue: every held subscription payment (newest first), with its facts. */
+export async function listHeldBillingWebhooks(args: {
+  status: 'open' | 'resolved';
+  limit?: number;
+}) {
+  const rows = await (prisma as unknown as Tx).billingWebhookEvent.findMany({
+    where: { outcome: args.status === 'open' ? WEBHOOK_HELD : WEBHOOK_HELD_RESOLVED },
+    orderBy: { receivedAt: 'desc' },
+    take: Math.min(Math.max(args.limit ?? 100, 1), 200),
+  });
+  return rows.map(r => {
+    let detail: Record<string, unknown> = {};
+    try {
+      detail = r.detail ? (JSON.parse(r.detail) as Record<string, unknown>) : {};
+    } catch {
+      detail = { unparsed: r.detail };
+    }
+    return {
+      id: r.id,
+      provider: r.provider,
+      eventId: r.eventId,
+      receivedAt: r.receivedAt,
+      status: args.status,
+      ...detail,
+    };
+  });
+}
+
+/**
+ * A person settled a held payment (credited the plan by hand, refunded it at the provider, or confirmed it is not ours):
+ * the row moves to `held_resolved` with who, when and the note. Only an OPEN hold can be resolved (a second click is 409).
+ */
+export async function resolveHeldBillingWebhook(args: {
+  id: string;
+  actorId: string;
+  action: 'credited' | 'refunded' | 'not_ours';
+  note: string;
+}): Promise<void> {
+  const db = prisma as unknown as Tx;
+  const row = await db.billingWebhookEvent.findFirst({
+    where: { id: args.id, outcome: WEBHOOK_HELD },
+  });
+  if (!row)
+    throw new AppError(
+      409,
+      'HELD_PAYMENT_NOT_OPEN',
+      'This held payment is already resolved or does not exist'
+    );
+  let detail: Record<string, unknown> = {};
+  try {
+    detail = row.detail ? (JSON.parse(row.detail) as Record<string, unknown>) : {};
+  } catch {
+    detail = { unparsed: row.detail };
+  }
+  const done = await db.billingWebhookEvent.updateMany({
+    where: { id: args.id, outcome: WEBHOOK_HELD },
+    data: {
+      outcome: WEBHOOK_HELD_RESOLVED,
+      detail: JSON.stringify({
+        ...detail,
+        resolution: {
+          action: args.action,
+          note: args.note,
+          by: args.actorId,
+          at: new Date().toISOString(),
+        },
+      }),
+    },
+  });
+  if (done.count !== 1)
+    throw new AppError(
+      409,
+      'HELD_PAYMENT_NOT_OPEN',
+      'This held payment is already resolved or does not exist'
+    );
 }
 
 /**
