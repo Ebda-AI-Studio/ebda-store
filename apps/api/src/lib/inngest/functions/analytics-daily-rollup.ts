@@ -30,6 +30,8 @@ import type { JobDef } from '../../jobs/types';
 import { storeDirectory } from '@ebda/database';
 import { runInStoreCtx } from '../../jobs/store-db';
 import { storeFilter } from '../../jobs/store-scope';
+import { isStoreGoneError } from '../../jobs/store-gone';
+import { storeRepo } from '../../repo-factory';
 import logger from '../../logger';
 import { inngest } from '../client';
 import {
@@ -134,6 +136,22 @@ export const analyticsRollupOnDemand: JobDef = inngest.createFunction(
     if (!storeId) {
       logger.warn({ eventId: event.id }, 'analytics-rollup-on-demand: missing storeId, skipping');
       return { skipped: 'missing-storeId' };
+    }
+
+    // A store deleted (or its storage removed) between the fan-out and this run, or a super_admin "run now" on one, can
+    // never come back: skip it instead of failing three retries (gone-store class). Any other error still throws.
+    const live = await step.run('store-live', async () => {
+      try {
+        await storeRepo(storeId);
+        return true;
+      } catch (err) {
+        if (isStoreGoneError(err)) return false;
+        throw err;
+      }
+    });
+    if (!live) {
+      logger.warn({ storeId }, 'analytics-rollup-on-demand: store is gone, skipping');
+      return { skipped: 'store-gone' };
     }
 
     // On-demand also runs without HTTP tenant context — wrap so FORCE RLS

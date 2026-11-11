@@ -21,6 +21,7 @@ const STORE = '11111111-1111-4111-8111-111111111111';
 const PRODUCT = '22222222-2222-4222-8222-222222222222';
 
 const m = vi.hoisted(() => ({
+  storageRoom: vi.fn(),
   isFeatureEnabled: vi.fn(),
   upload: vi.fn(),
   storageDelete: vi.fn(),
@@ -37,6 +38,8 @@ const m = vi.hoisted(() => ({
   invalidate: vi.fn(),
   audit: vi.fn(),
 }));
+
+vi.mock('@api/services/plan-limit.service', () => ({ assertStorageRoom: m.storageRoom }));
 
 vi.mock('@ebda/database', () => ({
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
@@ -122,6 +125,7 @@ const url = (p = '') => `/stores/${STORE}/product-models/${PRODUCT}${p}`;
 beforeEach(() => {
   vi.clearAllMocks();
   m.isFeatureEnabled.mockResolvedValue(true);
+  m.storageRoom.mockResolvedValue(undefined);
   m.assertProductInStore.mockResolvedValue({ id: PRODUCT });
   m.upload.mockResolvedValue({
     key: `stores/${STORE}/models/x.glb`,
@@ -168,6 +172,23 @@ describe('POST /glb — the upload gate', () => {
       })
     );
     expect(m.invalidate).toHaveBeenCalledWith(STORE);
+  });
+
+  it('a store at its plan storage ceiling is refused BEFORE the R2 write (#615)', async () => {
+    m.storageRoom.mockRejectedValue(
+      Object.assign(new Error('Your plan allows up to 500 MB of storage.'), {
+        statusCode: 402,
+        code: 'PLAN_LIMIT_REACHED',
+      })
+    );
+    const glb = Buffer.from(sampleGlb());
+    const res = await request(app()).post(url('/glb')).attach('file', glb, {
+      filename: 'ring.glb',
+      contentType: 'application/octet-stream',
+    });
+    expect(res.status).toBe(402);
+    expect(m.storageRoom).toHaveBeenCalledWith(STORE, glb.length);
+    expect(m.upload).not.toHaveBeenCalled();
   });
 
   it('rejects a PNG renamed .glb — nothing reaches R2', async () => {
