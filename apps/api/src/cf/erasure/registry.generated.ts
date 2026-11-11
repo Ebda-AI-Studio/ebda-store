@@ -432,7 +432,7 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
     },
     action: 'scrub',
     scrub: {
-      customer_id: '[erased]',
+      customer_id: null,
       approved_by: null,
       rejected_by: null,
     },

@@ -149,7 +149,7 @@ export default function GuestReturnForm() {
         </select>
       </label>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive-ink">
           {error}
         </p>
       )}
