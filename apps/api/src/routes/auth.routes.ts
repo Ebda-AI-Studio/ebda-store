@@ -44,6 +44,10 @@ import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
 import { passwordSchema } from '../services/merchant-signup.service';
 import { assertNotDemoStore } from '../services/plan-limit.service';
+import {
+  liveBilledStoresOf,
+  OWNER_HAS_BILLED_STORE_MESSAGE_AR,
+} from '../services/account-closure-guard';
 
 import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
 const router = Router();
@@ -860,6 +864,12 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
+
+      // OFFBOARD-1: an owner with a live billed store cannot close the account (the store would keep billing with no
+      // owner to cancel or pay it). Checked before anything is deactivated. Customers own no store.
+      if (req.user!.role !== 'customer' && (await liveBilledStoresOf(userId)).length > 0) {
+        throw new AppError(409, 'OWNER_HAS_LIVE_BILLED_STORE', OWNER_HAS_BILLED_STORE_MESSAGE_AR);
+      }
 
       // An identity-service account is deactivated THERE first (every session and refresh dies, sign-in is refused); if that
       // fails nothing has changed and the request fails.

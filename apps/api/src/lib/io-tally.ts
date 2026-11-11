@@ -27,6 +27,8 @@ export interface IoTally {
   inflight: number;
   /** Test / local dev only (DEV_STATS=1): the op labels in call order, for finding what to batch. */
   ops?: string[];
+  /** Test / local dev only (DEV_STATS=1): injected AuthState latency / stall (cf/auth-state-client.ts `call`). */
+  authStateFault?: { delayMs: number; stall: string };
 }
 
 const als = new AsyncLocalStorage<IoTally>();

@@ -17,6 +17,7 @@ const PAGES = [
   'compare/expandcart',
   'about',
   'credits',
+  'support',
   'legal',
   'privacy',
   'terms',

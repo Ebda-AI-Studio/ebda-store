@@ -18,6 +18,7 @@ import {
   withMoneyTx,
 } from '@ebda/database';
 import { storeDb, storeMoney, storeRepo, storeWriter } from '../lib/repo-factory';
+import { isP2002 } from '../lib/prisma-errors';
 import { platformDb } from '../lib/platform-directory';
 import { listDirectoryStores } from './platform/directory-d1';
 import { runInStoreCtx } from '../lib/jobs/store-db';
@@ -199,16 +200,9 @@ class ShippingCarrierService {
     }
   ) {
     const entry = carrierEntry(carrier);
-    const out = await prisma.$transaction(async tx => {
-      // Serialize concurrent saves of this carrier: two PUTs (sandbox keys + live keys, or settings
-      // + a rotation) would otherwise each merge over the SAME snapshot and the later write would
-      // silently revert the earlier one. (Nothing to lock on first creation: the unique key does it.)
-      await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;
-      // Straight from Prisma, never the cache: this read is the merge base for a secret.
-      const existing = await tx.shippingCarrierConfig.findUnique({
-        where: { storeId_carrier: { storeId, carrier } },
-      });
-
+    type Existing = Awaited<ReturnType<typeof prisma.shippingCarrierConfig.findUnique>>;
+    // The merge of this save over the stored row (a secret: the base is always read fresh, never the cache).
+    const plan = (existing: Existing) => {
       let cipher = existing?.credentials ?? '';
       let hints: unknown = existing?.credentialHints ?? {};
       let activeModeChanged = false;
@@ -280,19 +274,36 @@ class ShippingCarrierService {
         isDefault: nextDefault,
         settings: nextSettings as Prisma.InputJsonValue,
       };
-      if (nextDefault) {
-        await tx.shippingCarrierConfig.updateMany({
-          where: { storeId, isDefault: true, NOT: { carrier } },
-          data: { isDefault: false },
+      return { data, changed, mustDisable, nextDefault };
+    };
+
+    let out: { row: NonNullable<Existing>; changed: string[]; mustDisable: boolean };
+    if ((await storeRepo(storeId)).backend === 'do') {
+      out = await this.upsertCarrierConfigOnDo(storeId, carrier, plan);
+    } else
+      out = await prisma.$transaction(async tx => {
+        // Serialize concurrent saves of this carrier: two PUTs (sandbox keys + live keys, or settings
+        // + a rotation) would otherwise each merge over the SAME snapshot and the later write would
+        // silently revert the earlier one. (Nothing to lock on first creation: the unique key does it.)
+        await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;
+        // Straight from Prisma, never the cache: this read is the merge base for a secret.
+        const existing = await tx.shippingCarrierConfig.findUnique({
+          where: { storeId_carrier: { storeId, carrier } },
         });
-      }
-      const row = await tx.shippingCarrierConfig.upsert({
-        where: { storeId_carrier: { storeId, carrier } },
-        create: { storeId, carrier, ...data },
-        update: data,
+        const { data, changed, mustDisable, nextDefault } = plan(existing);
+        if (nextDefault) {
+          await tx.shippingCarrierConfig.updateMany({
+            where: { storeId, isDefault: true, NOT: { carrier } },
+            data: { isDefault: false },
+          });
+        }
+        const row = await tx.shippingCarrierConfig.upsert({
+          where: { storeId_carrier: { storeId, carrier } },
+          create: { storeId, carrier, ...data },
+          update: data,
+        });
+        return { row, changed, mustDisable };
       });
-      return { row, changed, mustDisable };
-    });
     await this.invalidateCarrierConfigCache(storeId);
     return {
       config: publicCarrierConfig(out.row),
@@ -302,11 +313,88 @@ class ShippingCarrierService {
   }
 
   /**
+   * A carrier-config save on a store's Durable Object (no Postgres, Ruling NZ-CARRIER-1). The Worker reaches the DO in
+   * separate calls, so there is no row lock: the write is a compare-and-swap on `updatedAt` (the merge base this save
+   * read). A save that lost a race to a concurrent one writes nothing and answers 409 (retry with the fresh row); two
+   * concurrent first saves meet the (store, carrier) unique key the same way. The default flag of the other carriers is
+   * cleared only after this row was written.
+   */
+  private async upsertCarrierConfigOnDo<
+    R extends { updatedAt: Date },
+    P extends {
+      data: Record<string, unknown>;
+      changed: string[];
+      mustDisable: boolean;
+      nextDefault: boolean;
+    },
+  >(storeId: string, carrier: CarrierCode, plan: (existing: R | null) => P) {
+    const w = await storeWriter(storeId);
+    const existing = (await w.shippingCarrierConfig.findUnique({
+      where: { storeId_carrier: { storeId, carrier } },
+    })) as R | null;
+    const { data, changed, mustDisable, nextDefault } = plan(existing);
+    const raced = () =>
+      new AppError(
+        409,
+        'CARRIER_CONFIG_CHANGED',
+        'This carrier was saved from another tab a moment ago. Reload it and save again.'
+      );
+    if (existing) {
+      const r = await w.shippingCarrierConfig.updateMany({
+        where: { storeId, carrier, updatedAt: existing.updatedAt },
+        data: { ...data, updatedAt: new Date() } as never,
+      });
+      if (r.count !== 1) throw raced();
+    } else {
+      try {
+        await w.shippingCarrierConfig.create({ data: { storeId, carrier, ...data } as never });
+      } catch (err) {
+        if (isP2002(err)) throw raced();
+        throw err;
+      }
+    }
+    if (nextDefault)
+      await w.shippingCarrierConfig.updateMany({
+        where: { storeId, isDefault: true, NOT: { carrier } },
+        data: { isDefault: false },
+      });
+    const row = await w.shippingCarrierConfig.findUnique({
+      where: { storeId_carrier: { storeId, carrier } },
+    });
+    if (!row) throw raced();
+    return { row: row as unknown as R, changed, mustDisable };
+  }
+
+  /**
    * The per-store secret that authenticates a carrier's webhook callbacks (it rides in the URL
    * path and, for carriers that echo a header, in that header). Kept inside the encrypted
    * credentials, generated once, replaced only on `rotate`.
    */
   async rotateWebhookSecret(storeId: string, carrier: CarrierCode, opts: { grace?: boolean } = {}) {
+    if ((await storeRepo(storeId)).backend === 'do') {
+      // a DO store: compare-and-swap on updatedAt instead of the row lock (Ruling NZ-CARRIER-1)
+      const w = await storeWriter(storeId);
+      const current = await w.shippingCarrierConfig.findUnique({
+        where: { storeId_carrier: { storeId, carrier } },
+        select: { credentials: true, settings: true, updatedAt: true },
+      });
+      if (!current) throw new AppError(404, 'NOT_FOUND', 'Carrier is not configured');
+      const r = await w.shippingCarrierConfig.updateMany({
+        where: { storeId, carrier, updatedAt: current.updatedAt },
+        data: {
+          credentials: rotateBlobWebhookSecret(current.credentials, current.settings, opts),
+          updatedAt: new Date(),
+        },
+      });
+      if (r.count !== 1)
+        throw new AppError(
+          409,
+          'CARRIER_CONFIG_CHANGED',
+          'This carrier was saved from another tab a moment ago. Reload it and try again.'
+        );
+      await this.invalidateCarrierConfigCache(storeId);
+      return;
+    }
     await prisma.$transaction(async tx => {
       // same lock as upsertCarrierConfig: a rotation must not be reverted by a concurrent save
       await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;
@@ -329,7 +417,9 @@ class ShippingCarrierService {
    * Delete a carrier config
    */
   async deleteCarrierConfig(storeId: string, carrier: CarrierCode) {
-    await prisma.shippingCarrierConfig.deleteMany({
+    await (
+      await storeWriter(storeId)
+    ).shippingCarrierConfig.deleteMany({
       where: { storeId, carrier },
     });
     await this.invalidateCarrierConfigCache(storeId);
@@ -340,20 +430,23 @@ class ShippingCarrierService {
    * enabled: this never enables one (that is the connect flow's gate).
    */
   async setDefaultCarrier(storeId: string, carrier: CarrierCode) {
-    const row = await prisma.shippingCarrierConfig.findUnique({
+    // the store's backend: its Durable Object (array transaction = one DO section) or Postgres
+    const w = await storeWriter(storeId);
+    const row = await w.shippingCarrierConfig.findUnique({
       where: { storeId_carrier: { storeId, carrier } },
       select: { enabled: true },
     });
     if (!row?.enabled) {
       throw new AppError(409, 'NOT_ENABLED', 'Enable the carrier before making it the default');
     }
-    await prisma.$transaction([
-      prisma.shippingCarrierConfig.updateMany({
+    await w.$transaction([
+      w.shippingCarrierConfig.updateMany({
         where: { storeId, isDefault: true },
         data: { isDefault: false },
       }),
-      prisma.shippingCarrierConfig.updateMany({
-        where: { storeId, carrier },
+      // still enabled at the moment of the write (a concurrent disable wins: no default on a disabled carrier)
+      w.shippingCarrierConfig.updateMany({
+        where: { storeId, carrier, enabled: true },
         data: { isDefault: true },
       }),
     ]);

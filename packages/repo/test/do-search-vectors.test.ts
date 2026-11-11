@@ -84,7 +84,8 @@ function fakeIndex() {
         .filter(
           v =>
             v.namespace === o.namespace &&
-            (!o.filter || Object.entries(o.filter).every(([k, x]) => v.metadata[k] === x))
+            // Production has NO metadata index: any `filter` matches nothing (measured 2026-11-11).
+            !o.filter
         )
         .map(v => ({
           id: [...store].find(([, s]) => s === v)![0].split('|')[1],
@@ -400,5 +401,26 @@ describe('text hash', () => {
     expect(textHash('abc')).toBe(textHash('abc'));
     expect(new Set(['a', 'b', 'ab', 'ba', '', ' ', 'عباية']).size).toBe(7);
     expect(new Set(['a', 'b', 'ab', 'ba', '', ' ', 'عباية'].map(textHash)).size).toBe(7);
+  });
+});
+
+describe('real-shaped scores (production bge-m3, 2026-11-11)', () => {
+  const idx = {
+    async query(_q: number[], o: { filter?: unknown; namespace: string }) {
+      if (o.filter) return { matches: [] }; // no metadata index in production
+      return {
+        matches: [
+          { id: 'p1:w', score: 0.465 }, // "gift for my wife": relevant top score
+          { id: 'p1:d', score: 0.44 },
+          { id: 'p2:d', score: 0.536 }, // "something for the sea"
+          { id: 'p3:d', score: 0.413 }, // below the cut-off (0.45)
+        ],
+      };
+    },
+  } as unknown as VectorizeLike;
+  it('keeps hits at score >= 0.45, drops the rest, and sends no filter', async () => {
+    const db = { all: (_sql: string, p: unknown[]) => p.slice(2).map(id => ({ id })) };
+    const ids = await semanticProductIds(db as never, 's1', new Array(EMBED_DIMS).fill(0.01), idx);
+    expect(ids).toEqual(['p2', 'p1']); // nearest first; p3 (0.413) is beyond 0.55 distance
   });
 });

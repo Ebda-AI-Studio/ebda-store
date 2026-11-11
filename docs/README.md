@@ -196,6 +196,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 ## launch - Launch readiness
 
 - [launch/marketing-assets-needed.md](launch/marketing-assets-needed.md) - Assets the marketing site still needs from Ahmad (marketing-levelup P2)
+- [launch/support-page.md](launch/support-page.md) - The /support page (24/7, assistant first, a person for money and security), the home cost line and the 360px check (audit M-033, M-031, M-039)
 - [launch/marketing-launch-checklist.md](launch/marketing-launch-checklist.md) - Marketing site: launch-day checklist (P12)
 
 ## legal - Legal
@@ -322,9 +323,12 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
 - [plans/2026-11-10-store-miss-counts-unverified-store-only.md](plans/2026-11-10-store-miss-counts-unverified-store-only.md) - LAUNCH-RL-MISS-3: a dead product or blog link inside a verified store is not a store-miss
 - [plans/2026-11-10-ssr-client-address.md](plans/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
+- [plans/2026-11-11-nz-money-auth.md](plans/2026-11-11-nz-money-auth.md) - NZ money + auth: InstaPay refund record, refund match-claim, agent COD, WhatsApp COD outcome, grants, tax report, customer MFA, merchant e-mail flows on a Durable Object store
 - [plans/2026-11-10-services-header-actions.md](plans/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
+- [plans/2026-11-10-resolve-bulletproof.md](plans/2026-11-10-resolve-bulletproof.md) - Store resolution bulletproofing: epoch-checked caches, stale-if-error, 503 + Retry-After (Ruling RESOLVE-BULLETPROOF-1)
 - [plans/2026-11-10-storefront-cold-render.md](plans/2026-11-10-storefront-cold-render.md) - PERF-LATENCY: why a cold storefront render took 4-12 s (empty per-build data cache after every deploy), the build-independent fetch cache and the widened warm step (Ruling WEB-COLD-2)
 - [plans/2026-11-10-accounts-standalone-signin.md](plans/2026-11-10-accounts-standalone-signin.md) - ACCOUNTS-PAGE-1: accounts.ebda.app/login as a standalone Ebda AI Studio sign-in page over the same /login and /login/mfa, allowlisted return
+- [plans/2026-11-10-api-hangs.md](plans/2026-11-10-api-hangs.md) - API-HANG-1: every AuthState call bounded at 2.5 s, a public cache fill answers before its write-back
 
 ## privacy - Privacy
 

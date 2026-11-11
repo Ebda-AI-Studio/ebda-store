@@ -27,6 +27,8 @@ export default defineConfig({
       '**/.next/**',
       '**/.claude/**',
       'tests/smoke/**',
+      // Playwright specs against production (playwright.prelaunch.config.ts) - not vitest tests.
+      'tests/prelaunch/**',
       // apps/status runs on workerd via @cloudflare/vitest-pool-workers (npm run test:status).
       'apps/status/**',
       // apps/accounts runs on workerd with a local D1 (npm run test:accounts).

@@ -237,7 +237,7 @@ describe('ci.yml lanes', () => {
 
   it('the full lane runs the WHOLE workers-test suite (route-sweep included), a PR the slice', () => {
     expect(raw).toMatch(
-      /if \[ "\$EVENT" = "pull_request" \]; then\n\s+npm run cf:test -w apps\/api -- workers-test\//
+      /if \[ "\$EVENT" = "pull_request" \]; then\n(\s+#[^\n]*\n)+\s+npm run cf:test -w apps\/api -- \$\(node scripts\/ci\/workers-test-lane\.mjs\)/
     );
     expect(raw).toMatch(/else\n\s+# full lane[^\n]*\n\s+npm run cf:test -w apps\/api\n/);
   });

@@ -21,6 +21,7 @@ export type StockOpName =
   | 'setProduct'
   | 'bulkAdjustProducts'
   | 'setVariantInventory'
+  | 'setVariantActive'
   | 'setWarehouseStock'
   | 'adjustWarehouseStock'
   | 'reconcileWarehouseSku'
@@ -32,6 +33,7 @@ export const STOCK_OP_NAMES: readonly StockOpName[] = [
   'setProduct',
   'bulkAdjustProducts',
   'setVariantInventory',
+  'setVariantActive',
   'setWarehouseStock',
   'adjustWarehouseStock',
   'reconcileWarehouseSku',
@@ -474,6 +476,47 @@ function setVariantInventory(db: SyncSql, storeId: string, a: Record<string, unk
   };
 }
 
+/**
+ * Disable / re-enable one variant (variant.service updateVariant on a DO store). A disabled variant is not stock
+ * (inventory-model.md, Ruling M5-6), so a toggle on a variant that HOLDS units records them in the stock history in the SAME
+ * transaction (issue 2146): quantity 0, previous = new = the variant's units, so no reader that sums movements is affected.
+ * A call that changes nothing writes nothing.
+ */
+function setVariantActive(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const productId = str(a.productId, 'productId');
+  const variantId = str(a.variantId, 'variantId');
+  if (typeof a.isActive !== 'boolean') return fail('BAD_ARGS', 'isActive');
+  if (!product(db, storeId, productId)) return fail('NOT_FOUND', 'Product not found', 404);
+  const v = db.all(
+    'SELECT inventory, is_active FROM product_variants WHERE id = ? AND product_id = ?',
+    [variantId, productId]
+  )[0] as { inventory: number; is_active: number } | undefined;
+  if (!v) return fail('NOT_FOUND', 'Variant not found', 404);
+  if (Boolean(v.is_active) === a.isActive) return { changed: false, historyId: null };
+  db.run('UPDATE product_variants SET is_active = ? WHERE id = ? AND product_id = ?', [
+    a.isActive ? 1 : 0,
+    variantId,
+    productId,
+  ]);
+  const historyId =
+    v.inventory !== 0
+      ? history(db, {
+          storeId,
+          productId,
+          type: 'adjustment',
+          quantity: 0,
+          previousStock: v.inventory,
+          newStock: v.inventory,
+          reason: a.isActive
+            ? `Variant re-enabled — ${v.inventory} unit(s) count as stock again`
+            : `Variant disabled — ${v.inventory} unit(s) no longer count as stock`,
+          reference: `variant:${variantId}`,
+          createdBy: optStr(a.userId, 'userId'),
+        })
+      : null;
+  return { changed: true, historyId };
+}
+
 function warehouseTarget(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const warehouseId = str(a.warehouseId, 'warehouseId');
   const productId = str(a.productId, 'productId');
@@ -593,6 +636,7 @@ const OPS: Record<
   setProduct,
   bulkAdjustProducts,
   setVariantInventory,
+  setVariantActive,
   setWarehouseStock,
   adjustWarehouseStock,
   reconcileWarehouseSku,

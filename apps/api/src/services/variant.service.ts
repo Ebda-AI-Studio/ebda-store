@@ -698,7 +698,9 @@ export class VariantService {
 
     // A Durable Object store refuses stock columns on a row write (Ruling CF-R7-4): a changed stock goes through the stock op.
     const { inventory: newInventory, ...rowInput } = input;
-    const stockOnDo = newInventory !== undefined ? await storeStock(storeId) : null;
+    // A store on its Durable Object (the Worker has no Postgres): stock and the is-active toggle move through DO stock ops.
+    const doStock = await storeStock(storeId);
+    const stockOnDo = newInventory !== undefined ? doStock : null;
     if (stockOnDo && newInventory !== undefined) {
       const r = await stockOnDo.setVariantInventory({
         productId,
@@ -706,11 +708,20 @@ export class VariantService {
       });
       if (r.updated !== 1) throw new AppError(404, 'NOT_FOUND', 'Variant not found');
     }
+    // On a DO store an is-active CHANGE goes through `setVariantActive` below (the row and its stock-history entry in one DO
+    // transaction), so the row update leaves `isActive` out.
+    const toggleOnDo =
+      doStock && input.isActive !== undefined && input.isActive !== variant.isActive;
+    const rowData: Record<string, unknown> = {
+      ...(stockOnDo ? rowInput : input),
+      ...barcodeUpdate,
+    };
+    if (toggleOnDo) delete rowData.isActive;
     const updated = await (
       await storeWriter(storeId)
     ).productVariant.update({
       where: { id: variantId },
-      data: { ...(stockOnDo ? rowInput : input), ...barcodeUpdate },
+      data: rowData,
       include: {
         options: {
           include: {
@@ -728,7 +739,10 @@ export class VariantService {
     // quantity changing. Record it in the stock history so the drop is
     // traceable (issue 2146): quantity 0, previous = new = the variant's
     // units, so no reader that sums movements is affected.
-    if (
+    if (toggleOnDo) {
+      await doStock.setVariantActive({ productId, variantId, isActive: input.isActive! });
+      updated.isActive = input.isActive!;
+    } else if (
       input.isActive !== undefined &&
       input.isActive !== variant.isActive &&
       variant.inventory !== 0

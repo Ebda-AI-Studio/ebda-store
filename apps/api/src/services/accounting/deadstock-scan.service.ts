@@ -33,7 +33,8 @@ import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { AppError } from '../../middleware/error-handler';
 import { withSavepointOn } from '../../lib/savepoint';
-import { storeDb, storeRepo } from '../../lib/repo-factory';
+import { storeDb, storeRepo, storeWriter } from '../../lib/repo-factory';
+import { isP2002 } from '../../lib/prisma-errors';
 import { withStoreRw } from '../../lib/jobs/store-db';
 
 // ---------------------------------------------------------------------------
@@ -502,7 +503,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
  * route (Task 8).
  *
  * This function is called from an HTTP route handler (tenant context already
- * set by middleware) — plain prisma calls are fine here; no bypass needed.
+ * set by middleware); both writes go through the store writer (its DO or Postgres).
  */
 export async function createClearanceCouponFromFlag(
   flagId: string,
@@ -533,22 +534,38 @@ export async function createClearanceCouponFromFlag(
   const code = `CLEAR-${skuSlug}`;
   const discountValue = Math.round(flag.suggestedDiscountBps / 100);
 
-  await prisma.coupon.create({
-    data: {
-      storeId: flag.storeId,
-      code,
-      name: `Clearance ${discountValue}% off`,
-      nameAr: `تخفيض ${discountValue}٪`,
-      type: 'percentage',
-      value: discountValue,
-      // isActive defaults to true in the schema; merchant can narrow scope afterwards
-    },
-  });
-
-  await prisma.deadStockFlag.update({
-    where: { id: flagId, storeId },
-    data: { status: 'accepted_clearance', couponCode: code },
-  });
+  const couponData = {
+    storeId: flag.storeId,
+    code,
+    name: `Clearance ${discountValue}% off`,
+    nameAr: `تخفيض ${discountValue}٪`,
+    type: 'percentage' as const,
+    value: discountValue,
+    // isActive defaults to true in the schema; merchant can narrow scope afterwards
+  };
+  const flagData = { status: 'accepted_clearance' as const, couponCode: code };
+  if ((await storeRepo(storeId)).backend === 'do') {
+    // A store on its Durable Object (the Worker has no Postgres): ONE DO batch, so the coupon and the flag move together, and
+    // a second click (or a code another coupon already holds) meets the (store, code) unique key and writes nothing.
+    const w = await storeWriter(storeId);
+    try {
+      await w.$transaction([
+        w.coupon.create({ data: couponData }),
+        w.deadStockFlag.update({ where: { id: flagId, storeId }, data: flagData }),
+      ]);
+    } catch (err) {
+      if (isP2002(err))
+        throw new AppError(
+          409,
+          'COUPON_CODE_TAKEN',
+          `A coupon with the code ${code} already exists. Rename it, then try again.`
+        );
+      throw err;
+    }
+  } else {
+    await prisma.coupon.create({ data: couponData });
+    await prisma.deadStockFlag.update({ where: { id: flagId, storeId }, data: flagData });
+  }
 
   return { couponCode: code };
 }
