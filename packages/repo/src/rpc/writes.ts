@@ -104,6 +104,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'ReorderSuggestion',
   // suppliers (NEON-ZERO-1 group A, Ruling NZ-A-1)
   'Supplier',
+  // per-product reorder thresholds the merchant sets by hand (M-107); the reorder scan only reads them
+  'ReorderRule',
   // catalogue import (#329) job / file / item rows and the Customer Intelligence hint log and per-store gate (#336) (Ruling INTEG-1)
   'CatalogImportJob',
   'CatalogImportFile',

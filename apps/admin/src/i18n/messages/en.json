@@ -7318,7 +7318,11 @@
         "failed": "Could not draft PO"
       },
       "pagePrev": "Previous page",
-      "pageNext": "Next page"
+      "pageNext": "Next page",
+      "rules": {
+        "manage": "Reorder rules",
+        "emptyCta": "Set reorder rules"
+      }
     },
     "deadstock": {
       "title": "Dead Stock",
@@ -7426,6 +7430,41 @@
       "breadcrumb": "Warehouses",
       "pagePrev": "Previous page",
       "pageNext": "Next page"
+    },
+    "reorderRules": {
+      "title": "Reorder rules",
+      "description": "Tell the scan when each item needs restocking: the level that triggers a reorder and how much to order.",
+      "newButton": "New rule",
+      "empty": "No reorder rules yet. Add one so low-stock items show up as reorder suggestions.",
+      "col": {
+        "item": "Item",
+        "minQty": "Reorder at",
+        "reorderQty": "Order qty",
+        "supplier": "Supplier",
+        "active": "Active"
+      },
+      "rowMenu": "Options for rule {name}",
+      "deleteObject": "Reorder rule for \"{name}\"",
+      "deleteConsequence": "The item stops being checked against this rule. Stock and purchase orders are not changed.",
+      "deleteAction": "Delete rule",
+      "deleteFailed": "Could not delete the rule. Try again.",
+      "form": {
+        "createTitle": "New reorder rule",
+        "editTitle": "Edit reorder rule",
+        "product": "Product",
+        "variant": "Variant",
+        "wholeProduct": "Whole product",
+        "minQty": "Reorder when stock is at or below",
+        "reorderQty": "Quantity to order",
+        "leadTimeDays": "Lead time (days)",
+        "safetyStockDays": "Safety stock (days)",
+        "supplier": "Preferred supplier",
+        "noSupplier": "No preferred supplier",
+        "active": "Rule is active",
+        "invalid": "Pick a product and enter whole numbers (quantity to order at least 1).",
+        "duplicate": "This item already has a reorder rule. Edit the existing one.",
+        "saveFailed": "Could not save the rule. Try again."
+      }
     }
   },
   "insights": {

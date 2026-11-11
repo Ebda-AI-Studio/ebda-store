@@ -11,7 +11,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { VariantText, useToast } from '@ebda/ui';
 import { withNumerals } from '@ebda/shared';
 
-import { Button } from '@/components/ui/Button';
+import { Button, buttonVariants } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ReorderProduct {
@@ -281,6 +281,12 @@ export default function ReorderPage() {
               </p>
             )}
           </div>
+          <a
+            href={`/stores/${storeId}/stock/reorder/rules`}
+            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+          >
+            {t('rules.manage')}
+          </a>
           {isSuperAdmin && (
             <Button
               type="button"
@@ -304,6 +310,12 @@ export default function ReorderPage() {
         {!loading && !error && items.length === 0 && (
           <div className="rounded-xl border border-border bg-muted/10 p-6 text-center">
             <p className="text-sm text-muted-foreground">{t('empty')}</p>
+            <a
+              href={`/stores/${storeId}/stock/reorder/rules`}
+              className={`${buttonVariants({ variant: 'outline', size: 'sm' })} mt-4`}
+            >
+              {t('rules.emptyCta')}
+            </a>
           </div>
         )}
 
