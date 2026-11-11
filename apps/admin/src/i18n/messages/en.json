@@ -4950,7 +4950,8 @@
         "totalEarned": "Total Earned",
         "totalRedeemed": "Total Redeemed",
         "actions": "Actions"
-      }
+      },
+      "owed": "Owes {count} points (spent before a refund)"
     },
     "award": {
       "title": "Award Points",
