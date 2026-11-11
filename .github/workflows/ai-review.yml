@@ -1,11 +1,16 @@
 name: AI review
 
-# Independent review of money / auth / data / migration PRs, run in CI (not on the controller's laptop).
-# Copy of ebda-foundation/.github/workflows/ai-review.yml with `on:` = pull_request (Ruling AIR-3: switch to `uses:` once the foundation's
-# Actions access is `organization`). Everything under `jobs:` must stay identical to the foundation file.
-# Secret: CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`). Risky PR + no secret or any infra error = FAIL, never pass.
+# Independent review of every PR except an all-safe one (docs / markdown / tests only), run in CI, not on the controller's laptop.
+# THE GATE RUNS FROM THE BASE BRANCH. The workflow file comes from the base (pull_request_target), the scripts and prompt are
+# checked out from the base branch tip, and the PR's commits are fetched as DATA (git diff) only: never checked out, never
+# executed. A PR that edits the gate cannot change how it is judged, and the edit is itself a non-safe path, so it is reviewed.
+# Classification is fail-closed (ci/ai-review/risky-paths.mjs): only an all-docs/markdown/tests diff skips review.
+# A diff over 400 KB fails with a clear message: it needs human/controller review, then the label `ai-review-passed` by hand.
+# Risky + any infra problem (no secret, CLI crash, bad JSON) = FAIL, never pass. Secret: CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`).
+# Copy of ebda-foundation/.github/workflows/ai-review.yml with `on:` = pull_request_target (foundation Ruling AIR-3: switch to `uses:` once the
+# foundation's Actions access is `organization`). Everything under `jobs:` must stay identical to the foundation file.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -28,6 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.base.ref }}
           fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -36,23 +42,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          git fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+          [ "$(git rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
           # a new head invalidates any earlier pass: the label must always describe the CURRENT head
           gh pr edit "$PR" --remove-label ai-review-passed 2>/dev/null || true
-          git diff --name-only "$BASE...$HEAD" > changed.txt
+          git diff --name-only --no-renames "origin/$BASE_REF...refs/pr/head" > changed.txt
           node .github/ai-review/risky-paths.mjs < changed.txt > risky.txt
           if [ -s risky.txt ]; then
             echo "risky=true" >> "$GITHUB_OUTPUT"
-            gh label create risky-path --color B60205 --description "touches money/auth/data/migrations: needs ai-review-passed" 2>/dev/null || true
+            gh label create risky-path --color B60205 --description "not a docs/markdown/tests-only diff: needs ai-review-passed" 2>/dev/null || true
             gh pr edit "$PR" --add-label risky-path
-            echo "risky paths:"; cat risky.txt
+            echo "paths that need review:"; cat risky.txt
           else
             echo "risky=false" >> "$GITHUB_OUTPUT"
             gh pr edit "$PR" --remove-label risky-path 2>/dev/null || true
-            echo "no risky paths: review not required"
+            echo "all-safe diff (docs, markdown, tests only): review not required"
           fi
 
   review:
@@ -64,6 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.base.ref }}
           fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -73,22 +82,33 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
-            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. This PR touches money/auth/data paths and cannot merge unreviewed. Ahmad: run 'claude setup-token', then 'gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <owner>/<repo>' (or once at org level)."
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. This PR cannot merge unreviewed. Ahmad: run 'claude setup-token', then 'gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <owner>/<repo>' (or once at org level)."
             exit 1
           fi
       - name: Install the Claude CLI (pinned)
         run: npm install --global --ignore-scripts @anthropic-ai/claude-code@2.1.310
+      - name: Build the diff (fail closed when it is too large)
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+          [ "$(git rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
+          git diff --no-renames --unified=3 "origin/$BASE_REF...refs/pr/head" > pr.diff
+          size="$(wc -c < pr.diff | tr -d ' ')"
+          if [ "$size" -ge 400000 ]; then
+            echo "::error::The diff is $size bytes (limit 400000). A partial review would pass what it never read, so this PR is NOT reviewed automatically: it needs human/controller review, then the label ai-review-passed applied by hand. Splitting the PR is the better fix."
+            exit 1
+          fi
       - name: Review the diff
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
           AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
         run: |
           set -euo pipefail
           # diff on stdin as data, rules as the prompt; no tools: the reviewer reads, it cannot act
-          git diff --unified=3 "$BASE...$HEAD" | head -c 400000 > pr.diff
-          if [ "$(wc -c < pr.diff)" -ge 400000 ]; then echo "::warning::diff truncated at 400 KB; the reviewer saw the first part only"; fi
           model=(); [ -n "${AI_REVIEW_MODEL:-}" ] && model=(--model "$AI_REVIEW_MODEL")
           claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > /tmp/claude-out.json
       - name: Post findings and gate

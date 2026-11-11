@@ -1,34 +1,27 @@
 #!/usr/bin/env node
-// Classifies changed file paths as risky (money / auth / data / migrations). Reads one path per line on stdin and
-// prints the risky ones. Matching is on whole path TOKENS (split on / . _ - and camelCase), not substrings: the old
-// drain regex matched `cod` inside `codemod` and `role` inside `controller`, which held harmless PRs forever.
-// usage: git diff --name-only base...head | node risky-paths.mjs        exit 0 always; empty output = not risky
+// Decides which changed paths need the independent AI review. FAIL CLOSED: a path is exempt only when it is provably
+// harmless (markdown, docs/, test files); EVERYTHING else needs review. A word list of "risky" names (the first version)
+// was open by construction: it missed packages/database, schema.prisma, order.routes, RLS, and the gate's own files.
+// Reads one path per line on stdin, prints the paths that need review. Empty output = an all-safe diff (docs/tests/md only).
+//   git diff --name-only --no-renames base...head | node risky-paths.mjs
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-export const RISKY_WORDS = [
-  'billing', 'payment', 'refund', 'checkout', 'coupon', 'promotion', 'discount', 'wallet', 'ledger', 'invoice',
-  'instapay', 'kashier', 'cod', 'money', 'price', 'pricing', 'auth', 'authn', 'authz', 'authentication',
-  'authorization', 'identity', 'session', 'passkey', 'mfa', 'erasure', 'pdpl', 'migration', 'tenant',
-  'permission', 'role', 'webhook', 'secret',
-];
-const WORDS = new Set(RISKY_WORDS);
+const MARKDOWN = /\.(?:md|mdx)$/i;
+const DOC_ASSET = /^docs\/.+\.(?:md|mdx|txt|png|jpe?g|gif|svg|webp)$/i;
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+const TEST_DIR = /(?:^|\/)(?:__tests__|e2e|tests?)\//;
 
-export function tokens(path) {
-  return path
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
+/** true only for docs / markdown / tests: nothing that runs in production or in CI */
+export function isSafe(path) {
+  const p = path.trim().replace(/^\.\//, '');
+  // .github/ holds the gate, its prompt (markdown!) and the workflows: never exempt, whatever the extension
+  if (!p || p.includes('..') || p.startsWith('.github/')) return false;
+  return MARKDOWN.test(p) || DOC_ASSET.test(p) || TEST_FILE.test(p) || TEST_DIR.test(p);
 }
 
-const singular = (t) => (t.endsWith('ies') ? t.slice(0, -3) + 'y' : t.endsWith('es') && WORDS.has(t.slice(0, -2)) ? t.slice(0, -2) : t.endsWith('s') ? t.slice(0, -1) : t);
-
-export function isRisky(path) {
-  return tokens(path).some((t) => WORDS.has(t) || WORDS.has(singular(t)));
-}
-
-export const riskyPaths = (paths) => paths.filter((p) => p.trim() && isRisky(p.trim()));
+export const isRisky = (path) => !isSafe(path);
+export const riskyPaths = (paths) => paths.map((p) => p.trim()).filter((p) => p && !isSafe(p));
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const out = riskyPaths(readFileSync(0, 'utf8').split('\n'));
