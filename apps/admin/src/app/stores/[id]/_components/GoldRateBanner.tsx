@@ -33,9 +33,11 @@ export function GoldRateBanner({ storeId }: { storeId: string }) {
     };
   }, [storeId]);
 
-  if (!state?.settings?.enabled || !state.goldProductCount) return null;
-  const stale = (state.rates ?? []).some(r => r.ratePerGram === null || r.stale);
+  if (!state) return null;
   const pending = (state.pending ?? []).length > 0;
+  // A waiting rate needs its owner whether or not gold products exist yet; the stale line only matters once they do.
+  if (!pending && (!state.settings?.enabled || !state.goldProductCount)) return null;
+  const stale = (state.rates ?? []).some(r => r.ratePerGram === null || r.stale);
   if (!stale && !pending) return null;
 
   return (

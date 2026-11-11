@@ -10736,6 +10736,7 @@
       "body": "Price this piece from today's gold rate. You set the weight and the making charge; the price follows the rate.",
       "toggle": "Price this product by gold",
       "featureOff": "Turn on gold pricing in Gold rates first.",
+      "featureOffSaved": "This product is set to gold pricing, but gold pricing is off for the store. Turn it on in Gold rates so the price updates.",
       "karat": "Karat",
       "grams": "Weight (grams)",
       "gramsHint": "Up to two decimals, for example 4.35",
