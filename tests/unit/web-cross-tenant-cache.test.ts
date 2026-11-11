@@ -185,13 +185,11 @@ describe('middleware — the Host alone picks the store', () => {
   });
 
   // SUBDOMAIN-SOON-2: every coming-soon software product has its page, named as in BRAND.comingProducts. invite/ads/quote
-  // used to reach the store lookup (500s and the store's 404); now none of them ever looks up a store.
+  // used to reach the store lookup (500s and the store's 404); now none of them ever looks up a store. Public copy lists
+  // only CRM and ERP as coming soon (this PR), so invite/ads/quote render the generic page: covered by the host test above.
   it.each([
     ['crm.ebda.app', 'ابدأ CRM', 'Ebda CRM'],
     ['erp.ebda.app', 'ابدأ ERP', 'Ebda ERP'],
-    ['invite.ebda.app', 'ابدأ إنفايت', 'Ebda Invite'],
-    ['ads.ebda.app', 'ابدأ آدز', 'Ebda Ads'],
-    ['quote.ebda.app', 'ابدأ ستوديو للتسعير', 'Ebda Quote Studio'],
   ])(
     '%s is its coming-soon page, Arabic by default and English on ?lang=en',
     async (host, ar, en) => {
