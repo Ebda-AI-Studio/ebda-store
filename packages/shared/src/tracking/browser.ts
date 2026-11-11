@@ -102,11 +102,27 @@ const PIXEL_SENSITIVE_KEY = /e[-_]?mail|phone|mobile|tel|whats(app)?|name|addres
 const CLICK_ID_KEY = /^(fbclid|gclid|ttclid|msclkid|wbraid|gbraid)$/i;
 
 function safeDecode(v: string): string {
-  try {
-    return decodeURIComponent(v.replace(/\+/g, ' '));
-  } catch {
-    return v;
+  // Decode until stable (max 3 passes): `%2540` is a double-encoded `@`.
+  let cur = v;
+  for (let i = 0; i < 3; i++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(cur.replace(/\+/g, ' '));
+    } catch {
+      break;
+    }
+    if (next === cur) break;
+    cur = next;
   }
+  return cur;
+}
+
+/** Arabic-Indic (U+0660-0669) and Persian (U+06F0-06F9) digits -> ASCII, so a phone typed in Arabic digits counts. */
+function asciiDigits(v: string): string {
+  return v.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, ch => {
+    const c = ch.charCodeAt(0);
+    return String(c >= 0x06f0 ? c - 0x06f0 : c - 0x0660);
+  });
 }
 
 /**
@@ -126,7 +142,8 @@ export function pixelQuerySensitive(search: string | null | undefined): boolean 
     const value = eq < 0 ? '' : safeDecode(pair.slice(eq + 1));
     if (PIXEL_SENSITIVE_KEY.test(key)) return true;
     if (value.includes('@')) return true;
-    if (!CLICK_ID_KEY.test(key) && /\d{7,}/.test(value.replace(/[\s\-.()+_/]/g, ''))) return true;
+    if (!CLICK_ID_KEY.test(key) && /\d{7,}/.test(asciiDigits(value).replace(/[\s\-.()+_/]/g, '')))
+      return true;
   }
   return false;
 }
