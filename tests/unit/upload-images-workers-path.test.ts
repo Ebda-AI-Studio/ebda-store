@@ -39,6 +39,10 @@ const { uploadMultiple } = vi.hoisted(() => ({
     files.map(f => ({ key: f.filename, url: `u/${f.filename}`, size: 1, contentType: 'image/png' }))
   ),
 }));
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertStorageRoom: vi.fn(async () => undefined),
+}));
+
 vi.mock('@api/services/storage.service', () => ({
   StorageService: { upload: vi.fn(), uploadMultiple, isAvailable: () => true },
 }));

@@ -26,7 +26,12 @@ const { putMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@api/services/storage.service', () => ({
-  StorageService: { upload: putMock, uploadMultiple: vi.fn(), isAvailable: () => true },
+  StorageService: {
+    upload: putMock,
+    uploadMultiple: vi.fn(),
+    isAvailable: () => true,
+    listStoreSizes: async () => ({ sizes: [], nextCursor: null }),
+  },
 }));
 vi.mock('@api/middleware/security', async importOriginal => ({
   ...(await importOriginal<typeof import('@api/middleware/security')>()),

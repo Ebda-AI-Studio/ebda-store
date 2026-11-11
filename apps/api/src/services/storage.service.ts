@@ -518,6 +518,29 @@ export class StorageService {
     };
   }
 
+  /** S3-X8: every object under `stores/<storeId>/` (originals and variants), sizes only, 1000 keys a page. */
+  static async listStoreSizes(
+    storeId: string,
+    cursor?: string
+  ): Promise<{ sizes: number[]; nextCursor: string | null }> {
+    if (!/^[0-9a-f-]{36}$/i.test(storeId)) {
+      throw new AppError(400, 'INVALID_PREFIX', 'listStoreSizes requires a store id');
+    }
+    const client = await this.getClient();
+    const listed = await client.send(
+      new (await loadS3()).ListObjectsV2Command({
+        Bucket: config.storageBucket,
+        Prefix: `stores/${storeId}/`,
+        ContinuationToken: cursor,
+        MaxKeys: 1000,
+      })
+    );
+    return {
+      sizes: (listed.Contents ?? []).map(o => o.Size ?? 0),
+      nextCursor: listed.IsTruncated ? (listed.NextContinuationToken ?? null) : null,
+    };
+  }
+
   /**
    * Get public URL for a file
    */

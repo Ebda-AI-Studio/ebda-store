@@ -44,6 +44,10 @@ vi.mock('@api/services/image-resize.service', () => ({
   enforceMaxDimensions: enforceMaxDimensionsMock,
 }));
 
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertStorageRoom: vi.fn(async () => undefined),
+}));
+
 vi.mock('@api/services/storage.service', () => ({
   StorageService: {
     uploadMultiple: uploadMultipleMock,
