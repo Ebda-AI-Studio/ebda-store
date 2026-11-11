@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { storeDb, storeMoney } from '../lib/repo-factory';
-import { requestHoldsOrderViewToken } from '../lib/order-view-token';
+import { requestHoldsOrderViewToken, requireOrderViewToken } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import {
   INSTAPAY_DEFAULT_EXPIRY_HOURS,
@@ -1070,13 +1070,13 @@ const receiptUpload = multer({
 
 /**
  * POST /payments/instapay/:orderId/receipt — the shopper uploads the InstaPay receipt
- * screenshot (multipart `file`). Public by order id (an unguessable v4 UUID, like the
- * rest of this flow). Rate-limited per IP and capped per order; stored in the PRIVATE
+ * screenshot (multipart `file`). Guarded by the order's signed view token (TEN-5). Rate-limited per IP and capped per order; stored in the PRIVATE
  * bucket only; the AI read is queued and the shopper polls GET .../receipt/:id.
  */
 router.post(
   '/instapay/:orderId/receipt',
   paymentLimiter,
+  requireOrderViewToken, // TEN-5: the order UUID alone is not a credential; refuse BEFORE multer buffers the file
   uploadLimiter,
   dailyUploadLimiter,
   receiptUpload.single('file'),
@@ -1129,6 +1129,7 @@ router.get(
 router.post(
   '/instapay/:orderId/receipt/:receiptId/submit',
   paymentLimiter,
+  requireOrderViewToken, // TEN-5
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const orderId = z.string().uuid().parse(req.params.orderId);

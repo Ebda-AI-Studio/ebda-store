@@ -66,3 +66,28 @@ export function requestHoldsOrderViewToken(
     return false;
   }
 }
+
+/**
+ * TEN-5 (2026-11-12 audit): route guard for the guest InstaPay WRITES (`receipt` upload, `submit`). The order UUID
+ * alone is not a credential (it leaks through history, screenshots, shared links); anyone holding it could upload a
+ * receipt or submit fields and freeze another shopper's hold. Same signed token the reads already use. Mount it
+ * BEFORE multer so a refused request never buffers an upload. Bad/missing UUID falls through to the handler's own
+ * zod 400.
+ */
+export function requireOrderViewToken(
+  req: { get(name: string): string | undefined; params: Record<string, string | undefined> },
+  res: {
+    status(code: number): { json(body: unknown): unknown };
+  },
+  next: () => void
+): void {
+  const orderId = req.params.orderId ?? '';
+  if (!UUID_RE.test(orderId) || requestHoldsOrderViewToken(req, orderId)) return next();
+  res.status(403).json({
+    success: false,
+    error: {
+      code: 'ORDER_VIEW_TOKEN_REQUIRED',
+      message: 'This order can only be changed from the device that placed it.',
+    },
+  });
+}

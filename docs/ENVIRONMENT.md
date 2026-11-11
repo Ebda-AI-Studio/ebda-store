@@ -308,7 +308,7 @@ Names only. "Set" says where it lives: wrangler var (committed in the Worker's `
 - `META_GRAPH_API_VERSION` — optional Meta Graph API version pin (`ebda-ads.service.ts`, `pixels-capi.service.ts`). Set: wrangler var.
 - `CARRIER_CALL_TIMEOUT_MS` — optional carrier HTTP timeout (`lib/carrier-http.ts`). Set: wrangler var.
 - `PAYMENT_RECONCILE_RECENCY_HOURS` — optional payment reconcile window (`payment-reconcile-sweep.ts`). Set: wrangler var.
-- `PDPL_CF_ERASURE_ENABLED` — optional gate for the Cloudflare-side erasure job (`cf/erasure/job.ts`). Set: wrangler var.
+- `PDPL_CF_ERASURE_ENABLED` — optional gate for the Cloudflare-side erasure job (`cf/erasure/job.ts`). Set: wrangler var. **While it is not `"true"`, `POST /auth/me/close-account` records the request, alerts ops (P1) and answers `503 ERASURE_NOT_ENABLED` (Egyptian Arabic + English message: nothing was erased); it never answers 202/"closed" (S3, 2026-11-12). The live state is `checks.pdplErasure` in the super-admin `GET /api/v1/health`.** Enabling it is Ahmad's call, after #595.
 
 ### API Worker: RETIRED names (Railway / Inngest / Redis), kept until the Cloudflare cutover completes
 

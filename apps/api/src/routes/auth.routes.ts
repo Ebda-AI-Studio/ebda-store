@@ -984,7 +984,7 @@ router.post(
 );
 
 // POST /auth/me/close-account - merchant / staff account closure (M-024, Ruling M024-1). Triggers the PDPL erasure job
-// (flag-gated by PDPL_CF_ERASURE_ENABLED; off = the request is recorded and nothing is erased). A shopper uses /me/erase.
+// (flag-gated by PDPL_CF_ERASURE_ENABLED; off = the request is recorded, ops alerted and the caller gets 503 ERASURE_NOT_ENABLED, never a success). A shopper uses /me/erase.
 router.post(
   '/me/close-account',
   authLimiter,
@@ -1005,10 +1005,9 @@ router.post(
         { userId, requestId: `close:${userId}` },
         closureDeps(req)
       );
-      if (outcome.status === 'erased') clearSessionCookies(res);
-      res
-        .status(outcome.status === 'erased' ? 200 : 202)
-        .json({ success: true, data: { status: outcome.status } });
+      // Only a real erasure reaches here; the flag-off path throws 503 ERASURE_NOT_ENABLED (S3).
+      clearSessionCookies(res);
+      res.status(200).json({ success: true, data: { status: outcome.status } });
     } catch (error) {
       next(error);
     }

@@ -206,3 +206,51 @@ describe('route wiring', () => {
     expect(src).toContain('return signOrderViewToken(orderId);');
   });
 });
+
+describe('TEN-5: InstaPay receipt upload + submit need the order view token', () => {
+  const run = async (orderId: string, header?: string) => {
+    const { requireOrderViewToken } = await import('@api/lib/order-view-token');
+    let status = 0;
+    let body: { error?: { code?: string } } = {};
+    let nexted = false;
+    requireOrderViewToken(
+      {
+        get: (n: string) => (n.toLowerCase() === 'x-order-view-token' ? header : undefined),
+        params: { orderId },
+      },
+      {
+        status(c: number) {
+          status = c;
+          return { json: (b: unknown) => void (body = b as typeof body) };
+        },
+      },
+      () => {
+        nexted = true;
+      }
+    );
+    return { status, body, nexted };
+  };
+
+  it('403s with no token, a wrong-order token, and passes with the order token', async () => {
+    const { signOrderViewToken } = await import('@api/lib/order-view-token');
+    const none = await run(A);
+    expect(none.status).toBe(403);
+    expect(none.body.error?.code).toBe('ORDER_VIEW_TOKEN_REQUIRED');
+    expect(none.nexted).toBe(false);
+    expect((await run(A, signOrderViewToken(B))).nexted).toBe(false);
+    expect((await run(A, signOrderViewToken(A))).nexted).toBe(true);
+  });
+
+  it('both write routes mount the guard before the handler (and upload before multer)', () => {
+    const pay = fs.readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/routes/payment.routes.ts'),
+      'utf8'
+    );
+    expect(pay).toMatch(
+      /'\/instapay\/:orderId\/receipt',\s*paymentLimiter,\s*requireOrderViewToken[^\n]*\n\s*uploadLimiter/
+    );
+    expect(pay).toMatch(
+      /'\/instapay\/:orderId\/receipt\/:receiptId\/submit',\s*paymentLimiter,\s*requireOrderViewToken/
+    );
+  });
+});

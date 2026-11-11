@@ -46,10 +46,17 @@ describe('marketing CSP (public/_headers)', () => {
     expect(dir('frame-ancestors')).toBe("frame-ancestors 'none'");
     expect(dir('form-action')).toBe(`form-action 'self' ${BRAND_API_URL}`);
   });
-  it('does not widen script, connect or frame sources for the form', () => {
-    for (const d of ['script-src', 'connect-src', 'frame-src', 'default-src'])
-      expect(dir(d), d).toBeUndefined();
-    expect(csp).not.toMatch(/\*|unsafe-|turnstile|challenges\./i);
+  it('S6: has a default-src floor and a self-only script-src (no remote script host, no eval)', () => {
+    expect(dir('default-src')).toBe("default-src 'self'");
+    expect(dir('script-src')).toBe("script-src 'self' 'unsafe-inline'");
+    expect(dir('script-src-attr')).toBe("script-src-attr 'none'");
+    expect(dir('object-src')).toBe("object-src 'none'");
+    expect(dir('base-uri')).toBe("base-uri 'self'");
+  });
+  it('does not widen connect or frame sources for the form', () => {
+    expect(dir('connect-src')).toBe("connect-src 'self' https://api.ebda.app");
+    expect(dir('frame-src')).toBe("frame-src 'none'");
+    expect(csp).not.toMatch(/\*|unsafe-eval|turnstile|challenges\./i);
   });
   it('the form does not load any third-party script', () => {
     const src = readFileSync(path.join(MK, 'src/components/ContactForm.tsx'), 'utf8');
