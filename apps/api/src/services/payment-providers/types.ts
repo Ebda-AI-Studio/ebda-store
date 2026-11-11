@@ -136,6 +136,12 @@ export interface RefundRequest {
    */
   refundKey?: string;
   /**
+   * PaymentService.refund only — never sent to a provider. The client's request attempt (derived from its
+   * Idempotency-Key, #628): a second claim under the same attempt while an earlier one is still open (sent, or
+   * indeterminate) is refused REFUND_ALREADY_ISSUED. Unlike `refundKey` it does NOT change how the refund is booked.
+   */
+  attemptKey?: string;
+  /**
    * PaymentService.refund only. The caller applies ITEM-LEVEL effects itself
    * (a partial return), so even a refund that uses up the payment must not
    * flip the order to refunded or run the whole-order reversals: lines the

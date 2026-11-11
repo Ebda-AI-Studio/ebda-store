@@ -433,6 +433,8 @@ export function beginRefund(
     paymentId: string;
     amount?: number;
     refundKey?: string;
+    /** the client request attempt (its Idempotency-Key, #628): an open claim under it refuses a second one */
+    attemptKey?: string;
     reason?: string;
     itemLevel?: boolean;
     claimId?: string;
@@ -465,21 +467,29 @@ export function beginRefund(
     const o = loadOrder(db, a.storeId, p.order_id);
     if (flipsOrder) assertTransition(o.status, 'refunded');
     const claimId = a.claimId ?? crypto.randomUUID();
-    if (a.refundKey) {
-      const released = releasedClaims(db, p.id);
-      const open = db
-        .all(
-          `SELECT json_extract(details, '$.claimId') AS cid FROM payment_events WHERE payment_id = ? AND event_type = ? AND json_extract(details, '$.refundKey') = ?`,
-          [p.id, REFUND_CLAIM_EVENT, a.refundKey]
-        )
-        .map(r => r.cid as string)
-        .filter(cid => !released.has(cid));
-      if (open.length > 0)
+    // A retry must not pay twice: an OPEN claim (sent or indeterminate; a provider refusal releases it) under the same
+    // business key or the same client attempt refuses a second one. The attempt key is checked across the ORDER's payments.
+    for (const [field, value] of [
+      ['refundKey', a.refundKey],
+      ['attemptKey', a.attemptKey],
+    ] as const) {
+      if (!value) continue;
+      const rows = db.all(
+        `SELECT payment_id, json_extract(details, '$.claimId') AS cid FROM payment_events
+          WHERE store_id = ? AND order_id = ? AND event_type = ? AND json_extract(details, '$.${field}') = ?`,
+        [a.storeId, p.order_id, REFUND_CLAIM_EVENT, value]
+      );
+      const released = new Set(
+        [...new Set(rows.map(r => r.payment_id as string))].flatMap(pid => [
+          ...releasedClaims(db, pid),
+        ])
+      );
+      if (rows.some(r => !released.has(r.cid as string)))
         throw err(
           'REFUND_ALREADY_ISSUED',
           'A refund for this was already sent to the payment provider and may have gone through. Check the provider dashboard before refunding again.',
           409,
-          { refundKey: a.refundKey }
+          { [field]: value }
         );
     }
     const claimedStatus = isFull ? 'refunded' : 'partially_refunded';
@@ -505,6 +515,7 @@ export function beginRefund(
         claimId,
         amount,
         refundKey: a.refundKey ?? null,
+        attemptKey: a.attemptKey ?? null,
         reason: a.reason ?? null,
         flipsOrder,
         isFullRefund: isFull,

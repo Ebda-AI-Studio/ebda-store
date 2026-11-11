@@ -699,6 +699,7 @@ export interface MoneyClient {
       paymentId: string;
       amount?: number;
       refundKey?: string;
+      attemptKey?: string;
       reason?: string;
       itemLevel?: boolean;
     },

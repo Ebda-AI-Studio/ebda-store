@@ -696,6 +696,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       paymentId: id(a.paymentId, 'paymentId'),
       amount: typeof a.amount === 'number' ? a.amount : undefined,
       refundKey: typeof a.refundKey === 'string' ? a.refundKey : undefined,
+      attemptKey: typeof a.attemptKey === 'string' ? a.attemptKey.slice(0, 200) : undefined,
       reason: typeof a.reason === 'string' ? a.reason : undefined,
       itemLevel: a.itemLevel === true,
     }),
