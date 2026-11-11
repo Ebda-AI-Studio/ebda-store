@@ -54,7 +54,7 @@ describe('acrossStores default isolation', () => {
       { storeIds: ids, startOffset: 0 }
     );
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(String(spy.mock.calls[0][0])).toContain('"failed":5');
+    expect(String(spy.mock.calls[0][0])).toContain('5 of 5 stores failed');
     spy.mockRestore();
   });
   it('abortOnError: true rejects on the first error (explicit opt-in)', async () => {

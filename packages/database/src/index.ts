@@ -1068,17 +1068,12 @@ export async function acrossStores<T>(
   if (abort) throw abort.err;
   if (failures.length > 0 && !opts.onStoreError) {
     // ONE line per call with counts (not per store); the log-drain error watch alerts on it.
+    const sample = failures
+      .slice(0, 5)
+      .map(f => `${f.storeId}:${(f.err as { code?: string })?.code ?? 'error'}`)
+      .join(',');
     console.error(
-      JSON.stringify({
-        level: 'error',
-        msg: '[acrossStores] stores failed; sweep carried on',
-        failed: failures.length,
-        of: total,
-        sample: failures.slice(0, 5).map(f => ({
-          storeId: f.storeId,
-          error: (f.err as { code?: string; message?: string })?.code ?? (f.err as Error)?.message,
-        })),
-      })
+      `[acrossStores] ${failures.length} of ${total} stores failed; sweep carried on (${sample})`
     );
   }
   return Object.assign(
