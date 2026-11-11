@@ -455,7 +455,7 @@ function computeLineAdjustments(
 export interface ReturnCreateArgs {
   storeId: string;
   orderId: string;
-  /** null = a GUEST return (Ruling GUEST-RET-1): the order has no customer. Stored as NULL (cf-0006 made the column nullable on every StoreDO). */
+  /** null = a GUEST return (Ruling GUEST-RET-1): the order has no customer. Stored as NULL (cf-0008_returns_customer_nullable made the column nullable on every StoreDO). */
   customerId: string | null;
   type: string;
   reason: string;
