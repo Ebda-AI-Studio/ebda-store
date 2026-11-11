@@ -1,3 +1,4 @@
+import { resolveNamePair } from '../lib/product-name-pair';
 import { Router, Request, Response, NextFunction } from 'express';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { z } from 'zod/v3';
@@ -49,7 +50,11 @@ const badgeLabelSchema = z
   });
 
 const createProductSchema = z.object({
-  name: z.string().min(1).max(255),
+  // The name in either language (Ruling NAME-PAIR-1): `name` / `nameEn` is English, `nameAr` Arabic, and at least one
+  // is required on create. `sourceLang` says which language a lone `name` was typed in. See lib/product-name-pair.ts.
+  name: z.string().min(1).max(255).optional(),
+  nameEn: z.string().min(1).max(255).optional(),
+  sourceLang: z.enum(['ar', 'en']).optional(),
   // Free-text columns the merchant can legitimately empty on the edit form.
   // Nullable so an emptied input can CLEAR the column — `undefined` (key
   // omitted) still means "leave alone", same convention as `excerpt` and the
@@ -178,13 +183,45 @@ function refineFixedDiscount(
   }
 }
 
+/** Fold `name` / `nameEn` / `nameAr` / `sourceLang` into the stored pair (Ruling NAME-PAIR-1). */
+function foldName<
+  T extends {
+    name?: string;
+    nameEn?: string;
+    nameAr?: string | null;
+    sourceLang?: 'ar' | 'en';
+  },
+>(data: T, op: 'create' | 'update') {
+  const { nameEn, sourceLang, name, nameAr, ...rest } = data;
+  const touched = name !== undefined || nameEn !== undefined || nameAr !== undefined;
+  if (!touched) return { ...rest, namePlaceholder: false };
+  const pair = resolveNamePair({ name, nameEn, nameAr, sourceLang }, op);
+  return { ...rest, ...pair };
+}
+
+const requireAName = (
+  data: { name?: string; nameEn?: string; nameAr?: string | null },
+  ctx: z.RefinementCtx
+) => {
+  if (!data.name?.trim() && !data.nameEn?.trim() && !data.nameAr?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['name'],
+      message: 'A product name is required (English or Arabic).',
+    });
+  }
+};
+
 export const createProductSchemaChecked = createProductSchema
   .superRefine(refineFixedDiscount)
-  .transform(foldImage);
+  .superRefine(requireAName)
+  .transform(foldImage)
+  .transform(d => foldName(d, 'create') as typeof d & { name: string; namePlaceholder: boolean });
 export const updateProductSchema = createProductSchema
   .partial()
   .superRefine(refineFixedDiscount)
-  .transform(foldImage);
+  .transform(foldImage)
+  .transform(d => foldName(d, 'update'));
 
 /**
  * @swagger

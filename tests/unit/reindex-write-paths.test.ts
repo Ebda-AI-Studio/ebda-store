@@ -37,6 +37,8 @@ const REVIEWED: Record<string, { sites: number; via: Via[] }> = {
   // bulkUpdate (`scalarData`, when it carries status) request a reindex (review M5). The 5th site is
   // `updateOnDo`'s product row write: the Durable Object twin of `update`'s transaction, reached only from
   // `update`, which emits product.upserted after it either way (CF-WRITES-2).
+  // the one-time name-pair repair (Ruling NAME-PAIR-1) emits product.upserted for every row it writes
+  'apps/api/src/services/product-name-repair.service.ts': { sites: 1, via: ['product.upserted'] },
   'apps/api/src/services/product.service.ts': {
     sites: 5,
     via: ['product.upserted', 'requestStoreReindex'],

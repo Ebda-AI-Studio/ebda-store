@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Input } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { ImageUpload } from '../../../components/ImageUpload';
-import { apiPost } from '../../../lib/api';
+import { adminUiLocale, apiPost } from '../../../lib/api';
 import { egpToPiastres } from '../../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
 
@@ -49,7 +49,10 @@ export function ProductStep({
 
     setAdding(true);
     const { error } = await apiPost(`/api/v1/stores/${storeId}/products`, {
+      // One field, typed in the admin's language: say which, so an Arabic name is stored as the Arabic name and the AI
+      // fills the English one (never the reverse; 2026-11-10 swapped pair, Ruling NAME-PAIR-1).
       name: name.trim(),
+      sourceLang: adminUiLocale(),
       price: piastres,
       // New products from onboarding go live with the store.
       status: 'active',
