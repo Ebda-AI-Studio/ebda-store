@@ -121,12 +121,12 @@ describe('order-driven purge is coalesced per store (#1220)', () => {
     for (let i = 0; i < 20; i++) await invalidateStoreProductCachesAfterOrder(store);
     expect(revalidateSpy).toHaveBeenCalledTimes(1);
 
-    vi.advanceTimersByTime(ORDER_PURGE_COALESCE_MS);
+    await vi.advanceTimersByTimeAsync(ORDER_PURGE_COALESCE_MS);
     // The orders that arrived mid-window are not left stale: one trailing purge.
     expect(revalidateSpy).toHaveBeenCalledTimes(2);
 
     // Nothing arrived in the second window — it closes without a purge.
-    vi.advanceTimersByTime(ORDER_PURGE_COALESCE_MS);
+    await vi.advanceTimersByTimeAsync(ORDER_PURGE_COALESCE_MS);
     expect(revalidateSpy).toHaveBeenCalledTimes(2);
 
     // Quiet again: the next order purges immediately.
@@ -240,5 +240,49 @@ describe('bundle writes fire ONE storefront purge (issue 2202)', () => {
     // one bust per bundle write: create, update, deactivate
     expect(callsIn(sf, /\.bundle\.(create|update)$/)).toHaveLength(5); // DO + Postgres create/update, deactivate
     expect(callsIn(sf, 'invalidateStoreBundlesCache')).toEqual([]);
+  });
+});
+
+import { runWithWaitUntil } from '../../apps/api/src/cf/bindings';
+
+describe('order purge trailing timer survives Workers (P2-1)', () => {
+  beforeEach(() => {
+    revalidateSpy.mockClear();
+  });
+
+  it('hands the trailing wait to ctx.waitUntil so the isolate stays alive for it', async () => {
+    const kept: Promise<unknown>[] = [];
+    vi.useFakeTimers();
+    try {
+      await runWithWaitUntil(
+        p => kept.push(p),
+        async () => {
+          await invalidateStoreProductCachesAfterOrder('store-wu');
+          await invalidateStoreProductCachesAfterOrder('store-wu'); // mid-window
+        }
+      );
+      expect(kept).toHaveLength(1);
+      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(ORDER_PURGE_COALESCE_MS);
+      await kept[0];
+      expect(revalidateSpy).toHaveBeenCalledTimes(2); // the trailing purge ran
+    } finally {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('a window whose timer was dropped does not suppress purges forever', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); // clock moves, timers never fire = a dropped timer
+    try {
+      await invalidateStoreProductCachesAfterOrder('store-dropped');
+      await invalidateStoreProductCachesAfterOrder('store-dropped');
+      expect(revalidateSpy).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(Date.now() + ORDER_PURGE_COALESCE_MS * 2 + 1);
+      await invalidateStoreProductCachesAfterOrder('store-dropped');
+      expect(revalidateSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

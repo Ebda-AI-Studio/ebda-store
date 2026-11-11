@@ -23,7 +23,7 @@ export type BridgeFailure =
   | 'unavailable';
 export type BridgeResult<T> =
   | { ok: true; value: T }
-  | { ok: false; reason: BridgeFailure; message?: string; outOfStock?: string[] };
+  | { ok: false; reason: BridgeFailure; message?: string; outOfStock?: string[]; code?: string };
 
 export interface StoreProfile {
   name: string;
@@ -78,7 +78,8 @@ export class PortError extends Error {
   constructor(
     readonly reason: BridgeFailure,
     message?: string,
-    readonly outOfStock?: string[]
+    readonly outOfStock?: string[],
+    readonly code?: string
   ) {
     super(message ?? reason);
   }
@@ -200,6 +201,7 @@ export function createBridge(deps: BridgeDeps) {
           reason: err.reason,
           message: err.message,
           ...(err.outOfStock ? { outOfStock: err.outOfStock } : {}),
+          ...(err.code ? { code: err.code } : {}),
         };
       deps.log?.(`wa-bridge ${method} failed`, {
         storeId: String(storeId).slice(0, 36),
