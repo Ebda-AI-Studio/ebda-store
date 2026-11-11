@@ -3,8 +3,10 @@
  *
  * WHY (2026-11-10 incident, measured): every render asks `GET /public/store/resolve`; the API's `storeResolveLimiter`
  * (30/min per IP) saw the whole storefront as one client, so busy or unknown hosts flipped between 404 and 500 inside a
- * minute. The Next data cache was not protecting us: OpenNext's default `tagCache` is `"dummy"`, so the
- * `store-domain:<host>` purge never reached it, and it is not a stale-if-error store for a host it has never cached.
+ * minute. The Next data cache could not protect us: it has no stale-if-error for a host it has not cached since the
+ * entry expired, and it cannot tell a purge apart from an outage. (Production does run a DO-sharded tag cache via the
+ * deploy-generated open-next config, so its own tag purges work; the committed local config has none.) This module
+ * is therefore the ONE owner of resolve caching, checked against the purge epochs, and the resolve fetch is no-store.
  *
  * LAYERS (docs/plans/2026-11-10-resolve-bulletproof.md):
  *   L1 per-isolate memory of hits AND definitive misses (hit 60 s / miss 30 s; without R2 8 s / 15 s).
@@ -58,7 +60,9 @@ const MEMORY_MAX = 5_000;
 const lkgKey = (key: string) => `resolve-lkg/${key}`;
 
 function idOf(value: unknown): string {
-  const id = (value as { id?: unknown } | null)?.id;
+  // A parsed store carries `id`; a raw resolve body carries `data.store.id` (store-resolver.ts caches the raw body).
+  const v = value as { id?: unknown; data?: { store?: { id?: unknown } } } | null;
+  const id = v?.id ?? v?.data?.store?.id;
   return typeof id === 'string' && id ? id : '-';
 }
 

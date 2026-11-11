@@ -324,6 +324,23 @@ describe('review follow-ups (#519)', () => {
     await expect(resolveHost(host)).rejects.toBeInstanceOf(StoreTemporarilyUnavailableError);
   });
 
+  it('the durable copy is the RAW API body, parsed by the current build (it outlives deploys)', async () => {
+    const host = uniq('raw');
+    hoisted.objects.set(
+      `resolve-lkg/${host}`,
+      JSON.stringify({
+        at: clock - 1_000,
+        value: {
+          success: true,
+          data: { store: { id: 'raw-1', slug: 'raw', status: 'suspended' } },
+        },
+      })
+    );
+    const s = await resolveHost(host);
+    expect(s).toMatchObject({ id: 'raw-1', slug: 'raw', status: 'suspended' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('R2 down but API healthy: resolution keeps working', async () => {
     hoisted.state.r2Down = true;
     const host = uniq('r2down-ok');

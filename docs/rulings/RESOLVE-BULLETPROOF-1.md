@@ -11,9 +11,12 @@ Decision:
    misses (30 s), a durable R2 last-known-good (`resolve-lkg/<host>` in `NEXT_INC_CACHE_R2_BUCKET`) shared by every
    isolate, in-isolate coalescing, stale-if-error up to 24 h, one jittered retry (150-400 ms) only when no copy exists,
    never on a 404. Without R2 (next dev/start) the memory TTLs are 8 s / 15 s.
-2. The resolve fetches leave the Next data cache (`cache: 'no-store'`). OpenNext's default `tagCache` is `"dummy"`
-   (we configure only `incrementalCache`), so the `store-domain:<host>` purge never reached it: a suspended store stayed
-   resolvable for the 15 s TTL plus one stale serve.
+2. The resolve fetches leave the Next data cache (`cache: 'no-store'`): this module is the one owner of resolve
+   caching, so a post-purge refetch can never read an older copy from a second cache (the prod tag cache is regional),
+   and only this layer does stale-if-error. CORRECTION 2026-11-11: production DOES have a tag cache (the deploy-generated config, `OPENNEXT_CACHE=true`, scripts/cf-setup-local.sh: DO-sharded, `regionalCache: true`); only the committed local open-next.config.ts has none — the earlier
+   claim that the tag purge never reached the data cache in production was wrong. The durable copy stores the RAW API
+   body and the current build parses it, so a copy written by an older build (it outlives deploys, unlike #523's
+   contract-keyed fetch cache) never reaches new code in an old parsed shape.
 3. NEVER-stale (status, domain/slug ownership, plan entitlement): every serve, including stale-if-error, first checks the
    purge epochs (`all`, `host/<host>`, `id/<storeId>`) the Worker writes on `/api/revalidate` (STORE-EDGE-1). A copy
    older than a purge is never served, not even during an outage (503 instead).
@@ -44,9 +47,8 @@ between (a purge the API still failed to deliver after its 3 bounded attempts, o
 epoch, is then invisible for that window; there is no durable purge outbox: a queue-backed purge is the next step if
 `purge LOST` ever fires); a never-seen host has nothing to fall
 back on, so a drained bucket still answers it 503 (layer 1, PR #514, removes the shared bucket); the alert is per
-isolate and its delivery to a pager depends on the Sentry alert rules (not verified here). Out of scope, same dummy
-tagCache: the crawler/feed routes `sitemap.ts`, `robots.ts`, `llms.txt`, `feeds/products.json` and
-`agent-store-resolver.ts` still call the resolver through the Next data cache (600-3600 s, TTL-bounded only); they
+isolate and its delivery to a pager depends on the Sentry alert rules (not verified here). Out of scope: the crawler/feed routes `sitemap.ts`, `robots.ts`, `llms.txt`, `feeds/products.json` and
+`agent-store-resolver.ts` still call the resolver through the Next data cache (600-3600 s, tag-purged in production); they
 render no shopper page and a failure there is not an error page, so they stay BOUNDED-stale at those TTLs.
 
 Cost if wrong: a merchant suspended or a domain removed during an API outage whose purge never reached the storefront

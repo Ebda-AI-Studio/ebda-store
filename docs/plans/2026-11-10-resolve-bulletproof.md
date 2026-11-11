@@ -6,10 +6,9 @@ between 404 and 500 inside a minute. Layer 1 (per-shopper signed IP, PR #514) is
 
 ## Finding that shapes the design
 
-`apps/web/open-next.config.ts` sets only `incrementalCache: r2IncrementalCache`. OpenNext's default `tagCache` is
-`"dummy"` (`@opennextjs/cloudflare/dist/api/config.js` `resolveTagCache(value = "dummy")`), so `revalidateTag
-('store-domain:<host>')` never reached the Next data cache: the resolve copy there was only TTL-bounded (15 s + one
-stale serve). Store status and domain ownership are NEVER-stale, so the resolve call now bypasses the Next data cache
+CORRECTION 2026-11-11: production DOES have a tag cache (the deploy-generated config, `OPENNEXT_CACHE=true`, scripts/cf-setup-local.sh: DO-sharded, `regionalCache: true`); only the committed local open-next.config.ts has none. So the tag purge did reach the Next data cache in production. The reason to leave it stands: that cache has no
+stale-if-error for an expired entry and cannot tell a purge from an outage, and two caches under one resolve let a
+post-purge refetch read the older one. Store status and domain ownership are NEVER-stale, so the resolve call now bypasses the Next data cache
 (`cache: 'no-store'`) and the storefront owns its caching, invalidated by the per-store purge EPOCHS the Worker already
 writes to R2 on every `/api/revalidate` (Ruling STORE-EDGE-1).
 

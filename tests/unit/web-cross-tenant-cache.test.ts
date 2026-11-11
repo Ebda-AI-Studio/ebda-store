@@ -395,7 +395,7 @@ describe('store-resolver — per-host store cache', () => {
     asHost('demo-boutique.ebda.app');
     await resolver.getStoreOrNotFound();
     const [, init] = fetchMock.mock.calls[0];
-    // Ruling RESOLVE-BULLETPROOF-1: OpenNext's tagCache is "dummy", so a tag purge never reached that cache.
+    // Ruling RESOLVE-BULLETPROOF-1: store-resolve-cache.ts is the one owner of resolve caching (epoch-checked).
     expect(init.cache).toBe('no-store');
     expect(init.next).toBeUndefined();
     expect(init.headers['x-store-domain']).toBe('demo-boutique.ebda.app');

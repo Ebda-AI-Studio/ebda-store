@@ -11,8 +11,8 @@ import { revalidateRequestSchema } from '@ebda/shared';
  * for these tags after this route accepts them; the store resolver's caches
  * (store-resolve-cache.ts, Ruling RESOLVE-BULLETPROOF-1) and the edge HTML cache
  * check those epochs before every serve. `revalidateTag` here is kept for the
- * other tagged fetches, but note OpenNext's tagCache is the default "dummy", so it
- * does not invalidate Next's data cache by itself.
+ * other tagged fetches (production's deploy-generated open-next config runs the
+ * DO-sharded tag cache; the committed local config has none).
  *
  * Auth: a shared `REVALIDATE_SECRET` (also set on the API). If the secret is
  * unset on this deployment, the route refuses (503) rather than purging
