@@ -249,7 +249,9 @@ export async function awaitInFlightAlerts(timeoutMs: number): Promise<void> {
  * Same text as the Telegram message. Unset token = no-op. A failure is logged and swallowed: Telegram stays the delivery path.
  */
 export async function mirrorToBrain(opts: AlertOptions, text: string): Promise<boolean> {
-  if (!config.osIngestToken || !config.osBrainUrl) return false;
+  // an https brain URL and a token, or no mirror (never an alert body to a mistyped / plain-http host)
+  if (!config.osIngestToken || !/^https:\/\/[^/\s]+/.test(String(config.osBrainUrl ?? '')))
+    return false;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
   try {
