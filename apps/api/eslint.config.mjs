@@ -1,4 +1,5 @@
 import tseslint from 'typescript-eslint';
+import { slopRules } from '../../eslint.slop.mjs';
 
 // Block sub-120s Redis cache TTLs outside an allow-list. Short TTLs
 // have repeatedly caused Vercel/Neon cost spikes — see the
@@ -66,7 +67,7 @@ export default [
     ignores: [
       'dist/**',
       'node_modules/**',
-      'src/cf/stubs/exceljs-workers.cjs',
+      'src/cf/modules/exceljs.cjs',
       'src/cf/modules/*.mjs',
     ], // generated minified library builds (BUNDLE-BUDGET-6, -7)
   },
@@ -97,4 +98,5 @@ export default [
       'no-restricted-syntax': ['error', ...cacheTtlSelectors, ...ssrfSelectors],
     },
   },
+  ...slopRules,
 ];

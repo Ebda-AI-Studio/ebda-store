@@ -82,6 +82,7 @@ import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
 import { anonymiseDeletedStore, finishStoreDeletion } from '../lib/store-delete-post-commit';
+import { purgeStoreVectors } from '../lib/search/purge-store-vectors';
 import { cfBindings } from '../cf/bindings';
 import { eraseStorePlatformData, type D1Like } from '../cf/erasure/platform-subject';
 import { paymentsErasurePort } from './billing/payments-erasure';
@@ -523,7 +524,7 @@ export class StoreService {
             products: await (await storeDb(storeId)).product.count({ where: { storeId } }),
             orders: await prisma.order.count({ where: { storeId } }),
           }),
-          { storeIds: stores.map(st => st.id) }
+          { storeIds: stores.map(st => st.id), abortOnError: true }
         )
       ).map(r => [r.storeId, r.value])
     );
@@ -1281,6 +1282,7 @@ export class StoreService {
           if (d1) await eraseStorePlatformData(d1, id);
         },
         erasePayments: (id, requestId) => paymentsErasurePort.scrub([id], requestId),
+        purgeVectors: id => purgeStoreVectors(id),
       });
 
     // Invalidate store cache (best-effort, post-commit)

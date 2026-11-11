@@ -26,6 +26,7 @@ import { healBackorderStockDebt } from '../../../services/accounting/backorder-s
 import logger from '../../logger';
 import { inngest } from '../client';
 import { auditLogExists } from '../../definer';
+import { STOCK_NOT_TAKEN_EVENT, addStockNotTaken } from '../../stock-not-taken';
 
 import { fromMinor } from '@ebda/shared';
 interface FanoutStep {
@@ -420,6 +421,14 @@ export async function handleOrderRefunded(
               );
             }
           }
+          // A manual (phone) order took no stock at all (#633): none of its units go back on the shelf.
+          addStockNotTaken(
+            await tx.orderEvent.findMany({
+              where: { storeId, orderId, toStatus: STOCK_NOT_TAKEN_EVENT },
+              select: { metadata: true },
+            }),
+            partialNeverTaken
+          );
           const priorPartials = await tx.orderEvent.findMany({
             where: { storeId, orderId, toStatus: PARTIAL_RESTORE_MARKER },
             select: { metadata: true },
@@ -554,6 +563,14 @@ export async function handleOrderRefunded(
             neverTaken.set(bl.orderItemId, (neverTaken.get(bl.orderItemId) ?? 0) + untaken);
           }
         }
+        // A manual (phone) order took no stock at all (#633): a cancel / refund restocks none of it.
+        addStockNotTaken(
+          await tx.orderEvent.findMany({
+            where: { storeId, orderId, toStatus: STOCK_NOT_TAKEN_EVENT },
+            select: { metadata: true },
+          }),
+          neverTaken
+        );
 
         for (const item of order.items) {
           const qty =

@@ -34,6 +34,7 @@ import { uploadLimiter, dailyUploadLimiter, auditLog, writeLimiter } from '../mi
 import { AppError } from '../middleware/error-handler';
 import { StorageService } from '../services/storage.service';
 import { assertStorageRoom } from '../services/plan-limit.service';
+import { releaseOnFailure } from '../lib/storage-usage';
 import {
   deleteR2ObjectIfOrphan,
   r2KeyBelongsToStore,
@@ -149,7 +150,7 @@ router.post(
       }
       // Fail before the R2 write when the product is not this store's.
       await runInStoreTenantContext(storeId, () => assertProductInStore(storeId, productId));
-      await assertStorageRoom(storeId, req.file.size); // S3-X8 / #615: a model counts against the plan ceiling
+      releaseOnFailure(res, await assertStorageRoom(storeId, req.file.size)); // S3-X8 / #615: a model counts against the plan ceiling
 
       const uploaded = await StorageService.upload(
         req.file.buffer,
@@ -241,7 +242,7 @@ router.post(
         return;
       }
       await runInStoreTenantContext(storeId, () => getModelRow(storeId, productId));
-      await assertStorageRoom(storeId, req.file.size);
+      releaseOnFailure(res, await assertStorageRoom(storeId, req.file.size));
       const uploaded = await StorageService.upload(
         req.file.buffer,
         fileNameWith(req.file.originalname, '.usdz'),

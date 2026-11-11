@@ -221,6 +221,34 @@ describe('warehouses', () => {
       )[0].n
     ).toBe(2);
   });
+  it('#632: a warehouse edit after a sale never resurrects the sold units (sale -> adjust -> aggregate)', () => {
+    const r = withWh();
+    r.op('setWarehouseStock', { warehouseId: 'w1', productId: 'p1', quantity: 10 });
+    expect(inv(r, 'p1')).toBe(10);
+    // a checkout sells 4: it decrements the aggregate only, the warehouse shadow still says 10
+    r.raw.exec(`UPDATE products SET inventory = 6 WHERE id = 'p1'`);
+    r.op('adjustWarehouseStock', {
+      warehouseId: 'w1',
+      productId: 'p1',
+      delta: 5,
+      reason: 'delivery',
+    });
+    expect(inv(r, 'p1')).toBe(11); // was 15: four phantom units
+    expect(
+      r.q(`SELECT quantity FROM warehouse_stock WHERE warehouse_id = 'w1' AND product_id = 'p1'`)[0]
+        .quantity
+    ).toBe(11);
+  });
+  it('#632: two warehouses, a sale, then an edit of the OTHER warehouse: the aggregate stays real', () => {
+    const r = withWh();
+    r.op('setWarehouseStock', { warehouseId: 'w1', productId: 'p1', quantity: 7 });
+    r.op('setWarehouseStock', { warehouseId: 'w2', productId: 'p1', quantity: 5 });
+    r.raw.exec(`UPDATE products SET inventory = 8 WHERE id = 'p1'`); // 4 sold
+    r.op('adjustWarehouseStock', { warehouseId: 'w2', productId: 'p1', delta: 1 });
+    expect(inv(r, 'p1')).toBe(9); // was 13
+    r.op('setWarehouseStock', { warehouseId: 'w2', productId: 'p1', quantity: 2 });
+    expect(inv(r, 'p1')).toBe(5); // the default warehouse absorbed the sale: 3 + 2
+  });
   it('variant rows aggregate onto the variant; refusals match the Postgres codes', () => {
     const r = withWh();
     r.op('setWarehouseStock', { warehouseId: 'w1', productId: 'pv', variantId: 'v1', quantity: 2 });

@@ -259,6 +259,64 @@ export async function forEachPaidOrderPage(
   }
 }
 
+/** RFM snapshot rows read per query / ids deleted per statement (a DO's SQLite binds at most ~100 parameters). */
+const RFM_SNAPSHOT_PAGE = 1000;
+const RFM_DELETE_CHUNK = 100;
+
+type RfmSnapshotRef = { id: string; customerId: string; segment: RfmSegment };
+
+/**
+ * Every RFM snapshot of the store, read in keyset pages (id ascending). Replaces `customerId: { in: <every customer key> }`,
+ * whose parameter list grows with the customer count (Postgres caps bind parameters at 32767, a DO's SQLite at ~100), and
+ * `notIn: <every customer key>` for the stale sweep, which has the same bound and cannot be chunked.
+ */
+async function readAllRfmSnapshots(
+  db: Awaited<ReturnType<typeof storeDb>>,
+  storeId: string,
+  pageSize = RFM_SNAPSHOT_PAGE
+): Promise<RfmSnapshotRef[]> {
+  const out: RfmSnapshotRef[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const page = (await db.customerRfmSnapshot.findMany({
+      where: { storeId },
+      select: { id: true, customerId: true, segment: true },
+      orderBy: { id: 'asc' },
+      take: pageSize,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    })) as RfmSnapshotRef[];
+    out.push(...page);
+    if (page.length < pageSize) return out;
+    cursor = page[page.length - 1]!.id;
+  }
+}
+
+/**
+ * Deletes the snapshots whose customer key no paid order produces any more (see the sweep note in `runRfmRollup`). Runs for
+ * a store with ZERO paid orders too: refunding or deleting a store's last paid order must empty its segments, not freeze them.
+ */
+async function sweepStaleRfm(
+  sw: Awaited<ReturnType<typeof storeWriter>>,
+  existing: RfmSnapshotRef[],
+  keep: Set<string>,
+  storeId: string
+): Promise<number> {
+  const staleIds = existing.filter(e => !keep.has(e.customerId)).map(e => e.id);
+  let removed = 0;
+  for (let i = 0; i < staleIds.length; i += RFM_DELETE_CHUNK) {
+    const ids = staleIds.slice(i, i + RFM_DELETE_CHUNK);
+    try {
+      const r = await withSavepoint(() =>
+        sw.customerRfmSnapshot.deleteMany({ where: { storeId, id: { in: ids } } })
+      );
+      removed += r.count;
+    } catch (err) {
+      logger.error({ err, storeId }, 'rfm-rollup: stale snapshot sweep failed');
+    }
+  }
+  return removed;
+}
+
 /**
  * For each cohort month (from store's oldest paid order to current month),
  * computes the retention matrix and writes CustomerCohortSnapshot rows.
@@ -650,8 +708,12 @@ export async function runRfmRollup(storeId: string): Promise<number> {
     }
   });
 
+  // One paged read of the store's snapshots serves both the update/create split and the stale sweep.
+  const existingSnapshots = await readAllRfmSnapshots(db, storeId);
+
   if (statsMap.size === 0) {
-    logger.info({ storeId }, 'rfm-rollup: no paid orders — skip');
+    const staleRemoved = await sweepStaleRfm(sw, existingSnapshots, new Set(), storeId);
+    logger.info({ storeId, staleRemoved }, 'rfm-rollup: no paid orders — skip');
     return 0;
   }
 
@@ -719,11 +781,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   let rowsWritten = 0;
 
   if (computedRows.length > 0) {
-    const existing = await db.customerRfmSnapshot.findMany({
-      where: { storeId, customerId: { in: computedRows.map(r => r.customerId) } },
-      select: { id: true, customerId: true, segment: true },
-    });
-    const existingByCustomerId = new Map(existing.map(e => [e.customerId, e]));
+    const existingByCustomerId = new Map(existingSnapshots.map(e => [e.customerId, e]));
 
     const toCreate: Array<RfmRow & { storeId: string; previousSegment: null; computedAt: Date }> =
       [];
@@ -776,17 +834,12 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   // counting in the segment totals forever (the unique key means no later
   // run ever touches it). Only runs when this run computed a full set, and
   // scoped to this store.
-  let staleRemoved = 0;
-  try {
-    const removed = await withSavepoint(() =>
-      sw.customerRfmSnapshot.deleteMany({
-        where: { storeId, customerId: { notIn: computedRows.map(r => r.customerId) } },
-      })
-    );
-    staleRemoved = removed.count;
-  } catch (err) {
-    logger.error({ err, storeId }, 'rfm-rollup: stale snapshot sweep failed');
-  }
+  const staleRemoved = await sweepStaleRfm(
+    sw,
+    existingSnapshots,
+    new Set(computedRows.map(r => r.customerId)),
+    storeId
+  );
 
   logger.info(
     { storeId, customers: metrics.length, rowsWritten, staleRemoved },

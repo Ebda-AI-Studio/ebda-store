@@ -9,7 +9,7 @@ import { join } from 'node:path';
 const require_ = createRequire(import.meta.url);
 const ROOT = join(__dirname, '../../..');
 const stock = require_('exceljs');
-const workers = require_(join(ROOT, 'apps/api/src/cf/stubs/exceljs-workers.cjs'));
+const workers = require_(join(ROOT, 'apps/api/src/cf/modules/exceljs.cjs'));
 
 async function sample(ExcelJS: any) {
   const wb = new ExcelJS.Workbook();
@@ -42,10 +42,10 @@ const dump = (wb: any) =>
 
 describe('exceljs build for the Workers bundle', () => {
   it('was built from the installed exceljs', () => {
-    const head = readFileSync(
-      join(ROOT, 'apps/api/src/cf/stubs/exceljs-workers.cjs'),
-      'utf8'
-    ).slice(0, 40);
+    const head = readFileSync(join(ROOT, 'apps/api/src/cf/modules/exceljs.cjs'), 'utf8').slice(
+      0,
+      40
+    );
     expect(head).toContain(`exceljs@${require_('exceljs/package.json').version} `);
   });
 
