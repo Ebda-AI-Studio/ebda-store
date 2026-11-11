@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -16,12 +16,20 @@ function repo() {
   writeFileSync(join(cwd, 'a.txt'), '1');
   git('add', 'a.txt', '.gitignore');
   git('commit', '-q', '-m', 'init');
-  const run = (mode: string, ...files: string[]) =>
+  const sp = (mode: string, files: string[], key?: string) =>
     spawnSync('bash', [SCRIPT, mode, ...files], {
       cwd,
-      env: { ...process.env, PREPUSH_CACHE_DIR: cache },
-    }).status;
-  return { cwd, git, run };
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PREPUSH_CACHE_DIR: cache,
+        ...(key ? { PREPUSH_CACHE_KEY: key } : {}),
+      },
+    });
+  const run = (mode: string, ...files: string[]) => sp(mode, files).status;
+  const out = (mode: string, ...files: string[]) => sp(mode, files).stdout.trim();
+  const runKey = (mode: string, key: string, ...files: string[]) => sp(mode, files, key).status;
+  return { cwd, git, run, out, runKey };
 }
 
 describe('prepush-scanner-cache.sh', () => {
@@ -65,6 +73,32 @@ describe('prepush-scanner-cache.sh', () => {
     writeFileSync(join(r.cwd, 'dist', 'extra.js'), 'x');
     r.run('record', 'x.test.ts');
     rmSync(join(r.cwd, 'dist', 'extra.js'));
+    expect(r.run('check', 'x.test.ts')).toBe(1);
+  });
+
+  it('records under the PRE-run key: a rebuild during the scan is not cached as a pass', () => {
+    const r = repo();
+    mkdirSync(join(r.cwd, 'dist'));
+    writeFileSync(join(r.cwd, 'dist', 'index.js'), 'v1');
+    const key = r.out('key', 'x.test.ts');
+    expect(key).toMatch(/^[0-9a-f]{40}$/);
+    writeFileSync(join(r.cwd, 'dist', 'index.js'), 'rebuilt-mid-scan'); // "scan" runs, dist changes
+    expect(r.runKey('record', key, 'x.test.ts')).toBe(0);
+    expect(r.run('check', 'x.test.ts')).toBe(1); // post-scan state was never validated
+    writeFileSync(join(r.cwd, 'dist', 'index.js'), 'v1');
+    expect(r.run('check', 'x.test.ts')).toBe(0); // the state that actually passed
+  });
+
+  it('small ignored files are hashed by content, not mtime (same bytes rewritten still hits)', () => {
+    const r = repo();
+    mkdirSync(join(r.cwd, 'dist'));
+    writeFileSync(join(r.cwd, 'dist', 'meta.json'), '{"a":1}');
+    r.run('record', 'x.test.ts');
+    const later = new Date(Date.now() + 60_000);
+    writeFileSync(join(r.cwd, 'dist', 'meta.json'), '{"a":1}');
+    utimesSync(join(r.cwd, 'dist', 'meta.json'), later, later);
+    expect(r.run('check', 'x.test.ts')).toBe(0);
+    writeFileSync(join(r.cwd, 'dist', 'meta.json'), '{"a":2}'); // same size, new content
     expect(r.run('check', 'x.test.ts')).toBe(1);
   });
 });

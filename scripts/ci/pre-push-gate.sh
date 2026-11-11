@@ -64,15 +64,19 @@ if [ -n "$SCANNERS" ]; then
     # plus the scanner list, used ONLY on a clean working tree (scanners read the working directory, so a dirty tree
     # always runs; a re-push of a clean identical tree costs 0 s); (2) a 4-slot semaphore (prepush-slot.sh) with a fixed --maxWorkers=2.
     # CI still runs every scanner; this cache lives only on this Mac and only ever records a PASS (ignored inputs are in the key).
+    # PREPUSH-5b: the key is computed BEFORE the run and the pass is recorded under that pre-run key, so a rebuild or an
+    # edit during the scan can never be cached as a pass for the post-scan state. Empty key = dirty tree = no cache.
     # shellcheck disable=SC2086
-    if bash scripts/ci/prepush-scanner-cache.sh check $SCANNERS; then
+    KEY=$(bash scripts/ci/prepush-scanner-cache.sh key $SCANNERS 2>/dev/null || true)
+    # shellcheck disable=SC2086
+    if [ -n "$KEY" ] && PREPUSH_CACHE_KEY="$KEY" bash scripts/ci/prepush-scanner-cache.sh check $SCANNERS; then
       echo "-> vitest scanners: this exact clean tree + list already passed locally; cache hit, skipped (CI still runs them)"
     else
       echo "-> vitest scanners ($(printf '%s\n' $SCANNERS | wc -l | tr -d ' ') repo-scanning tests, always run on a cache miss or dirty tree)"
       # shellcheck disable=SC2086
       bash scripts/ci/prepush-slot.sh npx vitest run --passWithNoTests --maxWorkers=2 $SCANNERS
       # shellcheck disable=SC2086
-      bash scripts/ci/prepush-scanner-cache.sh record $SCANNERS || true
+      if [ -n "$KEY" ]; then PREPUSH_CACHE_KEY="$KEY" bash scripts/ci/prepush-scanner-cache.sh record $SCANNERS || true; fi
     fi
   else
     echo "! scanner tests skipped (packages not built); CI runs them"
