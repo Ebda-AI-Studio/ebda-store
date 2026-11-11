@@ -338,7 +338,7 @@ router.get('/methods', async (req: Request, res: Response, next: NextFunction) =
   try {
     const q = methodsQuerySchema.parse(req.query);
     const amount = q.amount ?? 1000;
-    const currency = (q.currency?.toUpperCase() as Currency | undefined) || REGION.currency;
+    const currency = (q.currency?.toUpperCase() || REGION.currency) as Currency;
     const provider = q.provider as PaymentProvider | undefined;
     const storeId = await resolvePublicStoreId(req);
     if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found'); // BE:S-22
