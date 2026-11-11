@@ -8,6 +8,7 @@ import {
 import { MoneyError, type SyncSql } from './sync-sql';
 import { freshOrderNumber } from './order-number';
 import { decrementProduct, decrementVariant, forceDecrementVariant, recordMovement } from './stock';
+import { applyRoute, planRoute, recordAllocations, type Allocation } from './warehouse-route';
 import { issueSaleDocument } from './fiscal';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
 import {
@@ -450,6 +451,8 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       qty: number;
       stockTaken: number;
     }[] = [];
+    // WAREHOUSE-ROUTE-1: where each fully-taken line came from (multi-warehouse stores only; empty otherwise)
+    const allocations: Allocation[] = [];
     const take = (productId: string, variantId: string | null, qty: number, lineIndex: number) => {
       if (input.dryRun) return; // a quote reserves nothing
       const p = db.all(
@@ -462,7 +465,10 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           'SELECT allow_backorder FROM product_variants WHERE id = ? AND product_id = ?',
           [variantId, productId]
         )[0];
+        const route = planRoute(db, input.storeId, productId, variantId, qty);
         const r = decrementVariant(db, variantId, qty);
+        if (r.ok && route)
+          allocations.push(applyRoute(db, input.storeId, route, productId, variantId, qty));
         if (r.ok)
           return void recordMovement(db, {
             storeId: input.storeId,
@@ -502,7 +508,10 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
           available: r.newStock,
         });
       }
+      const route = planRoute(db, input.storeId, productId, null, qty);
       let r = decrementProduct(db, productId, qty);
+      if (r.ok && route)
+        allocations.push(applyRoute(db, input.storeId, route, productId, null, qty));
       if (!r.ok) {
         // backorder on a product WITHOUT variants: both the store feature and the product flag; the stock goes negative
         // (a real backorder debt, unlike a variant row which floors at 0) and the whole quantity counts as taken
@@ -962,6 +971,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         ]
       );
     }
+    recordAllocations(db, input.storeId, orderId, allocations, now);
     for (const b of backorders) {
       db.run('UPDATE order_items SET cost_price_deferred = 1 WHERE id = ?', [itemIds[b.lineIndex]]);
       db.run(

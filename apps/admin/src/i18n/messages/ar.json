@@ -1535,6 +1535,7 @@
         "statusUpdated": "تم تحديث حالة الطلب"
       },
       "notes": "ملاحظات الطلب",
+      "fulfilledFrom": "اتسحب من المخزن",
       "customerNotes": "ملاحظات العميل",
       "address": {
         "block": "قطعة",

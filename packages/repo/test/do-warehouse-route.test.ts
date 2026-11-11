@@ -1,0 +1,177 @@
+// WAREHOUSE-ROUTE-1: order creation routes stock lines to one warehouse, in the order's own section (real StoreDO schema).
+import { describe, expect, it } from 'vitest';
+import { openSqlite } from './diff-harness';
+import { nodeSyncSql } from './node-sync-sql';
+import { placeOrder, type CheckoutInput } from '../src/do/checkout';
+import { placeAdminOrder } from '../src/do/admin-order';
+import { cancelOrder } from '../src/do/refund';
+import { MoneyError } from '../src/do/sync-sql';
+
+function fixture(warehouses: Array<[string, number, number]>, inventory?: number) {
+  inventory ??= warehouses.length ? warehouses.reduce((n, w) => n + w[2], 0) : 10;
+  const raw = openSqlite();
+  const db = nodeSyncSql(raw);
+  const x = (sql: string, ...p: unknown[]) => raw.prepare(sql).run(...(p as never[]));
+  const all = <T = Record<string, number>>(sql: string, ...p: unknown[]) =>
+    raw.prepare(sql).all(...(p as never[])) as T[];
+  x(`INSERT INTO store_config (store_id) VALUES ('s1')`);
+  x(
+    `INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('p1', 's1', 'Widget', 'widget', 1500, ?, 'active')`,
+    inventory
+  );
+  // [code, priority, qty]
+  warehouses.forEach(([code, priority, qty], i) => {
+    x(
+      `INSERT INTO warehouses (id, store_id, name, code, priority, is_default) VALUES (?, 's1', ?, ?, ?, ?)`,
+      `w-${code}`,
+      code,
+      code,
+      priority,
+      i === 0 ? 1 : 0
+    );
+    if (qty > 0)
+      x(
+        `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity, store_id) VALUES (?, ?, 'p1', ?, 's1')`,
+        `ws-${code}`,
+        `w-${code}`,
+        qty
+      );
+  });
+  const base = (over: Partial<CheckoutInput> = {}, qty = 1): CheckoutInput => ({
+    storeId: 's1',
+    lines: [{ productId: 'p1', quantity: qty }],
+    shippingAddress: { name: 'A' },
+    ...over,
+  });
+  const agg = () =>
+    all<{ inventory: number }>(`SELECT inventory FROM products WHERE id='p1'`)[0].inventory;
+  const wh = () =>
+    Object.fromEntries(
+      all<{ code: string; quantity: number }>(
+        `SELECT w.code, ws.quantity FROM warehouse_stock ws JOIN warehouses w ON w.id = ws.warehouse_id`
+      ).map(r => [r.code, r.quantity])
+    );
+  const events = (type: string) =>
+    all(`SELECT 1 FROM order_events WHERE to_status = ?`, type).length;
+  return { raw, db, base, agg, wh, events, all };
+}
+const code = (fn: () => unknown): string => {
+  try {
+    fn();
+  } catch (e) {
+    return (e as MoneyError).code;
+  }
+  return 'NO_ERROR';
+};
+
+describe('multi-warehouse routing on order creation', () => {
+  it('takes the units from the routed (highest priority with enough stock) warehouse', () => {
+    const f = fixture([
+      ['A', 1, 4],
+      ['B', 5, 6],
+    ]);
+    placeOrder(f.db, f.base({}, 2));
+    expect(f.wh()).toEqual({ A: 4, B: 4 });
+    expect(f.agg()).toBe(8);
+    // B (4 left) cannot hold 5, A (4) neither: refused
+    expect(code(() => placeOrder(f.db, f.base({}, 5)))).toBe('NO_SINGLE_WAREHOUSE');
+  });
+
+  it('skips a higher-priority warehouse that cannot fulfil the whole line', () => {
+    const f = fixture([
+      ['A', 1, 6],
+      ['B', 5, 2],
+    ]);
+    placeOrder(f.db, f.base({}, 3));
+    expect(f.wh()).toEqual({ A: 3, B: 2 });
+  });
+
+  it('refuses (409 NO_SINGLE_WAREHOUSE) when stock exists but no single warehouse holds the line; nothing changes', () => {
+    const f = fixture([
+      ['A', 1, 3],
+      ['B', 5, 3],
+    ]);
+    expect(code(() => placeOrder(f.db, f.base({}, 5)))).toBe('NO_SINGLE_WAREHOUSE');
+    expect(f.wh()).toEqual({ A: 3, B: 3 });
+    expect(f.agg()).toBe(6);
+    expect(f.all(`SELECT 1 FROM orders`).length).toBe(0);
+  });
+
+  it('never oversells: more than the total is OUT_OF_STOCK', () => {
+    const f = fixture([
+      ['A', 1, 3],
+      ['B', 5, 3],
+    ]);
+    expect(code(() => placeOrder(f.db, f.base({}, 7)))).toBe('OUT_OF_STOCK');
+    expect(f.agg()).toBe(6);
+  });
+
+  it('a retried create (same idempotency key) does not reserve twice', () => {
+    const f = fixture([
+      ['A', 1, 4],
+      ['B', 5, 6],
+    ]);
+    const a = placeOrder(f.db, f.base({ idempotencyKey: 'idem-key-0001' }, 2));
+    const b = placeOrder(f.db, f.base({ idempotencyKey: 'idem-key-0001' }, 2));
+    expect(b.orderId).toBe(a.orderId);
+    expect(f.wh()).toEqual({ A: 4, B: 4 });
+    expect(f.agg()).toBe(8);
+    expect(f.events('warehouse_allocated')).toBe(1);
+  });
+
+  it('cancel puts the units back into the SAME warehouse, once', () => {
+    const f = fixture([
+      ['A', 1, 4],
+      ['B', 5, 6],
+    ]);
+    const o = placeOrder(f.db, f.base({}, 2));
+    // a later order drains B further so a wrong "default warehouse" release would show
+    placeOrder(f.db, f.base({}, 1));
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    expect(f.wh()).toEqual({ A: 4, B: 5 });
+    expect(f.agg()).toBe(9);
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    expect(f.wh()).toEqual({ A: 4, B: 5 });
+    expect(f.events('warehouse_released')).toBe(1);
+  });
+
+  it('a phone order routes and its cancel releases to the same warehouse', () => {
+    const f = fixture([
+      ['A', 1, 4],
+      ['B', 5, 6],
+    ]);
+    const o = placeAdminOrder(f.db, {
+      storeId: 's1',
+      lines: [{ productId: 'p1', quantity: 3 }],
+      shippingAddress: { name: 'A' },
+      actorId: 'u1',
+    });
+    expect(f.wh()).toEqual({ A: 4, B: 3 });
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    expect(f.wh()).toEqual({ A: 4, B: 6 });
+  });
+});
+
+describe('single / no warehouse is unchanged', () => {
+  const run = (f: ReturnType<typeof fixture>) => {
+    const o = placeOrder(f.db, f.base({}, 3));
+    const placed = { ...o, orderId: 'x', orderNumber: 'x' };
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    return {
+      placed,
+      agg: f.agg(),
+      hist: f.all(
+        `SELECT type, quantity, previous_stock, new_stock FROM inventory_history ORDER BY rowid`
+      ),
+    };
+  };
+  it('one warehouse: same totals, same stock math, no allocation event, shadow untouched by routing', () => {
+    const none = run(fixture([]));
+    const one = fixture([['A', 1, 10]]);
+    const withOne = run(one);
+    expect(withOne).toEqual(none);
+    expect(one.events('warehouse_allocated')).toBe(0);
+    expect(one.events('warehouse_released')).toBe(0);
+    expect(one.wh()).toEqual({ A: 10 });
+  });
+});

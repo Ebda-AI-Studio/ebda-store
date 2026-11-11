@@ -1535,6 +1535,7 @@
         "statusUpdated": "Order status updated"
       },
       "notes": "Order notes",
+      "fulfilledFrom": "Fulfilled from",
       "customerNotes": "Customer notes",
       "address": {
         "block": "Block",

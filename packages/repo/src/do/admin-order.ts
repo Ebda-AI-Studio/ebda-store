@@ -3,6 +3,7 @@ import { MoneyError, type SyncSql } from './sync-sql';
 import { freshOrderNumber } from './order-number';
 import { issueSaleDocument } from './fiscal';
 import { decrementProduct, decrementVariant, recordMovement, takeUpTo } from './stock';
+import { applyRoute, planRoute, recordAllocations, type Allocation } from './warehouse-route';
 import { assertGoldLinesPriceable, type GoldGateLine } from './gold';
 import { indexEntity } from './payments';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
@@ -406,6 +407,7 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
       'SELECT id, product_id, variant_id, quantity FROM order_items WHERE order_id = ?',
       [orderId]
     );
+    const allocations: Allocation[] = []; // WAREHOUSE-ROUTE-1
     for (const row of itemRows) {
       const productId = row.product_id as string;
       const variantId = (row.variant_id as string | null) ?? null;
@@ -417,7 +419,10 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
       if (!p || !p.track_inventory) continue; // an untracked line has no stock to take or give back
       const move = (n: number) =>
         variantId ? decrementVariant(db, variantId, n) : decrementProduct(db, productId, n);
+      const route = planRoute(db, storeId, productId, variantId, qty);
       const full = move(qty);
+      if (full.ok && route)
+        allocations.push(applyRoute(db, storeId, route, productId, variantId, qty));
       if (full.ok) {
         recordMovement(db, {
           storeId,
@@ -469,6 +474,7 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
         shortages,
       });
 
+    recordAllocations(db, storeId, orderId, allocations, now);
     // the durable record of an override, in the order's own section: an overridden order cannot exist without it
     const event = (toStatus: string, metadata: Record<string, unknown>) =>
       db.run(

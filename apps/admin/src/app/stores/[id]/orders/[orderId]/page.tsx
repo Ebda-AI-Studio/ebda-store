@@ -15,6 +15,7 @@ import { DeliveryCard } from './_components/DeliveryCard';
 import { PaymentCard } from './_components/PaymentCard';
 import { SummaryCard } from './_components/SummaryCard';
 import { ItemsCard } from './_components/ItemsCard';
+import { WarehouseCard } from './_components/WarehouseCard';
 import { PlatformCard } from './_components/PlatformCard';
 import { CustomerCard } from './_components/CustomerCard';
 import { NotesCard } from './_components/NotesCard';
@@ -283,6 +284,7 @@ export default function OrderDetailPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
                 <ItemsCard order={order} previewLimit={5} />
+                <WarehouseCard order={order} />
                 <SummaryCard order={order} />
                 <CustomerCard order={order} />
                 <DeliveryCard order={order} locale={locale} />

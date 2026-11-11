@@ -111,6 +111,7 @@ vi.mock('@ebda/database', () => ({
     // idempotency guard override this per-call.
     orderEvent: {
       findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]), // getById reads the warehouse allocations (WAREHOUSE-ROUTE-1)
       create: vi.fn().mockResolvedValue({}),
     },
     coupon: {

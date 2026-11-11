@@ -154,7 +154,7 @@ const variantCount = (db: SyncSql, productId: string): number =>
     .n as number;
 
 /** Warehouse upsert: the base-product row (variant NULL) and a variant row conflict on different unique indexes. */
-function upsertWarehouseStock(
+export function upsertWarehouseStock(
   db: SyncSql,
   a: {
     storeId: string;

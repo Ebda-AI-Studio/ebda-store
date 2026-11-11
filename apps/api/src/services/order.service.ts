@@ -726,7 +726,18 @@ export class OrderService {
     // InstaPay app: the reference the customer entered and the hold deadline. A
     // derived summary, never the raw payment metadata. Only present on an InstaPay
     // order, so every other order keeps exactly the shape it always had.
+    // WAREHOUSE-ROUTE-1: where each line's stock came from (multi-warehouse stores; [] otherwise), for the admin order page.
+    const allocEvents = await repo.db.orderEvent.findMany({
+      where: { storeId, orderId, toStatus: 'warehouse_allocated' },
+      select: { metadata: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const warehouseAllocations = allocEvents.flatMap(e => {
+      const a = (e.metadata as { allocations?: unknown } | null)?.allocations;
+      return Array.isArray(a) ? (a as Array<Record<string, unknown>>) : [];
+    });
     const result: typeof order & {
+      warehouseAllocations?: Array<Record<string, unknown>>;
       instapay?: {
         customerReference: string | null;
         customerReferenceAt: string | null;
@@ -734,6 +745,7 @@ export class OrderService {
         expiresAt: string | null;
       };
     } = order;
+    if (warehouseAllocations.length > 0) result.warehouseAllocations = warehouseAllocations;
     if (order.payments?.some(p => p.provider === 'instapay')) {
       const ip = await repo.db.payment.findFirst({
         where: { orderId, provider: 'instapay' },
