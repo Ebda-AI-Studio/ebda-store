@@ -103,7 +103,7 @@ export default function GuestReturnForm() {
     );
   }
 
-  const field = 'mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground';
+  const field = 'mt-1 w-full rounded-md border bg-background px-3 py-2 text-base text-foreground';
   return (
     <form onSubmit={submit} className="mt-6 space-y-4 border-t pt-6" noValidate>
       <h3 className="font-semibold text-foreground">
@@ -154,7 +154,7 @@ export default function GuestReturnForm() {
         </p>
       )}
       <Button type="submit" disabled={busy}>
-        {busy ? t('Submitting...', 'جاري الإرسال...') : t('Request a return', 'اطلب إرجاع')}
+        {busy ? t('Submitting...', 'بيتبعت...') : t('Request a return', 'اطلب إرجاع')}
       </Button>
     </form>
   );
