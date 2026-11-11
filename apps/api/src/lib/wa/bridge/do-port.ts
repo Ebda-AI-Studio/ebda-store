@@ -551,6 +551,16 @@ export function createDoPort(): BridgePort {
       return true;
     },
 
+    async orderBuyerKey(storeId, orderId) {
+      const o = await (
+        await db(storeId)
+      ).order.findFirst({
+        where: { id: orderId, storeId, deletedAt: null },
+        select: { buyerKey: true },
+      });
+      return o ? (o.buyerKey ?? null) : undefined;
+    },
+
     async addresses(storeId, buyerKey) {
       return (await (
         await storeWriter(storeId)

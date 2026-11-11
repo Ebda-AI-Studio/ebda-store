@@ -101,6 +101,8 @@ export function makeFakePort() {
       byKey.set(a.idempotencyKey, o.orderId);
       return { ...o, currency: 'EGP', replayed: false };
     },
+    orderBuyerKey: async (_s, id) =>
+      orders.has(id) ? (orders.get(id)!.buyerKey ?? null) : undefined,
     orderPayable: async (_s, id) => {
       const o = orders.get(id);
       return o

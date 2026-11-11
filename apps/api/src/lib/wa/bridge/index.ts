@@ -9,5 +9,6 @@ export const waBridge = () =>
     port: createDoPort(),
     storefrontUrl: storefrontUrlFor,
     buyerKeySecret: suiteBuyerKeySecret,
+    requireBuyerProof: () => process.env.WA_BRIDGE_REQUIRE_BUYER_PROOF === '1',
     log: (msg, ctx) => logger.error({ storeId: ctx.storeId, err: ctx.err }, msg),
   });

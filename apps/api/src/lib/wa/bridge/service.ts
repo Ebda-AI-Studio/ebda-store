@@ -138,6 +138,8 @@ export interface BridgePort {
     }
   ): Promise<{ orderNumber: string | null } | null>;
   attachProof(storeId: string, orderId: string, mediaUrl: string): Promise<boolean>;
+  /** The buyer key stored on the order: `null` = the order has none (a storefront order), `undefined` = no such order. */
+  orderBuyerKey(storeId: string, orderId: string): Promise<string | null | undefined>;
   addresses(storeId: string, buyerKey: string): Promise<Address[]>;
   saveAddress(
     storeId: string,
@@ -166,6 +168,12 @@ export interface BridgeDeps {
    * the two methods that take both fail closed instead of trusting the caller (WA-2). Production wires `suiteBuyerKeySecret`.
    */
   buyerKeySecret: () => string;
+  /**
+   * When true, every method that names a buyer or an order must PROVE the buyer: the key-only methods need `phoneE164`, the
+   * order methods need `buyerKey` (WA_BRIDGE_REQUIRE_BUYER_PROOF=1). Off while Ebda Chat still sends the old shapes; a proof that
+   * IS sent is always checked.
+   */
+  requireBuyerProof?: () => boolean;
   now?: () => number;
   log?: (msg: string, ctx: Record<string, unknown>) => void;
 }
@@ -230,6 +238,28 @@ export function createBridge(deps: BridgeDeps) {
   async function buyerBound(b: { buyerKey: string; phoneE164: string }): Promise<boolean> {
     const want = await buyerKeyFor(deps.buyerKeySecret(), b.phoneE164);
     return want !== null && sameKey(want, b.buyerKey);
+  }
+  /**
+   * The key-only methods (addresses, order status, order list): when the caller sends the phone too, the key must equal
+   * HMAC(secret, phone); with no phone it is refused in strict mode. Same constant-time check as `buyerBound`.
+   */
+  async function keyBound(buyerKey: string, phoneE164: string | undefined): Promise<boolean> {
+    if (phoneE164 === undefined) return !(deps.requireBuyerProof?.() ?? false);
+    return buyerBound({ buyerKey, phoneE164 });
+  }
+  /**
+   * The order methods (payment link, COD outcome, proof): the order id is all Chat used to send. When a buyer key comes with it
+   * it must equal the key STORED on that order (live state, never the claim); a mismatch answers like an unknown order so
+   * existence is not leaked. No key: refused in strict mode.
+   */
+  async function ownsOrder(
+    s: string,
+    orderId: string,
+    claimed: string | undefined
+  ): Promise<boolean> {
+    if (claimed === undefined) return !(deps.requireBuyerProof?.() ?? false);
+    const stored = await port.orderBuyerKey(s, orderId);
+    return typeof stored === 'string' && sameKey(stored, claimed);
   }
   const ok = <T>(value: T): BridgeResult<T> => ({ ok: true, value });
 
@@ -311,8 +341,9 @@ export function createBridge(deps: BridgeDeps) {
         });
       }),
 
-    getPaymentLink: (storeId: string, orderId: string) =>
-      run('getPaymentLink', storeId, args.getPaymentLink, { orderId }, async (s, a) => {
+    getPaymentLink: (storeId: string, orderId: string, buyerKey?: string) =>
+      run('getPaymentLink', storeId, args.getPaymentLink, { orderId, buyerKey }, async (s, a) => {
+        if (!(await ownsOrder(s, a.orderId, a.buyerKey))) return fail('not_found', 'order');
         const o = await port.orderPayable(s, a.orderId);
         if (!o) return fail('not_found', 'order');
         // Only an unpaid, still-open order can be paid: never mint a link for a paid, cancelled or refunded one.
@@ -323,17 +354,19 @@ export function createBridge(deps: BridgeDeps) {
 
     recordCodOutcome: (storeId: string, req: unknown) =>
       run('recordCodOutcome', storeId, args.recordCodOutcome, req, async (s, a) => {
+        if (!(await ownsOrder(s, a.orderId, a.buyerKey))) return fail('not_found', 'order');
         const r = await port.codOutcome(s, a);
         return r ? ok({ orderNumber: r.orderNumber }) : fail('not_found', 'order');
       }),
 
-    attachPaymentProof: (storeId: string, orderId: string, mediaUrl: string) =>
+    attachPaymentProof: (storeId: string, orderId: string, mediaUrl: string, buyerKey?: string) =>
       run(
         'attachPaymentProof',
         storeId,
         args.attachPaymentProof,
-        { orderId, mediaUrl },
+        { orderId, mediaUrl, buyerKey },
         async (s, a, p) => {
+          if (!(await ownsOrder(s, a.orderId, a.buyerKey))) return fail('not_found', 'order');
           if (!p.instapay) return fail('payment_method_disabled', 'instapay');
           return (await port.attachProof(s, a.orderId, a.mediaUrl))
             ? ok({})
@@ -341,44 +374,56 @@ export function createBridge(deps: BridgeDeps) {
         }
       ),
 
-    getCustomerAddresses: (storeId: string, buyerKey: string) =>
-      run('getCustomerAddresses', storeId, args.buyerKey, { buyerKey }, async (s, a) =>
-        ok({ items: await port.addresses(s, a.buyerKey) })
+    getCustomerAddresses: (storeId: string, buyerKey: string, phoneE164?: string) =>
+      run('getCustomerAddresses', storeId, args.buyerKey, { buyerKey, phoneE164 }, async (s, a) =>
+        (await keyBound(a.buyerKey, a.phoneE164))
+          ? ok({ items: await port.addresses(s, a.buyerKey) })
+          : fail('invalid', 'buyer')
       ),
 
-    saveCustomerAddress: (storeId: string, buyerKey: string, address: unknown) =>
+    saveCustomerAddress: (
+      storeId: string,
+      buyerKey: string,
+      address: unknown,
+      phoneE164?: string
+    ) =>
       run(
         'saveCustomerAddress',
         storeId,
         args.saveCustomerAddress,
-        { buyerKey, address },
+        { buyerKey, address, phoneE164 },
         async (s, a) => {
+          if (!(await keyBound(a.buyerKey, a.phoneE164))) return fail('invalid', 'buyer');
           const saved = await port.saveAddress(s, a.buyerKey, a.address);
           // Find-or-create by buyer key, idempotent (Ruling WA-RPC-4).
           return saved ? ok({ address: saved }) : fail('unavailable', 'address not saved');
         }
       ),
 
-    getOrderStatus: (storeId: string, orderNumber: string, buyerKey: string) =>
+    getOrderStatus: (storeId: string, orderNumber: string, buyerKey: string, phoneE164?: string) =>
       run(
         'getOrderStatus',
         storeId,
         args.getOrderStatus,
-        { orderNumber, buyerKey },
+        { orderNumber, buyerKey, phoneE164 },
         async (s, a) => {
+          if (!(await keyBound(a.buyerKey, a.phoneE164))) return fail('invalid', 'buyer');
           // Matched on number AND buyer key: a number alone never reveals another buyer's order.
           const o = await port.orderStatus(s, a.orderNumber, a.buyerKey);
           return o ? ok(o) : fail('not_found', 'order');
         }
       ),
 
-    listCustomerOrders: (storeId: string, buyerKey: string, limit: number) =>
+    listCustomerOrders: (storeId: string, buyerKey: string, limit: number, phoneE164?: string) =>
       run(
         'listCustomerOrders',
         storeId,
         args.listCustomerOrders,
-        { buyerKey, limit },
-        async (s, a) => ok({ items: await port.customerOrders(s, a.buyerKey, a.limit) })
+        { buyerKey, limit, phoneE164 },
+        async (s, a) =>
+          (await keyBound(a.buyerKey, a.phoneE164))
+            ? ok({ items: await port.customerOrders(s, a.buyerKey, a.limit) })
+            : fail('invalid', 'buyer')
       ),
   };
 }
