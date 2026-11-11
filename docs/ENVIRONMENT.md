@@ -287,7 +287,7 @@ Names only. "Set" says where it lives: wrangler var (committed in the Worker's `
 
 ### API Worker `ebda-api` (`apps/api`, `packages/*`)
 
-- `WEB_URL`, `ADMIN_URL` — required; public storefront / admin origins (`config/index.ts`, `provisioning.service.ts`). Set: wrangler var.
+- `WEB_URL`, `ADMIN_URL` — required; public storefront / admin origins (`config/index.ts`, `provisioning.service.ts`). Set: wrangler var. Read by `POST /auth/me/close-account` (M024-1); unset = closure requests are only recorded.
 - `AI_FEATURES_ENABLED` — optional gate for AI features (`config/index.ts`). Set: Worker secret/var.
 - `AI_DAILY_TOKEN_BUDGET_PER_STORE`, `AI_DAILY_INTERACTIVE_RESERVE`, `AI_STORE_DAILY_REQUEST_CAP` — optional AI spend caps (`config/index.ts`, `lib/ai-quota.ts`). Set: Worker var.
 - `APP_VERSION` — optional; version string surfaced in tracing/health. Set: wrangler var.

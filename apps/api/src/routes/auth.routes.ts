@@ -44,6 +44,8 @@ import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
 import { passwordSchema } from '../services/merchant-signup.service';
 import { assertNotDemoStore } from '../services/plan-limit.service';
+import { closeNonCustomerAccount } from '../services/account-closure.service';
+import { closureDeps } from '../services/account-closure.wiring';
 import {
   liveBilledStoresOf,
   OWNER_HAS_BILLED_STORE_MESSAGE_AR,
@@ -975,6 +977,38 @@ router.post(
         success: true,
         data: { message: 'Account data erased' },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /auth/me/close-account - merchant / staff account closure (M-024, Ruling M024-1). Triggers the PDPL erasure job
+// (flag-gated by PDPL_CF_ERASURE_ENABLED; off = the request is recorded and nothing is erased). A shopper uses /me/erase.
+router.post(
+  '/me/close-account',
+  authLimiter,
+  authenticate,
+  rejectAdminOnMerchantOrigin,
+  rejectImpersonated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (req.user!.role === 'customer') {
+        throw new AppError(
+          400,
+          'USE_ME_ERASE',
+          'Shoppers erase their account with POST /auth/me/erase'
+        );
+      }
+      const userId = req.user!.userId;
+      const outcome = await closeNonCustomerAccount(
+        { userId, requestId: `close:${userId}` },
+        closureDeps(req)
+      );
+      if (outcome.status === 'erased') clearSessionCookies(res);
+      res
+        .status(outcome.status === 'erased' ? 200 : 202)
+        .json({ success: true, data: { status: outcome.status } });
     } catch (error) {
       next(error);
     }
