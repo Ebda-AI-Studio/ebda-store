@@ -105,7 +105,7 @@ beforeEach(() => {
 describe('whatsapp.cod_outcome', () => {
   it('confirmed: a pending COD order becomes confirmed, tagged source whatsapp, in the store scope', async () => {
     expect(await handleStoreEvent(cod('confirmed'))).toBe('applied');
-    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'confirmed');
+    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'confirmed', {});
     expect(h.scope).toHaveBeenCalledWith(STORE);
     expect(h.audit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -118,11 +118,27 @@ describe('whatsapp.cod_outcome', () => {
 
   it('refused: a pending or confirmed order is cancelled', async () => {
     await handleStoreEvent(cod('refused'));
-    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled');
+    expect(h.updateStatus).toHaveBeenCalledWith(
+      STORE,
+      'o1',
+      'cancelled',
+      expect.objectContaining({
+        onlyFrom: ['pending', 'confirmed'],
+        exceptionNote: expect.stringContaining('Delivery exception'),
+      })
+    );
     h.updateStatus.mockClear();
     h.order.mockResolvedValue(order({ status: 'confirmed' }));
     await handleStoreEvent(cod('refused'));
-    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled');
+    expect(h.updateStatus).toHaveBeenCalledWith(
+      STORE,
+      'o1',
+      'cancelled',
+      expect.objectContaining({
+        onlyFrom: ['pending', 'confirmed'],
+        exceptionNote: expect.stringContaining('Delivery exception'),
+      })
+    );
   });
 
   it('the order moved on between the read and the change (a refused transition): not acted, audited, never a retry', async () => {
@@ -151,6 +167,25 @@ describe('whatsapp.cod_outcome', () => {
   it.each([
     ['shipped', 'unpaid'],
     ['delivered', 'unpaid'],
+  ])(
+    'a "refused" for a %s/%s order: the DO refuses the cancel (status moved) and notes it; never a cancel (#614)',
+    async (status, paymentStatus) => {
+      const { AppError } = await import('@api/middleware/error-handler');
+      h.order.mockResolvedValue(order({ status, paymentStatus }));
+      expect(await handleStoreEvent(cod('confirmed'))).toBe('ignored');
+      h.updateStatus.mockRejectedValueOnce(new AppError(409, 'ORDER_STATUS_MOVED', status));
+      expect(await handleStoreEvent(cod('refused'))).toBe('ignored');
+      expect(h.updateStatus).toHaveBeenCalledTimes(1);
+      expect(h.updateStatus).toHaveBeenCalledWith(
+        STORE,
+        'o1',
+        'cancelled',
+        expect.objectContaining({ onlyFrom: ['pending', 'confirmed'] })
+      );
+    }
+  );
+
+  it.each([
     ['cancelled', 'unpaid'],
     ['pending', 'paid'], // an online-paid order is not a COD order awaiting an answer
   ])('a late answer for a %s/%s order changes nothing', async (status, paymentStatus) => {
@@ -252,7 +287,12 @@ describe('whatsapp.order_after_erasure', () => {
   });
   it('cancels an order that is still open and leaves a fulfilled one', async () => {
     expect(await handleStoreEvent(erasure())).toBe('applied');
-    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled');
+    expect(h.updateStatus).toHaveBeenCalledWith(
+      STORE,
+      'o1',
+      'cancelled',
+      expect.objectContaining({ onlyFrom: ['pending', 'confirmed'] })
+    );
     h.updateStatus.mockClear();
     h.order.mockResolvedValue(order({ status: 'shipped' }));
     expect(await handleStoreEvent(erasure())).toBe('ignored');
