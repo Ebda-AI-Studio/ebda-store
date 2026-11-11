@@ -2,6 +2,7 @@ import { normalizePhoneForStorage } from '../../../shared/src/region';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { freshOrderNumber } from './order-number';
 import { issueSaleDocument } from './fiscal';
+import { decrementProduct, decrementVariant, recordMovement } from './stock';
 import { assertGoldLinesPriceable, type GoldGateLine } from './gold';
 import { indexEntity } from './payments';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
@@ -20,16 +21,18 @@ import { computeOrderAmounts, frozenTaxInvoiceFields, resolveActiveTaxRate } fro
  *
  * What it shares with `placeOrder` (the same functions, not copies): the cart price resolver (tiers, group, wholesale,
  * MOQ), the gold-rate gate, the shipping rates, the tax maths and the frozen seller identity, the entity index and the
- * gapless fiscal sale document. What it does NOT do, exactly like Postgres: reserve stock (the merchant confirms
- * availability; NO later step decrements it either, so the order records a `stock_not_taken` marker and a cancel / refund
- * restocks nothing it never took, #633), take a cart, apply promotions / bundles / loyalty / wallet / COD fee, enforce
- * the stock-hold cap or the minimum-order value, or refuse an area with no rate (an admin may order for any area).
+ * gapless fiscal sale document. Stock (Ruling STOCK-SYMMETRY-1, superseded 2026-11-11): the order RESERVES stock atomically in
+ * this section, like checkout, and is refused 422 INSUFFICIENT_STOCK when short. A store admin may override with a reason: the
+ * order then takes what is on hand, the short units are recorded as a `stock_not_taken` marker (so a cancel / refund puts back
+ * only what was taken) and a `stock_override` event keeps the audit. What it does NOT do, exactly like Postgres: take a cart,
+ * apply promotions / bundles / loyalty / wallet / COD fee, enforce the stock-hold cap or the minimum-order value, or refuse an
+ * area with no rate (an admin may order for any area).
  *
  * Trust boundary as `placeOrder`: `buyer`, `wholesaleEntitled`, `actorRole`/`actorId` and the override permissions are resolved
  * by the API Worker from the verified session (it has already refused an override from a role that may not make it, and one
  * without a reason); amounts are never taken from the caller.
  */
-/** The order took no stock at placement (a manual order): `{ items: [{ orderItemId, quantity }] }` (#633). */
+/** Units an order did NOT take from stock: `{ items: [{ orderItemId, quantity }] }` (#633; legacy phone orders list every line, new ones only an overridden shortage). */
 const STOCK_NOT_TAKEN_EVENT = 'stock_not_taken';
 
 export interface AdminOrderInput {
@@ -49,6 +52,9 @@ export interface AdminOrderInput {
   /** below-MOQ order (B2B); the API has checked role and reason */
   overrideMoq?: boolean;
   moqOverrideReason?: string;
+  /** take what is on hand and place the order although stock is short; the API has checked role and reason */
+  overrideStock?: boolean;
+  stockOverrideReason?: string;
   /** negotiated shipping fee in piastres, replaces the computed one */
   shippingOverride?: number;
   actorId: string;
@@ -63,9 +69,12 @@ export interface AdminOrderResult {
   shipping: number;
   tax: number;
   total: number;
+  /** true when the order was placed over a stock shortage (the admin override) */
+  stockOverridden?: boolean;
 }
 
 const COUPON_OVERRIDE_EVENT = 'coupon_override';
+const STOCK_OVERRIDE_EVENT = 'stock_override';
 const MAX_TOTAL = 2_000_000_000;
 const LIVE = "status NOT IN ('cancelled', 'refunded')";
 const jsonList = (v: unknown): string[] => {
@@ -357,11 +366,16 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
       ]
     );
     const notTaken: Array<{ orderItemId: string; quantity: number }> = [];
+    const shortages: Array<{
+      productId: string;
+      variantId: string | null;
+      requested: number;
+      available: number;
+    }> = [];
     for (const [i, l] of priced.lines.entries()) {
       const src = lines[i];
       const s = l.snapshot;
       const itemId = crypto.randomUUID();
-      notTaken.push({ orderItemId: itemId, quantity: l.qty });
       db.run(
         'INSERT INTO order_items (id, order_id, product_id, variant_id, product_name, variant_name, variant_name_ar, sku, quantity, price, cost_price, total, list_price, price_source, price_tier_min_qty, price_group_applied, tier_ladder, gold_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
@@ -386,6 +400,62 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
         ]
       );
     }
+    // ---- stock: reserve every tracked line atomically (one conditional UPDATE each, so a concurrent order can never
+    // oversell); a short line is collected, then the order is refused (the section rolls back) unless overridden
+    const itemRows = db.all(
+      'SELECT id, product_id, variant_id, quantity FROM order_items WHERE order_id = ?',
+      [orderId]
+    );
+    for (const row of itemRows) {
+      const productId = row.product_id as string;
+      const variantId = (row.variant_id as string | null) ?? null;
+      const qty = row.quantity as number;
+      const p = db.all('SELECT track_inventory FROM products WHERE id = ? AND store_id = ?', [
+        productId,
+        storeId,
+      ])[0];
+      if (!p || !p.track_inventory) continue; // an untracked line has no stock to take or give back
+      const move = (n: number) =>
+        variantId ? decrementVariant(db, variantId, n) : decrementProduct(db, productId, n);
+      const full = move(qty);
+      if (full.ok) {
+        recordMovement(db, {
+          storeId,
+          productId,
+          type: 'sale',
+          quantity: -qty,
+          previousStock: full.previousStock,
+          newStock: full.newStock,
+          reference: orderId,
+          reason: 'Sold via phone order',
+        });
+        continue;
+      }
+      const available = Math.max(0, full.newStock);
+      shortages.push({ productId, variantId, requested: qty, available });
+      if (input.overrideStock !== true) continue; // refused below; nothing partial is kept
+      let taken = 0;
+      if (available > 0) {
+        const part = move(available);
+        taken = available;
+        recordMovement(db, {
+          storeId,
+          productId,
+          type: 'sale',
+          quantity: -taken,
+          previousStock: part.previousStock,
+          newStock: part.newStock,
+          reference: orderId,
+          reason: 'Sold via phone order (stock override)',
+        });
+      }
+      notTaken.push({ orderItemId: row.id as string, quantity: qty - taken });
+    }
+    if (shortages.length > 0 && input.overrideStock !== true)
+      throw new MoneyError('INSUFFICIENT_STOCK', 'not enough stock for this order', 422, {
+        shortages,
+      });
+
     // the durable record of an override, in the order's own section: an overridden order cannot exist without it
     const event = (toStatus: string, metadata: Record<string, unknown>) =>
       db.run(
@@ -400,8 +470,14 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
           now,
         ]
       );
-    // #633: this order took NO stock; the cancel / refund restock reads this and puts back only what was taken
-    event(STOCK_NOT_TAKEN_EVENT, { items: notTaken });
+    // #633: the units this order did not take (only an overridden shortage); cancel / refund restock puts back only what was taken
+    if (notTaken.length > 0) event(STOCK_NOT_TAKEN_EVENT, { items: notTaken });
+    if (shortages.length > 0 && input.overrideStock === true)
+      event(STOCK_OVERRIDE_EVENT, {
+        reason: input.stockOverrideReason?.trim() ?? '',
+        actorRole: input.actorRole ?? null,
+        shortages,
+      });
     if (override && couponCode)
       event(COUPON_OVERRIDE_EVENT, {
         couponCode,
@@ -418,6 +494,15 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
       });
     indexEntity(db, storeId, 'order', orderId, now);
     issueSaleDocument(db, { storeId, orderId, now });
-    return { orderId, orderNumber: num, subtotal, discount: couponDiscount, shipping, tax, total };
+    return {
+      orderId,
+      orderNumber: num,
+      subtotal,
+      discount: couponDiscount,
+      shipping,
+      tax,
+      total,
+      stockOverridden: shortages.length > 0 && input.overrideStock === true,
+    };
   });
 }

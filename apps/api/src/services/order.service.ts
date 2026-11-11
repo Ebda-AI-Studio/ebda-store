@@ -3876,6 +3876,26 @@ export class OrderService {
     });
   }
 
+  /** Who may place an admin order over a stock shortage, and with what reason (owner decision 2026-11-11). */
+  private static assertStockOverrideAllowed(
+    data: { overrideStock?: boolean; stockOverrideReason?: string },
+    actor: { role?: string }
+  ): void {
+    if (data.overrideStock !== true) return;
+    if (!actor.role || !COUPON_OVERRIDE_ROLES.includes(actor.role))
+      throw new AppError(
+        403,
+        'STOCK_OVERRIDE_FORBIDDEN',
+        'Only a store admin can place an order over a stock shortage'
+      );
+    if (!data.stockOverrideReason?.trim())
+      throw new AppError(
+        400,
+        'STOCK_OVERRIDE_REASON_REQUIRED',
+        'A reason is required to place an order over a stock shortage'
+      );
+  }
+
   /**
    * `createAdminOrder` for a store on its Durable Object (Ruling CF-R4-2). The permission rules for the two overrides (coupon
    * rules, minimum order quantity) are decided HERE from the verified session, in the Postgres order's wording; the engine
@@ -3906,6 +3926,7 @@ export class OrderService {
           'A reason is required to override the minimum order quantity'
         );
     }
+    OrderService.assertStockOverrideAllowed(data, actor);
     const overrideCoupon = !!data.couponCode && data.overrideCouponRules === true;
     const overrideReason = data.couponOverrideReason?.trim() ?? '';
     if (overrideCoupon) {
@@ -3941,6 +3962,8 @@ export class OrderService {
       couponOverrideReason: overrideReason,
       overrideMoq: moqOverride,
       moqOverrideReason: data.moqOverrideReason?.trim(),
+      overrideStock: data.overrideStock === true,
+      stockOverrideReason: data.stockOverrideReason?.trim(),
       shippingOverride: data.shippingOverride,
       actorId: adminUserId,
       actorRole: actor.role ?? null,
@@ -3991,6 +4014,18 @@ export class OrderService {
         details: {
           orderNumber: placed.orderNumber,
           description: data.moqOverrideReason?.trim() ?? '',
+        },
+      });
+    if (placed.stockOverridden)
+      await auditLog({
+        action: 'order.stock_override',
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: placed.orderId,
+        details: {
+          orderNumber: placed.orderNumber,
+          description: data.stockOverrideReason?.trim() ?? '',
         },
       });
     void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
@@ -4094,6 +4129,14 @@ export class OrderService {
        */
       overrideMoq?: boolean;
       moqOverrideReason?: string;
+      /**
+       * Place the order although stock is short (owner decision 2026-11-11, Ruling STOCK-SYMMETRY-1 superseded). An admin
+       * order reserves stock like checkout and is refused 422 INSUFFICIENT_STOCK by default; honoured only for
+       * COUPON_OVERRIDE_ROLES and only with a reason. The order then takes what is on hand; the short units are recorded as a
+       * `stock_not_taken` marker and a `stock_override` event.
+       */
+      overrideStock?: boolean;
+      stockOverrideReason?: string;
     },
     actor: { role?: string } = {},
     /** Who the order is priced for (Ruling B2B-2d): the Customer the merchant selected; absent = retail. */
@@ -4318,6 +4361,7 @@ export class OrderService {
     } else {
       assertMoqSatisfied(moqLines);
     }
+    OrderService.assertStockOverrideAllowed(data, actor);
     const adminGroupPriceApplied = resolved.some(r => r.pricing.groupApplied);
 
     const subtotal = resolved.reduce((sum, r) => sum + r.lineTotal, 0);
@@ -4486,6 +4530,7 @@ export class OrderService {
     // decremented for admin orders by default — the merchant
     // confirms physical availability before placing. The mark-paid
     // path elsewhere decrements as needed when payment lands.
+    let stockOverridden = false;
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // Ruling B5-17: the gold rates the lines were priced from must still be the current ones.
       await assertSameRates(tx, storeId, adminGoldGate);
@@ -4619,6 +4664,77 @@ export class OrderService {
         },
       });
 
+      // Stock (owner decision 2026-11-11, Ruling STOCK-SYMMETRY-1 superseded): a phone order RESERVES stock like checkout, one
+      // conditional UPDATE per line (a concurrent order can never oversell), in this same transaction. A short line is
+      // collected and the order refused 422 (the transaction rolls back) unless a store admin overrode with a reason: then it
+      // takes what is on hand and the short units go into the `stock_not_taken` marker. Mirror: packages/repo/src/do/admin-order.ts.
+      const trackedProducts = new Set(
+        (
+          await tx.product.findMany({
+            where: {
+              id: { in: created.items.map(it => it.productId) },
+              storeId,
+              trackInventory: true,
+            },
+            select: { id: true },
+          })
+        ).map(p => p.id)
+      );
+      const notTaken: Array<{ orderItemId: string; quantity: number }> = [];
+      const shortages: Array<{
+        productId: string;
+        variantId: string | null;
+        requested: number;
+        available: number;
+      }> = [];
+      const stockOverride = data.overrideStock === true;
+      for (const it of created.items) {
+        if (!trackedProducts.has(it.productId)) continue; // an untracked line has no stock to take or give back
+        const move = (n: number) =>
+          it.variantId
+            ? decrementVariantInventory(tx, it.variantId, n)
+            : decrementProductInventory(tx, it.productId, n);
+        const ledger = (
+          n: number,
+          res: { previousStock: number; newStock: number },
+          reason: string
+        ) =>
+          tx.inventoryHistory.create({
+            data: {
+              productId: it.productId,
+              storeId,
+              type: 'sale',
+              quantity: -n,
+              previousStock: res.previousStock,
+              newStock: res.newStock,
+              reason,
+              reference: created.id,
+            },
+          });
+        const full = await move(it.quantity);
+        if (full.ok) {
+          await ledger(it.quantity, full, 'Sold via phone order');
+          continue;
+        }
+        const available = Math.max(0, full.newStock);
+        shortages.push({
+          productId: it.productId,
+          variantId: it.variantId ?? null,
+          requested: it.quantity,
+          available,
+        });
+        if (!stockOverride) continue; // refused below; nothing partial is kept
+        if (available > 0) {
+          await ledger(available, await move(available), 'Sold via phone order (stock override)');
+        }
+        notTaken.push({ orderItemId: it.id, quantity: it.quantity - available });
+      }
+      stockOverridden = shortages.length > 0 && stockOverride;
+      if (shortages.length > 0 && !stockOverride)
+        throw new AppError(422, 'INSUFFICIENT_STOCK', 'Not enough stock for this order', {
+          shortages,
+        });
+
       // The durable record of a coupon override — in the order transaction,
       // so an overridden order can never exist without it. The audit-log row
       // below is best-effort (auditLog swallows its own failures).
@@ -4641,20 +4757,36 @@ export class OrderService {
           },
         });
       }
-      // #633 (Ruling STOCK-SYMMETRY-1): this order took NO stock; the cancel / refund restock reads this marker and
-      // puts back only what was taken. Same event as the DO's placeAdminOrder (repo-factory-orders-contract parity).
-      await tx.orderEvent.create({
-        data: {
-          storeId,
-          orderId: created.id,
-          fromStatus: null,
-          toStatus: STOCK_NOT_TAKEN_EVENT,
-          actorId: adminUserId,
-          metadata: {
-            items: created.items.map(it => ({ orderItemId: it.id, quantity: it.quantity })),
+      // #633: the units this order did not take (only an overridden shortage); cancel / refund restock puts back only what
+      // was taken. Same events as the DO's placeAdminOrder (repo-factory-orders-contract parity).
+      if (notTaken.length > 0) {
+        await tx.orderEvent.create({
+          data: {
+            storeId,
+            orderId: created.id,
+            fromStatus: null,
+            toStatus: STOCK_NOT_TAKEN_EVENT,
+            actorId: adminUserId,
+            metadata: { items: notTaken },
           },
-        },
-      });
+        });
+      }
+      if (shortages.length > 0 && stockOverride) {
+        await tx.orderEvent.create({
+          data: {
+            storeId,
+            orderId: created.id,
+            fromStatus: null,
+            toStatus: 'stock_override',
+            actorId: adminUserId,
+            metadata: {
+              reason: data.stockOverrideReason?.trim() ?? '',
+              actorRole: actor.role ?? null,
+              shortages,
+            },
+          },
+        });
+      }
       // The durable record of a MOQ override, in the order transaction (the audit row below is best-effort).
       if (moqOverride && belowMoqProducts.length > 0) {
         await tx.orderEvent.create({
@@ -4688,6 +4820,20 @@ export class OrderService {
           orderNumber: order.orderNumber,
           description: data.moqOverrideReason?.trim() ?? '',
           productIds: [...new Set(belowMoqProducts)],
+        },
+      });
+    }
+
+    if (stockOverridden) {
+      await auditLog({
+        action: 'order.stock_override',
+        userId: adminUserId,
+        storeId,
+        resourceType: 'order',
+        resourceId: order.id,
+        details: {
+          orderNumber: order.orderNumber,
+          description: data.stockOverrideReason?.trim() ?? '',
         },
       });
     }

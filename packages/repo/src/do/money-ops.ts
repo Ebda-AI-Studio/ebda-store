@@ -1097,7 +1097,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       userCap: typeof a.userCap === 'number' && a.userCap > 0 ? a.userCap : undefined,
       guestCap: typeof a.guestCap === 'number' && a.guestCap > 0 ? a.guestCap : undefined,
     }),
-  /** A merchant's manual order (Ruling CF-R4-2): priced from the DO's rows, no stock reserved, overrides recorded in the section. */
+  /** A merchant's manual order (Ruling CF-R4-2): priced from the DO's rows, stock reserved (422 INSUFFICIENT_STOCK unless overridden, STOCK-SYMMETRY-1), overrides recorded in the section. */
   createAdminOrder: (db, storeId, a) => {
     const { storeId: _s, now: _n, ...rest } = a as Partial<AdminOrderInput>;
     return placeAdminOrder(db, { ...(rest as AdminOrderInput), storeId });

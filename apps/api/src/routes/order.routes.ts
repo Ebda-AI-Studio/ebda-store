@@ -42,6 +42,7 @@ const ORDER_SHIPPING_OVERRIDE_AUDIT_ACTION = 'order.shipping_override';
 const CUSTOMER_HIDDEN_AUDIT_ACTIONS = new Set<string>([
   COUPON_OVERRIDE_AUDIT_ACTION,
   'order.moq_override',
+  'order.stock_override',
   ORDER_SHIPPING_OVERRIDE_AUDIT_ACTION,
 ]);
 import { InvoiceService } from '../services/invoice.service';
@@ -2207,8 +2208,22 @@ const adminOrderSchema = z
      */
     overrideMoq: z.boolean().optional(),
     moqOverrideReason: z.string().trim().min(3).max(500).optional(),
+    /**
+     * Phone orders reserve stock and are refused 422 INSUFFICIENT_STOCK when short (owner decision 2026-11-11, Ruling
+     * STOCK-SYMMETRY-1 superseded). store_admin / super_admin may place it anyway with a reason (takes what is on hand;
+     * order event + audit log). Rejected for staff in the service.
+     */
+    overrideStock: z.boolean().optional(),
+    stockOverrideReason: z.string().trim().min(3).max(500).optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.overrideStock === true && !v.stockOverrideReason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['stockOverrideReason'],
+        message: 'A reason is required to place an order over a stock shortage',
+      });
+    }
     if (v.overrideMoq === true && !v.moqOverrideReason) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

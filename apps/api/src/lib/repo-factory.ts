@@ -848,6 +848,8 @@ export interface MoneyClient {
     shipping: number;
     tax: number;
     total: number;
+    /** placed over a stock shortage by a store admin's override */
+    stockOverridden?: boolean;
   }>;
   /** The step-3 abandoned-cart recovery coupon, created or re-activated and linked to the cart in one section (Ruling CF-R4-5). */
   recoveryCoupon(

@@ -970,17 +970,18 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       { role }
     ) as Promise<{ id: string; total: number }>;
 
-  it('admin (manual) order: guest, totals, items, NO stock taken, the sale document and the cart rows are the same', async () => {
+  it('admin (manual) order: guest, totals, items, stock RESERVED (STOCK-SYMMETRY-1 superseded 2026-11-11), the sale document and the cart rows are the same', async () => {
     const t = await parity(10, async w => {
       const o = await admin(w, [{ productId: w.product, quantity: 3 }], { notes: 'phone order' });
       return { total: o.total, events: await adminTrace([o.id]) };
     });
-    expect(t.state.products[0].inventory).toBe(10);
-    expect(t.state.history).toEqual([]);
-    // #633 (STOCK-SYMMETRY-1): the order records that it took no stock, line by line, on BOTH backends
-    expect(t.out.ok.events).toEqual([
-      { to: 'stock_not_taken', meta: { items: [{ orderItemId: '<id>', quantity: 3 }] } },
+    // the order takes its 3 units like checkout and records one ledger row, on BOTH backends
+    expect(t.state.products[0].inventory).toBe(7);
+    expect(t.state.history).toEqual([
+      { type: 'sale', quantity: -3, previousStock: 10, newStock: 7 },
     ]);
+    // no stock_not_taken marker: it took everything, so a cancel / refund puts everything back
+    expect(t.out.ok.events).toEqual([]);
     expect(t.state.orders[0]).toMatchObject({
       subtotal: 30_000,
       status: 'pending',
@@ -989,7 +990,7 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(t.state.fiscal).toHaveLength(1);
   });
 
-  it('admin (manual) order cancelled: nothing goes back on the shelf, it never took any (#633, STOCK-SYMMETRY-1)', async () => {
+  it('admin (manual) order cancelled: the units it took go back on the shelf, symmetric (STOCK-SYMMETRY-1 superseded 2026-11-11)', async () => {
     const t = await parity(10, async w => {
       const o = await admin(w, [{ productId: w.product, quantity: 3 }]);
       await OrderService.updateStatus(STORE, o.id, 'cancelled');
@@ -998,8 +999,99 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
       return 'done';
     });
     expect(t.state.orders[0].status).toBe('cancelled');
-    // was 13 on both backends before #633: the cancel restocked 3 units the phone order never took
+    // 10 - 3 taken at placement + 3 restored on cancel (was 13 before #633, when it restocked units it never took)
     expect(t.state.products[0].inventory).toBe(10);
+    expect(t.state.history.map((h: { type: string }) => h.type).sort()).toEqual([
+      'return_stock',
+      'sale',
+    ]);
+  });
+
+  it('admin order: short stock is refused 422 INSUFFICIENT_STOCK and nothing is kept; only a store admin with a reason overrides, it takes what is on hand, and a cancel restocks only that', async () => {
+    const t = await parity(2, async w => {
+      const item = [{ productId: w.product, quantity: 3 }];
+      const out: Record<string, unknown> = {};
+      out.refused = await settle(() => admin(w, item));
+      out.afterRefusal = (await state(w)).products;
+      out.staff = await settle(() =>
+        admin(w, item, { overrideStock: true, stockOverrideReason: 'phone deal' }, 'staff')
+      );
+      out.noReason = await settle(() => admin(w, item, { overrideStock: true }));
+      const r = await settle(() =>
+        admin(w, item, { overrideStock: true, stockOverrideReason: 'phone deal' })
+      );
+      out.override = 'ok' in r ? { total: r.ok.total } : r;
+      out.events = await adminTrace('ok' in r ? [r.ok.id] : []);
+      out.afterOverride = (await state(w)).products;
+      if ('ok' in r) {
+        await OrderService.updateStatus(STORE, r.ok.id, 'cancelled');
+        if ((await storeMoney(STORE)) === null)
+          await handleOrderRefunded(r.ok.id, STORE, true, false, inlineStep);
+      }
+      return out;
+    });
+    const o = t.out.ok;
+    expect(o.refused.err).toMatchObject({ status: 422, code: 'INSUFFICIENT_STOCK' });
+    expect(o.afterRefusal).toEqual([{ inventory: 2 }]); // the refused order left no trace
+    expect(o.staff.err.status).toBe(403);
+    expect(o.noReason.err.status).toBe(400);
+    expect(o.override.total).toBeGreaterThan(0);
+    expect(o.afterOverride).toEqual([{ inventory: 0 }]); // took the 2 on hand
+    expect(o.events.map((e: { to: string }) => e.to).sort()).toEqual([
+      'stock_not_taken',
+      'stock_override',
+    ]);
+    expect(o.events.find((e: { to: string }) => e.to === 'stock_not_taken').meta.items).toEqual([
+      { orderItemId: '<id>', quantity: 1 },
+    ]);
+    expect(t.state.products[0].inventory).toBe(2); // the cancel put back 2, not 3
+    expect(t.state.orders).toHaveLength(1); // the refused and rejected attempts created nothing
+  });
+
+  it('admin order: a legacy order that carries the stock_not_taken marker (took nothing) still restocks nothing on cancel', async () => {
+    const t = await parity(10, async w => {
+      const o = await admin(w, [{ productId: w.product, quantity: 3 }]);
+      // turn it into a pre-change order: it took no stock and carries the full-line marker
+      const isDo = (await storeMoney(STORE)) !== null;
+      await prisma.product.update({ where: { id: w.product }, data: { inventory: 10 } });
+      sqlite.prepare('UPDATE products SET inventory = 10 WHERE id = ?').run(w.product);
+      const itemId = isDo
+        ? (
+            sqlite.prepare('SELECT id FROM order_items WHERE order_id = ?').get(o.id) as {
+              id: string;
+            }
+          ).id
+        : (await prisma.orderItem.findFirstOrThrow({ where: { orderId: o.id } })).id;
+      if (isDo)
+        sqlite
+          .prepare(
+            `INSERT INTO order_events (id, store_id, order_id, from_status, to_status, actor_id, metadata, created_at) VALUES (?, ?, ?, NULL, 'stock_not_taken', ?, ?, ?)`
+          )
+          .run(
+            crypto.randomUUID(),
+            STORE,
+            o.id,
+            ownerId,
+            JSON.stringify({ items: [{ orderItemId: itemId, quantity: 3 }] }),
+            Date.now()
+          );
+      else
+        await prisma.orderEvent.create({
+          data: {
+            storeId: STORE,
+            orderId: o.id,
+            fromStatus: null,
+            toStatus: 'stock_not_taken',
+            actorId: ownerId,
+            metadata: { items: [{ orderItemId: itemId, quantity: 3 }] },
+          },
+        });
+      await OrderService.updateStatus(STORE, o.id, 'cancelled');
+      if (!isDo) await handleOrderRefunded(o.id, STORE, true, false, inlineStep);
+      return 'done';
+    });
+    expect(t.state.orders[0].status).toBe('cancelled');
+    expect(t.state.products[0].inventory).toBe(10); // legacy behaviour kept: nothing phantom put back
   });
 
   it('admin order: a coupon is claimed once, discounts like checkout, a negotiated shipping fee replaces the computed one', async () => {
@@ -1069,10 +1161,9 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(o['used enforced'].err.code).toBe('COUPON_LIMIT_REACHED');
     expect(o['expired staff'].err.status).toBe(403);
     expect(o['no reason'].err.status).toBe(400);
-    // one override event per overridden order, and (#633, STOCK-SYMMETRY-1) each manual order's stock_not_taken marker
+    // one override event per overridden order; a fully stocked order writes no stock_not_taken marker any more
     expect(o.events.filter((e: { to: string }) => e.to === 'coupon_override')).toHaveLength(3);
-    expect(o.events.filter((e: { to: string }) => e.to === 'stock_not_taken')).toHaveLength(3);
-    expect(o.events).toHaveLength(6);
+    expect(o.events).toHaveLength(3);
     expect(o.unknown.err.status).toBe(404);
   });
 
@@ -1099,11 +1190,8 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(o.refused.err).toMatchObject({ status: 422, code: 'BELOW_MOQ' });
     expect(o.staff.err.status).toBe(403);
     expect(o.override.total).toBeGreaterThan(0);
-    // the override event, plus (#633, STOCK-SYMMETRY-1) the manual order's stock_not_taken marker
-    expect(o.events.map((e: { to: string }) => e.to).sort()).toEqual([
-      'moq_override',
-      'stock_not_taken',
-    ]);
+    // the override event only: the order took all its stock, so there is no stock_not_taken marker
+    expect(o.events.map((e: { to: string }) => e.to)).toEqual(['moq_override']);
   });
 
   it('admin order: refusals (unknown product, variant required / unknown / disabled) carry the same status and code, and a variant line is priced from the variant', async () => {

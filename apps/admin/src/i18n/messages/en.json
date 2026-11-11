@@ -1437,6 +1437,13 @@
         "overrideHint": "Apply this coupon even if the order breaks its rules (customer group, first order, products, dates, usage limits). Your name and reason are recorded on the order.",
         "overrideReasonLabel": "Reason for the override"
       },
+      "stockSection": {
+        "shortHeading": "Not enough stock for this order",
+        "shortBody": "A phone order takes stock the same way an online order does, and one or more lines are more than what is on the shelf. Lower the quantity, or ask a store admin to place it anyway.",
+        "overrideLabel": "Place the order anyway",
+        "overrideHint": "The order takes whatever is on hand and the missing units are not deducted. Your name and reason are recorded on the order.",
+        "overrideReasonLabel": "Reason for placing it over the stock"
+      },
       "footer": {
         "itemCount": "{count, plural, one {{count, number, latn} item} other {{count, number, latn} items}}",
         "creating": "Creating…",
@@ -1451,7 +1458,9 @@
         "overrideReasonRequired": "Enter a reason (at least 3 characters) to override the coupon rules",
         "variantsLoadFailed": "Couldn't load this product's sizes and options. Try again.",
         "variantRequired": "Pick a size or option for every product that has them.",
-        "variantInactive": "A size on this order is disabled. Re-enable it on the product page or pick another size."
+        "variantInactive": "A size on this order is disabled. Re-enable it on the product page or pick another size.",
+        "insufficientStock": "Not enough stock for one or more products. Lower the quantity, or a store admin can place it anyway with a reason.",
+        "stockOverrideReasonRequired": "Enter a reason (at least 3 characters) to place the order over the stock shortage"
       },
       "toast": {
         "created": "Order {orderNumber} created"
