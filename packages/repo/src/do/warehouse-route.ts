@@ -20,6 +20,10 @@ export const ALLOCATED_EVENT = 'warehouse_allocated';
 export const RELEASED_EVENT = 'warehouse_released';
 
 export interface Allocation {
+  /** the order line this came from (Ruling WAREHOUSE-ROUTE-2: give-backs are keyed per line, not per product) */
+  orderItemId?: string;
+  /** checkout only, before the order_items rows exist: index of the line; `recordAllocations` turns it into `orderItemId` */
+  lineIndex?: number;
   productId: string;
   variantId: string | null;
   warehouseId: string;
@@ -83,7 +87,8 @@ export function applyRoute(
   plan: RoutePlan,
   productId: string,
   variantId: string | null,
-  qty: number
+  qty: number,
+  ref: { lineIndex?: number; orderItemId?: string }
 ): Allocation {
   if (!plan.chosen)
     throw new MoneyError(
@@ -101,6 +106,7 @@ export function applyRoute(
     value: -qty,
   });
   return {
+    ...ref,
     productId,
     variantId,
     warehouseId: plan.chosen.id,
@@ -129,13 +135,16 @@ export function recordAllocations(
   storeId: string,
   orderId: string,
   allocations: Allocation[],
-  now: number
+  now: number,
+  itemIds: string[] = []
 ): void {
   if (allocations.length === 0) return;
-  writeEvent(db, storeId, orderId, ALLOCATED_EVENT, { allocations }, now);
+  const resolved = allocations.map(({ lineIndex, ...a }) => ({
+    ...a,
+    orderItemId: a.orderItemId ?? (lineIndex === undefined ? undefined : itemIds[lineIndex]),
+  }));
+  writeEvent(db, storeId, orderId, ALLOCATED_EVENT, { allocations: resolved }, now);
 }
-
-const skuKey = (p: string, v: string | null) => `${p}|${v ?? ''}`;
 
 function eventsOf(db: SyncSql, storeId: string, orderId: string, type: string): Allocation[][] {
   const out: Allocation[][] = [];
@@ -153,20 +162,18 @@ function eventsOf(db: SyncSql, storeId: string, orderId: string, type: string): 
   return out;
 }
 
-/** What the order took from each warehouse for one SKU, minus what was already given back. */
+/** What the order took from each warehouse for ONE ORDER LINE, minus what was already given back. */
 function outstanding(
   db: SyncSql,
   storeId: string,
   orderId: string,
-  productId: string,
-  variantId: string | null
+  orderItemId: string
 ): Array<{ warehouseId: string; quantity: number }> {
-  const key = skuKey(productId, variantId);
   const left = new Map<string, number>();
   const sign = (list: Allocation[][], dir: 1 | -1) => {
     for (const alloc of list)
       for (const a of alloc) {
-        if (skuKey(a.productId, a.variantId ?? null) !== key) continue;
+        if (a.orderItemId !== orderItemId) continue;
         left.set(a.warehouseId, (left.get(a.warehouseId) ?? 0) + dir * a.quantity);
       }
   };
@@ -186,6 +193,7 @@ export function releaseToWarehouses(
   db: SyncSql,
   storeId: string,
   orderId: string,
+  orderItemId: string,
   productId: string,
   variantId: string | null,
   qty: number,
@@ -193,7 +201,7 @@ export function releaseToWarehouses(
 ): void {
   let todo = qty;
   const given: Allocation[] = [];
-  for (const o of outstanding(db, storeId, orderId, productId, variantId)) {
+  for (const o of outstanding(db, storeId, orderId, orderItemId)) {
     if (todo <= 0) break;
     const wh = db.all('SELECT code FROM warehouses WHERE id = ? AND store_id = ?', [
       o.warehouseId,
@@ -210,6 +218,7 @@ export function releaseToWarehouses(
       value: n,
     });
     given.push({
+      orderItemId,
       productId,
       variantId,
       warehouseId: o.warehouseId,
@@ -218,6 +227,11 @@ export function releaseToWarehouses(
     });
     todo -= n;
   }
+  // Units this line never had allocated (an order from before routing, an overridden phone order, backorder units) were
+  // restocked on the aggregate only: bring the shadow back to it, the surplus landing on the default warehouse (the
+  // reconcile rule). Only in a routed store; a single / no-warehouse store keeps its exact old behaviour.
+  if (todo > 0 && activeWarehouses(db, storeId).length >= 2)
+    reconcileToAggregate(db, storeId, productId, variantId);
   if (given.length > 0)
     writeEvent(db, storeId, orderId, RELEASED_EVENT, { allocations: given }, now);
 }

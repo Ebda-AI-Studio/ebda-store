@@ -1,10 +1,11 @@
 // WAREHOUSE-ROUTE-1: order creation routes stock lines to one warehouse, in the order's own section (real StoreDO schema).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { openSqlite } from './diff-harness';
 import { nodeSyncSql } from './node-sync-sql';
 import { placeOrder, type CheckoutInput } from '../src/do/checkout';
 import { placeAdminOrder } from '../src/do/admin-order';
 import { cancelOrder } from '../src/do/refund';
+import { releaseToWarehouses } from '../src/do/warehouse-route';
 import { MoneyError } from '../src/do/sync-sql';
 
 function fixture(warehouses: Array<[string, number, number]>, inventory?: number) {
@@ -149,6 +150,96 @@ describe('multi-warehouse routing on order creation', () => {
     expect(f.wh()).toEqual({ A: 4, B: 3 });
     cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
     expect(f.wh()).toEqual({ A: 4, B: 6 });
+  });
+});
+
+describe('WAREHOUSE-ROUTE-2', () => {
+  it('a reasoned phone-order stock override is never refused NO_SINGLE_WAREHOUSE, writes no allocation, and its cancel restores the totals', () => {
+    const f = fixture([
+      ['A', 1, 4],
+      ['B', 5, 6],
+    ]);
+    const input = {
+      storeId: 's1',
+      lines: [{ productId: 'p1', quantity: 8 }],
+      shippingAddress: { name: 'A' },
+      actorId: 'u1',
+    };
+    expect(code(() => placeAdminOrder(f.db, input))).toBe('NO_SINGLE_WAREHOUSE');
+    const o = placeAdminOrder(f.db, {
+      ...input,
+      overrideStock: true,
+      stockOverrideReason: 'phone deal',
+    });
+    expect(f.agg()).toBe(2);
+    expect(f.events('warehouse_allocated')).toBe(0);
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    expect(f.agg()).toBe(10);
+    expect(f.wh()).toEqual({ A: 4, B: 6 });
+  });
+
+  it('an order from before routing (no allocation): its cancel puts the units on the default warehouse, shadow sum == aggregate', () => {
+    const f = fixture([
+      ['A', 1, 4],
+      ['B', 5, 6],
+    ]);
+    const o = placeOrder(f.db, f.base({}, 3));
+    f.raw.prepare(`DELETE FROM order_events WHERE to_status = 'warehouse_allocated'`).run();
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    expect(f.agg()).toBe(10);
+    expect(f.wh()).toEqual({ A: 7, B: 3 }); // default (A) takes the unallocated units
+  });
+
+  it('a negative aggregate (backorder) is not a shortfall: no reconcile_shortfall error is logged', () => {
+    const f = fixture(
+      [
+        ['A', 1, 0],
+        ['B', 5, 0],
+      ],
+      -3
+    );
+    f.raw.prepare(`UPDATE products SET allow_backorder = 1 WHERE id = 'p1'`).run();
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      placeOrder(f.db, f.base({ backorderEnabled: true }, 1));
+      expect(spy.mock.calls.filter(c => String(c[0]).includes('reconcile_shortfall'))).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('give-backs are keyed per order line: an unrouted line cannot use up a routed line of the same product', () => {
+    const f = fixture([
+      ['A', 1, 4],
+      ['B', 5, 6],
+    ]);
+    const o = placeOrder(
+      f.db,
+      f.base(
+        {
+          lines: [
+            { productId: 'p1', quantity: 2 },
+            { productId: 'p1', quantity: 3 },
+          ],
+        },
+        1
+      )
+    );
+    const items = f.all<{ id: string; quantity: number }>(
+      `SELECT id, quantity FROM order_items WHERE order_id = ? ORDER BY quantity`,
+      o.orderId
+    );
+    expect(items).toHaveLength(2);
+    expect(f.wh()).toEqual({ A: 4, B: 1 });
+    // a line id that was never routed gets nothing from the routed lines' allocations
+    releaseToWarehouses(f.db, 's1', o.orderId, 'unrouted-line', 'p1', null, 2, Date.now());
+    expect(f.events('warehouse_released')).toBe(0);
+    // the 3-unit line gives back exactly its own 3 units to B
+    releaseToWarehouses(f.db, 's1', o.orderId, items[1].id, 'p1', null, 3, Date.now());
+    expect(f.wh().B).toBe(4);
+    // the 2-unit line still has its own 2 outstanding
+    releaseToWarehouses(f.db, 's1', o.orderId, items[0].id, 'p1', null, 2, Date.now());
+    expect(f.wh().B).toBe(6);
   });
 });
 

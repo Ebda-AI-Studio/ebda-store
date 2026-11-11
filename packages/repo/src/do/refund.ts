@@ -327,6 +327,7 @@ function restoreLine(
     db,
     storeId,
     orderId,
+    item.id,
     item.product_id,
     item.variant_id ?? null,
     qty,
