@@ -60,7 +60,10 @@ const ACCOUNTS_PUBLIC_JWK = {
   alg: 'ES256',
   use: 'sig',
 };
-const ACCOUNTS_PRIVATE_JWK = { ...accountsKeys.privateKey.export({ format: 'jwk' }), kid: ACCOUNTS_TEST_KID };
+const ACCOUNTS_PRIVATE_JWK = {
+  ...accountsKeys.privateKey.export({ format: 'jwk' }),
+  kid: ACCOUNTS_TEST_KID,
+};
 
 // Two workers in one Miniflare: the BUILT API Worker (`npm run cf:dry-run`: wrangler's esbuild bundle with
 // the alias block applied, i.e. exactly what would be deployed) loaded from disk, and the vitest test
@@ -211,6 +214,22 @@ export default defineConfig(async () => {
                 ...readdirSync(here('./dist-cf'))
                   .filter(f => f.endsWith('.wasm'))
                   .map(f => ({ type: 'CompiledWasm' as const, path: here(`./dist-cf/${f}`) })),
+                // the separate Worker modules the deploy uploads (wrangler `rules`, Rulings BUNDLE-BUDGET-7/10): without them
+                // `import('./cf/modules/exceljs.cjs')` has nothing to load and the xlsx routes answer 500
+                ...(existsSync(here('./dist-cf/cf/modules'))
+                  ? readdirSync(here('./dist-cf/cf/modules')).flatMap(f =>
+                      f.endsWith('.mjs') || f.endsWith('.cjs')
+                        ? [
+                            {
+                              type: (f.endsWith('.cjs') ? 'CommonJS' : 'ESModule') as
+                                | 'CommonJS'
+                                | 'ESModule',
+                              path: here(`./dist-cf/cf/modules/${f}`),
+                            },
+                          ]
+                        : []
+                    )
+                  : []),
               ],
               compatibilityDate: '2026-08-01',
               compatibilityFlags: ['nodejs_compat'],
