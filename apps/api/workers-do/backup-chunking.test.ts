@@ -103,6 +103,48 @@ describe('StoreDO paged backup (P2-4a)', () => {
     expect(left).toEqual({ p: 0, f: 1 });
   });
 
+  it('a paged restore that FAILS its foreign key check empties every table, customer logins included, and a retry succeeds', async () => {
+    const S = 'ck4-src';
+    await seed(S, 60);
+    await runInDurableObject(stub(S), (_i, s) => {
+      s.storage.sql.exec(
+        `INSERT INTO _cauth_users (id, email, password_hash, first_name, last_name, created_at, updated_at) VALUES ('u1', 'a@x.com', 'h', 'A', 'B', 1, 1)`
+      );
+    });
+    await runInDurableObject(stub(S), (_i, s) => s.storage.sync());
+    await runInDurableObject(stub(S), (_i, s) => {
+      // a variant whose product does not exist: written with foreign keys off, as a torn backup would carry it
+      s.storage.sql.exec('PRAGMA foreign_keys = OFF');
+      s.storage.sql.exec(
+        `INSERT INTO product_variants (id, product_id, title, sku, price) VALUES ('orphan', 'no-such-product', 'V', 'S-2', 1)`
+      );
+    });
+    await runInDurableObject(stub(S), (_i, s) => s.storage.sync());
+    await runInDurableObject(stub(S), (_i, s) => s.storage.sql.exec('PRAGMA foreign_keys = ON'));
+    const opts = { snapshotRows: 10, partRows: 20 };
+    await runInDurableObject(stub(S), (d: StoreDO) => d.backupNow(S, opts));
+    const day = new Date().toISOString().slice(0, 10);
+
+    const bad = await stub('ck4-dst').restoreFrom(S, day);
+    expect(JSON.stringify(bad)).toMatch(/dangling foreign key/);
+    const counts = () =>
+      runInDurableObject(stub('ck4-dst'), (_i, s) => ({
+        users: s.storage.sql.exec('SELECT count(*) AS n FROM _cauth_users').toArray()[0].n,
+        products: s.storage.sql.exec('SELECT count(*) AS n FROM products').toArray()[0].n,
+        fk: s.storage.sql.exec('PRAGMA foreign_keys').toArray()[0].foreign_keys,
+      }));
+    expect(await counts()).toEqual({ users: 0, products: 0, fk: 1 });
+
+    // fix the source, back it up again (same day: overwrites), and the SAME target restores
+    await runInDurableObject(stub(S), (_i, s) =>
+      s.storage.sql.exec(`DELETE FROM product_variants WHERE id = 'orphan'`)
+    );
+    await runInDurableObject(stub(S), (d: StoreDO) => d.backupNow(S, opts));
+    const good = await stub('ck4-dst').restoreFrom(S, day);
+    expect(JSON.stringify(good)).toContain('"ok":true');
+    expect(await counts()).toEqual({ users: 1, products: 60, fk: 1 });
+  });
+
   it('a legacy single-file backup (written before parts existed) still restores', async () => {
     await seed('ck3-src', 8);
     const { manifest, files } = await runInDurableObject(stub('ck3-src'), async (_i, s) =>
