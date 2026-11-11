@@ -438,6 +438,16 @@
     "synAr": "نقطة اعادة الطلب مخزون منخفض"
   },
   {
+    "id": "page:/stock/reorder/rules",
+    "kind": "page",
+    "route": "/stock/reorder/rules",
+    "access": "owner",
+    "en": "Reorder rules",
+    "ar": "قواعد إعادة الطلب",
+    "synEn": "reorder rules minimum stock threshold restock",
+    "synAr": "قواعد اعادة الطلب حد ادنى مخزون"
+  },
+  {
     "id": "page:/stock/deadstock",
     "kind": "page",
     "route": "/stock/deadstock",

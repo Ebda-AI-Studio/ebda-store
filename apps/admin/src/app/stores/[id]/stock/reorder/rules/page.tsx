@@ -64,7 +64,8 @@ const EMPTY: Draft = {
   isActive: true,
 };
 
-const FIELD = 'w-full border border-border rounded px-2 py-1.5 text-base sm:text-sm bg-background';
+const FIELD =
+  'w-full border border-border rounded-md px-2 py-1.5 text-base sm:text-sm bg-background';
 
 function intOrNull(v: string): number | null {
   return /^\d+$/.test(v.trim()) ? parseInt(v, 10) : null;
@@ -374,7 +375,7 @@ export default function ReorderRulesPage() {
             <span>{t('form.active')}</span>
           </label>
           {formError && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-destructive-ink">
               {formError}
             </p>
           )}
