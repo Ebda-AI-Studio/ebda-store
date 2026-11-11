@@ -60,10 +60,10 @@ describe('host-lock.sh', () => {
 
   it('a killed holder frees the lock (the kernel drops it)', async () => {
     const f = fresh();
-    const holder = spawn('bash', [SCRIPT, 'sleep', '60'], { env: env(f) });
+    // detached = its own process group, so killing -pid takes down bash + lockf + sleep that THIS test started and nothing else
+    const holder = spawn('bash', [SCRIPT, 'sleep', '60'], { env: env(f), detached: true });
     await new Promise(r => setTimeout(r, 800));
-    holder.kill('SIGKILL');
-    spawnSync('pkill', ['-f', 'sleep 60']);
+    process.kill(-holder.pid!, 'SIGKILL');
     await new Promise(r => setTimeout(r, 500));
     const r = spawnSync('bash', [SCRIPT, 'echo', 'ran'], {
       env: env(f, { HOST_LOCK_MAX_WAIT_S: '5' }),
