@@ -2144,14 +2144,12 @@ export async function storeCompareAndSet(
           }
         : { OR: [{ [field]: null }, { [field]: '' }] }
       : { [field]: jsonValue ? { equals: was } : was };
-    const res = await prisma.store.updateMany({
+    // storeUpdateMany copies the written settings to the DO mirror itself when it matched a row
+    const res = await storeUpdateMany(prisma, {
       where: { id: storeId, ...cond } as never,
       data: { [field]: value } as never,
     });
-    if (res.count > 0) {
-      written.push(field);
-      await copyStoreSettings(storeId, { [field]: value });
-    }
+    if (res.count > 0) written.push(field);
   }
   return written;
 }
