@@ -50,7 +50,7 @@ export function AcceptedPaymentBadges({
   // IA-04 (W4): one inline row under the summary, not a second card; it names the methods once.
   return (
     <div className={['flex flex-wrap items-center gap-2', className].filter(Boolean).join(' ')}>
-      <span className="text-xs text-muted-foreground">{t('We accept', 'نقبل الدفع عبر')}</span>
+      <span className="text-xs text-muted-foreground">{t('We accept', 'طرق الدفع المتاحة')}</span>
       {marks}
     </div>
   );

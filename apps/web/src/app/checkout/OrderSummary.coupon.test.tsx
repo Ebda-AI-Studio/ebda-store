@@ -82,3 +82,19 @@ describe('failed coupon (P1-N1)', () => {
     }
   });
 });
+
+describe('shipping line (QA-C3/C4)', () => {
+  const ship = (over: Record<string, unknown>) =>
+    render(React.createElement(OrderSummary, { ...base, ...over } as never)).container
+      .textContent ?? '';
+  it('never says free when the store has no delivery rates', () => {
+    const text = ship({ shippingToConfirm: true, shippingAreaChosen: true });
+    expect(text).toContain('بيتحدد مع المتجر');
+    expect(text).not.toContain('Free');
+  });
+  it('updates from "pick an area" once an area is chosen and the fee is 0', () => {
+    expect(ship({ shippingAreaChosen: false })).toContain('اختر المنطقة');
+    cleanup();
+    expect(ship({ shippingAreaChosen: true })).not.toContain('اختر المنطقة');
+  });
+});

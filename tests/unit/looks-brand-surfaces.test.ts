@@ -28,6 +28,7 @@ vi.mock('@ebda/database', () => {
       order: { findFirst: async () => state.order, count },
       product: { count },
       shippingZone: { count },
+      shippingAreaRate: { count: vi.fn().mockResolvedValue(0) },
       paymentConfig: { count },
     },
     withStore: async (_id: string, fn: (t: typeof tx) => unknown) => fn(tx),

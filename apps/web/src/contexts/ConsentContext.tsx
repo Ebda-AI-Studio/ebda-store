@@ -94,13 +94,15 @@ export function ConsentProvider({ children, initialConsent }: ConsentProviderPro
       v: 1,
       ts: new Date().toISOString(),
     };
+    const previouslyMarketing = consent?.marketing === true;
     setConsentState(next);
     writeCookie(next);
     setPreferencesOpen(false);
-    // Reload so server-side pixel gating in layout.tsx re-runs with the
-    // new cookie. Mirrors the locale-cookie reload pattern. Defer one
-    // tick so the cookie write commits in all browsers.
-    if (typeof window !== 'undefined') {
+    // Reload only when the server-side pixel gating in layout.tsx must change: marketing
+    // turned ON (pixels must now render) or OFF after having been on (rendered pixels must
+    // go). A first-time reject changes nothing on the server (no pixel was rendered), so it
+    // must not reload the page (QA-C2). Defer one tick so the cookie write commits.
+    if (typeof window !== 'undefined' && next.marketing !== previouslyMarketing) {
       setTimeout(() => window.location.reload(), 0);
     }
   };

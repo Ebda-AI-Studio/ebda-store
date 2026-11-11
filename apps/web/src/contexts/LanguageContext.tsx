@@ -208,7 +208,7 @@ export const translations = {
   'About Us': 'من نحن',
   Newsletter: 'النشرة البريدية',
   Email: 'البريد الإلكتروني',
-  'We accept:': 'نقبل الدفع عبر:',
+  'We accept:': 'طرق الدفع المتاحة:',
 
   // Common
   Home: 'الرئيسية',

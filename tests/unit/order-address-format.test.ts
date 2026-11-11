@@ -120,6 +120,8 @@ describe('formatAddressLines — locale-aware labels', () => {
     const addr = { block: '1', streetAr: 'شارع الحرية' };
     const lines = formatAddressLines(addr, AR_LABELS);
     const allText = lines.join(' ');
-    expect(allText).toContain('شارع شارع الحرية');
+    // QA-D2: the value already carries the label, so it is not doubled.
+    expect(allText).toContain('شارع الحرية');
+    expect(allText).not.toContain('شارع شارع');
   });
 });

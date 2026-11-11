@@ -105,9 +105,10 @@ export class SetupGuideService {
 
     // the catalogue, zones, orders and gateways live in the store's backend (Durable Object or Postgres)
     const db = await storeDb(storeId);
-    const [products, zones, orders, otherMethods] = await Promise.all([
+    const [products, zones, areaRates, orders, otherMethods] = await Promise.all([
       db.product.count({ where: { storeId, deletedAt: null } }),
       db.shippingZone.count({ where: { storeId, isActive: true } }),
+      db.shippingAreaRate.count({ where: { storeId, isActive: true } }),
       db.order.count({ where: { storeId } }),
       db.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
     ]);
@@ -119,7 +120,8 @@ export class SetupGuideService {
       add_product: products > 0,
       // A look IS a brand palette: a look store has its colours without storing any (LOOKS-14).
       brand: !!store.logo || !!getLook(store.look) || hasBrandColor(store.theme),
-      shipping: zones > 0,
+      // C3: delivery rates are zones OR per-area rates (an area-rate-only store was shown as not done).
+      shipping: zones > 0 || areaRates > 0,
       // COD is on by default, so "enabled" alone proves nothing: payment is
       // done when the merchant confirmed it (onboarding step / explicit tick)
       // or has switched on a non-COD gateway.

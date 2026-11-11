@@ -1472,6 +1472,7 @@
       "unpaid": "Unpaid",
       "remain": "Remain {amount}",
       "paymentMethod": "Payment method",
+      "methodCod": "Cash on delivery",
       "paymentTransactionId": "Transaction ID",
       "paymentLink": "Payment link",
       "summary": "Summary",
@@ -9382,6 +9383,11 @@
       }
     },
     "setupGuide": {
+      "shippingWarning": {
+        "title": "Delivery rates are not set yet",
+        "body": "Customers will not see a delivery fee at checkout, so you will not collect delivery fees. Add at least one delivery rate before you take orders.",
+        "cta": "Add delivery rates"
+      },
       "title": "Setup guide",
       "subtitle": "Finish these steps to get your first order.",
       "progress": "{done} of {total} done",

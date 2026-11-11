@@ -411,7 +411,21 @@ function handleStoreHost(
       target.pathname = q === -1 ? decision.location : decision.location.slice(0, q);
       target.search = q === -1 ? '' : decision.location.slice(q);
       if (target.origin === request.nextUrl.origin && target.pathname.startsWith('/')) {
-        return NextResponse.redirect(target, 301);
+        const redirectResponse = NextResponse.redirect(target, 301);
+        // QA-C6: `/ar/cart` -> `/cart` must not drop the shopper's language. The language of a
+        // non-prefixed page is the `force-language` cookie, so write it from the prefix being
+        // stripped, and never let a cache replay the redirect without the cookie.
+        const prefixed = /^\/(ar|en)(\/|$)/.exec(request.nextUrl.pathname);
+        if (prefixed) {
+          redirectResponse.cookies.set('force-language', prefixed[1], {
+            path: '/',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 365,
+            secure: request.nextUrl.protocol === 'https:',
+          });
+          redirectResponse.headers.set('Cache-Control', 'private, no-store');
+        }
+        return redirectResponse;
       }
       return new NextResponse(null, { status: 404 });
     }

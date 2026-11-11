@@ -455,6 +455,9 @@ export default function CheckoutClient() {
   // NOT "unavailable". A `matched:false` result only means "not available"
   // when the store DOES have area rates but this specific area isn't covered.
   const [storeHasAreaRates, setStoreHasAreaRates] = useState(false);
+  // C3: the store configured no delivery rates at all. Never shown as "free": the shopper is told
+  // the store sets the delivery fee (the order total carries no shipping line until it does).
+  const [shippingToConfirm, setShippingToConfirm] = useState(false);
 
   // Shipping & discount
   const [selectedArea, setSelectedArea] = useState('');
@@ -848,6 +851,7 @@ export default function CheckoutClient() {
         freeShipping: boolean;
         matched?: boolean;
         storeHasAreaRates?: boolean;
+        noRatesConfigured?: boolean;
       }>(`/stores/public/${store.id}/shipping/calculate`, {
         area: selectedArea,
         orderTotal: cart.subtotal,
@@ -857,6 +861,7 @@ export default function CheckoutClient() {
       if (result.success && result.data) {
         const hasAreaRates = result.data.storeHasAreaRates === true;
         setStoreHasAreaRates(hasAreaRates);
+        setShippingToConfirm(result.data.noRatesConfigured === true);
         // "Not available for delivery" applies ONLY when the store configured
         // per-area rates but this specific area isn't covered. A store with no
         // shipping config at all (storeHasAreaRates === false) falls back to
@@ -2626,15 +2631,17 @@ export default function CheckoutClient() {
                               )}
                             </span>
                             <span className="text-sm font-medium text-foreground">
-                              {freeShipping
-                                ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
-                                : shippingCost > 0
-                                  ? formatPrice(shippingCost)
-                                  : rateByArea.has(formData.area)
-                                    ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
-                                    : !storeHasAreaRates
-                                      ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
-                                      : t('Calculating...', 'بنحسب...')}
+                              {shippingToConfirm
+                                ? t('Delivery fee is set by the store', 'التوصيل بيتحدد مع المتجر')
+                                : freeShipping
+                                  ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                  : shippingCost > 0
+                                    ? formatPrice(shippingCost)
+                                    : rateByArea.has(formData.area)
+                                      ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
+                                      : !storeHasAreaRates
+                                        ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                        : t('Calculating...', 'بنحسب...')}
                             </span>
                           </div>
                         )}
@@ -2873,6 +2880,8 @@ export default function CheckoutClient() {
               taxIncludedInPrice={taxIncludedInPrice}
               total={total}
               freeShipping={freeShipping}
+              shippingToConfirm={shippingToConfirm}
+              shippingAreaChosen={Boolean(formData.area)}
               couponCode={couponCode}
               onCouponCodeChange={setCouponCode}
               appliedCoupon={appliedCoupon}

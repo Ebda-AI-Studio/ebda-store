@@ -86,6 +86,10 @@ interface OrderSummaryProps {
   taxIncludedInPrice: boolean;
   total: number;
   freeShipping: boolean;
+  /** C3: store has no delivery rates; the line says the store sets the fee, never "Free". */
+  shippingToConfirm?: boolean;
+  /** C4: an area is chosen, so a 0 fee is a known price (free), not "pick an area". */
+  shippingAreaChosen?: boolean;
   couponCode: string;
   onCouponCodeChange: (code: string) => void;
   appliedCoupon: Coupon | null;
@@ -115,6 +119,8 @@ export function OrderSummary({
   taxIncludedInPrice,
   total,
   freeShipping,
+  shippingToConfirm = false,
+  shippingAreaChosen = false,
   couponCode,
   onCouponCodeChange,
   appliedCoupon,
@@ -490,11 +496,13 @@ export function OrderSummary({
               className={`font-medium tabular-nums ${freeShipping ? 'text-success-ink' : ''}`}
               style={typography?.price}
             >
-              {freeShipping
-                ? t('Free', translations['Free'])
-                : shipping > 0
-                  ? formatPrice(shipping)
-                  : t('Select area', 'اختر المنطقة')}
+              {shippingToConfirm
+                ? t('Set by the store', 'بيتحدد مع المتجر')
+                : freeShipping || (shipping === 0 && shippingAreaChosen)
+                  ? t('Free', translations['Free'])
+                  : shipping > 0
+                    ? formatPrice(shipping)
+                    : t('Select area', 'اختر المنطقة')}
             </span>
           </div>
           {codFee > 0 && (

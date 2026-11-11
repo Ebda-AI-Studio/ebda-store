@@ -231,10 +231,13 @@ function Combobox({
                 role="option"
                 aria-selected={option.value === value}
                 onMouseDown={e => {
-                  // mousedown fires before blur — prevent blur from closing
+                  // mousedown fires before blur — prevent blur from closing the list
                   e.preventDefault();
-                  handleSelect(option);
                 }}
+                // QA-C7: the commit is the CLICK (pointer, touch tap and assistive-tech activation all fire
+                // it; committing on mousedown missed taps and synthetic clicks, and a touch scroll of the
+                // list used to select whatever the finger landed on).
+                onClick={() => handleSelect(option)}
                 className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
                   option.value === value
                     ? 'bg-primary/10 text-primary font-medium'

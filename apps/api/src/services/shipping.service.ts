@@ -317,6 +317,8 @@ export class ShippingService {
         return {
           matched: true,
           storeHasAreaRates: areaRates.length > 0,
+          // C3: the store has no delivery rates at all. Callers must NOT present this as free shipping.
+          noRatesConfigured: zones.length === 0 && areaRates.length === 0,
           zone: null,
           shippingCost: resolved.shippingCost,
           freeShipping: resolved.freeShipping,
@@ -331,6 +333,8 @@ export class ShippingService {
       return {
         matched: true,
         storeHasAreaRates: areaRates.length > 0,
+        // C3: the store has no delivery rates at all. Callers must NOT present this as free shipping.
+        noRatesConfigured: zones.length === 0 && areaRates.length === 0,
         zone: {
           id: matchedZone.id,
           name: matchedZone.name,
@@ -355,6 +359,8 @@ export class ShippingService {
       return {
         matched: true,
         storeHasAreaRates: false,
+        // C3: the store has no delivery rates at all. Callers must NOT present this as free shipping.
+        noRatesConfigured: zones.length === 0 && areaRates.length === 0,
         zone: {
           id: fallbackZone.id,
           name: fallbackZone.name,
@@ -372,6 +378,8 @@ export class ShippingService {
     return {
       matched: false,
       storeHasAreaRates: areaRates.length > 0,
+      // C3: the store has no delivery rates at all. Callers must NOT present this as free shipping.
+      noRatesConfigured: zones.length === 0 && areaRates.length === 0,
       zone: null,
       shippingCost: 0,
       freeShipping: false,
