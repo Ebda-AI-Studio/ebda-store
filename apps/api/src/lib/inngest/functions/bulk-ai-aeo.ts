@@ -1104,7 +1104,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                       metaDescriptionAeo: parsed.en.trim().slice(0, 160),
                       metaDescriptionAeoAr: parsed.ar?.trim().slice(0, 160),
                     },
-                    { overwrite: force }
+                    { overwrite: force, job: 'bulk-ai-meta-aeo' }
                   );
                   bFilled++;
                 } else {

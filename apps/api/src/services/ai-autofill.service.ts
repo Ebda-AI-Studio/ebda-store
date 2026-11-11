@@ -554,7 +554,7 @@ const isBlankVal = (v: unknown): boolean =>
   v === undefined ||
   (typeof v === 'string' && v.trim() === '') ||
   (typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length === 0);
-type EntityOpts = { overwrite?: boolean };
+type EntityOpts = { overwrite?: boolean; /** the calling job, for logs */ job?: string };
 
 /** Candidates the AI may offer: non-blank, and (without overwrite) only for a field that was blank when read. */
 function entityCandidates(
@@ -615,7 +615,8 @@ export async function writeBulkStoreFields(
   return storeCompareAndSet(
     storeId,
     Object.fromEntries(picked.map(([f]) => [f, baseline[f] ?? null])),
-    Object.fromEntries(picked)
+    Object.fromEntries(picked),
+    opts.job
   );
 }
 

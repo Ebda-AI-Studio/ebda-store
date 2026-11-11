@@ -45,6 +45,7 @@ import {
   type AppPrismaClient,
 } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
+import logger from './logger';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
 import { platformDb, requirePlatformDb } from './platform-db';
@@ -2091,6 +2092,15 @@ export async function storePatchOnDo(
   return readStoreRowOnDo(storeId, args);
 }
 
+/** A field that lives only in D1 is not served by the DO compare-and-set: say so (ids and field names only, never values). */
+export function warnD1OnlySkips(storeId: string, fields: string[] | undefined, job?: string): void {
+  for (const field of fields ?? [])
+    logger.warn(
+      { storeId, field, job },
+      '[store-cas] field exists only in D1; not written by the DO compare-and-set'
+    );
+}
+
 /**
  * Compare-and-set of Store fields for the AI jobs (issue #620, Ruling NEVER-OVERWRITE-1): each field in `set` is written only if it
  * still holds `expect[field]` (blank equivalence). A DO store does it in ONE DO transaction (`casStoreFields`) and then mirrors ONLY the
@@ -2099,7 +2109,8 @@ export async function storePatchOnDo(
 export async function storeCompareAndSet(
   storeId: string,
   expect: Record<string, unknown>,
-  set: Record<string, unknown>
+  set: Record<string, unknown>,
+  job?: string
 ): Promise<string[]> {
   if (Object.keys(set).length === 0) return [];
   if (await storeWritesToDo(storeId)) {
@@ -2108,7 +2119,7 @@ export async function storeCompareAndSet(
         storeId: string,
         inputJson: string
       ): Promise<
-        | { ok: true; data: { written: string[]; stale: string[] } }
+        | { ok: true; data: { written: string[]; stale: string[]; directoryOnly: string[] } }
         | { ok: false; code: string; status: number }
       >;
     };
@@ -2116,7 +2127,8 @@ export async function storeCompareAndSet(
     const r = await stub.casStoreFields(storeId, encodeRpc({ expect, set }));
     if (!r.ok)
       throw new AppError(502, 'STORE_CAS_REFUSED', `store compare-and-set refused: ${r.code}`);
-    const { written } = r.data;
+    const { written, directoryOnly } = r.data;
+    warnD1OnlySkips(storeId, directoryOnly, job);
     const mirror = Object.fromEntries(written.map(f => [f, set[f]]));
     if (written.length > 0) {
       await mirrorEntitlementToPg(storeId, mirror);

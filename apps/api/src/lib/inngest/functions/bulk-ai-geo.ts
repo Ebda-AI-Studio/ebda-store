@@ -261,7 +261,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
                 storeId,
                 store,
                 { llmsTxt: text.slice(0, 4000) },
-                { overwrite: force }
+                { overwrite: force, job: 'bulk-ai-llms-txt' }
               );
               filled++;
             } else {
@@ -811,7 +811,7 @@ Populate using only the information provided above. For keyCategories, use the c
                 storeId,
                 store,
                 { aboutJson: facts },
-                { overwrite: force }
+                { overwrite: force, job: 'bulk-ai-brand-facts' }
               );
               filled++;
             } else {

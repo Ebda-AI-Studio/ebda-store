@@ -239,12 +239,17 @@ const bulkAiSeoFn = inngest.createFunction(
                       }),
                     `seo:store:${storeId}`
                   );
-                  await writeBulkStoreFields(storeId, s, {
-                    metaTitle: r.suggestion.title,
-                    metaTitleAr: r.suggestion.titleAr,
-                    metaDescription: r.suggestion.description,
-                    metaDescriptionAr: r.suggestion.descriptionAr,
-                  });
+                  await writeBulkStoreFields(
+                    storeId,
+                    s,
+                    {
+                      metaTitle: r.suggestion.title,
+                      metaTitleAr: r.suggestion.titleAr,
+                      metaDescription: r.suggestion.description,
+                      metaDescriptionAr: r.suggestion.descriptionAr,
+                    },
+                    { job: 'bulk-ai-seo' }
+                  );
                   bFilled++;
                   await sleep(THROTTLE_MS);
                 } catch (err) {

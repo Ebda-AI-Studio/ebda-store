@@ -465,7 +465,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
             if (Object.keys(updates).length > 0) {
               try {
-                await writeBulkStoreFields(storeId, store, updates);
+                await writeBulkStoreFields(storeId, store, updates, { job: 'bulk-ai-translate' });
               } catch (err) {
                 await recordError({
                   entityKind: 'store',
