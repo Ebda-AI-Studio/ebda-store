@@ -90,7 +90,10 @@ jobs:
             exit 1
           fi
       - name: Install the Claude CLI (pinned)
-        run: npm install --global --ignore-scripts @anthropic-ai/claude-code@2.1.310
+        # Into this job's RUNNER_TEMP, never --global: a global install writes into the shared Mac host's Homebrew prefix.
+        run: |
+          npm install --prefix "$RUNNER_TEMP/claude-cli" --no-save --ignore-scripts @anthropic-ai/claude-code@2.1.310
+          echo "$RUNNER_TEMP/claude-cli/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Build the diff (fail closed when it is too large)
         env:
           PR: ${{ github.event.pull_request.number }}
@@ -110,11 +113,12 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
+          CLAUDE_OUTPUT: ${{ runner.temp }}/claude-out.json
         run: |
           set -euo pipefail
           # diff on stdin as data, rules as the prompt; no tools: the reviewer reads, it cannot act
           model=(); [ -n "${AI_REVIEW_MODEL:-}" ] && model=(--model "$AI_REVIEW_MODEL")
-          claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > /tmp/claude-out.json
+          claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > "$CLAUDE_OUTPUT"
       - name: Post findings and gate
         id: gate
         env:
@@ -122,6 +126,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           FAIL_CLOSED: 'true'
+          CLAUDE_OUTPUT: ${{ runner.temp }}/claude-out.json
         run: node .github/ai-review/review.mjs
       - name: Label ai-review-passed
         if: steps.gate.outputs.passed == 'true'
