@@ -412,7 +412,10 @@ export function bundlesCacheKey(storeId: string): string {
 export const ORDER_PURGE_COALESCE_MS = 10_000;
 
 /** Open coalescing windows by store: `pending` = an order arrived mid-window; `openedAt` = when it opened. */
-const orderPurgeWindows = new BoundedMap<string, { pending: boolean; openedAt: number }>(10_000);
+const orderPurgeWindows = new BoundedMap<
+  string,
+  { pending: boolean; openedAt: number; done: Promise<void> }
+>(10_000);
 
 function purgeStorefrontProducts(storeId: string): void {
   revalidateStorefront({
@@ -425,26 +428,30 @@ function purgeStorefrontProducts(storeId: string): void {
  * (`cfWaitUntil`), NOT a bare `setTimeout`: Workers do not promise a timer survives the response, so a
  * dropped timer left the window open for the isolate's life and the NEVER-stale inventory purge never
  * fired. As a second line, `invalidateStoreProductCachesAfterOrder` treats a window older than
- * 2x the coalesce time as dead and purges itself, so even a dropped waitUntil costs at most one extra window.
+ * 2x the coalesce time as dead and purges itself, so even a dropped waitUntil costs at most one extra window. Every mid-window order also registers the
+ * window's promise on its own request (#663), so the last order of a burst keeps the purge alive.
  */
 function openOrderPurgeWindow(storeId: string): void {
-  const window = { pending: false, openedAt: Date.now() };
+  const window: { pending: boolean; openedAt: number; done: Promise<void> } = {
+    pending: false,
+    openedAt: Date.now(),
+    done: Promise.resolve(),
+  };
   orderPurgeWindows.set(storeId, window);
-  cfWaitUntil(
-    new Promise<void>(resolve => {
-      const timer = setTimeout(resolve, ORDER_PURGE_COALESCE_MS);
-      // Never hold the process open for a cache purge.
-      timer.unref?.();
-    }).then(() => {
-      if (orderPurgeWindows.get(storeId) !== window) return;
-      if (window.pending) {
-        purgeStorefrontProducts(storeId);
-        openOrderPurgeWindow(storeId);
-      } else {
-        orderPurgeWindows.delete(storeId);
-      }
-    })
-  );
+  window.done = new Promise<void>(resolve => {
+    const timer = setTimeout(resolve, ORDER_PURGE_COALESCE_MS);
+    // Never hold the process open for a cache purge.
+    timer.unref?.();
+  }).then(() => {
+    if (orderPurgeWindows.get(storeId) !== window) return;
+    if (window.pending) {
+      purgeStorefrontProducts(storeId);
+      openOrderPurgeWindow(storeId);
+    } else {
+      orderPurgeWindows.delete(storeId);
+    }
+  });
+  cfWaitUntil(window.done);
 }
 
 /**
@@ -467,6 +474,9 @@ export async function invalidateStoreProductCachesAfterOrder(storeId: string): P
   const open = orderPurgeWindows.get(storeId);
   if (open && Date.now() - open.openedAt < ORDER_PURGE_COALESCE_MS * 2) {
     open.pending = true;
+    // #663: every order landing mid-window ALSO keeps the trailing purge alive on its own request's
+    // waitUntil, so the last order of a burst is covered by its own 30 s grace, not the opener's.
+    cfWaitUntil(open.done);
     return;
   }
   // No window, or one whose trailing purge never ran (dropped timer/waitUntil): purge now, start fresh.

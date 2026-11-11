@@ -261,11 +261,35 @@ describe('order purge trailing timer survives Workers (P2-1)', () => {
           await invalidateStoreProductCachesAfterOrder('store-wu'); // mid-window
         }
       );
-      expect(kept).toHaveLength(1);
+      expect(kept).toHaveLength(2); // opener + the mid-window order each keep the trailing purge alive (#663)
       expect(revalidateSpy).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(ORDER_PURGE_COALESCE_MS);
-      await kept[0];
+      await Promise.all(kept.slice(0, 2)); // the chained window registers a third, still-pending wait
       expect(revalidateSpy).toHaveBeenCalledTimes(2); // the trailing purge ran
+    } finally {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('the last order of a window keeps the trailing purge alive on ITS OWN request (#663)', async () => {
+    const keptFirst: Promise<unknown>[] = [];
+    const keptLast: Promise<unknown>[] = [];
+    vi.useFakeTimers();
+    try {
+      await runWithWaitUntil(
+        p => keptFirst.push(p),
+        () => invalidateStoreProductCachesAfterOrder('store-last')
+      );
+      // the opener's 30 s grace is long gone; only this later request's ctx can keep the purge alive
+      await runWithWaitUntil(
+        p => keptLast.push(p),
+        () => invalidateStoreProductCachesAfterOrder('store-last')
+      );
+      expect(keptLast).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(ORDER_PURGE_COALESCE_MS);
+      await Promise.all(keptLast);
+      expect(revalidateSpy).toHaveBeenCalledTimes(2);
     } finally {
       vi.runOnlyPendingTimers();
       vi.useRealTimers();
