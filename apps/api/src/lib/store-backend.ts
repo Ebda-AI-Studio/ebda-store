@@ -19,6 +19,7 @@ import { backendMemoKey, requestMemo } from './request-memo';
 import { cfBindings } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { isWorkers } from './runtime';
+import { currentSweepScope, type SweepScope } from './sweep-scope';
 
 export type StoreBackend = 'do' | 'pg';
 
@@ -89,6 +90,13 @@ export async function backendFor(storeId: string): Promise<StoreBackend> {
   // find falls through to the live read below, so an unknown store keeps today's 404 (never a guess).
   if (batchStorage.getStore()?.has(storeId))
     return backendFromRow({ storage_backend: batchStorage.getStore()!.get(storeId) });
+  // Inside a sweep scope (cron job run / one queue message, lib/sweep-scope.ts) the second distinct store makes the scope read
+  // the whole directory once; an id it does not hold falls through to the live read, so an unknown store keeps its 404.
+  const sweep = currentSweepScope();
+  if (sweep) {
+    const dir = await sweepDirectory(sweep, d1 as unknown as BatchD1, storeId);
+    if (dir?.has(storeId)) return backendFromRow({ storage_backend: dir.get(storeId) });
+  }
   // PERF-LATENCY: one D1 read per store per REQUEST (tenant context, repo factory and store access each asked; a directory
   // lookup that already read the row seeds it, lib/platform-directory.ts). A request never flips a store's backend (the flip is
   // the operator cutover outside Express), and a 404 / 503 is never memoised (request-memo drops failed loads).
@@ -134,6 +142,45 @@ interface BatchD1 {
  */
 const batchStorage = new AsyncLocalStorage<Map<string, unknown>>();
 const MAX_IDS_PER_READ = 90; // D1 allows 100 bound parameters per statement
+
+const DIRECTORY_PAGE = 1000;
+
+/**
+ * The scope's directory snapshot (storeId -> raw `storage_backend`, soft-deleted rows included exactly like the per-id read), or
+ * `undefined` while only ONE store has been asked about (a single-store run keeps its one indexed read, never a directory scan).
+ * Read once per scope, keyset-paged; a failed read is `null` and the scope runs unbatched. Staleness: lib/sweep-scope.ts.
+ */
+function sweepDirectory(
+  scope: SweepScope,
+  d1: BatchD1,
+  storeId: string
+): Promise<Map<string, unknown> | null> | undefined {
+  if (scope.directory) return scope.directory;
+  if (scope.firstStore === undefined || scope.firstStore === storeId) {
+    scope.firstStore = storeId;
+    return undefined;
+  }
+  scope.directory = (async () => {
+    const found = new Map<string, unknown>();
+    let after = '';
+    for (;;) {
+      const rows =
+        (
+          await d1
+            .prepare(
+              `SELECT id, storage_backend FROM stores WHERE id > ?1 ORDER BY id LIMIT ${DIRECTORY_PAGE}`
+            )
+            .bind(after)
+            .all<{ id?: unknown; storage_backend?: unknown }>()
+        ).results ?? [];
+      for (const r of rows) if (typeof r.id === 'string') found.set(r.id, r.storage_backend);
+      const last = rows[rows.length - 1]?.id;
+      if (rows.length < DIRECTORY_PAGE || typeof last !== 'string') return found;
+      after = last;
+    }
+  })().catch(() => null);
+  return scope.directory;
+}
 
 /**
  * Run a cron sweep with every store's `storage_backend` read in as few D1 queries as possible (Sentry EBDA-API-Z: one

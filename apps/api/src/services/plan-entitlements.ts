@@ -154,6 +154,33 @@ export async function getEntitlements(
 }
 
 /**
+ * `getAutomationFlags` from rows a batched read already holds (one `store_subscriptions` row or none, the `plans` row of the
+ * effective code or none) - the same resolution as `getEntitlements`, no query. Used by FeatureService's batched prefetch.
+ */
+export function automationFlagsFromRows(
+  legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE,
+  sub: { planCode: string; status: string } | null | undefined,
+  planRows: ReadonlyMap<string, { code: string; limits: unknown }>
+) {
+  const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[legacyPlan];
+  const effectiveCode = sub?.status === 'canceled' ? FALLBACK_PLAN_CODE : subscribedPlanCode;
+  const plan = planRows.get(effectiveCode);
+  const seed = seedFor(effectiveCode);
+  const limits = plan ? parseLimits(plan.limits, effectiveCode) : seed.limits;
+  return {
+    effectiveCode,
+    flags: {
+      abandonedCartAutomation: limits.abandonedCartAutomation,
+      whatsappAutomation: limits.whatsappAutomation,
+      brandingRemoval: limits.brandingRemoval,
+      apiAccess: limits.apiAccess,
+      wholesalePricing: limits.wholesalePricing,
+      mcpAccess: planIncludesMerchantMcp(plan?.code ?? seed.code, limits),
+    },
+  };
+}
+
+/**
  * The plan flags FeatureService layers over PLAN_BASELINE (and under a
  * StoreFeature override): the two automation flags, plus `brandingRemoval`
  * (-> `remove_branding`) and the merchant-MCP entitlement `mcpAccess` (-> `merchant_mcp` + `merchant_mcp_write`; Growth + Business, NOT `apiAccess`). `null` = no plan

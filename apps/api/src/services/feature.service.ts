@@ -6,9 +6,11 @@ import { bustStoreCaches } from './store.service';
 import logger from '../lib/logger';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
-import { getAutomationFlags } from './plan-entitlements';
+import { automationFlagsFromRows, getAutomationFlags } from './plan-entitlements';
+import { platformDb } from '../lib/platform-db';
+import { currentSweepScope, forgetSweepMemo, seedSweepMemo, sweepMemo } from '../lib/sweep-scope';
 import { readStorePlan } from '../lib/store-plan';
-import { storeUpdate } from '../lib/repo-factory';
+import { storeRepo, storeUpdate } from '../lib/repo-factory';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -225,6 +227,7 @@ class FeatureService {
    */
   async invalidateCache(storeId: string): Promise<void> {
     try {
+      forgetSweepMemo(this.cacheKey(storeId));
       await redis.delete(this.cacheKey(storeId));
       // B2B: the public product payload lists the public price tiers only while `b2b.wholesale` is on, so any change to the
       // resolved feature map (plan change, plan-limit edit, override) must also drop the cached public product payloads.
@@ -272,6 +275,96 @@ class FeatureService {
    * Checks Redis cache first; on miss reads from DB and populates cache.
    */
   async getStoreFeatures(storeId: string): Promise<Record<FeatureKey, boolean>> {
+    // Inside a cron job run / queue message the map is resolved once per store (lib/sweep-scope.ts; BOUNDED-stale, window = that
+    // invocation, shorter than the 5-min cache below). `prefetchStoreFeatures` fills it for a whole page of stores in 3 reads.
+    return sweepMemo(this.cacheKey(storeId), () => this.resolveStoreFeatures(storeId));
+  }
+
+  /**
+   * One batched read for many stores (instead of `store_features` + `store_subscriptions` + `plans` per store): only inside a
+   * sweep scope on a Worker with the platform D1. Seeds the scope memo, so every later `getStoreFeatures(id)` of the run is a
+   * hit. A store this cannot resolve exactly (not on its DO, plan unreadable) is left out and resolves per store as before.
+   */
+  async prefetchStoreFeatures(storeIds: readonly string[]): Promise<void> {
+    const scope = currentSweepScope();
+    const platform = scope ? await platformDb() : undefined;
+    if (!scope || !platform) return;
+    const CHUNK = 50; // D1: 100 bound parameters per statement
+    const ids = [...new Set(storeIds)].filter(id => !scope.memo.has(this.cacheKey(id)));
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const part = ids.slice(i, i + CHUNK);
+      try {
+        const legacy = new Map<string, StorePlan>();
+        await Promise.all(
+          part.map(async id => {
+            const repo = await storeRepo(id);
+            if (repo.backend !== 'do') return;
+            const row = await (repo.db as unknown as Prisma.TransactionClient).store.findUnique({
+              where: { id },
+              select: { plan: true },
+            });
+            if (row) legacy.set(id, row.plan as StorePlan);
+          })
+        );
+        const known = part.filter(id => legacy.has(id));
+        if (known.length === 0) continue;
+        const [featureRows, subs] = await Promise.all([
+          platform.storeFeature.findMany({
+            where: { storeId: { in: known } },
+            select: { storeId: true, featureKey: true, enabled: true },
+          }),
+          platform.storeSubscription.findMany({
+            where: { storeId: { in: known } },
+            select: { storeId: true, planCode: true, status: true },
+          }),
+        ]);
+        const subBy = new Map<string, { planCode: string; status: string }>(
+          (subs as Array<{ storeId: string; planCode: string; status: string }>).map(r => [
+            r.storeId,
+            r,
+          ])
+        );
+        const codes = [
+          ...new Set(
+            known.map(id => {
+              const sub = subBy.get(id);
+              const r = automationFlagsFromRows(legacy.get(id)!, sub, new Map());
+              return r.effectiveCode;
+            })
+          ),
+        ];
+        const planList = (await platform.plan.findMany({
+          where: { code: { in: codes } },
+        })) as Array<{ code: string; limits: unknown }>;
+        const planRows = new Map(planList.map(p => [p.code, p]));
+        const featBy = new Map<string, Array<{ featureKey: string; enabled: boolean }>>();
+        for (const r of featureRows as Array<{
+          storeId: string;
+          featureKey: string;
+          enabled: boolean;
+        }>) {
+          const list = featBy.get(r.storeId) ?? [];
+          list.push(r);
+          featBy.set(r.storeId, list);
+        }
+        for (const id of known) {
+          const { flags } = automationFlagsFromRows(legacy.get(id)!, subBy.get(id), planRows);
+          seedSweepMemo(
+            this.cacheKey(id),
+            this.rowsToMap(legacy.get(id)!, featBy.get(id) ?? [], flags)
+          );
+        }
+      } catch (err) {
+        // Not fatal: the stores of this chunk resolve one by one, exactly as before.
+        logger.warn(
+          { err },
+          '[FeatureService] batched feature prefetch failed; resolving per store'
+        );
+      }
+    }
+  }
+
+  private async resolveStoreFeatures(storeId: string): Promise<Record<FeatureKey, boolean>> {
     // 1. Try cache
     const cached = await this.readFromCache(storeId);
     if (cached !== null) {

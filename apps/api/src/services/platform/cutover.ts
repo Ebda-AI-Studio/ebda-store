@@ -23,6 +23,7 @@ import { cfBindings } from '../../cf/bindings';
 import { AppError } from '../../middleware/error-handler';
 import { sendAlert } from '../alerts.service';
 import { postgresRemovedOnThisWorker } from '../../lib/postgres-present';
+import { sweepMemo } from '../../lib/sweep-scope';
 
 export type PlatformFamily =
   | 'billing'
@@ -161,7 +162,7 @@ function evaluateCutoverRows(
   return { moved: rows.some(r => k.markers.includes(r.key)), frozen };
 }
 
-const selectKeys = async (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
+const selectKeysLive = async (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
   (
     await d1
       .prepare(
@@ -170,6 +171,19 @@ const selectKeys = async (d1: MarkerD1, keys: readonly string[]): Promise<Cutove
       .bind(...keys)
       .all<CutoverRow>()
   ).results ?? [];
+
+/**
+ * Inside a cron job run / queue message (lib/sweep-scope.ts) the same key set is read once, not once per store or per call
+ * (Sentry N+1: `SELECT key, value FROM system_settings WHERE key IN (...)` repeated in one run). Staleness class: BOUNDED-stale,
+ * window = OFF_TTL_MS, the bound the in-process "off" verdict above already has; a freeze or marker written mid-run is seen
+ * within 10 s, as before. Request paths open no scope and keep the live read.
+ */
+const selectKeys = (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
+  sweepMemo(
+    `cutover-keys:${[...keys].sort().join('|')}`,
+    () => selectKeysLive(d1, keys),
+    OFF_TTL_MS
+  );
 
 export async function readCutoverKeys(
   d1: MarkerD1,

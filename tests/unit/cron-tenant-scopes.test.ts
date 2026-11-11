@@ -81,7 +81,7 @@ vi.mock('@ebda/database', () => ({
   },
 }));
 vi.mock('@api/services/feature.service', () => ({
-  featureService: { isFeatureEnabled: m.feature },
+  featureService: { isFeatureEnabled: m.feature, prefetchStoreFeatures: async () => undefined },
 }));
 vi.mock('@api/services/redis.service', () => ({ redis: {} }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({ notificationDispatcher: {} }));

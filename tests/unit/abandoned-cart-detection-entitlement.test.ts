@@ -52,6 +52,7 @@ vi.mock('@ebda/database', () => ({
 }));
 vi.mock('@api/services/feature.service', () => ({
   featureService: {
+    prefetchStoreFeatures: async () => undefined,
     isFeatureEnabled: async (id: string, key: string) =>
       key === 'abandoned_cart' && m.entitled.has(id),
   },

@@ -127,6 +127,8 @@ async function primeAllMarkers(ids: readonly string[]): Promise<void> {
 async function storeIdsWithFeature(feature: 'abandoned_cart'): Promise<string[]> {
   const stores = await storeDirectory();
   const out: string[] = [];
+  // One batched read of the whole sweep's feature maps (no `store_features` / `store_subscriptions` read per store).
+  await featureService.prefetchStoreFeatures(stores.map(st => st.id));
   const CHUNK = 20;
   for (let i = 0; i < stores.length; i += CHUNK) {
     const part = stores.slice(i, i + CHUNK);

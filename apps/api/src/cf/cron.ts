@@ -22,6 +22,7 @@ import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from './bindings';
 import { doStoreIdList } from '../lib/store-backend';
+import { withSweepScope } from '../lib/sweep-scope';
 import { runBackupSweep, type SweepEnv } from './ops/backup-sweep';
 import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
@@ -108,7 +109,8 @@ export async function runScheduled(
     jobs.map(async job => {
       if (frozen) return deferLegacyJob(cron, job.name, scheduledTime);
       try {
-        await withReachLabel(job.name, () => job.run());
+        // One sweep scope per job run (lib/sweep-scope.ts): store backends read once, repeated reads memoised.
+        await withSweepScope(() => withReachLabel(job.name, () => job.run()));
         logger.info({ cron, job: job.name }, '[cron] job done');
         return { name: job.name, ok: true };
       } catch (err) {
