@@ -79,6 +79,27 @@ describe('backup sweep at scale (P2-5 follow-up)', () => {
     expect([...visited].sort()).toEqual(ids);
   });
 
+  it('6 stores, cap 2, six nights running: every walk finishes in 3 nights, so nothing ever pages', async () => {
+    const r2 = memR2();
+    const alerts: string[] = [];
+    const nights: number[] = [];
+    for (let n = 3; n <= 8; n++) {
+      const d = `2026-11-${String(n).padStart(2, '0')}`;
+      for (const id of ids)
+        r2.m.set(yk(id, new Date(day(d).getTime() - 86_400_000).toISOString().slice(0, 10)), '{}');
+      const rep = await runBackupSweep(fakeEnv(r2, {}, []), {
+        listStoreIds: () => ids,
+        alert: async t => void alerts.push(t),
+        now: day(d),
+        maxStores: 2,
+      });
+      nights.push(rep.stores.walkNights);
+      expect(rep.ok).toBe(true);
+    }
+    expect(nights).toEqual([1, 2, 3, 1, 2, 3]); // the counter resets when a walk completes
+    expect(alerts).toEqual([]);
+  });
+
   it('pages when the walk has been running longer than the allowed nights', async () => {
     const r2 = memR2();
     const alerts: string[] = [];

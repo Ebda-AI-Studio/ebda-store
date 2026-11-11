@@ -200,7 +200,7 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   // Bounded loop: ids in a stable order, resuming after the last tick's cursor, stopping at the deadline or the cap.
   const all = [...(await deps.listStoreIds(env))].sort();
   let start = 0;
-  let prev: { day?: string; next?: string | null; nights?: number } = {};
+  let prev: { day?: string; next?: string | null; nights?: number; visited?: number } = {};
   try {
     const cur = await r2.get(SWEEP_CURSOR_KEY);
     if (cur) prev = JSON.parse(await cur.text()) as typeof prev;
@@ -248,17 +248,26 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
   const nextId = report.stores.deferred > 0 ? order[done] : null;
   // A walk over a fleet bigger than one tick's cap legitimately spans several nights (the next tick resumes at the cursor), so
   // deferral alone never pages. It pages when the walk is older than N nights, or when a tick reached no store at all.
-  const continuing = !!prev.next;
-  report.stores.walkNights = continuing
-    ? (prev.nights ?? 1) + (prev.day === report.day ? 0 : 1)
-    : 1;
+  // The cursor carries the state of ONE walk: nights it has run and stores visited since it began. The walk is complete once it has
+  // visited the whole fleet; the counters then reset, so a fleet that always needs 3 nights never pages and a stuck walk does.
+  const prevNights = prev.nights ?? 0;
+  const nights = prevNights + (prev.day === report.day && prevNights > 0 ? 0 : 1);
+  const visited = (prev.visited ?? 0) + done;
+  const complete = visited >= all.length;
+  report.stores.walkNights = nights;
   report.stores.deferredAlert =
+    !complete &&
     report.stores.deferred > 0 &&
-    (report.stores.walkNights > (deps.maxDeferredNights ?? 3) || done === 0);
+    (nights > (deps.maxDeferredNights ?? 3) || done === 0);
   try {
     await r2.put(
       SWEEP_CURSOR_KEY,
-      JSON.stringify({ day: report.day, next: nextId, nights: report.stores.walkNights })
+      JSON.stringify({
+        day: report.day,
+        next: nextId,
+        nights: complete ? 0 : nights,
+        visited: complete ? 0 : visited,
+      })
     );
   } catch (e) {
     report.stores.errors.push(`cursor: ${(e as Error).message}`);
