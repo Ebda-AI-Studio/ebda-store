@@ -1180,7 +1180,7 @@
       "intro": "Let shoppers rotate the product, see it in each colour or metal, and place it in their room (AR). One self-contained .glb file, up to {mb} MB.",
       "disabled": "3D models are switched off for this store. Contact support to turn them on. You can still remove an existing model.",
       "chooseGlb": "Upload .glb model",
-      "formatHint": "Binary glTF (.glb) with textures embedded. Draco/KTX2 compression is not supported yet: use meshopt + WebP.",
+      "formatHint": "A .glb file with its textures inside. Special compression (Draco or KTX2) is not supported yet: export without it, or with meshopt, and use WebP images.",
       "replace": "Replace model",
       "remove": "Remove 3D model",
       "removeConfirm": "Remove this product's 3D model? Shoppers will see photos only.",
@@ -10076,7 +10076,7 @@
     },
     "conflict": {
       "message": "This page was changed in another tab or by another editor. Choose which version to keep.",
-      "takeTheirs": "Load their version",
+      "takeTheirs": "Discard my changes, load the latest",
       "keepMine": "Keep mine"
     },
     "live": {
