@@ -7,11 +7,12 @@ import { revalidateRequestSchema } from '@ebda/shared';
  * merchant saves theme / layout / branding so the change appears on the
  * storefront within ~a second instead of waiting out the data-cache TTL.
  *
- * The store-resolver fetches are tagged `store-domain:<domain>` and
- * `store-slug:<slug>`; this route purges those tags via `revalidateTag`, which
- * invalidates Next's shared data cache across all instances. The per-instance
- * in-memory `storeCache` (resolver) has a short TTL so it can't hold a change
- * for more than a few seconds even on the instance that didn't serve this call.
+ * The Worker entry (sentry-worker-entry.ts) bumps the per-store purge EPOCHS in R2
+ * for these tags after this route accepts them; the store resolver's caches
+ * (store-resolve-cache.ts, Ruling RESOLVE-BULLETPROOF-1) and the edge HTML cache
+ * check those epochs before every serve. `revalidateTag` here is kept for the
+ * other tagged fetches (production's deploy-generated open-next config runs the
+ * DO-sharded tag cache; the committed local config has none).
  *
  * Auth: a shared `REVALIDATE_SECRET` (also set on the API). If the secret is
  * unset on this deployment, the route refuses (503) rather than purging
@@ -54,13 +55,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'tags must be 1..10 strings' }, { status: 400 });
   }
 
-  // Next 16 signature: revalidateTag(tag, profile). 'max' = purge across the
-  // longest cache-life. Wrapped defensively so an evolving cache-API quirk can
-  // never 500 this endpoint — the short fetch `revalidate` window is the floor
-  // either way.
+  // Next 16 signature: revalidateTag(tag, profile). NOT 'max': that is stale-while-revalidate, so the FIRST
+  // request after a merchant write was served the pre-write entry (a product page with no photo right after
+  // upload, Amelia Aurum 2026-11-11) and only the background refresh was fresh. `{ expire: 0 }` expires the
+  // tagged entries at once, so the next render refetches inline. Wrapped defensively so an evolving
+  // cache-API quirk can never 500 this endpoint; the short fetch `revalidate` window is the floor either way.
   for (const tag of tags) {
     try {
-      revalidateTag(tag, 'max');
+      revalidateTag(tag, { expire: 0 });
     } catch (e) {
       console.warn('[revalidate] revalidateTag failed for', tag, e);
     }
