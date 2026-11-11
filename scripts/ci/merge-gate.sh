@@ -17,7 +17,7 @@
 # options: --repo OWNER/NAME (default Ebda-AI-Studio/ebda-store)  --polls N (3)  --interval S (30)  --max-wait-min M (180)
 #          --dry-run (evaluate, never merge)
 # test seams: MERGE_GATE_VIEW_CMD (prints the `gh pr view --json state,headRefOid,mergeable,statusCheckRollup` JSON),
-#             MERGE_GATE_MERGE_CMD (replaces the final gh pr merge), MERGE_GATE_REQUIRED_JSON, MERGE_GATE_MAX_WAIT_S.
+#             MERGE_GATE_MERGE_CMD (replaces the final gh pr merge), MERGE_GATE_REQUIRED_JSON, MERGE_GATE_MAX_WAIT_S, MERGE_GATE_MAX_TICKS.
 set -uo pipefail
 pr="${1:?usage: merge-gate.sh <pr> <expected-head-sha> [--repo R] [--polls N] [--interval S] [--max-wait-min M] [--dry-run]}"
 want="${2:?expected head sha required}"; shift 2
@@ -60,7 +60,7 @@ evaluate() {
       else "ok" end'
 }
 
-deadline=$((SECONDS + ${MERGE_GATE_MAX_WAIT_S:-$((maxmin * 60))})); streak=0; sha=""
+deadline=$((SECONDS + ${MERGE_GATE_MAX_WAIT_S:-$((maxmin * 60))})); streak=0; sha=""; ticks=0
 while :; do
   json="$(view 2>/dev/null)" || json=""
   # PR state first, on EVERY poll: a PR merged/closed by someone else must end the gate, not poll to the deadline.
@@ -80,6 +80,9 @@ while :; do
     refuse:*) echo "merge-gate: REFUSED PR $pr: ${v#refuse:}" >&2; exit 1 ;;
     *) streak=0; echo "merge-gate: waiting (${v#wait:})" ;;
   esac
-  if [ "$SECONDS" -ge "$deadline" ]; then echo "merge-gate: gave up after ${maxmin} min; nothing merged (last: ${v#*:})" >&2; exit 2; fi
+  # MERGE_GATE_MAX_TICKS bounds the loop by poll COUNT (test seam): a wall-clock budget makes the verdict depend on
+  # host load, a poll count does not.
+  ticks=$((ticks + 1))
+  if [ "$SECONDS" -ge "$deadline" ] || [ "$ticks" -ge "${MERGE_GATE_MAX_TICKS:-2147483647}" ]; then echo "merge-gate: gave up after ${maxmin} min; nothing merged (last: ${v#*:})" >&2; exit 2; fi
   sleep "$interval"
 done
