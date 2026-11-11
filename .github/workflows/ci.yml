@@ -1515,10 +1515,37 @@ jobs:
           node .github/scripts/audit-gate.mjs
 
       - name: Check for secrets
+        # The action runs trufflehog in a docker container; the Mac runner has no docker, so it runs on Linux only.
+        if: runner.os == 'Linux'
         uses: trufflesecurity/trufflehog@ea68ca03c865c5f324e86e849ced20ed3cf9dbbb # v3.99.8
         with:
           path: ./
           extra_args: --only-verified
+
+      - name: Check for secrets (Mac runner, native trufflehog with the action's scan range)
+        # Same release as the action above (v3.99.8), checksum-pinned, installed into RUNNER_TEMP. Same range as the action:
+        # a push scans before..after (a first push / zero `before` scans the branch), schedule / dispatch the whole branch.
+        if: runner.os == 'macOS'
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          V=3.99.8
+          T="trufflehog_${V}_darwin_arm64.tar.gz"
+          SHA=85724f221bc390f6e0bdf65df245468c8426350de85aa9290ea5491c6d4ec35a
+          # The 29 MB tarball is kept in the runners' tool cache and re-verified on every run (download only on a miss).
+          C="$HOME/.ebda-ci/tools"; mkdir -p "$C"
+          echo "$SHA  $C/$T" | shasum -a 256 -c - >/dev/null 2>&1 || {
+            curl -fsSL -o "$C/$T.part" "https://github.com/trufflesecurity/trufflehog/releases/download/v${V}/${T}" && mv "$C/$T.part" "$C/$T"; }
+          echo "$SHA  $C/$T" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/th" && tar -xz -C "$RUNNER_TEMP/th" -f "$C/$T" trufflehog
+          since=()
+          if [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            since=(--since-commit "$BEFORE")
+          fi
+          "$RUNNER_TEMP/th/trufflehog" git "file://$PWD" "${since[@]}" --branch "$AFTER" --fail --no-update --github-actions --only-verified
 
   # Mutation tests: weekly (Sunday) or manual only (far too slow for a push or
   # a nightly).
