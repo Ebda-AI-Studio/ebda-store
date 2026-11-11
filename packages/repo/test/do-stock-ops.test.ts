@@ -137,6 +137,45 @@ describe('setVariantInventory', () => {
   });
 });
 
+describe('setVariantActive', () => {
+  it('flips is_active with a quantity-0 history row when the variant holds units; no-op and missing rows', () => {
+    const r = rig();
+    const units = r.q('SELECT inventory FROM product_variants WHERE id = ?', 'v1')[0]
+      .inventory as number;
+    const before = r.q('SELECT count(*) AS n FROM inventory_history')[0].n as number;
+    const off = r.op('setVariantActive', { productId: 'pv', variantId: 'v1', isActive: false });
+    expect(off).toMatchObject({ changed: true });
+    expect(r.q('SELECT is_active FROM product_variants WHERE id = ?', 'v1')[0].is_active).toBe(0);
+    const h = r.q(
+      'SELECT quantity, previous_stock, new_stock, reference FROM inventory_history ORDER BY rowid DESC LIMIT 1'
+    )[0];
+    if (units !== 0) {
+      expect(h).toMatchObject({
+        quantity: 0,
+        previous_stock: units,
+        new_stock: units,
+        reference: 'variant:v1',
+      });
+      expect(r.q('SELECT count(*) AS n FROM inventory_history')[0].n).toBe(before + 1);
+    } else expect(r.q('SELECT count(*) AS n FROM inventory_history')[0].n).toBe(before);
+    expect(r.op('setVariantActive', { productId: 'pv', variantId: 'v1', isActive: false })).toEqual(
+      {
+        changed: false,
+        historyId: null,
+      }
+    );
+    expect(r.code('setVariantActive', { productId: 'pv', variantId: 'zzz', isActive: true })).toBe(
+      'NOT_FOUND/404'
+    );
+    expect(r.code('setVariantActive', { productId: 'nope', variantId: 'v1', isActive: true })).toBe(
+      'NOT_FOUND/404'
+    );
+    expect(r.code('setVariantActive', { productId: 'pv', variantId: 'v1', isActive: 'yes' })).toBe(
+      'BAD_ARGS/400'
+    );
+  });
+});
+
 describe('warehouses', () => {
   function withWh() {
     const r = rig();

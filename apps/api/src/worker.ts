@@ -320,6 +320,21 @@ async function handle(incoming: Request, env: CfBindings, ctx: Ctx): Promise<Res
       return Response.json(await runEveryJobBody());
     });
   }
+  // Test only: run the jobs one event triggers, inline (workers-test/merchant-orders-do.test.ts, the CSV import job body).
+  if (path === '/__dev/run-event' && request.method === 'POST' && env.DEV_STATS === '1') {
+    return withWorkerContext(env, ctx, async () => {
+      const { runEventJobs } = await import('./lib/jobs/dev-run-all.js');
+      const body = (await request.json()) as { name: string; data: Record<string, unknown> };
+      return Response.json({ jobs: await runEventJobs(body.name, body.data ?? {}) });
+    });
+  }
+  // Test only: apply one WhatsApp store event as the ebda-store-events consumer does (merchant-orders-do.test.ts, COD outcome).
+  if (path === '/__dev/wa-store-event' && request.method === 'POST' && env.DEV_STATS === '1') {
+    return withWorkerContext(env, ctx, async () => {
+      const { handleStoreEvent } = await import('./lib/wa/store-events-consumer.js');
+      return Response.json({ result: await handleStoreEvent(await request.json()) });
+    });
+  }
   // Test only: the job events this isolate dispatched (workers-test/money-path.test.ts counts order/created).
   if (path === '/__dev/dispatched' && env.DEV_STATS === '1') {
     return Response.json({ events: dispatchedEvents() });

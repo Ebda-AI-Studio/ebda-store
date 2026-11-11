@@ -1,0 +1,5 @@
+# ESC-AIOS-1
+
+> Section: 2026-11-10 — operations / escalation
+
+Ruling ESC-AIOS-1 — the Whisky AI OS (now in `ebda-foundation/os`: prod-watch + the brain `os.ebda.app` + hands) is the target primary DevOps operator and Ahmad the human backup, reached only through the Telegram alert chat (@EbdaAIStudiobot, chat 1943728711). Today it watches and alerts only: its hands are halted (`HANDS_HALT=1`) and the brain lacks its GitHub and Cloudflare read tokens, so Ahmad is the first responder until he enables them. When live, the OS opens PRs only (never merges, deploys or rolls back), skips repos under a controller lease and files changed by another open PR, and asks Ahmad for money, auth, production-data, deploy-config and destructive changes. Evidence: Ahmad, 2026-11-10 ("the Whisky AI OS is the main DevOps and the one here to solve everything, and I'm the backup person"); launch-map row HANDS-COORD; `ebda-foundation/docs/plans/2026-11-10-aios-primary-operator.md`. Cost if wrong: a P0 the OS cannot fix by PR (Worker rollback, leaked secret) still waits for Ahmad, as before.
