@@ -59,6 +59,33 @@ describe('backfill-buyer-keys script', () => {
       'HEADLINE: 7 unpaid COD/InstaPay orders had NO buyer key (2 of them'
     );
   });
+  it('lists failed stores and how to retry them', async () => {
+    const { io } = mkIo();
+    const out: string[] = [];
+    const p = {
+      success: true,
+      data: {
+        dryRun: false,
+        stores: [],
+        failed: [{ storeId: 'sx', code: 'DO_OVERLOADED' }],
+        totals: {
+          scanned: 1,
+          keyed: 0,
+          noPhone: 0,
+          openUnkeyed: 0,
+          openUnkeyedNoPhone: 0,
+          skippedStores: 1,
+        },
+        nextCursor: null,
+      },
+    };
+    await drive({ ...parseArgs(['--apply']), cursorFile: 'c' }, 'tok', {
+      fetchFn: async () => ({ ok: true, status: 200, json: async () => p }),
+      io,
+      log: (l: string) => void out.push(l),
+    });
+    expect(out.join('\n')).toContain('FAILED STORES (1): sx=DO_OVERLOADED');
+  });
   it('follows nextCursor to the end, saves it between calls, sends dryRun:true, and removes the cursor file when done', async () => {
     const { io, files } = mkIo();
     const bodies: Array<Record<string, unknown>> = [];

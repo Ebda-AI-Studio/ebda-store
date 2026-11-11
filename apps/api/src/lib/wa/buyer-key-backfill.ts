@@ -12,6 +12,7 @@
 import { buyerKeyFor, toE164 } from '@ebda/shared';
 import { d1All } from '../../services/platform/billing-d1';
 import { lookupStore } from '../definer';
+import logger from '../logger';
 import { storeMoney, storeRepo } from '../repo-factory';
 
 export interface BackfillStoreReport {
@@ -24,6 +25,8 @@ export interface BackfillStoreReport {
   openUnkeyed: number;
   /** of those, the ones with no usable phone: this script cannot key them, a human must */
   openUnkeyedNoPhone: number;
+  /** set when `skipped === 'error'`: the error's code (or name); the store is NOT done and a rerun with `storeId` retries it */
+  errorCode: string | null;
   skipped: 'gone' | 'not_do' | 'error' | null;
   done: boolean;
 }
@@ -38,6 +41,8 @@ export interface BackfillResult {
     openUnkeyedNoPhone: number;
     skippedStores: number;
   };
+  /** stores whose DO errored in THIS call: rerun with `storeId` to retry them (a resumed run does not revisit a store it already passed) */
+  failed: Array<{ storeId: string; code: string }>;
   /** null = the whole fleet is done; pass it back to continue */
   nextCursor: string | null;
 }
@@ -84,6 +89,7 @@ async function backfillStore(
     noPhone: 0,
     openUnkeyed: 0,
     openUnkeyedNoPhone: 0,
+    errorCode: null,
     skipped: null,
     done: false,
   };
@@ -144,8 +150,15 @@ async function backfillStore(
       }
     }
     return { report, lastOrder: after };
-  } catch {
+  } catch (err) {
+    // Never swallowed: logged with the store id and the error code, and recorded in the result (`failed`), so the operator sees it and a rerun
+    // limited to that store (or the resumed run, which restarts at the cursor store) can retry it.
+    const code = String(
+      (err as { code?: unknown })?.code ?? (err as Error)?.name ?? 'unknown'
+    ).slice(0, 64);
+    logger.error({ storeId, code }, 'buyer-key backfill: store failed');
     report.skipped = 'error';
+    report.errorCode = code;
     report.done = true;
     return { report, lastOrder: from };
   }
@@ -194,5 +207,8 @@ export async function runBuyerKeyBackfill(opts: BackfillOpts): Promise<BackfillR
     }),
     { scanned: 0, keyed: 0, noPhone: 0, openUnkeyed: 0, openUnkeyedNoPhone: 0, skippedStores: 0 }
   );
-  return { dryRun: opts.dryRun, stores: reports, totals, nextCursor };
+  const failed = reports
+    .filter(r => r.skipped === 'error')
+    .map(r => ({ storeId: r.storeId, code: r.errorCode ?? 'unknown' }));
+  return { dryRun: opts.dryRun, stores: reports, totals, failed, nextCursor };
 }

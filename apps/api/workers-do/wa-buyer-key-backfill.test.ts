@@ -122,6 +122,33 @@ describe('buyer-key backfill', () => {
     expect((await keys(S1)).every(([, k]) => k === null)).toBe(true);
   });
 
+  it('open:false is exercised on a real DO: a paid order and a cancelled order drop out of openUnkeyed', async () => {
+    await sql(S2, "UPDATE orders SET payment_status = 'paid'");
+    expect(
+      (
+        await run(() =>
+          runBuyerKeyBackfill({ secret: SECRET, dryRun: true, budget: 100, storeId: S2 })
+        )
+      ).totals
+    ).toMatchObject({ scanned: 1, openUnkeyed: 0 });
+    await sql(S2, "UPDATE orders SET payment_status = 'unpaid', status = 'cancelled'");
+    expect(
+      (
+        await run(() =>
+          runBuyerKeyBackfill({ secret: SECRET, dryRun: true, budget: 100, storeId: S2 })
+        )
+      ).totals
+    ).toMatchObject({ scanned: 1, openUnkeyed: 0 });
+    await sql(S2, "UPDATE orders SET payment_status = 'unpaid', status = 'pending'");
+    expect(
+      (
+        await run(() =>
+          runBuyerKeyBackfill({ secret: SECRET, dryRun: true, budget: 100, storeId: S2 })
+        )
+      ).totals
+    ).toMatchObject({ openUnkeyed: 1 });
+  });
+
   it('apply stamps the same key checkout derives, leaves the phone-less order alone, and the deleted store untouched', async () => {
     const r = await run(() => runBuyerKeyBackfill({ secret: SECRET, dryRun: false, budget: 100 }));
     expect(r.totals).toMatchObject({ keyed: 3, noPhone: 1 });
