@@ -1,9 +1,15 @@
 import type { AddressJson } from './types';
 
-import { minorToDecimalString, REGION } from '@ebda/shared';
+import { formatMoney as formatMoneyShared, REGION } from '@ebda/shared';
+
+/**
+ * One money format for the admin order pages and the storefront (QA-D4): `4,850 ج.م` in Arabic,
+ * `EGP 4,850` in English, thousands grouped, a whole amount without `.00` (same function the
+ * storefront uses). The locale is the page's `<html lang>`; the server default is Arabic.
+ */
 export function formatMoney(piastres: number, currency = REGION.currency): string {
-  const major = minorToDecimalString(piastres);
-  return `${major} ${currency}`;
+  const lang = typeof document !== 'undefined' ? document.documentElement.lang : 'ar';
+  return formatMoneyShared(piastres, lang.startsWith('en') ? 'en' : 'ar', { currency });
 }
 
 /** Labels used when rendering individual address field names. */

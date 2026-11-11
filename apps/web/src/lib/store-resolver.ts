@@ -19,6 +19,9 @@ import { devSuffixesAllowed } from './platform-host';
 import { API_URL } from './api';
 import { decodeRouteParam } from './route-params';
 import { StoreTemporarilyUnavailableError } from './store-unavailable';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+import type { R2Like } from '../../store-edge-cache';
+import { clearResolveMemory, resolveResilient, type ResolveDeps } from './store-resolve-cache';
 import { applyDemoLook, DEMO_LOOK_HEADER } from './demo-look';
 
 // Re-exported so server callers have one import site for the resolver and the
@@ -247,16 +250,38 @@ const DEFAULT_STORE: ResolvedStore = {
   heroImage: null,
 };
 
-// Simple per-instance in-memory cache for store resolution — a hot-path
-// optimizer on top of Next's tagged data cache (the API purges that on save).
-const storeCache = new Map<string, { store: ResolvedStore; expires: number }>();
-// Short TTL (was 2 min). This per-instance in-memory layer is just a hot-path
-// optimizer on top of Next's tagged data cache. The API purges the data cache
-// on save via /api/revalidate (revalidateTag), so this small window is the only
-// residual staleness — keeping it low (8s) makes a merchant's theme/layout edit
-// appear on the storefront within a few seconds instead of up to 2 minutes.
-// In-memory (not Redis), so the <120s Redis-TTL-floor rule does not apply.
-const CACHE_TTL = 8 * 1000;
+// Resolution caching + stale-if-error live in store-resolve-cache.ts (Ruling RESOLVE-BULLETPROOF-1): per-isolate
+// memory of hits AND definitive misses, a durable R2 last-known-good shared by every isolate, both checked against the
+// per-store purge epochs before every serve (store status / domain ownership / plan are NEVER-stale).
+
+/** Normalised host: the key the purge epochs use (`host/<label>`, store-edge-cache.ts epochKeysForTag). */
+function hostKey(domain: string): string {
+  return domain.toLowerCase().replace(/^www\./, '');
+}
+
+/** The Worker bindings when running on Cloudflare; null under next dev/start and in tests (memory-only, short TTLs). */
+function resolveDeps(): ResolveDeps {
+  let r2: R2Like | null = null;
+  let waitUntil: (p: Promise<unknown>) => void = p => {
+    void p;
+  };
+  try {
+    const ctx = getCloudflareContext();
+    const bucket = (ctx.env as { NEXT_INC_CACHE_R2_BUCKET?: R2Like }).NEXT_INC_CACHE_R2_BUCKET;
+    if (bucket) r2 = bucket;
+    const c = ctx.ctx as { waitUntil?(p: Promise<unknown>): void } | undefined;
+    if (c?.waitUntil) waitUntil = p => c.waitUntil!(p);
+  } catch {
+    // not on Cloudflare
+  }
+  return {
+    r2,
+    now: Date.now,
+    sleep: ms => new Promise(r => setTimeout(r, ms)),
+    random: Math.random,
+    waitUntil,
+  };
+}
 
 /**
  * Get the store domain from request headers
@@ -345,12 +370,128 @@ function parsePublicLocations(raw: unknown): StoreLocationPublic[] | undefined {
 }
 
 /**
+ * The raw `{ success, data: { store, enabledFeatures, disabledCmsSlugs, locations } }` body of a store lookup, as the
+ * resolve caches keep it (Ruling RESOLVE-BULLETPROOF-1): the RAW API body, not the parsed store, so a copy written by an
+ * older storefront build is always parsed by the CURRENT code (the durable copy outlives deploys).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type StoreBody = { success?: unknown; data: { store: any; [k: string]: any } };
+
+/** Parse a store lookup body into the storefront's ResolvedStore (shared by the domain and slug lookups). */
+function storeFromBody(data: StoreBody): ResolvedStore {
+  const storeData = data.data.store;
+  const enabledFeatures: string[] | undefined = Array.isArray(data.data.enabledFeatures)
+    ? data.data.enabledFeatures
+    : undefined;
+  const disabledCmsSlugs: string[] | undefined = Array.isArray(data.data.disabledCmsSlugs)
+    ? data.data.disabledCmsSlugs.filter((s: unknown): s is string => typeof s === 'string')
+    : undefined;
+
+  // Merge theme with template defaults
+  const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
+
+  return {
+    id: storeData.id,
+    name: storeData.name,
+    nameAr: storeData.nameAr,
+    slug: storeData.slug,
+    domain: storeData.domain,
+    status: storeData.status === 'suspended' ? 'suspended' : 'active',
+    logo: storeData.logo,
+    logoAr: storeData.logoAr,
+    favicon: storeData.favicon,
+    description: storeData.description,
+    descriptionAr: storeData.descriptionAr,
+    currency: storeData.currency || REGION.currency,
+    timezone: storeData.timezone || 'Africa/Cairo',
+    template: normalizeLegacyTemplate(storeData.template),
+    look: storeData.look ?? null,
+    isDemo: storeData.isDemo === true,
+    theme: composeStoreTheme({
+      template: normalizeLegacyTemplate(storeData.template),
+      look: storeData.look,
+      theme: customTheme,
+    }),
+    socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
+    email: storeData.email,
+    phone: storeData.phone,
+    phoneAr: storeData.phoneAr,
+    whatsapp: storeData.whatsapp,
+    address: storeData.address,
+    addressAr: storeData.addressAr,
+    announcementBar:
+      typeof storeData.announcementBar === 'object' ? storeData.announcementBar : undefined,
+    metaTitle: storeData.metaTitle,
+    metaTitleAr: storeData.metaTitleAr,
+    metaDescription: storeData.metaDescription,
+    metaDescriptionAr: storeData.metaDescriptionAr,
+    metaDescriptionAeo: storeData.metaDescriptionAeo,
+    metaDescriptionAeoAr: storeData.metaDescriptionAeoAr,
+    ogImage: storeData.ogImage,
+    twitterHandle: storeData.twitterHandle,
+    googleSiteVerification: storeData.googleSiteVerification,
+    marketingPixels:
+      typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
+    pwaEnabled: typeof storeData.pwaEnabled === 'boolean' ? storeData.pwaEnabled : undefined,
+    pwaSettings:
+      storeData.pwaSettings &&
+      typeof storeData.pwaSettings === 'object' &&
+      !Array.isArray(storeData.pwaSettings)
+        ? (storeData.pwaSettings as Record<string, unknown>)
+        : undefined,
+    settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+    locationsEnabled:
+      typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
+    returnWindowDays:
+      typeof storeData.returnWindowDays === 'number' ? storeData.returnWindowDays : undefined,
+    returnFeesPaidBy:
+      typeof storeData.returnFeesPaidBy === 'string' ? storeData.returnFeesPaidBy : undefined,
+    taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
+    taxIncludedInPrice:
+      typeof storeData.taxIncludedInPrice === 'boolean' ? storeData.taxIncludedInPrice : undefined,
+    taxRatePercent:
+      typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
+    smsMarketingOptIn: storeData.smsMarketingOptIn === true,
+    cartEmailOptIn: storeData.cartEmailOptIn === true,
+    whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
+    enabledFeatures,
+    disabledCmsSlugs,
+    heroTitle: storeData.heroTitle ?? null,
+    heroTitleAr: storeData.heroTitleAr ?? null,
+    heroSubtitle: storeData.heroSubtitle ?? null,
+    heroSubtitleAr: storeData.heroSubtitleAr ?? null,
+    heroCtaText: storeData.heroCtaText ?? null,
+    heroCtaTextAr: storeData.heroCtaTextAr ?? null,
+    heroCtaLink: storeData.heroCtaLink ?? null,
+    heroImage: storeData.heroImage ?? null,
+    // Per-store typography overrides — passed through verbatim;
+    // layout.tsx sanitises every value before injecting CSS.
+    typography:
+      storeData.typography && typeof storeData.typography === 'object'
+        ? (storeData.typography as Record<string, unknown>)
+        : null,
+    faqs: Array.isArray(storeData.faqs) ? storeData.faqs : undefined,
+    howtos: Array.isArray(storeData.howtos) ? storeData.howtos : undefined,
+    llmsTxt: typeof storeData.llmsTxt === 'string' ? storeData.llmsTxt : null,
+    aboutJson:
+      storeData.aboutJson &&
+      typeof storeData.aboutJson === 'object' &&
+      !Array.isArray(storeData.aboutJson)
+        ? (storeData.aboutJson as Record<string, unknown>)
+        : null,
+    // Sibling of `store`, not a store field — only present when the API
+    // decided to include it (locationsEnabled && showBranchesInFooter).
+    locations: parsePublicLocations(data.data.locations),
+  };
+}
+
+/**
  * Fetch store from API by domain
  */
 async function fetchStoreByDomain(
   domain: string,
   builderToken?: string
-): Promise<ResolvedStore | null> {
+): Promise<StoreBody | null> {
   try {
     const response = await fetch(`${API_URL}/public/store/resolve`, {
       // Builder canvas (token present): never cached by Next's data cache, so a
@@ -358,9 +499,10 @@ async function fetchStoreByDomain(
       // Otherwise tagged so the API can purge THIS store's cached resolve on
       // save (POST /api/revalidate → revalidateTag). `revalidate` stays as a
       // slow fallback for stores that never get an explicit purge.
-      ...(builderToken
-        ? { cache: 'no-store' as const }
-        : { next: { revalidate: 15, tags: [`store-domain:${domain}`] } }),
+      // Never the Next data cache: store-resolve-cache.ts is the one owner of resolve caching (epoch-checked memory +
+      // durable copy, stale-if-error), so a second cache underneath cannot hand a refetch an older answer after a purge
+      // (the prod tag cache is regional). Ruling RESOLVE-BULLETPROOF-1. The builder canvas path was already uncached.
+      cache: 'no-store' as const,
       headers: {
         'Content-Type': 'application/json',
         'x-store-domain': domain,
@@ -396,112 +538,7 @@ async function fetchStoreByDomain(
       return null;
     }
 
-    const storeData = data.data.store;
-    const enabledFeatures: string[] | undefined = Array.isArray(data.data.enabledFeatures)
-      ? data.data.enabledFeatures
-      : undefined;
-    const disabledCmsSlugs: string[] | undefined = Array.isArray(data.data.disabledCmsSlugs)
-      ? data.data.disabledCmsSlugs.filter((s: unknown): s is string => typeof s === 'string')
-      : undefined;
-
-    // Merge theme with template defaults
-    const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
-
-    return {
-      id: storeData.id,
-      name: storeData.name,
-      nameAr: storeData.nameAr,
-      slug: storeData.slug,
-      domain: storeData.domain,
-      status: storeData.status === 'suspended' ? 'suspended' : 'active',
-      logo: storeData.logo,
-      logoAr: storeData.logoAr,
-      favicon: storeData.favicon,
-      description: storeData.description,
-      descriptionAr: storeData.descriptionAr,
-      currency: storeData.currency || REGION.currency,
-      timezone: storeData.timezone || 'Africa/Cairo',
-      template: normalizeLegacyTemplate(storeData.template),
-      look: storeData.look ?? null,
-      isDemo: storeData.isDemo === true,
-      theme: composeStoreTheme({
-        template: normalizeLegacyTemplate(storeData.template),
-        look: storeData.look,
-        theme: customTheme,
-      }),
-      socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
-      email: storeData.email,
-      phone: storeData.phone,
-      phoneAr: storeData.phoneAr,
-      whatsapp: storeData.whatsapp,
-      address: storeData.address,
-      addressAr: storeData.addressAr,
-      announcementBar:
-        typeof storeData.announcementBar === 'object' ? storeData.announcementBar : undefined,
-      metaTitle: storeData.metaTitle,
-      metaTitleAr: storeData.metaTitleAr,
-      metaDescription: storeData.metaDescription,
-      metaDescriptionAr: storeData.metaDescriptionAr,
-      metaDescriptionAeo: storeData.metaDescriptionAeo,
-      metaDescriptionAeoAr: storeData.metaDescriptionAeoAr,
-      ogImage: storeData.ogImage,
-      twitterHandle: storeData.twitterHandle,
-      googleSiteVerification: storeData.googleSiteVerification,
-      marketingPixels:
-        typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
-      pwaEnabled: typeof storeData.pwaEnabled === 'boolean' ? storeData.pwaEnabled : undefined,
-      pwaSettings:
-        storeData.pwaSettings &&
-        typeof storeData.pwaSettings === 'object' &&
-        !Array.isArray(storeData.pwaSettings)
-          ? (storeData.pwaSettings as Record<string, unknown>)
-          : undefined,
-      settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
-      locationsEnabled:
-        typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
-      returnWindowDays:
-        typeof storeData.returnWindowDays === 'number' ? storeData.returnWindowDays : undefined,
-      returnFeesPaidBy:
-        typeof storeData.returnFeesPaidBy === 'string' ? storeData.returnFeesPaidBy : undefined,
-      taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
-      taxIncludedInPrice:
-        typeof storeData.taxIncludedInPrice === 'boolean'
-          ? storeData.taxIncludedInPrice
-          : undefined,
-      taxRatePercent:
-        typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
-      smsMarketingOptIn: storeData.smsMarketingOptIn === true,
-      cartEmailOptIn: storeData.cartEmailOptIn === true,
-      whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
-      enabledFeatures,
-      disabledCmsSlugs,
-      heroTitle: storeData.heroTitle ?? null,
-      heroTitleAr: storeData.heroTitleAr ?? null,
-      heroSubtitle: storeData.heroSubtitle ?? null,
-      heroSubtitleAr: storeData.heroSubtitleAr ?? null,
-      heroCtaText: storeData.heroCtaText ?? null,
-      heroCtaTextAr: storeData.heroCtaTextAr ?? null,
-      heroCtaLink: storeData.heroCtaLink ?? null,
-      heroImage: storeData.heroImage ?? null,
-      // Per-store typography overrides — passed through verbatim;
-      // layout.tsx sanitises every value before injecting CSS.
-      typography:
-        storeData.typography && typeof storeData.typography === 'object'
-          ? (storeData.typography as Record<string, unknown>)
-          : null,
-      faqs: Array.isArray(storeData.faqs) ? storeData.faqs : undefined,
-      howtos: Array.isArray(storeData.howtos) ? storeData.howtos : undefined,
-      llmsTxt: typeof storeData.llmsTxt === 'string' ? storeData.llmsTxt : null,
-      aboutJson:
-        storeData.aboutJson &&
-        typeof storeData.aboutJson === 'object' &&
-        !Array.isArray(storeData.aboutJson)
-          ? (storeData.aboutJson as Record<string, unknown>)
-          : null,
-      // Sibling of `store`, not a store field — only present when the API
-      // decided to include it (locationsEnabled && showBranchesInFooter).
-      locations: parsePublicLocations(data.data.locations),
-    };
+    return data as StoreBody;
   } catch (error) {
     // Already classified above — rethrow rather than re-wrap or downgrade.
     if (error instanceof StoreTemporarilyUnavailableError) throw error;
@@ -524,35 +561,23 @@ async function resolveStoreByDomain(
   // Builder canvas: bypass the per-instance map in BOTH directions — a preview
   // result must never be written under the key public requests read, and a
   // cached public miss/hit must not stand in for the token-checked answer.
-  if (builderToken) return fetchStoreByDomain(domain, builderToken);
-
-  // Check cache
-  const cached = storeCache.get(domain);
-  if (cached && cached.expires > Date.now()) {
-    return cached.store;
+  if (builderToken) {
+    const preview = await fetchStoreByDomain(domain, builderToken);
+    return preview ? storeFromBody(preview) : null;
   }
 
-  // Fetch from API
-  const store = await fetchStoreByDomain(domain);
-
-  if (store) {
-    // Cache the result
-    storeCache.set(domain, {
-      store,
-      expires: Date.now() + CACHE_TTL,
-    });
-  }
-
-  return store;
+  const key = hostKey(domain);
+  const body = await resolveResilient(key, key, () => fetchStoreByDomain(domain), resolveDeps());
+  return body ? storeFromBody(body) : null;
 }
 
 /**
  * Fetch store from API by slug
  */
-async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
+async function fetchStoreBySlug(slug: string): Promise<StoreBody | null> {
   try {
     const response = await fetch(`${API_URL}/public/stores/${slug}`, {
-      next: { revalidate: 15, tags: [`store-slug:${slug}`] },
+      cache: 'no-store' as const, // see fetchStoreByDomain (Ruling RESOLVE-BULLETPROOF-1)
       headers: { 'Content-Type': 'application/json' },
     });
 
@@ -575,110 +600,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       return null;
     }
 
-    const storeData = data.data.store;
-    const enabledFeatures: string[] | undefined = Array.isArray(data.data.enabledFeatures)
-      ? data.data.enabledFeatures
-      : undefined;
-    const disabledCmsSlugs: string[] | undefined = Array.isArray(data.data.disabledCmsSlugs)
-      ? data.data.disabledCmsSlugs.filter((s: unknown): s is string => typeof s === 'string')
-      : undefined;
-    const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
-
-    return {
-      id: storeData.id,
-      name: storeData.name,
-      nameAr: storeData.nameAr,
-      slug: storeData.slug,
-      domain: storeData.domain,
-      status: storeData.status === 'suspended' ? 'suspended' : 'active',
-      logo: storeData.logo,
-      logoAr: storeData.logoAr,
-      favicon: storeData.favicon,
-      description: storeData.description,
-      descriptionAr: storeData.descriptionAr,
-      currency: storeData.currency || REGION.currency,
-      timezone: storeData.timezone || 'Africa/Cairo',
-      template: normalizeLegacyTemplate(storeData.template),
-      look: storeData.look ?? null,
-      isDemo: storeData.isDemo === true,
-      theme: composeStoreTheme({
-        template: normalizeLegacyTemplate(storeData.template),
-        look: storeData.look,
-        theme: customTheme,
-      }),
-      socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
-      email: storeData.email,
-      phone: storeData.phone,
-      phoneAr: storeData.phoneAr,
-      whatsapp: storeData.whatsapp,
-      address: storeData.address,
-      addressAr: storeData.addressAr,
-      announcementBar:
-        typeof storeData.announcementBar === 'object' ? storeData.announcementBar : undefined,
-      metaTitle: storeData.metaTitle,
-      metaTitleAr: storeData.metaTitleAr,
-      metaDescription: storeData.metaDescription,
-      metaDescriptionAr: storeData.metaDescriptionAr,
-      metaDescriptionAeo: storeData.metaDescriptionAeo,
-      metaDescriptionAeoAr: storeData.metaDescriptionAeoAr,
-      ogImage: storeData.ogImage,
-      twitterHandle: storeData.twitterHandle,
-      googleSiteVerification: storeData.googleSiteVerification,
-      marketingPixels:
-        typeof storeData.marketingPixels === 'object' ? storeData.marketingPixels : undefined,
-      pwaEnabled: typeof storeData.pwaEnabled === 'boolean' ? storeData.pwaEnabled : undefined,
-      pwaSettings:
-        storeData.pwaSettings &&
-        typeof storeData.pwaSettings === 'object' &&
-        !Array.isArray(storeData.pwaSettings)
-          ? (storeData.pwaSettings as Record<string, unknown>)
-          : undefined,
-      settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
-      locationsEnabled:
-        typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
-      returnWindowDays:
-        typeof storeData.returnWindowDays === 'number' ? storeData.returnWindowDays : undefined,
-      returnFeesPaidBy:
-        typeof storeData.returnFeesPaidBy === 'string' ? storeData.returnFeesPaidBy : undefined,
-      taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
-      taxIncludedInPrice:
-        typeof storeData.taxIncludedInPrice === 'boolean'
-          ? storeData.taxIncludedInPrice
-          : undefined,
-      taxRatePercent:
-        typeof storeData.taxRatePercent === 'number' ? storeData.taxRatePercent : undefined,
-      smsMarketingOptIn: storeData.smsMarketingOptIn === true,
-      cartEmailOptIn: storeData.cartEmailOptIn === true,
-      whatsappMarketingOptIn: storeData.whatsappMarketingOptIn === true,
-      enabledFeatures,
-      disabledCmsSlugs,
-      heroTitle: storeData.heroTitle ?? null,
-      heroTitleAr: storeData.heroTitleAr ?? null,
-      heroSubtitle: storeData.heroSubtitle ?? null,
-      heroSubtitleAr: storeData.heroSubtitleAr ?? null,
-      heroCtaText: storeData.heroCtaText ?? null,
-      heroCtaTextAr: storeData.heroCtaTextAr ?? null,
-      heroCtaLink: storeData.heroCtaLink ?? null,
-      heroImage: storeData.heroImage ?? null,
-      // Per-store typography overrides — passed through verbatim;
-      // layout.tsx sanitises every value before injecting CSS.
-      typography:
-        storeData.typography && typeof storeData.typography === 'object'
-          ? (storeData.typography as Record<string, unknown>)
-          : null,
-      faqs: Array.isArray(storeData.faqs) ? storeData.faqs : undefined,
-      howtos: Array.isArray(storeData.howtos) ? storeData.howtos : undefined,
-      llmsTxt: typeof storeData.llmsTxt === 'string' ? storeData.llmsTxt : null,
-      aboutJson:
-        storeData.aboutJson &&
-        typeof storeData.aboutJson === 'object' &&
-        !Array.isArray(storeData.aboutJson)
-          ? (storeData.aboutJson as Record<string, unknown>)
-          : null,
-      // Sibling of `store`, not a store field — only present when the API
-      // decided to include it (locationsEnabled && showBranchesInFooter).
-      locations: parsePublicLocations(data.data.locations),
-    };
+    return data as StoreBody;
   } catch (error) {
     if (error instanceof StoreTemporarilyUnavailableError) throw error;
     console.error(`Error fetching store for slug ${logSafe(slug)}:`, error);
@@ -701,22 +623,14 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
 export async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | null> {
   // A reserved or malformed slug is never a store: answer null without an API call.
   if (isReservedSlug(slug) || !validateStoreSlugFormat(slug).ok) return null;
-  const cacheKey = `slug:${slug}`;
-  const cached = storeCache.get(cacheKey);
-  if (cached && cached.expires > Date.now()) {
-    return cached.store;
-  }
-
-  const store = await fetchStoreBySlug(slug);
-
-  if (store) {
-    storeCache.set(cacheKey, {
-      store,
-      expires: Date.now() + CACHE_TTL,
-    });
-  }
-
-  return store;
+  // Epoch host = `<slug>.ebda.app`, what a `store-slug:<slug>` purge bumps (store-edge-cache.ts epochKeysForTag).
+  const body = await resolveResilient(
+    `slug:${slug}`,
+    `${slug}.ebda.app`,
+    () => fetchStoreBySlug(slug),
+    resolveDeps()
+  );
+  return body ? storeFromBody(body) : null;
 }
 
 /**
@@ -1016,9 +930,5 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
  * Clear store cache (useful for updates)
  */
 export function clearStoreCache(domain?: string): void {
-  if (domain) {
-    storeCache.delete(domain);
-  } else {
-    storeCache.clear();
-  }
+  clearResolveMemory(domain ? hostKey(domain) : undefined);
 }
