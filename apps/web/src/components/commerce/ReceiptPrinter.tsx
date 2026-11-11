@@ -273,15 +273,9 @@ export function ReceiptPrinter({
               dir="ltr"
               className={`${styles.mono} text-xl font-semibold ${styles.ink}`}
             >
-              {groupOrderNumber(order.orderNumber) === order.orderNumber ? (
-                `#${order.orderNumber}`
-              ) : (
-                // a11y re-audit P2-N7: no aria-label on a <p>; read the full value instead.
-                <>
-                  <span aria-hidden="true">#{groupOrderNumber(order.orderNumber)}</span>
-                  <span className="sr-only">{order.orderNumber}</span>
-                </>
-              )}
+              {/* QA-D5: the FULL number, the one the merchant's admin list and the courier message use. The
+                  grouped "TMZRB9 · IR5JY" plus a screen-reader copy printed the number twice in text. */}
+              #{order.orderNumber}
             </p>
           </div>
         </>

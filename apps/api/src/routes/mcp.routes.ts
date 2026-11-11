@@ -110,7 +110,10 @@ async function handleMcpPost(req: Request, res: Response): Promise<void> {
   ]);
   // The caller's identity for the query-embed limit (search_products, Ruling SEARCH-T12-6).
   const server = buildStoreMcpServer(store, { searcher: searcherFromIp(req.ip) });
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
+  });
   res.on('close', () => {
     void transport.close();
     void server.close();

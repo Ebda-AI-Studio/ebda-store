@@ -196,3 +196,7 @@ Merchant path (admin dashboard, products, orders, uploads, settings, billing):
 19. routes/product-model.routes.ts L150-255 (3D / USDZ upload), routes/merchant-key.routes.ts L100-283 (MCP keys) - mechanical
 
 Non-merchant or agent surfaces: mcp/merchant-write.ts:270 (every admin MCP write tool, POST /api/v1/mcp/admin/:slug), mcp/tools/admin-read\*.tools.ts, mcp/tools/order.tools.ts (agent checkout), mcp/agent-auth.ts:759 - all mechanical (swap the wrapper to runInStoreTenantContext); lib/wa/store-events-consumer.ts (WhatsApp COD outcome + erasure queue, design); routes/mfa.routes.ts (L78-316, any account with a storeId; design); services/passkey.service.ts (admin passkeys, null storeId path; design).
+
+## Port status (one line per merged slice; the table above stays the 2026-11-10 classification)
+
+- 2026-11-11 `routes/insights.routes.ts` (row 1): PORTED, Ruling NZ-INSIGHTS-1, proof `apps/api/workers-test/merchant-orders-do.test.ts`. Also fixed: prisma-lite `_count: true` answered `{ _all }` instead of a number.

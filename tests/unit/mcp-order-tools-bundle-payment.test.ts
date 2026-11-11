@@ -23,6 +23,16 @@ vi.mock('@ebda/database', () => ({
   withTenantContext: vi.fn((_storeId: string, fn: (tx: unknown) => unknown) => fn({})),
 }));
 
+// order.tools opens its scopes through runInStoreTenantContext (a DO store gets a bare scope, a Postgres store the
+// tenant transaction); this suite is a Postgres store, so it delegates to the mocked runInTenantContext it asserts on.
+vi.mock('@api/lib/store-scoped-read', async () => {
+  const db = await import('@ebda/database');
+  return {
+    runInStoreTenantContext: (storeId: string, fn: () => unknown) =>
+      db.runInTenantContext(storeId, fn as never),
+  };
+});
+
 vi.mock('@api/services/order.service', () => ({
   OrderService: {
     create: vi.fn(),

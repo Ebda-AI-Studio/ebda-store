@@ -34,6 +34,7 @@
  * new, empty key space: no copy of an older build is ever read, stale window or not. No version id = no caching.
  */
 import { getLook } from '@ebda/shared';
+import { retryableUnavailable } from './resolve-unavailable-edge';
 import { DEMO_HOSTS } from './src/lib/demo-hosts';
 import { renewNonce } from './csp-nonce-renew';
 import { buildScopedKey } from './edge-build-id';
@@ -123,7 +124,9 @@ export function demoEdgeKey(request: Request): string | null {
   return `https://${host}${path}${q ? `?${q}` : ''}`;
 }
 
-const demoVerdict = new Map<string, { demo: boolean; until: number }>();
+const demoVerdict = new Map<string, { demo: boolean; until: number; at: number }>();
+/** Ruling RESOLVE-BULLETPROOF-1: a transient error keeps the last verdict only this long after the last real answer. */
+export const DEMO_VERDICT_STALE_MAX_MS = 10 * 60_000;
 
 /**
  * True only when the API's store resolver says `host` is an ACTIVE `isDemo` store. Fails closed.
@@ -142,6 +145,15 @@ export async function isDemoStoreHost(
     const res = await fetcher(`${apiUrl}/public/store/resolve`, {
       headers: { 'x-store-domain': host },
     });
+    // Ruling RESOLVE-BULLETPROOF-1: a 429/5xx is "could not ask", not "not a demo": keep the last verdict.
+    if (known && !res.ok && res.status !== 404 && now - known.at < DEMO_VERDICT_STALE_MAX_MS) {
+      demoVerdict.set(host, { demo: known.demo, until: now + 60_000, at: known.at });
+      return known.demo;
+    }
+    if (!res.ok && res.status !== 404) {
+      demoVerdict.set(host, { demo: false, until: now + 60_000, at: known?.at ?? 0 });
+      return false;
+    }
     if (res.ok) {
       const store = (
         (await res.json()) as { data?: { store?: { isDemo?: unknown; status?: unknown } } }
@@ -149,9 +161,14 @@ export async function isDemoStoreHost(
       demo = store?.isDemo === true && store?.status === 'active';
     }
   } catch {
-    demo = false;
+    if (known && now - known.at < DEMO_VERDICT_STALE_MAX_MS) {
+      demoVerdict.set(host, { demo: known.demo, until: now + 60_000, at: known.at });
+      return known.demo;
+    }
+    demoVerdict.set(host, { demo: false, until: now + 60_000, at: known?.at ?? 0 });
+    return false;
   }
-  demoVerdict.set(host, { demo, until: now + 300_000 });
+  demoVerdict.set(host, { demo, until: now + 300_000, at: now });
   return demo;
 }
 
@@ -201,11 +218,13 @@ type Origin = (request: Request) => Promise<Response>;
 export async function serveDemoEdge(
   request: Request,
   ctx: EdgeCtx,
-  origin: Origin,
+  render: Origin,
   isDemoHost: (host: string) => Promise<boolean>,
   build: string | null,
   cache: Pick<Cache, 'match' | 'put'> = (caches as unknown as { default: Cache }).default
 ): Promise<Response> {
+  // Ruling RESOLVE-BULLETPROOF-1: a store-unresolvable render leaves as 503 + Retry-After, never 500 (and never stored).
+  const origin = (r: Request) => render(r).then(retryableUnavailable);
   const requestKey = build ? demoEdgeKey(request) : null;
   if (!requestKey || !build) return origin(request);
   const key = buildScopedKey(requestKey, build);

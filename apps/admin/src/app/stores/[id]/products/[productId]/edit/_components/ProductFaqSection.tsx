@@ -17,6 +17,7 @@ import { Input, Textarea, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
+import { SparkleIcon } from '@/components/SparkleIcon';
 
 interface ProductFaq {
   id: string;
@@ -308,12 +309,13 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
       <div className="rounded-xl border bg-card p-6 shadow-sm">
         {/* Section header with collapse toggle */}
         <div className="mb-4 flex items-center justify-between gap-3">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="lg"
             onClick={() => setOpen(o => !o)}
             aria-expanded={open}
-            data-ui="row"
-            className="flex items-center gap-2 text-lg font-semibold text-foreground hover:text-primary transition-colors"
+            className="-ms-3 font-semibold"
           >
             <svg
               className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`}
@@ -330,7 +332,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
                 {faqs.length}
               </span>
             )}
-          </button>
+          </Button>
 
           {open && (
             <Button
@@ -341,7 +343,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
               size="sm"
               className="gap-2 font-semibold"
             >
-              <span aria-hidden="true">✨</span>
+              <SparkleIcon />
               {aiGenerating ? t('generating') : t('generateWithAi')}
             </Button>
           )}

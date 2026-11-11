@@ -185,6 +185,29 @@ export function analyticsCustomersOp(db: SyncSql, storeId: string, a: Record<str
   return { newCustomers, returningCustomers, top };
 }
 
+/**
+ * repeatPurchaseInDb (insights.routes.ts): paid orders since `sinceMs` grouped by the buyer key the dashboard uses (customer
+ * id, else the shipping email LOWERCASED, else the shipping phone verbatim; each only a non-empty JSON string). An order with
+ * none of the three is skipped (no `'guest:' || id` fallback, unlike CUSTOMER_KEY). Returns two counts, never the rows.
+ */
+export function analyticsRepeatBuyersOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const since = intArg(a.sinceMs, 'sinceMs');
+  const row = db.all(
+    `SELECT COALESCE(SUM(CASE WHEN n >= 2 THEN 1 ELSE 0 END), 0) AS repeat, COUNT(*) AS buyers FROM (
+       SELECT COALESCE(
+         NULLIF(o.customer_id, ''),
+         NULLIF(LOWER(CASE WHEN json_type(o.shipping_address, '$.email') = 'text' THEN json_extract(o.shipping_address, '$.email') END), ''),
+         NULLIF(CASE WHEN json_type(o.shipping_address, '$.phone') = 'text' THEN json_extract(o.shipping_address, '$.phone') END, '')
+       ) AS buyer_key, COUNT(*) AS n
+       FROM orders o
+       WHERE o.store_id = ?1 AND o.payment_status = 'paid' AND o.created_at >= ?2
+       GROUP BY 1
+     ) per_buyer WHERE buyer_key IS NOT NULL`,
+    [storeId, since]
+  )[0] as Record<string, unknown> | undefined;
+  return { repeat: num(row?.repeat), buyers: num(row?.buyers) };
+}
+
 /** getLowStockProducts: active, inventory-tracked products whose on-hand (variant-aware, active variants only) is <= threshold. */
 export function analyticsLowStockOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const threshold = intArg(a.threshold, 'threshold', -1_000_000, 1_000_000);
