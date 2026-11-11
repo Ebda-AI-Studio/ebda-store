@@ -22,6 +22,8 @@
 // Modeled on .github/ai-review/review.mjs — match its style exactly.
 
 import { readFileSync, appendFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
 import {
   fetchOpenFollowupTitles,
   followupIssueTitle,
@@ -44,7 +46,8 @@ const {
   GITHUB_EVENT_NAME,
   PR_NUMBER,
   HEAD_SHA,
-  CLAUDE_OUTPUT = '/tmp/scoped-audit-out.json',
+  // RUNNER_TEMP, never a fixed /tmp path: runners share the Mac host (Ruling CI-MAC-RUNNER-1).
+  CLAUDE_OUTPUT = joinPath(process.env.RUNNER_TEMP || tmpdir(), 'scoped-audit-out.json'),
   GITHUB_OUTPUT,
   GITHUB_STEP_SUMMARY,
   AUDIT_RAN,

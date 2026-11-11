@@ -28,7 +28,7 @@ function orphanScript(): ts.SourceFile {
   const steps: Array<{ run?: string }> = workflow.jobs?.['orphan-tests']?.steps ?? [];
   const run = steps
     .map(s => s.run ?? '')
-    .find(r => r.includes('/tmp/all-tests.json') && r.includes('node -e "'));
+    .find(r => r.includes('/all-tests.json') && r.includes('node -e "'));
   expect(
     run,
     'orphan-tests job or its node -e step is gone — this guard is measuring nothing'
@@ -46,7 +46,7 @@ describe('#1438: orphan-tests job floors the FIRST collection too', () => {
     s =>
       ts.isVariableStatement(s) &&
       s.declarationList.declarations.some(
-        d => d.name.getText() === 'all' && d.initializer?.getText().includes('/tmp/all-tests.json')
+        d => d.name.getText() === 'all' && d.initializer?.getText().includes('/all-tests.json')
       )
   );
   const floorAt = ifWhere('all.size < 50');
