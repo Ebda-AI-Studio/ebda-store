@@ -6,7 +6,6 @@
  * process `prisma`.
  */
 import { describe, it, expect, afterAll, vi } from 'vitest';
-import crypto from 'crypto';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
