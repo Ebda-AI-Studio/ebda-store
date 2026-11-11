@@ -47,7 +47,7 @@ describe('social links (parity with the foundation list)', () => {
       const html = renderToStaticMarkup(<Footer locale={lang} />);
       const list = [...html.matchAll(/<ul class="sf-social">([\s\S]*?)<\/ul>/g)][0]![1]!;
       const anchors = list.match(/<a [^>]*>[\s\S]*?<\/a>/g)!;
-      expect(anchors).toHaveLength(5);
+      expect(anchors).toHaveLength(6);
       for (const a of anchors) {
         expect(a).toMatch(/aria-label="[^"]+"/);
         expect(a).toContain('target="_blank"');

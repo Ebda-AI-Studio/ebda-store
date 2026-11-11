@@ -596,8 +596,8 @@ describe('marketing SEO and trust surface', () => {
         const cur = currentLegalVersion(LEGAL_POLICIES, DOC_OF[page]);
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain(`${word} ${cur.version}`);
-        // the WhatsApp number and the Facebook page id (JSON-LD sameAs) are the only long numbers on the page, and neither is a registration number
-        const withoutPhone = html.replace(/201514191411|61596368614285/g, '');
+        // the WhatsApp number is the only long number on the page, and neither is a registration number
+        const withoutPhone = html.replace(/201514191411/g, '');
         expect(withoutPhone).not.toMatch(/\b\d{5,}\b/);
       }
     }

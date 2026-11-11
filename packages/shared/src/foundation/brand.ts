@@ -49,9 +49,10 @@ export const EBDA = {
     handle: 'ebdaaistudio',
     accounts: [
       { id: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/ebdaaistudio/' },
-      { id: 'facebook', label: 'Facebook', url: 'https://www.facebook.com/profile.php?id=61596368614285' },
+      { id: 'facebook', label: 'Facebook', url: 'https://www.facebook.com/ebdaaistudio' },
       { id: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/@ebdaaistudio' },
       { id: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/company/ebda-ai-studio/' },
+      { id: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@EbdaAIStudio' },
       { id: 'whatsapp', label: 'WhatsApp', url: 'https://wa.me/201514191411' },
     ],
   },
