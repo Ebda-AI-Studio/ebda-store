@@ -775,7 +775,7 @@ function ReplaceCheckbox({
         type="checkbox"
         checked={checked}
         onChange={e => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 cursor-pointer accent-primary"
+        className="h-5 w-5 cursor-pointer accent-primary"
       />
       <span className="text-xs text-muted-foreground">{label}</span>
       <span

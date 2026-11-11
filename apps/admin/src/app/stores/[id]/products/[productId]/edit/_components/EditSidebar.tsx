@@ -101,7 +101,7 @@ export function EditSidebar({
               type="checkbox"
               checked={isFeatured}
               onChange={e => onFeaturedChange(e.target.checked)}
-              className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
+              className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">{tFields('featured')}</span>
           </label>
@@ -110,7 +110,7 @@ export function EditSidebar({
               type="checkbox"
               checked={isNew}
               onChange={e => onIsNewChange(e.target.checked)}
-              className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
+              className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">{tFields('newArrival')}</span>
           </label>
@@ -119,7 +119,7 @@ export function EditSidebar({
               type="checkbox"
               checked={isBestSeller}
               onChange={e => onIsBestSellerChange(e.target.checked)}
-              className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
+              className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">{tFields('bestSeller')}</span>
           </label>

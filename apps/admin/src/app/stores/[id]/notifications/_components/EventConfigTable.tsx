@@ -72,7 +72,7 @@ export function EventConfigTable({
                 type="checkbox"
                 checked={ev.sms}
                 onChange={() => onToggleEventChannel(idx, 'sms')}
-                className="h-4 w-4 rounded-md border-input text-primary focus:ring-primary"
+                className="h-5 w-5 rounded-md border-input text-primary focus:ring-primary"
                 aria-label={tShared('channelNames.sms')}
               />
             ),
@@ -88,7 +88,7 @@ export function EventConfigTable({
                 type="checkbox"
                 checked={ev.push_notifications}
                 onChange={() => onToggleEventChannel(idx, 'push_notifications')}
-                className="h-4 w-4 rounded-md border-input text-primary focus:ring-primary"
+                className="h-5 w-5 rounded-md border-input text-primary focus:ring-primary"
                 aria-label={tShared('channelNames.pushShort')}
               />
             ),

@@ -615,7 +615,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
               type="checkbox"
               checked={formData.isPublished}
               onChange={e => setFormData(p => ({ ...p, isPublished: e.target.checked }))}
-              className="h-4 w-4 rounded-md border-input text-primary focus:ring-ring"
+              className="h-5 w-5 rounded-md border-input text-primary focus:ring-ring"
             />
             <label htmlFor="loc-published" className="text-sm text-foreground">
               {t('fieldPublished')}

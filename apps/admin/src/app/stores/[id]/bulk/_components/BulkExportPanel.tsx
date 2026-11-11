@@ -69,7 +69,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
                 id="includeDeleted"
                 checked={filters.includeDeleted}
                 onChange={e => setFilters(prev => ({ ...prev, includeDeleted: e.target.checked }))}
-                className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
+                className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
               />
               <Label htmlFor="includeDeleted" className="text-sm font-normal">
                 {t('includeDeleted')}

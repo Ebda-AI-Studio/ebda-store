@@ -171,7 +171,7 @@ export function PersonalisationCard({ value, onChange }: Props) {
                 type="checkbox"
                 checked={value.required}
                 onChange={e => set({ required: e.target.checked })}
-                className="h-4 w-4 rounded-md border-border accent-primary"
+                className="h-5 w-5 rounded-md border-border accent-primary"
               />
               {t('required')}
             </label>

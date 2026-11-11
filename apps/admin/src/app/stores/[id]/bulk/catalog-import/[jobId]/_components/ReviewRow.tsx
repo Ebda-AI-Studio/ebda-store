@@ -149,7 +149,7 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
             <label className="mt-2 flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
               <input
                 type="checkbox"
-                className="h-4 w-4"
+                className="h-5 w-5"
                 checked={item.acknowledged.includes('create_category')}
                 disabled={disabled}
                 onChange={e => void save({ createCategory: e.target.checked })}
@@ -225,7 +225,7 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
             <label key={f} className="flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
               <input
                 type="checkbox"
-                className="h-4 w-4"
+                className="h-5 w-5"
                 checked={checked.has(f)}
                 onChange={e => {
                   const next = new Set(checked);

@@ -259,7 +259,7 @@ export default function FloatingWidgetPage() {
               type="checkbox"
               checked={config.startExpanded === true}
               onChange={e => patch({ startExpanded: e.target.checked })}
-              className="h-4 w-4 cursor-pointer accent-primary"
+              className="h-5 w-5 cursor-pointer accent-primary"
             />
             <span className="text-sm text-foreground">{t('startExpandedLabel')}</span>
           </label>
@@ -269,7 +269,7 @@ export default function FloatingWidgetPage() {
                 type="checkbox"
                 checked={config.hideOnMobile === true}
                 onChange={e => patch({ hideOnMobile: e.target.checked })}
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               {t('hideOnMobile')}
             </label>
@@ -278,7 +278,7 @@ export default function FloatingWidgetPage() {
                 type="checkbox"
                 checked={config.hideOnDesktop === true}
                 onChange={e => patch({ hideOnDesktop: e.target.checked })}
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               {t('hideOnDesktop')}
             </label>
@@ -645,7 +645,7 @@ export default function FloatingWidgetPage() {
                               type="checkbox"
                               checked={b.musicLoop !== false}
                               onChange={e => updateButton(b.id, { musicLoop: e.target.checked })}
-                              className="h-4 w-4 cursor-pointer accent-primary"
+                              className="h-5 w-5 cursor-pointer accent-primary"
                             />
                             {t('loopAudioLabel')}
                           </label>

@@ -185,7 +185,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                     <li key={i.id} className="flex items-center gap-3 px-3 py-2 text-sm">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 accent-primary"
+                        className="h-5 w-5 accent-primary"
                         checked={!!pick}
                         onChange={() => L.toggle(i)}
                         aria-label={`${name}${variant ? ` / ${variant}` : ''}`}
@@ -260,7 +260,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                 <label key={k} className="flex items-center gap-2 text-sm text-foreground">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 accent-primary"
+                    className="h-5 w-5 accent-primary"
                     checked={settings.content[k]}
                     onChange={e => set({ content: { ...settings.content, [k]: e.target.checked } })}
                   />

@@ -111,7 +111,7 @@ function Row({
         <button
           data-ui="handle"
           type="button"
-          className="min-h-6 min-w-6 cursor-grab touch-none rounded-md px-1 text-muted-foreground hover:text-foreground"
+          className="min-h-6 min-w-6 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center cursor-grab touch-none rounded-md px-1 text-muted-foreground hover:text-foreground"
           aria-label={t('drag', { name })}
           {...attributes}
           {...listeners}

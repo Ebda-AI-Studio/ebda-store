@@ -215,7 +215,7 @@ export default function CatalogImportReviewPage() {
                 <input
                   type="checkbox"
                   aria-label={t('review.selectDraft')}
-                  className="mt-5 h-4 w-4"
+                  className="mt-5 h-5 w-5"
                   checked={selected.has(item.id)}
                   onChange={e => {
                     const next = new Set(selected);

@@ -302,7 +302,7 @@ export default function CategoryProductOrderPage() {
               type="checkbox"
               checked={activeOnly}
               onChange={e => setActiveOnly(e.target.checked)}
-              className="h-4 w-4 rounded-md border-border accent-primary"
+              className="h-5 w-5 rounded-md border-border accent-primary"
             />
             {t('activeOnly')}
           </label>

@@ -806,7 +806,7 @@ export default function NewOrderPage() {
                   type="checkbox"
                   checked={overrideCouponRules}
                   onChange={e => setOverrideCouponRules(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded-md border-border"
+                  className="mt-0.5 h-5 w-5 rounded-md border-border"
                 />
                 <span>
                   <span className="font-medium text-foreground">

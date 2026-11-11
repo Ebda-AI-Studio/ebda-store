@@ -603,7 +603,7 @@ export default function StoreSeoPage() {
                       onChange={e =>
                         setSettings(prev => ({ ...prev, hideFromSearchEngines: e.target.checked }))
                       }
-                      className="mt-0.5 h-4 w-4 rounded-md border-input accent-primary"
+                      className="mt-0.5 h-5 w-5 rounded-md border-input accent-primary"
                       data-testid="hide-from-search-toggle"
                     />
                     <span>

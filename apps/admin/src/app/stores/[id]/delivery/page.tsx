@@ -252,7 +252,7 @@ export default function CheckoutDeliveryPage() {
                 type="checkbox"
                 checked={config.note.enabled}
                 onChange={e => patchNote({ enabled: e.target.checked })}
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
             </label>
           </div>
@@ -299,7 +299,7 @@ export default function CheckoutDeliveryPage() {
                 type="checkbox"
                 checked={config.windows.enabled}
                 onChange={e => patchWindows({ enabled: e.target.checked })}
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
             </label>
           </div>

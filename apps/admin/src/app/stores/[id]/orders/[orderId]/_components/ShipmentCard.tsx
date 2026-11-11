@@ -460,7 +460,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
             type="checkbox"
             checked={restock}
             onChange={e => setRestock(e.target.checked)}
-            className="h-4 w-4"
+            className="h-5 w-5"
           />
           {t('restockLabel')}
         </label>

@@ -262,7 +262,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
                     theme: { ...branding.theme, footerSocialOriginalColor: e.target.checked },
                   })
                 }
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               <span className="text-xs text-foreground">{t('socialIconColors.footerLabel')}</span>
             </label>
@@ -276,7 +276,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
                     theme: { ...branding.theme, floatingWidgetOriginalColor: e.target.checked },
                   })
                 }
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               <span className="text-xs text-foreground">{t('socialIconColors.widgetLabel')}</span>
             </label>
@@ -301,7 +301,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
                     theme: { ...branding.theme, frameChromeDedup: e.target.checked },
                   })
                 }
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               <span className="text-xs text-foreground">{t('cardFrameDedup.enableLabel')}</span>
             </label>
@@ -347,7 +347,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
                     theme: { ...branding.theme, footerLogoInvert: e.target.checked },
                   })
                 }
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               <span className="text-xs text-foreground">{t('footerLogo.invertLabel')}</span>
             </label>
@@ -361,7 +361,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
                     theme: { ...branding.theme, hideFooterLogoMobile: e.target.checked },
                   })
                 }
-                className="h-4 w-4 cursor-pointer accent-primary"
+                className="h-5 w-5 cursor-pointer accent-primary"
               />
               <span className="text-xs text-foreground">{t('footerLogo.hideMobileLabel')}</span>
             </label>

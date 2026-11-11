@@ -447,7 +447,7 @@ export default function WarehousesPage() {
                   type="checkbox"
                   checked={form.isDefault}
                   onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))}
-                  className="h-4 w-4 rounded-md border-input text-primary"
+                  className="h-5 w-5 rounded-md border-input text-primary"
                 />
                 <span className="text-sm">{t('form.isDefault')}</span>
               </label>

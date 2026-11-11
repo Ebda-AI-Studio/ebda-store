@@ -206,6 +206,23 @@
     color-scheme: dark;
   }
 
+  /* Native checkboxes and radios are 20px (the browser default is 13px, under the 24px WCAG 2.5.8 floor); a utility class on
+     the input still wins. On touch the wrapping label is a 44px row, so the whole row is the target (DESIGN.md: 44px on phones). */
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+  @media (pointer: coarse) {
+    label:has(> input[type='checkbox']),
+    label:has(> input[type='radio']) {
+      display: inline-flex;
+      min-height: 2.75rem;
+      align-items: center;
+    }
+  }
+
   /* Eliminate 300ms tap-zoom delay on touch devices */
   html {
     touch-action: manipulation;

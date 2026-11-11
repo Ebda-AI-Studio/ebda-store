@@ -15,6 +15,8 @@
  *   G9  `rounded-xl/2xl/3xl`: xl duplicates control (12px), 2xl/3xl are off-scale. Control = rounded-md, surface = rounded-lg, pill = rounded-full.
  *   G10 `shadow-lg` / `shadow-2xl` / a coloured shadow (`shadow-primary/25`): elevation is flat (default), shadow-sm (cards),
  *       shadow-md (menus), shadow-xl (modals), never coloured.
+ *   G11 a native checkbox/radio sized under 20px (h-3/h-3.5/h-4): the global rule in globals.css makes the default 20px (+ a 44px
+ *       label row on touch); this keeps a utility class from shrinking it back below the 24px WCAG 2.5.8 floor.
  *   G6  a `data-ui="nav"` item that does not take its classes from navItemClasses() / bottomNavClasses().
  *
  * G1-G5 are a RATCHET: tests/unit/admin-design-tokens.baseline.json holds the per-file count of pages not yet
@@ -64,6 +66,22 @@ export function countOffScaleShadow(src: string): number {
   return (stripComments(src).match(G10) ?? []).length;
 }
 
+export function countTinyChecks(src: string): number {
+  const code = stripComments(src);
+  const re = /<input(?=[\s>/])/g;
+  let n = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) {
+    const tag = openingTag(code, m.index);
+    if (
+      /\btype=["'](?:checkbox|radio)["']/.test(tag) &&
+      /(?<![\w:-])(?:h|w|size)-(?:3|3\.5|4)(?![\w.-])/.test(tag)
+    )
+      n++;
+  }
+  return n;
+}
+
 /** G8: content elements set in 12px. */
 export function countSmallContent(src: string): number {
   return (stripComments(src).match(CONTENT_TAG) ?? []).filter(t =>
@@ -103,6 +121,7 @@ function scan(): { counts: Counts; nav: string[] } {
     G8: {},
     G9: {},
     G10: {},
+    G11: {},
   };
   const nav: string[] = [];
   for (const p of walk(SRC)) {
@@ -122,6 +141,8 @@ function scan(): { counts: Counts; nav: string[] } {
       if (rx) counts.G9![file] = rx;
       const sh = countOffScaleShadow(src);
       if (sh) counts.G10![file] = sh;
+      const tc = countTinyChecks(src);
+      if (tc) counts.G11![file] = tc;
     }
     if (p.endsWith('.tsx'))
       nav.push(...navIssues(file, src, ['navItemClasses', 'bottomNavClasses']));
@@ -184,6 +205,20 @@ describe('admin design tokens', () => {
     expect(countOffScaleShadow('className="shadow-sm shadow-md shadow-xl shadow-none"')).toBe(0);
   });
 
+  it('G11 self-test, and the global 20px / 44px-row rules exist', () => {
+    expect(countTinyChecks('<input type="checkbox" className="h-4 w-4" />')).toBe(1);
+    expect(countTinyChecks('<input type="radio" className="size-3.5" />')).toBe(1);
+    expect(countTinyChecks('<input type="checkbox" className="h-5 w-5" />')).toBe(0);
+    expect(countTinyChecks('<input type="text" className="h-4" />')).toBe(0);
+    const css = readFileSync(join(SRC, 'styles/globals.css'), 'utf8');
+    expect(css).toMatch(
+      /input\[type='checkbox'\],\s*input\[type='radio'\] \{\s*width: 1\.25rem;\s*height: 1\.25rem;/
+    );
+    expect(css).toMatch(
+      /@media \(pointer: coarse\) \{\s*label:has\(> input\[type='checkbox'\]\)[\s\S]*?min-height: 2\.75rem;/
+    );
+  });
+
   it('no count exceeds the BASE branch baseline (the ratchet only shrinks)', () => {
     const ref = process.env.BASE_REF ?? 'origin/main';
     let baseTxt: string;
@@ -226,7 +261,7 @@ describe('admin design tokens', () => {
     const base: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
     const grew: string[] = [];
     const stale: string[] = [];
-    for (const rule of [...Object.keys(RULES), 'G7', 'G8', 'G9', 'G10']) {
+    for (const rule of [...Object.keys(RULES), 'G7', 'G8', 'G9', 'G10', 'G11']) {
       const files = new Set([...Object.keys(counts[rule]), ...Object.keys(base[rule] ?? {})]);
       for (const f of files) {
         const now = counts[rule][f] ?? 0;

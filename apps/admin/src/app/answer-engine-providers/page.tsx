@@ -134,7 +134,7 @@ export function ProviderRow({
             type="checkbox"
             checked={enabled}
             onChange={e => setEnabled(e.target.checked)}
-            className="h-4 w-4 rounded-md border-input"
+            className="h-5 w-5 rounded-md border-input"
           />
           {t('enabledLabel')}
         </label>

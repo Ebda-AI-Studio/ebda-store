@@ -226,7 +226,7 @@ export function BulkImportWizard({
               id="updateExisting"
               checked={updateExisting}
               onChange={e => setUpdateExisting(e.target.checked)}
-              className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
+              className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
             />
             <Label htmlFor="updateExisting" className="text-sm font-normal">
               {t('updateExisting')}
@@ -285,7 +285,7 @@ export function BulkImportWizard({
                     id="trackInventory"
                     checked={trackInventory}
                     onChange={e => setTrackInventory(e.target.checked)}
-                    className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
+                    className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
                   />
                   <Label htmlFor="trackInventory" className="text-sm font-normal">
                     {t('trackInventory')}

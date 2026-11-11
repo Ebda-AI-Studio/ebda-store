@@ -277,7 +277,7 @@ function LinkRow({
           type="checkbox"
           checked={enabled}
           onChange={e => onToggle(e.target.checked)}
-          className="mt-2.5 h-4 w-4 shrink-0 rounded-md border-border text-primary focus:ring-primary"
+          className="mt-2.5 h-5 w-5 shrink-0 rounded-md border-border text-primary focus:ring-primary"
           aria-label={primaryLabel}
         />
         <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -750,7 +750,7 @@ export function FooterLinksEditor({
                   type="checkbox"
                   checked={bottomBar[key] !== false}
                   onChange={e => setBottomBar(b => ({ ...b, [key]: e.target.checked }))}
-                  className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
+                  className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
                 />
                 {t(label)}
               </label>

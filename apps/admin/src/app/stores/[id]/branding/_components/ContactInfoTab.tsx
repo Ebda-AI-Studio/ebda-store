@@ -163,7 +163,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             type="checkbox"
             checked={branding.addressLink !== false}
             onChange={e => onChange({ ...branding, addressLink: e.target.checked })}
-            className="h-4 w-4 rounded-md border-input text-primary focus:ring-primary/40"
+            className="h-5 w-5 rounded-md border-input text-primary focus:ring-primary/40"
           />
           <span className="text-sm text-foreground">{t('addressClickable')}</span>
         </label>
