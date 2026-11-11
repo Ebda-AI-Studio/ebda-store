@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
-import { isTrustedSsr, publicTenantKey } from './public-limiter-keys';
+import { ssrWithinLocalBudget, publicTenantKey } from './public-limiter-keys';
 import { isVerifiedCatalogueMiss } from './catalogue-miss';
 import rateLimit, {
   ipKeyGenerator,
@@ -1797,7 +1797,7 @@ export const storeResolveLimiter = rateLimit({
   // Ruling RL-SSR-IP-6: an explicit per-address key, and no address = not counted (the `noClientIp` convention) rather than
   // every such request pooling in one bucket that would throttle all shoppers at once.
   // Ruling DO-BUDGET-2: a verified storefront render (HMAC) is not a shopper probing; the web Worker caches resolves per host.
-  skip: req => noClientIp(req) || skipForLoadTest(req) || isTrustedSsr(req),
+  skip: req => noClientIp(req) || skipForLoadTest(req) || ssrWithinLocalBudget(req),
   keyGenerator: req => ipKeyGenerator(req.ip ?? ''),
 });
 

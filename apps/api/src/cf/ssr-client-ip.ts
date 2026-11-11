@@ -18,7 +18,12 @@ import { isIP } from '../lib/safe-fetch';
 export const CLIENT_IP_HEADER = 'x-ebda-client-ip';
 export const SSR_AUTH_HEADER = 'x-ebda-ssr-auth';
 /** Signed by the storefront for a render with no shopper behind it (background revalidation): no per-address bucket. */
+/** Retired (DO-BUDGET-2): `none` is no longer honoured, an unknown client address gets full limiting. */
 export const NO_SHOPPER_ADDRESS = 'none';
+/** v2: ts.hex(HMAC(HKDF(REVALIDATE_SECRET, info), method|path+query|store host|address|ts)); the only thing that grants {@link TRUSTED_SSR_HEADER}. */
+export const SSR_V2_HEADER = 'x-ebda-ssr-v2';
+export const SSR_V2_MAX_SKEW_MS = 60_000;
+const SSR_V2_INFO = 'ebda-ssr-forward.v2';
 /**
  * Set by this module (never by a caller: an inbound copy is always removed) when a request has NO client address.
  * Express has no socket address on workerd and would otherwise fall back to one fixed value for every such request;
@@ -51,7 +56,7 @@ export const SSR_FORWARD_ROUTES: Readonly<Record<string, 'forward' | 'own'>> = {
   '/categories': 'forward',
   '/tags': 'forward',
   '/redirects/resolve': 'forward',
-  '/qr/scan': 'forward',
+  '/qr/scan': 'own', // writes a counter: never forwarded, never exempt (DO-BUDGET-2)
   '/stores': 'forward',
   '/stores/:slugOrId': 'forward',
   '/store/resolve': 'forward',
@@ -115,6 +120,46 @@ export async function verifyClientIpSignature(
   return crypto.subtle.verify('HMAC', key, mac, enc.encode(SIGNING_CONTEXT + ip));
 }
 
+/**
+ * Verify the v2 per-request signature (constant-time WebCrypto `verify`). It binds method, path + query, the store host header,
+ * the client address and a timestamp inside +-60 s, under a key derived from the secret (HKDF-SHA256), so it cannot be moved to
+ * another request, replayed later, or produced from a leaked revalidate token alone.
+ */
+export async function verifySsrV2(
+  secret: string,
+  header: string,
+  parts: { method: string; pathAndQuery: string; host: string; ip: string },
+  now = Date.now()
+): Promise<boolean> {
+  const m = /^(\d{10,16})\.([0-9a-f]{64})$/i.exec(header);
+  if (!m) return false;
+  const ts = Number(m[1]);
+  if (!Number.isSafeInteger(ts) || Math.abs(now - ts) > SSR_V2_MAX_SKEW_MS) return false;
+  const mac = hexToBytes(m[2]);
+  if (!mac) return false;
+  const base = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    'HKDF',
+    false,
+    ['deriveKey']
+  );
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new Uint8Array(0),
+      info: new TextEncoder().encode(SSR_V2_INFO),
+    },
+    base,
+    { name: 'HMAC', hash: 'SHA-256', length: 256 },
+    false,
+    ['verify']
+  );
+  const msg = `ebda-ssr-forward.v2\n${parts.method.toUpperCase()}\n${parts.pathAndQuery}\n${parts.host.toLowerCase()}\n${parts.ip}\n${ts}`;
+  return crypto.subtle.verify('HMAC', key, mac, new TextEncoder().encode(msg));
+}
+
 let warnedNoSecret = false;
 
 /**
@@ -149,24 +194,37 @@ export async function resolveClientAddress(
   headers.delete(SSR_AUTH_HEADER);
   headers.delete(NO_CLIENT_ADDRESS_HEADER);
   headers.delete(TRUSTED_SSR_HEADER);
+  headers.delete(SSR_V2_HEADER);
+  const v2 = incoming.headers.get(SSR_V2_HEADER)?.trim() ?? '';
+  const url = new URL(incoming.url);
 
   let ip = seen;
   let forwarded = false;
   if (
     claimed &&
-    auth &&
     typeof secret === 'string' &&
     secret.length > 0 &&
-    (isIP(claimed) !== 0 || claimed === NO_SHOPPER_ADDRESS) &&
-    isForwardableRead(incoming.method, new URL(incoming.url).pathname)
+    isIP(claimed) !== 0 &&
+    isForwardableRead(incoming.method, url.pathname)
   ) {
     try {
-      if (await verifyClientIpSignature(secret, claimed, auth)) {
-        // `none`: the storefront itself, no shopper. No address = the per-IP limiters skip it (`noClientIp`), the
-        // per-store limits still apply. Never the storefront Worker's egress address, which every store would share.
-        ip = claimed === NO_SHOPPER_ADDRESS ? null : claimed;
-        forwarded = true;
+      // v1 (rollout only): the address is honoured, never an exemption. `none` is not accepted any more.
+      let ok = Boolean(auth) && (await verifyClientIpSignature(secret, claimed, auth));
+      if (
+        v2 &&
+        (await verifySsrV2(secret, v2, {
+          method: incoming.method,
+          pathAndQuery: url.pathname + url.search,
+          host: incoming.headers.get('x-store-domain') ?? '',
+          ip: claimed,
+        }))
+      ) {
+        ok = true;
         headers.set(TRUSTED_SSR_HEADER, '1');
+      }
+      if (ok) {
+        ip = claimed;
+        forwarded = true;
       }
     } catch {
       // a WebCrypto failure is a "no": the address Cloudflare saw stands
@@ -176,7 +234,8 @@ export async function resolveClientAddress(
     incoming.headers.has(CLIENT_IP_HEADER) ||
     incoming.headers.has(SSR_AUTH_HEADER) ||
     incoming.headers.has(NO_CLIENT_ADDRESS_HEADER) ||
-    incoming.headers.has(TRUSTED_SSR_HEADER);
+    incoming.headers.has(TRUSTED_SSR_HEADER) ||
+    incoming.headers.has(SSR_V2_HEADER);
   if (ip && !hadInternal && !forwarded && incoming.headers.get('x-forwarded-for') === ip) {
     return { request: incoming, ip, forwarded };
   }

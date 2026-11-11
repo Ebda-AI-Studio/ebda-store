@@ -6,7 +6,7 @@ import { prefetchHits, releaseUnconsumed, runWithPrefetchedHits } from '../cf/ra
 import { isWorkers } from '../lib/runtime';
 import { resolvedStoreId } from '../utils/resolved-store';
 import {
-  isTrustedSsr,
+  ssrWithinLocalBudget,
   publicIpKey,
   publicTenantKey,
   skipPublicLimiters,
@@ -43,7 +43,7 @@ export function plannedPublicHits(req: Request): { hits: string[]; peeks: string
     Boolean(b?.PUBLIC_IP_LIMITER && b.PUBLIC_TENANT_LIMITER) &&
     Boolean(resolvedStoreId(req));
   // Ruling DO-BUDGET-2: a verified storefront render spends no public read bucket; only the store-miss peek remains.
-  if (!native && !isTrustedSsr(req))
+  if (!native && !ssrWithinLocalBudget(req))
     keys.push(`rl:public:${publicIpKey(req)}`, `rl:public-tenant:${publicTenantKey(req)}`);
   if (req.ip) {
     const ip = ipKeyGenerator(req.ip);

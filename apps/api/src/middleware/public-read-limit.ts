@@ -1,6 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { cfBindings } from '../cf/bindings';
-import { isTrustedSsr, publicIpKey, skipPublicLimiters } from './public-limiter-keys';
+import { ssrWithinLocalBudget, publicIpKey, skipPublicLimiters } from './public-limiter-keys';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 
 /**
@@ -64,7 +64,7 @@ const BODY = {
 
 export function publicReadLimit(exactLimiters: RequestHandler): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (skipPublicLimiters(req) || isTrustedSsr(req)) return next();
+    if (skipPublicLimiters(req) || ssrWithinLocalBudget(req)) return next();
     const b = cfBindings();
     if (!isAnonymousPublicRead(req) || !b?.PUBLIC_IP_LIMITER || !b.PUBLIC_TENANT_LIMITER) {
       return exactLimiters(req, res, next);

@@ -41,17 +41,57 @@ export function skipPublicLimiters(req: Request): boolean {
 }
 
 /**
- * Ruling DO-BUDGET-2: a storefront server render (ebda-web) is not a shopper hitting the API, so it does not spend the shopper's
- * per-IP / per-store / store-resolve read buckets (each is an AuthState Durable Object round trip, 39% of all DO requests).
- *
- * Why a caller cannot fake it: trust is membership of a WeakSet that only `app.ts` fills, from a header that only `worker.ts`
- * sets, and only after `resolveClientAddress` verified `x-ebda-ssr-auth` = HMAC-SHA256(REVALIDATE_SECRET, address) in constant
- * time (WebCrypto `verify`) on a GET/HEAD of an anonymous storefront read. The secret exists only in ebda-web and ebda-api;
- * both forward headers (and this marker) are stripped from every inbound request first, so a spoofed header, X-Forwarded-For
- * or Host value is simply deleted. No secret on the API = nothing is ever trusted (the limiters run as before).
- * Residual: the shopper is then bounded by Cloudflare's edge in front of ebda-web, the store-miss limiter (kept: it still
- * peeks and counts 404s per shopper address) and the per-store caches, not by the public read buckets.
+ * Ruling DO-BUDGET-2: a request from ebda-web carrying a VERIFIED v2 signature (cf/ssr-client-ip.ts) is `trusted`. Trust is
+ * membership of a WeakSet that only app.ts fills, from a header only worker.ts sets after a constant-time WebCrypto verify of
+ * ts.HMAC(HKDF(REVALIDATE_SECRET), method | path+query | store host | shopper address | ts) inside +-60 s on an anonymous
+ * storefront read. Every inbound copy of the marker and the forward headers is deleted first. A signature cannot move to another
+ * request, replay after a minute, or come from a v1 header; `none` is never trusted. No secret = nothing trusted.
+ * Residual: the signing key is derived from the revalidate secret (one root secret).
  */
 export function isTrustedSsr(req: Request): boolean {
   return trustedSsrRequests.has(req);
+}
+
+/**
+ * A trusted render is still limited per VERIFIED shopper address and per store, but isolate-first: an in-memory fixed-window
+ * counter (no Durable Object call) answers while a key is cold; once a key passes {@link LOCAL_HOT} hits in the window the
+ * exact DO limiters run for it (they count from zero, so a hot key can use at most LOCAL_HOT + the limit per isolate). Same
+ * protection under abuse, no DO call in the normal case. Per-isolate counts are the residual: N isolates can each pass
+ * LOCAL_HOT free hits.
+ */
+export const LOCAL_WINDOW_MS = 60_000;
+export const LOCAL_HOT = { ip: 60, tenant: 1200 } as const;
+const LOCAL_MAX_KEYS = 20_000;
+const local = new Map<string, { n: number; resetAt: number }>();
+const decided = new WeakMap<object, boolean>();
+let clock = (): number => Date.now();
+
+function bump(key: string, hot: number): boolean {
+  const now = clock();
+  if (local.size >= LOCAL_MAX_KEYS) local.clear();
+  let e = local.get(key);
+  if (!e || e.resetAt <= now) local.set(key, (e = { n: 0, resetAt: now + LOCAL_WINDOW_MS }));
+  e.n += 1;
+  return e.n > hot;
+}
+
+/**
+ * True = this trusted request spends NO exact DO limiter hit (both its keys are cold). Decided once per request (memoised), so
+ * the prefetch, publicReadLimit and storeResolveLimiter agree. Always false for an untrusted request.
+ */
+export function ssrWithinLocalBudget(req: Request): boolean {
+  if (!isTrustedSsr(req)) return false;
+  const known = decided.get(req);
+  if (known !== undefined) return known;
+  const ipHot = req.ip ? bump(`ip:${publicIpKey(req)}`, LOCAL_HOT.ip) : false;
+  const tenantHot = bump(`t:${publicTenantKey(req)}`, LOCAL_HOT.tenant);
+  const cold = !ipHot && !tenantHot;
+  decided.set(req, cold);
+  return cold;
+}
+
+/** Tests only. */
+export function __resetSsrLocalLimitForTests(now?: () => number): void {
+  local.clear();
+  clock = now ?? (() => Date.now());
 }

@@ -64,28 +64,45 @@ async function observe(res: Response): Promise<Seen> {
 const rlCalls = (s: Seen) => s.calls.filter(c => c.op.includes('"rl:'));
 const cachegenCalls = (s: Seen) => s.calls.filter(c => c.op.includes('"cachegen:'));
 
-/** The headers ebda-web adds to an API fetch (apps/web/ssr-client-address.ts): the shopper address, HMAC-signed. */
+/** The headers ebda-web adds to an API fetch (apps/web/ssr-client-address.ts): v1 address + v2 request-bound signature. */
 async function signedRender(
   path: string,
   shopper: string,
-  secret = 'workers-test-revalidate-secret'
+  host: string,
+  secret = 'workers-test-revalidate-secret',
+  at = Date.now()
 ) {
-  const key = await crypto.subtle.importKey(
+  const enc = new TextEncoder();
+  const hex = (b: ArrayBuffer) =>
+    Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
+  const k1 = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(secret),
+    enc.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
   );
-  const mac = new Uint8Array(
-    await crypto.subtle.sign(
-      'HMAC',
-      key,
-      new TextEncoder().encode(`ebda-ssr-client-ip.v1\n${shopper}`)
-    )
+  const v1 = hex(
+    await crypto.subtle.sign('HMAC', k1, enc.encode(`ebda-ssr-client-ip.v1\n${shopper}`))
   );
-  const auth = Array.from(mac, b => b.toString(16).padStart(2, '0')).join('');
-  return { 'x-ebda-client-ip': shopper, 'x-ebda-ssr-auth': auth };
+  const base = await crypto.subtle.importKey('raw', enc.encode(secret), 'HKDF', false, [
+    'deriveKey',
+  ]);
+  const k2 = await crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new Uint8Array(0),
+      info: enc.encode('ebda-ssr-forward.v2'),
+    },
+    base,
+    { name: 'HMAC', hash: 'SHA-256', length: 256 },
+    false,
+    ['sign']
+  );
+  const msg = `ebda-ssr-forward.v2\nGET\n/api/v1${path}\n${host.toLowerCase()}\n${shopper}\n${at}`;
+  const v2 = `${at}.${hex(await crypto.subtle.sign('HMAC', k2, enc.encode(msg)))}`;
+  return { 'x-ebda-client-ip': shopper, 'x-ebda-ssr-auth': v1, 'x-ebda-ssr-v2': v2 };
 }
 
 describe.skipIf(e.E2E_DB === '1')('public request Durable Object round trips (PERF-RL-DO)', () => {
@@ -221,7 +238,7 @@ describe.skipIf(e.E2E_DB === '1')('public request Durable Object round trips (PE
       const headers = {
         'x-store-id': storeId,
         'x-store-domain': 'rl-do-shop.ebda.app',
-        ...(await signedRender(path, ip)),
+        ...(await signedRender(path, ip, 'rl-do-shop.ebda.app')),
       };
       const s = await observe(await call(path, headers, '2a06:98c0:3600::103'));
       expect(s.status, path).toBe(200);
@@ -239,7 +256,12 @@ describe.skipIf(e.E2E_DB === '1')('public request Durable Object round trips (PE
       { 'x-ebda-trusted-ssr': '1', 'x-store-domain': 'rl-do-shop.ebda.app' },
       {
         'x-store-domain': 'rl-do-shop.ebda.app',
-        ...(await signedRender('/public/store/resolve', ip, 'not-the-secret')),
+        ...(await signedRender(
+          '/public/store/resolve',
+          ip,
+          'rl-do-shop.ebda.app',
+          'not-the-secret'
+        )),
       },
     ]) {
       const s = await observe(await call('/public/store/resolve', headers, ip));
@@ -253,9 +275,38 @@ describe.skipIf(e.E2E_DB === '1')('public request Durable Object round trips (PE
     const ip = nextIp();
     const headers = {
       'x-store-domain': 'no-such-shop-zzz.ebda.app',
-      ...(await signedRender('/public/store/resolve', ip)),
+      ...(await signedRender('/public/store/resolve', ip, 'no-such-shop-zzz.ebda.app')),
     };
     const res = await call('/public/store/resolve', headers, '2a06:98c0:3600::103');
     expect(res.status).toBe(404);
   });
+
+  it('a replayed signature (>60 s old) is limited like any caller', async () => {
+    const ip = nextIp();
+    const headers = {
+      'x-store-domain': 'rl-do-shop.ebda.app',
+      ...(await signedRender(
+        '/public/store/resolve',
+        ip,
+        'rl-do-shop.ebda.app',
+        undefined,
+        Date.now() - 61_000
+      )),
+    };
+    const s = await observe(await call('/public/store/resolve', headers, '2a06:98c0:3600::103'));
+    expect(s.status).toBe(200);
+    expect(s.calls.filter(c => c.op.startsWith('[["hit",')).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a hot shopper through SSR falls back to the exact limiters (scraper protection)', async () => {
+    const ip = nextIp();
+    let hits = 0;
+    for (let i = 0; i < 70; i++) {
+      const path = `/public/products?limit=${(i % 5) + 1}`;
+      const headers = { 'x-store-id': storeId, ...(await signedRender(path, ip, '')) };
+      const s = await observe(await call(path, headers, '2a06:98c0:3600::103'));
+      hits += s.calls.filter(c => c.op.startsWith('[["hit",')).length;
+    }
+    expect(hits).toBeGreaterThan(0);
+  }, 60_000);
 });
