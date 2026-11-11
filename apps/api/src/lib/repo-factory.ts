@@ -1790,9 +1790,10 @@ async function doClients(
   const callMoney = async (op: string, args: unknown, key?: string) => {
     const r = await stub.moneyOp(storeId, op, encodeRpc(args), key);
     if (!r.ok) throw new AppError(r.status, r.code, r.message, r.meta);
-    const out = decodeRpc<any>(r.json);
-    if (Array.isArray(out?.moneyAlerts) && out.moneyAlerts.length > 0)
-      void sendMoneyAlerts(storeId, op, out.moneyAlerts);
+    const out = decodeRpc<unknown>(r.json);
+    const alerts = (out as { moneyAlerts?: unknown } | null)?.moneyAlerts;
+    if (Array.isArray(alerts) && alerts.length > 0)
+      void sendMoneyAlerts(storeId, op, alerts as Parameters<typeof sendMoneyAlerts>[2]);
     return out;
   };
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);
@@ -1929,6 +1930,7 @@ function pgWriter(storeId: string): StoreWrites {
  * a store-scoped P1 to the platform channel. The merchant sees the same fact on the order's payment timeline. Never
  * throws into the caller: the money state is already committed and recorded for review.
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/money-alerts-dispatch.test.ts
 export async function sendMoneyAlerts(
   storeId: string,
   op: string,
