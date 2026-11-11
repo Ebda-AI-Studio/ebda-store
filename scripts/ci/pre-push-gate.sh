@@ -38,8 +38,15 @@ if [ "$MODE" = "affected" ]; then
   if [ -n "$RELATED" ] && [ -d packages/database/dist ] && [ -d packages/shared/dist ]; then
     EXCLUDE_ARGS=()
     for g in $(field exclude); do EXCLUDE_ARGS+=(--exclude "$g"); done
-    echo "-> vitest related (changed source files only)"
-    npx vitest related --run --passWithNoTests --maxWorkers=50% "${EXCLUDE_ARGS[@]}" $RELATED
+    # PREPUSH-4: a wide change fans `vitest related` out to thousands of tests, which on a loaded Mac holds the
+    # host lock for hours. Past the cap CI runs it (sharded); the lock is held only for the vitest run itself.
+    NREL=$(printf '%s\n' $RELATED | wc -l | tr -d ' ')
+    if [ "$NREL" -gt "${PREPUSH_RELATED_MAX:-6}" ]; then
+      echo "! vitest related skipped: $NREL changed files > ${PREPUSH_RELATED_MAX:-6}; CI runs it, sharded"
+    else
+      echo "-> vitest related (changed source files only, $NREL files)"
+      bash scripts/ci/host-lock.sh npx vitest related --run --passWithNoTests --maxWorkers=50% "${EXCLUDE_ARGS[@]}" $RELATED
+    fi
   else
     echo "! related tests skipped (nothing related, or packages not built); CI runs them"
   fi
@@ -54,7 +61,7 @@ if [ -n "$SCANNERS" ]; then
   if [ -d packages/database/dist ] && [ -d packages/shared/dist ]; then
     echo "-> vitest scanners ($(printf '%s\n' $SCANNERS | wc -l | tr -d ' ') repo-scanning tests, always run)"
     # shellcheck disable=SC2086
-    npx vitest run --passWithNoTests --maxWorkers=50% $SCANNERS
+    bash scripts/ci/host-lock.sh npx vitest run --passWithNoTests --maxWorkers=50% $SCANNERS
   else
     echo "! scanner tests skipped (packages not built); CI runs them"
   fi
