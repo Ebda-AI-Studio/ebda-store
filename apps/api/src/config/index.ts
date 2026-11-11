@@ -195,6 +195,11 @@ export const config = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramAlertChatId: process.env.TELEGRAM_ALERT_CHAT_ID || '',
 
+  // The AI OS brain mirrors every alert (Ruling ESC-AIOS-1 / AIOS-8): a Telegram bot cannot read its own outgoing messages, so the
+  // brain is the only place an operator or controller can read them back. Token empty = no mirror (Telegram is unaffected).
+  osBrainUrl: process.env.EBDA_OS_BRAIN_URL || 'https://os.ebda.app',
+  osIngestToken: process.env.EBDA_OS_INGEST_TOKEN || '',
+
   // Cloudflare-for-SaaS Custom Hostnames — the only custom-domain provider
   // (Vercel cancelled 2026-07, removed). Unset → CloudflareDomainService
   // reports not-configured and the resolver no-ops the domain-provisioning path.

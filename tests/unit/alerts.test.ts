@@ -123,6 +123,53 @@ describe('sendAlert — configured', () => {
     expect(body.disable_web_page_preview).toBe(true);
   });
 
+  it('mirrors the same alert text to the AI OS brain when EBDA_OS_INGEST_TOKEN is set (Ruling ESC-AIOS-1); off without it', async () => {
+    const cfg = mockState.configValue as Record<string, unknown>;
+    cfg.osBrainUrl = 'https://brain.test';
+    cfg.osIngestToken = 'ingest-k';
+    try {
+      mockState.acquireLockMock.mockResolvedValueOnce(true);
+      mockState.fetchMock.mockImplementation(async (url: string) =>
+        String(url).startsWith('https://brain.test')
+          ? new Response('down', { status: 503 })
+          : new Response('{"ok":true}', { status: 200 })
+      );
+      const { sendAlert } = await loadService();
+      const result = await sendAlert({
+        level: 'p1',
+        title: 'billing-renewal-daily failed',
+        body: 'job threw',
+      });
+      await new Promise(r => setTimeout(r, 0));
+      expect(result).toBe('sent'); // a brain failure never changes the Telegram outcome
+      const brain = mockState.fetchMock.mock.calls.find(
+        ([u]) => String(u) === 'https://brain.test/alerts'
+      );
+      expect(brain).toBeDefined(); // must fire
+      expect((brain![1].headers as Record<string, string>).Authorization).toBe('Bearer ingest-k');
+      const sentText = JSON.parse(
+        mockState.fetchMock.mock.calls.find(([u]) => String(u).includes('/sendMessage'))![1]
+          .body as string
+      ).text;
+      expect(JSON.parse(brain![1].body as string)).toMatchObject({
+        source: 'ebda-store/api',
+        level: 'p1',
+        title: 'billing-renewal-daily failed',
+        text: sentText,
+      });
+      cfg.osIngestToken = '';
+      mockState.fetchMock.mockClear();
+      mockState.acquireLockMock.mockResolvedValueOnce(true);
+      await sendAlert({ level: 'p1', title: 'second', body: 'x' });
+      expect(mockState.fetchMock.mock.calls.some(([u]) => String(u).includes('brain.test'))).toBe(
+        false
+      ); // must not fire
+    } finally {
+      cfg.osIngestToken = '';
+      mockState.fetchMock.mockReset();
+    }
+  });
+
   it('returns throttled when the lock is held', async () => {
     mockState.acquireLockMock.mockResolvedValueOnce(false);
 
