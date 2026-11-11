@@ -17,9 +17,7 @@ export function WarehouseCard({ order }: WarehouseCardProps) {
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        {t('fulfilledFrom')}
-      </h3>
+      <h3 className="text-xs font-medium text-muted-foreground">{t('fulfilledFrom')}</h3>
       <ul className="space-y-1.5 text-sm">
         {rows.map((r, i) => (
           <li key={i} className="flex items-center justify-between gap-3">
