@@ -638,3 +638,21 @@ describe('round 3 review', () => {
     await expect(lite.product.aggregate({ _sum: { name: true } })).rejects.toThrow(/numeric/);
   });
 });
+
+describe('`_count: true` answers a number, as Prisma does (insights dashboard read `{ _all: 5 }` as the order count)', () => {
+  it('aggregate and groupBy: `_count: true` is a number, `_count: { _all: true }` stays an object', async () => {
+    const { lite } = setup();
+    expect(await lite.product.aggregate({ where: { storeId: 's1' }, _count: true })).toEqual({
+      _count: 2,
+    });
+    expect(
+      await lite.product.aggregate({ where: { storeId: 's1' }, _count: { _all: true } })
+    ).toEqual({ _count: { _all: 2 } });
+    expect(
+      await lite.product.groupBy({ by: ['storeId'], _count: true, orderBy: { storeId: 'asc' } })
+    ).toEqual([
+      { storeId: 's1', _count: 2 },
+      { storeId: 's2', _count: 1 },
+    ]);
+  });
+});

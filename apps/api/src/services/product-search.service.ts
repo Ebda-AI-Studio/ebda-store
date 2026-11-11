@@ -271,6 +271,7 @@ export const QUERY_EMBED_MAX_CHARS = 100;
  * keyword-only).
  */
 export const KEYWORD_STRONG_AT = HYBRID_LEG;
+/** Calibrated on real bge-m3 scores: see DEFAULT_VECTOR_MAX_DISTANCE in packages/repo/src/do/search-vectors.ts. */
 const DEFAULT_VECTOR_MAX_DISTANCE = 0.55;
 
 /**
@@ -414,10 +415,10 @@ async function vectorLegDo(
     );
     return { ids: [], degraded: true };
   }
+  // NO `filter`: without a metadata index on storeId Vectorize matches nothing (Ruling SEARCH-SEMANTIC-LIVE-2).
   const res = await index.query(v, {
     topK: VECTORIZE_TOPK,
     namespace: storeId,
-    filter: { storeId },
     returnMetadata: 'none',
   });
   const maxD = vectorMaxDistance();

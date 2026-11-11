@@ -469,16 +469,30 @@ router.get(
 
 /**
  * POST /admin/stores/:id/repair-product-names — one-time name-pair repair (Ruling NAME-PAIR-1). DRY-RUN unless the body
- * says `{ "apply": true }`: the report lists every product whose names are swapped, Arabic-in-English or an
- * untranslated placeholder, and what each would become. Super admin only.
+ * says `{ "apply": true, "productIds": [...] }`: the dry run lists every product whose names are swapped, Arabic-in-English
+ * or an untranslated placeholder, and what each would become; apply writes ONLY the listed ids, and never overwrites an
+ * English name the merchant typed. Super admin only.
  */
 router.post(
   '/stores/:id/repair-product-names',
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { apply } = z.object({ apply: z.boolean().optional() }).parse(req.body ?? {});
-      const report = await repairProductNames(req.params.id, { apply: apply === true });
+      const { apply, productIds } = z
+        .object({
+          apply: z.boolean().optional(),
+          productIds: z.array(z.string().min(1).max(64)).max(500).optional(),
+        })
+        .strict()
+        .refine(b => b.apply !== true || (b.productIds?.length ?? 0) > 0, {
+          message: 'apply needs productIds: the products to repair, from the dry run',
+          path: ['productIds'],
+        })
+        .parse(req.body ?? {});
+      const report = await repairProductNames(req.params.id, {
+        apply: apply === true,
+        productIds,
+      });
       if (report.apply) {
         await auditLog({
           action: 'product.names_repaired',
@@ -486,7 +500,7 @@ router.post(
           storeId: req.params.id,
           resourceType: 'store',
           resourceId: req.params.id,
-          details: { repaired: report.items.length },
+          details: { repaired: report.applied, skipped: report.skipped },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });

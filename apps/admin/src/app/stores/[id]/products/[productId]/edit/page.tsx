@@ -52,6 +52,8 @@ import {
   type PersonalisationForm,
 } from './_components/PersonalisationCard';
 import { applyAiLanguagePair, applyAiSeoSuggestion } from '../../../seo/language-guard';
+import { SparkleIcon } from '@/components/SparkleIcon';
+import { queueFlashToast } from '@/lib/flash-toast';
 
 interface Product {
   id: string;
@@ -694,7 +696,7 @@ export default function EditProductPage() {
       // `returnTo` (when present and same-store) restores the exact filtered list view. No router.refresh() and no
       // setSaving(false) on success: the bar stays busy until the route changes (UX:PN-1), and the list refetches
       // on mount.
-      toast.success(t('toast.saved'));
+      queueFlashToast(t('toast.saved'));
       router.push(returnTo);
     } catch {
       setError(t('updateFailed'));
@@ -756,7 +758,11 @@ export default function EditProductPage() {
 
   return (
     <AdminLayout
-      title={t('title', { name: product?.name || t('fallbackTitle') })}
+      title={t('title', {
+        name:
+          (locale === 'ar' ? product?.nameAr || product?.name : product?.name || product?.nameAr) ||
+          t('fallbackTitle'),
+      })}
       subtitle={t('subtitle', { storeName: product?.store?.name || t('fallbackStore') })}
       actions={
         product ? (
@@ -994,7 +1000,7 @@ export default function EditProductPage() {
                         by the standalone bulk-ai-excerpt sweep, not the
                         AI_AUTOFILL_FIELDS autopilot list, so the reset-field
                         endpoint doesn't support regenerating it. Omitting the
-                        ids keeps the badge display-only (the "✨ AI" chip
+                        ids keeps the badge display-only (the "AI" sparkle chip
                         still renders; the "Switch to AI" hand-back button,
                         which would 400, never does). */}
                     <AiFieldBadge field="excerpt" sources={aiSources} />
@@ -1259,7 +1265,7 @@ export default function EditProductPage() {
                     size="sm"
                     className="gap-2 font-semibold"
                   >
-                    <span aria-hidden>✨</span>
+                    <SparkleIcon />
                     {seoGenerating ? tSeo('generating') : tSeo('aiFillEmpty')}
                   </Button>
                   <Button
