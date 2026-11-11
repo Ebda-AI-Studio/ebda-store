@@ -51,6 +51,7 @@ interface OwnerResponseDraft {
 }
 
 import { formatDate } from '@/lib/format';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -613,7 +614,7 @@ export default function ReviewsPage() {
               {t('aiDraftEnLabel')}
             </label>
             <textarea
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               rows={4}
               value={draftEn}
               onChange={e => setDraftEn(e.target.value)}
@@ -624,7 +625,7 @@ export default function ReviewsPage() {
               {t('aiDraftArLabel')}
             </label>
             <textarea
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               rows={4}
               dir="rtl"
               value={draftAr}

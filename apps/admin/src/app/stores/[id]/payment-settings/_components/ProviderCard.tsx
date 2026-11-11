@@ -6,6 +6,7 @@ import { useT } from '@/i18n/useT';
 
 import { INSTAPAY_DEFAULT_EXPIRY_HOURS, minorToDecimalString, roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface StorePaymentConfig {
   id?: string;
@@ -179,7 +180,7 @@ function CodFields({
             value={form.displayName || ''}
             onChange={e => onUpdateField('displayName', e.target.value)}
             placeholder={t('displayNamePlaceholder')}
-            className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -193,7 +194,7 @@ function CodFields({
             value={form.displayNameAr || ''}
             onChange={e => onUpdateField('displayNameAr', e.target.value)}
             placeholder={t('displayNameArPlaceholder')}
-            className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div className="sm:col-span-2">
@@ -216,7 +217,7 @@ function CodFields({
                 )
               }
               placeholder={t('fixedFeePlaceholder')}
-              className="w-40 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={`${FIELD_CLASSES} w-40`}
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -247,7 +248,7 @@ function CodFields({
               })
             )
           }
-          className="w-40 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className={`${FIELD_CLASSES} w-40`}
         />
         <p className="mt-1 text-xs text-muted-foreground">{t('percentHelp')}</p>
       </div>
@@ -351,7 +352,7 @@ function InstapayFields({
                 )
               )
             }
-            className="w-32 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`${FIELD_CLASSES} w-32`}
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('expiryHelp')}</p>
         </div>

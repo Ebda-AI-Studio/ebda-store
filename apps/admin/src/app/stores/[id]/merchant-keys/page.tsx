@@ -12,6 +12,7 @@ import { useLocale } from 'next-intl';
 import { planNamesJoined } from '@/lib/plan-labels';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Merchant screen for the MCP merchant-admin keys — issue, review, revoke.
@@ -373,7 +374,7 @@ export default function MerchantKeysPage() {
           <label className="block text-xs font-medium text-foreground" dir="auto">
             {t('create.nameLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder={t('create.namePlaceholder')}
@@ -412,7 +413,7 @@ export default function MerchantKeysPage() {
           <label className="block text-xs font-medium text-foreground" dir="auto">
             {t('create.expiryLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={expiresInDays}
               onChange={e => setExpiresInDays(e.target.value.replace(/[^0-9]/g, ''))}
               placeholder={t('create.expiryPlaceholder')}

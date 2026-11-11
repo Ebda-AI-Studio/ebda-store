@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import type { StoreTheme } from '@ebda/shared';
 import { ColorField } from '../../../../../components/ColorField';
 import { IOS_STATUS_OPTIONS, type PWASettings } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface PwaIosSettingsProps {
   settings: PWASettings;
@@ -35,7 +36,7 @@ export function PwaIosSettings({ settings, pwaEnabled, onChange, theme }: PwaIos
                 iosStatusBarStyle: e.target.value as PWASettings['iosStatusBarStyle'],
               })
             }
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
             disabled={!pwaEnabled}
           >
             {IOS_STATUS_OPTIONS.map(opt => (

@@ -68,6 +68,10 @@ export const ELEVATION_VALUES = FDN_ELEVATION;
 export const FIELD_CLASSES =
   'h-11 w-full rounded-md border border-input bg-background px-3 text-base sm:h-10 sm:text-sm placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60';
 
+/** A multi-line field: same border, radius, padding rhythm and focus ring as FIELD_CLASSES, grows from 96px, 16px text on phones. */
+export const TEXTAREA_CLASSES =
+  'min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60';
+
 export type NavKind = 'sidebar' | 'tab' | 'rail';
 
 const NAV_BASE =

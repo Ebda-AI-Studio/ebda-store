@@ -11,6 +11,7 @@ import { usePaymentAbandonments } from './_hooks/usePaymentAbandonments';
 import { AbandonmentStatsGrid } from './_components/AbandonmentStatsGrid';
 import { AbandonmentsTable } from './_components/AbandonmentsTable';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export default function PaymentAbandonmentsPage() {
   // Feature gate — shows an upsell card for store_admins without the Enterprise feature.
@@ -67,7 +68,7 @@ export default function PaymentAbandonmentsPage() {
                 type="date"
                 value={localFrom}
                 onChange={e => setLocalFrom(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -79,7 +80,7 @@ export default function PaymentAbandonmentsPage() {
                 type="date"
                 value={localTo}
                 onChange={e => setLocalTo(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <Button

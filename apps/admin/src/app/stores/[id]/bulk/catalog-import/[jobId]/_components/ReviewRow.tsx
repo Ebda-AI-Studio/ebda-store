@@ -11,6 +11,7 @@ import {
   minorToEgp,
   type ReviewItem,
 } from '../../_lib/api';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface Props {
   item: ReviewItem;
@@ -135,7 +136,7 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
             value={item.categoryId ?? ''}
             disabled={disabled}
             onChange={e => void save({ categoryId: e.target.value || null })}
-            className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`${FIELD_CLASSES} mt-1`}
           >
             <option value="">{item.categoryName ? t('noCategoryYet') : t('noCategory')}</option>
             {categories.map(c => (

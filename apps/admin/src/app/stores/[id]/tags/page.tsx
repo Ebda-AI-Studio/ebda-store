@@ -11,6 +11,7 @@ import { DataTable } from '../../../../components/mobile/DataTable';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { tagTranslatePair } from '../../../../lib/tag-translate-pair';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Store tags (Phase B3 fix wave 1, Ruling B3-13): the skin-type / concern chips are tags, and each
@@ -124,7 +125,7 @@ export default function StoreTagsPage() {
                   <input
                     aria-label={t('name')}
                     data-tag-row={r.id}
-                    className="h-10 w-full min-w-[10rem] rounded-md border border-input bg-background px-3"
+                    className={`${FIELD_CLASSES} min-w-[10rem]`}
                     value={r.name}
                     maxLength={80}
                     onChange={e => patch(r.id, { name: e.target.value })}
@@ -139,7 +140,7 @@ export default function StoreTagsPage() {
                       aria-label={t('nameAr')}
                       dir="rtl"
                       lang="ar"
-                      className="h-10 w-full min-w-[10rem] rounded-md border border-input bg-background px-3"
+                      className={`${FIELD_CLASSES} min-w-[10rem]`}
                       value={r.nameAr}
                       maxLength={80}
                       onChange={e => patch(r.id, { nameAr: e.target.value })}

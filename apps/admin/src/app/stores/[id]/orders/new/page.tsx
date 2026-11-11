@@ -21,6 +21,7 @@ import { useAuth } from '../../../../../lib/auth';
 import { formatPrice } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { effectiveVariantPrice } from '@/lib/variant-price';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface ProductVariant {
   id: string;
@@ -555,7 +556,7 @@ export default function NewOrderPage() {
               <select
                 value={governorate}
                 onChange={e => handleGovernorateChange(e.target.value)}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               >
                 <option value="">{t('shippingSection.selectGovernoratePlaceholder')}</option>
                 {/* Governorate names are shown in both languages together on purpose —
@@ -576,7 +577,7 @@ export default function NewOrderPage() {
                 value={area}
                 onChange={e => setArea(e.target.value)}
                 disabled={!governorate}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`${FIELD_CLASSES} disabled:cursor-not-allowed`}
               >
                 <option value="">
                   {governorate
@@ -645,7 +646,7 @@ export default function NewOrderPage() {
                 value={shippingOverrideMajor}
                 onChange={e => setShippingOverrideMajor(e.target.value)}
                 dir="ltr"
-                className="w-48 rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={`${FIELD_CLASSES} w-48`}
               />
               {typeof shippingOverrideFils === 'number' && (
                 <p className="text-xs text-primary">
@@ -745,7 +746,7 @@ export default function NewOrderPage() {
                     onChange={e =>
                       updateQuantity(it.productId, Number(e.target.value), it.variantId)
                     }
-                    className="w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
+                    className={`${FIELD_CLASSES} w-16 text-center`}
                   />
                   <span className="w-24 text-end font-semibold text-foreground">
                     {formatPrice(it.unitPrice * it.quantity)}
@@ -883,7 +884,7 @@ function Input({ label, value, onChange, type = 'text', required, className, dir
         onChange={e => onChange(e.target.value)}
         required={required}
         dir={dir}
-        className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        className={FIELD_CLASSES}
       />
     </label>
   );

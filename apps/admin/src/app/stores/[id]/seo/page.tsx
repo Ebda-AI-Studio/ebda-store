@@ -11,6 +11,7 @@ import { useT } from '@/i18n/useT';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { applyAiSeoSuggestion, arabicInEnglishFields } from './language-guard';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface SeoSettings {
   metaTitle: string;
@@ -586,7 +587,7 @@ export default function StoreSeoPage() {
                         }))
                       }
                       placeholder={t('twitterPlaceholder')}
-                      className="flex-1 rounded-e-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      className={`${FIELD_CLASSES} flex-1`}
                     />
                   </div>
                 </div>
@@ -631,7 +632,7 @@ export default function StoreSeoPage() {
                       }))
                     }
                     placeholder={t('googleSiteVerificationPlaceholder')}
-                    className="w-full rounded-lg border border-input px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={`${FIELD_CLASSES} font-mono`}
                   />
                   <p className="mt-1 text-xs text-muted-foreground whitespace-pre-line">
                     {t('googleSiteVerificationHint')}
@@ -654,7 +655,7 @@ export default function StoreSeoPage() {
                       onChange={e =>
                         setSettings(prev => ({ ...prev, emailSenderLocalPart: e.target.value }))
                       }
-                      className="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none"
+                      className={`${FIELD_CLASSES} flex-1`}
                     >
                       {SENDER_PREFIXES.map(p => (
                         <option key={p} value={p}>

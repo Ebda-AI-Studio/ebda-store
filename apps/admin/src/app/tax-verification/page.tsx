@@ -23,6 +23,7 @@ import { openProtectedDocument } from '../../lib/open-document';
 import { useT } from '../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { withNumerals } from '@ebda/shared';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 type Tab = 'pending' | 'verified' | 'rejected' | 'revoked' | 'all';
 const TABS: Tab[] = ['pending', 'verified', 'rejected', 'revoked', 'all'];
@@ -327,7 +328,7 @@ function TaxVerificationInner() {
                     <span className="mb-1 block font-medium">{t('detail.reasonLabel')}</span>
                     <textarea
                       aria-label={t('detail.reasonLabel')}
-                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+                      className={TEXTAREA_CLASSES}
                       rows={3}
                       maxLength={1000}
                       value={reason}

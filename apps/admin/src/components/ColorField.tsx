@@ -6,6 +6,7 @@ import { ColorContrastPreview } from './ColorContrastPreview';
 import { COLOR_TOKENS, resolveColor } from '@ebda/shared';
 import type { StoreTheme, ColorToken } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface ColorFieldProps {
   label: string;
@@ -211,7 +212,7 @@ export function ColorField({
               onBlur={handleHexTextBlur}
               placeholder="#RRGGBB"
               maxLength={7}
-              className="h-11 w-28 rounded border border-border bg-background px-2 py-1 font-mono text-sm uppercase text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={`${FIELD_CLASSES} w-28 font-mono uppercase`}
               aria-label={t('hexValueAriaLabel')}
             />
           </>

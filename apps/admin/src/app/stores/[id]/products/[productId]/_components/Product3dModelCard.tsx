@@ -31,6 +31,7 @@ import { uploadErrorText } from '../../../../../../hooks/useImageUpload';
 import { ImageUpload } from '../../../../../../components/ImageUpload';
 import { ColorField } from '../../../../../../components/ColorField';
 import { intlLocaleForUi } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const ProductModelViewer = dynamic(() => import('@ebda/ui/model3d'), {
   ssr: false,
@@ -602,7 +603,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
                           <label className="text-xs text-muted-foreground">
                             {t('target')}
                             <select
-                              className="mt-1 block h-9 rounded-md border border-input bg-background px-2 text-sm"
+                              className={`${FIELD_CLASSES} mt-1 block`}
                               value={row.target}
                               onChange={e => setRow(v.id, { target: e.target.value })}
                             >
@@ -631,7 +632,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
                             <label className="text-xs text-muted-foreground">
                               {t('finish')}
                               <select
-                                className="mt-1 block h-9 rounded-md border border-input bg-background px-2 text-sm"
+                                className={`${FIELD_CLASSES} mt-1 block`}
                                 value={row.finish}
                                 onChange={e => setRow(v.id, { finish: e.target.value as Finish })}
                               >

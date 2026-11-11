@@ -6,6 +6,7 @@ import { apiPost } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface PaymentLinkButtonProps {
   storeId: string;
   orderId: string;
@@ -317,7 +318,7 @@ export function PaymentLinkButton({
                       type="text"
                       readOnly
                       value={result.paymentUrl || result.instruction?.code || ''}
-                      className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-foreground focus:outline-none"
+                      className={`${FIELD_CLASSES} flex-1`}
                       onFocus={e => e.currentTarget.select()}
                       dir="ltr"
                     />

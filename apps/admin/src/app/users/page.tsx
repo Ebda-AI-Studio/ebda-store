@@ -14,6 +14,7 @@ import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { intlLocaleForUi } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface User {
   id: string;
@@ -291,7 +292,7 @@ export default function UsersPage() {
               placeholder={t('searchPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full rounded-lg border py-2 ps-10 pe-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <Button type="submit" variant="outline" size="sm">
@@ -310,7 +311,7 @@ export default function UsersPage() {
               setPagination(prev => ({ ...prev, page: 1 }));
             }}
             aria-label={t('filterRoleLabel')}
-            className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           >
             <option value="all">{t('allRoles')}</option>
             <option value="super_admin">{t('roleSuperAdmins')}</option>
@@ -463,7 +464,7 @@ export default function UsersPage() {
               <Label htmlFor="invite-role">{t('roleLabel')}</Label>
               <select
                 id="invite-role"
-                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className={`${FIELD_CLASSES} block`}
                 value={inviteForm.role}
                 onChange={e =>
                   setInviteForm({

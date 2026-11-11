@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiFetch } from '@/lib/api';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountOption {
@@ -122,7 +123,7 @@ export default function ImportStatementPage() {
             <select
               value={selectedAccountId}
               onChange={e => setSelectedAccountId(e.target.value)}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             >
               <option value="">{ti('accountPlaceholder')}</option>
               {accounts.map(a => (

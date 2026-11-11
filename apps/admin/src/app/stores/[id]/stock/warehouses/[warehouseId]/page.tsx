@@ -12,6 +12,7 @@ import { useFeatures } from '@/hooks/useFeatures';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { VariantText, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -318,7 +319,7 @@ export default function WarehouseStockPage() {
                     <input
                       type="number"
                       min={0}
-                      className="w-20 rounded border border-input bg-background px-2 py-1 text-end text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className={`${FIELD_CLASSES} w-20 text-end`}
                       value={editing[row.id]}
                       onChange={e => setEditing(ed => ({ ...ed, [row.id]: e.target.value }))}
                       onKeyDown={e => {
@@ -460,7 +461,7 @@ export default function WarehouseStockPage() {
                   onChange={e =>
                     setAdjustModal(m => m && { ...m, delta: parseInt(e.target.value) || 0 })
                   }
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className={FIELD_CLASSES}
                   placeholder={t('deltaExample')}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -478,7 +479,7 @@ export default function WarehouseStockPage() {
                   type="text"
                   value={adjustModal.reason}
                   onChange={e => setAdjustModal(m => m && { ...m, reason: e.target.value })}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className={FIELD_CLASSES}
                   placeholder={t('reasonPlaceholder')}
                 />
               </label>

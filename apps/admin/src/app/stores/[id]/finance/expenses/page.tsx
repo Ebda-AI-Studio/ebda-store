@@ -16,6 +16,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
 import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -302,7 +303,7 @@ export default function ExpensesPage() {
             setStatusFilter(e.target.value as ExpenseStatus | 'all');
             setPage(1); // a new filter is a new list, in the same batch (issue 2436)
           }}
-          className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+          className={FIELD_CLASSES}
         >
           <option value="all">{t('allStatuses')}</option>
           {EXPENSE_STATUSES.map(s => (

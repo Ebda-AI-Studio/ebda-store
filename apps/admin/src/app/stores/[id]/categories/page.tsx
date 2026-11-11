@@ -19,6 +19,7 @@ import { CategorySuggestionPanel } from './CategorySuggestionPanel';
 import { useT } from '@/i18n/useT';
 import { RowActions } from '../../../../components/RowActions';
 import type { SizeChartOption } from '../../../../components/SizeChartSelect';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const emptyForm: CategoryFormData = {
   name: '',
@@ -561,7 +562,7 @@ export default function StoreCategoriesPage() {
               onChange={e => setCountUnitEn(e.target.value)}
               placeholder={t('countUnitEnSample')}
               maxLength={30}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
@@ -580,7 +581,7 @@ export default function StoreCategoriesPage() {
               onChange={e => setCountUnitAr(e.target.value)}
               placeholder={t('countUnitArSample')}
               maxLength={30}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             />
           </div>
         </div>

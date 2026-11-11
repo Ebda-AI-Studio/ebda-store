@@ -13,6 +13,7 @@ import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
@@ -213,7 +214,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
             type="date"
             value={asOf}
             onChange={e => setAsOf(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <div className="flex gap-2 ms-auto">
@@ -371,7 +372,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
             type="date"
             value={from}
             onChange={e => setFrom(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <label className="space-y-1">
@@ -380,7 +381,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
             type="date"
             value={to}
             onChange={e => setTo(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <div className="flex gap-2 ms-auto">
@@ -614,7 +615,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
             type="date"
             value={asOf}
             onChange={e => setAsOf(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <div className="flex gap-2 ms-auto">
@@ -745,7 +746,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             type="date"
             value={from}
             onChange={e => setFrom(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <label className="space-y-1">
@@ -754,7 +755,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             type="date"
             value={to}
             onChange={e => setTo(e.target.value)}
-            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} block`}
           />
         </label>
         <div className="flex gap-2 ms-auto">

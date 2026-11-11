@@ -5,6 +5,7 @@ import { Input, Label } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import type { ExportFilters } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface BulkExportPanelProps {
   isExporting: boolean;
@@ -41,7 +42,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
               id="exportStatus"
               value={filters.status}
               onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={`${FIELD_CLASSES} mt-1`}
             >
               <option value="">{t('statusAll')}</option>
               <option value="active">{t('statusActive')}</option>

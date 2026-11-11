@@ -8,6 +8,8 @@
  *   G3  a hex colour literal: colours come from the CSS variables in styles/globals.css.
  *   G4  the bare `rounded` class (4px): control = rounded-md, surface = rounded-lg, pill = rounded-full.
  *   G5  letter-spacing (`tracking-*` other than tracking-normal): it breaks Arabic letter joining.
+ *   G7  a raw <input>/<select>/<textarea> (not checkbox/radio/hidden/file/range/color) that does not use FIELD_CLASSES /
+ *       TEXTAREA_CLASSES (or an explicit h-10/h-11): fields sit on the 44/40 control scale.
  *   G6  a `data-ui="nav"` item that does not take its classes from navItemClasses() / bottomNavClasses().
  *
  * G1-G5 are a RATCHET: tests/unit/admin-design-tokens.baseline.json holds the per-file count of pages not yet
@@ -16,9 +18,17 @@
  * tests/unit/admin-design-tokens.test.ts). The baseline reaching {} is the exit gate. G6 has no baseline.
  */
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { GUARD_RULES, countRule, navIssues, type GuardRule } from '@ebda/shared/design';
+import {
+  GUARD_RULES,
+  countRule,
+  navIssues,
+  openingTag,
+  stripComments,
+  type GuardRule,
+} from '@ebda/shared/design';
 
 const SRC = join(__dirname, '../../apps/admin/src');
 const BASELINE = join(__dirname, 'admin-design-tokens.baseline.json');
@@ -34,10 +44,30 @@ function walk(dir: string): string[] {
   });
 }
 
+const FIELD_SKIP = /\btype=["'](?:checkbox|radio|hidden|file|range|color)["']/;
+/** G7: raw field tags that are off the control scale. */
+export function countFields(src: string): number {
+  const code = stripComments(src);
+  const re = /<(?:input|select|textarea)(?=[\s>/])/g;
+  let n = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) {
+    const tag = openingTag(code, m.index);
+    if (
+      FIELD_SKIP.test(tag) ||
+      /\b(?:FIELD_CLASSES|TEXTAREA_CLASSES)\b/.test(tag) ||
+      /(?<![\w-])h-1[01](?![\w-])/.test(tag)
+    )
+      continue;
+    n++;
+  }
+  return n;
+}
+
 type Counts = Record<string, Record<string, number>>; // rule -> file -> n
 
 function scan(): { counts: Counts; nav: string[] } {
-  const counts: Counts = { G1: {}, G2: {}, G3: {}, G4: {}, G5: {} };
+  const counts: Counts = { G1: {}, G2: {}, G3: {}, G4: {}, G5: {}, G7: {} };
   const nav: string[] = [];
   for (const p of walk(SRC)) {
     const file = relative(SRC, p);
@@ -46,6 +76,10 @@ function scan(): { counts: Counts; nav: string[] } {
     for (const r of Object.keys(RULES)) {
       const n = countRule(r as GuardRule, src);
       if (n) counts[r][file] = n;
+    }
+    if (p.endsWith('.tsx')) {
+      const f = countFields(src);
+      if (f) counts.G7![file] = f;
     }
     if (p.endsWith('.tsx'))
       nav.push(...navIssues(file, src, ['navItemClasses', 'bottomNavClasses']));
@@ -79,6 +113,42 @@ describe('admin design tokens', () => {
     expect(navIssues('a.tsx', good, ['navItemClasses'])).toEqual([]);
   });
 
+  it('G7 self-test and negative control', () => {
+    expect(countFields('<input type="text" className="px-3 py-2 border" />')).toBe(1);
+    expect(countFields('<input type="text" className={FIELD_CLASSES} />')).toBe(0);
+    expect(countFields('<input type="checkbox" className="h-4 w-4" />')).toBe(0);
+    expect(countFields('<select className={`${FIELD_CLASSES} w-40`}>')).toBe(0);
+    expect(countFields('<textarea className="rounded border" />')).toBe(1);
+    expect(countFields('<Input label="x" />')).toBe(0);
+  });
+
+  it('no count exceeds the BASE branch baseline (the ratchet only shrinks)', () => {
+    const ref = process.env.BASE_REF ?? 'origin/main';
+    let baseTxt: string;
+    try {
+      baseTxt = execFileSync(
+        'git',
+        ['show', `${ref}:tests/unit/admin-design-tokens.baseline.json`],
+        {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }
+      );
+    } catch {
+      return; // no base ref in this checkout (shallow clone): CI fetches it; the local ratchet below still holds
+    }
+    const base: Counts = JSON.parse(baseTxt);
+    const now: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
+    const loosened: string[] = [];
+    for (const rule of Object.keys(now)) {
+      if (!base[rule]) continue; // a rule introduced by this PR has no base to compare with
+      for (const [f, n] of Object.entries(now[rule]!))
+        if (n > (base[rule]![f] ?? 0))
+          loosened.push(`${rule} ${f}: ${n} > base ${base[rule]![f] ?? 0}`);
+    }
+    expect(loosened, `baseline loosened against ${ref}`).toEqual([]);
+  });
+
   it('nav items take their classes from the tokens (G6)', () => {
     expect(scan().nav).toEqual([]);
   });
@@ -94,7 +164,7 @@ describe('admin design tokens', () => {
     const base: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
     const grew: string[] = [];
     const stale: string[] = [];
-    for (const rule of Object.keys(RULES)) {
+    for (const rule of [...Object.keys(RULES), 'G7']) {
       const files = new Set([...Object.keys(counts[rule]), ...Object.keys(base[rule] ?? {})]);
       for (const f of files) {
         const now = counts[rule][f] ?? 0;

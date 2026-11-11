@@ -6,6 +6,7 @@ import { formatDate } from '../../../../lib/format';
 import { getStoreDisplayUrl } from '../../../../lib/store-url';
 import { useT } from '@/i18n/useT';
 import { statusColors, type Store, type StoreEditForm, type StoreFormErrors } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface StoreDetailsCardProps {
   store: Store;
@@ -124,7 +125,7 @@ export function StoreDetailsCard({
                   const value = e.target.value;
                   onChangeForm(prev => ({ ...prev, status: value }));
                 }}
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={`${FIELD_CLASSES} mt-1`}
               >
                 <option value="active">{t('statusActive')}</option>
                 <option value="inactive">{t('statusInactive')}</option>

@@ -21,6 +21,7 @@ import { useFeatures } from '../../../../../../../hooks/useFeatures';
 import { checkTierDraft, type DraftProblem } from './tier-draft';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface TierRow extends TierInput {
   id: string;
   stale: boolean;
@@ -257,7 +258,7 @@ export function WholesalePricingCard(props: Props) {
           <label className="block text-sm">
             {t('audience')}
             <select
-              className="mt-1 min-h-11 w-full rounded-md border px-3"
+              className={`${FIELD_CLASSES} mt-1`}
               value={draft.groupId}
               onChange={e => setDraft({ ...draft, groupId: e.target.value })}
             >
@@ -272,7 +273,7 @@ export function WholesalePricingCard(props: Props) {
           <label className="block text-sm">
             {t('variantLabel')}
             <select
-              className="mt-1 min-h-11 w-full rounded-md border px-3"
+              className={`${FIELD_CLASSES} mt-1`}
               value={draft.variantId}
               onChange={e => setDraft({ ...draft, variantId: e.target.value })}
             >
@@ -290,7 +291,7 @@ export function WholesalePricingCard(props: Props) {
               type="number"
               inputMode="numeric"
               min={2}
-              className="mt-1 min-h-11 w-full rounded-md border px-3"
+              className={`${FIELD_CLASSES} mt-1`}
               value={draft.minQty}
               onChange={e => setDraft({ ...draft, minQty: e.target.value })}
             />
@@ -301,7 +302,7 @@ export function WholesalePricingCard(props: Props) {
               type="text"
               inputMode="decimal"
               dir="ltr"
-              className="mt-1 min-h-11 w-full rounded-md border px-3"
+              className={`${FIELD_CLASSES} mt-1`}
               value={draft.price}
               onChange={e => setDraft({ ...draft, price: e.target.value })}
             />
@@ -346,7 +347,7 @@ export function WholesalePricingCard(props: Props) {
             inputMode="numeric"
             min={2}
             placeholder={t('moqPlaceholder')}
-            className="mt-1 min-h-11 w-full rounded-md border px-3"
+            className={`${FIELD_CLASSES} mt-1`}
             value={moq}
             onChange={e => setMoq(e.target.value)}
           />
@@ -355,7 +356,7 @@ export function WholesalePricingCard(props: Props) {
         <label className="block text-sm">
           {t('audienceField')}
           <select
-            className="mt-1 min-h-11 w-full rounded-md border px-3"
+            className={`${FIELD_CLASSES} mt-1`}
             value={audience}
             onChange={e => setAudience(e.target.value as 'public' | 'wholesale_only')}
             disabled={!entitled && audience === 'public'}

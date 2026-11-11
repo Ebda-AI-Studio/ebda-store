@@ -16,6 +16,7 @@ import { RateAttribution } from './RateAttribution';
 import type { RateView } from './types';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface ConfirmItem {
   karat: GoldKarat;
   jumpBps: number | null;
@@ -113,7 +114,7 @@ export function RateEditor({
                 disabled={!canEdit}
                 value={values[k]}
                 onChange={e => setValues(v => ({ ...v, [k]: e.target.value }))}
-                className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3 text-base"
+                className={`${FIELD_CLASSES} mt-1 block`}
                 aria-describedby={`gold-current-${String(k)}`}
               />
               <span

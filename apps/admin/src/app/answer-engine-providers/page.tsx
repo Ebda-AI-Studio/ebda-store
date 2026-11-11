@@ -26,6 +26,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ export function ProviderRow({
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
             placeholder={hasKey ? t('apiKeyPlaceholderMasked') : t('apiKeyPlaceholderEmpty')}
-            className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className={FIELD_CLASSES}
           />
         </div>
 

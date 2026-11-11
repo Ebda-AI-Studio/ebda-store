@@ -10,6 +10,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BackorderLine {
@@ -109,7 +110,7 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
               {t('cancelModal.reasonLabel')}
             </label>
             <textarea
-              className="w-full rounded border border-border bg-muted/20 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               rows={3}
               value={reason}
               onChange={e => setReason(e.target.value)}

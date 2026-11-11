@@ -48,6 +48,7 @@ import {
   presetPatch,
   type Tier2Id,
 } from './theme-panel-model';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface EffectiveTypography {
   fonts: FontEntry[];
@@ -192,11 +193,7 @@ export function ThemeSettingsPanel({
       return (
         <label key={s.id} className="block text-sm">
           <span className="mb-1 block text-xs font-semibold">{label}</span>
-          <select
-            value={shown}
-            onChange={e => set(s.id, e.target.value)}
-            className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
-          >
+          <select value={shown} onChange={e => set(s.id, e.target.value)} className={FIELD_CLASSES}>
             {shown === '' &&
               (s.trait || s.id === 'headerLogoPlacement' || s.id === 'headerSearch') && (
                 <option value="" disabled>
@@ -233,7 +230,7 @@ export function ThemeSettingsPanel({
             dir="ltr"
             value={typeof v === 'string' ? v : ''}
             onChange={e => set(s.id, e.target.value)}
-            className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+            className={FIELD_CLASSES}
           />
         </label>
       );
@@ -513,7 +510,7 @@ export function ThemeSettingsPanel({
             placeholder={t('search')}
             aria-label={t('search')}
             data-testid="theme-search"
-            className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-base sm:text-sm"
+            className={FIELD_CLASSES}
           />
         </div>
         {hasChanges && (

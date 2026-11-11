@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import type { ZoneOverride, StoreTheme, ColorToken } from '@ebda/shared';
 import { ColorField } from './ColorField';
 import { useT } from '@/i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface ZoneEditorProps {
   /** Unique key identifying the zone (e.g. 'sectionHeading', 'kicker'). Used as label prefix. */
@@ -175,7 +176,7 @@ export function ZoneEditor({
             <select
               value={values.fontFamily ?? ''}
               onChange={e => onChange({ fontFamily: e.target.value })}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             >
               {fontFamilyOptions.map(o => (
                 <option key={o.value} value={o.value}>
@@ -189,7 +190,7 @@ export function ZoneEditor({
               value={values.fontFamily ?? ''}
               onChange={e => onChange({ fontFamily: e.target.value })}
               placeholder={ph('fontFamily')}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              className={FIELD_CLASSES}
             />
           )}
         </label>
@@ -216,7 +217,7 @@ export function ZoneEditor({
               }
             }}
             placeholder={ph('fontSize') === t('inherit') ? t('fontSizeExample') : ph('fontSize')}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            className={FIELD_CLASSES}
           />
           {sizeRejected ? (
             <span role="alert" className="whitespace-pre-line text-xs text-destructive-ink">
@@ -236,7 +237,7 @@ export function ZoneEditor({
             placeholder={
               ph('fontWeight') === t('inherit') ? t('fontWeightExample') : ph('fontWeight')
             }
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            className={FIELD_CLASSES}
           />
           <span className="text-xs text-muted-foreground/80">{t('fontWeightHint')}</span>
         </label>
@@ -253,7 +254,7 @@ export function ZoneEditor({
             placeholder={
               ph('letterSpacing') === t('inherit') ? t('letterSpacingExample') : ph('letterSpacing')
             }
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            className={FIELD_CLASSES}
           />
         </label>
 
@@ -267,7 +268,7 @@ export function ZoneEditor({
             placeholder={
               ph('lineHeight') === t('inherit') ? t('lineHeightExample') : ph('lineHeight')
             }
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+            className={FIELD_CLASSES}
           />
         </label>
 
@@ -286,7 +287,7 @@ export function ZoneEditor({
                     : (e.target.value as ZoneOverride['textTransform']),
               })
             }
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className={FIELD_CLASSES}
           >
             <option value="">{t('textTransformOptions.inherit')}</option>
             <option value="uppercase">{t('textTransformOptions.uppercase')}</option>
@@ -313,7 +314,7 @@ export function ZoneEditor({
                     : (e.target.value as ZoneOverride['textDecoration']),
               })
             }
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className={FIELD_CLASSES}
           >
             <option value="">{t('textDecorationOptions.inherit')}</option>
             <option value="none">{t('textDecorationOptions.none')}</option>

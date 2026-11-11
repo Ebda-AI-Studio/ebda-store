@@ -13,6 +13,7 @@ import { useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ─── Select-all checkbox (indeterminate-aware) ─────────────────────────────────
 
@@ -356,7 +357,7 @@ export default function StockInventoryPage() {
                 onChange={e => setThresholdInput(e.target.value)}
                 placeholder={t('lowStockThreshold')}
                 aria-label={t('bulkSetThreshold')}
-                className="w-28 rounded-lg border border-border bg-card px-3 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={`${FIELD_CLASSES} w-28`}
               />
               <Button size="sm" disabled={bulkBusy} onClick={handleBulkSetThreshold}>
                 {bulkBusy ? '…' : t('bulkSetThreshold')}

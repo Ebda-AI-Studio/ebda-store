@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiFetch, localizedApiMessage } from '../../lib/api';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ---------------------------------------------------------------------------
 // Font library — Ahmad 2026-05-20.
@@ -172,7 +173,7 @@ export function FontsCard({
               value={family}
               onChange={e => setFamily(e.target.value)}
               placeholder={t('fontFamilyExample')}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -184,7 +185,7 @@ export function FontsCard({
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="https://fonts.googleapis.com/css2?family=..."
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
           <div className="flex justify-end gap-2 pt-1">
@@ -223,7 +224,7 @@ export function FontsCard({
               value={uploadFamily}
               onChange={e => setUploadFamily(e.target.value)}
               placeholder={t('fontNameExample')}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
           <label className="flex flex-col gap-1">

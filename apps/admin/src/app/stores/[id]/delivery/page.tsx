@@ -23,6 +23,7 @@ import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/sha
 
 import { minorToDecimalString } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 const DEFAULT_CONFIG: CheckoutDeliverySettings = {
   note: { enabled: false, text: '', textAr: '' },
   windows: { enabled: false, items: [] },
@@ -262,7 +263,7 @@ export default function CheckoutDeliveryPage() {
                 value={config.note.text}
                 onChange={e => patchNote({ text: e.target.value })}
                 rows={3}
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={TEXTAREA_CLASSES}
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -272,7 +273,7 @@ export default function CheckoutDeliveryPage() {
                 onChange={e => patchNote({ textAr: e.target.value })}
                 rows={3}
                 dir="rtl"
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={TEXTAREA_CLASSES}
               />
             </label>
           </div>
@@ -323,7 +324,7 @@ export default function CheckoutDeliveryPage() {
                 });
               }}
               aria-label={t('daysAheadLabel')}
-              className="min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             >
               <option value="">{t('daysAheadOff')}</option>
               {Array.from({ length: 14 }, (_, i) => i + 1).map(n => (
@@ -349,7 +350,7 @@ export default function CheckoutDeliveryPage() {
                         type="text"
                         value={w.label}
                         onChange={e => updateWindow(w.id, { label: e.target.value })}
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -361,7 +362,7 @@ export default function CheckoutDeliveryPage() {
                         value={w.labelAr}
                         onChange={e => updateWindow(w.id, { labelAr: e.target.value })}
                         dir="rtl"
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -372,7 +373,7 @@ export default function CheckoutDeliveryPage() {
                         type="time"
                         value={w.start}
                         onChange={e => updateWindow(w.id, { start: e.target.value })}
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -383,7 +384,7 @@ export default function CheckoutDeliveryPage() {
                         type="time"
                         value={w.end}
                         onChange={e => updateWindow(w.id, { end: e.target.value })}
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -394,7 +395,7 @@ export default function CheckoutDeliveryPage() {
                         type="time"
                         value={w.orderBy ?? ''}
                         onChange={e => updateWindow(w.id, { orderBy: e.target.value || undefined })}
-                        className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+                        className={FIELD_CLASSES}
                       />
                     </label>
                     <Button
@@ -439,7 +440,7 @@ export default function CheckoutDeliveryPage() {
               value={minimumOrderMajor}
               onChange={e => setMinimumOrderMajor(e.target.value)}
               placeholder={t('minOrderPlaceholder')}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
         </section>
@@ -467,7 +468,7 @@ export default function CheckoutDeliveryPage() {
                 step={1}
                 value={deliveryDaysMin}
                 onChange={e => setDeliveryDaysMin(e.target.value)}
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
             <label className="flex w-28 flex-col gap-1">
@@ -482,7 +483,7 @@ export default function CheckoutDeliveryPage() {
                 step={1}
                 value={deliveryDaysMax}
                 onChange={e => setDeliveryDaysMax(e.target.value)}
-                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
             <Button
@@ -535,7 +536,7 @@ export default function CheckoutDeliveryPage() {
               value={orderInvoiceEmail}
               onChange={e => setOrderInvoiceEmail(e.target.value)}
               placeholder={t('invoiceEmailPlaceholder')}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
         </section>

@@ -14,6 +14,7 @@ import {
   unwrapObject,
 } from '../../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 // "أسئلة وأجوبة": the FAQ and how-to guides the storefront shows and Google/AI answers read. They moved here from the
 // SEO page (UX:SEO-3): they are content the merchant writes, not search settings.
@@ -313,7 +314,7 @@ export default function StoreFaqsPage() {
                         type="text"
                         value={faqDraft.question}
                         onChange={e => setFaqDraft(d => ({ ...d, question: e.target.value }))}
-                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className={FIELD_CLASSES}
                       />
                     </div>
                     <div>
@@ -328,7 +329,7 @@ export default function StoreFaqsPage() {
                         onChange={e =>
                           setFaqDraft(d => ({ ...d, questionAr: e.target.value || null }))
                         }
-                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        className={FIELD_CLASSES}
                       />
                     </div>
                   </div>
@@ -341,7 +342,7 @@ export default function StoreFaqsPage() {
                         rows={3}
                         value={faqDraft.answer}
                         onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
-                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        className={`${TEXTAREA_CLASSES} resize-none`}
                       />
                     </div>
                     <div>
@@ -356,7 +357,7 @@ export default function StoreFaqsPage() {
                         onChange={e =>
                           setFaqDraft(d => ({ ...d, answerAr: e.target.value || null }))
                         }
-                        className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        className={`${TEXTAREA_CLASSES} resize-none`}
                       />
                     </div>
                   </div>
@@ -465,7 +466,7 @@ export default function StoreFaqsPage() {
                     type="text"
                     value={faqDraft.question}
                     onChange={e => setFaqDraft(d => ({ ...d, question: e.target.value }))}
-                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                     autoFocus
                   />
                 </div>
@@ -479,7 +480,7 @@ export default function StoreFaqsPage() {
                     dir="rtl"
                     value={faqDraft.questionAr ?? ''}
                     onChange={e => setFaqDraft(d => ({ ...d, questionAr: e.target.value || null }))}
-                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
               </div>
@@ -492,7 +493,7 @@ export default function StoreFaqsPage() {
                     rows={3}
                     value={faqDraft.answer}
                     onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
-                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                    className={`${TEXTAREA_CLASSES} resize-none`}
                   />
                 </div>
                 <div>
@@ -505,7 +506,7 @@ export default function StoreFaqsPage() {
                     dir="rtl"
                     value={faqDraft.answerAr ?? ''}
                     onChange={e => setFaqDraft(d => ({ ...d, answerAr: e.target.value || null }))}
-                    className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                    className={`${TEXTAREA_CLASSES} resize-none`}
                   />
                 </div>
               </div>
@@ -691,7 +692,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             value={draft.title}
             autoFocus={autoFocus}
             onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
-            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -704,7 +705,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             dir="rtl"
             value={draft.titleAr ?? ''}
             onChange={e => setDraft(d => ({ ...d, titleAr: e.target.value || null }))}
-            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       </div>
@@ -717,7 +718,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             rows={2}
             value={draft.description}
             onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
-            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
           />
         </div>
         <div>
@@ -730,7 +731,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
             dir="rtl"
             value={draft.descriptionAr ?? ''}
             onChange={e => setDraft(d => ({ ...d, descriptionAr: e.target.value || null }))}
-            className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
           />
         </div>
       </div>
@@ -776,7 +777,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                         return { ...d, steps };
                       })
                     }
-                    className="rounded-lg border border-input px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                   <input
                     type="text"
@@ -792,7 +793,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                         return { ...d, stepsAr };
                       })
                     }
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
                 {draft.steps.length > 1 && (
@@ -825,7 +826,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                       return { ...d, steps };
                     })
                   }
-                  className="rounded-lg border border-input px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                 />
                 <textarea
                   rows={2}
@@ -841,7 +842,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                       return { ...d, stepsAr };
                     })
                   }
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                 />
               </div>
             </div>

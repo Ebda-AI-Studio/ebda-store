@@ -10,6 +10,7 @@ import { applyAiSeoSuggestion } from '../seo/language-guard';
 
 import { Button } from '@/components/ui/Button';
 import { SparkleIcon } from '@/components/SparkleIcon';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 interface CategoryFormData {
   name: string;
   nameAr: string;
@@ -236,7 +237,7 @@ export function CategoryForm({
               onChange={e => onFormChange(prev => ({ ...prev, description: e.target.value }))}
               placeholder={t('descriptionPlaceholder')}
               rows={3}
-              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
             />
           </div>
           <div>
@@ -250,7 +251,7 @@ export function CategoryForm({
               onChange={e => onFormChange(prev => ({ ...prev, descriptionAr: e.target.value }))}
               placeholder={t('descriptionArabicPlaceholder')}
               rows={3}
-              className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
             />
           </div>
         </div>
@@ -342,7 +343,7 @@ export function CategoryForm({
                 maxLength={70}
                 value={form.metaTitle ?? ''}
                 onChange={e => onFormChange(prev => ({ ...prev, metaTitle: e.target.value }))}
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <div>
@@ -356,7 +357,7 @@ export function CategoryForm({
                 dir="rtl"
                 value={form.metaTitleAr ?? ''}
                 onChange={e => onFormChange(prev => ({ ...prev, metaTitleAr: e.target.value }))}
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <div>
@@ -368,7 +369,7 @@ export function CategoryForm({
                 rows={2}
                 value={form.metaDescription ?? ''}
                 onChange={e => onFormChange(prev => ({ ...prev, metaDescription: e.target.value }))}
-                className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={`${TEXTAREA_CLASSES} resize-none`}
               />
             </div>
             <div>
@@ -384,7 +385,7 @@ export function CategoryForm({
                 onChange={e =>
                   onFormChange(prev => ({ ...prev, metaDescriptionAr: e.target.value }))
                 }
-                className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={`${TEXTAREA_CLASSES} resize-none`}
               />
             </div>
             <div className="col-span-2">
@@ -405,7 +406,7 @@ export function CategoryForm({
                 onChange={e =>
                   onFormChange(prev => ({ ...prev, metaDescriptionAeo: e.target.value }))
                 }
-                className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={`${TEXTAREA_CLASSES} resize-none`}
               />
             </div>
             <div>
@@ -421,7 +422,7 @@ export function CategoryForm({
                 onChange={e =>
                   onFormChange(prev => ({ ...prev, metaDescriptionAeoAr: e.target.value }))
                 }
-                className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={`${TEXTAREA_CLASSES} resize-none`}
               />
             </div>
           </div>

@@ -10,6 +10,7 @@ import { numericFieldValue, textFieldValue } from '@/lib/form-text';
 
 import { REGION } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Supplier {
@@ -164,7 +165,7 @@ export default function NewSupplierPage() {
               value={name}
               onChange={e => setName(e.target.value)}
               required
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder={t('supplierNameEnSample')}
             />
           </label>
@@ -175,7 +176,7 @@ export default function NewSupplierPage() {
               value={nameAr}
               onChange={e => setNameAr(e.target.value)}
               dir="rtl"
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder={t('supplierNameArPlaceholder')}
             />
           </label>
@@ -189,7 +190,7 @@ export default function NewSupplierPage() {
               type="text"
               value={contactName}
               onChange={e => setContactName(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder={t('contactPlaceholder')}
             />
           </label>
@@ -199,7 +200,7 @@ export default function NewSupplierPage() {
               type="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder={REGION.phone.placeholderIntl}
             />
           </label>
@@ -209,7 +210,7 @@ export default function NewSupplierPage() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder="supplier@example.com"
             />
           </label>
@@ -225,7 +226,7 @@ export default function NewSupplierPage() {
             <select
               value={paymentTerms}
               onChange={e => setPaymentTerms(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
             >
               {PAYMENT_TERMS.map(pt => (
                 <option key={pt} value={pt}>
@@ -244,7 +245,7 @@ export default function NewSupplierPage() {
                 step="1"
                 value={customTermsDays}
                 onChange={e => setCustomTermsDays(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
                 placeholder={t('termsDaysExample')}
               />
             </label>
@@ -265,7 +266,7 @@ export default function NewSupplierPage() {
               step="1"
               value={leadTimeDays}
               onChange={e => setLeadTimeDays(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder="7"
             />
           </label>
@@ -279,7 +280,7 @@ export default function NewSupplierPage() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               placeholder={t('notesEnPlaceholder')}
             />
           </label>
@@ -290,7 +291,7 @@ export default function NewSupplierPage() {
               onChange={e => setNotesAr(e.target.value)}
               rows={3}
               dir="rtl"
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               placeholder={t('notesArPlaceholder')}
             />
           </label>

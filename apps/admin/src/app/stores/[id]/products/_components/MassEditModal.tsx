@@ -11,6 +11,7 @@ import type { Product } from './types';
 import { variantPriceToField, variantFieldToPrice } from '@/lib/variant-price';
 
 import { roundToMinor } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── local types ─────────────────────────────────────────────────────────────
 
 interface Category {
@@ -66,7 +67,7 @@ function TristateSelect({ value, onChange, label, t }: TristateSelectProps) {
       <select
         value={value}
         onChange={e => onChange(e.target.value as Tristate)}
-        className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+        className={`${FIELD_CLASSES} flex-1`}
       >
         <option value="noChange">{t('massEdit.tristate.noChange')}</option>
         <option value="on">{t('massEdit.tristate.on')}</option>
@@ -398,7 +399,7 @@ export function MassEditModal({
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value as typeof status)}
-                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className={FIELD_CLASSES}
               >
                 <option value="active">{t('status.active')}</option>
                 <option value="draft">{t('status.draft')}</option>
@@ -422,7 +423,7 @@ export function MassEditModal({
               <select
                 value={addCategoryId}
                 onChange={e => setAddCategoryId(e.target.value)}
-                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className={FIELD_CLASSES}
               >
                 <option value="">{t('massEdit.selectCategory')}</option>
                 {categories.map(c => (
@@ -468,7 +469,7 @@ export function MassEditModal({
                 <select
                   value={priceMode}
                   onChange={e => setPriceMode(e.target.value as PriceMode)}
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 >
                   <option value="set">{t('massEdit.priceMode.set')}</option>
                   <option value="adjustPct">{t('massEdit.priceMode.adjustPct')}</option>
@@ -481,7 +482,7 @@ export function MassEditModal({
                   }
                   value={priceValue}
                   onChange={e => setPriceValue(e.target.value)}
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 />
               </div>
             )}
@@ -494,7 +495,7 @@ export function MassEditModal({
               <select
                 value={goldSwitch}
                 onChange={e => setGoldSwitch(e.target.value as '' | 'fixed' | 'gold_rate')}
-                className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className={`${FIELD_CLASSES} mt-1`}
               >
                 <option value="">{t('massEdit.noChange')}</option>
                 <option value="gold_rate">{tGold('toGold')}</option>
@@ -520,7 +521,7 @@ export function MassEditModal({
                 <select
                   value={inventoryMode}
                   onChange={e => setInventoryMode(e.target.value as InventoryMode)}
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 >
                   <option value="set">{t('massEdit.inventoryMode.set')}</option>
                   <option value="adjust">{t('massEdit.inventoryMode.adjust')}</option>
@@ -531,7 +532,7 @@ export function MassEditModal({
                   placeholder={t('massEdit.inventoryValue')}
                   value={inventoryValue}
                   onChange={e => setInventoryValue(e.target.value)}
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 />
               </div>
             )}
@@ -624,7 +625,7 @@ export function MassEditModal({
                                       [v.id]: { ...prev[v.id], inventory: e.target.value },
                                     }))
                                   }
-                                  className="w-full rounded border border-border bg-card px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                  className={FIELD_CLASSES}
                                 />
                               </td>
                               <td className="px-3 py-2">
@@ -639,7 +640,7 @@ export function MassEditModal({
                                       [v.id]: { ...prev[v.id], price: e.target.value },
                                     }))
                                   }
-                                  className="w-full rounded border border-border bg-card px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                  className={FIELD_CLASSES}
                                 />
                               </td>
                             </tr>

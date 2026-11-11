@@ -27,6 +27,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { orderLineVariantTitle, searchQueryHeaders, withNumerals } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -274,7 +275,7 @@ function BarcodeInput({
             }
           }}
           placeholder={placeholder}
-          className="flex-1 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          className={`${FIELD_CLASSES} flex-1`}
           disabled={disabled}
           autoComplete="off"
           autoCorrect="off"
@@ -435,7 +436,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
               min={1}
               value={qty}
               onChange={e => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-              className="w-24 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${FIELD_CLASSES} w-24`}
             />
           </div>
           <Button
@@ -569,7 +570,7 @@ function PickMode({ storeId }: { storeId: string }) {
               onChange={e => setOrderInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && loadOrder()}
               placeholder={t('orderNumberPlaceholder')}
-              className="flex-1 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${FIELD_CLASSES} flex-1`}
               autoComplete="off"
             />
             <Button type="button" onClick={loadOrder} disabled={orderLoading} variant="default">
@@ -909,7 +910,7 @@ function CountMode({ storeId }: { storeId: string }) {
             value={newNote}
             onChange={e => setNewNote(e.target.value)}
             placeholder={t('counting.sessionNote')}
-            className="w-full min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className={FIELD_CLASSES}
           />
           <Button
             type="button"
@@ -1003,7 +1004,7 @@ function CountMode({ storeId }: { storeId: string }) {
                   min={0}
                   value={countQty}
                   onChange={e => setCountQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="w-24 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className={`${FIELD_CLASSES} w-24`}
                 />
               </div>
               <Button

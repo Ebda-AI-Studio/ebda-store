@@ -11,6 +11,7 @@ import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
 import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const formatMajor = minorToMajor;
 
@@ -134,7 +135,7 @@ export function AbandonedCartsTable({
             value={statusFilter}
             onChange={e => onStatusFilterChange(e.target.value)}
             aria-label={t('filterAriaLabel')}
-            className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
           >
             <option value="all">{t('allStatuses')}</option>
             {CART_STATUS_KEYS.map(key => (

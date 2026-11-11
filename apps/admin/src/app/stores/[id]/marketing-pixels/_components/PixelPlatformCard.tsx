@@ -4,6 +4,7 @@ import { useId } from 'react';
 import { useT } from '@/i18n/useT';
 import { getIdField } from './platformsConfig';
 import type { PixelConfigRow, Platform } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface PixelPlatformCardProps {
   platform: Platform;
@@ -128,7 +129,7 @@ export function PixelPlatformCard({
               onChange={e => onFieldChange(getIdField(platform.id), e.target.value)}
               placeholder={platform.idPlaceholder}
               disabled={!isEnabled}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:cursor-not-allowed"
+              className={`${FIELD_CLASSES} disabled:cursor-not-allowed`}
             />
           </div>
 
@@ -144,7 +145,7 @@ export function PixelPlatformCard({
                 onChange={e => onFieldChange('accessToken', e.target.value)}
                 placeholder={t('fields.accessTokenPlaceholder')}
                 disabled={!isEnabled}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:cursor-not-allowed"
+                className={`${FIELD_CLASSES} disabled:cursor-not-allowed`}
               />
               <p className="text-xs text-muted-foreground mt-1">{t('fields.accessTokenHelp')}</p>
             </div>
@@ -161,7 +162,7 @@ export function PixelPlatformCard({
                 onChange={e => onFieldChange('conversionLabel', e.target.value)}
                 placeholder={t('fields.conversionLabelPlaceholder')}
                 disabled={!isEnabled}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:cursor-not-allowed"
+                className={`${FIELD_CLASSES} disabled:cursor-not-allowed`}
               />
             </div>
           )}

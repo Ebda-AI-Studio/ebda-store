@@ -14,6 +14,7 @@ import { formatPrice } from '@/lib/format';
 
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SupplierOption {
@@ -157,7 +158,7 @@ export default function NewPurchaseOrderPage() {
         <select
           value={line.productId}
           onChange={e => selectProduct(i, e.target.value)}
-          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+          className={FIELD_CLASSES}
         >
           <option value="">— {tNew('selectProduct')} —</option>
           {products.map(p => (
@@ -180,7 +181,7 @@ export default function NewPurchaseOrderPage() {
           <select
             value={line.variantId}
             onChange={e => updateLine(i, { variantId: e.target.value })}
-            className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             aria-invalid={!line.variantId}
           >
             <option value="">— {tNew('selectVariant')} —</option>
@@ -205,7 +206,7 @@ export default function NewPurchaseOrderPage() {
           step="1"
           value={line.qty}
           onChange={e => updateLine(i, { qty: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          className={`${FIELD_CLASSES} text-end font-mono`}
           placeholder="1"
         />
       ),
@@ -221,7 +222,7 @@ export default function NewPurchaseOrderPage() {
           step="0.01"
           value={line.unitCost}
           onChange={e => updateLine(i, { unitCost: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          className={`${FIELD_CLASSES} text-end font-mono`}
           placeholder="0.00"
         />
       ),
@@ -341,7 +342,7 @@ export default function NewPurchaseOrderPage() {
                 value={supplierId}
                 onChange={e => setSupplierId(e.target.value)}
                 required
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
               >
                 <option value="">— {tNew('selectSupplier')} —</option>
                 {suppliers.map(s => (
@@ -358,7 +359,7 @@ export default function NewPurchaseOrderPage() {
                 type="date"
                 value={expectedDate}
                 onChange={e => setExpectedDate(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
               />
             </label>
           </div>
@@ -371,7 +372,7 @@ export default function NewPurchaseOrderPage() {
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 rows={2}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                className={`${TEXTAREA_CLASSES} resize-none`}
                 placeholder={tNew('notesPlaceholder')}
               />
             </label>
@@ -382,7 +383,7 @@ export default function NewPurchaseOrderPage() {
                 onChange={e => setNotesAr(e.target.value)}
                 rows={2}
                 dir="rtl"
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                className={`${TEXTAREA_CLASSES} resize-none`}
                 placeholder={t('notesArPlaceholder')}
               />
             </label>

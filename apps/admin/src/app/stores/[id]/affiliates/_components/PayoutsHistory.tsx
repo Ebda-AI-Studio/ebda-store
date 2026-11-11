@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import { minorToMajor } from '@/lib/format';
 import { formatFils, type Affiliate } from './types';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 interface PayoutsHistoryProps {
   affiliate: Affiliate;
@@ -80,7 +81,7 @@ export function PayoutsHistory({
               value={amount}
               onChange={e => onAmountChange(e.target.value)}
               placeholder="0.00"
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
               required
             />
           </div>
@@ -92,7 +93,7 @@ export function PayoutsHistory({
             <select
               value={method}
               onChange={e => onMethodChange(e.target.value)}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             >
               {PAYOUT_METHODS.map(m => (
                 <option key={m} value={m}>
@@ -111,7 +112,7 @@ export function PayoutsHistory({
               onChange={e => onNotesChange(e.target.value)}
               placeholder={t('fields.notesPlaceholder')}
               rows={3}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
             />
           </div>
 

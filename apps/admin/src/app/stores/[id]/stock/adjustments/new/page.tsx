@@ -12,6 +12,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '@/lib/api';
 import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@ebda/shared';
 import type { StockAdjustParseResult, StockAdjustParsedRow } from '@ebda/shared';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -272,7 +273,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
         <select
           value={type}
           onChange={e => setType(e.target.value)}
-          className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+          className={`${FIELD_CLASSES} max-w-xs`}
         >
           {ADJUSTMENT_TYPES.map(at => (
             <option key={at} value={at}>
@@ -292,7 +293,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             value={reason}
             onChange={e => setReason(e.target.value)}
             rows={2}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
             placeholder={t('reasonEnPlaceholder')}
           />
         </label>
@@ -303,7 +304,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             onChange={e => setReasonAr(e.target.value)}
             rows={2}
             dir="rtl"
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
             placeholder={t('reasonArPlaceholder')}
           />
         </label>
@@ -521,7 +522,7 @@ export default function NewStockAdjustmentPage() {
         <select
           value={item.productId}
           onChange={e => updateItem(i, { productId: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+          className={FIELD_CLASSES}
         >
           <option value="">— {tNew('selectProduct')} —</option>
           {products.map(p => (
@@ -544,7 +545,7 @@ export default function NewStockAdjustmentPage() {
           step="1"
           value={item.newQty}
           onChange={e => updateItem(i, { newQty: e.target.value })}
-          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+          className={`${FIELD_CLASSES} text-end font-mono`}
         />
       ),
     },
@@ -712,7 +713,7 @@ export default function NewStockAdjustmentPage() {
               <select
                 value={type}
                 onChange={e => setType(e.target.value)}
-                className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={`${FIELD_CLASSES} max-w-xs`}
               >
                 {ADJUSTMENT_TYPES.map(at => (
                   <option key={at} value={at}>
@@ -732,7 +733,7 @@ export default function NewStockAdjustmentPage() {
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   rows={3}
-                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                   placeholder={t('reasonEnPlaceholder')}
                 />
               </label>
@@ -743,7 +744,7 @@ export default function NewStockAdjustmentPage() {
                   onChange={e => setReasonAr(e.target.value)}
                   rows={3}
                   dir="rtl"
-                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                  className={`${TEXTAREA_CLASSES} resize-none`}
                   placeholder={t('reasonArPlaceholder')}
                 />
               </label>
@@ -756,7 +757,7 @@ export default function NewStockAdjustmentPage() {
                 type="url"
                 value={evidenceUrl}
                 onChange={e => setEvidenceUrl(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
                 placeholder={tNew('evidencePlaceholder')}
               />
             </label>

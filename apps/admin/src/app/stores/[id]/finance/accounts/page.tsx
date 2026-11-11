@@ -8,6 +8,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountNode {
@@ -226,7 +227,7 @@ export default function AccountsPage() {
                   required
                   value={form.parentId}
                   onChange={e => setForm(f => ({ ...f, parentId: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  className={FIELD_CLASSES}
                 >
                   <option value="">{t('selectParent')}</option>
                   {parentOptions.map(p => (
@@ -244,7 +245,7 @@ export default function AccountsPage() {
                   onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
                   placeholder="5210"
                   pattern="\d{4,6}"
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-sm"
+                  className={`${FIELD_CLASSES} font-mono`}
                 />
               </label>
               <label className="space-y-1 text-sm">
@@ -253,7 +254,7 @@ export default function AccountsPage() {
                   required
                   value={form.nameEn}
                   onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
               <label className="space-y-1 text-sm">
@@ -262,7 +263,7 @@ export default function AccountsPage() {
                   value={form.nameAr}
                   onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
                   dir="rtl"
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
             </div>

@@ -103,6 +103,7 @@ interface OrderRow {
 import { formatDate, formatPrice } from '../../../../../lib/format';
 import { ERASURE_REVIEW_PARAM } from '../_components/customerSegments';
 import { useT } from '../../../../../i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 function formatMajor(piastres: number): string {
   return formatPrice(piastres);
@@ -541,7 +542,7 @@ export default function CustomerDetailPage() {
                             value={customer.groupId ?? ''}
                             disabled={savingGroup}
                             onChange={e => assignGroup(e.target.value || null)}
-                            className="rounded-md border bg-background px-2 py-1 text-sm font-medium text-foreground disabled:opacity-50"
+                            className={FIELD_CLASSES}
                           >
                             <option value="">{t('groupNone')}</option>
                             {groupOptions.map(g => (

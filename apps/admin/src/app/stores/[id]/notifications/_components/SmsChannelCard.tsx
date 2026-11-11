@@ -5,6 +5,7 @@ import { Toggle } from '../../../../../components/Toggle';
 import { ConnectionStatus } from '../../../../../components/ConnectionStatus';
 import { useT } from '@/i18n/useT';
 import type { ChannelConfig, TestStatus } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface SmsChannelCardProps {
   config: ChannelConfig;
@@ -81,7 +82,7 @@ export function SmsChannelCard({
             value={config.appSid || ''}
             onChange={e => onConfigChange({ appSid: e.target.value })}
             placeholder={t('placeholders.appSid')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -93,7 +94,7 @@ export function SmsChannelCard({
             value={config.senderId || ''}
             onChange={e => onConfigChange({ senderId: e.target.value })}
             placeholder={t('placeholders.senderId')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       </div>

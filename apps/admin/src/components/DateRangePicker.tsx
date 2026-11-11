@@ -6,6 +6,7 @@ import { useT } from '@/i18n/useT';
 import { ANALYTICS_PERIOD_PRESETS } from '@ebda/shared';
 import type { Period, ResolvedDateRange } from '../app/stores/[id]/analytics/_components/types';
 import { resolveDateRange } from '../app/stores/[id]/analytics/_components/types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface DateRangePickerProps {
   period: Period;
@@ -141,7 +142,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
               value={customStart}
               onChange={e => handleCustomChange(e.target.value, customEnd)}
               max={customEnd}
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -151,7 +152,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
               value={customEnd}
               onChange={e => handleCustomChange(customStart, e.target.value)}
               min={customStart}
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+              className={FIELD_CLASSES}
             />
           </label>
         </div>

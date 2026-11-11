@@ -19,6 +19,7 @@ import {
 } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountNode {
@@ -430,7 +431,7 @@ export default function NewExpensePage() {
             type="date"
             value={expenseDate}
             onChange={e => setExpenseDate(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             required
           />
         </label>
@@ -441,7 +442,7 @@ export default function NewExpensePage() {
           <select
             value={supplierId}
             onChange={e => setSupplierId(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
           >
             <option value="">{t('selectSupplier')}</option>
             {suppliers.map(s => (
@@ -460,7 +461,7 @@ export default function NewExpensePage() {
           <select
             value={expenseAccountId}
             onChange={e => setExpenseAccountId(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             required
           >
             <option value="">{t('selectExpenseAccount')}</option>
@@ -480,7 +481,7 @@ export default function NewExpensePage() {
           <select
             value={paidFromAccountId}
             onChange={e => setPaidFromAccountId(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             required
           >
             <option value="">{t('selectPaidFromAccount')}</option>
@@ -503,7 +504,7 @@ export default function NewExpensePage() {
                   setCurrency(e.target.value);
                   setFxRate('');
                 }}
-                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                className={FIELD_CLASSES}
               >
                 {ALLOWED_CURRENCIES.map(c => (
                   <option key={c} value={c}>
@@ -524,7 +525,7 @@ export default function NewExpensePage() {
                   step="0.000001"
                   value={fxRate}
                   onChange={e => setFxRate(e.target.value)}
-                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+                  className={`${FIELD_CLASSES} font-mono`}
                   placeholder={t('fxRatePlaceholder')}
                   required
                 />
@@ -547,7 +548,7 @@ export default function NewExpensePage() {
               step={isNonBase ? '1' : '0.01'}
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+              className={`${FIELD_CLASSES} font-mono`}
               placeholder="0"
               required
             />
@@ -567,7 +568,7 @@ export default function NewExpensePage() {
               step={isNonBase ? '1' : '0.01'}
               value={taxAmount}
               onChange={e => setTaxAmount(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+              className={`${FIELD_CLASSES} font-mono`}
             />
             {isNonBase && rawTax > 0 && fxRateNum > 0 && (
               <p className="text-xs text-muted-foreground">
@@ -606,7 +607,7 @@ export default function NewExpensePage() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
             />
           </label>
           <label className="block space-y-1" dir="rtl">
@@ -615,7 +616,7 @@ export default function NewExpensePage() {
               value={notesAr}
               onChange={e => setNotesAr(e.target.value)}
               rows={3}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               dir="rtl"
             />
           </label>
@@ -628,7 +629,7 @@ export default function NewExpensePage() {
             type="url"
             value={receiptUrl}
             onChange={e => setReceiptUrl(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+            className={FIELD_CLASSES}
             placeholder="https://..."
           />
           <p className="text-xs text-muted-foreground">{t('receiptHint')}</p>

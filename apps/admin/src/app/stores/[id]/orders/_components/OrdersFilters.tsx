@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import { STATUS_FILTERS, type StatusFilter } from './types';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface OrdersFiltersProps {
   statusFilter: StatusFilter;
   onStatusFilterChange: (status: StatusFilter) => void;
@@ -55,7 +56,7 @@ export function OrdersFilters({
           placeholder={t('search.placeholder')}
           value={search}
           onChange={e => onSearchChange(e.target.value)}
-          className="w-full rounded-lg border py-2 ps-10 pe-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className={FIELD_CLASSES}
         />
       </div>
     </div>

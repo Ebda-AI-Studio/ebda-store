@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { useMemo } from 'react';
 import { useT } from '@/i18n/useT';
 import { SOCIAL_PLATFORMS, type StoreBranding } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface SocialLinksTabProps {
   branding: StoreBranding;
@@ -106,7 +107,7 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
                 })
               }
               placeholder={social.placeholder}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         ))}

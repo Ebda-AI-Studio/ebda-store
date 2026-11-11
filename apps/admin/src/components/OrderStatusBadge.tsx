@@ -28,10 +28,11 @@ export type StatusStyle = { bg: string; text: string; dot: string } | { classNam
 const DEFAULT_STATUS_STYLES: Record<string, StatusStyle> = {
   pending: { bg: 'bg-warning/10', text: 'text-warning-ink', dot: 'bg-warning' },
   // InstaPay: the money has not been confirmed to have arrived (SP6a).
+  // Money not yet confirmed: the warning (brass) role, distinct from `confirmed` (gold).
   awaiting_payment_confirmation: {
-    bg: 'bg-primary/10',
-    text: 'text-primary-ink',
-    dot: 'bg-primary',
+    bg: 'bg-warning/10',
+    text: 'text-warning-ink',
+    dot: 'bg-warning',
   },
   confirmed: { bg: 'bg-primary/10', text: 'text-primary-ink', dot: 'bg-primary' },
   processing: { bg: 'bg-info/10', text: 'text-info-ink', dot: 'bg-info' },

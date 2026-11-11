@@ -11,6 +11,7 @@ import { minorToMajor } from '@/lib/format';
 
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountRow {
@@ -157,7 +158,7 @@ export default function NewJournalEntryPage() {
               type="text"
               value={memo}
               onChange={e => setMemo(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder={tNew('memoPlaceholder')}
             />
           </label>
@@ -167,7 +168,7 @@ export default function NewJournalEntryPage() {
               type="text"
               value={memoAr}
               onChange={e => setMemoAr(e.target.value)}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              className={FIELD_CLASSES}
               placeholder={tNew('memoArPlaceholder')}
             />
           </label>
@@ -202,7 +203,7 @@ export default function NewJournalEntryPage() {
                     <select
                       value={l.accountId}
                       onChange={e => updateLine(i, { accountId: e.target.value })}
-                      className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+                      className={FIELD_CLASSES}
                     >
                       <option value="">— {tNew('selectAccount')} —</option>
                       {accounts.map(a => (
@@ -224,7 +225,7 @@ export default function NewJournalEntryPage() {
                           credit: e.target.value ? '' : l.credit,
                         })
                       }
-                      className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                      className={`${FIELD_CLASSES} text-end font-mono`}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -239,7 +240,7 @@ export default function NewJournalEntryPage() {
                           debit: e.target.value ? '' : l.debit,
                         })
                       }
-                      className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                      className={`${FIELD_CLASSES} text-end font-mono`}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -247,7 +248,7 @@ export default function NewJournalEntryPage() {
                       type="text"
                       value={l.lineMemo}
                       onChange={e => updateLine(i, { lineMemo: e.target.value })}
-                      className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+                      className={FIELD_CLASSES}
                     />
                   </td>
                   <td className="px-3 py-2 text-center">

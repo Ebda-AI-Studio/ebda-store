@@ -34,6 +34,7 @@ function isInteractive(target: EventTarget | null): boolean {
 import { formatDate, minorToMajor } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 /**
  * Build a compact, single-line item summary for the orders list row, e.g.
  * "2x Mastic, 1x Caraway +2 more". Shows the first two DISPLAY ROWS with
@@ -198,7 +199,7 @@ export function OrdersTable({
             {agentBadge}
             <select
               aria-label={t('actions.updateStatusLabel')}
-              className="rounded-lg border border-border px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
               disabled={isUpdating}
               defaultValue=""
               onChange={e => {

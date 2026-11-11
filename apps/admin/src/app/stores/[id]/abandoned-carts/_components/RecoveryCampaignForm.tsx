@@ -7,6 +7,7 @@ import type { AbandonedCartConfig } from './types';
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 import { Toggle } from '@/components/Toggle';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface StepRowProps {
   title: string;
@@ -43,7 +44,7 @@ function StepRow({
           value={delay}
           onChange={e => onDelayChange(Number(e.target.value))}
           disabled={!enabled}
-          className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          className={`${FIELD_CLASSES} w-20`}
         />
         <label className="text-sm text-muted-foreground">{minutesLabel}</label>
       </div>
@@ -129,7 +130,7 @@ export function RecoveryCampaignForm({
                       max={100}
                       value={config.couponDiscountPercent}
                       onChange={e => onPatch({ couponDiscountPercent: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      className={FIELD_CLASSES}
                     />
                     <span className="text-sm text-muted-foreground">%</span>
                   </div>
@@ -156,7 +157,7 @@ export function RecoveryCampaignForm({
                         })
                       }
                       placeholder={t('autoCoupon.noLimit')}
-                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      className={FIELD_CLASSES}
                     />
                     <span className="text-sm text-muted-foreground">{t('autoCoupon.major')}</span>
                   </div>
@@ -171,7 +172,7 @@ export function RecoveryCampaignForm({
                       min={1}
                       value={config.couponExpiryHours}
                       onChange={e => onPatch({ couponExpiryHours: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      className={FIELD_CLASSES}
                     />
                     <span className="text-sm text-muted-foreground">{t('autoCoupon.hours')}</span>
                   </div>
@@ -203,7 +204,7 @@ export function RecoveryCampaignForm({
               value={config.emailDelayMinutes}
               onChange={e => onPatch({ emailDelayMinutes: Number(e.target.value) })}
               disabled={!config.emailEnabled}
-              className="w-20 px-3 py-1.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+              className={`${FIELD_CLASSES} w-20`}
             />
             <span className="text-sm text-muted-foreground">{t('email.minutes')}</span>
           </div>

@@ -19,6 +19,7 @@ import { pctToBps } from './pct';
 import { wholesalePlanName } from '@/lib/plan-labels';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface CustomerGroup {
   id: string;
@@ -276,7 +277,7 @@ export default function CustomerGroupsPage() {
                 <input
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
 
@@ -286,7 +287,7 @@ export default function CustomerGroupsPage() {
                   value={form.nameAr}
                   onChange={e => setForm({ ...form, nameAr: e.target.value })}
                   dir="rtl"
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                 />
               </label>
 
@@ -308,7 +309,7 @@ export default function CustomerGroupsPage() {
                     onChange={e =>
                       setForm({ ...form, pricingMode: e.target.value as FormState['pricingMode'] })
                     }
-                    className="min-h-11 w-full rounded-md border px-3 text-sm"
+                    className={FIELD_CLASSES}
                   >
                     <option value="none">{t('modeNone')}</option>
                     <option value="percent_off">{t('modePercent')}</option>
@@ -322,7 +323,7 @@ export default function CustomerGroupsPage() {
                       dir="ltr"
                       value={form.discountPct}
                       onChange={e => setForm({ ...form, discountPct: e.target.value })}
-                      className="min-h-11 w-full rounded-md border px-3 text-sm"
+                      className={FIELD_CLASSES}
                     />
                     <span className="mt-1 block text-xs text-muted-foreground">
                       {t('discountHint')}

@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../../lib/api';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface EtaReceiptRow {
   id: string;
   kind: 'sale' | 'return';
@@ -103,7 +104,7 @@ export function OrderEtaCard({ storeId, orderId }: { storeId: string; orderId: s
                 </label>
                 <select
                   id={`eta-reason-${r.id}`}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  className={FIELD_CLASSES}
                   value={picked[r.id] ?? ''}
                   onChange={e => setPicked(p => ({ ...p, [r.id]: e.target.value }))}
                 >

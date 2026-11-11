@@ -6,6 +6,7 @@ import type { AffiliateConfig } from './types';
 
 import { roundToMinor } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface AffiliateCommissionFormProps {
   config: AffiliateConfig;
   saving: boolean;
@@ -46,7 +47,7 @@ export function AffiliateCommissionForm({
                   defaultCommissionRate: parseFloat(e.target.value) || 0,
                 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
@@ -64,7 +65,7 @@ export function AffiliateCommissionForm({
                   cookieDurationDays: parseInt(e.target.value) || 30,
                 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
           <div>
@@ -82,7 +83,7 @@ export function AffiliateCommissionForm({
                   minPayoutAmount: roundToMinor(parseFloat(e.target.value) || 0),
                 })
               }
-              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             />
           </div>
         </div>

@@ -73,6 +73,7 @@ const CATEGORY_ORDER: FeatureCategory[] = [
 ];
 
 import { formatDate } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
@@ -448,7 +449,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
               {planLabelFor(plan)}
             </span>
             <select
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className={FIELD_CLASSES}
               value=""
               onChange={e => {
                 const val = e.target.value as StorePlan;

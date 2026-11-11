@@ -3,6 +3,7 @@
 import { hasWaMeNumber, normalizeEgyptianMobile } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import type { StoreBranding } from './types';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 interface ContactInfoTabProps {
   branding: StoreBranding;
@@ -33,7 +34,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.email || ''}
             onChange={e => onChange({ ...branding, email: e.target.value })}
             placeholder={t('emailPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -45,7 +46,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             placeholder={t('phonePlaceholder')}
             aria-invalid={waInvalid}
             dir="ltr"
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
           <p
             className={`mt-1 text-xs ${waInvalid ? 'text-destructive-ink' : 'text-muted-foreground'}`}
@@ -92,7 +93,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.phone || ''}
             onChange={e => onChange({ ...branding, phone: e.target.value })}
             placeholder={t('phonePlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
         <div>
@@ -104,7 +105,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.phoneAr || ''}
             onChange={e => onChange({ ...branding, phoneAr: e.target.value })}
             placeholder={t('phoneArPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
         </div>
       </div>
@@ -117,7 +118,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             onChange={e => onChange({ ...branding, address: e.target.value })}
             rows={3}
             placeholder={t('addressPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
           />
         </div>
         <div>
@@ -129,7 +130,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             onChange={e => onChange({ ...branding, addressAr: e.target.value })}
             rows={3}
             placeholder={t('addressArPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className={`${TEXTAREA_CLASSES} resize-none`}
           />
         </div>
       </div>
@@ -153,7 +154,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             value={branding.addressUrl || ''}
             onChange={e => onChange({ ...branding, addressUrl: e.target.value })}
             placeholder={t('addressUrlPlaceholder')}
-            className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={FIELD_CLASSES}
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('addressUrlHint')}</p>
         </div>

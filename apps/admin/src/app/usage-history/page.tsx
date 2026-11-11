@@ -28,6 +28,7 @@ import { useT } from '../../i18n/useT';
 import { formatSpend } from '@/lib/ai-spend';
 
 import { formatMoney, withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 interface UsageStoreRow {
   storeId: string;
   slug: string;
@@ -216,7 +217,7 @@ function UsageHistoryInner() {
         <select
           value={selected ?? ''}
           onChange={e => setSelected(e.target.value)}
-          className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          className={FIELD_CLASSES}
         >
           {periods.map(p => (
             <option key={p.periodStart} value={p.periodStart}>

@@ -27,6 +27,7 @@ import { SectionPreview } from './SectionPreview';
 import { apiPost } from '../lib/api';
 import { useT } from '../i18n/useT';
 import { useConfirm } from '../hooks/useConfirm';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Brand-color updates the parent should persist to StoreTheme on apply.
@@ -501,7 +502,7 @@ export function SmartPaletteModal({
                           },
                         }))
                       }
-                      className="rounded border border-border bg-background px-2 py-1 text-sm"
+                      className={FIELD_CLASSES}
                     >
                       <option value="thin">{t('frameThin')}</option>
                       <option value="normal">{t('frameNormal')}</option>

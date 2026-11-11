@@ -7,6 +7,7 @@ import { apiPut } from '../../../../../lib/api';
 import type { GoldSettingsView } from './types';
 
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 const STEPS = [1, 100, 500, 1000] as const;
 
 export function GoldSettingsCard({
@@ -89,7 +90,7 @@ export function GoldSettingsCard({
             disabled={!canEdit}
             value={premium}
             onChange={e => setPremium(e.target.value)}
-            className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3"
+            className={`${FIELD_CLASSES} mt-1 block`}
           />
           <span className="mt-1 block text-xs text-muted-foreground">{t('premiumHint')}</span>
         </label>
@@ -101,7 +102,7 @@ export function GoldSettingsCard({
             disabled={!canEdit}
             value={maxHours}
             onChange={e => setMaxHours(e.target.value)}
-            className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3"
+            className={`${FIELD_CLASSES} mt-1 block`}
           />
           <span className="mt-1 block text-xs text-muted-foreground">{t('maxAgeHint')}</span>
         </label>
@@ -113,7 +114,7 @@ export function GoldSettingsCard({
             onChange={e =>
               setS(v => ({ ...v, roundingStep: Number(e.target.value) as 1 | 100 | 500 | 1000 }))
             }
-            className="mt-1 block min-h-11 w-full rounded-md border bg-background px-3"
+            className={`${FIELD_CLASSES} mt-1 block`}
           >
             {STEPS.map(step => (
               <option key={step} value={step}>

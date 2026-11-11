@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, getApiUrl, apiFetch, apiPost } from '../../../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Admin newsletter page.
@@ -342,7 +343,7 @@ export default function NewsletterPage() {
                     required
                     maxLength={300}
                     placeholder={tPage('broadcastSubjectPlaceholder')}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={FIELD_CLASSES}
                   />
                 </div>
 
@@ -357,7 +358,7 @@ export default function NewsletterPage() {
                     required
                     rows={10}
                     placeholder={tPage('broadcastBodyPlaceholder')}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+                    className={`${TEXTAREA_CLASSES} font-mono resize-y`}
                   />
 
                   {hasRiskyHtml && (

@@ -10,6 +10,7 @@ import {
   type QrDesign,
 } from '@ebda/shared/qr';
 import { Segmented } from './Segmented';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 const CODE_SWATCHES = ['#14110d', '#1f3a2e', '#1d3557', '#5b1a2b', '#3a2a1a'];
 const BG_SWATCHES = ['#ffffff', '#faf6ee', '#f2efe8'];
@@ -71,7 +72,7 @@ function ColorRow({
           setText(v);
           if (HEX_COLOR.test(v)) onChange(v.toLowerCase());
         }}
-        className="w-24 rounded-lg border border-border bg-card px-2 py-1.5 font-mono text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+        className={`${FIELD_CLASSES} w-24 font-mono`}
       />
     </div>
   );
@@ -215,7 +216,7 @@ export function DesignControls({
                 onChange={e =>
                   set({ cta: e.target.value ? { ...cta, text: e.target.value } : null })
                 }
-                className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+                className={FIELD_CLASSES}
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 {tt('remaining', { count: QR_CTA_MAX - cta.text.length })}
@@ -251,7 +252,7 @@ export function DesignControls({
             value={whatsappText}
             placeholder={tw('textPlaceholder')}
             onChange={e => onWhatsappText(e.target.value)}
-            className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+            className={TEXTAREA_CLASSES}
           />
           <p className="text-xs text-muted-foreground">{tw('hint')}</p>
         </section>

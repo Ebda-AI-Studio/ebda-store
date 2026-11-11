@@ -7,6 +7,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../lib/api';
 import { textFieldValue } from '../../../../../lib/form-text';
 import type { StoreBranding } from './types';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface Location {
   id: string;
@@ -443,7 +444,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.name}
                 onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
                 placeholder={t('phName')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Name AR */}
@@ -457,7 +458,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.nameAr}
                 onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value }))}
                 placeholder={t('phNameAr')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Country EN */}
@@ -470,7 +471,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.country}
                 onChange={e => setFormData(p => ({ ...p, country: e.target.value }))}
                 placeholder={t('phCountry')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Country AR */}
@@ -484,7 +485,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.countryAr}
                 onChange={e => setFormData(p => ({ ...p, countryAr: e.target.value }))}
                 placeholder={t('phCountryAr')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Address EN */}
@@ -497,7 +498,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.address}
                 onChange={e => setFormData(p => ({ ...p, address: e.target.value }))}
                 placeholder={t('phAddress')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Address AR */}
@@ -511,7 +512,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.addressAr}
                 onChange={e => setFormData(p => ({ ...p, addressAr: e.target.value }))}
                 placeholder={t('phAddressAr')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Phone */}
@@ -522,7 +523,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.phone}
                 onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
                 placeholder={t('phPhone')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* WhatsApp */}
@@ -535,7 +536,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.whatsapp}
                 onChange={e => setFormData(p => ({ ...p, whatsapp: e.target.value }))}
                 placeholder={t('phWhatsapp')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Hours EN */}
@@ -546,7 +547,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.hours}
                 onChange={e => setFormData(p => ({ ...p, hours: e.target.value }))}
                 placeholder={t('phHours')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Hours AR */}
@@ -560,7 +561,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.hoursAr}
                 onChange={e => setFormData(p => ({ ...p, hoursAr: e.target.value }))}
                 placeholder={t('phHoursAr')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Maps URL */}
@@ -573,7 +574,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.mapsUrl}
                 onChange={e => setFormData(p => ({ ...p, mapsUrl: e.target.value }))}
                 placeholder={t('phMapsUrl')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Maps Embed URL */}
@@ -586,7 +587,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 value={formData.mapsEmbedUrl}
                 onChange={e => setFormData(p => ({ ...p, mapsEmbedUrl: e.target.value }))}
                 placeholder={t('phMapsEmbedUrl')}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
             {/* Position */}
@@ -602,7 +603,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
                 onChange={e =>
                   setFormData(p => ({ ...p, position: parseInt(e.target.value, 10) || 0 }))
                 }
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>

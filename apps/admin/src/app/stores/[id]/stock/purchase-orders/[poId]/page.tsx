@@ -14,6 +14,7 @@ import { PageState } from '@/components/PageState';
 import { useConfirm } from '@/hooks/useConfirm';
 
 import { minorToDecimalString, withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface POItem {
@@ -246,7 +247,7 @@ export default function PurchaseOrderDetailPage() {
                   step="1"
                   value={receiptQtys[item.id] ?? ''}
                   onChange={e => setReceiptQtys(cur => ({ ...cur, [item.id]: e.target.value }))}
-                  className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                  className={`${FIELD_CLASSES} text-end font-mono`}
                 />
               );
             },

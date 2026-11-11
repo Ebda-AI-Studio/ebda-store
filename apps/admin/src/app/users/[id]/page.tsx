@@ -10,6 +10,7 @@ import { apiGet, apiPut, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 import { intlLocaleForUi } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface UserDetail {
   id: string;
@@ -317,7 +318,7 @@ export default function UserDetailPage() {
                     type="text"
                     value={editFirstName}
                     onChange={e => setEditFirstName(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
                 <div>
@@ -328,7 +329,7 @@ export default function UserDetailPage() {
                     type="text"
                     value={editLastName}
                     onChange={e => setEditLastName(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
               </div>
@@ -341,7 +342,7 @@ export default function UserDetailPage() {
                   type="email"
                   value={editEmail}
                   onChange={e => setEditEmail(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 />
               </div>
 
@@ -360,7 +361,7 @@ export default function UserDetailPage() {
                     autoComplete="new-password"
                     value={editPassword}
                     onChange={e => setEditPassword(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                   <input
                     type="password"
@@ -368,7 +369,7 @@ export default function UserDetailPage() {
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={FIELD_CLASSES}
                   />
                 </div>
                 {editPassword && editPassword !== confirmPassword && (
@@ -384,7 +385,7 @@ export default function UserDetailPage() {
                 <select
                   value={editRole}
                   onChange={e => setEditRole(e.target.value)}
-                  className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 >
                   <option value="customer">{t('roleOptions.customer')}</option>
                   <option value="store_admin">{t('roleOptions.store_admin')}</option>
@@ -400,7 +401,7 @@ export default function UserDetailPage() {
                 <select
                   value={editStatus}
                   onChange={e => setEditStatus(e.target.value)}
-                  className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASSES}
                 >
                   <option value="active">{t('statusActiveOption')}</option>
                   <option value="inactive">{t('statusInactiveOption')}</option>

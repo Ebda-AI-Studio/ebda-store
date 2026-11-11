@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 export interface AiPatchChangeRow {
   op: string;
@@ -165,7 +166,7 @@ export function AiPatchPane({
               onChange={e => setText(e.target.value)}
               placeholder={t('placeholder')}
               disabled={busy !== null}
-              className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+              className={TEXTAREA_CLASSES}
             />
             <div className="flex flex-wrap gap-2">
               {(['example1', 'example2'] as const).map(k => (

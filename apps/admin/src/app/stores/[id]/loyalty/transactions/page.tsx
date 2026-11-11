@@ -12,6 +12,7 @@ import { useT } from '@/i18n/useT';
 import { localDayRange, reportRangeParams, withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface LoyaltyTransaction {
   id: string;
@@ -252,7 +253,7 @@ export default function LoyaltyTransactionsPage() {
             value={typeFilter}
             onChange={e => handleFilterChange(setTypeFilter, e.target.value)}
             aria-label={t('filterTypeAriaLabel')}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className={FIELD_CLASSES}
           >
             {TYPE_FILTERS.map(type => (
               <option key={type} value={type}>
@@ -267,7 +268,7 @@ export default function LoyaltyTransactionsPage() {
             value={dateFrom}
             onChange={e => handleFilterChange(setDateFrom, e.target.value)}
             aria-label={t('dateFromAriaLabel')}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
 
           {/* Date to */}
@@ -276,7 +277,7 @@ export default function LoyaltyTransactionsPage() {
             value={dateTo}
             onChange={e => handleFilterChange(setDateTo, e.target.value)}
             aria-label={t('dateToAriaLabel')}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
 
           {/* Customer search */}
@@ -287,7 +288,7 @@ export default function LoyaltyTransactionsPage() {
               onChange={e => setCustomerFilter(e.target.value)}
               placeholder={t('customerIdPlaceholder')}
               aria-label={t('customerIdAriaLabel')}
-              className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className={FIELD_CLASSES}
             />
             <Button variant="default" size="md" type="submit">
               {t('searchButton')}

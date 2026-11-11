@@ -7,6 +7,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { NOTIFICATION_COLORS } from './types';
 import type { NotificationLog } from './types';
 import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface NotificationsLogProps {
   logs: NotificationLog[];
@@ -135,7 +136,7 @@ export function NotificationsLog({
               value={channelFilter}
               onChange={e => onChannelFilterChange(e.target.value)}
               aria-label={t('filters.channelLabel')}
-              className="px-3 py-1.5 text-sm border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             >
               <option value="all">{t('filters.allChannels')}</option>
               {smsEnabled && <option value="sms">{tShared('channelNames.sms')}</option>}
@@ -147,7 +148,7 @@ export function NotificationsLog({
               value={statusFilter}
               onChange={e => onStatusFilterChange(e.target.value)}
               aria-label={t('filters.statusLabel')}
-              className="px-3 py-1.5 text-sm border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className={FIELD_CLASSES}
             >
               <option value="all">{t('filters.allStatuses')}</option>
               <option value="sent">{t('status.sent')}</option>

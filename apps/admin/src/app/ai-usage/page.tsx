@@ -26,6 +26,7 @@ import { PageState } from '@/components/PageState';
 import { formatSpend } from '@/lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ function PlatformAiUsagePageInner() {
             id="plan-filter"
             value={planFilter}
             onChange={e => setPlanFilter(e.target.value)}
-            className="rounded-lg border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className={FIELD_CLASSES}
             aria-label={t('filters.filterByPlan')}
           >
             <option value="all">{t('filters.allPlans')}</option>
@@ -360,7 +361,7 @@ function PlatformAiUsagePageInner() {
             id="feature-filter"
             value={featureFilter}
             onChange={e => setFeatureFilter(e.target.value)}
-            className="rounded-lg border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className={FIELD_CLASSES}
             aria-label={t('filters.filterByFeature')}
           >
             <option value="all">{t('filters.allFeatures')}</option>

@@ -13,6 +13,7 @@ import { apiGet, apiPatch, apiPut } from '../../../../lib/api';
 import { PLAN_LABELS, STORE_PLANS, type StorePlan } from '@ebda/shared';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Fetches the store theme and surfaces the aiAutopilot flag as a small
@@ -628,7 +629,7 @@ export default function StoreSettingsPage() {
                   {PLAN_LABELS[storeInfo.plan]?.en ?? storeInfo.plan}
                 </span>
                 <select
-                  className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={FIELD_CLASSES}
                   value=""
                   onChange={e => {
                     const val = e.target.value as StorePlan;

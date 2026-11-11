@@ -6,6 +6,7 @@ import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../lib/api';
 import { useT } from '@/i18n/useT';
 import type { FooterBottomBarSettings } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Reusable footer links + utility bar editor. Extracted from
@@ -285,7 +286,7 @@ function LinkRow({
             value={primaryValue}
             onChange={e => onPrimaryChange(e.target.value)}
             placeholder={primaryPlaceholder}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
           <input
             type="text"
@@ -294,14 +295,14 @@ function LinkRow({
             placeholder={arabicPlaceholder}
             lang="ar"
             dir="rtl"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={FIELD_CLASSES}
           />
           <input
             type="text"
             value={pathValue}
             onChange={e => onPathChange(e.target.value)}
             placeholder={pathPlaceholder}
-            className="sm:col-span-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-muted-foreground focus:border-primary focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`${FIELD_CLASSES} sm:col-span-2 font-mono`}
           />
         </div>
         <Button
@@ -762,7 +763,7 @@ export function FooterLinksEditor({
                 onChange={e => setBottomBar(b => ({ ...b, copyrightOverride: e.target.value }))}
                 placeholder={t('legalRowCopyrightPlaceholder')}
                 aria-label={t('legalRowCopyrightPlaceholder')}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
               <input
                 type="text"
@@ -773,7 +774,7 @@ export function FooterLinksEditor({
                 aria-label={t('legalRowCopyrightArPlaceholder')}
                 lang="ar"
                 dir="rtl"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>

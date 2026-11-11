@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { TIER_COLORS, TIER_KEYS, type LoyaltySettings, type TierKey } from './types';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface TierSettingsProps {
   settings: LoyaltySettings;
@@ -44,7 +45,7 @@ export function TierSettings({ settings, disabled, onChange }: TierSettingsProps
                   min="0"
                   value={settings.tiers[tier].minPoints}
                   onChange={e => updateTier(tier, { minPoints: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                  className={FIELD_CLASSES}
                   disabled={disabled || tier === 'bronze'}
                 />
               </div>
@@ -58,7 +59,7 @@ export function TierSettings({ settings, disabled, onChange }: TierSettingsProps
                   min="1"
                   value={settings.tiers[tier].multiplier}
                   onChange={e => updateTier(tier, { multiplier: parseFloat(e.target.value) || 1 })}
-                  className="w-full px-3 py-1.5 border border-border rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                  className={FIELD_CLASSES}
                   disabled={disabled}
                 />
               </div>

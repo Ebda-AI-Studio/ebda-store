@@ -14,6 +14,7 @@ import type {
 } from './types';
 import { BulkImportPreview } from './BulkImportPreview';
 import { BulkImportResults } from './BulkImportResults';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface ImportArgs {
   fileKind: FileKind;
@@ -272,7 +273,7 @@ export function BulkImportWizard({
                     id="defaultStatus"
                     value={defaultStatus}
                     onChange={e => setDefaultStatus(e.target.value as DefaultStatus)}
-                    className="mt-2 block h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    className={`${FIELD_CLASSES} mt-2 block`}
                   >
                     <option value="active">{t('statusActive')}</option>
                     <option value="draft">{t('statusDraft')}</option>

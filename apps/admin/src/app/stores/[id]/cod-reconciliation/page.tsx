@@ -12,6 +12,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { formatMoney } from '../orders/[orderId]/_components/format';
 import { Button } from '@/components/ui/Button';
+import { FIELD_CLASSES, TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 type ReconStatus = 'awaiting' | 'partial' | 'settled' | 'over_remitted' | 'mismatch';
 
@@ -215,7 +216,7 @@ export default function CodReconciliationPage() {
                 <select
                   value={importCarrier}
                   onChange={e => setImportCarrier(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-input rounded-lg text-sm"
+                  className={`${FIELD_CLASSES} mt-1`}
                 >
                   {CARRIERS.map(c => (
                     <option key={c} value={c}>
@@ -240,7 +241,7 @@ export default function CodReconciliationPage() {
               rows={4}
               placeholder={t('pastePlaceholder')}
               aria-label={t('paste')}
-              className="mt-3 w-full px-3 py-2 border border-input rounded-lg text-xs font-mono"
+              className={`${TEXTAREA_CLASSES} mt-3 font-mono`}
             />
             <Button
               variant="default"
@@ -283,7 +284,7 @@ export default function CodReconciliationPage() {
                   setPage(1);
                 }}
                 aria-label={t('filterStatus')}
-                className="px-3 py-1.5 text-sm border border-input rounded-lg"
+                className={FIELD_CLASSES}
               >
                 <option value="">{t('allStatuses')}</option>
                 <option value="flagged">{t('statuses.flagged')}</option>
@@ -302,7 +303,7 @@ export default function CodReconciliationPage() {
                   setPage(1);
                 }}
                 aria-label={t('filterCarrier')}
-                className="px-3 py-1.5 text-sm border border-input rounded-lg"
+                className={FIELD_CLASSES}
               >
                 <option value="">{t('allCarriers')}</option>
                 {CARRIERS.map(c => (

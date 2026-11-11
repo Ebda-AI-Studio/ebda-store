@@ -22,6 +22,7 @@ import { ShapePicker } from './_components/ShapePicker';
 import { SheetPreview } from './_components/SheetPreview';
 import { toLabelItem, useLabels } from './useLabels';
 import { Button, buttonVariants } from '@/components/ui/Button';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 const MAX_TOTAL_COPIES = 2000;
 
@@ -169,7 +170,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
               onChange={e => L.setSearch(e.target.value)}
               placeholder={ti('searchPlaceholder')}
               aria-label={ti('search')}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             />
             {L.items.length === 0 && !L.itemsLoading ? (
               <p className="text-sm text-muted-foreground">{ti('empty')}</p>
@@ -207,7 +208,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                           dir="ltr"
                           aria-label={`${ti('qty')}: ${name}${variant ? ` / ${variant}` : ''}`}
                           onChange={e => L.setQty(i.id, Number(e.target.value))}
-                          className="w-16 shrink-0 rounded-lg border border-input bg-card px-2 py-1 text-center text-sm"
+                          className={`${FIELD_CLASSES} w-16 shrink-0 text-center`}
                         />
                       )}
                     </li>
@@ -289,7 +290,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
               aria-label={t('size.title')}
               value={settings.preset}
               onChange={e => set({ preset: e.target.value })}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/40"
+              className={FIELD_CLASSES}
             >
               <optgroup label={t('size.sheets')}>
                 {LABEL_PRESETS.filter(p => p.kind === 'sheet').map(p => (

@@ -12,6 +12,7 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../lib/api';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Global ⌘K / Ctrl+K command palette for the admin. Searches EVERY admin
@@ -297,7 +298,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder={t('placeholder')}
-            className="h-12 w-full bg-transparent text-sm text-foreground outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground"
+            className={FIELD_CLASSES}
             aria-label={t('placeholder')}
           />
           <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">

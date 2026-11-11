@@ -22,6 +22,7 @@ import { Toggle } from '../../components/Toggle';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 interface PlanRow {
   code: string;
@@ -385,7 +386,7 @@ function PlansInner() {
                     <label key={key} className="space-y-1 text-sm">
                       <span>{t(`limits.${key}`)}</span>
                       <select
-                        className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        className={`${FIELD_CLASSES} block`}
                         value={limits[key]}
                         onChange={e => setLimits(l => (l ? { ...l, [key]: e.target.value } : l))}
                       >

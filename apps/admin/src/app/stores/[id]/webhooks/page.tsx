@@ -11,6 +11,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../../..
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { planNamesJoined } from '@/lib/plan-labels';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Merchant outgoing webhooks: endpoints, the once-only signing secret, the delivery log with
@@ -411,7 +412,7 @@ export default function WebhooksPage() {
           <label className="block text-xs font-medium text-foreground" dir="auto">
             {t('form.urlLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={form.url}
               onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
               placeholder={t('form.urlPlaceholder')}
@@ -426,7 +427,7 @@ export default function WebhooksPage() {
           <label className="block text-xs font-medium text-foreground" dir="auto">
             {t('form.descriptionLabel')}
             <input
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className={`${FIELD_CLASSES} mt-1`}
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               maxLength={120}

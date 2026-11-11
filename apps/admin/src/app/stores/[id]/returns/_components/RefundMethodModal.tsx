@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 
 import { formatMoney, tryToMinor } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 type RefundMethod = 'original' | 'store_credit' | 'bank_transfer' | 'manual';
 
 // 'manual' ("Already refunded — record only") is offered ONLY when a refund for
@@ -383,7 +384,7 @@ export function RefundMethodModal({
                                   })
                                 }
                                 aria-invalid={err === 'amount'}
-                                className="mt-1 min-h-11 w-full rounded-md border px-3 text-sm"
+                                className={`${FIELD_CLASSES} mt-1`}
                               />
                             </label>
                             <label className="block text-xs">
@@ -398,7 +399,7 @@ export function RefundMethodModal({
                                   })
                                 }
                                 aria-invalid={err === 'reason'}
-                                className="mt-1 min-h-11 w-full rounded-md border px-3 text-sm"
+                                className={`${FIELD_CLASSES} mt-1`}
                               />
                             </label>
                             {err && (

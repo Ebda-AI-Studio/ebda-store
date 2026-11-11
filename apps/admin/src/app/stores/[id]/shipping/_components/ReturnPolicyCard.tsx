@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut } from '../../../../../lib/api';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Return-policy control.
@@ -127,7 +128,7 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
             value={days}
             onChange={e => setDays(e.target.value)}
             placeholder={t('notDeclared')}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className={`${FIELD_CLASSES} mt-1`}
           />
         </div>
 
@@ -143,7 +144,7 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
             value={feesPaidBy}
             onChange={e => setFeesPaidBy(e.target.value)}
             disabled={days.trim() === ''}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+            className={`${FIELD_CLASSES} mt-1`}
           >
             <option value="customer">{t('feesCustomer')}</option>
             <option value="merchant">{t('feesMerchant')}</option>

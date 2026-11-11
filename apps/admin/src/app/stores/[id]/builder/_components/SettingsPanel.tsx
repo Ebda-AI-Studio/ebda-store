@@ -49,6 +49,7 @@ import { MediaPicker } from './MediaPicker';
 import { VideoField } from './VideoField';
 import type { Selection } from './SectionTree';
 import { fieldDefId } from '../_lib/deeplink';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 type Mode = 'content' | 'design';
 
@@ -488,7 +489,7 @@ export function Field({
             aria-invalid={bad}
             onChange={e => onChange(def.id, empty(e.target.value))}
             placeholder={PATH_EXAMPLE}
-            className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+            className={FIELD_CLASSES}
           />
           {bad && <span className="mt-1 block text-xs text-destructive-ink">{t('unsafeUrl')}</span>}
         </label>
@@ -561,7 +562,7 @@ export function Field({
               const opt = def.options?.find(o => String(o.value) === e.target.value);
               onChange(def.id, opt ? opt.value : undefined);
             }}
-            className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+            className={FIELD_CLASSES}
           >
             <option value="">{t('default')}</option>
             {def.options?.map(o => (
@@ -601,7 +602,7 @@ export function Field({
                     )
               )
             }
-            className="w-28 rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+            className={`${FIELD_CLASSES} w-28`}
           />
         </label>
       );
@@ -772,7 +773,7 @@ function CategoryPicker({
       aria-label={label}
       value={value}
       onChange={e => onChange(e.target.value || undefined)}
-      className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+      className={FIELD_CLASSES}
     >
       <option value="">{t('pickCategory')}</option>
       {cats.map(c => (
@@ -847,7 +848,7 @@ function ProductListPicker({
         value={query}
         onChange={e => setQuery(e.target.value)}
         placeholder={t('searchProducts')}
-        className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+        className={FIELD_CLASSES}
       />
       <ul className="max-h-40 space-y-0.5 overflow-y-auto">
         {found

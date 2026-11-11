@@ -11,6 +11,7 @@ import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { minorToMajor, intlLocaleForUi } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
           value={entryId}
           onChange={e => setEntryId(e.target.value)}
           placeholder={t('uuidExample')}
-          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className={FIELD_CLASSES}
         />
         <p className="mt-1 text-xs text-muted-foreground">{t('entryIdHelp')}</p>
         <div className="mt-5 flex gap-3 justify-end">

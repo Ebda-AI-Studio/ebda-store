@@ -25,6 +25,7 @@ import { Toggle } from '../../components/Toggle';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 function PlatformSettingsInner() {
   const t = useT('platformSettings');
@@ -145,7 +146,7 @@ function PlatformSettingsInner() {
             <span className="mb-1 block font-medium text-foreground">{t('vat.mode')}</span>
             <select
               aria-label={t('vat.mode')}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              className={FIELD_CLASSES}
               value={mode}
               onChange={e => setMode(e.target.value as PlatformVatMode)}
             >

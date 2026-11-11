@@ -15,6 +15,7 @@ import { ColorField } from '../../../../components/ColorField';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import type { StoreTheme } from '@ebda/shared';
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // Field names mirror the canonical AnnouncementBar shape from @ebda/shared
 // and the API's announcementSchema (`bgColor`, `link`). The previous local
@@ -165,7 +166,7 @@ export default function AnnouncementPage() {
                 value={settings.text}
                 onChange={e => setSettings(prev => ({ ...prev, text: e.target.value }))}
                 placeholder={t('textEnglishPlaceholder')}
-                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <div>
@@ -179,7 +180,7 @@ export default function AnnouncementPage() {
                 value={settings.textAr}
                 onChange={e => setSettings(prev => ({ ...prev, textAr: e.target.value }))}
                 placeholder={t('textArabicPlaceholder')}
-                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>
@@ -191,7 +192,7 @@ export default function AnnouncementPage() {
               value={settings.link}
               onChange={e => setSettings(prev => ({ ...prev, link: e.target.value }))}
               placeholder={t('linkUrlPlaceholder')}
-              className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={FIELD_CLASSES}
             />
             <p className="mt-1 text-xs text-muted-foreground">{t('linkUrlHint')}</p>
           </div>
@@ -206,7 +207,7 @@ export default function AnnouncementPage() {
                 value={settings.linkText}
                 onChange={e => setSettings(prev => ({ ...prev, linkText: e.target.value }))}
                 placeholder={t('linkTextEnglishPlaceholder')}
-                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
             <div>
@@ -220,7 +221,7 @@ export default function AnnouncementPage() {
                 value={settings.linkTextAr}
                 onChange={e => setSettings(prev => ({ ...prev, linkTextAr: e.target.value }))}
                 placeholder={t('linkTextArabicPlaceholder')}
-                className="w-full rounded-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className={FIELD_CLASSES}
               />
             </div>
           </div>
