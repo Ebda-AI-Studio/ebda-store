@@ -1,5 +1,5 @@
 # Ebda AI Studio security contact (RFC 9116)
 Contact: mailto:security@ebda.app
-Expires: 2027-07-15T00:00:00.000Z
+Expires: 2027-09-30T00:00:00.000Z
 Preferred-Languages: en, ar
 Canonical: https://ebda.app/.well-known/security.txt
