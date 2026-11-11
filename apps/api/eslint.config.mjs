@@ -66,7 +66,7 @@ export default [
     ignores: [
       'dist/**',
       'node_modules/**',
-      'src/cf/stubs/exceljs-workers.cjs',
+      'src/cf/modules/exceljs.cjs',
       'src/cf/modules/*.mjs',
     ], // generated minified library builds (BUNDLE-BUDGET-6, -7)
   },
