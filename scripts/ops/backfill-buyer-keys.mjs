@@ -32,7 +32,7 @@ export function parseArgs(argv) {
 export async function drive(args, token, { fetchFn = fetch, io = { exists: existsSync, read: p => readFileSync(p, 'utf8'), write: writeFileSync, rm: unlinkSync }, log = console.log } = {}) {
   let cursor = io.exists(args.cursorFile) ? io.read(args.cursorFile).trim() || undefined : undefined;
   if (cursor) log(`resuming from saved cursor (${args.cursorFile})`);
-  const totals = { scanned: 0, keyed: 0, noPhone: 0, skippedStores: 0, calls: 0 };
+  const totals = { scanned: 0, keyed: 0, noPhone: 0, openUnkeyed: 0, openUnkeyedNoPhone: 0, skippedStores: 0, calls: 0 };
   do {
     const res = await fetchFn(`${args.api}/api/v1/admin/wa/buyer-key-backfill`, {
       method: 'POST',
@@ -43,13 +43,14 @@ export async function drive(args, token, { fetchFn = fetch, io = { exists: exist
     if (!res.ok || !body?.success) throw new Error(`backfill call failed: ${res.status} ${JSON.stringify(body)?.slice(0, 300)}`);
     const d = body.data;
     totals.calls++;
-    for (const k of ['scanned', 'keyed', 'noPhone', 'skippedStores']) totals[k] += d.totals[k];
-    for (const s of d.stores) log(`${d.dryRun ? 'would key' : 'keyed'} ${String(s.keyed).padStart(5)}  noPhone ${String(s.noPhone).padStart(5)}  scanned ${String(s.scanned).padStart(5)}  ${s.storeId}${s.skipped ? `  SKIPPED(${s.skipped})` : ''}${s.done ? '' : '  (partial)'}`);
+    for (const k of ['scanned', 'keyed', 'noPhone', 'openUnkeyed', 'openUnkeyedNoPhone', 'skippedStores']) totals[k] += d.totals[k];
+    for (const s of d.stores) log(`${d.dryRun ? 'would key' : 'keyed'} ${String(s.keyed).padStart(5)}  noPhone ${String(s.noPhone).padStart(5)}  openUnkeyed ${String(s.openUnkeyed ?? 0).padStart(4)}  scanned ${String(s.scanned).padStart(5)}  ${s.storeId}${s.skipped ? `  SKIPPED(${s.skipped})` : ''}${s.done ? '' : '  (partial)'}`);
     cursor = d.nextCursor ?? undefined;
     if (cursor) io.write(args.cursorFile, cursor);
     else if (io.exists(args.cursorFile)) io.rm(args.cursorFile);
   } while (cursor);
   log(`${args.apply ? 'APPLIED' : 'DRY RUN'}: ${JSON.stringify(totals)}`);
+  log(`HEADLINE: ${totals.openUnkeyed} unpaid COD/InstaPay orders had NO buyer key (${totals.openUnkeyedNoPhone} of them have no usable phone and cannot be keyed by this script: fix those by hand before Chat #67 deploys).`);
   return totals;
 }
 

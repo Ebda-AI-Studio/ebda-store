@@ -31,6 +31,34 @@ describe('backfill-buyer-keys script', () => {
     expect(() => parseArgs(['--budget', '5000'])).toThrow('budget');
     expect(() => parseArgs(['--nope'])).toThrow('unknown');
   });
+  it('prints the headline count of unpaid COD/InstaPay orders without a key', async () => {
+    const { io } = mkIo();
+    const out: string[] = [];
+    const p = {
+      success: true,
+      data: {
+        dryRun: true,
+        stores: [],
+        totals: {
+          scanned: 9,
+          keyed: 5,
+          noPhone: 4,
+          openUnkeyed: 7,
+          openUnkeyedNoPhone: 2,
+          skippedStores: 0,
+        },
+        nextCursor: null,
+      },
+    };
+    await drive({ ...parseArgs([]), cursorFile: 'c' }, 'tok', {
+      fetchFn: async () => ({ ok: true, status: 200, json: async () => p }),
+      io,
+      log: (l: string) => void out.push(l),
+    });
+    expect(out.join('\n')).toContain(
+      'HEADLINE: 7 unpaid COD/InstaPay orders had NO buyer key (2 of them'
+    );
+  });
   it('follows nextCursor to the end, saves it between calls, sends dryRun:true, and removes the cursor file when done', async () => {
     const { io, files } = mkIo();
     const bodies: Array<Record<string, unknown>> = [];

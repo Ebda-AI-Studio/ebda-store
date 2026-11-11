@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { env, applyD1Migrations, runInDurableObject } from 'cloudflare:test';
-import { encodeRpc } from '@ebda-src/repo';
+import { decodeRpc, encodeRpc } from '@ebda-src/repo';
 import { buyerKeyFor, toE164 } from '@ebda/shared';
 import { createPostgresRemovedClient, runWithRequestDb } from '@ebda/database';
 import type { StoreDO } from '../src/cf/store-do/store-do';
@@ -68,6 +68,21 @@ async function order(id: string, slug: string, phone: string | null, n: number) 
     `bf-${slug}-${n}`
   );
   if (!r.ok) throw new Error(`order failed ${JSON.stringify(r)}`);
+  // the COD payment row is a second step at checkout (PaymentService.recordCodPayment); the report counts OPEN COD / InstaPay orders by it
+  const placed = decodeRpc<{ orderId: string; total: number }>(r.json);
+  const p = await stub(id).moneyOp(
+    id,
+    'paymentCreate',
+    encodeRpc({
+      orderId: placed.orderId,
+      provider: 'cod',
+      method: 'cod',
+      amount: placed.total,
+      currency: 'EGP',
+      metadata: {},
+    })
+  );
+  if (!p.ok) throw new Error(`payment failed ${JSON.stringify(p)}`);
 }
 const keys = async (id: string) =>
   (
@@ -96,6 +111,8 @@ describe('buyer-key backfill', () => {
     const r = await run(() => runBuyerKeyBackfill({ secret: SECRET, dryRun: true, budget: 100 }));
     expect(r.nextCursor).toBeNull();
     expect(r.totals).toMatchObject({ scanned: 4, keyed: 3, noPhone: 1, skippedStores: 0 });
+    // every fixture order is an unpaid COD order: all 4 are open and unkeyed, and the one with no phone cannot be fixed by the script
+    expect(r.totals).toMatchObject({ openUnkeyed: 4, openUnkeyedNoPhone: 1 });
     expect(r.stores.map(s => [s.storeId, s.keyed, s.noPhone]).sort()).toEqual(
       [
         [S1, 2, 1],

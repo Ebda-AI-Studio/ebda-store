@@ -20,13 +20,24 @@ export interface BackfillStoreReport {
   /** stamped (apply) or would be stamped (dry run) */
   keyed: number;
   noPhone: number;
+  /** UNPAID COD / InstaPay orders (still open) found WITHOUT a buyer key: the ones whose COD outcome / payment proof is lost if the key stays missing */
+  openUnkeyed: number;
+  /** of those, the ones with no usable phone: this script cannot key them, a human must */
+  openUnkeyedNoPhone: number;
   skipped: 'gone' | 'not_do' | 'error' | null;
   done: boolean;
 }
 export interface BackfillResult {
   dryRun: boolean;
   stores: BackfillStoreReport[];
-  totals: { scanned: number; keyed: number; noPhone: number; skippedStores: number };
+  totals: {
+    scanned: number;
+    keyed: number;
+    noPhone: number;
+    openUnkeyed: number;
+    openUnkeyedNoPhone: number;
+    skippedStores: number;
+  };
   /** null = the whole fleet is done; pass it back to continue */
   nextCursor: string | null;
 }
@@ -71,6 +82,8 @@ async function backfillStore(
     scanned: 0,
     keyed: 0,
     noPhone: 0,
+    openUnkeyed: 0,
+    openUnkeyedNoPhone: 0,
     skipped: null,
     done: false,
   };
@@ -94,7 +107,13 @@ async function backfillStore(
         where: { storeId, buyerKey: null, ...(after ? { id: { gt: after } } : {}) },
         orderBy: { id: 'asc' },
         take,
-        select: { id: true, shippingAddress: true },
+        select: {
+          id: true,
+          shippingAddress: true,
+          status: true,
+          paymentStatus: true,
+          payments: { select: { provider: true } },
+        },
       });
       for (const o of rows) {
         report.scanned++;
@@ -102,8 +121,14 @@ async function backfillStore(
         const phone = (o.shippingAddress as { phone?: unknown } | null)?.phone;
         const e164 = typeof phone === 'string' ? toE164(phone) : null;
         const key = e164 ? await buyerKeyFor(secret, e164) : null;
+        const open =
+          o.paymentStatus === 'unpaid' &&
+          ['pending', 'confirmed', 'awaiting_payment_confirmation'].includes(String(o.status)) &&
+          (o.payments ?? []).some(p => p.provider === 'cod' || p.provider === 'instapay');
+        if (open) report.openUnkeyed++;
         if (!key) {
           report.noPhone++;
+          if (open) report.openUnkeyedNoPhone++;
           continue;
         }
         if (dryRun) {
@@ -163,9 +188,11 @@ export async function runBuyerKeyBackfill(opts: BackfillOpts): Promise<BackfillR
       scanned: t.scanned + r.scanned,
       keyed: t.keyed + r.keyed,
       noPhone: t.noPhone + r.noPhone,
+      openUnkeyed: t.openUnkeyed + r.openUnkeyed,
+      openUnkeyedNoPhone: t.openUnkeyedNoPhone + r.openUnkeyedNoPhone,
       skippedStores: t.skippedStores + (r.skipped ? 1 : 0),
     }),
-    { scanned: 0, keyed: 0, noPhone: 0, skippedStores: 0 }
+    { scanned: 0, keyed: 0, noPhone: 0, openUnkeyed: 0, openUnkeyedNoPhone: 0, skippedStores: 0 }
   );
   return { dryRun: opts.dryRun, stores: reports, totals, nextCursor };
 }

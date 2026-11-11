@@ -10,12 +10,18 @@ import { runBuyerKeyBackfill, encodeCursor, decodeCursor } from '@api/lib/wa/buy
 
 const SECRET = 'unit-test-suite-secret-at-least-32-chars!!';
 const stamp = vi.fn(async () => ({ stamped: true }));
-const orders = (rows: Array<{ id: string; phone?: string }>) => ({
+const orders = (rows: Array<{ id: string; phone?: string; open?: boolean }>) => ({
   backend: 'do',
   db: {
     order: {
       findMany: async () =>
-        rows.map(r => ({ id: r.id, shippingAddress: r.phone ? { phone: r.phone } : {} })),
+        rows.map(r => ({
+          id: r.id,
+          shippingAddress: r.phone ? { phone: r.phone } : {},
+          status: 'pending',
+          paymentStatus: r.open === false ? 'paid' : 'unpaid',
+          payments: [{ provider: 'cod' }],
+        })),
     },
   },
 });
@@ -47,7 +53,14 @@ describe('buyer-key backfill skip paths', () => {
       ['c', 'error'],
       ['d', null],
     ]);
-    expect(r.totals).toMatchObject({ skippedStores: 3, keyed: 1, noPhone: 1, scanned: 2 });
+    expect(r.totals).toMatchObject({
+      skippedStores: 3,
+      keyed: 1,
+      noPhone: 1,
+      scanned: 2,
+      openUnkeyed: 2,
+      openUnkeyedNoPhone: 1,
+    });
     expect(stamp).toHaveBeenCalledTimes(1);
   });
   it('dry run never calls the stamp op', async () => {
