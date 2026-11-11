@@ -1932,6 +1932,27 @@ h1:where([data-zone='productName']) {
   box-shadow: inset 0 0 0 2px hsl(var(--filter-fg));
 }
 
+/*
+ * UI audit 2026-11-11 (P1): footer and breadcrumb links measured 18-22 px tall at every width (WCAG 2.5.8 floor
+ * is 24 px, the store's own bar is 44 px on touch). Footer links get a real row height; the breadcrumb a touch
+ * height. No colour, font or spacing between columns changes, so merchant themes are untouched.
+ */
+[data-zone='footer'] a:not([data-part='logo']) {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 28px;
+}
+@media (pointer: coarse) {
+  [data-zone='footer'] a:not([data-part='logo']),
+  nav[aria-label] ol a {
+    min-block-size: 44px;
+  }
+  nav[aria-label] ol a {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
 /* ==========================================================================
    Looks (Phase S). EVERY rule here is scoped under [data-look], which the
    root layout sets on <body> only for stores with a valid look. Legacy
@@ -2042,26 +2063,5 @@ html[lang='en'] [data-look] .font-display {
   [data-look] .aspect-\[var\(--hero-m-aspect\)\].max-h-\[45vh\] {
     aspect-ratio: var(--look-hero-aspect, var(--hero-m-aspect));
     max-height: var(--look-hero-maxh, 45vh);
-  }
-}
-
-/*
- * UI audit 2026-11-11 (P1): footer and breadcrumb links measured 18-22 px tall at every width (WCAG 2.5.8 floor
- * is 24 px, the store's own bar is 44 px on touch). Footer links get a real row height; the breadcrumb a touch
- * height. No colour, font or spacing between columns changes, so merchant themes are untouched.
- */
-[data-zone='footer'] a:not([data-part='logo']) {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: 28px;
-}
-@media (pointer: coarse) {
-  [data-zone='footer'] a:not([data-part='logo']),
-  nav[aria-label] ol a {
-    min-block-size: 44px;
-  }
-  nav[aria-label] ol a {
-    display: inline-flex;
-    align-items: center;
   }
 }
