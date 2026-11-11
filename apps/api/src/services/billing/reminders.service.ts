@@ -210,7 +210,7 @@ type StageKey = { storeId: string; subscriptionId: string; dueAt: Date; kind: Gr
 type OutboxRow = StageKey & { id: string; createdAt: Date };
 
 /*
- * `billing_reminders.notice_sent_at` is a D1-only column (platform migration 0011): it is not in the Prisma model, so the outbox
+ * `billing_reminders.notice_sent_at` is a D1-only column (platform migration 0014): it is not in the Prisma model, so the outbox
  * state is read and written with raw D1 SQL (billing-d1.ts). Off D1 (no such column) the outbox is a no-op and a stage is
  * as before: claimed, sent once.
  */

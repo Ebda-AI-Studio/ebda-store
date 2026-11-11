@@ -55,6 +55,7 @@ const snapshot = (db: DatabaseSync) => ({
 const LATE_TABLE: Record<string, string> = {
   BillingEvent: 'billing_events',
   BillingReminder: 'billing_reminders',
+  Store: 'stores',
 };
 
 const late = Object.entries(

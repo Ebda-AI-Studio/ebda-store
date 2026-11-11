@@ -40,7 +40,7 @@ describe('D1 0013: billing_reminders accepts the grace stages (BILL-NOTICE-1)', 
   it('exists, after 0011 (0012 is reserved for the template contract step)', () => {
     expect(M10).toBeTruthy();
     expect(files.indexOf(M10)).toBe(
-      files.findIndex(f => f.endsWith('0009_store_template_current.sql')) + 1
+      files.findIndex(f => f.endsWith('0011_template_expand_only.sql')) + 1
     );
   });
 
