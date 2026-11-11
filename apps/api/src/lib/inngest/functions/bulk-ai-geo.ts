@@ -1,6 +1,8 @@
 import type { JobDef } from '../../jobs/types';
-import { writeBulkProductFields } from '../../../services/ai-autofill.service';
-import { storeWriter } from '../../../lib/repo-factory';
+import {
+  writeBulkProductFields,
+  writeBulkStoreFields,
+} from '../../../services/ai-autofill.service';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
@@ -20,7 +22,6 @@ import { bustStoreCachesById } from '../../../services/store.service';
 import { storeOrigin } from '@ebda/shared';
 import { isPlaceholderText } from '../../ai/placeholder-guard';
 import { EGYPTIAN_ARABIC_REGISTER } from '../../ai/arabic-register';
-import { storeUpdate } from '../../repo-factory';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -256,10 +257,12 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
             const text = genResult.response.text().trim();
 
             if (text.length > 50 && !isPlaceholderText(text)) {
-              await storeUpdate(prisma, {
-                where: { id: storeId },
-                data: { llmsTxt: text.slice(0, 4000) },
-              });
+              await writeBulkStoreFields(
+                storeId,
+                store,
+                { llmsTxt: text.slice(0, 4000) },
+                { overwrite: force }
+              );
               filled++;
             } else {
               skipped++;
@@ -804,7 +807,12 @@ Populate using only the information provided above. For keyCategories, use the c
             const facts = normalizeBrandFacts(JSON.parse(raw));
 
             if (facts) {
-              await storeUpdate(prisma, { where: { id: storeId }, data: { aboutJson: facts } });
+              await writeBulkStoreFields(
+                storeId,
+                store,
+                { aboutJson: facts },
+                { overwrite: force }
+              );
               filled++;
             } else {
               skipped++;

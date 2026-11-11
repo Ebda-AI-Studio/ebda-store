@@ -1,6 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { writeBulkProductFields } from '../../../services/ai-autofill.service';
-import { storeWriter } from '../../../lib/repo-factory';
+import { writeBulkProductFields, writeBulkRowFields } from '../../../services/ai-autofill.service';
+import { writeBulkStoreFields } from '../../../services/ai-autofill.service';
 import { lazyStoreDb, lazyStoreWriter, withStoreDb } from '../../jobs/store-db';
 import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
@@ -1097,14 +1097,15 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                   parsed.en.trim() &&
                   !isPlaceholderText(parsed.en)
                 ) {
-                  await storeUpdate(prisma, {
-                    where: { id: storeId },
-                    data: {
+                  await writeBulkStoreFields(
+                    storeId,
+                    s,
+                    {
                       metaDescriptionAeo: parsed.en.trim().slice(0, 160),
-                      metaDescriptionAeoAr:
-                        parsed.ar?.trim().slice(0, 160) || s.metaDescriptionAeoAr || null,
+                      metaDescriptionAeoAr: parsed.ar?.trim().slice(0, 160),
                     },
-                  });
+                    { overwrite: force }
+                  );
                   bFilled++;
                 } else {
                   bSkipped++;
@@ -1244,16 +1245,17 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 parsed.en.trim() &&
                 !isPlaceholderText(parsed.en)
               ) {
-                await (
-                  await storeWriter(storeId)
-                ).category.update({
-                  where: { id: c.id, storeId },
-                  data: {
+                await writeBulkRowFields(
+                  storeId,
+                  'category',
+                  c.id,
+                  c,
+                  {
                     metaDescriptionAeo: parsed.en.trim().slice(0, 160),
-                    metaDescriptionAeoAr:
-                      parsed.ar?.trim().slice(0, 160) || c.metaDescriptionAeoAr || null,
+                    metaDescriptionAeoAr: parsed.ar?.trim().slice(0, 160),
                   },
-                });
+                  { overwrite: force }
+                );
                 bFilled++;
               } else {
                 bSkipped++;

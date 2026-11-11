@@ -16,9 +16,13 @@ const aiJobs = readdirSync(DIR).filter(
 describe('AI jobs write product fields only through the guarded fill-only layer', () => {
   it('finds the AI jobs', () => expect(aiJobs.length).toBeGreaterThan(10));
   for (const f of aiJobs) {
-    it(`${f}: no direct product.update / updateMany / upsert`, () => {
+    it(`${f}: no direct product / category / productImage / store write`, () => {
       const src = readFileSync(join(DIR, f), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
-      expect(src).not.toMatch(/\.product\.(update|updateMany|upsert)\s*\(/);
+      expect(src).not.toMatch(
+        /\.(product|category|productImage|store)\.(update|updateMany|upsert)\s*\(/
+      );
+      // the AI-text Store write; bulk-ai-aeo's footer-link settings write goes through a `tx`, not `prisma`
+      expect(src).not.toMatch(/\bstoreUpdate\s*\(\s*prisma\b/);
     });
   }
   for (const f of [

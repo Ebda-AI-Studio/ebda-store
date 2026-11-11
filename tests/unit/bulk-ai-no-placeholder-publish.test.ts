@@ -164,13 +164,20 @@ function writesOfColumn(root: ts.Node, key: string): ts.CallExpression[] {
   return out;
 }
 
-/** `writeBulkProductFields(storeId, id, baseline, { <key>: ... })`: the guarded product write of that column (#620). */
+/** `writeBulk{Product,Row,Store}Fields(..., { <key>: ... })`: the guarded write of that column (#620). */
 function bulkWritesOfColumn(root: ts.Node, key: string): ts.CallExpression[] {
   const out: ts.CallExpression[] = [];
   walk(root, n => {
-    if (!ts.isCallExpression(n) || n.expression.getText() !== 'writeBulkProductFields') return;
-    const c = n.arguments[3];
-    if (c && ts.isObjectLiteralExpression(c) && c.properties.some(pr => pr.name?.getText() === key))
+    if (
+      !ts.isCallExpression(n) ||
+      !/^writeBulk(Product|Row|Store)Fields$/.test(n.expression.getText())
+    )
+      return;
+    if (
+      n.arguments.some(
+        a => ts.isObjectLiteralExpression(a) && a.properties.some(pr => pr.name?.getText() === key)
+      )
+    )
       out.push(n);
   });
   return out;
@@ -298,7 +305,7 @@ describe('bulk-ai-geo.ts: every live write site rejects placeholder output befor
 
   it('bulk-ai-llms-txt guards Store.llmsTxt', () => {
     const fn = functionNode(sf, 'bulk-ai-llms-txt');
-    expectGuardedWrites(writesOfColumn(fn, 'llmsTxt'), 1, 'Store.llmsTxt');
+    expectGuardedWrites(bulkWritesOfColumn(fn, 'llmsTxt'), 1, 'Store.llmsTxt');
   });
 
   it('bulk-ai-citation-copy guards Product.citationCopy', () => {

@@ -1,6 +1,6 @@
 import type { JobDef } from '../../jobs/types';
-import { writeBulkProductFields } from '../../../services/ai-autofill.service';
-import { storeWriter } from '../../../lib/repo-factory';
+import { writeBulkProductFields, writeBulkRowFields } from '../../../services/ai-autofill.service';
+import { writeBulkStoreFields } from '../../../services/ai-autofill.service';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { AIService } from '../../../services/ai.service';
@@ -11,7 +11,6 @@ import { inngest } from '../client';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { requestStoreReindex } from '../../search/reindex';
-import { storeUpdate } from '../../repo-factory';
 
 /**
  * Catalogue-wide translation sweep. Walks every product + category
@@ -374,9 +373,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
               if (Object.keys(updates).length > 0) {
                 try {
-                  await (
-                    await storeWriter(storeId)
-                  ).category.update({ where: { id: c.id, storeId }, data: updates });
+                  await writeBulkRowFields(storeId, 'category', c.id, c, updates);
                 } catch (err) {
                   await recordError({
                     entityKind: 'category',
@@ -468,7 +465,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
             if (Object.keys(updates).length > 0) {
               try {
-                await storeUpdate(prisma, { where: { id: storeId }, data: updates });
+                await writeBulkStoreFields(storeId, store, updates);
               } catch (err) {
                 await recordError({
                   entityKind: 'store',
