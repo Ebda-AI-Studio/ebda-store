@@ -411,8 +411,8 @@ export function bundlesCacheKey(storeId: string): string {
  */
 export const ORDER_PURGE_COALESCE_MS = 10_000;
 
-/** Open coalescing windows by store: `pending` = an order arrived mid-window. */
-const orderPurgeWindows = new BoundedMap<string, { pending: boolean }>(10_000);
+/** Open coalescing windows by store: `pending` = an order arrived mid-window; `openedAt` = when it opened. */
+const orderPurgeWindows = new BoundedMap<string, { pending: boolean; openedAt: number }>(10_000);
 
 function purgeStorefrontProducts(storeId: string): void {
   revalidateStorefront({
@@ -420,20 +420,31 @@ function purgeStorefrontProducts(storeId: string): void {
   });
 }
 
+/**
+ * Open a window and schedule its trailing purge. The wait is a promise handed to `ctx.waitUntil`
+ * (`cfWaitUntil`), NOT a bare `setTimeout`: Workers do not promise a timer survives the response, so a
+ * dropped timer left the window open for the isolate's life and the NEVER-stale inventory purge never
+ * fired. As a second line, `invalidateStoreProductCachesAfterOrder` treats a window older than
+ * 2x the coalesce time as dead and purges itself, so even a dropped waitUntil costs at most one extra window.
+ */
 function openOrderPurgeWindow(storeId: string): void {
-  const window = { pending: false };
+  const window = { pending: false, openedAt: Date.now() };
   orderPurgeWindows.set(storeId, window);
-  const timer = setTimeout(() => {
-    if (orderPurgeWindows.get(storeId) !== window) return;
-    if (window.pending) {
-      purgeStorefrontProducts(storeId);
-      openOrderPurgeWindow(storeId);
-    } else {
-      orderPurgeWindows.delete(storeId);
-    }
-  }, ORDER_PURGE_COALESCE_MS);
-  // Never hold the process open for a cache purge.
-  timer.unref?.();
+  cfWaitUntil(
+    new Promise<void>(resolve => {
+      const timer = setTimeout(resolve, ORDER_PURGE_COALESCE_MS);
+      // Never hold the process open for a cache purge.
+      timer.unref?.();
+    }).then(() => {
+      if (orderPurgeWindows.get(storeId) !== window) return;
+      if (window.pending) {
+        purgeStorefrontProducts(storeId);
+        openOrderPurgeWindow(storeId);
+      } else {
+        orderPurgeWindows.delete(storeId);
+      }
+    })
+  );
 }
 
 /**
@@ -454,10 +465,11 @@ function openOrderPurgeWindow(storeId: string): void {
 export async function invalidateStoreProductCachesAfterOrder(storeId: string): Promise<void> {
   await clearProductsRedis(storeId);
   const open = orderPurgeWindows.get(storeId);
-  if (open) {
+  if (open && Date.now() - open.openedAt < ORDER_PURGE_COALESCE_MS * 2) {
     open.pending = true;
     return;
   }
+  // No window, or one whose trailing purge never ran (dropped timer/waitUntil): purge now, start fresh.
   purgeStorefrontProducts(storeId);
   openOrderPurgeWindow(storeId);
 }
