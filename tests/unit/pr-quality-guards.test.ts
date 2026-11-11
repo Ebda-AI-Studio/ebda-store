@@ -300,3 +300,13 @@ describe('symlinks never leave the checkout', () => {
     expect(eslintGrowth(pr, base, ['apps'])).toEqual([]);
   });
 });
+
+describe('pr-quality.yml leaves nothing of a fork on a self-hosted runner', () => {
+  it('the slop job ends with an always() step that removes the pr/ checkout', () => {
+    const wf = readFileSync('.github/workflows/pr-quality.yml', 'utf8');
+    const job = wf.slice(wf.indexOf('  slop-baselines:'));
+    const tail = job.slice(job.lastIndexOf('- name: Remove the checkouts'));
+    expect(tail).toMatch(/if: always\(\)/);
+    expect(tail).toMatch(/rm -rf "\$GITHUB_WORKSPACE\/pr"/);
+  });
+});
