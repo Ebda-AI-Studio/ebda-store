@@ -12,8 +12,6 @@
  * Run: npm run build -w @ebda/marketing && npx playwright test -c playwright.marketing.config.ts design-guard
  */
 import { test, expect } from '@playwright/test';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 const WIDTHS = [360, 390, 820, 1280];
 
@@ -233,51 +231,7 @@ test('marketing stays one coherent light theme under a dark OS (ar + en)', async
   expect(failures, failures.join('\n')).toEqual([]);
 });
 
-// Token ratchet: raw px spacing / radius and off-scale font sizes may only go DOWN. Lower the baseline in
-// apps/marketing/token-ratchet.json when you migrate more; raising it needs a Ruling. Generated blocks (between
-// `:start (generated ...)` and `:end`) belong to packages/shared and are not counted. Also: no physical
-// left/right margin, padding or text-align (RTL mirrors only with logical properties).
-test('marketing css token ratchet + logical properties', async () => {
-  const dir = path.join(__dirname, '../../apps/marketing/src/app');
-  const base = JSON.parse(
-    fs.readFileSync(path.join(__dirname, '../../apps/marketing/token-ratchet.json'), 'utf8')
-  );
-  let spacing = 0;
-  let radius = 0;
-  let fontSize = 0;
-  const physical: string[] = [];
-  for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.css'))) {
-    let gen = false;
-    let root = false;
-    fs.readFileSync(path.join(dir, f), 'utf8')
-      .split('\n')
-      .forEach((ln, i) => {
-        if (/:start\b/.test(ln) && /generated/.test(ln)) gen = true;
-        if (/^:root\s*\{/.test(ln)) root = true;
-        const m = ln.match(/^\s*([a-z-]+):\s*(.*?);/);
-        if (!gen && !root && m) {
-          const [, prop, val] = m;
-          const px = (val.match(/(?<![\w.-])\d+(\.\d+)?px(?!\w)/g) || []).length;
-          if (/^(padding|margin)(-|$)|^(row-|column-)?gap$/.test(prop)) spacing += px;
-          else if (/radius$/.test(prop)) radius += px;
-          else if (prop === 'font-size' && /^[\d.]+rem$/.test(val)) fontSize++;
-          if (
-            /^(margin|padding)-(left|right)$|^float$/.test(prop) ||
-            (prop === 'text-align' && /^(left|right)$/.test(val))
-          )
-            physical.push(`${f}:${i + 1} ${prop}`);
-        }
-        if (gen && /:end\b/.test(ln)) gen = false;
-        if (root && ln.startsWith('}')) root = false;
-      });
-  }
-  expect(spacing, 'raw px in padding/margin/gap (use --space-*)').toBeLessThanOrEqual(
-    base.spacingRawPx
-  );
-  expect(radius, 'raw px border-radius (use --radius-*)').toBeLessThanOrEqual(base.radiusRawPx);
-  expect(fontSize, 'raw rem font-size (use --fs-*)').toBeLessThanOrEqual(base.fontSizeRawRem);
-  expect(physical, 'physical left/right properties break RTL').toEqual([]);
-});
+// Token ratchet + logical-property checks live in tests/unit/marketing-design-tokens.test.ts (base-branch baseline).
 
 // The scroller's edge fade shows only on a side that still has content (start gone at the start, end gone at the end),
 // in LTR and RTL.
