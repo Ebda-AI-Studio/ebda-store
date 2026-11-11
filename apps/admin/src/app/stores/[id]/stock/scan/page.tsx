@@ -290,7 +290,19 @@ function BarcodeInput({
             variant="outline"
             className="min-w-[44px] justify-center text-muted-foreground"
           >
-            📷
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 8h3l2-3h6l2 3h3v11H4V8z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
           </Button>
         )}
       </div>
