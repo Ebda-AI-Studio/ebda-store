@@ -1102,6 +1102,42 @@ export class InventoryService {
    * in a public or private wishlist for this store.
    * Fire-and-forget — never throws.
    */
+  /**
+   * The wishers of a product on a store's Durable Object (no Postgres, no `users` table in the Worker): the wishlist rows
+   * and the product slug from the DO, the shopper's name and phone from the store's `customers` row linked to the
+   * wishlist's user (`customers.user_id`). A wisher with no customer row still gets the notification, unnamed and with no
+   * phone (the dispatcher then skips SMS), the shape the Postgres read produced for a user with no name.
+   */
+  private static async backInStockWishersOnDo(storeId: string, productId: string) {
+    const db = await storeDb(storeId);
+    const items = await db.wishlistItem.findMany({
+      where: { productId, wishlist: { storeId } },
+      select: { wishlist: { select: { userId: true } }, product: { select: { slug: true } } },
+    });
+    const userIds = [...new Set(items.map(i => i.wishlist.userId))];
+    const customers = userIds.length
+      ? await db.customer.findMany({
+          where: { storeId, userId: { in: userIds } },
+          select: { userId: true, firstName: true, lastName: true, phone: true },
+        })
+      : [];
+    const byUser = new Map(customers.map(c => [c.userId, c]));
+    return items.map(i => {
+      const c = byUser.get(i.wishlist.userId);
+      return {
+        product: i.product,
+        wishlist: {
+          user: {
+            id: i.wishlist.userId,
+            firstName: c?.firstName ?? null,
+            lastName: c?.lastName ?? null,
+            phone: c?.phone ?? null,
+          },
+        },
+      };
+    });
+  }
+
   private static async fireBackInStockNotifications(
     storeId: string,
     productId: string,
@@ -1119,29 +1155,32 @@ export class InventoryService {
       if (!store) return;
 
       // Find all wishlists in this store that contain this product
-      const wishlistItems = await prisma.wishlistItem.findMany({
-        where: {
-          productId,
-          wishlist: { storeId },
-        },
-        include: {
-          wishlist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  phone: true,
+      const wishlistItems =
+        (await storeRepo(storeId)).backend === 'do'
+          ? await InventoryService.backInStockWishersOnDo(storeId, productId)
+          : await prisma.wishlistItem.findMany({
+              where: {
+                productId,
+                wishlist: { storeId },
+              },
+              include: {
+                wishlist: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
+                      },
+                    },
+                  },
+                },
+                product: {
+                  select: { slug: true },
                 },
               },
-            },
-          },
-          product: {
-            select: { slug: true },
-          },
-        },
-      });
+            });
 
       if (wishlistItems.length === 0) return;
 

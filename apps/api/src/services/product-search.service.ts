@@ -235,6 +235,27 @@ export async function searchVariantIdsBySku(
 ): Promise<ProductSearchIdSet> {
   const tokens = searchTokens(raw);
   if (tokens.length === 0) return { ids: [], truncated: false };
+  // A store on its Durable Object has no Postgres `ebda_ar_norm`: the same every-token match over the store's variant SKUs
+  // with the shared TS fold (the bundle / promotion / category search above does the same). Postgres is untouched.
+  if ((await storeRepo(storeId)).backend === 'do') {
+    const rows = await (
+      await storeDb(storeId)
+    ).productVariant.findMany({
+      where: { sku: { not: null }, product: { storeId } },
+      select: { id: true, sku: true },
+    });
+    const ids = rows
+      .filter(r => {
+        const hay = normalizeArabicSearch(r.sku ?? '');
+        return tokens.every(t => hay.includes(t));
+      })
+      .map(r => r.id)
+      .sort();
+    return {
+      ids: ids.slice(0, PRODUCT_SEARCH_ID_CAP),
+      truncated: ids.length > PRODUCT_SEARCH_ID_CAP,
+    };
+  }
   const match = normalisedArms(Prisma.sql`public.ebda_ar_norm(coalesce(v.sku, ''))`, tokens);
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT v.id FROM product_variants v JOIN products p ON p.id = v.product_id

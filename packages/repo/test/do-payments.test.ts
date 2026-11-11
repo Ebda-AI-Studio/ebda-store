@@ -14,6 +14,7 @@ import {
   expireInstapay,
   markRefundIndeterminate,
   matchRefundToClaim,
+  recordInstapayRefund,
   releaseRefund,
   type PaymentWebhookInput,
 } from '../src/do/payments';
@@ -1326,5 +1327,82 @@ describe('InstaPay', () => {
     expect(
       expireInstapay(g.db, { storeId: 's1', orderId: o2.orderId, proofSubmitted: false, now: NOW })
     ).toBe('skipped');
+  });
+});
+
+describe('recordInstapayRefund (merchant-recorded InstaPay refund, Ruling NZ-MONEY-6)', () => {
+  const instapayPaid = async () => {
+    const f = fx();
+    const p = await f.paid(3, 'paymob');
+    f.raw.prepare("UPDATE payments SET provider = 'instapay' WHERE id = ?").run(p.paymentId);
+    const amount = f.one('SELECT amount a FROM payments').a as number;
+    return { f, p, amount };
+  };
+  const rec = (
+    f: ReturnType<typeof fx>,
+    orderId: string,
+    referenceKey: string,
+    amountMinor: number
+  ) =>
+    recordInstapayRefund(f.db, {
+      storeId: 's1',
+      orderId,
+      referenceKey,
+      amountMinor,
+      record: { reference: referenceKey },
+      actorUserId: 'm1',
+      now: NOW,
+    });
+
+  it('partial, replay, over-remaining, full: one section each; a replay never refunds twice', async () => {
+    const { f, p, amount } = await instapayPaid();
+    expect(rec(f, p.orderId, 'R-1', 100)).toMatchObject({
+      duplicate: false,
+      full: false,
+      status: 'partially_refunded',
+    });
+    expect(rec(f, p.orderId, 'R-1', 100)).toMatchObject({ duplicate: true, refundedAmount: 100 });
+    expect(f.one('SELECT refunded_amount a FROM payments').a).toBe(100);
+    expect(() => rec(f, p.orderId, 'R-2', amount)).toThrow(/between 1 and/);
+    const full = rec(f, p.orderId, 'R-3', amount - 100);
+    expect(full).toMatchObject({
+      duplicate: false,
+      full: true,
+      status: 'refunded',
+      refundedAmount: amount,
+    });
+    expect(f.one('SELECT payment_status s FROM orders WHERE id = ?', p.orderId).s).toBe('refunded');
+    expect(() => rec(f, p.orderId, 'R-4', 1)).toThrow(/fully refunded/);
+    expect(
+      f.one(
+        "SELECT count(*) n FROM payment_events WHERE event_type = 'refund' AND payment_id = ?",
+        p.paymentId
+      ).n
+    ).toBe(2);
+    // a replay of the full refund says `full` so the caller can finish the order status flip (forward completion)
+    expect(rec(f, p.orderId, 'R-3', amount - 100)).toMatchObject({ duplicate: true, full: true });
+  });
+
+  it('refuses an order with no confirmed InstaPay payment, an unknown order, a bad amount', async () => {
+    const f = fx();
+    const p = await f.paid(3, 'paymob');
+    expect(() => rec(f, p.orderId, 'R-1', 100)).toThrow(/no confirmed InstaPay payment/);
+    expect(() => rec(f, 'nope', 'R-1', 100)).toThrow(/order not found/);
+    expect(() => rec(f, p.orderId, 'R-1', 0)).toThrow(MoneyError);
+  });
+
+  it('matchRefundToClaim refuses a claim of another order when the route names its order', async () => {
+    const f = fx();
+    const p = await f.paid(6, 'kashier');
+    const c = beginRefund(f.db, { storeId: 's1', paymentId: p.paymentId, amount: 1000, now: NOW });
+    expect(() =>
+      matchRefundToClaim(f.db, {
+        storeId: 's1',
+        claimId: c.claimId,
+        providerRefundId: 'X',
+        actorUserId: 'op',
+        orderId: 'another-order',
+      })
+    ).toThrow(/no such refund claim on this order/);
   });
 });
