@@ -7860,7 +7860,7 @@
           "type": "String",
           "column": "customer_id",
           "list": false,
-          "optional": false
+          "optional": true
         },
         "returnNumber": {
           "kind": "scalar",
@@ -8053,7 +8053,7 @@
           "kind": "relation",
           "type": "User",
           "list": false,
-          "optional": false,
+          "optional": true,
           "external": true,
           "owner": true,
           "from": ["customer_id"],

@@ -455,7 +455,8 @@ function computeLineAdjustments(
 export interface ReturnCreateArgs {
   storeId: string;
   orderId: string;
-  customerId: string;
+  /** null = a GUEST return (Ruling GUEST-RET-1): the order has no customer. Stored as '' (the column is NOT NULL on a DO already deployed). */
+  customerId: string | null;
   type: string;
   reason: string;
   reasonDetail?: string;
@@ -507,8 +508,8 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
   return db.transactionSync(() => {
     const o = db.all(
       `SELECT id, order_number, updated_at, delivered_at FROM orders
-        WHERE id = ?1 AND store_id = ?2 AND customer_id = ?3 AND status = 'delivered' AND deleted_at IS NULL`,
-      [sid(a.orderId, 'orderId'), storeId, sid(a.customerId, 'customerId')]
+        WHERE id = ?1 AND store_id = ?2 AND customer_id IS ?3 AND status = 'delivered' AND deleted_at IS NULL`,
+      [sid(a.orderId, 'orderId'), storeId, a.customerId ? sid(a.customerId, 'customerId') : null]
     )[0];
     if (!o)
       throw new MoneyError('INVALID_ORDER', 'Order not found or not eligible for return', 400);
@@ -647,7 +648,7 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
         returnId,
         storeId,
         o.id,
-        a.customerId,
+        a.customerId ?? '',
         returnNumber(now),
         a.type,
         reason,
@@ -1020,6 +1021,13 @@ function planReturn(
   const skipProvider = isGatewayRefund && partial !== null && partial.gatewayShare === 0;
 
   let walletCreditAmount: number | null = null;
+  // GUEST-RET-1: a guest return has no wallet to credit; store credit would be money into nowhere.
+  if (refundMethod === 'store_credit' && walletFeature && !ret.customer_id)
+    throw new MoneyError(
+      'GUEST_RETURN_NO_WALLET',
+      'A guest return has no wallet. Refund it to the original method or by bank transfer instead.',
+      400
+    );
   if (refundMethod === 'store_credit' && isInventoryRestoring && orderId && walletFeature) {
     walletCreditAmount = computeStoreCreditAmount(
       db,

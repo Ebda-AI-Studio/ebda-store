@@ -2277,7 +2277,8 @@ model Return {
   id           String       @id @default(uuid())
   storeId      String       @map("store_id")
   orderId      String       @map("order_id")
-  customerId   String       @map("customer_id")
+  /// NULL = a GUEST return (Ruling GUEST-RET-1): the order has no customer row. The merchant sees the order contact instead.
+  customerId   String?      @map("customer_id")
   returnNumber String       @unique @map("return_number")
   type         ReturnType   @default(return)
   status       ReturnStatus @default(pending)
@@ -2315,7 +2316,7 @@ model Return {
 
   store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   order              Order               @relation(fields: [orderId], references: [id])
-  customer           User                @relation(fields: [customerId], references: [id])
+  customer           User?               @relation(fields: [customerId], references: [id])
   items              ReturnItem[]
   walletTransactions WalletTransaction[]
 

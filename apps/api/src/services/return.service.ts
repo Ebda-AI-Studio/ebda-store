@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { normalizePhoneForStorage } from '@ebda/shared';
 import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
 import { prisma, Prisma, ReturnStatus, ReturnType, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
@@ -46,7 +47,8 @@ interface CreateReturnItemInput {
 
 interface CreateReturnData {
   orderId: string;
-  customerId: string;
+  /** null = a GUEST return (Ruling GUEST-RET-1, `createForGuest`): the order has no customer row. */
+  customerId: string | null;
   type: 'return' | 'exchange' | 'refund';
   reason: string;
   reasonDetail?: string;
@@ -251,12 +253,13 @@ async function lockOrderReturnsBounded(orderId: string): Promise<void> {
  * A store's customers are User rows in the identity/Postgres side, not in its Durable Object: a DO read cannot `include`
  * them (prisma-lite refuses a cross-database relation), so the DO paths read the return without `customer` and attach it here.
  */
-async function withCustomer<T extends { customerId: string }>(
+async function withCustomer<T extends { customerId: string | null }>(
   storeId: string,
   rows: T[],
   select: Prisma.UserSelect
 ): Promise<Array<T & { customer: unknown }>> {
-  const ids = Array.from(new Set(rows.map(r => r.customerId)));
+  // a guest return (GUEST-RET-1) has a null (PG) or '' (DO) customer: nothing to look up
+  const ids = Array.from(new Set(rows.map(r => r.customerId).filter((id): id is string => !!id)));
   const doRows = await customerRows(storeId, ids);
   const users: Array<{ id: string }> = doRows
     ? doRows.map(u => pickSelected(u, select as Record<string, unknown>) as { id: string })
@@ -268,12 +271,71 @@ async function withCustomer<T extends { customerId: string }>(
       : [];
   const byId = new Map(users.map(u => [u.id, u]));
   return rows.map(r => {
-    const u = byId.get(r.customerId) as ({ id: string } & Record<string, unknown>) | undefined;
+    const u = (r.customerId ? byId.get(r.customerId) : undefined) as
+      | ({ id: string } & Record<string, unknown>)
+      | undefined;
     if (!u) return { ...r, customer: null };
     const { id: _id, ...rest } = u;
     const keep = Object.fromEntries(Object.keys(select).map(k => [k, rest[k]]));
     return { ...r, customer: { ...(select.id ? { id: u.id } : {}), ...keep } };
   });
+}
+
+/**
+ * Constant-time compare of a guest's second factor: both sides are hashed first so the buffers are equal length
+ * and the time does not depend on where they differ. An empty factor never matches (nothing on the order to prove).
+ */
+export function guestFactorEquals(onOrder: string, given: string): boolean {
+  const h = (v: string) => crypto.createHash('sha256').update(v).digest();
+  const equal = crypto.timingSafeEqual(h(onOrder), h(given));
+  return equal && onOrder.length > 0 && given.length > 0;
+}
+
+/** The contact a guest left on the order (`shipping_address` JSON): the only identity a guest return has. */
+function contactOfOrder(order: { shippingAddress?: unknown }): { email: string; name: string } {
+  const a =
+    order.shippingAddress && typeof order.shippingAddress === 'object'
+      ? (order.shippingAddress as Record<string, unknown>)
+      : {};
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  return {
+    email: str(a.email),
+    name: `${str(a.firstName)} ${str(a.lastName)}`.trim(),
+  };
+}
+
+/**
+ * A guest return (Ruling GUEST-RET-1) has no customer row: give the merchant's views (list, detail) the contact the
+ * guest left on the order in the same `customer` shape, so the returns list and drawer render it like any other.
+ * One order read for the whole page, and only when a row is a guest return.
+ */
+async function fillGuestCustomers<T extends { customerId: string | null; orderId: string }>(
+  storeId: string,
+  rows: T[]
+): Promise<T[]> {
+  const guests = rows.filter(r => !r.customerId && !(r as { customer?: unknown }).customer);
+  if (guests.length === 0) return rows;
+  const orders = await (
+    await storeDb(storeId)
+  ).order.findMany({
+    where: { id: { in: Array.from(new Set(guests.map(g => g.orderId))) }, storeId },
+    select: { id: true, shippingAddress: true },
+  });
+  const byId = new Map(
+    orders.map(o => [o.id, (o.shippingAddress ?? {}) as Record<string, unknown>])
+  );
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  for (const g of guests) {
+    const a = byId.get(g.orderId) ?? {};
+    (g as { customer?: unknown }).customer = {
+      id: '',
+      email: str(a.email),
+      firstName: str(a.firstName),
+      lastName: str(a.lastName),
+      phone: str(a.phone),
+    };
+  }
+  return rows;
 }
 
 type UpdatedReturn = Prisma.ReturnGetPayload<{
@@ -336,10 +398,11 @@ export class ReturnService {
       where: { id: data.orderId, storeId },
       select: { orderNumber: true, locale: true },
     });
-    const doCustomer = await customerRow(storeId, data.customerId);
-    // a deleted / erased / suspended customer is not mailed (N-9)
-    const customer =
-      doCustomer !== undefined
+    const doCustomer = data.customerId ? await customerRow(storeId, data.customerId) : null;
+    // a deleted / erased / suspended customer is not mailed (N-9); a guest has no customer row at all
+    const customer = !data.customerId
+      ? null
+      : doCustomer !== undefined
         ? doCustomer && isLiveCustomer(doCustomer)
           ? doCustomer
           : null
@@ -379,6 +442,91 @@ export class ReturnService {
       logger.error({ err: notifyError }, 'Failed to send return notification');
     }
     return returnRequest;
+  }
+
+  /**
+   * A GUEST return request (Foundation criterion 19, Ruling GUEST-RET-1, audit S2-7).
+   *
+   * Identity = the order number PLUS a second factor already on the order (the phone or the email the guest typed at
+   * checkout, from `shipping_address`). Only a guest order (`customer_id` null) qualifies: a signed-in shopper's order
+   * answers like a missing one and the shopper signs in. Every failure of identity (no such order, a registered
+   * customer's order, wrong phone, wrong email, no factor given) is ONE identical `GUEST_RETURN_NOT_FOUND` response that
+   * echoes nothing and takes the same compare work, so the endpoint is no order-number or phone oracle.
+   *
+   * Once identity holds, the return is made by `create` itself (Postgres or the StoreDO twin): same delivered-only
+   * eligibility, same return window, same items rules. A request moves NO money: the refund method is only chosen
+   * at completion, by the merchant (refund-never-implicit), and a guest return can never be completed to store credit.
+   */
+  static async createForGuest(
+    storeId: string,
+    input: Omit<CreateReturnData, 'customerId' | 'orderId'> & {
+      orderNumber: string;
+      phone?: string;
+      email?: string;
+    }
+  ) {
+    const { orderNumber, phone, email, ...data } = input;
+    const db = await storeDb(storeId);
+    const order = await db.order.findFirst({
+      where: { storeId, orderNumber: orderNumber.trim(), customerId: null },
+      select: { id: true, shippingAddress: true },
+    });
+    const onOrder = (order?.shippingAddress ?? {}) as Record<string, unknown>;
+    // Always run both compares (a dummy value for a missing order) so the work does not depend on the order existing.
+    const phoneOk = guestFactorEquals(
+      normalizePhoneForStorage(typeof onOrder.phone === 'string' ? onOrder.phone : ''),
+      normalizePhoneForStorage(phone ?? '')
+    );
+    const emailOk = guestFactorEquals(
+      typeof onOrder.email === 'string' ? onOrder.email.trim().toLowerCase() : '',
+      (email ?? '').trim().toLowerCase()
+    );
+    // a factor that was given must match; at least one must be given
+    const given = Boolean((phone ?? '').trim()) || Boolean((email ?? '').trim());
+    const verified =
+      !!order && given && (!(phone ?? '').trim() || phoneOk) && (!(email ?? '').trim() || emailOk);
+    if (!verified) {
+      throw new AppError(
+        404,
+        'GUEST_RETURN_NOT_FOUND',
+        'We could not find an order matching those details.'
+      );
+    }
+    // A guest cannot see order line ids, so with no lines named the request is the WHOLE order: every plain line at its
+    // ordered quantity and every bundle box as one unit. The merchant reviews it like any other return.
+    let { items, bundleGroupIds } = data;
+    if (!items?.length && !bundleGroupIds?.length) {
+      const lines = await db.orderItem.findMany({
+        where: { orderId: order.id },
+        select: {
+          id: true,
+          productId: true,
+          productName: true,
+          quantity: true,
+          bundleGroupId: true,
+        },
+      });
+      items = lines
+        .filter(l => !l.bundleGroupId)
+        .map(l => ({
+          orderItemId: l.id,
+          productId: l.productId,
+          productName: l.productName,
+          quantity: l.quantity,
+        }));
+      const groups = Array.from(
+        new Set(lines.flatMap(l => (l.bundleGroupId ? [l.bundleGroupId] : [])))
+      );
+      bundleGroupIds = groups.length ? groups : undefined;
+      if (!items.length) items = undefined;
+    }
+    return ReturnService.create(storeId, {
+      ...data,
+      items,
+      bundleGroupIds,
+      orderId: order.id,
+      customerId: null,
+    });
   }
 
   /**
@@ -455,6 +603,7 @@ export class ReturnService {
         })
       : listed;
 
+    await fillGuestCustomers(storeId, returns as never[]);
     return {
       returns: returns as typeof listed,
       meta: {
@@ -522,8 +671,10 @@ export class ReturnService {
         lastName: true,
         phone: true,
       });
+      await fillGuestCustomers(storeId, [withUser as never]);
       return withUser as typeof found;
     }
+    await fillGuestCustomers(storeId, [found as never]);
     const returnRequest = found;
 
     return returnRequest;
@@ -553,6 +704,7 @@ export class ReturnService {
         },
       },
     });
+    const orderContact = order ? contactOfOrder(order) : null;
     const orderLocale = (order?.locale ?? undefined) as 'en' | 'ar' | undefined;
 
     if (!order) {
@@ -801,9 +953,10 @@ export class ReturnService {
       EmailService.sendReturnConfirmation(
         storeId,
         {
-          email: order.customer?.email || '',
+          email: order.customer?.email || orderContact?.email || '',
           customerName:
             `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+            orderContact?.name ||
             'Customer',
           storeName: order.store.name,
           returnNumber,
@@ -822,6 +975,7 @@ export class ReturnService {
         orderNumber: order.orderNumber,
         customerName:
           `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+          orderContact?.name ||
           'Customer',
       });
     } catch (notifyError) {
@@ -891,6 +1045,17 @@ export class ReturnService {
         });
 
     const returnOrderLocale = (updatedReturn.order?.locale ?? undefined) as 'en' | 'ar' | undefined;
+    // A guest return (GUEST-RET-1) has no customer row: its status mail goes to the contact on the order.
+    const guestContact = updatedReturn.customer
+      ? null
+      : contactOfOrder(
+          (await (
+            await storeDb(storeId)
+          ).order.findFirst({
+            where: { id: updatedReturn.orderId, storeId },
+            select: { shippingAddress: true },
+          })) ?? {}
+        );
 
     // Status was updated — same post-commit deferral as sendReturnConfirmation
     // above; this path was broken in exactly the same way.
@@ -898,8 +1063,10 @@ export class ReturnService {
       EmailService.sendReturnStatusUpdate(
         storeId,
         {
-          email: updatedReturn.customer.email,
-          customerName: `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`,
+          email: updatedReturn.customer?.email ?? guestContact?.email ?? '',
+          customerName: updatedReturn.customer
+            ? `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`
+            : guestContact?.name || 'Customer',
           storeName: updatedReturn.store.name,
           returnNumber: updatedReturn.returnNumber,
           status,
@@ -911,10 +1078,11 @@ export class ReturnService {
 
     // Send real-time notification to customer
     try {
-      socketService.returnStatusNotification(updatedReturn.customerId, {
-        returnNumber: updatedReturn.returnNumber,
-        status,
-      });
+      if (updatedReturn.customerId)
+        socketService.returnStatusNotification(updatedReturn.customerId, {
+          returnNumber: updatedReturn.returnNumber,
+          status,
+        });
     } catch (notifyError) {
       logger.error({ err: notifyError }, 'Failed to send return status notification');
     }
@@ -1266,6 +1434,18 @@ export class ReturnService {
       // commit or roll back together; the idempotency key (the return id)
       // makes a replayed completion a no-op rather than a second credit.
       let walletCreditAmount: number | undefined;
+      // GUEST-RET-1: a guest return has no wallet; store credit would be money into nowhere.
+      if (
+        refundMethod === 'store_credit' &&
+        !returnRequest.customerId &&
+        (await featureService.isFeatureEnabled(storeId, 'customer_wallet'))
+      ) {
+        throw new AppError(
+          400,
+          'GUEST_RETURN_NO_WALLET',
+          'A guest return has no wallet. Refund it to the original method or by bank transfer instead.'
+        );
+      }
       if (
         refundMethod === 'store_credit' &&
         isInventoryRestoring &&
@@ -1323,7 +1503,12 @@ export class ReturnService {
         });
       }
 
-      if (walletCreditAmount != null && walletCreditAmount > 0 && returnRequest.orderId) {
+      if (
+        walletCreditAmount != null &&
+        walletCreditAmount > 0 &&
+        returnRequest.orderId &&
+        returnRequest.customerId
+      ) {
         await WalletService.creditForReturn({
           storeId,
           customerId: returnRequest.customerId,
@@ -1337,7 +1522,7 @@ export class ReturnService {
       // transaction as the completion row. Keyed on the return, so a replayed
       // completion credits nothing more. The GL reads this ledger row to book
       // the share against the wallet liability (resolveReturnRefundLegs).
-      if (walletShare > 0 && returnRequest.orderId) {
+      if (walletShare > 0 && returnRequest.orderId && returnRequest.customerId) {
         await WalletService.creditReturnWalletShare({
           storeId,
           customerId: returnRequest.customerId,

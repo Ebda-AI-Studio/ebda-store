@@ -1166,7 +1166,7 @@ export interface MoneyClient {
   returnCreate(
     a: {
       orderId: string;
-      customerId: string;
+      customerId: string | null;
       type: string;
       reason: string;
       reasonDetail?: string;
