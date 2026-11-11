@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
 import { call, emailCodeFor, fakes, login, seedUser, testEnv } from './helpers';
+import { ipPrefix } from '../src/clients';
 import { totpAt } from '../src/totp';
 import { issueOtp } from '../src/otp';
 import { SESSION_MAX_MS } from '../src/data';
@@ -393,7 +394,7 @@ describe('throttle: namespaced IP budgets, no inserts over budget, successes ref
     expect(await rows()).toBe(5); // 5 more refused attempts inserted nothing
     expect(
       await env.DB.prepare(`SELECT count(*) AS n FROM login_attempts WHERE key = ?1`)
-        .bind(`i:login:${ip}`)
+        .bind(`i:login:${ipPrefix(ip)}`)
         .first()
     ).toMatchObject({ n: 5 });
     // a different flow from the same IP has its own counter
