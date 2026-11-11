@@ -3,15 +3,18 @@
  * writer, so the reorder report had no data. This is the one writer. NO money effect: a rule only holds thresholds
  * (min qty, reorder qty, lead time, safety days, preferred supplier); nothing here posts to the books or moves stock.
  *
- * Uniqueness is (storeId, productId, variantId). `variant_id` is nullable and a NULL is distinct in a unique index on
- * both Postgres and the DO's SQLite, so the DB alone cannot stop two product-level rules: the service checks first.
- * Residual: two simultaneous creates for the same pair can both pass the check (merchant-driven, single form, low rate;
- * the reorder scan picks one rule per product, so the effect is a duplicate row the merchant can delete).
+ * Uniqueness is (storeId, productId, variantId). `variant_id` is nullable and a NULL is distinct in a plain unique index, so
+ * the database enforces it with `reorder_rules_one_per_item` on (store_id, product_id, COALESCE(variant_id, '')): Postgres
+ * migration 20261111000100 and the StoreDO's cf-0005 (both dedupe existing rows, keeping the newest). The pre-check below
+ * only gives the common case a cheap answer; the index decides a race, and the loser's unique violation (P2002 on either
+ * backend) is answered as the same 409.
  *
  * Every id the body supplies (product, variant, supplier) is verified to belong to THIS store before it is written.
  */
 import { storeDb, storeWriter } from '../../lib/repo-factory';
 import { AppError } from '../../middleware/error-handler';
+import { withSavepoint } from '../../lib/savepoint';
+import { isP2002 } from '../../lib/prisma-errors';
 
 export interface ReorderRuleInput {
   productId: string;
@@ -71,6 +74,9 @@ export async function listReorderRules(storeId: string) {
   });
 }
 
+const exists = () =>
+  new AppError(409, 'REORDER_RULE_EXISTS', 'A reorder rule already exists for this item.');
+
 export async function createReorderRule(storeId: string, input: ReorderRuleInput) {
   const variantId = input.variantId ?? null;
   await assertOwnedRefs(storeId, {
@@ -83,23 +89,30 @@ export async function createReorderRule(storeId: string, input: ReorderRuleInput
     where: { storeId, productId: input.productId, variantId },
     select: { id: true },
   });
-  if (dup) {
-    throw new AppError(409, 'REORDER_RULE_EXISTS', 'A reorder rule already exists for this item.');
-  }
+  if (dup) throw exists();
   const w = await storeWriter(storeId);
-  const created = await w.reorderRule.create({
-    data: {
-      storeId,
-      productId: input.productId,
-      variantId,
-      minQty: input.minQty,
-      reorderQty: input.reorderQty,
-      leadTimeDays: input.leadTimeDays ?? 7,
-      safetyStockDays: input.safetyStockDays ?? 7,
-      preferredSupplierId: input.preferredSupplierId ?? null,
-      isActive: input.isActive ?? true,
-    },
-  });
+  let created: { id: string };
+  try {
+    // Savepoint: on Postgres a unique violation would otherwise abort the request's tenant transaction.
+    created = await withSavepoint(() =>
+      w.reorderRule.create({
+        data: {
+          storeId,
+          productId: input.productId,
+          variantId,
+          minQty: input.minQty,
+          reorderQty: input.reorderQty,
+          leadTimeDays: input.leadTimeDays ?? 7,
+          safetyStockDays: input.safetyStockDays ?? 7,
+          preferredSupplierId: input.preferredSupplierId ?? null,
+          isActive: input.isActive ?? true,
+        },
+      })
+    );
+  } catch (err) {
+    if (isP2002(err)) throw exists();
+    throw err;
+  }
   return (await db.reorderRule.findFirst({
     where: { id: created.id, storeId },
     include: RULE_INCLUDE,

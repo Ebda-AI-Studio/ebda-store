@@ -2269,6 +2269,7 @@ CREATE INDEX IF NOT EXISTS "reorder_rules_store_id_idx" ON "reorder_rules" ("sto
 CREATE INDEX IF NOT EXISTS "reorder_rules_product_id_idx" ON "reorder_rules" ("product_id");
 CREATE INDEX IF NOT EXISTS "reorder_rules_variant_id_idx" ON "reorder_rules" ("variant_id");
 CREATE INDEX IF NOT EXISTS "reorder_rules_preferred_supplier_id_idx" ON "reorder_rules" ("preferred_supplier_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "reorder_rules_one_per_item" ON "reorder_rules" ("store_id", "product_id", (COALESCE("variant_id", '')));
 
 CREATE TABLE IF NOT EXISTS "reorder_suggestions" (
   "id" TEXT NOT NULL,
