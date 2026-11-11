@@ -75,6 +75,7 @@ import {
   decrementProductInventory,
   decrementVariantInventory,
   forceDecrementVariantInventory,
+  takeUpToInventory,
 } from './inventory-decrement';
 import { inngest } from '../lib/inngest/client';
 import { handleOrderStatusChanged } from '../lib/inngest/functions/order-status-changed';
@@ -4716,18 +4717,28 @@ export class OrderService {
           await ledger(it.quantity, full, 'Sold via phone order');
           continue;
         }
-        const available = Math.max(0, full.newStock);
-        shortages.push({
-          productId: it.productId,
-          variantId: it.variantId ?? null,
-          requested: it.quantity,
-          available,
-        });
-        if (!stockOverride) continue; // refused below; nothing partial is kept
-        if (available > 0) {
-          await ledger(available, await move(available), 'Sold via phone order (stock override)');
+        if (!stockOverride) {
+          shortages.push({
+            productId: it.productId,
+            variantId: it.variantId ?? null,
+            requested: it.quantity,
+            available: Math.max(0, full.newStock),
+          });
+          continue; // refused below; nothing partial is kept
         }
-        notTaken.push({ orderItemId: it.id, quantity: it.quantity - available });
+        // override: take what is ACTUALLY on hand in one atomic clamped statement; ledger and marker use the units taken
+        const part = await takeUpToInventory(tx, it, it.quantity);
+        const taken = part.previousStock - part.newStock;
+        if (taken > 0) await ledger(taken, part, 'Sold via phone order (stock override)');
+        if (taken < it.quantity) {
+          shortages.push({
+            productId: it.productId,
+            variantId: it.variantId ?? null,
+            requested: it.quantity,
+            available: taken,
+          });
+          notTaken.push({ orderItemId: it.id, quantity: it.quantity - taken });
+        }
       }
       stockOverridden = shortages.length > 0 && stockOverride;
       if (shortages.length > 0 && !stockOverride)

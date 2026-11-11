@@ -860,7 +860,7 @@ export default function NewOrderPage() {
                       type="checkbox"
                       checked={overrideStock}
                       onChange={e => setOverrideStock(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-border"
+                      className="mt-0.5 h-4 w-4 rounded-md border-border"
                     />
                     <span>
                       <span className="font-medium text-foreground">

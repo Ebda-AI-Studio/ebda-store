@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
-import { encodeRpc } from '@ebda-src/repo';
+import { decodeRpc, encodeRpc } from '@ebda-src/repo';
 import type { StoreDO } from '../src/cf/store-do/store-do';
 
 // INFRA-CF-1 PR R4 (Ruling CF-R4-2): the merchant's manual order on real workerd. Postgres serialised its coupon claim with a
@@ -179,6 +179,44 @@ describe('StoreDO.moneyOp createAdminOrder', () => {
     expect(new Set(nums).size).toBe(2);
     expect(nums.filter(n => n.endsWith('-00000'))).toHaveLength(1);
     expect(nums.every(n => /^ORD-[0-9A-Z]{6}-[0-9A-Z]{5}$/.test(n))).toBe(true);
+  });
+
+  it('override orders racing checkouts for 6 units: the ledger and the markers equal what was ACTUALLY taken, and a cancel restocks exactly that', async () => {
+    const stub = await seed('adm-override-race', '', 6);
+    const calls = [
+      ...Array.from({ length: 5 }, () =>
+        op(
+          stub,
+          'adm-override-race',
+          'createAdminOrder',
+          admin({
+            lines: [{ productId: 'p1', quantity: 3 }],
+            overrideStock: true,
+            stockOverrideReason: 'phone deal',
+          })
+        )
+      ),
+      ...Array.from({ length: 5 }, () =>
+        op(stub, 'adm-override-race', 'createOrder', {
+          lines: [{ productId: 'p1', quantity: 2 }],
+          shippingAddress: { name: 'A' },
+        })
+      ),
+    ];
+    const answers = await Promise.all(calls);
+    const left = await num(stub, `SELECT inventory AS n FROM products`);
+    const ledger = await num(
+      stub,
+      `SELECT coalesce(-sum(quantity), 0) AS n FROM inventory_history WHERE type = 'sale'`
+    );
+    expect(left).toBe(0); // 6 units all sold, never negative
+    expect(ledger).toBe(6); // ledger == units actually taken, not the units requested
+    for (const a of answers)
+      if (a.ok)
+        await op(stub, 'adm-override-race', 'cancel', {
+          orderId: (decodeRpc(a.json) as { orderId: string }).orderId,
+        });
+    expect(await num(stub, `SELECT inventory AS n FROM products`)).toBe(6); // exactly what was taken comes back
   });
 
   it('a random source that only ever repeats a taken number: a clean 503 refusal, nothing written, no 500', async () => {

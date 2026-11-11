@@ -2,7 +2,7 @@ import { normalizePhoneForStorage } from '../../../shared/src/region';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { freshOrderNumber } from './order-number';
 import { issueSaleDocument } from './fiscal';
-import { decrementProduct, decrementVariant, recordMovement } from './stock';
+import { decrementProduct, decrementVariant, recordMovement, takeUpTo } from './stock';
 import { assertGoldLinesPriceable, type GoldGateLine } from './gold';
 import { indexEntity } from './payments';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
@@ -431,13 +431,24 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
         });
         continue;
       }
-      const available = Math.max(0, full.newStock);
-      shortages.push({ productId, variantId, requested: qty, available });
-      if (input.overrideStock !== true) continue; // refused below; nothing partial is kept
-      let taken = 0;
-      if (available > 0) {
-        const part = move(available);
-        taken = available;
+      if (input.overrideStock !== true) {
+        shortages.push({
+          productId,
+          variantId,
+          requested: qty,
+          available: Math.max(0, full.newStock),
+        });
+        continue; // refused below; nothing partial is kept
+      }
+      // override: take what is ACTUALLY on hand in one clamped statement; the ledger and the marker use the units taken
+      const part = takeUpTo(
+        db,
+        variantId ? 'product_variants' : 'products',
+        variantId ?? productId,
+        qty
+      );
+      const taken = part.previousStock - part.newStock;
+      if (taken > 0)
         recordMovement(db, {
           storeId,
           productId,
@@ -446,10 +457,12 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
           previousStock: part.previousStock,
           newStock: part.newStock,
           reference: orderId,
-          reason: 'Sold via phone order (stock override)',
+          reason: taken === qty ? 'Sold via phone order' : 'Sold via phone order (stock override)',
         });
+      if (taken < qty) {
+        shortages.push({ productId, variantId, requested: qty, available: taken });
+        notTaken.push({ orderItemId: row.id as string, quantity: qty - taken });
       }
-      notTaken.push({ orderItemId: row.id as string, quantity: qty - taken });
     }
     if (shortages.length > 0 && input.overrideStock !== true)
       throw new MoneyError('INSUFFICIENT_STOCK', 'not enough stock for this order', 422, {
