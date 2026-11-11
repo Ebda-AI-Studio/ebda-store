@@ -13,6 +13,10 @@ const h = vi.hoisted(() => ({
   updateSettings: vi.fn(async () => ({ pwaEnabled: true })),
   pass: (_req: any, _res: any, next: any) => next(),
 }));
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertStorageRoom: vi.fn(async () => undefined),
+}));
+
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'u1', role: 'store_admin' };
