@@ -60,7 +60,7 @@ export default function PaymentAbandonmentsPage() {
           {/* Date range filter */}
           <div className="bg-card rounded-xl border border-border p-4 flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
-              <label htmlFor="pa-from" className="text-xs text-muted-foreground">
+              <label htmlFor="pa-from" className="text-sm text-muted-foreground">
                 {t('dateFrom')}
               </label>
               <input
@@ -72,7 +72,7 @@ export default function PaymentAbandonmentsPage() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor="pa-to" className="text-xs text-muted-foreground">
+              <label htmlFor="pa-to" className="text-sm text-muted-foreground">
                 {t('dateTo')}
               </label>
               <input

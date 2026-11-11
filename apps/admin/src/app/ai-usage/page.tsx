@@ -334,7 +334,7 @@ function PlatformAiUsagePageInner() {
       {/* ── Filters ─────────────────────────────────────────────────── */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="plan-filter">
+          <label className="text-sm font-medium text-muted-foreground" htmlFor="plan-filter">
             {t('filters.planLabel')}:
           </label>
           <select
@@ -354,7 +354,7 @@ function PlatformAiUsagePageInner() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="feature-filter">
+          <label className="text-sm font-medium text-muted-foreground" htmlFor="feature-filter">
             {t('filters.featureLabel')}:
           </label>
           <select

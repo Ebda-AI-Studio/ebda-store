@@ -127,7 +127,7 @@ function LinkList({
     'w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm';
   return (
     <fieldset className="space-y-2" data-testid={testId}>
-      <legend className="text-xs font-semibold text-foreground">{title}</legend>
+      <legend className="text-sm font-semibold text-foreground">{title}</legend>
       {rows.map((r, i) => {
         const bad = r.href !== '' && !isSafeUrl(r.href);
         return (

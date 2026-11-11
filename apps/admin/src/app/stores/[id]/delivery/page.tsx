@@ -504,7 +504,7 @@ export default function CheckoutDeliveryPage() {
             <div>
               <h3
                 data-setting-id="delivery.off-days"
-                className="text-xs font-semibold text-foreground"
+                className="text-sm font-semibold text-foreground"
               >
                 {t('deliveryOffDaysTitle')}
               </h3>

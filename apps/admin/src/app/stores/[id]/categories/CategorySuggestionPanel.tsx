@@ -128,7 +128,7 @@ export function CategorySuggestionPanel({
         {drafts.map(d => (
           <li key={d.key} className="rounded-lg border border-border p-3">
             <div className="grid gap-2 sm:grid-cols-2">
-              <label className="block text-xs font-medium">
+              <label className="block text-sm font-medium">
                 {t('nameEn')}
                 <input
                   dir="ltr"
@@ -138,7 +138,7 @@ export function CategorySuggestionPanel({
                   className={`${FIELD_CLASSES} mt-1`}
                 />
               </label>
-              <label className="block text-xs font-medium">
+              <label className="block text-sm font-medium">
                 {t('nameAr')}
                 <input
                   dir="rtl"

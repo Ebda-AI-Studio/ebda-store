@@ -875,7 +875,7 @@ export default function CampaignDetailPage() {
                     <tbody>
                       {recipients.map(r => (
                         <tr key={r.id} className="border-t">
-                          <td className="px-3 py-2 font-mono text-xs">{r.email}</td>
+                          <td className="px-3 py-2 font-mono text-sm">{r.email}</td>
                           <td className="px-3 py-2 uppercase">{r.locale}</td>
                           <td className="px-3 py-2">
                             <OrderStatusBadge
@@ -891,7 +891,7 @@ export default function CampaignDetailPage() {
                                 })
                               : formatDateTime(r.sentAt)}
                           </td>
-                          <td className="px-3 py-2 text-xs text-destructive-ink">
+                          <td className="px-3 py-2 text-sm text-destructive-ink">
                             {r.error || '—'}
                           </td>
                         </tr>

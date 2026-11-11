@@ -610,7 +610,7 @@ export default function ReviewsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
               {t('aiDraftEnLabel')}
             </label>
             <textarea
@@ -621,7 +621,7 @@ export default function ReviewsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
               {t('aiDraftArLabel')}
             </label>
             <textarea

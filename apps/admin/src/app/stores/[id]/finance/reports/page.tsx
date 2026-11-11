@@ -422,7 +422,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                 <tbody>
                   {data.revenue.accounts.map((a, i) => (
                     <tr key={i} className="border-b border-border/40 last:border-0">
-                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-16">
+                      <td className="px-3 py-2 font-mono text-sm text-muted-foreground w-16">
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
@@ -454,7 +454,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                 <tbody>
                   {data.expenses.accounts.map((a, i) => (
                     <tr key={i} className="border-b border-border/40 last:border-0">
-                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-16">
+                      <td className="px-3 py-2 font-mono text-sm text-muted-foreground w-16">
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
@@ -573,7 +573,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
             <tbody>
               {section.accounts.map((a, i) => (
                 <tr key={i} className="border-b border-border/40 last:border-0">
-                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-16">
+                  <td className="px-3 py-2 font-mono text-sm text-muted-foreground w-16">
                     {a.code}
                   </td>
                   <td className="px-3 py-2">
@@ -902,11 +902,11 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                             row.kind === 'sale' ? '' : ' text-muted-foreground bg-muted/10'
                           }`}
                         >
-                          <td className="px-3 py-2 text-xs">
+                          <td className="px-3 py-2 text-sm">
                             {row.kind === 'sale' ? tt('kindSale') : tt('kindReversal')}
                           </td>
-                          <td className="px-3 py-2 font-mono text-xs">{row.date}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{row.orderNumber}</td>
+                          <td className="px-3 py-2 font-mono text-sm">{row.date}</td>
+                          <td className="px-3 py-2 font-mono text-sm">{row.orderNumber}</td>
                           <td className="px-3 py-2 text-muted-foreground">
                             {row.customerName ?? <span className="italic">{tt('guest')}</span>}
                           </td>

@@ -362,31 +362,31 @@ export function CategoryTable({
           <tr>
             <th
               scope="col"
-              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-sm font-medium text-muted-foreground uppercase tracking-wider"
             >
               {t('category')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-sm font-medium text-muted-foreground uppercase tracking-wider"
             >
               {t('slug')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-start text-sm font-medium text-muted-foreground uppercase tracking-wider"
             >
               {t('products')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
+              className="px-6 py-3 text-start text-sm font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
             >
               {t('status')}
             </th>
             <th
               scope="col"
-              className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
+              className="px-6 py-3 text-end text-sm font-medium text-muted-foreground uppercase tracking-wider"
             >
               {t('actions')}
             </th>

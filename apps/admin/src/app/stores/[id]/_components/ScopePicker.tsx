@@ -136,7 +136,7 @@ export function ScopePicker({
           {value.map(id => (
             <li
               key={id}
-              className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-xs"
+              className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-sm"
             >
               {selectedDetails[id] ? labelFor(selectedDetails[id]) : id}
               <button

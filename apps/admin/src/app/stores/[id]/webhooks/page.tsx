@@ -409,7 +409,7 @@ export default function WebhooksPage() {
         title={editing ? t('form.editTitle') : t('form.addTitle')}
       >
         <div className="space-y-3">
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('form.urlLabel')}
             <input
               className={`${FIELD_CLASSES} mt-1`}
@@ -424,7 +424,7 @@ export default function WebhooksPage() {
               {t('form.urlHelp')}
             </span>
           </label>
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('form.descriptionLabel')}
             <input
               className={`${FIELD_CLASSES} mt-1`}
@@ -435,13 +435,13 @@ export default function WebhooksPage() {
             />
           </label>
           <fieldset className="space-y-1">
-            <legend className="text-xs font-medium text-foreground" dir="auto">
+            <legend className="text-sm font-medium text-foreground" dir="auto">
               {t('form.eventsLabel')}
             </legend>
             {WEBHOOK_EVENT_TYPES.map(ev => (
               <label
                 key={ev}
-                className="flex items-center gap-2 text-xs max-md:min-h-11"
+                className="flex items-center gap-2 text-sm max-md:min-h-11"
                 dir="auto"
               >
                 <input
@@ -453,7 +453,7 @@ export default function WebhooksPage() {
               </label>
             ))}
           </fieldset>
-          <label className="flex items-start gap-2 text-xs" dir="auto">
+          <label className="flex items-start gap-2 text-sm" dir="auto">
             <input
               type="checkbox"
               className="mt-0.5"
@@ -612,7 +612,7 @@ export default function WebhooksPage() {
           ) : null}
           <ul className="space-y-2">
             {log?.map(d => (
-              <li key={d.id} className="rounded-lg border p-2 text-xs">
+              <li key={d.id} className="rounded-lg border p-2 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-foreground" dir="auto">
                     {t(`events.${d.eventType}`)}

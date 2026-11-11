@@ -342,7 +342,7 @@ function PlansInner() {
                           setLimits(l => (l ? { ...l, [k]: Number.isNaN(n) ? 0 : n } : l));
                         }}
                       />
-                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <label className="flex items-center gap-2 text-sm text-muted-foreground">
                         <input
                           type="checkbox"
                           checked={limits[k] === null}

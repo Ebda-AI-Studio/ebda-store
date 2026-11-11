@@ -41,7 +41,7 @@ export function PickupAddressForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {FIELDS.map(field => (
           <div key={field}>
-            <label className="block text-xs text-muted-foreground mb-1">
+            <label className="block text-sm text-muted-foreground mb-1">
               {t(`fields.${field}`)}
             </label>
             <input

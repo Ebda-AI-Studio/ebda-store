@@ -436,7 +436,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Name EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldName')} <span className="text-destructive-ink">*</span>
               </label>
               <input
@@ -449,7 +449,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Name AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldNameAr')}
               </label>
               <input
@@ -463,7 +463,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Country EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldCountry')} <span className="text-destructive-ink">*</span>
               </label>
               <input
@@ -476,7 +476,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Country AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldCountryAr')}
               </label>
               <input
@@ -490,7 +490,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Address EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldAddress')} <span className="text-destructive-ink">*</span>
               </label>
               <input
@@ -503,7 +503,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Address AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldAddressAr')}
               </label>
               <input
@@ -517,7 +517,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Phone */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">{t('fieldPhone')}</label>
+              <label className="block text-sm font-medium text-foreground">{t('fieldPhone')}</label>
               <input
                 type="tel"
                 value={formData.phone}
@@ -528,7 +528,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* WhatsApp */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldWhatsapp')}
               </label>
               <input
@@ -541,7 +541,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Hours EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">{t('fieldHours')}</label>
+              <label className="block text-sm font-medium text-foreground">{t('fieldHours')}</label>
               <input
                 type="text"
                 value={formData.hours}
@@ -552,7 +552,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Hours AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldHoursAr')}
               </label>
               <input
@@ -566,7 +566,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Maps URL */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldMapsUrl')}
               </label>
               <input
@@ -579,7 +579,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Maps Embed URL */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldMapsEmbedUrl')}
               </label>
               <input
@@ -592,7 +592,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             </div>
             {/* Position */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">
+              <label className="block text-sm font-medium text-foreground">
                 {t('fieldPosition')}
               </label>
               <input

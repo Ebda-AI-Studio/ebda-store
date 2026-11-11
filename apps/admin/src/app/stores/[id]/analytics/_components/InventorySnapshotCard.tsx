@@ -32,7 +32,7 @@ export function InventorySnapshotCard({ snapshot }: InventorySnapshotCardProps) 
       <dl className="grid grid-cols-2 gap-4">
         {rows.map(row => (
           <div key={row.label} className="flex flex-col gap-1">
-            <dt className="text-xs text-muted-foreground">{row.label}</dt>
+            <dt className="text-sm text-muted-foreground">{row.label}</dt>
             <dd className="text-base font-semibold text-foreground tabular-nums">{row.value}</dd>
           </div>
         ))}

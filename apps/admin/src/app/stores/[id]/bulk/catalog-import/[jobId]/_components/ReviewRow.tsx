@@ -146,7 +146,7 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
             ))}
           </select>
           {!item.categoryId && item.categoryName && (
-            <label className="mt-2 flex min-h-11 items-center gap-2 text-xs sm:min-h-0">
+            <label className="mt-2 flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
               <input
                 type="checkbox"
                 className="h-4 w-4"
@@ -167,7 +167,7 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
           </p>
           <ul className="mt-1 grid gap-1 sm:grid-cols-2">
             {item.variants.map((v, i) => (
-              <li key={i} className="flex items-center justify-between gap-2 text-xs">
+              <li key={i} className="flex items-center justify-between gap-2 text-sm">
                 <span dir="auto">{Object.values(v.options).join(' / ') || '-'}</span>
                 <Input
                   aria-label={t('variantPrice', { name: Object.values(v.options).join(' / ') })}
@@ -222,7 +222,7 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
       {blocking.length > 0 && item.status !== 'accepted' && (
         <div className="mt-3 space-y-1" role="group" aria-label={t('checkTitle')}>
           {blocking.map(f => (
-            <label key={f} className="flex min-h-11 items-center gap-2 text-xs sm:min-h-0">
+            <label key={f} className="flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
               <input
                 type="checkbox"
                 className="h-4 w-4"

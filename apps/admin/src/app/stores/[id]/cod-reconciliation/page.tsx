@@ -348,7 +348,7 @@ export default function CodReconciliationPage() {
                     <tr key={r.shipmentId} className="border-t border-border align-top">
                       <td className="px-3 py-2 font-medium">{r.orderNumber}</td>
                       <td className="px-3 py-2">{carrierName(r)}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{r.trackingNumber ?? '—'}</td>
+                      <td className="px-3 py-2 font-mono text-sm">{r.trackingNumber ?? '—'}</td>
                       <td className="px-3 py-2">{formatMoney(r.result.owed)}</td>
                       <td className="px-3 py-2">
                         {formatMoney(r.result.gross)}
@@ -423,7 +423,7 @@ export default function CodReconciliationPage() {
                     {report.unmatched.map(u => (
                       <tr key={u.id} className="border-t border-border">
                         <td className="px-3 py-2">{tStatus(`carrierNames.${u.carrier}`)}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{u.trackingNumber}</td>
+                        <td className="px-3 py-2 font-mono text-sm">{u.trackingNumber}</td>
                         <td className="px-3 py-2">{formatMoney(u.grossAmount)}</td>
                         <td className="px-3 py-2">{formatMoney(u.feeAmount)}</td>
                         <td className="px-3 py-2">{formatMoney(u.netAmount)}</td>

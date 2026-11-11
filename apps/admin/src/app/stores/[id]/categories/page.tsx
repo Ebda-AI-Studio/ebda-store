@@ -550,7 +550,7 @@ export default function StoreCategoriesPage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label
-              className="mb-1 block text-xs font-medium text-foreground"
+              className="mb-1 block text-sm font-medium text-foreground"
               htmlFor="count-unit-en"
             >
               {t('countUnitEnglishLabel')}
@@ -567,7 +567,7 @@ export default function StoreCategoriesPage() {
           </div>
           <div>
             <label
-              className="mb-1 block text-xs font-medium text-foreground"
+              className="mb-1 block text-sm font-medium text-foreground"
               htmlFor="count-unit-ar"
               dir="rtl"
             >

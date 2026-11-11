@@ -307,7 +307,7 @@ export default function StoreFaqsPage() {
                 <div className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {t('faqQuestion')}
                       </label>
                       <input
@@ -318,7 +318,7 @@ export default function StoreFaqsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {t('faqQuestionAr')}
                       </label>
                       <input
@@ -335,7 +335,7 @@ export default function StoreFaqsPage() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {t('faqAnswer')}
                       </label>
                       <textarea
@@ -346,7 +346,7 @@ export default function StoreFaqsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">
+                      <label className="block text-sm font-medium text-foreground mb-1">
                         {t('faqAnswerAr')}
                       </label>
                       <textarea
@@ -459,7 +459,7 @@ export default function StoreFaqsPage() {
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     {t('faqQuestion')}
                   </label>
                   <input
@@ -471,7 +471,7 @@ export default function StoreFaqsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     {t('faqQuestionAr')}
                   </label>
                   <input
@@ -486,7 +486,7 @@ export default function StoreFaqsPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     {t('faqAnswer')}
                   </label>
                   <textarea
@@ -497,7 +497,7 @@ export default function StoreFaqsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     {t('faqAnswerAr')}
                   </label>
                   <textarea
@@ -684,7 +684,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             {t('howtoGuideTitle')}
           </label>
           <input
@@ -696,7 +696,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             {t('howtoGuideTitleAr')}
           </label>
           <input
@@ -711,7 +711,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             {t('howtoDescription')}
           </label>
           <textarea
@@ -722,7 +722,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             {t('howtoDescriptionAr')}
           </label>
           <textarea
@@ -741,7 +741,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
           always touches both. */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-medium text-foreground">{t('howtoSteps')}</label>
+          <label className="text-sm font-medium text-foreground">{t('howtoSteps')}</label>
           <Button
             variant="link"
             size="sm"

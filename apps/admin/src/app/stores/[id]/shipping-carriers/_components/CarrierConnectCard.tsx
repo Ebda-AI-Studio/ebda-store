@@ -636,7 +636,7 @@ function CarrierSettingsForm({
         <div>
           <label
             htmlFor={`${entry.code}-weight`}
-            className="mb-1 block text-xs text-muted-foreground"
+            className="mb-1 block text-sm text-muted-foreground"
           >
             {t('settings.defaultWeight')}
           </label>
@@ -655,7 +655,7 @@ function CarrierSettingsForm({
           <div>
             <label
               htmlFor={`${entry.code}-size`}
-              className="mb-1 block text-xs text-muted-foreground"
+              className="mb-1 block text-sm text-muted-foreground"
             >
               {t('settings.packageSize')}
             </label>
@@ -678,7 +678,7 @@ function CarrierSettingsForm({
           <div>
             <label
               htmlFor="aramex-product-type"
-              className="mb-1 block text-xs text-muted-foreground"
+              className="mb-1 block text-sm text-muted-foreground"
             >
               {t('settings.productType')}
             </label>

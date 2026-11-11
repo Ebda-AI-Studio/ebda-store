@@ -592,7 +592,7 @@ function GatewayOptions({
     <div className="space-y-3 rounded-lg border border-border bg-background p-3">
       <p className="text-sm font-medium text-foreground">{t('options.title')}</p>
       <fieldset>
-        <legend className="mb-1 text-xs text-muted-foreground">{t('options.methods')}</legend>
+        <legend className="mb-1 text-sm text-muted-foreground">{t('options.methods')}</legend>
         <div className="flex flex-wrap gap-4">
           {allMethods.map(m => (
             <label key={m} className="flex items-center gap-2 text-sm text-foreground">
@@ -616,7 +616,7 @@ function GatewayOptions({
       )}
       {isKashier ? (
         <div>
-          <label htmlFor="kashier-display" className="mb-1 block text-xs text-muted-foreground">
+          <label htmlFor="kashier-display" className="mb-1 block text-sm text-muted-foreground">
             {t('options.display')}
           </label>
           <select
@@ -631,7 +631,7 @@ function GatewayOptions({
         </div>
       ) : (
         <div>
-          <label htmlFor="fawry-expiry" className="mb-1 block text-xs text-muted-foreground">
+          <label htmlFor="fawry-expiry" className="mb-1 block text-sm text-muted-foreground">
             {t('options.expiryHours')}
           </label>
           <input

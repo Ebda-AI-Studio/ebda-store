@@ -118,7 +118,7 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="return-window-days" className="block text-xs font-medium text-foreground">
+          <label htmlFor="return-window-days" className="block text-sm font-medium text-foreground">
             {t('windowLabel')}
           </label>
           <input
@@ -135,7 +135,7 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
         <div>
           <label
             htmlFor="return-fees-paid-by"
-            className="block text-xs font-medium text-foreground"
+            className="block text-sm font-medium text-foreground"
           >
             {t('feesLabel')}
           </label>

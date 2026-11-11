@@ -310,7 +310,7 @@ export function PaymentLinkButton({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                  <label className="block text-sm font-medium uppercase tracking-wide text-muted-foreground mb-2">
                     {t('paymentUrlLabel')}
                   </label>
                   <div className="flex items-stretch gap-2">

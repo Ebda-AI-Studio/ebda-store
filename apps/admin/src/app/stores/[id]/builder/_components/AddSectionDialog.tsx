@@ -81,7 +81,7 @@ export function AddSectionDialog({ list, doc, template, look, onPick, onClose }:
             ? [
                 <li
                   key="more"
-                  className="col-span-full pt-2 text-xs font-semibold text-muted-foreground"
+                  className="col-span-full pt-2 text-sm font-semibold text-muted-foreground"
                   data-testid="add-section-more"
                 >
                   {t('more')}

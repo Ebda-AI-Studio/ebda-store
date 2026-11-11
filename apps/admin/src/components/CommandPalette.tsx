@@ -357,12 +357,12 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             ))
           )}
           {rows.length > 0 && failureText && (
-            <li role="alert" className="px-3 py-2 text-center text-xs text-destructive-ink">
+            <li role="alert" className="px-3 py-2 text-center text-sm text-destructive-ink">
               {failureText}
             </li>
           )}
           {rows.length > 0 && searching && (
-            <li className="px-3 py-2 text-center text-xs text-muted-foreground">
+            <li className="px-3 py-2 text-center text-sm text-muted-foreground">
               {t('searching')}
             </li>
           )}

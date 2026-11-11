@@ -134,7 +134,7 @@ export function RefundButton({
         <p className="mt-2 text-sm text-muted-foreground">{t('modalBodySideEffects')}</p>
 
         <div className="mt-4">
-          <label htmlFor="refund-reason" className="block text-xs font-medium text-foreground mb-1">
+          <label htmlFor="refund-reason" className="block text-sm font-medium text-foreground mb-1">
             {t('reasonLabel')}
           </label>
           <textarea

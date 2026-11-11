@@ -15,7 +15,7 @@ export function NotesCard({ order }: NotesCardProps) {
     <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
       {order.customerNotes && (
         <div>
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
             {t('customerNotes')}
           </h3>
           <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
@@ -25,7 +25,7 @@ export function NotesCard({ order }: NotesCardProps) {
       )}
       {order.notes && (
         <div>
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
             {t('notes')}
           </h3>
           <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">

@@ -154,7 +154,7 @@ export default function JournalDetailPage() {
             <tbody>
               {entry.lines.map(line => (
                 <tr key={line.id} className="border-t border-border/40">
-                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                  <td className="px-3 py-2 font-mono text-sm text-muted-foreground">
                     {line.account.code}
                   </td>
                   <td className="px-3 py-2">
@@ -165,10 +165,10 @@ export default function JournalDetailPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono text-xs">
+                  <td className="px-3 py-2 text-end font-mono text-sm">
                     {line.debit > 0 ? minorToMajor(line.debit) : ''}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono text-xs">
+                  <td className="px-3 py-2 text-end font-mono text-sm">
                     {line.credit > 0 ? minorToMajor(line.credit) : ''}
                   </td>
                 </tr>
@@ -177,13 +177,13 @@ export default function JournalDetailPage() {
             {/* Totals footer */}
             <tfoot className="bg-muted/20 border-t border-border">
               <tr>
-                <td className="px-3 py-2 text-xs font-medium text-muted-foreground" colSpan={2}>
+                <td className="px-3 py-2 text-sm font-medium text-muted-foreground" colSpan={2}>
                   {t('totalLabel')}
                 </td>
-                <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
+                <td className="px-3 py-2 text-end font-mono text-sm font-semibold">
                   {minorToMajor(totalDr)}
                 </td>
-                <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
+                <td className="px-3 py-2 text-end font-mono text-sm font-semibold">
                   {minorToMajor(totalCr)}
                 </td>
               </tr>

@@ -336,7 +336,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
           )}
 
           <div>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
               {t('timeline')}
             </h3>
             {shipment.statusHistory.length === 0 ? (

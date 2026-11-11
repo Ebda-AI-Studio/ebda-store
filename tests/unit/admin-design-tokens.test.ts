@@ -10,6 +10,8 @@
  *   G5  letter-spacing (`tracking-*` other than tracking-normal): it breaks Arabic letter joining.
  *   G7  a raw <input>/<select>/<textarea> (not checkbox/radio/hidden/file/range/color) that does not use FIELD_CLASSES /
  *       TEXTAREA_CLASSES (or an explicit h-10/h-11): fields sit on the 44/40 control scale.
+ *   G8  `text-xs` (12px) on a content element (<p> <th> <td> <label> <li> <dt> <dd> <legend> <h3-6>): content is 14px or more;
+ *       12px is for counters and badges (<span>, <Badge>), never the sole carrier of meaning.
  *   G6  a `data-ui="nav"` item that does not take its classes from navItemClasses() / bottomNavClasses().
  *
  * G1-G5 are a RATCHET: tests/unit/admin-design-tokens.baseline.json holds the per-file count of pages not yet
@@ -45,6 +47,15 @@ function walk(dir: string): string[] {
 }
 
 const FIELD_SKIP = /\btype=["'](?:checkbox|radio|hidden|file|range|color)["']/;
+const CONTENT_TAG =
+  /<(?:p|th|td|label|li|dd|dt|legend|h[3-6])(?=[\s>])[^<>]*?className=(?:"[^"]*"|\{`[^`]*`\})/g;
+/** G8: content elements set in 12px. */
+export function countSmallContent(src: string): number {
+  return (stripComments(src).match(CONTENT_TAG) ?? []).filter(t =>
+    /(?<![\w:-])text-xs(?![\w-])/.test(t)
+  ).length;
+}
+
 /** G7: raw field tags that are off the control scale. */
 export function countFields(src: string): number {
   const code = stripComments(src);
@@ -67,7 +78,7 @@ export function countFields(src: string): number {
 type Counts = Record<string, Record<string, number>>; // rule -> file -> n
 
 function scan(): { counts: Counts; nav: string[] } {
-  const counts: Counts = { G1: {}, G2: {}, G3: {}, G4: {}, G5: {}, G7: {} };
+  const counts: Counts = { G1: {}, G2: {}, G3: {}, G4: {}, G5: {}, G7: {}, G8: {} };
   const nav: string[] = [];
   for (const p of walk(SRC)) {
     const file = relative(SRC, p);
@@ -80,6 +91,8 @@ function scan(): { counts: Counts; nav: string[] } {
     if (p.endsWith('.tsx')) {
       const f = countFields(src);
       if (f) counts.G7![file] = f;
+      const sm = countSmallContent(src);
+      if (sm) counts.G8![file] = sm;
     }
     if (p.endsWith('.tsx'))
       nav.push(...navIssues(file, src, ['navItemClasses', 'bottomNavClasses']));
@@ -120,6 +133,14 @@ describe('admin design tokens', () => {
     expect(countFields('<select className={`${FIELD_CLASSES} w-40`}>')).toBe(0);
     expect(countFields('<textarea className="rounded border" />')).toBe(1);
     expect(countFields('<Input label="x" />')).toBe(0);
+  });
+
+  it('G8 self-test and negative control', () => {
+    expect(countSmallContent('<p className="text-xs text-muted-foreground">x</p>')).toBe(1);
+    expect(countSmallContent('<th className={`px-3 text-xs`}>x</th>')).toBe(1);
+    expect(countSmallContent('<p className="text-sm">x</p>')).toBe(0);
+    expect(countSmallContent('<span className="text-xs">3</span>')).toBe(0);
+    expect(countSmallContent('<p className="sm:text-xs text-sm">x</p>')).toBe(0);
   });
 
   it('no count exceeds the BASE branch baseline (the ratchet only shrinks)', () => {
@@ -164,7 +185,7 @@ describe('admin design tokens', () => {
     const base: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
     const grew: string[] = [];
     const stale: string[] = [];
-    for (const rule of [...Object.keys(RULES), 'G7']) {
+    for (const rule of [...Object.keys(RULES), 'G7', 'G8']) {
       const files = new Set([...Object.keys(counts[rule]), ...Object.keys(base[rule] ?? {})]);
       for (const f of files) {
         const now = counts[rule][f] ?? 0;

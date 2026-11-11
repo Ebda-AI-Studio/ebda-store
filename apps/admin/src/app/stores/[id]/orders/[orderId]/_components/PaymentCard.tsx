@@ -151,7 +151,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
                 )}
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
                   <dt className="text-primary-ink">{tInstapay('orderRef')}</dt>
-                  <dd className="font-mono text-xs" dir="ltr">
+                  <dd className="font-mono text-sm" dir="ltr">
                     {order.orderNumber}
                   </dd>
                 </div>
@@ -176,7 +176,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               {detailPayment?.transactionId && (
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
                   <dt className="text-muted-foreground">{t('paymentTransactionId')}</dt>
-                  <dd className="font-mono text-xs text-foreground break-all text-end">
+                  <dd className="font-mono text-sm text-foreground break-all text-end">
                     {detailPayment.transactionId}
                   </dd>
                 </div>

@@ -851,7 +851,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
             <p className="mt-1 text-sm text-muted-foreground">{t('firstRunHint')}</p>
           </div>
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <label className="flex flex-col gap-1 text-sm text-muted-foreground">
               {t('firstRunFee')}
               <span className="flex items-center gap-1">
                 <input
@@ -867,7 +867,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                 <span>{t('currency')}</span>
               </span>
             </label>
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <label className="flex flex-col gap-1 text-sm text-muted-foreground">
               {t('firstRunFreeOver')}
               <span className="flex items-center gap-1">
                 <input
@@ -954,7 +954,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
         <div className="mt-3">
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">{t('applyAllGlobalFee')}</label>
+              <label className="text-sm text-muted-foreground">{t('applyAllGlobalFee')}</label>
               <div className="flex items-center gap-1">
                 <input
                   type="number"
@@ -970,7 +970,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">
+              <label className="text-sm text-muted-foreground">
                 {t('applyAllGlobalThreshold')}
               </label>
               <div className="flex items-center gap-1">
@@ -1238,7 +1238,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                     ) : (
                       <div className="flex flex-wrap items-end gap-2 py-1">
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-muted-foreground">{t('areaEn')}</label>
+                          <label className="text-sm text-muted-foreground">{t('areaEn')}</label>
                           <input
                             type="text"
                             placeholder={t('areaNameEnSample')}
@@ -1253,7 +1253,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-muted-foreground">{t('areaAr')}</label>
+                          <label className="text-sm text-muted-foreground">{t('areaAr')}</label>
                           <input
                             type="text"
                             placeholder={t('areaNameArSample')}
@@ -1269,7 +1269,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-muted-foreground">{t('feeLabel')}</label>
+                          <label className="text-sm text-muted-foreground">{t('feeLabel')}</label>
                           <div className="flex items-center gap-1">
                             <input
                               type="number"
@@ -1456,7 +1456,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                         ) : (
                           <div className="flex flex-wrap items-end gap-2 py-1">
                             <div className="flex flex-col gap-1">
-                              <label className="text-xs text-muted-foreground">{t('areaEn')}</label>
+                              <label className="text-sm text-muted-foreground">{t('areaEn')}</label>
                               <input
                                 type="text"
                                 placeholder={t('areaNameEnSample')}
@@ -1471,7 +1471,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                               />
                             </div>
                             <div className="flex flex-col gap-1">
-                              <label className="text-xs text-muted-foreground">{t('areaAr')}</label>
+                              <label className="text-sm text-muted-foreground">{t('areaAr')}</label>
                               <input
                                 type="text"
                                 placeholder={t('areaNameArSample')}
@@ -1487,7 +1487,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                               />
                             </div>
                             <div className="flex flex-col gap-1">
-                              <label className="text-xs text-muted-foreground">
+                              <label className="text-sm text-muted-foreground">
                                 {t('feeLabel')}
                               </label>
                               <div className="flex items-center gap-1">
@@ -1575,7 +1575,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Country EN */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('countryEn')} *</label>
+                <label className="text-sm font-medium text-foreground">{t('countryEn')} *</label>
                 <input
                   type="text"
                   placeholder={t('countryEnSample')}
@@ -1586,7 +1586,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
               </div>
               {/* Country AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('countryAr')}</label>
+                <label className="text-sm font-medium text-foreground">{t('countryAr')}</label>
                 <input
                   type="text"
                   placeholder={t('countryArSample')}
@@ -1598,7 +1598,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
               </div>
               {/* Governorate EN */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">
+                <label className="text-sm font-medium text-foreground">
                   {t('governorateEn')} *
                 </label>
                 <input
@@ -1611,7 +1611,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
               </div>
               {/* Governorate AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('governorateAr')}</label>
+                <label className="text-sm font-medium text-foreground">{t('governorateAr')}</label>
                 <input
                   type="text"
                   placeholder={t('cityArSample')}
@@ -1625,7 +1625,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
               </div>
               {/* Area EN */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('areaEn')} *</label>
+                <label className="text-sm font-medium text-foreground">{t('areaEn')} *</label>
                 <input
                   type="text"
                   placeholder={t('districtEnSample')}
@@ -1636,7 +1636,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
               </div>
               {/* Area AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('areaAr')}</label>
+                <label className="text-sm font-medium text-foreground">{t('areaAr')}</label>
                 <input
                   type="text"
                   placeholder={t('districtArSample')}
@@ -1648,7 +1648,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
               </div>
               {/* Fee */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">{t('feeLabel')}</label>
+                <label className="text-sm font-medium text-foreground">{t('feeLabel')}</label>
                 <div className="flex items-center gap-1">
                   <input
                     type="number"

@@ -99,7 +99,7 @@ export function OrderEtaCard({ storeId, orderId }: { storeId: string; orderId: s
             {r.status === 'manual' && r.errorCode === 'reason_required' ? (
               <div className="mt-2 space-y-2">
                 <p className="text-xs text-muted-foreground">{t('reasonIntro')}</p>
-                <label className="block text-xs font-medium" htmlFor={`eta-reason-${r.id}`}>
+                <label className="block text-sm font-medium" htmlFor={`eta-reason-${r.id}`}>
                   {t('reasonLabel')}
                 </label>
                 <select

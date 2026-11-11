@@ -73,7 +73,7 @@ export function LookSwitchPane({
             data-testid="look-report"
             className="space-y-2 text-sm"
           >
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {t('reportTitle')}
             </h3>
             <ul className="list-disc space-y-1 ps-5">
@@ -120,7 +120,7 @@ export function LookSwitchPane({
           <>
             <LookPicker value={picked} onChange={setPicked} locale={locale} />
             <fieldset className="space-y-1" disabled={busy !== null}>
-              <legend className="mb-1 text-xs font-semibold text-foreground">{t('design')}</legend>
+              <legend className="mb-1 text-sm font-semibold text-foreground">{t('design')}</legend>
               {(['keep', 'reset'] as const).map(k => (
                 <label
                   key={k}

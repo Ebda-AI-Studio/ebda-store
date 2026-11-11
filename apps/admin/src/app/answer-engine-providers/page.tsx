@@ -112,7 +112,7 @@ export function ProviderRow({
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
         <div>
           <label
-            className="mb-1 block text-xs font-medium text-muted-foreground"
+            className="mb-1 block text-sm font-medium text-muted-foreground"
             htmlFor={`apikey-${config.engine}`}
           >
             {t('apiKeyLabel')} {hasKey ? t('apiKeyMaskedHint') : ''}

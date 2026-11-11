@@ -86,10 +86,10 @@ export function AiPatchPane({
               <p className="text-xs text-muted-foreground">{t('none')}</p>
             ) : (
               <>
-                <h3 className="text-xs font-semibold text-muted-foreground">{t('changesTitle')}</h3>
+                <h3 className="text-sm font-semibold text-muted-foreground">{t('changesTitle')}</h3>
                 <ul className="space-y-2">
                   {proposal.changes.map((c, i) => (
-                    <li key={i} className="rounded-lg border border-border p-2 text-xs">
+                    <li key={i} className="rounded-lg border border-border p-2 text-sm">
                       <span className="block font-medium">
                         {locale === 'ar' ? c.labelAr : c.labelEn}
                       </span>

@@ -586,16 +586,16 @@ export function MassEditModal({
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50 sticky top-0 z-10">
                       <tr>
-                        <th className="px-3 py-2 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <th className="px-3 py-2 text-start text-sm font-medium uppercase tracking-wide text-muted-foreground">
                           {t('massEdit.variantGridProduct')}
                         </th>
-                        <th className="px-3 py-2 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <th className="px-3 py-2 text-start text-sm font-medium uppercase tracking-wide text-muted-foreground">
                           {t('massEdit.variantGridVariant')}
                         </th>
-                        <th className="px-3 py-2 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground w-24">
+                        <th className="px-3 py-2 text-start text-sm font-medium uppercase tracking-wide text-muted-foreground w-24">
                           {t('massEdit.variantGridInventory')}
                         </th>
-                        <th className="px-3 py-2 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground w-28">
+                        <th className="px-3 py-2 text-start text-sm font-medium uppercase tracking-wide text-muted-foreground w-28">
                           {t('massEdit.variantGridPrice')}
                         </th>
                       </tr>

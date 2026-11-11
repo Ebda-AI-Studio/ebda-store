@@ -284,13 +284,13 @@ function TaxVerificationInner() {
             <div className="space-y-4 text-sm">
               <dl className="grid gap-2 sm:grid-cols-2">
                 <div>
-                  <dt className="text-xs text-muted-foreground">{t('columns.trn')}</dt>
+                  <dt className="text-sm text-muted-foreground">{t('columns.trn')}</dt>
                   <dd dir="ltr" className="font-mono text-start">
                     {detail.taxRegistrationNumber ?? '—'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">{t('columns.legalName')}</dt>
+                  <dt className="text-sm text-muted-foreground">{t('columns.legalName')}</dt>
                   <dd>{detail.legalName ?? '—'}</dd>
                 </div>
               </dl>

@@ -600,7 +600,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
                           <span className="min-w-[6rem] text-sm text-foreground">
                             {locale === 'ar' && v.valueAr ? v.valueAr : v.value}
                           </span>
-                          <label className="text-xs text-muted-foreground">
+                          <label className="text-sm text-muted-foreground">
                             {t('target')}
                             <select
                               className={`${FIELD_CLASSES} mt-1 block`}
@@ -629,7 +629,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
                             </select>
                           </label>
                           {isMaterial && (
-                            <label className="text-xs text-muted-foreground">
+                            <label className="text-sm text-muted-foreground">
                               {t('finish')}
                               <select
                                 className={`${FIELD_CLASSES} mt-1 block`}

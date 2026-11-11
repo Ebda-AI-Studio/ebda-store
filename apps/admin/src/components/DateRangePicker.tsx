@@ -135,7 +135,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
       </div>
       {period === 'custom' && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('dateFrom')}
             <input
               type="date"
@@ -145,7 +145,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
               className={FIELD_CLASSES}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('dateTo')}
             <input
               type="date"

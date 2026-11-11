@@ -39,7 +39,7 @@ export function TierSettings({ settings, disabled, onChange }: TierSettingsProps
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">{t('minPoints')}</label>
+                <label className="block text-sm text-muted-foreground mb-1">{t('minPoints')}</label>
                 <input
                   type="number"
                   min="0"
@@ -50,7 +50,7 @@ export function TierSettings({ settings, disabled, onChange }: TierSettingsProps
                 />
               </div>
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">
+                <label className="block text-sm text-muted-foreground mb-1">
                   {t('multiplier')}
                 </label>
                 <input

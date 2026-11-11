@@ -91,7 +91,7 @@ export function SectionSpacingField({
       data-field-id="paddingTop"
       data-setting-id="builder.section-spacing"
     >
-      <legend className="text-xs font-semibold text-muted-foreground">{t('spacing.title')}</legend>
+      <legend className="text-sm font-semibold text-muted-foreground">{t('spacing.title')}</legend>
       <label className="flex items-center justify-between gap-3 text-sm">
         <span>{t('spacing.sameOnAll')}</span>
         <Toggle checked={!split} onChange={setSame} label={t('spacing.sameOnAll')} />

@@ -204,12 +204,12 @@ export default function ImportStatementPage() {
                 <p className="text-xs font-semibold text-warning-ink mb-1">{ti('parseErrors')}:</p>
                 <ul className="list-inside list-disc space-y-0.5">
                   {result.parseErrors.slice(0, 10).map((e, i) => (
-                    <li key={i} className="text-xs text-warning-ink">
+                    <li key={i} className="text-sm text-warning-ink">
                       {e}
                     </li>
                   ))}
                   {result.parseErrors.length > 10 && (
-                    <li className="text-xs text-warning-ink">
+                    <li className="text-sm text-warning-ink">
                       {ti('andMore', { count: result.parseErrors.length - 10 })}
                     </li>
                   )}

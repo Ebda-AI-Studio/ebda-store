@@ -296,7 +296,7 @@ export function SmartPaletteModal({
 
         {/* Layer B: Vibe picker */}
         <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('vibeSection')}
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -316,11 +316,11 @@ export function SmartPaletteModal({
 
         {/* Distribution sub-section: pattern + frame thickness */}
         <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('distributionSection')}
           </h3>
           <div className="mb-3">
-            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+            <label className="mb-2 block text-sm font-medium text-muted-foreground">
               {t('patternLabel')}
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -338,7 +338,7 @@ export function SmartPaletteModal({
             </div>
           </div>
           <div>
-            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+            <label className="mb-2 block text-sm font-medium text-muted-foreground">
               {t('frameThicknessLabel')}
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -356,7 +356,7 @@ export function SmartPaletteModal({
             </div>
           </div>
           <div className="mt-3">
-            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+            <label className="mb-2 block text-sm font-medium text-muted-foreground">
               {t('frameSizeLabel')}
             </label>
             <div className="grid grid-cols-4 gap-2">

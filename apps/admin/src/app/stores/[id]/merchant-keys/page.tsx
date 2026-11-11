@@ -371,7 +371,7 @@ export default function MerchantKeysPage() {
       {/* ── Create ──────────────────────────────────────────────────────── */}
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title={t('create.title')}>
         <div className="space-y-3">
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('create.nameLabel')}
             <input
               className={`${FIELD_CLASSES} mt-1`}
@@ -384,14 +384,14 @@ export default function MerchantKeysPage() {
           </label>
 
           <fieldset className="space-y-1">
-            <legend className="text-xs font-medium text-foreground" dir="auto">
+            <legend className="text-sm font-medium text-foreground" dir="auto">
               {t('create.scopesLabel')}
             </legend>
             <p className="text-xs leading-relaxed text-muted-foreground" dir="auto">
               {t('create.scopesHelp')}
             </p>
             {SCOPE_ORDER.map(scope => (
-              <label key={scope} className="flex items-start gap-2 text-xs" dir="auto">
+              <label key={scope} className="flex items-start gap-2 text-sm" dir="auto">
                 <input
                   type="checkbox"
                   className="mt-0.5"
@@ -410,7 +410,7 @@ export default function MerchantKeysPage() {
             ))}
           </fieldset>
 
-          <label className="block text-xs font-medium text-foreground" dir="auto">
+          <label className="block text-sm font-medium text-foreground" dir="auto">
             {t('create.expiryLabel')}
             <input
               className={`${FIELD_CLASSES} mt-1`}

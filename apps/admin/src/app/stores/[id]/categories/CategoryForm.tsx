@@ -335,7 +335,7 @@ export function CategoryForm({
           {seoMessage && <p className="mb-2 text-xs text-muted-foreground">{seoMessage}</p>}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">
+              <label className="mb-1 block text-sm font-medium text-foreground">
                 {t('metaTitleLabel', { count: (form.metaTitle ?? '').length })}
               </label>
               <input
@@ -347,7 +347,7 @@ export function CategoryForm({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">
+              <label className="mb-1 block text-sm font-medium text-foreground">
                 {t('metaTitleArLabel', { count: (form.metaTitleAr ?? '').length })}
               </label>
               <input
@@ -361,7 +361,7 @@ export function CategoryForm({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">
+              <label className="mb-1 block text-sm font-medium text-foreground">
                 {t('metaDescriptionLabel', { count: (form.metaDescription ?? '').length })}
               </label>
               <textarea
@@ -373,7 +373,7 @@ export function CategoryForm({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">
+              <label className="mb-1 block text-sm font-medium text-foreground">
                 {t('metaDescriptionArLabel', { count: (form.metaDescriptionAr ?? '').length })}
               </label>
               <textarea
@@ -396,7 +396,7 @@ export function CategoryForm({
               </p>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">
+              <label className="mb-1 block text-sm font-medium text-foreground">
                 {t('aeoMetaEnLabel', { count: (form.metaDescriptionAeo ?? '').length })}
               </label>
               <textarea
@@ -410,7 +410,7 @@ export function CategoryForm({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">
+              <label className="mb-1 block text-sm font-medium text-foreground">
                 {t('aeoMetaArLabel', { count: (form.metaDescriptionAeoAr ?? '').length })}
               </label>
               <textarea

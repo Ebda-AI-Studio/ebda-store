@@ -120,7 +120,7 @@ export function RecoveryCampaignForm({
             {config.autoCouponEnabled && config.step3Enabled && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     {t('autoCoupon.discount')}
                   </label>
                   <div className="flex items-center gap-1">
@@ -136,7 +136,7 @@ export function RecoveryCampaignForm({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     {t('autoCoupon.maxDiscount')}
                   </label>
                   <div className="flex items-center gap-1">
@@ -163,7 +163,7 @@ export function RecoveryCampaignForm({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     {t('autoCoupon.expiry')}
                   </label>
                   <div className="flex items-center gap-1">

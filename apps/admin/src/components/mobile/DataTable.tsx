@@ -254,7 +254,7 @@ export function DataTable<T>({
                 >
                   {labelColumns.map((c, ci) => (
                     <div key={ci} className="flex items-baseline gap-3">
-                      <dt className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <dt className="w-24 shrink-0 text-sm font-medium uppercase tracking-wide text-muted-foreground">
                         {c.header}
                       </dt>
                       <dd

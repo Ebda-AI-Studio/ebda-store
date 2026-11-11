@@ -356,7 +356,7 @@ export function RefundMethodModal({
                             {t('tierAdjustment.shortfall', { amount: formatCurrency(l.shortfall) })}
                           </p>
                         )}
-                        <label className="mt-2 flex min-h-11 items-center gap-2 text-xs md:min-h-0">
+                        <label className="mt-2 flex min-h-11 items-center gap-2 text-sm md:min-h-0">
                           <input
                             type="checkbox"
                             checked={d.on}
@@ -371,7 +371,7 @@ export function RefundMethodModal({
                         </label>
                         {d.on && (
                           <div className="mt-1 grid gap-2 sm:grid-cols-2">
-                            <label className="block text-xs">
+                            <label className="block text-sm">
                               {t('tierAdjustment.overrideAmount')}
                               <input
                                 inputMode="decimal"
@@ -387,7 +387,7 @@ export function RefundMethodModal({
                                 className={`${FIELD_CLASSES} mt-1`}
                               />
                             </label>
-                            <label className="block text-xs">
+                            <label className="block text-sm">
                               {t('tierAdjustment.overrideReason')}
                               <input
                                 value={d.reason}

@@ -507,7 +507,7 @@ export default function StatementDetailPage() {
                   ].map(h => (
                     <th
                       key={h}
-                      className="whitespace-nowrap px-3 py-3 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                      className="whitespace-nowrap px-3 py-3 text-start text-sm font-medium uppercase tracking-wide text-muted-foreground"
                     >
                       {h}
                     </th>
@@ -536,7 +536,7 @@ export default function StatementDetailPage() {
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-sm text-foreground">
                       {major(tx.amountFils)}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                    <td className="px-3 py-2.5 text-sm text-muted-foreground">
                       {tx.externalRef ?? '—'}
                     </td>
                     <td className="px-3 py-2.5">
@@ -549,7 +549,7 @@ export default function StatementDetailPage() {
                         )}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                    <td className="px-3 py-2.5 text-sm text-muted-foreground">
                       {tx.matchedJournalEntry ? (
                         <span className="font-mono">{tx.matchedJournalEntry.entryNumber}</span>
                       ) : (
