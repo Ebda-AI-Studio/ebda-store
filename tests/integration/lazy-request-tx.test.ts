@@ -80,9 +80,10 @@ describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_a
       const s = await owner.store.create({
         data: { slug: `${PREFIX}${tag}-${run}`, name: `LT ${tag}`, ownerId: u.id },
       });
-      await owner.category.create({
+      const cat = await owner.category.create({
         data: { storeId: s.id, name: `cat-${tag}`, slug: `cat-${tag}-${run}` },
       });
+      // QA-B2: shoppers only see a category that holds a visible product, so the fixture links one.
       await owner.product.create({
         data: {
           storeId: s.id,
@@ -90,7 +91,12 @@ describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_a
           slug: `prod-${tag}-${run}`,
           price: 1000,
           status: 'active' as never,
+          categories: { create: [{ categoryId: cat.id }] },
         },
+      });
+      // ...and an empty one that must stay hidden.
+      await owner.category.create({
+        data: { storeId: s.id, name: `empty-${tag}`, slug: `empty-${tag}-${run}` },
       });
       return s.id;
     };
@@ -153,6 +159,7 @@ describe.skipIf(!hasDb)('cached public reads open no request transaction (ebda_a
     expect(r.status).toBe(200);
     const cats = r.body.data.categories as Array<{ name: string }>;
     expect(cats.map(c => c.name)).toContain('cat-a');
+    expect(cats.map(c => c.name)).not.toContain('empty-a');
     expect(seen.at(-1)).toMatchObject({ path: '/categories', scope: undefined });
   });
 

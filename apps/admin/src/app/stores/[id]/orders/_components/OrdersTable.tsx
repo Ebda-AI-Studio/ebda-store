@@ -112,15 +112,14 @@ export function OrdersTable({
       header: t('table.order'),
       primaryOnMobile: true,
       cell: order => {
-        // Show a compact order number on the list row: last 6 chars of the
-        // full number prefixed with "#…" so it's de-emphasised. The full
-        // number lives on the order detail page and is unchanged there.
+        // QA-D5: the list shows the FULL order number (the merchant reads it to the customer; a "#…-DRHWY"
+        // truncation matched nothing in the customer's message). It wraps rather than clips.
         const full = order.orderNumber || `#${order.id.slice(0, 8).toUpperCase()}`;
-        const compact = full.length > 7 ? `#…${full.slice(-6)}` : full;
+        const compact = full;
         return (
           <Link
             href={`/stores/${storeId}/orders/${order.id}`}
-            className="font-mono text-xs font-medium text-primary hover:underline"
+            className="font-mono text-xs font-medium text-primary hover:underline break-all"
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
             title={full}
           >
@@ -178,7 +177,7 @@ export function OrdersTable({
         const agentBadge = order.source === 'agent' && (
           <OrderStatusBadge
             status="agent"
-            label={`🤖 ${t('agentBadge')}`}
+            label={t('agentBadge')}
             // Uses the `orders.list` namespace's own `agentBadge` key
             // (added alongside `orders.detail.agent`) so this list-row
             // badge doesn't depend on the detail page's translations.

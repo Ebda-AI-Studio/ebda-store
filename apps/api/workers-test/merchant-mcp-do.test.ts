@@ -182,14 +182,6 @@ describe.skipIf(e.E2E_DB === '1')(
       )
         .bind('mcp-do-accounting', storeId, 'accounting.basic', Date.now())
         .run();
-      // The agent-key MINT and the StoreCredential row are not on the DO yet (STORE_RECORD_REFUSED / MODEL_NOT_WRITABLE), so
-      // the key-less grant is used (set before any request, the feature map is cached): the store's own `agent_checkout_open_writes` override (merchant-switched, same write gate).
-      await e.PLATFORM_DB.prepare(
-        'INSERT OR REPLACE INTO store_features (id, store_id, feature_key, enabled, enabled_at) VALUES (?1, ?2, ?3, 1, ?4)'
-      )
-        .bind('mcp-do-open-writes', storeId, 'agent_checkout_open_writes', Date.now())
-        .run();
-
       for (const u of [owner, customerId])
         await authState(`user:tv:${u}`, [['set', `user:tv:${u}`, '0', {}]]);
       const sa = await accessToken({
@@ -394,14 +386,26 @@ describe.skipIf(e.E2E_DB === '1')(
       expect(reachReport(await pgReaches(true))).toBe('');
     }, 60_000);
 
-    it('agent place_order (cod): one cod_pending payment + created event in the DO, a replay adds none (Ruling NZ-MONEY-AGENT-1)', async () => {
+    it('agent key mint/rotate/revoke + place_order (cod): one cod_pending payment + created event in the DO, a replay adds none (Ruling NZ-MONEY-AGENT-1)', async () => {
       await pgReaches(true);
-      const buyer = async (tool: string, args: Record<string, unknown>) => {
+      // the store's agent key: mint (POST), the status (GET) shows it, and it is what the write gate accepts
+      const keyUrl = `/stores/${storeId}/integrations/agent-key`;
+      const minted = await api(keyUrl, { method: 'POST', headers: merchant, body: '{}' });
+      expect(minted.status, await minted.clone().text()).toBe(201);
+      let agentKey = (JSON.parse(await minted.text()).data as { apiKey: string }).apiKey;
+      const status = async () =>
+        JSON.parse(await (await api(keyUrl, { headers: merchant })).text()).data as {
+          hasKey: boolean;
+        };
+      expect((await status()).hasKey).toBe(true);
+      const buyer = async (tool: string, args: Record<string, unknown>, key?: string) => {
+        key ??= agentKey;
         const r = await api('/mcp/mcp-do-shop', {
           method: 'POST',
           headers: {
             accept: 'application/json, text/event-stream',
             host: 'api.ebda.app',
+            ...(key ? { 'x-agent-key': key } : {}),
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
@@ -475,6 +479,22 @@ describe.skipIf(e.E2E_DB === '1')(
       expect((await doRead(storeId, 'Order', { where: { storeId } })).length).toBe(
         ordersBefore + 1
       );
+      // rotate: the old key is refused at the write gate, the new one is accepted
+      const oldKey = agentKey;
+      const rotated = await api(keyUrl, { method: 'POST', headers: merchant, body: '{}' });
+      expect(rotated.status, await rotated.clone().text()).toBe(201);
+      agentKey = (JSON.parse(await rotated.text()).data as { apiKey: string }).apiKey;
+      expect(agentKey).not.toBe(oldKey);
+      const stale = await buyer('add_to_cart', { productId: productIds[0], quantity: 1 }, oldKey);
+      expect(stale.body.result?.isError, stale.text).toBe(true);
+      const fresh2 = await buyer('add_to_cart', { productId: productIds[0], quantity: 1 });
+      expect(fresh2.body.result?.isError, fresh2.text).not.toBe(true);
+      // revoke: nothing writes any more
+      const del = await api(keyUrl, { method: 'DELETE', headers: merchant });
+      expect(del.status, await del.clone().text()).toBe(200);
+      expect((await status()).hasKey).toBe(false);
+      const gone = await buyer('add_to_cart', { productId: productIds[0], quantity: 1 });
+      expect(gone.body.result?.isError, gone.text).toBe(true);
       expect(reachReport(await pgReaches(true))).toBe('');
     }, 60_000);
 

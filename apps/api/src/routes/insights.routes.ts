@@ -16,8 +16,9 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { currentStoreId, prisma, runInTenantContext, RfmSegment } from '@ebda/database';
-import { storeDb } from '../lib/repo-factory';
+import { currentStoreId, prisma, RfmSegment } from '@ebda/database';
+import { storeDb, storeMoney } from '../lib/repo-factory';
+import { readInStoreContext } from '../lib/store-scoped-read';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireAnalyticsTier } from '../middleware/analytics-tier';
@@ -110,6 +111,13 @@ export async function repeatPurchaseInDb(
   storeId: string,
   since: Date
 ): Promise<{ repeatPurchaseRate: number | null; identifiedBuyers: number }> {
+  // A store on its Durable Object (the Worker has no Postgres): the SQLite twin of the query below, same key, same counts.
+  const money = await storeMoney(storeId);
+  if (money) {
+    const r = await money.analyticsRepeatBuyers({ sinceMs: since.getTime() });
+    if (r.buyers === 0) return { repeatPurchaseRate: null, identifiedBuyers: 0 };
+    return { repeatPurchaseRate: r.repeat / r.buyers, identifiedBuyers: r.buyers };
+  }
   const rows = await prisma.$queryRaw<Array<{ repeat: number; buyers: number }>>`
     SELECT
       COUNT(*) FILTER (WHERE n >= 2)::int AS repeat,
@@ -155,8 +163,8 @@ router.get(
       const [orderStats, prevOrderStats, topSegmentRaw, yesterdayFunnel, topSkus, narration] =
         await Promise.all([
           // AOV + MRR-equiv (last 30d)
-          runInTenantContext(storeId, () =>
-            prisma.order.aggregate({
+          readInStoreContext(storeId, async () =>
+            (await storeDb(storeId)).order.aggregate({
               where: {
                 storeId,
                 paymentStatus: 'paid',
@@ -170,8 +178,8 @@ router.get(
 
           // AOV for the PREVIOUS 30d window (days 30–60 ago) — drives the
           // period-over-period change shown on the dashboard AOV tile.
-          runInTenantContext(storeId, () =>
-            prisma.order.aggregate({
+          readInStoreContext(storeId, async () =>
+            (await storeDb(storeId)).order.aggregate({
               where: {
                 storeId,
                 paymentStatus: 'paid',
@@ -185,7 +193,7 @@ router.get(
           ),
 
           // Top segment by count + revenue contribution
-          runInTenantContext(storeId, async () =>
+          readInStoreContext(storeId, async () =>
             (await storeDb(currentStoreId())).customerRfmSnapshot.groupBy({
               by: ['segment'],
               where: { storeId },
@@ -197,7 +205,7 @@ router.get(
           ),
 
           // Yesterday funnel snapshot
-          runInTenantContext(storeId, async () =>
+          readInStoreContext(storeId, async () =>
             (await storeDb(currentStoreId())).funnelSnapshot.findFirst({
               where: { storeId },
               orderBy: { periodDate: 'desc' },
@@ -205,8 +213,8 @@ router.get(
           ),
 
           // Top 5 SKUs by revenue (last 7d)
-          runInTenantContext(storeId, () =>
-            prisma.orderItem.groupBy({
+          readInStoreContext(storeId, async () =>
+            (await storeDb(storeId)).orderItem.groupBy({
               by: ['productId'],
               where: {
                 order: {
@@ -228,7 +236,7 @@ router.get(
       // Enrich top SKUs with product info
       const productIds = topSkus.map(s => s.productId);
       const products = productIds.length
-        ? await runInTenantContext(storeId, async () =>
+        ? await readInStoreContext(storeId, async () =>
             (await storeDb(storeId)).product.findMany({
               where: { storeId, id: { in: productIds } },
               select: { id: true, name: true, nameAr: true, sku: true },
@@ -251,13 +259,13 @@ router.get(
       // by exactly `customerKeyOf`'s key (see its doc) and returns two counts.
       const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const [{ repeatPurchaseRate, identifiedBuyers }, guestCheckout] = await Promise.all([
-        runInTenantContext(storeId, () => repeatPurchaseInDb(storeId, since30d)),
+        readInStoreContext(storeId, () => repeatPurchaseInDb(storeId, since30d)),
         // Same 30d window: does this store take guest orders? Ruling AN-1's
         // definition — ANY order with no customer, paid or not — the same
         // probe /insights/funnel uses. Deriving it from the PAID orders read a
         // false `false` on a store whose guest orders are unpaid COD, while
         // the funnel page read `true` for the same days (issue 2257).
-        runInTenantContext(storeId, () => storeTakesGuestOrders(storeId, since30d)),
+        readInStoreContext(storeId, () => storeTakesGuestOrders(storeId, since30d)),
       ]);
 
       // Window length used to derive a per-day velocity from the 7d unit sums.
@@ -345,7 +353,7 @@ router.get(
       const storeId = req.params.storeId;
 
       const [cohorts, narration] = await Promise.all([
-        runInTenantContext(storeId, async () =>
+        readInStoreContext(storeId, async () =>
           (await storeDb(currentStoreId())).customerCohortSnapshot.findMany({
             where: { storeId },
             orderBy: [{ cohortMonth: 'desc' }, { periodOffset: 'asc' }],
@@ -404,12 +412,12 @@ router.get(
 
       const [funnelDays, narration, guestCheckout] = await Promise.all([
         // Shared with the merchant MCP `admin_get_funnel` tool.
-        runInTenantContext(storeId, () => listFunnelSnapshots(storeId, days)),
+        readInStoreContext(storeId, () => listFunnelSnapshots(storeId, days)),
         generateInsightNarration(storeId, 'funnel'),
         // checkoutsStarted / ordersAbandoned come from abandoned_carts, which
         // cannot see guest carts — flag it so the page shows "not tracked for
         // guest checkout" instead of a false 0.
-        runInTenantContext(storeId, () => storeTakesGuestOrders(storeId, since)),
+        readInStoreContext(storeId, () => storeTakesGuestOrders(storeId, since)),
       ]);
 
       res.json({
@@ -437,7 +445,7 @@ router.get(
       const storeId = req.params.storeId;
 
       const [rawSegments, narration] = await Promise.all([
-        runInTenantContext(storeId, async () =>
+        readInStoreContext(storeId, async () =>
           (await storeDb(currentStoreId())).customerRfmSnapshot.groupBy({
             by: ['segment'],
             where: { storeId },
@@ -510,8 +518,8 @@ router.get(
       const since30d = new Date(now - PRODUCT_VELOCITY_WINDOW_DAYS * DAY_MS);
       const since7d = new Date(now - 7 * DAY_MS);
 
-      const top30d = await runInTenantContext(storeId, () =>
-        prisma.orderItem.groupBy({
+      const top30d = await readInStoreContext(storeId, async () =>
+        (await storeDb(storeId)).orderItem.groupBy({
           by: ['productId'],
           where: { order: { storeId, paymentStatus: 'paid', createdAt: { gte: since30d } } },
           _sum: { total: true, quantity: true },
@@ -522,9 +530,9 @@ router.get(
 
       const productIds = top30d.map(s => s.productId);
       const [sold7dRows, products] = productIds.length
-        ? await runInTenantContext(storeId, async () =>
+        ? await readInStoreContext(storeId, async () =>
             Promise.all([
-              prisma.orderItem.groupBy({
+              (await storeDb(storeId)).orderItem.groupBy({
                 by: ['productId'],
                 where: {
                   productId: { in: productIds },
@@ -601,7 +609,7 @@ router.get(
     try {
       const storeId = req.params.storeId;
 
-      const rows = await runInTenantContext(storeId, async () =>
+      const rows = await readInStoreContext(storeId, async () =>
         (await storeDb(currentStoreId())).customerRfmSnapshot.findMany({
           where: { storeId, isGuest: false },
           select: { customerId: true, segment: true },
@@ -630,7 +638,7 @@ router.get(
     try {
       const { storeId, customerId } = req.params;
 
-      const snapshot = await runInTenantContext(storeId, async () =>
+      const snapshot = await readInStoreContext(storeId, async () =>
         (await storeDb(currentStoreId())).customerRfmSnapshot.findUnique({
           where: { storeId_customerId: { storeId, customerId } },
         })

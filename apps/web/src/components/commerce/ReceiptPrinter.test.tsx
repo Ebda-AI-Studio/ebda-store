@@ -491,10 +491,7 @@ describe('receipt W3', () => {
 // IA-14 (independent audit): the number and the total each printed twice (printer
 // head and paper); the number set huge in one unbroken monospace run.
 describe('receipt IA-14', () => {
-  it('groups a prefixed order number for reading out, keeps the full value for readers', async () => {
-    const { groupOrderNumber } = await import('./ReceiptPrinter');
-    expect(groupOrderNumber('ORD-TMZRB9-IR5JY')).toBe('TMZRB9 · IR5JY');
-    expect(groupOrderNumber('1043')).toBe('1043');
+  it('QA-D5: prints the full order number once, as the admin list and the courier see it', () => {
     render(
       <ReceiptPrinter
         order={{ ...order, orderNumber: 'ORD-TMZRB9-IR5JY' }}
@@ -503,11 +500,8 @@ describe('receipt IA-14', () => {
       />
     );
     const n = screen.getByTestId('receipt-order-number');
-    // a11y re-audit P2-N7: aria-label is prohibited on a <p>; the grouped form is shown
-    // (aria-hidden) and the full value is read from an sr-only span.
-    expect(n.hasAttribute('aria-label')).toBe(false);
-    expect(n.querySelector('[aria-hidden="true"]')!.textContent).toBe('#TMZRB9 · IR5JY');
-    expect(n.querySelector('.sr-only')!.textContent).toBe('ORD-TMZRB9-IR5JY');
+    expect(n.textContent).toBe('#ORD-TMZRB9-IR5JY');
+    expect(n.querySelector('.sr-only')).toBeNull();
   });
 
   it('the order number and the total appear once on the page', () => {
