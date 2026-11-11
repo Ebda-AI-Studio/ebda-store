@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { cleanGitEnv, sandboxGit, initSandboxRepo } from '../helpers/git-env';
 
 const SCRIPT = join(process.cwd(), '.github/ai-review/pass-marker.mjs');
 const WF = readFileSync(join(process.cwd(), '.github/workflows/ai-review.yml'), 'utf8');
@@ -32,16 +33,10 @@ else if (a[0] === 'api' && a.includes('PATCH')) { const id = Number(a[a.length -
 else { console.error('stub gh: unhandled ' + a.join(' ')); process.exit(9); }
 `;
 
-const ID = ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false'];
 let dir = '',
   O = '',
   W = '';
-const sh = (cwd: string, ...a: string[]) =>
-  execFileSync('git', [...ID, ...a], {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-  }).trim();
+const sh = (cwd: string, ...a: string[]) => sandboxGit(cwd)(...a);
 const file = (rel: string, body: string, cwd = W) => writeFileSync(join(cwd, rel), body);
 const commit = (msg: string) => {
   sh(W, 'add', '-A');
@@ -58,13 +53,16 @@ const refreshBase = () =>
 
 function setup(init: { labels?: string[]; comments?: object[] } = {}) {
   dir = mkdtempSync(join(tmpdir(), 'pm-'));
-  O = join(dir, 'origin.git');
-  W = join(dir, 'work');
   mkdirSync(join(dir, 'bin'));
   writeFileSync(join(dir, 'bin', 'gh'), GH);
   chmodSync(join(dir, 'bin', 'gh'), 0o755);
-  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', O]);
-  execFileSync('git', ['clone', '-q', O, W], { stdio: 'pipe' });
+  // origin: a normal repo that accepts pushes to its checked-out branch (a stand-in for the base repo on GitHub)
+  const origin = initSandboxRepo('pm-origin-');
+  O = origin.dir;
+  origin.git('config', 'receive.denyCurrentBranch', 'ignore');
+  const work = initSandboxRepo('pm-work-');
+  W = work.dir;
+  work.git('remote', 'add', 'origin', O);
   file('a.txt', lines(20));
   file('b.txt', lines(5));
   commit('base');
@@ -94,7 +92,7 @@ const head0 = () => {
 const run = (cmd: string, headSha: string, extra: Record<string, string> = {}) =>
   spawnSync('node', [SCRIPT, cmd], {
     cwd: W,
-    env: {
+    env: cleanGitEnv({
       PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
       STUB_DIR: dir,
       GH_REPO: 'o/r',
@@ -103,7 +101,7 @@ const run = (cmd: string, headSha: string, extra: Record<string, string> = {}) =
       HEAD_SHA: headSha,
       GITHUB_OUTPUT: join(dir, 'out'),
       ...extra,
-    },
+    }),
     encoding: 'utf8',
   });
 const labels = () => readFileSync(join(dir, 'LABELS'), 'utf8').split('\n').filter(Boolean);
@@ -124,7 +122,7 @@ const diffOf = (headSha: string) =>
       '-U3',
       `origin/main...${headSha}`,
     ],
-    { cwd: W, encoding: 'utf8' }
+    { cwd: W, encoding: 'utf8', env: cleanGitEnv() }
   );
 
 describe('pass-marker: a pass is bound to the head and the exact diff that were reviewed', () => {
@@ -174,7 +172,11 @@ describe('pass-marker: a pass is bound to the head and the exact diff that were 
     const before = diffOf(h0),
       after = diffOf(h1);
     const pid = (d: string) =>
-      execFileSync('git', ['patch-id', '--stable'], { input: d, encoding: 'utf8' }).split(' ')[0];
+      execFileSync('git', ['patch-id', '--stable'], {
+        input: d,
+        encoding: 'utf8',
+        env: cleanGitEnv(),
+      }).split(' ')[0];
     expect(pid(before)).toBe(pid(after)); // the old fingerprint could not tell these apart
     expect(sha256(before)).not.toBe(sha256(after)); // the byte hash can
     run('revalidate', h1);
