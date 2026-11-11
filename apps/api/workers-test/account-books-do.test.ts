@@ -457,7 +457,7 @@ describe.skipIf(e.E2E_DB === '1')(
       expect.soft(reachReport(await pgReaches(true)), steps.join('\n')).toBe('');
     }, 60_000);
 
-    it('billing: recording a plan payment (the grant award path) answers 200 with no Postgres reach (Ruling NZ-ACCT-1)', async () => {
+    it('billing: recording a plan payment (the grant award path) records the payment with no Postgres reach (Ruling NZ-ACCT-1)', async () => {
       // the super admin records the store's first payment: runBillingEffects -> awardGrantsAfterPayment -> inOwnTx (a Postgres
       // transaction before NZ-ACCT-1, whose throw the effect runner swallows: the store simply never got its free month)
       await authState('user:tv:super-acct-do', [['set', 'user:tv:super-acct-do', '0', {}]]);
@@ -485,7 +485,10 @@ describe.skipIf(e.E2E_DB === '1')(
         }),
       });
       const text = await paid.text();
-      expect.soft(paid.status, text.slice(0, 300)).toBe(200);
+      // a fresh payment is CREATED (201) and is not a replay: the award path ran past the D1 commit (main fixed the
+      // commitManualPaymentD1 duplicate answer this case first observed)
+      expect.soft(paid.status, text.slice(0, 300)).toBe(201);
+      expect.soft(JSON.parse(text).data?.duplicate, text.slice(0, 300)).toBe(false);
       expect.soft(reachReport(await pgReaches(true)), text.slice(0, 300)).toBe('');
     }, 60_000);
   }
