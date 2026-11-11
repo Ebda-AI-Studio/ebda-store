@@ -41,7 +41,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { computeBundlePrice, isAllocatable, type BundlePricingType } from '@ebda/shared';
+import { computeBundlePrice, isAllocatable, slugify, type BundlePricingType } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { RowActions } from '@/components/RowActions';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
@@ -136,15 +136,6 @@ const EMPTY_FORM: FormState = {
   expiresAt: '',
   items: [],
 };
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9؀-ۿ-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
 
 export default function BundlesPage() {
   const { gate } = useRequireFeature('bundles');

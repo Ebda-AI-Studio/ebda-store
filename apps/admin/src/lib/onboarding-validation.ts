@@ -1,7 +1,7 @@
 // Client-side mirrors of the signup rules the API enforces
 // (apps/api/src/services/merchant-signup.service.ts), so the form can answer
 // instantly. The API stays the authority; these only avoid a round trip.
-import { isValidEgyptianMobile, isValidEmail } from '@ebda/shared';
+import { isValidEgyptianMobile, isValidEmail, slugify } from '@ebda/shared';
 
 /** Same policy as the API: 8+ chars, upper, lower, digit, symbol. */
 export function isStrongPassword(password: string): boolean {
@@ -57,10 +57,5 @@ export function egpToPiastres(input: string): number | null {
 
 /** Suggest a latin store address from a store name; Arabic-only names yield ''. */
 export function suggestSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-    .replace(/-+$/g, '');
+  return slugify(name, { ascii: true, max: 40 });
 }

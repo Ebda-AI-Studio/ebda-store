@@ -1,4 +1,9 @@
-import { validateStoreSlug, validateStoreSlugFormat, isDemoShowroomSlug } from '@ebda/shared';
+import {
+  slugify,
+  validateStoreSlug,
+  validateStoreSlugFormat,
+  isDemoShowroomSlug,
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -21,13 +26,7 @@ export function assertStoreSlug(raw: string, opts: { allowProtected?: boolean } 
  * it unreserved and unique.
  */
 export function deriveStoreSlug(derived: string): string {
-  let slug = derived
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/-{2,}/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-    .replace(/-+$/g, '');
+  let slug = slugify(derived, { ascii: true, max: 40 });
   // A name that derives into the demo showroom family ("StoreDemo") is moved out of it, so the
   // de-dup loop never has to suffix its way through an unclaimable prefix (Ruling B2-17).
   if (isDemoShowroomSlug(slug)) slug = slug.replace(/^storedemo/, 'store-demo');

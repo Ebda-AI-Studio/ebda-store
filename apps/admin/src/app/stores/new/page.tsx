@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiPost } from '../../../lib/api';
-import { isValidEmail, validateStoreSlug } from '@ebda/shared';
+import { isValidEmail, slugify, validateStoreSlug } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { StepIndicator } from './_components/StepIndicator';
 import { StoreDetailsStep } from './_components/StoreDetailsStep';
@@ -39,18 +39,11 @@ export default function CreateStorePage() {
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  function generateSlug(name: string) {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-  }
-
   function handleNameChange(value: string) {
     setFormData(prev => ({
       ...prev,
       storeName: value,
-      storeSlug: generateSlug(value),
+      storeSlug: slugify(value, { ascii: true, max: 40 }),
     }));
     setValidationErrors(prev => ({ ...prev, storeName: '', storeSlug: '' }));
   }

@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { recommendedSizeText } from '@ebda/shared';
+import { recommendedSizeText, slugify, slugifyWithFallback } from '@ebda/shared';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import { AdminLayout } from '../../../../../components/AdminLayout';
@@ -52,15 +52,6 @@ function emptyForm(): BlogFormData {
     coverImage: '',
     isPublished: false,
   };
-}
-
-function slugify(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 80);
 }
 
 /**
@@ -116,7 +107,7 @@ export default function BlogPostEditorPage({
       const next = { ...prev, [key]: value };
       // Auto-derive slug from title only on create + when slug is empty
       if (isNew && key === 'title' && !prev.slug) {
-        next.slug = slugify(value as string);
+        next.slug = slugifyWithFallback(value as string, 'post', { ascii: true, max: 80 });
       }
       return next;
     });
@@ -208,7 +199,12 @@ export default function BlogPostEditorPage({
             <input
               type="text"
               value={form.slug}
-              onChange={e => update('slug', slugify(e.target.value))}
+              onChange={e =>
+                update(
+                  'slug',
+                  slugify(e.target.value, { ascii: true, max: 80, keepTrailingHyphen: true })
+                )
+              }
               className="w-full rounded-lg border border-input px-4 py-2 font-mono text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               placeholder={t('slugPlaceholder')}
             />

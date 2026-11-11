@@ -16,6 +16,7 @@ import {
   redactPersonalData,
   injectionMarkers,
   sanitizeCatalogueText,
+  slugifyWithFallback,
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
@@ -713,11 +714,7 @@ export async function createDraftForItem(
     categoryId =
       all.find(c => fold(c.name) === f || (c.nameAr && fold(c.nameAr) === f))?.id ?? null;
     if (!categoryId) {
-      const base =
-        item.categoryName
-          .toLowerCase()
-          .replace(/[^a-z0-9؀-ۿ]+/g, '-')
-          .replace(/(^-|-$)/g, '') || `category-${Date.now()}`;
+      const base = slugifyWithFallback(item.categoryName, 'category', { max: 120 });
       let slug = base;
       for (
         let n = 1;

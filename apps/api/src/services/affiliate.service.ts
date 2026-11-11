@@ -87,7 +87,7 @@ interface CreatePayoutData {
 // Helpers
 // ==========================================
 
-function slugify(text: string): string {
+function affiliatePrefix(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '')
@@ -159,7 +159,7 @@ class AffiliateService {
   // ---- Referral Code Generation ----
 
   private async generateUniqueReferralCode(storeId: string, name: string): Promise<string> {
-    const base = slugify(name);
+    const base = affiliatePrefix(name);
 
     for (let attempt = 0; attempt < 10; attempt++) {
       const code = `${base}${randomChars(4)}`;

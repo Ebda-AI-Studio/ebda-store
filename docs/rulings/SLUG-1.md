@@ -1,0 +1,5 @@
+# SLUG-1
+
+> Section: Audit M-106 (2026-11-12)
+
+**Ruling SLUG-1 - one slugifier, `slugify` / `slugifyWithFallback` in `@ebda/shared` (`packages/shared/src/utils`); no app defines its own.** Options: `ascii` (store addresses, blog: DNS/URL-safe, Arabic-only text falls back), `max` (cut, never ends on a hyphen), `keepTrailingHyphen` (live typing, so a hyphen can be typed; clean on submit). Measured before: admin blog, bundles, categories, new-store, onboarding, `deriveStoreSlug`, category route, catalogue import and category suggest each carried their own regex; the blog field stripped the trailing hyphen while typing and an Arabic title gave an empty slug. The affiliate code prefix is not a slug and is renamed `affiliatePrefix`. Guard: `tests/unit/slugify.test.ts` fails if an app defines `slugify` or `generateSlug` again. Server-side validators (`blog.service`, `pages.service` SLUG_REGEX) stay: they validate, they do not derive. Cost if wrong: a slug rule changed in one copy only sends a different URL than the one stored, and a link breaks.
