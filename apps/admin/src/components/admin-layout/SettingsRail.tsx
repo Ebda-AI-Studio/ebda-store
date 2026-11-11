@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '../../hooks/useFeatures';
+import { navFeatureState } from '../../lib/nav-lock';
+import { LockBadge } from './LockBadge';
 import { SETTINGS_GROUPS } from '../../lib/settings-groups';
 
 /**
@@ -15,7 +17,8 @@ export function SettingsRail({ storeId }: { storeId: string }) {
   const t = useT('settings');
   const tCards = useT('settings.cards');
   const pathname = usePathname() ?? '';
-  const { isEnabled } = useFeatures();
+  const { isEnabled, isLoading } = useFeatures();
+  const ctx = { isEnabled, isLoading, isSuperAdmin: false };
   const base = `/stores/${storeId}`;
 
   return (
@@ -28,7 +31,7 @@ export function SettingsRail({ storeId }: { storeId: string }) {
           {t('rail.allSettings')}
         </Link>
         {SETTINGS_GROUPS.map(group => {
-          const items = group.items.filter(i => !i.featureKey || isEnabled(i.featureKey));
+          const items = group.items.filter(i => navFeatureState(i.featureKey, ctx) !== 'hidden');
           if (items.length === 0) return null;
           return (
             <div key={group.key}>
@@ -52,6 +55,7 @@ export function SettingsRail({ storeId }: { storeId: string }) {
                         }`}
                       >
                         {tCards(`${i.card}.title`)}
+                        {navFeatureState(i.featureKey, ctx) === 'locked' && <LockBadge />}
                       </Link>
                     </li>
                   );

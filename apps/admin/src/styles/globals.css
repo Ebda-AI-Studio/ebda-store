@@ -119,9 +119,29 @@
     --sidebar-border: 192 6.33% 15.49%;
   }
 
-  /* RTL Support */
-  [dir='rtl'] {
-    font-family: var(--font-arabic), system-ui, sans-serif;
+  /* RTL support. Type is ONE family (IBM Plex Sans Arabic, Arabic + Latin: ruling DS-FONT-1), set on body below.
+     Arabic needs more leading than Latin (the Tailwind defaults are 1.43 at text-sm, tight for Arabic marks and
+     ascenders), so the scale's Arabic leading from components/ui/tokens.ts TYPE is applied here. No letter-spacing. */
+  [dir='rtl'] .text-xs {
+    line-height: 1.25rem;
+  }
+  [dir='rtl'] .text-sm {
+    line-height: 1.5rem;
+  }
+  [dir='rtl'] .text-base {
+    line-height: 1.75rem;
+  }
+  [dir='rtl'] .text-lg {
+    line-height: 1.875rem;
+  }
+  [dir='rtl'] .text-xl {
+    line-height: 2rem;
+  }
+  [dir='rtl'] .text-2xl {
+    line-height: 2.25rem;
+  }
+  [dir='rtl'] .text-3xl {
+    line-height: 2.75rem;
   }
 }
 
@@ -146,11 +166,6 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans), system-ui, sans-serif;
-    font-feature-settings: 'cv11', 'ss01';
-  }
-
-  html[dir='rtl'] body {
-    font-family: var(--font-arabic), system-ui, sans-serif;
   }
 
   /* Improved focus styles for accessibility */

@@ -6277,6 +6277,18 @@
       "defaultRetry": "حاول مرة أخرى",
       "loadFailed": "معرفناش نحمّل البيانات دي. جرّب تاني من فضلك."
     },
+    "planLocked": {
+      "lockedBadge": "مقفول",
+      "lockedAria": "مقفول في باقتك الحالية",
+      "title": "الميزة دي مقفولة في باقتك",
+      "titleAnalyticsTier": "التحليلات المتقدمة",
+      "unlocksAnalyticsTierAdvanced": "تحليلات الأفواج والقمع والشرائح، وتقارير أعمق عن عملائك ومبيعاتك.",
+      "unlocksAnalyticsTierStandard": "تقارير تحليلات أكتر تفصيلًا عن مبيعاتك وزوّارك.",
+      "unlocksGeneric": "الميزة دي مش متاحة في باقتك الحالية.",
+      "availableOn": "متاحة في باقة {plan} وما فوقها.",
+      "upgradeCta": "اترقّى لباقة {plan}",
+      "seePlansCta": "شوف الباقات"
+    },
     "languageSwitcher": {
       "ariaLabel": "اللغة",
       "nativeEn": "English",

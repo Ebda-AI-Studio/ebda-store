@@ -29,6 +29,7 @@ import {
   RAW_STATUS_MESSAGE,
   isPlanGateError,
 } from './route-feature-gates';
+import { registerPlanGate } from './plan-gate-registry';
 import { AccountsError, accountsLogout, accountsToken, establishApiSession } from './accounts';
 import { armProactiveRefresh, disarmProactiveRefresh, grantExpiryMs } from './proactive-refresh';
 import { handleSessionEnded } from './session-ended';
@@ -759,6 +760,14 @@ export async function apiRequest<T = unknown>(
           hasBilingualDetails: hasBilingualText(errObj?.details),
         });
       }
+      // Pages hand `message` to <ErrorState>: a plan refusal renders as the upgrade card (lib/plan-gate-registry.ts).
+      registerPlanGate(message, {
+        status: response.status,
+        code: errCode,
+        details: (errObj?.details ?? (data as unknown as Record<string, unknown>)) as
+          | Record<string, unknown>
+          | undefined,
+      });
       return {
         data: null,
         error: {
