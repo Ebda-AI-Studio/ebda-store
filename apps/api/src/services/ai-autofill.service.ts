@@ -90,6 +90,8 @@ export interface FillPlan {
   fillSet: string[];
   values: Record<string, string | null>;
   sources: AiFieldSources;
+  /** set only for a merchant-initiated run (hand-back to AI): the writer may replace a non-empty value */
+  mayOverwrite?: boolean;
   /** names of the product's own categories (ar, en); empty when it has none */
   categoryNames: string[];
   hasCategories: boolean;
@@ -188,6 +190,7 @@ export async function readFillPlan(
       AI_AUTOFILL_FIELD_NAMES.map(f => [f, (row[f] as string | null | undefined) ?? null])
     ),
     sources,
+    mayOverwrite: !!opts.onlyFields?.length,
     categoryNames,
     hasCategories,
     storeCategories,
@@ -229,7 +232,7 @@ export async function generateFill(plan: FillPlan): Promise<FillGeneration> {
   const canWrite = (field: string, currentVal: string | null | undefined): boolean =>
     fillSet.has(field) &&
     (!currentVal?.trim() ||
-      sources[field] === 'ai' ||
+      (sources[field] === 'ai' && !!plan.mayOverwrite) ||
       (field === 'name' && sources.name !== 'human' && isNamePlaceholder(product)));
 
   try {
@@ -372,7 +375,21 @@ type GuardedOpts = {
   extraData?: Record<string, unknown>;
   extra?: (fresh: { categoryCount: number }) => Promise<void>;
   reindexReason?: string;
+  /**
+   * Merchant-initiated runs only (hand-back "Switch to AI", the language-balance button): the AI may replace a
+   * non-empty value. Default false = FILL-ONLY: the writer refuses any field whose stored value is not empty (or the
+   * `name === nameAr` placeholder of an Arabic-only product). Ruling NEVER-OVERWRITE-1.
+   */
+  overwrite?: boolean;
 };
+
+/** Fill-only guard shared by both writers: may the AI write `field` over this row's stored value? */
+export function aiMayWriteOver(field: string, row: Record<string, unknown>): boolean {
+  const cur = row[field];
+  if (cur === null || cur === undefined || String(cur).trim() === '') return true;
+  const name = String(row.name ?? '').trim();
+  return field === 'name' && name !== '' && name === String(row.nameAr ?? '').trim();
+}
 
 /** The guarded write on Postgres: row lock, fresh re-read, per-field compare-and-set (unchanged). */
 async function guardedAiWriteOnPg(
@@ -403,7 +420,11 @@ async function guardedAiWriteOnPg(
     const stale: string[] = [];
     for (const [field, value] of Object.entries(writes)) {
       const changed = ((row[field] as string | null) ?? '') !== (baseline[field] ?? '');
-      if (freshSources[field] === 'human' || changed) {
+      if (
+        freshSources[field] === 'human' ||
+        changed ||
+        (!opts.overwrite && !aiMayWriteOver(field, row))
+      ) {
         stale.push(field);
         continue;
       }
@@ -453,6 +474,7 @@ async function guardedAiWriteOnDo(
       baseline: Object.fromEntries(Object.entries(baseline).map(([k, v]) => [k, v ?? null])),
       writes,
       extra: opts.extraData ?? {},
+      fillOnly: !opts.overwrite,
     }),
   ] as never)) as unknown as [
     { found: boolean; written: string[]; stale: string[]; categoryCount: number },
@@ -500,6 +522,7 @@ export async function writeAiFieldsGuarded(
 export async function applyFill(plan: FillPlan, gen: FillGeneration): Promise<{ filled: number }> {
   const { storeId, productId } = plan;
   const { written } = await writeAiFieldsGuarded(storeId, productId, plan.values, gen.writes, {
+    overwrite: plan.mayOverwrite,
     extra: async ({ categoryCount }) => {
       // Only a product that STILL has no category gets the AI's picks.
       if (gen.pickedCategoryIds.length === 0 || categoryCount > 0) return;
@@ -793,7 +816,11 @@ export async function balanceProductLanguages(
       descriptionAr: product.descriptionAr,
     },
     writes as Record<string, string | null>,
-    { extraData: { aiBalanceBackup: backup as object }, reindexReason: 'ai-balance' }
+    {
+      extraData: { aiBalanceBackup: backup as object },
+      reindexReason: 'ai-balance',
+      overwrite: true, // the merchant pressed balance (revert backup kept)
+    }
   );
   if (written.length === 0) return { balanced: false, changed: {}, sides: {}, calls };
   const wrote = (a: string, b: string) => written.includes(a) || written.includes(b);

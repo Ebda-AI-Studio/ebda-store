@@ -50,7 +50,7 @@ describe('SummaryCard — loyalty points line (#197)', () => {
       />
     );
     expect(screen.getByText('loyaltyPoints (1,000)')).toBeTruthy();
-    expect(screen.getByText('20.00 EGP')).toBeTruthy();
+    expect(screen.getByText('20 ج.م')).toBeTruthy();
     // Not folded into the generic "discount" bucket alongside it.
     expect(screen.queryByText(/^discount/)).toBeNull();
   });
@@ -74,7 +74,7 @@ describe('SummaryCard — loyalty points line (#197)', () => {
     expect(screen.getByText(/^discount/)).toBeTruthy();
     // #2261 — its percentage is of the 500 piastres shown (5% of 10,000), not the
     // whole-order 50%.
-    expect(screen.getByText('5.00 EGP (5%)')).toBeTruthy();
+    expect(screen.getByText('5 ج.م (5%)')).toBeTruthy();
     expect(screen.queryByText(/\(50%\)/)).toBeNull();
   });
 

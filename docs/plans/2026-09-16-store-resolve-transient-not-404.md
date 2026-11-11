@@ -1,5 +1,7 @@
 # A transient store-resolve failure must not tell a shopper the store does not exist
 
+> **2026-11-10 follow-up:** the transient path now serves a stale-if-error copy first and answers 503 + Retry-After only when no safe copy exists; resolve caching moved out of the Next data cache into `store-resolve-cache.ts` (Ruling RESOLVE-BULLETPROOF-1, `docs/plans/2026-11-10-resolve-bulletproof.md`).
+
 **Status:** implementing. Scope approved by Ahmad 2026-09-16 — this fix ONLY.
 
 This implements **F2** of `docs/plans/2026-09-15-storefront-concurrency-500.md`, whose Ruling S1

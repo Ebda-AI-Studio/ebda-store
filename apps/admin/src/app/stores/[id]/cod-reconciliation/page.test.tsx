@@ -141,8 +141,8 @@ describe('COD reconciliation page', () => {
   it('renders the totals to the piastre, each shipment with its match, and the unmatched lines', async () => {
     mount();
     // 72345 piastres = 723.45 EGP; the open amount of the partial shipment is 99.99
-    expect(await screen.findByText('723.45 EGP')).toBeTruthy();
-    expect(screen.getAllByText('99.99 EGP').length).toBeGreaterThan(0);
+    expect(await screen.findByText('723.45 ج.م')).toBeTruthy();
+    expect(screen.getAllByText('99.99 ج.م').length).toBeGreaterThan(0);
     expect(screen.getByText('ORD-1')).toBeTruthy();
     expect(screen.getByText('ORD-2')).toBeTruthy();
     expect(screen.getByText('BST1')).toBeTruthy();

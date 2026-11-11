@@ -14,6 +14,14 @@ import { MoneyError, type SyncSql } from './sync-sql';
 export const EMBED_MODEL = '@cf/baai/bge-m3';
 export const EMBED_DIMS = 1024;
 export const EMBED_MAX_BATCH = 100;
+/**
+ * Cosine distance (1 - Vectorize score) cut-off. CALIBRATED on real bge-m3 scores from the production index
+ * (2026-11-11, Amelia Aurum, 9 products, Ruling SEARCH-SEMANTIC-LIVE-2): relevant hits score 0.46-0.70
+ * ("earrings" 0.65, "something for the sea" 0.54, "gift for my wife" 0.47), unrelated queries score 0.35-0.50
+ * ("pizza recipe" 0.37, "laptop charger" 0.50). The bands overlap, so no absolute cut-off separates them in a
+ * 9-product store; 0.55 (score >= 0.45) keeps the relevant head and drops most noise. Do not lower it without
+ * re-measuring; the keyword leg and RRF rank, this only bounds the candidate set.
+ */
 export const DEFAULT_VECTOR_MAX_DISTANCE = 0.55;
 export const HYBRID_LEG = 50;
 export const DEFAULT_DAILY_CAP = 3000;
@@ -625,8 +633,9 @@ export async function semanticProductIds(
   const maxDistance = opts.maxDistance ?? DEFAULT_VECTOR_MAX_DISTANCE;
   const res = await index.query(queryVector, {
     topK: VECTORIZE_TOPK_MAX,
+    // NO `filter`: the index has no metadata index on storeId, and Vectorize then matches NOTHING (measured
+    // 2026-11-11, Ruling SEARCH-SEMANTIC-LIVE-2). The namespace is the store boundary.
     namespace: storeId,
-    filter: { storeId },
     returnMetadata: 'none',
   });
   const best = new Map<string, number>();
