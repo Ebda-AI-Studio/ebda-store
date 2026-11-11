@@ -32,12 +32,19 @@ export async function signingKey(raw: string | undefined): Promise<SigningKey> {
   return key;
 }
 
-/** Kids of retired keys that carry no numeric `exp` (ID-08): they are NOT published. Surfaced on /health so a deploy gets a warning. */
+/** A retired key is published for at most this long from now, whatever its `exp` says (a typo'd far-future exp must not keep it alive). */
+export const RETIRED_KEY_MAX_AHEAD_SECONDS = 30 * 24 * 3600;
+
+/** Kids of retired keys that are NOT published: no numeric `exp`, or an `exp` more than 30 days ahead (ID-08). Surfaced on /health. */
 export function retiredKeysWithoutExp(env: { JWT_PREVIOUS_PUBLIC_JWKS?: string }): string[] {
   if (!env.JWT_PREVIOUS_PUBLIC_JWKS) return [];
   try {
     return (JSON.parse(env.JWT_PREVIOUS_PUBLIC_JWKS) as Array<{ kid?: string; exp?: unknown }>)
-      .filter(k => typeof k.exp !== 'number')
+      .filter(
+        k =>
+          typeof k.exp !== 'number' ||
+          k.exp > Math.floor(Date.now() / 1000) + RETIRED_KEY_MAX_AHEAD_SECONDS
+      )
       .map(k => k.kid ?? '(no kid)');
   } catch {
     return ['(unparseable JWT_PREVIOUS_PUBLIC_JWKS)'];
@@ -65,6 +72,12 @@ export async function jwks(env: {
       const exp = (k as JWK & { exp?: unknown }).exp;
       if (typeof exp !== 'number') {
         console.error(JSON.stringify({ msg: 'retired jwk has no exp, not published', kid: k.kid }));
+        return false;
+      }
+      if (exp > nowS + RETIRED_KEY_MAX_AHEAD_SECONDS) {
+        console.error(
+          JSON.stringify({ msg: 'retired jwk exp too far ahead, not published', kid: k.kid })
+        );
         return false;
       }
       return exp > nowS;

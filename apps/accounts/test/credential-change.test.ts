@@ -110,6 +110,16 @@ describe('ID-08: a retired signing key is published only until its own exp', () 
     expect(await set([retired('old-3')])).not.toContain('old-3');
   });
 
+  it('does not publish a retired key whose exp is more than 30 days ahead, and names it', async () => {
+    const far = nowS() + 31 * 24 * 3600;
+    expect(await set([retired('old-far', far)])).not.toContain('old-far');
+    expect(await set([retired('old-ok', nowS() + 29 * 24 * 3600)])).toContain('old-ok');
+    const { retiredKeysWithoutExp } = await import('../src/keys');
+    expect(
+      retiredKeysWithoutExp({ JWT_PREVIOUS_PUBLIC_JWKS: JSON.stringify([retired('old-far', far)]) })
+    ).toEqual(['old-far']);
+  });
+
   it('/health warns (and still answers ok) while a retired key has no exp', async () => {
     const { retiredKeysWithoutExp } = await import('../src/keys');
     expect(
