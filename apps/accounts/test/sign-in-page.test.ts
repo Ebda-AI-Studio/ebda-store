@@ -217,6 +217,38 @@ describe('return: the open-redirect boundary (Ruling SIGNIN-RETURN-1 allowlist)'
     }
   });
 
+  it('refuses a trailing-dot host (wa.ebda.app. is not wa.ebda.app)', async () => {
+    for (const bad of ['https://wa.ebda.app./inbox', 'https://ebda.app./'])
+      expect(dataReturn((await page(`?return=${encodeURIComponent(bad)}`)).html), bad).toBe(
+        DEFAULT
+      );
+  });
+
+  it('refuses a non-ASCII lookalike host (Cyrillic letters, ideographic dot)', async () => {
+    for (const bad of [
+      'https://w\u0430.ebda.app/inbox',
+      'https://wa.\u0435bda.app/',
+      'https://wa.ebda.app\u3002evil.example/',
+    ])
+      expect(dataReturn((await page(`?return=${encodeURIComponent(bad)}`)).html), bad).toBe(
+        DEFAULT
+      );
+  });
+
+  it('fullwidth letters are not a lookalike: IDNA maps them to the real host, and only the canonical href is used', async () => {
+    const html = (await page(`?return=${encodeURIComponent('https://\uff57\uff41.ebda.app/x')}`))
+      .html;
+    expect(dataReturn(html)).toBe('https://wa.ebda.app/x');
+    expect(html).not.toContain('\uff57');
+  });
+
+  it('refuses a merchant subdomain: shop.ebda.app is a store, not a sign-in destination', async () => {
+    for (const bad of ['https://shop.ebda.app/', 'https://shop.ebda.app/account?x=1'])
+      expect(dataReturn((await page(`?return=${encodeURIComponent(bad)}`)).html), bad).toBe(
+        DEFAULT
+      );
+  });
+
   it('a hostile but allowlisted URL cannot break out of the attribute', async () => {
     const { html } = await page(
       `?return=${encodeURIComponent('https://wa.ebda.app/"><script>alert(1)</script>')}`
