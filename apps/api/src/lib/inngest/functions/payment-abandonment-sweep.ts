@@ -131,6 +131,7 @@ export const paymentAbandonmentSweep: JobDef = inngest.createFunction(
     // In a step: on a Workflow only step bodies hold a database connection.
     const enabledStoreIds = new Set(
       await step.run('check-features', async () => {
+        await featureService.prefetchStoreFeatures(storeIds); // per run only, 3 batched reads
         const flags = await Promise.all(
           storeIds.map(
             async (sid: string) =>

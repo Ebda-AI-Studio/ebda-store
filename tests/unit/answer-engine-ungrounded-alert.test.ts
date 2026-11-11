@@ -34,7 +34,10 @@ vi.mock('@ebda/database', () => ({
 }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { createFunction: h.createFunction } }));
 vi.mock('@api/services/feature.service', () => ({
-  featureService: { isFeatureEnabled: vi.fn(async () => true) },
+  featureService: {
+    isFeatureEnabled: vi.fn(async () => true),
+    prefetchStoreFeatures: async () => undefined,
+  },
 }));
 vi.mock('@api/services/answer-engine/citation-scan.service', () => ({
   runCitationScan: h.runCitationScan,

@@ -45,6 +45,12 @@ export const stockReorderScanCron: JobDef = inngest.createFunction(
       ).then(list => list.filter(storeFilter(event)).map(s => ({ id: s.id })))
     );
 
+    // Entitlements for the whole sweep in 3 batched reads (per run only, never cached across runs; Sentry N+1).
+    await step.run('prefetch-features', async () => {
+      await featureService.prefetchStoreFeatures(stores.map(s => s.id));
+      return true; // a step result must be JSON-safe
+    });
+
     let totalSuggested = 0;
     let totalExpired = 0;
 

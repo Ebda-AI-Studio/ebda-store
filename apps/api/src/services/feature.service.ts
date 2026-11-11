@@ -281,6 +281,10 @@ class FeatureService {
   }
 
   /**
+   * STALENESS: the prefetch and the memo it seeds live ONLY in the current sweep scope (one cron job run / one queue message);
+   * nothing is written to Redis, KV or module state, so there is no cross-request or cross-run cache here. Entitlements are
+   * NEVER-stale: the next invocation re-reads, and `invalidateCache` drops a store's memo entry inside the same run.
+   *
    * One batched read for many stores (instead of `store_features` + `store_subscriptions` + `plans` per store): only inside a
    * sweep scope on a Worker with the platform D1. Seeds the scope memo, so every later `getStoreFeatures(id)` of the run is a
    * hit. A store this cannot resolve exactly (not on its DO, plan unreadable) is left out and resolves per store as before.

@@ -173,10 +173,12 @@ const selectKeysLive = async (d1: MarkerD1, keys: readonly string[]): Promise<Cu
   ).results ?? [];
 
 /**
- * Inside a cron job run / queue message (lib/sweep-scope.ts) the same key set is read once, not once per store or per call
- * (Sentry N+1: `SELECT key, value FROM system_settings WHERE key IN (...)` repeated in one run). Staleness class: BOUNDED-stale,
- * window = OFF_TTL_MS, the bound the in-process "off" verdict above already has; a freeze or marker written mid-run is seen
- * within 10 s, as before. Request paths open no scope and keep the live read.
+ * STALENESS CLASS: BOUNDED-stale. Inside a cron job run / queue message (lib/sweep-scope.ts) the same key set is read once, not
+ * once per store or per call (Sentry N+1: `SELECT key, value FROM system_settings WHERE key IN (...)` repeated in one run).
+ * RESIDUAL WINDOW: at most OFF_TTL_MS (10 s) per key set, per invocation, never across invocations or isolates. Why safe: a
+ * marker / freeze row is written by an operator script, not by the run itself; the in-process "off" verdict above already
+ * tolerates the same 10 s, and an unreadable read still fails closed (503, a failed load is never kept). A freeze landing
+ * mid-run is therefore seen within 10 s, exactly as without this memo. Request paths open no scope and keep the live read.
  */
 const selectKeys = (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
   sweepMemo(

@@ -57,6 +57,12 @@ export const stockLowStockAlertCron: JobDef = inngest.createFunction(
     const webhookPending: Array<{ storeId: string; items: LowStockAlertItem[] }> = [];
     let totalAlerted = 0;
     let totalCleared = 0;
+    // Entitlements for the whole sweep in 3 batched reads (per run only, never cached across runs; Sentry N+1).
+    await step.run('prefetch-features', async () => {
+      await featureService.prefetchStoreFeatures(stores.map(s => s.id));
+      return true; // a step result must be JSON-safe
+    });
+
     let totalSkipped = 0;
     let emailsSent = 0;
 

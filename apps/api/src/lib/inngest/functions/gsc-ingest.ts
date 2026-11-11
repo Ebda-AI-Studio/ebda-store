@@ -139,6 +139,12 @@ const gscIngestCronFn = inngest.createFunction(
       ).then(list => list.map(s => ({ id: s.id })))
     );
 
+    // Entitlements for the whole sweep in 3 batched reads (per run only, never cached across runs; Sentry N+1).
+    await step.run('prefetch-features', async () => {
+      await featureService.prefetchStoreFeatures(stores.map(s => s.id));
+      return true; // a step result must be JSON-safe
+    });
+
     const batches = chunk(stores, BULK_AI_BATCH_SIZE);
 
     let ingested = 0;
