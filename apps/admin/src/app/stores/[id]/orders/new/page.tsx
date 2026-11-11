@@ -112,6 +112,11 @@ export default function NewOrderPage() {
   // them with a reason; the API rejects the flag for staff (403).
   const [overrideCouponRules, setOverrideCouponRules] = useState(false);
   const [couponOverrideReason, setCouponOverrideReason] = useState('');
+  // A phone order reserves stock; when the API refuses it (422 INSUFFICIENT_STOCK) a store admin may place it anyway with a
+  // reason (the API rejects the flag for staff, 403).
+  const [stockShort, setStockShort] = useState(false);
+  const [overrideStock, setOverrideStock] = useState(false);
+  const [stockOverrideReason, setStockOverrideReason] = useState('');
 
   // Shipping preview state (live-computed after governorate+area chosen).
   const [shippingPreview, setShippingPreview] = useState<ShippingPreview | null>(null);
@@ -341,6 +346,11 @@ export default function NewOrderPage() {
       toastError(t('errors.overrideReasonRequired'));
       return;
     }
+    const stockOverriding = canOverrideCoupon && stockShort && overrideStock;
+    if (stockOverriding && stockOverrideReason.trim().length < 3) {
+      toastError(t('errors.stockOverrideReasonRequired'));
+      return;
+    }
     setIsSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
@@ -369,6 +379,10 @@ export default function NewOrderPage() {
         payload.overrideCouponRules = true;
         payload.couponOverrideReason = couponOverrideReason.trim();
       }
+      if (stockOverriding) {
+        payload.overrideStock = true;
+        payload.stockOverrideReason = stockOverrideReason.trim();
+      }
       // shippingOverride — integer piastres, omitted when blank.
       if (typeof shippingOverrideFils === 'number') {
         payload.shippingOverride = shippingOverrideFils;
@@ -376,6 +390,7 @@ export default function NewOrderPage() {
       const { data, error: apiError } = await apiPost<{
         order: { id: string; orderNumber: string };
       }>(`/api/v1/stores/${storeId}/orders/admin`, payload);
+      if (apiError?.code === 'INSUFFICIENT_STOCK') setStockShort(true);
       if (apiError || !data) {
         toastError(
           t('errors.createFailed'),
@@ -383,7 +398,9 @@ export default function NewOrderPage() {
             ? t('errors.variantRequired')
             : apiError?.code === 'VARIANT_INACTIVE'
               ? t('errors.variantInactive')
-              : (apiError?.message ?? '')
+              : apiError?.code === 'INSUFFICIENT_STOCK'
+                ? t('errors.insufficientStock')
+                : (apiError?.message ?? '')
         );
         return;
       }
@@ -415,6 +432,9 @@ export default function NewOrderPage() {
     canOverrideCoupon,
     overrideCouponRules,
     couponOverrideReason,
+    stockShort,
+    overrideStock,
+    stockOverrideReason,
     shippingOverrideFils,
     router,
     toastSuccess,
@@ -823,6 +843,43 @@ export default function NewOrderPage() {
                   onChange={setCouponOverrideReason}
                   required
                 />
+              )}
+            </div>
+          )}
+          {stockShort && (
+            <div
+              role="alert"
+              className="mt-3 flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm"
+            >
+              <p className="font-medium text-foreground">{t('stockSection.shortHeading')}</p>
+              <p className="text-xs text-muted-foreground">{t('stockSection.shortBody')}</p>
+              {canOverrideCoupon && (
+                <>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={overrideStock}
+                      onChange={e => setOverrideStock(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded-md border-border"
+                    />
+                    <span>
+                      <span className="font-medium text-foreground">
+                        {t('stockSection.overrideLabel')}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {t('stockSection.overrideHint')}
+                      </span>
+                    </span>
+                  </label>
+                  {overrideStock && (
+                    <Input
+                      label={t('stockSection.overrideReasonLabel')}
+                      value={stockOverrideReason}
+                      onChange={setStockOverrideReason}
+                      required
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

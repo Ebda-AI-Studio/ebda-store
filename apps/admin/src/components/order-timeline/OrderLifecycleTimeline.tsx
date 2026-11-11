@@ -33,6 +33,7 @@ const KIND_LABELS: Record<string, { en: string; ar: string }> = {
   'order.note_added': { en: 'Note added', ar: 'تمت إضافة ملاحظة' },
   'order.payment_link_issued': { en: 'Payment link issued', ar: 'تم إصدار رابط الدفع' },
   'order.coupon_override': { en: 'Coupon rules overridden', ar: 'تم تجاوز شروط الكوبون' },
+  'order.stock_override': { en: 'Placed over a stock shortage', ar: 'الطلب اتسجل رغم نقص المخزون' },
   'shipment.created': { en: 'Shipment created', ar: 'إنشاء الشحنة' },
   'shipment.picked_up': { en: 'Package picked up', ar: 'استلام الطرد' },
   'shipment.in_transit': { en: 'In transit', ar: 'في الطريق' },

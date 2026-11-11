@@ -1229,7 +1229,11 @@ describe('OrderService', () => {
             // can bleed into a LATER describe block (e.g. `updateStatus`)
             // whose own applyRefundEffects call needs these. Kept as safe
             // no-op defaults so that bleed can't throw.
-            product: { update: vi.fn().mockResolvedValue({}) },
+            // findMany: the admin order's tracked-product lookup for the stock reservation (none tracked here)
+            product: {
+              update: vi.fn().mockResolvedValue({}),
+              findMany: vi.fn().mockResolvedValue([]),
+            },
             productVariant: { update: vi.fn().mockResolvedValue({}) },
             inventoryHistory: {
               findFirst: vi.fn().mockResolvedValue(null),
@@ -1348,7 +1352,7 @@ describe('OrderService', () => {
       vi.mocked(prisma.$transaction).mockImplementationOnce(async (fn: any) =>
         fn({
           order: { create, count: txOrderCount },
-          // the admin order's stock_not_taken marker (#633, STOCK-SYMMETRY-1)
+          product: { findMany: vi.fn().mockResolvedValue([]) },
           orderEvent: { create: vi.fn() },
           coupon: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
           $executeRaw: vi.fn().mockResolvedValue(1),

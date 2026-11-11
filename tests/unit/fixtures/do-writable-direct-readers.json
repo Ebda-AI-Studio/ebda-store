@@ -200,7 +200,7 @@
       "kind": "pg-branch",
       "reason": "create / rollbackForPaymentFailure / createAdminOrder: after `storeMoney()` early return (CF-ORDERS-1, CF-R4-2); the interactive-transaction body is the Postgres branch.",
       "models": {
-        "product": 4,
+        "product": 5,
         "cartItem": 1,
         "cartBundle": 1,
         "productVariant": 1,

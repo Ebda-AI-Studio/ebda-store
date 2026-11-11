@@ -47,10 +47,11 @@ describe('order routes source contract', () => {
     expect(m![1]).toContain('store_admin');
   });
 
-  it('the customer timeline hides the coupon, MOQ and shipping override audit rows (BE:S-26)', () => {
+  it('the customer timeline hides the coupon, MOQ, stock and shipping override audit rows (BE:S-26)', () => {
     const set = src.match(/CUSTOMER_HIDDEN_AUDIT_ACTIONS = new Set<string>\(\[([\s\S]*?)\]\)/);
     expect(set?.[1]).toContain('COUPON_OVERRIDE_AUDIT_ACTION');
     expect(set?.[1]).toContain("'order.moq_override'");
+    expect(set?.[1]).toContain("'order.stock_override'");
     expect(set?.[1]).toContain('ORDER_SHIPPING_OVERRIDE_AUDIT_ACTION');
     expect(src).toContain('!isStoreViewer && CUSTOMER_HIDDEN_AUDIT_ACTIONS.has(a.action)');
   });

@@ -100,3 +100,27 @@ export function recordMovement(
     ]
   );
 }
+
+/**
+ * Takes UP TO `qty` units (never below 0, never raising a negative backorder debt) and reports what was ACTUALLY taken:
+ * `previousStock - newStock`. The read and the clamped UPDATE run in one synchronous DO section (no await between them), so
+ * the figure is exact; the phone-order override path books its ledger row and `stock_not_taken` marker from it.
+ */
+export function takeUpTo(
+  db: SyncSql,
+  table: 'products' | 'product_variants',
+  id: string,
+  qty: number
+): StockResult {
+  if (!Number.isInteger(qty) || qty < 1 || qty > 100_000)
+    throw new MoneyError('BAD_QUANTITY', 'quantity must be an integer from 1 to 100000', 400);
+  const cur = db.all(`SELECT inventory FROM ${table} WHERE id = ?`, [id])[0]?.inventory as
+    | number
+    | undefined;
+  if (cur === undefined) throw new MoneyError('NOT_FOUND', 'stock row not found', 404);
+  const rows = db.all(
+    `UPDATE ${table} SET inventory = inventory - MIN(?1, MAX(inventory, 0)) WHERE id = ?2 RETURNING inventory`,
+    [qty, id]
+  );
+  return { ok: true, previousStock: cur, newStock: rows[0].inventory as number };
+}
