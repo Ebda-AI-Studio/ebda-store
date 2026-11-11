@@ -484,6 +484,7 @@
   "POST /admin/tax-verification/:storeId/decision",
   "POST /admin/users",
   "POST /admin/webhook-events/:id/replay",
+  "POST /admin/wa/buyer-key-backfill",
   "POST /auth/change-password",
   "POST /auth/forgot-password",
   "POST /auth/login",
