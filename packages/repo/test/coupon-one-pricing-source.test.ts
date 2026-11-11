@@ -3,11 +3,14 @@
 // Object twin, must give identical totals, including for stored values the old duplicate copies disagreed on.
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../lib/repo-factory', () => ({ storeDb: vi.fn(), storeWriter: vi.fn() }));
+vi.mock('../../../apps/api/src/lib/repo-factory', () => ({
+  storeDb: vi.fn(),
+  storeWriter: vi.fn(),
+}));
 
-import { CouponService } from '../coupon.service';
-import * as apiMath from '../promotion-targeting';
-import * as doMath from '../../../../../packages/repo/src/do/promotions';
+import { CouponService } from '../../../apps/api/src/services/coupon.service';
+import * as apiMath from '../../../apps/api/src/services/promotion-targeting';
+import * as doMath from '../src/do/promotions';
 import * as shared from '@ebda/shared';
 
 const items = [
@@ -46,7 +49,7 @@ const coupons: Array<
 describe('M-078: one coupon discount source behind every entry point', () => {
   it.each(coupons)('%s prices identically everywhere', (_n, c) => {
     const fromCheckoutAndQuote = CouponService.evaluateForCart(c, ctx).discount;
-    const fromAdminOrder = CouponService.adminOrderCouponDiscount(c, ctx, 25_000, false);
+    const fromAdminOrder = CouponService.adminOrderCouponDiscount(c as never, ctx, 25_000, false);
     const fromShared = shared.couponCartDiscount(c, ctx).discount;
     const matched = doMath.matchesTargeting(c, ctx);
     const fromDo = doMath.computeDiscount(c.type, c.value, c.maxDiscount, matched.matchingSubtotal);
@@ -81,7 +84,7 @@ describe('M-078: one coupon discount source behind every entry point', () => {
       scopeProductIds: ['p2'],
       minOrderAmount: 999_999,
     };
-    expect(CouponService.adminOrderCouponDiscount(c, ctx, 25_000, true)).toBe(1_000);
+    expect(CouponService.adminOrderCouponDiscount(c as never, ctx, 25_000, true)).toBe(1_000);
     expect(
       shared.couponCartDiscount(c, ctx, { override: true, overrideBase: 25_000 }).discount
     ).toBe(1_000);
