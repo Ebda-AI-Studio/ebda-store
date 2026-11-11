@@ -1,0 +1,109 @@
+name: AI review
+
+# Independent review of money / auth / data / migration PRs, run in CI (not on the controller's laptop).
+# Copy of ebda-foundation/.github/workflows/ai-review.yml with `on:` = pull_request (Ruling AIR-3: switch to `uses:` once the foundation's
+# Actions access is `organization`). Everything under `jobs:` must stay identical to the foundation file.
+# Secret: CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`). Risky PR + no secret or any infra error = FAIL, never pass.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    name: AI review classify
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    outputs:
+      risky: ${{ steps.paths.outputs.risky }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - id: paths
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # a new head invalidates any earlier pass: the label must always describe the CURRENT head
+          gh pr edit "$PR" --remove-label ai-review-passed 2>/dev/null || true
+          git diff --name-only "$BASE...$HEAD" > changed.txt
+          node .github/ai-review/risky-paths.mjs < changed.txt > risky.txt
+          if [ -s risky.txt ]; then
+            echo "risky=true" >> "$GITHUB_OUTPUT"
+            gh label create risky-path --color B60205 --description "touches money/auth/data/migrations: needs ai-review-passed" 2>/dev/null || true
+            gh pr edit "$PR" --add-label risky-path
+            echo "risky paths:"; cat risky.txt
+          else
+            echo "risky=false" >> "$GITHUB_OUTPUT"
+            gh pr edit "$PR" --remove-label risky-path 2>/dev/null || true
+            echo "no risky paths: review not required"
+          fi
+
+  review:
+    name: AI review
+    needs: classify
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 20
+    if: github.event.pull_request.head.repo.full_name == github.repository && needs.classify.outputs.risky == 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Require the Claude credential (fail closed)
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. This PR touches money/auth/data paths and cannot merge unreviewed. Ahmad: run 'claude setup-token', then 'gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <owner>/<repo>' (or once at org level)."
+            exit 1
+          fi
+      - name: Install the Claude CLI (pinned)
+        run: npm install --global --ignore-scripts @anthropic-ai/claude-code@2.1.310
+      - name: Review the diff
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
+        run: |
+          set -euo pipefail
+          # diff on stdin as data, rules as the prompt; no tools: the reviewer reads, it cannot act
+          git diff --unified=3 "$BASE...$HEAD" | head -c 400000 > pr.diff
+          if [ "$(wc -c < pr.diff)" -ge 400000 ]; then echo "::warning::diff truncated at 400 KB; the reviewer saw the first part only"; fi
+          model=(); [ -n "${AI_REVIEW_MODEL:-}" ] && model=(--model "$AI_REVIEW_MODEL")
+          claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > /tmp/claude-out.json
+      - name: Post findings and gate
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          FAIL_CLOSED: 'true'
+        run: node .github/ai-review/review.mjs
+      - name: Label ai-review-passed
+        if: steps.gate.outputs.passed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh label create ai-review-passed --color 0E8A16 --description "independent AI review found no criticals on this head" 2>/dev/null || true
+          gh pr edit "$PR" --add-label ai-review-passed
