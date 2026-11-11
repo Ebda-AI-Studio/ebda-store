@@ -95,6 +95,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'AnswerEngineCheck',
   // the carrier booking job claims and updates the shipment row (INFRA-CF-1, Ruling CF-JOBS-4)
   'Shipment',
+  // a carrier pickup request (claim -> carrier call -> requested / cancelled); the partial unique index keeps one active
+  'ShipmentPickup',
   // merchant shipping zones and per-area rates (NEON-ZERO-1 group A, Ruling NZ-A-1)
   'ShippingZone',
   'ShippingAreaRate',
@@ -222,6 +224,63 @@ export const DO_PROCS: Record<string, Proc> = {
     if (sql.all('SELECT changes() AS n', [])[0]?.n !== 1)
       throw Object.assign(new Error('customer not found'), { code: 'CUSTOMER_NOT_FOUND' });
     return { id: customerId, groupId, group };
+  },
+  /**
+   * Ebda Chat saves a delivery address for a buyer known only by `buyerKey` (WA-RPC-4). Find-or-create the store's CRM row for that
+   * key (deterministic id `wa-<buyerKey>` + INSERT OR IGNORE, so a race or replay makes ONE row; no phone, name or email is invented),
+   * then add the address unless an identical one exists (idempotent). Runs in one DO section, tenant-scoped by `storeId`.
+   */
+  waSaveAddress(sql, a) {
+    const { storeId, buyerKey, label, area, street } = a as Record<string, unknown>;
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    if (typeof buyerKey !== 'string' || !/^[0-9a-f]{64}$/.test(buyerKey)) throw procErr('buyerKey');
+    if (label !== null && label !== undefined && (typeof label !== 'string' || label.length > 40))
+      throw procErr('label');
+    if (typeof area !== 'string' || !area || area.length > 120) throw procErr('area');
+    if (typeof street !== 'string' || !street || street.length > 240) throw procErr('street');
+    const now = Date.now();
+    const lab = (label as string | null | undefined) ?? null;
+    let customerId = sql.all(
+      'SELECT id FROM customers WHERE store_id = ? AND buyer_key = ? ORDER BY created_at, id LIMIT 1',
+      [storeId, buyerKey]
+    )[0]?.id as string | undefined;
+    if (!customerId) {
+      customerId = `wa-${buyerKey}`;
+      sql.run(
+        "INSERT OR IGNORE INTO customers (id, store_id, first_name, last_name, buyer_key, created_at, updated_at) VALUES (?, ?, 'WhatsApp', 'customer', ?, ?, ?)",
+        [customerId, storeId, buyerKey, now, now]
+      );
+    }
+    const same = sql.all(
+      'SELECT id, label, area, street FROM customer_addresses WHERE customer_id = ? AND area = ? AND street = ? AND label IS ? LIMIT 1',
+      [customerId, area, street, lab]
+    )[0];
+    if (same)
+      return {
+        id: same.id,
+        label: same.label ?? null,
+        area: same.area,
+        street: same.street,
+        created: false,
+      };
+    const id = crypto.randomUUID();
+    sql.run(
+      'INSERT INTO customer_addresses (id, customer_id, label, street, area, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)',
+      [id, customerId, lab, street, area, now, now]
+    );
+    return { id, label: lab, area, street, created: true };
+  },
+  /** The saved addresses of the CRM row keyed by `buyerKey` (WA-RPC-4), newest first, at most 10. Read-only; `customers.buyer_key` is not a Prisma field, so it is a named op. */
+  waAddresses(sql, a) {
+    const { storeId, buyerKey } = a as Record<string, unknown>;
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    if (typeof buyerKey !== 'string' || !/^[0-9a-f]{64}$/.test(buyerKey)) throw procErr('buyerKey');
+    return sql
+      .all(
+        'SELECT a.id AS id, a.label AS label, a.area AS area, a.street AS street FROM customer_addresses a JOIN customers c ON c.id = a.customer_id WHERE c.store_id = ? AND c.buyer_key = ? ORDER BY a.created_at DESC, a.id LIMIT 10',
+        [storeId, buyerKey]
+      )
+      .map(r => ({ id: r.id, label: r.label ?? null, area: r.area, street: r.street }));
   },
   /** The wholesale-approval / identity-assign insert of a CRM row that is born inside a group. Same contract as above. */
   customerCreateInGroup(sql, a) {

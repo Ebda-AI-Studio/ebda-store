@@ -42,13 +42,20 @@ const docs = `https://${BRAND.domains.docs}`;
 const status = `https://${BRAND.domains.status}`;
 const demo = demoLookUrl('souq', 'catalogue');
 const chatApp = `https://${BRAND.domains.whatsappApp}/`;
-/** The coming-soon products, straight from BRAND (names only; they have no page to link yet). */
+/**
+ * The coming-soon list, from BRAND (names only; no page to link yet). "Coming soon" is for CRM and ERP ONLY (Ahmad,
+ * 2026-11-11); the other BRAND.comingProducts are not shown here. The list ships three times in the page payload, so
+ * it also keeps /en and /en/store inside their size budget.
+ */
+const COMING_SOON_IDS: readonly string[] = ['crm', 'erp'];
 const comingSoon = (lang: Locale): NotFoundLink[] =>
-  BRAND.comingProducts.map(p => ({
-    href: '',
-    label: lang === 'ar' ? p.nameAr : p.nameEn,
-    soon: true,
-  }));
+  BRAND.comingProducts
+    .filter(p => COMING_SOON_IDS.includes(p.id))
+    .map(p => ({
+      href: '',
+      label: lang === 'ar' ? p.nameAr : p.nameEn,
+      soon: true,
+    }));
 
 export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
   ar: {

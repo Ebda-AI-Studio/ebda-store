@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { isStoreScopedRole } from '@/lib/store-scoped-role';
 import { AdminLayout } from '../components/AdminLayout';
 import { apiGet } from '../lib/api';
 import { useStore } from '../contexts/StoreContext';
@@ -34,7 +35,7 @@ export default function DashboardPage() {
   // dashboard. The redirect is one-shot — once we leave this page the
   // store-scoped admin shell takes over.
   useEffect(() => {
-    if (user?.role !== 'store_admin') return;
+    if (!isStoreScopedRole(user?.role)) return;
     // A self-serve merchant who has not created a store yet lands in the
     // onboarding stepper, not on an empty platform dashboard.
     if (!storesLoading && globalStores.length === 0) {
@@ -50,7 +51,7 @@ export default function DashboardPage() {
     // Don't fetch the platform dashboard while we're about to redirect
     // a store admin to their store dashboard — the api would 200 with
     // a store-scoped slice, but rendering it here is wasted work.
-    if (user?.role === 'store_admin') return;
+    if (isStoreScopedRole(user?.role)) return;
 
     async function fetchData() {
       try {

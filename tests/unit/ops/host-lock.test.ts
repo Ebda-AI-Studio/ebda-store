@@ -84,10 +84,15 @@ describe('host-lock.sh', () => {
     holder.kill();
   }, 20000);
 
-  it('MAC-LIGHT-1: the pre-push gate runs inside the host lock and keeps only the fast checks', () => {
+  it('MAC-LIGHT-1 / PREPUSH-4: the gate is light and unlocked; only its vitest steps take the host lock', () => {
     const hook = readFileSync(join(__dirname, '../../../.husky/pre-push'), 'utf8');
     const gate = readFileSync(join(__dirname, '../../../scripts/ci/pre-push-gate.sh'), 'utf8');
-    expect(hook).toContain('bash scripts/ci/host-lock.sh bash scripts/ci/pre-push-gate.sh');
+    expect(hook).toContain('bash scripts/ci/pre-push-gate.sh');
+    expect(hook).not.toContain('host-lock.sh bash scripts/ci/pre-push-gate.sh');
+    // every vitest invocation in the gate is wrapped in the lock; the related run is capped
+    expect(gate).toMatch(/host-lock\.sh npx vitest related/);
+    expect(gate).toMatch(/host-lock\.sh npx vitest run/);
+    expect(gate).toContain('PREPUSH_RELATED_MAX');
     for (const heavy of [
       'npm run lint',
       'tsc --noEmit',
@@ -112,7 +117,9 @@ describe('host-lock.sh', () => {
     expect(gate).toContain('gitleaks detect');
     expect(gate).toContain('vitest related');
     expect(gate).not.toContain('npm run test:unit');
-    // not re-entrant: a nested lock on the same file would wait on its own parent forever
-    expect(gate).not.toMatch(/^\s*(bash\s+)?scripts\/ci\/host-lock\.sh/m);
+    // not re-entrant: a nested lock on the same file would wait on its own parent forever, so the gate may take
+    // the lock ONLY around a vitest run (the hook above no longer holds it)
+    for (const m of gate.matchAll(/^\s*(?:bash\s+)?scripts\/ci\/host-lock\.sh\s+(\S+\s+\S+)/gm))
+      expect(m[1]).toBe('npx vitest');
   });
 });

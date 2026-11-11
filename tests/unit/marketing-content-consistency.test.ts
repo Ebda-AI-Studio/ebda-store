@@ -3,8 +3,8 @@
  * content fixes, so they cannot drift back.
  *  - C3: the Arabic studio name is always the FULL «ابدأ ستوديو للذكاء الاصطناعي» in copy (the legal entity
  *    «ابدأ ستوديو لتكنولوجيا المعلومات» and the product «ابدأ ستوديو للتسعير» are other names, not truncations).
- *  - C1/C2: a live product (Ebda Store, Ebda Chat) is never listed as coming soon; the 404's coming-soon list IS
- *    BRAND.comingProducts.
+ *  - C1/C2: a live product (Ebda Store, Ebda Chat) is never listed as coming soon; the 404's coming-soon list is CRM and ERP
+ *    only, from BRAND.comingProducts.
  *  - C12: the Store sign-up action has one label, «افتح متجرك» / "Open your store".
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -64,8 +64,11 @@ describe('content audit rules', () => {
   it('C1/C2: the 404 coming-soon list is BRAND.comingProducts and never names a live product', () => {
     for (const lang of ['ar', 'en'] as const) {
       const soon = NOT_FOUND[lang].groups.flatMap(g => g.links).filter(l => l.soon);
+      // "coming soon" is for CRM and ERP only (Ahmad, 2026-11-11)
       expect(soon.map(l => l.label)).toEqual(
-        BRAND.comingProducts.map(p => (lang === 'ar' ? p.nameAr : p.nameEn))
+        BRAND.comingProducts
+          .filter(p => p.id === 'crm' || p.id === 'erp')
+          .map(p => (lang === 'ar' ? p.nameAr : p.nameEn))
       );
       for (const l of soon) expect(LIVE).not.toContain(l.label);
       // Ebda Chat is linked as a live product

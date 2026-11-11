@@ -39,10 +39,10 @@ describe('marketing 404', () => {
     }
   });
 
-  it('maps the site by product: Ebda Chat LIVE (linked), the coming-soon list from BRAND.comingProducts (not links)', () => {
+  it('maps the site by product: Ebda Chat LIVE (linked), the coming-soon list is CRM and ERP only, from BRAND.comingProducts (not links)', () => {
     for (const label of ['ابدأ ستور', 'Ebda Store', 'ابدأ شات', 'Ebda Chat'])
       expect(html).toContain(label);
-    for (const p of BRAND.comingProducts) {
+    for (const p of BRAND.comingProducts.filter(c => c.id === 'crm' || c.id === 'erp')) {
       expect(html).toContain(p.nameAr);
       expect(html).toContain(p.nameEn);
     }

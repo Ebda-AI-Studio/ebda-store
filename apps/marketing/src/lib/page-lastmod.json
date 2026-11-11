@@ -1,90 +1,94 @@
 {
   "home": {
-    "hash": "44f44fa708654212",
+    "hash": "5e2562ca039f8b4c",
     "date": "2026-11-11"
   },
   "store": {
-    "hash": "7e3dbd5505b9036b",
+    "hash": "3a33cab9ea3d4cb7",
     "date": "2026-11-11"
   },
   "features": {
-    "hash": "3844cabf60bfded9",
+    "hash": "4df410ecc7067f7a",
     "date": "2026-11-11"
   },
   "whatsapp": {
-    "hash": "07711807d298ed24",
+    "hash": "3c9bbb233624dd98",
     "date": "2026-11-11"
   },
   "compare/zid": {
-    "hash": "89c5680140a2b828",
+    "hash": "3084bdcc54c60c08",
     "date": "2026-11-11"
   },
   "compare/shopify": {
-    "hash": "cc95b6d89602daa7",
+    "hash": "df615a2f862cfad2",
     "date": "2026-11-11"
   },
   "compare/wuilt": {
-    "hash": "7fd1b3e16268fd91",
+    "hash": "971ecb5a10e2c944",
     "date": "2026-11-11"
   },
   "compare/youcan": {
-    "hash": "25a112d1bb63e21a",
+    "hash": "04e08d907b089205",
     "date": "2026-11-11"
   },
   "compare/easyorders": {
-    "hash": "f75342454b758a01",
+    "hash": "6db027e2924518ba",
     "date": "2026-11-11"
   },
   "compare/expandcart": {
-    "hash": "0989f1a64cfac416",
+    "hash": "cb31360216b25f0f",
     "date": "2026-11-11"
   },
   "for/fashion": {
-    "hash": "04e86d60c4db9ec3",
+    "hash": "fcf92a23bf873f76",
     "date": "2026-11-11"
   },
   "for/electronics": {
-    "hash": "fb8f017868fc5cf6",
+    "hash": "333cb44a8d0e33fb",
     "date": "2026-11-11"
   },
   "for/beauty": {
-    "hash": "6123926ce56fcc8b",
+    "hash": "901988b43e63bd43",
     "date": "2026-11-11"
   },
   "for/food": {
-    "hash": "b80f7ebd66bcfa45",
+    "hash": "7ea2103a0fe5ba2d",
     "date": "2026-11-11"
   },
   "for/jewellery": {
-    "hash": "e1fff8a4d5a59a6d",
+    "hash": "cc8abe3af3d2b5e1",
     "date": "2026-11-11"
   },
   "services": {
-    "hash": "23833f2d93caed20",
+    "hash": "4964ca2f8fa6cee9",
     "date": "2026-11-11"
   },
   "services/marketing": {
-    "hash": "e1368ec83bb49c10",
+    "hash": "a2ed01eef98b93a9",
     "date": "2026-11-11"
   },
   "services/design": {
-    "hash": "127e6447ccc1701d",
+    "hash": "c6ecf0e285348691",
     "date": "2026-11-11"
   },
   "services/events": {
-    "hash": "6c1c8831be326310",
+    "hash": "47a984f3cfb3284b",
     "date": "2026-11-11"
   },
   "about": {
-    "hash": "9bce2eede503c1ec",
+    "hash": "93c1ffb1a8414de4",
     "date": "2026-11-11"
   },
   "contact": {
-    "hash": "0c7a36fc0f178bc3",
+    "hash": "1c8de9e0eb77aabf",
     "date": "2026-11-11"
   },
   "credits": {
-    "hash": "503b01d512ba503e",
+    "hash": "3ac613318e38f560",
+    "date": "2026-11-11"
+  },
+  "support": {
+    "hash": "483082945a87eedc",
     "date": "2026-11-11"
   }
 }

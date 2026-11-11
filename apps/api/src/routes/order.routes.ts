@@ -1568,16 +1568,28 @@ router.post(
         });
         return;
       }
-      const result = await inSettlementTx(storeId, () =>
-        matchRefundToClaim({
-          paymentId: payment.id,
-          storeId,
-          orderId,
-          providerRefundId: body.providerRefundId,
-          claimId: body.claimId,
-          actorUserId: user.userId,
-        })
-      );
+      // A store on its Durable Object (no Postgres): the DO op does the whole match in ONE section, scoped to this order
+      // (Ruling NZ-MONEY-6); its refusals arrive as 409/404 AppErrors.
+      const money = await storeMoney(storeId);
+      const result = money
+        ? (
+            await money.refundMatchClaim({
+              claimId: body.claimId,
+              providerRefundId: body.providerRefundId,
+              actorUserId: user.userId,
+              orderId,
+            })
+          ).result
+        : await inSettlementTx(storeId, () =>
+            matchRefundToClaim({
+              paymentId: payment.id,
+              storeId,
+              orderId,
+              providerRefundId: body.providerRefundId,
+              claimId: body.claimId,
+              actorUserId: user.userId,
+            })
+          );
       await auditLog({
         action: 'refund.match_claim',
         userId: user.userId,

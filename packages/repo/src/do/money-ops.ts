@@ -29,6 +29,8 @@ import {
   expireInstapay,
   initiateInstapay,
   markRefundIndeterminate,
+  matchRefundToClaim,
+  recordInstapayRefund,
   releaseRefund,
   type ConfirmedTransaction,
   type PaymentWebhookInput,
@@ -198,6 +200,8 @@ export type MoneyOpName =
   | 'refundBegin'
   | 'refundComplete'
   | 'refundRelease'
+  | 'refundMatchClaim'
+  | 'instapayRefundRecord'
   | 'refundIndeterminate'
   | 'refundBook'
   | 'journalSale'
@@ -334,6 +338,8 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'refundBegin',
   'refundComplete',
   'refundRelease',
+  'refundMatchClaim',
+  'instapayRefundRecord',
   'refundIndeterminate',
   'refundBook',
   'journalSale',
@@ -697,6 +703,29 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       refundId: id(a.refundId, 'refundId'),
       providerStatus: typeof a.providerStatus === 'string' ? a.providerStatus : undefined,
       reason: typeof a.reason === 'string' ? a.reason : undefined,
+    }),
+  /** Operator match of an executed refund claim to a held refund webhook (Ruling NZ-MONEY-6); `already_matched` = replay. */
+  refundMatchClaim: (db, storeId, a) => ({
+    result: matchRefundToClaim(db, {
+      storeId,
+      claimId: id(a.claimId, 'claimId'),
+      providerRefundId: id(a.providerRefundId, 'providerRefundId'),
+      actorUserId: id(a.actorUserId, 'actorUserId'),
+      orderId: a.orderId === undefined ? undefined : id(a.orderId, 'orderId'),
+    }),
+  }),
+  /** A merchant-recorded InstaPay refund (no gateway call): one section, idempotent on referenceKey (NZ-MONEY-6). */
+  instapayRefundRecord: (db, storeId, a) =>
+    recordInstapayRefund(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      referenceKey: id(a.referenceKey, 'referenceKey'),
+      amountMinor: a.amountMinor as number,
+      record:
+        a.record && typeof a.record === 'object' && !Array.isArray(a.record)
+          ? (a.record as Record<string, unknown>)
+          : {},
+      actorUserId: typeof a.actorUserId === 'string' ? a.actorUserId : null,
     }),
   refundRelease: (db, storeId, a) =>
     releaseRefund(db, {

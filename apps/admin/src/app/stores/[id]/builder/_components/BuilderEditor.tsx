@@ -940,21 +940,23 @@ export function BuilderEditor({
           role="radiogroup"
           aria-label={t('viewport.label')}
           onKeyDown={e => rovingKeyDown(e, 'radio')}
-          className="order-last mx-auto inline-flex rounded-lg bg-muted p-0.5 text-xs max-lg:max-w-full lg:order-none"
+          className="order-last mx-auto inline-flex gap-0.5 rounded-md bg-muted p-0.5 max-lg:max-w-full lg:order-none"
         >
           {(['desktop', 'tablet', 'mobile'] as const).map(v => (
-            <button
+            <Button
               key={v}
               type="button"
               role="radio"
+              size="sm"
+              variant={viewport === v ? 'soft' : 'ghost'}
               aria-checked={viewport === v}
               tabIndex={viewport === v ? 0 : -1}
               onClick={() => setViewport(v)}
-              className={`rounded-md px-2.5 py-1 max-lg:min-h-11 ${viewport === v ? 'bg-background font-semibold shadow-sm' : 'text-muted-foreground'}`}
+              className={viewport === v ? '' : 'text-muted-ink'}
               data-testid={`viewport-${v}`}
             >
               {t(`viewport.${v}`)}
-            </button>
+            </Button>
           ))}
         </div>
         <Button

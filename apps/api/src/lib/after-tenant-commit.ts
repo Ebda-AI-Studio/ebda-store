@@ -92,6 +92,8 @@ interface DeferredTask {
   connections: number;
   /** See DeferOptions.runOnRollback. */
   runOnRollback?: boolean;
+  /** See DeferOptions.holdResponse. */
+  holdResponse?: boolean;
 }
 
 export interface DeferOptions {
@@ -105,6 +107,14 @@ export interface DeferOptions {
    * rolled-back rows no longer exist, so drop the work) is false for those.
    */
   runOnRollback?: boolean;
+  /**
+   * Release the response only AFTER this task has run (still after the COMMIT). For work the
+   * client's next step depends on: the builder's publish purge, so "Published" is never shown
+   * while the storefront still serves the old page (S5-12). Costs the task's duration on the
+   * request's latency path: use it only for short, must-finish-first work. A failure is
+   * reported like any deferred failure and does not fail the request.
+   */
+  holdResponse?: boolean;
 }
 
 interface DeferralScope {
@@ -205,7 +215,13 @@ export function deferAfterTenantCommit<T>(
     // P2028 this module exists to avoid.
     return runOneDeferredTask({ name, run, connections }, ctx).then(() => null);
   }
-  scope.tasks.push({ name, run, connections, runOnRollback: options.runOnRollback });
+  scope.tasks.push({
+    name,
+    run,
+    connections,
+    runOnRollback: options.runOnRollback,
+    holdResponse: options.holdResponse,
+  });
   return Promise.resolve(null);
 }
 
@@ -267,6 +283,12 @@ export async function withDeferredWork<T>(
   // COMMITTED. Let the client have its response BEFORE the drain: deferred
   // work is post-response work by definition and must not sit on the request's
   // latency path.
+  // Tasks that asked to hold the response run first (still after the COMMIT, outside the scope).
+  const held = scope.tasks.filter(t => t.holdResponse);
+  if (held.length > 0) {
+    scope.tasks = scope.tasks.filter(t => !t.holdResponse);
+    await trackDrain(held, ctx);
+  }
   onCommitted?.();
   // Close BEFORE draining: `drain()` splices `scope.tasks` exactly once, so
   // anything that arrives after this point has missed its only chance to be

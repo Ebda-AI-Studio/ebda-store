@@ -17,8 +17,9 @@
  *    checks the carrier's dashboard first).
  *  - Every request and cancel is audit-logged.
  */
-import { prisma, runInTenantContext } from '@ebda/database';
-import { storeDb } from '../lib/repo-factory';
+import { prisma } from '@ebda/database';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import { runInStoreTenantContext } from '../lib/store-scoped-read';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
@@ -85,7 +86,9 @@ async function usableConfig(storeId: string, carrier: CarrierCode) {
 /** What the order page's pickup panel shows for a shipment. */
 export async function getPickupState(storeId: string, shipmentId: string) {
   const { shipment, impl } = await loadShipment(storeId, shipmentId);
-  const pickups = await prisma.shipmentPickup.findMany({
+  const pickups = await (
+    await storeDb(storeId)
+  ).shipmentPickup.findMany({
     where: { storeId, shipmentId },
     orderBy: { createdAt: 'desc' },
     take: 10,
@@ -165,8 +168,8 @@ function validateRequest(
 async function expireStaleClaim(storeId: string, row: NonNullable<PickupRow>): Promise<boolean> {
   if (row.status !== 'requesting') return false;
   if (Date.now() - row.updatedAt.getTime() < PICKUP_CLAIM_STALE_MS) return false;
-  const r = await runInTenantContext(storeId, () =>
-    prisma.shipmentPickup.updateMany({
+  const r = await runInStoreTenantContext(storeId, async () =>
+    (await storeWriter(storeId)).shipmentPickup.updateMany({
       where: { id: row.id, storeId, status: 'requesting' },
       data: {
         status: 'failed',
@@ -189,7 +192,9 @@ export async function requestPickup(
   actor: { userId?: string; ip?: string; userAgent?: string } = {}
 ) {
   // 1) A replay of the same request is answered from the row, before anything else is checked.
-  const replay = await prisma.shipmentPickup.findFirst({
+  const replay = await (
+    await storeDb(storeId)
+  ).shipmentPickup.findFirst({
     where: { storeId, idempotencyKey: input.idempotencyKey },
   });
   if (replay) {
@@ -224,7 +229,9 @@ export async function requestPickup(
   const chosen = validateRequest(impl, input);
 
   // 2) One live pickup per shipment: return it instead of booking a second courier.
-  const live = await prisma.shipmentPickup.findFirst({
+  const live = await (
+    await storeDb(storeId)
+  ).shipmentPickup.findFirst({
     where: { storeId, shipmentId, status: { in: ['requesting', 'requested'] } },
   });
   if (live && !(await expireStaleClaim(storeId, live))) {
@@ -238,8 +245,8 @@ export async function requestPickup(
   // 3) Claim the row (own transaction) BEFORE the carrier is called.
   let claimed: NonNullable<PickupRow>;
   try {
-    claimed = await runInTenantContext(storeId, () =>
-      prisma.shipmentPickup.create({
+    claimed = await runInStoreTenantContext(storeId, async () =>
+      (await storeWriter(storeId)).shipmentPickup.create({
         data: {
           storeId,
           shipmentId,
@@ -260,10 +267,14 @@ export async function requestPickup(
     // Lost a race to the same key or to another live pickup: answer with the winner.
     if (uniqueViolationTarget(err).length > 0 || (err as { code?: string })?.code === 'P2002') {
       const winner =
-        (await prisma.shipmentPickup.findFirst({
+        (await (
+          await storeDb(storeId)
+        ).shipmentPickup.findFirst({
           where: { storeId, idempotencyKey: input.idempotencyKey },
         })) ??
-        (await prisma.shipmentPickup.findFirst({
+        (await (
+          await storeDb(storeId)
+        ).shipmentPickup.findFirst({
           where: { storeId, shipmentId, status: { in: ['requesting', 'requested'] } },
         }));
       if (winner) return { pickup: winner, created: false };
@@ -286,8 +297,8 @@ export async function requestPickup(
       },
       shippingCarrierService.callContext({ ...cfg, storeId })
     );
-    const pickup = await runInTenantContext(storeId, () =>
-      prisma.shipmentPickup.update({
+    const pickup = await runInStoreTenantContext(storeId, async () =>
+      (await storeWriter(storeId)).shipmentPickup.update({
         where: { id: claimed.id, storeId },
         data: {
           status: 'requested',
@@ -319,8 +330,8 @@ export async function requestPickup(
   } catch (err) {
     const unknownOutcome = err instanceof CarrierError ? err.retryable : true;
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 400);
-    await runInTenantContext(storeId, () =>
-      prisma.shipmentPickup.update({
+    await runInStoreTenantContext(storeId, async () =>
+      (await storeWriter(storeId)).shipmentPickup.update({
         where: { id: claimed.id, storeId },
         data: {
           status: 'failed',
@@ -354,7 +365,9 @@ export async function cancelPickup(
   actor: { userId?: string; ip?: string; userAgent?: string } = {}
 ) {
   const { impl } = await loadShipment(storeId, shipmentId);
-  const row = await prisma.shipmentPickup.findFirst({
+  const row = await (
+    await storeDb(storeId)
+  ).shipmentPickup.findFirst({
     where: { id: pickupId, storeId, shipmentId },
   });
   if (!row) throw new AppError(404, 'NOT_FOUND', 'Pickup not found');
@@ -382,8 +395,8 @@ export async function cancelPickup(
       result.message ?? `${impl.name} did not cancel the pickup`
     );
   }
-  const updated = await runInTenantContext(storeId, () =>
-    prisma.shipmentPickup.update({
+  const updated = await runInStoreTenantContext(storeId, async () =>
+    (await storeWriter(storeId)).shipmentPickup.update({
       where: { id: row.id, storeId },
       data: { status: 'cancelled', cancelledAt: new Date() },
     })

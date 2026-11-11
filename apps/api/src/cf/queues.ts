@@ -15,7 +15,7 @@
  */
 import { runInStoreScope } from '@ebda/database';
 import { emailQueue, isQueuedEmail } from '../services/email-queue.service';
-import { EmailSendError } from '../services/mail-transport';
+import { EmailSendError, isBadRecipientError } from '../services/mail-transport';
 import { smsQueue, isQueuedSms } from '../services/sms-queue.service';
 import logger from '../lib/logger';
 import { handleJobsBatch } from '../lib/jobs/run-queue';
@@ -71,6 +71,8 @@ export async function handleQueueBatch(batch: MessageBatchLike): Promise<void> {
                 { id: msg.id, code: err.code },
                 '[queues] recipient suppressed, email dropped'
               );
+            } else if (isBadRecipientError(err)) {
+              await emailQueue.recordBadRecipient(email, 'bad recipient: E_VALIDATION_ERROR');
             } else {
               await emailQueue.parkDeadLetter(email, `permanent send error ${err.code}`);
             }

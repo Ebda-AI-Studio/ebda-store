@@ -11,12 +11,16 @@ const PAGES = [
   'features',
   'whatsapp',
   'compare/zid',
+  'store',
+  'services',
   'about',
   'contact',
   'credits',
+  'support',
   'legal',
   'privacy',
   'terms',
+  'refund',
 ];
 
 for (const locale of ['ar', 'en'] as const) {

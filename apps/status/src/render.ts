@@ -193,6 +193,7 @@ h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
 .search{position:relative;display:flex;gap:6px;margin-inline-start:auto}
 .search input{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0;width:190px;font:inherit}
 .search button{background:var(--gold);color:var(--night);border:0;border-radius:10px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+@media (max-width:640px){.header-row{flex-wrap:nowrap;gap:8px}.wordmark span{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.search{flex:1 1 0;min-inline-size:0;margin-inline-start:0}.search input{inline-size:100%;width:100%;min-block-size:44px}.search button{padding-inline:10px;min-block-size:44px}.lang{flex:none;padding-inline:8px;min-block-size:44px;display:inline-flex;align-items:center}}
 .ta-list,.ta-note{position:absolute;inset-inline-end:0;top:calc(100% + 6px);z-index:30;inline-size:min(420px,calc(100vw - 32px));margin:0;padding:6px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.14);text-align:start}
 .ta-note{padding:12px 14px;color:var(--muted)}
 .ta-list[hidden],.ta-note[hidden]{display:none}
