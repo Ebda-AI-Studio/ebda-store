@@ -62,6 +62,7 @@ describe('expense receipt upload is judged by its bytes', () => {
   beforeAll(async () => {
     const { default: router } = await import('@api/routes/expenses.routes');
     app = express();
+    app.use(express.json());
     app.use('/api/v1/stores', router);
     app.use(errorHandler);
   });
@@ -102,4 +103,19 @@ describe('expense receipt upload is judged by its bytes', () => {
     // private reference, never a public URL
     expect(res.body.receiptUrl).toBe('private:stores/store-1/receipts/r.jpg');
   });
+
+  it.each(['private:stores/store-1/instapay/proof.jpg', ' PRIVATE:stores/store-1/tax/card.pdf'])(
+    'create-expense rejects a client-sent private reference (%s)',
+    async ref => {
+      const res = await request(app).post('/api/v1/stores/store-1/expenses').send({
+        amount: 100,
+        expenseAccountId: '11111111-1111-4111-8111-111111111111',
+        paidFromAccountId: '22222222-2222-4222-8222-222222222222',
+        expenseDate: '2026-11-01',
+        receiptImageUrl: ref,
+      });
+      expect(res.status).toBe(422);
+      expect(JSON.stringify(res.body)).toContain('receiptImageUrl');
+    }
+  );
 });

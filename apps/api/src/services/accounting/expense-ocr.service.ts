@@ -98,18 +98,18 @@ function detectMime(url: string): string | null {
 /** Receipts live in the PRIVATE bucket and are referenced as `private:<key>` (never a public URL). */
 export const PRIVATE_RECEIPT_PREFIX = 'private:';
 
-/** The private key of a receipt reference, only when it is inside this store's own prefix. */
+/** The private key of a receipt reference, only when it is inside this store's `receipts/` folder (never other private files). */
 export function privateReceiptKey(ref: string, storeId: string): string | null {
   if (!ref.startsWith(PRIVATE_RECEIPT_PREFIX)) return null;
   const key = ref.slice(PRIVATE_RECEIPT_PREFIX.length);
-  return key.startsWith(`stores/${storeId}/`) && !key.includes('..') ? key : null;
+  return key.startsWith(`stores/${storeId}/receipts/`) && !key.includes('..') ? key : null;
 }
 
 /** Fetch a receipt (private reference or legacy URL) and return the body as a Buffer. */
 async function fetchBuffer(url: string, storeId: string): Promise<Buffer> {
   if (url.startsWith(PRIVATE_RECEIPT_PREFIX)) {
     const key = privateReceiptKey(url, storeId);
-    if (!key) throw new Error('receipt reference is outside the store prefix');
+    if (!key) throw new Error('receipt reference is outside the store receipts folder');
     return (await StorageService.getPrivate(key)).body;
   }
   return fetchUrlBuffer(url);

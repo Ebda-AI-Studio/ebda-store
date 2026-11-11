@@ -101,6 +101,9 @@ describe('expense receipts are merchant financial documents: private bucket only
     );
     expect(privateReceiptKey('private:stores/s2/receipts/a.jpg', 's1')).toBeNull();
     expect(privateReceiptKey('private:stores/s1/../s2/a.jpg', 's1')).toBeNull();
+    // other private files of the SAME store (payment proofs, tax documents) are not receipts
+    expect(privateReceiptKey('private:stores/s1/instapay/a.jpg', 's1')).toBeNull();
+    expect(privateReceiptKey('private:stores/s1/tax/a.pdf', 's1')).toBeNull();
     expect(privateReceiptKey('https://media.example/stores/s1/misc/a.jpg', 's1')).toBeNull();
   });
 });

@@ -76,7 +76,13 @@ const createSchema = z
      * When absent, the API treats `amount` as the raw foreign amount.
      */
     originalAmount: z.number().int().nonnegative().optional(),
-    receiptImageUrl: z.string().url().optional(),
+    // Only the server's upload path may set a `private:` reference (it names a file in the private bucket); a
+    // client-sent one could point an expense at any private file of the store (payment proofs, tax documents).
+    receiptImageUrl: z
+      .string()
+      .url()
+      .refine(v => !/^\s*private:/i.test(v), { message: 'receiptImageUrl must be a public URL' })
+      .optional(),
     notes: z.string().max(1000).optional(),
     notesAr: z.string().max(1000).optional(),
   })
