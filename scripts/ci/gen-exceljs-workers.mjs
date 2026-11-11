@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Builds apps/api/src/cf/stubs/exceljs-workers.cjs (Ruling BUNDLE-BUDGET-6): the same exceljs library, bundled from its
+ * Builds apps/api/src/cf/modules/exceljs.cjs (Ruling BUNDLE-BUDGET-6): the same exceljs library, bundled from its
  * `lib/exceljs.bare.js` source with the Node built-ins (`crypto`, `events`, `buffer`, `util`, `stream`) left to the Workers
  * `nodejs_compat` runtime instead of the browserify copies (bn.js, elliptic, asn1.js, hash.js, browserify-aes, a `buffer`
  * polyfill) that `dist/exceljs.bare.min.js` embeds: -390 KB of the API Worker. `fs`, `tmp`, `unzipper` and `archiver` (file
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-export const OUT_PATH = path.join(ROOT, 'apps/api/src/cf/stubs/exceljs-workers.cjs');
+export const OUT_PATH = path.join(ROOT, 'apps/api/src/cf/modules/exceljs.cjs');
 const require = createRequire(import.meta.url);
 const exceljsVersion = () => require('exceljs/package.json').version;
 const banner = v =>

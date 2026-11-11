@@ -22,8 +22,9 @@ import { defaultNewStoreLook } from '@ebda/shared';
 import { API_BASE } from '../helpers/api-base';
 import { hasDb } from '../helpers/bundle-fixtures';
 import { mintIdentityToken } from '../helpers/identity-session';
+import { safeRun } from '../helpers/safe-run';
 
-const run = crypto.randomUUID().slice(0, 8);
+const run = safeRun();
 const email = `live-ob-${run}@test.local`;
 const slug = `live-ob-${run}`;
 const PASSWORD = 'Str0ng!Passw0rd';

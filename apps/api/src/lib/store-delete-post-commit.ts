@@ -44,11 +44,12 @@ export async function finishStoreDeletion(
 
 /**
  * PDPL anonymisation of a DELETED DO store (Rulings FOLD-ERASURE-2, RETENTION-1): runs AFTER the delete committed, because it cannot
- * be rolled back (a failed delete reopens the DO; anonymised rows would stay anonymised). Three independent steps, each retried and
+ * be rolled back (a failed delete reopens the DO; anonymised rows would stay anonymised). Four independent steps, each retried and
  * each a P1 alert when it cannot finish, none able to stop the others:
  *   1. the StoreDO: buyer + merchant contact data anonymised, account / cart / consent data deleted, fiscal / VAT / payment rows KEPT
  *   2. the platform D1 rows of the store (memberships, API keys, invitee addresses, card reference)
  *   3. the platform payer fields (InstaPay receipts, manual-payment claims), anonymised not deleted
+ *   4. the store's product vectors in Vectorize (embeddings of product text; cost + stale data)
  * Idempotent, so a retry or a second delete call converges.
  */
 export async function anonymiseDeletedStore(
@@ -60,6 +61,8 @@ export async function anonymiseDeletedStore(
     ) => Promise<{ refused?: unknown; remaining: number }>;
     eraseD1?: (storeId: string) => Promise<void>;
     erasePayments?: (storeId: string, requestId: string) => Promise<unknown>;
+    /** The store's product vectors in Vectorize (P2-7): idempotent, throws on failure so the retry + P1 alert apply. */
+    purgeVectors?: (storeId: string) => Promise<unknown>;
     alert?: (title: string, body: string) => Promise<unknown> | unknown;
     requestId?: string;
   }
@@ -96,6 +99,10 @@ export async function anonymiseDeletedStore(
   if (deps.erasePayments) {
     const erasePayments = deps.erasePayments;
     await step('platform-payments', async () => void (await erasePayments(storeId, requestId)));
+  }
+  if (deps.purgeVectors) {
+    const purgeVectors = deps.purgeVectors;
+    await step('vectorize', async () => void (await purgeVectors(storeId)));
   }
   if (failed.length)
     await alert(
