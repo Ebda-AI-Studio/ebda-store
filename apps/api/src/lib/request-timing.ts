@@ -54,7 +54,16 @@ export function showsIoCounts(path: string, nodeEnv = process.env.NODE_ENV): boo
 
 export function serverTiming(req: Request, res: Response, next: NextFunction): void {
   const io = newIoTally();
-  if (process.env.DEV_STATS === '1') io.ops = [];
+  if (process.env.DEV_STATS === '1') {
+    io.ops = [];
+    // API-HANG-1 tests: a production-like AuthState round trip, or a stuck instance (cf/auth-state-client.ts `call`)
+    const delayMs = Math.min(
+      5_000,
+      Math.max(0, Number(req.headers['x-dev-authstate-delay-ms']) || 0)
+    );
+    const stall = String(req.headers['x-dev-authstate-stall'] ?? '').slice(0, 64);
+    if (delayMs || stall) io.authStateFault = { delayMs, stall };
+  }
   const t: Timings = {
     start: performance.now(),
     ms: {},

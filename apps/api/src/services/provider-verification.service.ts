@@ -18,6 +18,7 @@
  * `isProviderVerified` is BOUNDED-stale (60 s in-process cache): bookkeeping and display only.
  */
 import { storeDb } from '../lib/repo-factory';
+import { readInStoreContext } from '../lib/store-scoped-read';
 import { prisma, withStore } from '@ebda/database';
 import {
   AUTO_VERIFY_AFTER_DEFAULT,
@@ -96,17 +97,17 @@ async function modeOf(
   kind: ProviderKind
 ): Promise<'sandbox' | 'live'> {
   try {
-    const testMode = await withStore(storeId, async tx => {
+    // Both configs are per-store rows: the store's DO (no Postgres in the Worker) or its Postgres tenant scope.
+    const testMode = await readInStoreContext(storeId, async () => {
+      const db = await storeDb(storeId);
       if (kind === 'payments') {
-        const r = await (
-          await storeDb(storeId)
-        ).paymentConfig.findFirst({
+        const r = await db.paymentConfig.findFirst({
           where: { storeId, provider },
           select: { testMode: true },
         });
         return r?.testMode;
       }
-      const r = await tx.shippingCarrierConfig.findUnique({
+      const r = await db.shippingCarrierConfig.findUnique({
         where: { storeId_carrier: { storeId, carrier: provider } },
         select: { testMode: true },
       });

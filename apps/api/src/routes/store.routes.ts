@@ -22,6 +22,7 @@ import { merchantSenderPrefixInput } from '../services/email-sender';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { insertAuditLog } from '../lib/definer';
 import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
@@ -898,27 +899,24 @@ router.patch(
       // Two-tier visibility (2026-05-27): per-store entries (storeId = X)
       // are visible to that store's admins for their own team-action
       // trail; super-admin sees the cross-store trail.
-      await prisma.auditLog
-        .create({
-          data: {
-            action: status === 'suspended' ? 'store.suspend' : 'store.reactivate',
-            userId: req.user!.userId,
-            storeId: req.params.id,
-            resourceType: 'store',
-            resourceId: req.params.id,
-            details: {
-              previousStatus: store.status === status ? 'unknown' : 'flipped',
-              newStatus: status,
-            },
-            ipAddress: req.ip ?? null,
-            userAgent: req.headers['user-agent'] ?? null,
-          },
-        })
-        .catch(err => {
-          // Don't fail the status change if audit log write fails.
-          // Logged elsewhere; status change is the source of truth.
-          logger.warn({ err, storeId: req.params.id }, '[store.status] audit log write failed');
-        });
+      // insertAuditLog routes the row to the store's DO / D1 (the Worker has no Postgres) and never throws into the caller.
+      await insertAuditLog({
+        action: status === 'suspended' ? 'store.suspend' : 'store.reactivate',
+        userId: req.user!.userId,
+        storeId: req.params.id,
+        resourceType: 'store',
+        resourceId: req.params.id,
+        details: {
+          previousStatus: store.status === status ? 'unknown' : 'flipped',
+          newStatus: status,
+        },
+        ip: req.ip ?? null,
+        userAgent: req.headers['user-agent'] ?? null,
+      }).catch(err => {
+        // Don't fail the status change if audit log write fails.
+        // Logged elsewhere; status change is the source of truth.
+        logger.warn({ err, storeId: req.params.id }, '[store.status] audit log write failed');
+      });
 
       res.json({ success: true, data: toSafeStoreResponse(store) });
     } catch (error) {

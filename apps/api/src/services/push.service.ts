@@ -233,7 +233,7 @@ class PushService {
    *     that subscribed through the role-gated Orders-PWA route. Never touches
    *     shopper (`storefront`) subscriptions, so it can't double-send with the
    *     storefront push.
-   *  2. Runs the subscription read inside `runInTenantContext` because callers
+   *  2. Runs the subscription read inside `withStoreRw` (the DO, or a tenant-scoped Postgres read) because callers
    *     are Inngest jobs that run OUTSIDE the HTTP tenant-context middleware —
    *     `push_subscriptions` is FORCE-RLS, so without the GUC the read returns
    *     0 rows and the push silently no-ops.
@@ -281,8 +281,9 @@ class PushService {
     }
 
     // FORCE-RLS read — set the tenant GUC explicitly (Inngest has no middleware).
-    const subscriptions = await runInTenantContext(storeId, () =>
-      prisma.pushSubscription.findMany({
+    // `withStoreRw`: the store's DO on the Worker (no Postgres), the tenant-scoped Postgres read otherwise (same as send()).
+    const subscriptions = await withStoreRw(storeId, tx =>
+      tx.pushSubscription.findMany({
         where: { storeId, audience: 'orders_app' },
         select: { id: true, endpoint: true, p256dh: true, auth: true },
       })
@@ -327,8 +328,8 @@ class PushService {
     });
 
     if (expiredEndpoints.length > 0) {
-      await runInTenantContext(storeId, () =>
-        prisma.pushSubscription.deleteMany({
+      await withStoreRw(storeId, tx =>
+        tx.pushSubscription.deleteMany({
           where: { storeId, endpoint: { in: expiredEndpoints } },
         })
       ).catch(err =>

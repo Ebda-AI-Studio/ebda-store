@@ -217,18 +217,11 @@
         "productCategory": 1
       }
     },
-    "apps/api/src/services/provider-verification.service.ts": {
-      "kind": "platform",
-      "reason": "carrier-config merchant and verification paths still read the row through the store-scope prisma; the Test-connection result is written through storeWriter (hub follow-ups). Porting the remaining readers is the platform agent's follow-up to #432.",
-      "models": {
-        "shippingCarrierConfig": 1
-      }
-    },
     "apps/api/src/services/shipping-carrier.service.ts": {
       "kind": "platform",
-      "reason": "carrier-config merchant and verification paths still read the row through the store-scope prisma; the Test-connection result is written through storeWriter (hub follow-ups). Porting the remaining readers is the platform agent's follow-up to #432.",
+      "reason": "the Postgres legs of upsertCarrierConfig / rotateWebhookSecret (row lock + read inside prisma.$transaction) stay on the store-scope prisma; a DO store takes the compare-and-swap branch through storeWriter (Ruling NZ-CARRIER-1).",
       "models": {
-        "shippingCarrierConfig": 3
+        "shippingCarrierConfig": 2
       }
     },
     "apps/api/src/services/sms-queue.service.ts": {
