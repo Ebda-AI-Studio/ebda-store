@@ -18,7 +18,14 @@
 
 **Not measured here, and why:** the local Next/OpenNext cold-isolate render and the API startup CPU. The host was at load average 26 with 4.2 of 5 GB swap used (several agents' suites queued on the heavy-test lock), so local milliseconds were 4x inflated and noisy (API startup CPU 389-633 ms against a 99 ms baseline). A number from that would fail `benchmark-vet`. The web build was queued behind the lock and cancelled.
 
-**What would fix it (ranked, none done):**
+**Platform options checked (read-only, Cloudflare docs + `ttfb-probe.mjs`, 2026-11-11):**
+
+- Smart Tiered Cache cannot help: `caches.default` (what DEMO-EDGE-1 and STORE-EDGE use) is local to one data centre and "does not interact with Tiered Cache" (Workers docs, "How the cache works"). The zone setting itself was not read (no zone-read token here); it would not matter for this layer.
+- The OpenNext incremental cache (R2 + Durable Objects) is already global, but it holds fetch data and ISR output, not the HTML served by the edge layers; the data half is shared since WEB-COLD-2.
+- Probe across data centres: `/en` MISS 3.66 s in MRS, then stale/cached 0.41-0.45 s in ZRH; `/ar/products` MISS 1.11 s in ZRH, then HIT 0.55 and 0.45 s. One render per page per data centre per deploy; a hit is already under 0.6 s.
+- Single change that would get the first hit under 1 s: Workers Caching (`cache: { enabled: true }`, tiered by default, read-through, request collapsing) in place of `caches.default`. A MISS anywhere fills the upper tier. Plan: `docs/plans/2026-11-11-workers-caching-html.md`. It changes the price/stock staleness contract and has a platform blocker (compat date vs the pinned wrangler), so it is NOT implemented here.
+
+**What would fix it (ranked, none done; item 1 below is superseded by the Workers Caching plan above):**
 
 1. A second cache tier shared by all data centres for demo and listed-store HTML (R2 under `html/<build>/<host>/<path>`, validated by the existing per-store epochs in `store-edge-cache.ts`): a cold colo reads one R2 object instead of rendering. Touches the security-reviewed DEMO-EDGE-1 / STORE-EDGE rules (cache poisoning, per-visitor state), so it needs its own review and a deploy to measure; not attempted unverified.
 2. Warm the colos real visitors hit, not only the CI runner's (`warm-storefront.mjs` reaches one colo): a scheduled probe from several regions after each deploy.
