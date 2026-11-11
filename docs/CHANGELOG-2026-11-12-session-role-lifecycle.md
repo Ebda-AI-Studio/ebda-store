@@ -24,7 +24,7 @@
 - **ID-08** `JWT_PREVIOUS_PUBLIC_JWKS` entries need their own `exp` (unix s); expired or exp-less retired keys are not published. See ENVIRONMENT.md.
 - **TEN-4 admin UI**: `apiRequest` handles `STEP_UP_REQUIRED` once: signs out at the identity service and goes to `/login?returnTo=<page>&stepup=1`;
   the login page shows an Egyptian-Arabic / English note (`auth.login.stepUpRequired`). Error text in `ERROR_AR` / `ERROR_EN`.
-- **ID-08 warning**: accounts `/health` adds `warning: retired_jwk_without_exp` + the kids (and logs loudly) while a retired key has no `exp`.
+- **ID-08 warning**: accounts `/health` adds `warning: retired_jwk_without_exp` (no exp, or exp more than 30 days ahead) + `warningDetail` + the kids (and logs loudly) while a retired key has no `exp`.
   Check the production `JWT_PREVIOUS_PUBLIC_JWKS` secret before deploying.
 - **ID-08 cap**: a retired key whose `exp` is more than 30 days ahead is not published either; `/health` names the kid.
 - Login/step-up `returnTo`: hostile values (`//evil.com`, `/\\evil.com`, `https://evil.com`, `/%5Cevil.com`, `\\\\evil.com`) are covered by `step-up-return-to-hostile.test.ts`; the existing guards already hold.
