@@ -2,7 +2,8 @@ import { z } from 'zod/v3';
 import { storeDb } from '../../lib/repo-factory';
 import { storefrontOrigin } from '@ebda/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { prisma, runInTenantContext, withTenantContext } from '@ebda/database';
+import { withTenantContext } from '@ebda/database';
+import { runInStoreTenantContext } from '../../lib/store-scoped-read';
 import type { McpStore } from '../resolve-store';
 import { CartService } from '../../services/cart.service';
 import { OrderService } from '../../services/order.service';
@@ -101,7 +102,9 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
 
       try {
         if (acknowledgePrices === true)
-          await runInTenantContext(store.id, () => CartService.acknowledgePrices(store.id, cartId));
+          await runInStoreTenantContext(store.id, () =>
+            CartService.acknowledgePrices(store.id, cartId)
+          );
         const { firstName, lastName } = splitName(customer.name);
         const shippingAddress = {
           firstName,
@@ -151,7 +154,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           let createdOrderId = null as string | null;
           let order: Awaited<ReturnType<typeof OrderService.create>>;
           try {
-            order = await runInTenantContext(store.id, async () => {
+            order = await runInStoreTenantContext(store.id, async () => {
               const created = await OrderService.create(store.id, undefined, cartId, {
                 shippingAddress,
                 paymentMethod: 'cod',
@@ -163,7 +166,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           } catch (err) {
             if (createdOrderId) {
               const orderId = createdOrderId;
-              await runInTenantContext(store.id, () =>
+              await runInStoreTenantContext(store.id, () =>
                 OrderService.rollbackForPaymentFailure(store.id, orderId, cartId)
               ).catch(rbErr =>
                 logger.error(
@@ -219,7 +222,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
             // payment transaction above has rolled back, so there is no
             // ambient scope and, under ebda_app, the rollback's reads would
             // see no rows and silently do nothing (PR 2301 audit).
-            await runInTenantContext(store.id, () =>
+            await runInStoreTenantContext(store.id, () =>
               OrderService.rollbackForPaymentFailure(store.id, order.id, cartId)
             ).catch(rbErr =>
               logger.error(
@@ -239,7 +242,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // P2028), and letting that reach the outer catch would audit a real,
           // shippable order as `agent.write.failed` and tell the agent its
           // checkout failed — while its retry hits EMPTY_CART. #1648
-          await runInTenantContext(store.id, async () => {
+          await runInStoreTenantContext(store.id, async () => {
             await recordPaymentEvent({
               paymentId: codPayment.id,
               storeId: store.id,
@@ -341,7 +344,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
         // (issue 2360, ruling PAY-ORPH-1).
         let acceptedInvoice = null as OrphanedProviderInvoice | null;
         try {
-          const order = await runInTenantContext(store.id, async () => {
+          const order = await runInStoreTenantContext(store.id, async () => {
             const created = await OrderService.create(store.id, undefined, cartId, {
               shippingAddress,
               paymentMethod: 'online',
@@ -397,7 +400,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
             currency: order.currency,
             source: 'agent',
           };
-          await runInTenantContext(store.id, () =>
+          await runInStoreTenantContext(store.id, () =>
             PaymentService.recordProviderPayment(acceptedBy, paymentRequest, payment, store.id)
           );
           // The Payment row is committed: the order is paid-for-pending now,
@@ -422,7 +425,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
             // strand an unpaid, cart-less order the agent/customer can't
             // retry. Its own fresh tenant wrap — never the one that failed.
             const orderId = rollbackOrderId;
-            await runInTenantContext(store.id, () =>
+            await runInStoreTenantContext(store.id, () =>
               OrderService.rollbackForPaymentFailure(store.id, orderId, cartId)
             ).catch(rbErr =>
               logger.error(
