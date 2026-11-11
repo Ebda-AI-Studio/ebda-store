@@ -321,7 +321,30 @@ export function shouldEmbedQuery(raw: string): boolean {
 /** The query's vector (cached), raced against QUERY_EMBED_BUDGET_MS; the loser is aborted. */
 /** The exact text embedded for a query (and its cache key part): normalised, at most 100 chars. */
 export function queryEmbedText(raw: string): string {
-  return normalizeArabicSearch(raw).slice(0, QUERY_EMBED_MAX_CHARS).trim();
+  return colloquialToMsa(normalizeArabicSearch(raw)).slice(0, QUERY_EMBED_MAX_CHARS).trim();
+}
+
+/**
+ * Egyptian colloquial -> standard words, on ALREADY FOLDED tokens, with an optional one-letter clitic (ل ب و ف).
+ * Measured on production bge-m3 (Ruling SEARCH-SEMANTIC-LIVE-3): «حاجة للبحر» tops at 0.41, «شيء للبحر» at 0.52;
+ * «هدية لمراتي» 0.44, «هدية لزوجتي» 0.47. The model knows the standard word, not the dialect one.
+ */
+const COLLOQUIAL: Record<string, string> = {
+  مراتي: 'زوجتي',
+  مرتي: 'زوجتي',
+  جوزي: 'زوجي',
+  حاجه: 'شيء',
+  حاجات: 'اشياء',
+};
+export function colloquialToMsa(folded: string): string {
+  return folded
+    .split(' ')
+    .map(t => {
+      if (COLLOQUIAL[t]) return COLLOQUIAL[t];
+      const c = t.slice(0, 1);
+      return 'لبوف'.includes(c) && COLLOQUIAL[t.slice(1)] ? c + COLLOQUIAL[t.slice(1)] : t;
+    })
+    .join(' ');
 }
 
 async function queryVector(
@@ -394,6 +417,8 @@ export async function semanticProductIds(
 
 /** Vectorize returns at most this many matches for a query that asks for metadata-less ids. */
 const VECTORIZE_TOPK = 100;
+/** Keep hits within this much cosine score of the best hit (measured: relevant heads span <= 0.10; see SEARCH-SEMANTIC-LIVE-3). */
+const VECTOR_BAND = 0.1;
 
 /**
  * The vector leg of a DO store: Vectorize nearest vectors (cosine distance = 1 - score) within SEARCH_VECTOR_MAX_DISTANCE, a
@@ -422,11 +447,19 @@ async function vectorLegDo(
     returnMetadata: 'none',
   });
   const maxD = vectorMaxDistance();
+  // Relative band (Ruling SEARCH-SEMANTIC-LIVE-3): only hits within VECTOR_BAND of the best score are kept.
+  const topScore = Math.max(0, ...(res.matches ?? []).map(m => m.score));
   const best = new Map<string, number>();
   for (const m of res.matches ?? []) {
     const productId = m.id.slice(0, m.id.lastIndexOf(':'));
     const d = 1 - m.score;
-    if (productId && d <= maxD && d < (best.get(productId) ?? Infinity)) best.set(productId, d);
+    if (
+      productId &&
+      d <= maxD &&
+      m.score >= topScore - VECTOR_BAND &&
+      d < (best.get(productId) ?? Infinity)
+    )
+      best.set(productId, d);
   }
   if (best.size === 0) return { ids: [], degraded: false };
   const { ids: visible } = await money.vectorVisible({ ids: [...best.keys()] });
