@@ -127,13 +127,23 @@ const SLUG_STRIP_ASCII = /[^a-z0-9\s-]+/g;
  * CAN RETURN AN EMPTY STRING for input with no letters or digits in the
  * supported charset. Callers that persist a slug must use `slugifyWithFallback`.
  */
-export function slugify(text: string, opts: { ascii?: boolean } = {}): string {
-  return (text ?? '')
+export interface SlugifyOptions {
+  ascii?: boolean;
+  /** Cut to this many characters (no trailing hyphen after the cut). */
+  max?: number;
+  /** Live typing: keep one trailing hyphen so "a-" can become "a-b" (the blog field could not take a hyphen). Clean on submit. */
+  keepTrailingHyphen?: boolean;
+}
+
+export function slugify(text: string, opts: SlugifyOptions = {}): string {
+  const cut = (text ?? '')
     .toLowerCase()
     .trim()
     .replace(opts.ascii ? SLUG_STRIP_ASCII : SLUG_STRIP, '')
     .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+/, '');
+  const sized = opts.max ? cut.slice(0, opts.max) : cut;
+  return opts.keepTrailingHyphen ? sized : sized.replace(/-+$/g, '');
 }
 
 /**
@@ -156,7 +166,7 @@ export function slugify(text: string, opts: { ascii?: boolean } = {}): string {
 export function slugifyWithFallback(
   text: string,
   prefix = 'item',
-  opts: { ascii?: boolean } = {}
+  opts: SlugifyOptions = {}
 ): string {
   const base = slugify(text ?? '', opts);
   return base || `${prefix}-${Date.now().toString(36)}`;
