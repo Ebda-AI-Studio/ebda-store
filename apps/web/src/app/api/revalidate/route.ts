@@ -54,13 +54,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'tags must be 1..10 strings' }, { status: 400 });
   }
 
-  // Next 16 signature: revalidateTag(tag, profile). 'max' = purge across the
-  // longest cache-life. Wrapped defensively so an evolving cache-API quirk can
-  // never 500 this endpoint — the short fetch `revalidate` window is the floor
-  // either way.
+  // Next 16 signature: revalidateTag(tag, profile). NOT 'max': that is stale-while-revalidate, so the FIRST
+  // request after a merchant write was served the pre-write entry (a product page with no photo right after
+  // upload, Amelia Aurum 2026-11-11) and only the background refresh was fresh. `{ expire: 0 }` expires the
+  // tagged entries at once, so the next render refetches inline. Wrapped defensively so an evolving
+  // cache-API quirk can never 500 this endpoint; the short fetch `revalidate` window is the floor either way.
   for (const tag of tags) {
     try {
-      revalidateTag(tag, 'max');
+      revalidateTag(tag, { expire: 0 });
     } catch (e) {
       console.warn('[revalidate] revalidateTag failed for', tag, e);
     }

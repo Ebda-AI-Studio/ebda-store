@@ -676,7 +676,7 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           if [ "$EVENT" = "pull_request" ]; then
-            npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/store-settings-do.test.ts workers-test/merchant-signup.test.ts workers-test/merchant-journey.test.ts workers-test/merchant-catalogue.test.ts workers-test/money-path.test.ts workers-test/demo-home.test.ts workers-test/latency-budget.test.ts workers-test/failure-only-limiters.test.ts workers-test/pg-unreachable.test.ts workers-test/answer-engine-do.test.ts
+            npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/store-settings-do.test.ts workers-test/merchant-signup.test.ts workers-test/merchant-journey.test.ts workers-test/merchant-catalogue.test.ts workers-test/money-path.test.ts workers-test/merchant-mcp-do.test.ts workers-test/demo-home.test.ts workers-test/latency-budget.test.ts workers-test/failure-only-limiters.test.ts workers-test/pg-unreachable.test.ts workers-test/answer-engine-do.test.ts
           else
             # full lane: every workers-test file, route-sweep.test.ts included
             npm run cf:test -w apps/api
