@@ -16,7 +16,7 @@
 #
 # options: --repo OWNER/NAME (default Ebda-AI-Studio/ebda-store)  --polls N (3)  --interval S (30)  --max-wait-min M (180)
 #          --dry-run (evaluate, never merge)
-# test seams: MERGE_GATE_VIEW_CMD (prints the `gh pr view --json headRefOid,mergeable,statusCheckRollup` JSON),
+# test seams: MERGE_GATE_VIEW_CMD (prints the `gh pr view --json state,headRefOid,mergeable,statusCheckRollup` JSON),
 #             MERGE_GATE_MERGE_CMD (replaces the final gh pr merge), MERGE_GATE_REQUIRED_JSON, MERGE_GATE_MAX_WAIT_S.
 set -uo pipefail
 pr="${1:?usage: merge-gate.sh <pr> <expected-head-sha> [--repo R] [--polls N] [--interval S] [--max-wait-min M] [--dry-run]}"
@@ -36,7 +36,7 @@ required="${MERGE_GATE_REQUIRED_JSON:-$(node "$here/merge-gate-required.mjs" "$h
 
 view() {
   if [ -n "${MERGE_GATE_VIEW_CMD:-}" ]; then eval "$MERGE_GATE_VIEW_CMD"
-  else gh pr view "$pr" --repo "$repo" --json headRefOid,mergeable,statusCheckRollup; fi
+  else gh pr view "$pr" --repo "$repo" --json state,headRefOid,mergeable,statusCheckRollup; fi
 }
 
 # one verdict word per poll: ok | wait:<why> | refuse:<why>
@@ -63,6 +63,12 @@ evaluate() {
 deadline=$((SECONDS + ${MERGE_GATE_MAX_WAIT_S:-$((maxmin * 60))})); streak=0; sha=""
 while :; do
   json="$(view 2>/dev/null)" || json=""
+  # PR state first, on EVERY poll: a PR merged/closed by someone else must end the gate, not poll to the deadline.
+  pstate="$(echo "$json" | jq -r '.state // empty' 2>/dev/null || true)"
+  case "$pstate" in
+    MERGED) echo "merge-gate: PR $pr already merged; nothing to do"; exit 0 ;;
+    CLOSED) echo "merge-gate: REFUSED PR $pr: closed without merging" >&2; exit 1 ;;
+  esac
   if [ -z "$json" ]; then v="wait:could not read the PR"; else v="$(echo "$json" | evaluate)"; sha="$(echo "$json" | jq -r .headRefOid)"; fi
   case "$v" in
     ok) streak=$((streak + 1)); echo "merge-gate: PR $pr green poll $streak/$polls"

@@ -737,7 +737,7 @@
         "seo": "Search appearance"
       },
       "fields": {
-        "name": "Product Name",
+        "name": "Product Name (English)",
         "namePlaceholder": "Enter product name",
         "nameAr": "Product Name (Arabic)",
         "nameArPlaceholder": "ادخل اسم المنتج",
@@ -782,7 +782,7 @@
         "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
         "searchTerms": "Search words",
         "searchTermsPlaceholder": "e.g. sneakers, kotshi, 3abaya",
-        "searchTermsHint": "Separate words with commas. Not shown in the store. Leave empty and AI Autopilot suggests them; if you cleared them yourself, press ✨ Switch to AI. Your own words are never replaced.",
+        "searchTermsHint": "Separate words with commas. Not shown in the store. Leave empty and AI Autopilot suggests them; if you cleared them yourself, press Switch to AI. Your own words are never replaced.",
         "searchTermsTruncated": "Words that will be cut to 60 characters: {count}",
         "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
         "searchTermsAtLimit": "Limit reached",
@@ -886,7 +886,7 @@
       },
       "balanceFailed": "Balance failed — try again",
       "balanceTitle": "Balance languages (name + description EN/AR)",
-      "retryWarn": "⚠ Retry",
+      "retryWarn": "Retry",
       "balanced": "✓ Balanced",
       "balanceLanguages": "Balance languages",
       "revertFailed": "Revert failed — try again",
@@ -1172,8 +1172,8 @@
       "aiLabel": "AI",
       "failedTitle": "Could not switch to AI — try again",
       "handBackTitle": "Hand this field back to the AI",
-      "retryLabel": "⚠ Retry",
-      "switchToAiLabel": "✨ Switch to AI"
+      "retryLabel": "Retry",
+      "switchToAiLabel": "Switch to AI"
     },
     "model3d": {
       "title": "3D model",
@@ -10954,7 +10954,8 @@
       "audiencePublic": "Everyone",
       "audienceWholesaleOnly": "Approved wholesale buyers only",
       "audienceHint": "A wholesale-only product is hidden from the public catalogue, search and feeds.",
-      "saveRules": "Save order rules",
+      "saveRules": "Save wholesale rules",
+      "rulesScopeHint": "Saved on its own, right now. The rest of the product is saved with the «Save product» button below.",
       "rulesSaved": "Order rules saved.",
       "tierAdded": "Price break added.",
       "problem": {

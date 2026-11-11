@@ -165,10 +165,15 @@ describe('ci.yml worker-dry-run runs generator → assertion → build → dry-r
   it('runs wrangler on Node 22 (wrangler >= 4.110 needs it) and only for apps with a config', () => {
     expect(ci).toMatch(/NODE_VERSION: '22'/);
     expect(job).toMatch(/node-version: \$\{\{ env\.NODE_VERSION \}\}/);
-    // The matrix comes from scripts/ci-affected.mjs, which only lists apps that
-    // have a wrangler config, so an app without one is skipped, not failed.
-    expect(job).toMatch(/app: \$\{\{ fromJSON\(needs\.changes\.outputs\.workers\) \}\}/);
-    expect(job).toMatch(/if: needs\.changes\.outputs\.has_workers == 'true'/);
+    // On a PR the matrix comes from scripts/ci-affected.mjs, which only lists apps that have a wrangler config, so an
+    // app without one is skipped, not failed. The full lane (`changes` skipped) dry-runs marketing alone, so its
+    // page-weight budget is measured on main (Ruling MKT-LEGAL-HTML-BUDGET-2).
+    expect(job).toContain(
+      `app: \${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.workers || '["marketing"]') }}`
+    );
+    expect(job).toContain(
+      `if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true')`
+    );
   });
 
   it('each leg is its own hosted runner: no max-parallel, a roomy budget (issue 2155)', () => {

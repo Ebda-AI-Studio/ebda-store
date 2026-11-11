@@ -178,7 +178,7 @@ export function OrdersTable({
         const agentBadge = order.source === 'agent' && (
           <OrderStatusBadge
             status="agent"
-            label={`🤖 ${t('agentBadge')}`}
+            label={t('agentBadge')}
             // Uses the `orders.list` namespace's own `agentBadge` key
             // (added alongside `orders.detail.agent`) so this list-row
             // badge doesn't depend on the detail page's translations.
