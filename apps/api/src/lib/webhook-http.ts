@@ -96,7 +96,7 @@ async function pinnedNodeFetch(url: string, init: RequestInit): Promise<Response
         lookup: pinnedLookup(addresses),
         signal: init.signal ?? undefined,
       },
-      res => {
+      (res: import('node:http').IncomingMessage) => {
         const status = res.statusCode ?? 0;
         const bodyless = status === 204 || status === 205 || status === 304;
         if (bodyless) res.resume();
