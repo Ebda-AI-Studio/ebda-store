@@ -109,6 +109,19 @@ const nextConfig = {
     optimizePackageImports: ['@ebda/shared', '@ebda/ui'],
   },
 
+  // `/account/login` is the natural guess for the sign-in page; the page lives at `/auth/login`. Permanent, keeps the
+  // `/ar|/en` language prefix (LOCALE-PATHS-1) and the query string (next appends it to the destination).
+  async redirects() {
+    return [
+      { source: '/account/login', destination: '/auth/login', permanent: true },
+      {
+        source: '/:locale(ar|en)/account/login',
+        destination: '/:locale/auth/login',
+        permanent: true,
+      },
+    ];
+  },
+
   // Security headers
   async headers() {
     return [
