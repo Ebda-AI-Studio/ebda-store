@@ -102,7 +102,14 @@ export async function assertStorageRoom(
           Math.ceil(r.usedBytes / BYTES_PER_MB),
           bytes / BYTES_PER_MB
         );
-      return { release: () => releaseStoreBytes(storeId, bytes) };
+      let released = false; // idempotent: a second call (finish + close) must not subtract twice
+      return {
+        release: () => {
+          if (released) return;
+          released = true;
+          releaseStoreBytes(storeId, bytes, r.gen);
+        },
+      };
     }
   }
   await assertWithinLimit(storeId, 'maxStorageMb', { delta: bytes / BYTES_PER_MB });

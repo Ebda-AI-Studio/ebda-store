@@ -69,4 +69,27 @@ describe('assertStorageRoom reserves bytes (#630)', () => {
     await expect(assertStorageRoom(S, 5 * MB)).rejects.toMatchObject({ statusCode: 402 });
     await expect(assertStorageRoom(S, 2 * MB)).resolves.toBeDefined();
   });
+
+  it('release() is idempotent: calling it twice subtracts once', async () => {
+    const a = await assertStorageRoom(S, 1 * MB); // 9 of 10
+    a.release();
+    a.release(); // would drop to 7 if it subtracted twice
+    // 8 used again: exactly two 1 MB uploads fit, the third is refused
+    await assertStorageRoom(S, 1 * MB);
+    await assertStorageRoom(S, 1 * MB);
+    await expect(assertStorageRoom(S, 1 * MB)).rejects.toMatchObject({ statusCode: 402 });
+  });
+
+  it('a release that lands after the cache refreshed is ignored (no under-count)', async () => {
+    vi.useFakeTimers();
+    try {
+      const a = await assertStorageRoom(S, 1 * MB); // 8 -> 9 MB on generation 1
+      vi.advanceTimersByTime(61_000); // TTL passes: the next read re-lists the bucket (8 MB on generation 2)
+      await assertStorageRoom(S, 1 * MB); // refresh -> 9 MB
+      a.release(); // old generation: must NOT take 1 MB off the fresh count
+      await expect(assertStorageRoom(S, 2 * MB)).rejects.toMatchObject({ statusCode: 402 }); // 9+2 > 10
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

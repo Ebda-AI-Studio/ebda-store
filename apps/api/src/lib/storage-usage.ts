@@ -65,19 +65,23 @@ export function reserveStoreBytes(
   bytes: number,
   limitMb: number,
   now: number = Date.now()
-): { ok: boolean; usedBytes: number } | null {
+): { ok: boolean; usedBytes: number; gen: object } | null {
   const hit = cache.get(storeId);
   if (!hit || now - hit.at >= USAGE_TTL_MS) return null;
   if (Math.ceil((hit.bytes + bytes) / BYTES_PER_MB) > limitMb)
-    return { ok: false, usedBytes: hit.bytes };
+    return { ok: false, usedBytes: hit.bytes, gen: hit };
   hit.bytes += bytes;
-  return { ok: true, usedBytes: hit.bytes };
+  return { ok: true, usedBytes: hit.bytes, gen: hit };
 }
 
-/** Undo a reservation (floors at 0). */
-export function releaseStoreBytes(storeId: string, bytes: number): void {
+/**
+ * Undo a reservation (floors at 0). `gen` is the cache entry the reservation was made on: a refresh replaces the entry
+ * with a fresh bucket listing that already reflects (or never counted) the upload, so a release from an OLDER
+ * generation is ignored instead of subtracting from the fresh count.
+ */
+export function releaseStoreBytes(storeId: string, bytes: number, gen: object): void {
   const hit = cache.get(storeId);
-  if (hit) hit.bytes = Math.max(0, hit.bytes - bytes);
+  if (hit && hit === gen) hit.bytes = Math.max(0, hit.bytes - bytes);
 }
 
 /** A held reservation; `release()` is idempotent and a no-op when nothing was reserved. */
