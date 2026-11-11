@@ -15,6 +15,7 @@
  *   S5  JSX text ending in a sign followed by ANY expression/element (comments and `{' '}` included):
  *       `-{n}`, `- {n}`, `{t('refund')} \u2212{fmt(x)}`, `{' '}-{x}`, a JSX comment before the sign
  *   S6  JSX text starting with a sign after an expression/element: `{a} - {b}` (use <Sep/>)
+ *   S8  `signDisplay` in Intl.NumberFormat / toLocaleString options (ASCII sign, "+0")
  *   S7  <MinusGlyph/> followed by any value, or <PlusGlyph/> followed by a number-shaped value or <SignedNumber>
  *       (the glyphs are aria-hidden: a screen reader would read a refund as positive)
  * Also signs: MINUS / PLUS constants, HTML entities (&minus; &plus; &#8722; &#x2212;), fullwidth/small signs, `${'-'}`.
@@ -134,6 +135,20 @@ export function signViolations(src: string, file = 'x.tsx'): Violation[] {
       )
         add(n, 'S2');
     }
+    // S3: a conditional sign via `&&`: `neg && '\u2212'`, `(x < 0 && '-') || ''`, `(n < 0 && '\u2212') + fmt(n)`
+    if (
+      ts.isBinaryExpression(n) &&
+      n.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+      isSignLit(n.right)
+    )
+      add(n, 'S3');
+    // S8: signDisplay builds an ASCII sign and "+0" (Intl.NumberFormat / toLocaleString options)
+    if (
+      (ts.isPropertyAssignment(n) || ts.isShorthandPropertyAssignment(n)) &&
+      (ts.isIdentifier(n.name) || ts.isStringLiteral(n.name)) &&
+      n.name.text === 'signDisplay'
+    )
+      add(n, 'S8');
     if (ts.isConditionalExpression(n)) {
       const a = n.whenTrue;
       const b = n.whenFalse;
@@ -269,6 +284,16 @@ describe('SIGN-1: no hand-built sign prefixes in UI source', () => {
     ['S5', 'const a = <b>ج.م-{n}</b>;'],
     ['S1', "export const f = (n: number) => '\uFF0D' + n;", 'h.ts'],
     ['S1', "export const f = (n: number) => '\uFE63' + n;", 'h.ts'],
+    // conditional signs via && / ||, and signDisplay
+    ['S3', "const a = <b>{neg && '\u2212'}{x}</b>;"],
+    ['S3', "export const f = (x: number) => (x < 0 && '-') || '';", 'h.ts'],
+    ['S3', "export const f = (n: number) => (n < 0 && '\u2212') + formatMoney(n);", 'h.ts'],
+    [
+      'S8',
+      "export const f = (n: number) => n.toLocaleString('en', { signDisplay: 'always' });",
+      'h.ts',
+    ],
+    ['S8', "export const f = new Intl.NumberFormat('en', { signDisplay: 'exceptZero' });", 'h.ts'],
     // marker bypasses: there is no marker any more, so a comment must change nothing
     ['S5', 'const a = <b>{/* sign-ok: */}-{order.total}</b>;'],
     ['S5', 'const a = <b>{/* sign-ok: label */}−{formatMoney(refund)}</b>;'],
@@ -298,6 +323,7 @@ describe('SIGN-1: no hand-built sign prefixes in UI source', () => {
     'const a = <b><SignedNumber value={v} plus /></b>;',
     'const a = <b>{a}<Sep />{b}</b>;',
     'const a = <b><MinusGlyph /></b>;',
+    "const a = <b>{open && 'yes'}</b>;",
     "const a = <b><PlusGlyph /> {t('add')}</b>;",
     'const a = <b><PlusGlyph /> {label}</b>;',
     "export const id = (sectionId: string) => 'tier2-' + sectionId;",
