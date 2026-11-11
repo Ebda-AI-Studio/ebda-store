@@ -6,6 +6,9 @@ import type { Snapshot } from './types';
 export interface AlertEnv {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_ALERT_CHAT_ID?: string;
+  /** the AI OS brain mirror (Ruling ESC-AIOS-1 / AIOS-8); token unset = no mirror */
+  EBDA_OS_BRAIN_URL?: string;
+  EBDA_OS_INGEST_TOKEN?: string;
 }
 
 export type SendFetch = (url: string, init: RequestInit) => Promise<Response>;
@@ -35,6 +38,36 @@ export async function sendTelegram(
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ chat_id: env.TELEGRAM_ALERT_CHAT_ID, text }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Mirror the same text to the AI OS brain (a Telegram bot cannot read its own messages). Never throws; false = not mirrored. */
+export async function mirrorToBrain(
+  env: AlertEnv,
+  text: string,
+  level: 'p1' | 'info',
+  send: SendFetch = (u, i) => fetch(u, i)
+): Promise<boolean> {
+  if (!env.EBDA_OS_INGEST_TOKEN) return false;
+  const base = (env.EBDA_OS_BRAIN_URL || 'https://os.ebda.app').replace(/\/$/, '');
+  try {
+    const r = await send(`${base}/alerts`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${env.EBDA_OS_INGEST_TOKEN}`,
+      },
+      body: JSON.stringify({
+        source: 'ebda-store/status',
+        level,
+        title: text.split('\n')[1]?.slice(0, 300) || 'Ebda Store status',
+        text: text.slice(0, 4096),
+        url: 'https://status.ebda.app/en',
+      }),
     });
     return r.ok;
   } catch {

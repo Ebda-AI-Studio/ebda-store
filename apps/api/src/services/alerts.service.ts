@@ -244,6 +244,44 @@ export async function awaitInFlightAlerts(timeoutMs: number): Promise<void> {
   clearTimeout(timer);
 }
 
+/**
+ * Mirror one alert to the AI OS brain (`POST {EBDA_OS_BRAIN_URL}/alerts`, Bearer EBDA_OS_INGEST_TOKEN), Ruling ESC-AIOS-1 / AIOS-8.
+ * Same text as the Telegram message. Unset token = no-op. A failure is logged and swallowed: Telegram stays the delivery path.
+ */
+export async function mirrorToBrain(opts: AlertOptions, text: string): Promise<boolean> {
+  if (!config.osIngestToken || !config.osBrainUrl) return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${config.osBrainUrl.replace(/\/$/, '')}/alerts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.osIngestToken}`,
+      },
+      body: JSON.stringify({
+        source: 'ebda-store/api',
+        level: opts.level,
+        title: opts.title.slice(0, 300),
+        text: text.slice(0, 4096),
+        at: Date.now(),
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok)
+      logger.warn(
+        { status: res.status, level: opts.level },
+        'alerts.service: brain mirror rejected'
+      );
+    return res.ok;
+  } catch (err) {
+    logger.warn({ err, level: opts.level }, 'alerts.service: brain mirror failed');
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function deliverAlert(opts: AlertOptions): Promise<AlertOutcome> {
   if (!isConfigured()) {
     emitBootWarningOnce('TELEGRAM_BOT_TOKEN or TELEGRAM_ALERT_CHAT_ID missing');
@@ -298,6 +336,8 @@ async function deliverAlert(opts: AlertOptions): Promise<AlertOutcome> {
   }
 
   const text = buildMessage(opts);
+  // mirror to the AI OS brain in parallel; never awaited by the Telegram path's outcome, never throws
+  void mirrorToBrain(opts, text);
   const url = `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`;
 
   try {

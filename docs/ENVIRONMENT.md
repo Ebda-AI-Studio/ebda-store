@@ -125,11 +125,13 @@ Optional (feature degrades gracefully if missing):
 
 ### Operator alerts (Telegram bridge) — secrets on `ebda-api`
 
-| Var                      | Required | Notes                                                                                                                         |
-| ------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN`     | prod     | @EbdaAIStudiobot (one bot for every Ebda AI Studio product). Keychain `ebda-telegram-bot`.                                    |
-| `TELEGRAM_ALERT_CHAT_ID` | prod     | Ahmad's chat with the bot. Keychain `ebda-telegram-alert-chat-id`.                                                            |
-| `ALERTS_WEBHOOK_TOKEN`   | prod     | Guards `/api/v1/alerts/webhooks/*`; unset in production → every call 503 (fail closed). Keychain `ebda-alerts-webhook-token`. |
+| Var                      | Required | Notes                                                                                                                                  |
+| ------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN`     | prod     | @EbdaAIStudiobot (one bot for every Ebda AI Studio product). Keychain `ebda-telegram-bot`.                                             |
+| `TELEGRAM_ALERT_CHAT_ID` | prod     | Ahmad's chat with the bot. Keychain `ebda-telegram-alert-chat-id`.                                                                     |
+| `EBDA_OS_INGEST_TOKEN`   | prod     | API + status Workers: Bearer for the AI OS brain `POST /alerts` mirror of every Telegram alert (Ruling ESC-AIOS-1). Unset = no mirror. |
+| `EBDA_OS_BRAIN_URL`      | optional | Brain base URL for that mirror; default `https://os.ebda.app`.                                                                         |
+| `ALERTS_WEBHOOK_TOKEN`   | prod     | Guards `/api/v1/alerts/webhooks/*`; unset in production → every call 503 (fail closed). Keychain `ebda-alerts-webhook-token`.          |
 
 ### Self-serve abuse controls (SP5 task 4) — all optional, defaults in `apps/api/src/lib/abuse-config.ts`
 

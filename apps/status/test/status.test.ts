@@ -499,6 +499,30 @@ describe('human alerting (OPS-5)', () => {
     expect(sent).toHaveLength(0);
   });
 
+  it('mirrors the same text to the AI OS brain when the ingest token is set; a brain failure never changes the Telegram result', async () => {
+    const withBrain = {
+      ...withSecrets,
+      EBDA_OS_INGEST_TOKEN: 'k',
+      EBDA_OS_BRAIN_URL: 'https://brain.test',
+    } as typeof env;
+    const calls: { url: string; body: string; auth: string }[] = [];
+    const sendBoth = async (url: string, init: RequestInit) => {
+      calls.push({
+        url,
+        body: String(init.body),
+        auth: String((init.headers as Record<string, string>).authorization ?? ''),
+      });
+      return url.startsWith('https://brain.test')
+        ? new Response('down', { status: 503 })
+        : new Response('{"ok":true}', { status: 200 });
+    };
+    expect(await alertOnOutcome(withBrain, { opened: [1], resolved: [] }, sendBoth)).toBe(true);
+    const brain = calls.find(c => c.url === 'https://brain.test/alerts');
+    expect(brain?.auth).toBe('Bearer k');
+    expect(JSON.parse(brain!.body)).toMatchObject({ source: 'ebda-store/status', level: 'p1' });
+    expect(calls.filter(c => c.url.includes('/sendMessage'))).toHaveLength(1);
+  });
+
   it('probes the orders and accounts Workers too (M-070)', () => {
     const ids = COMPONENTS.map(c => c.id);
     expect(ids).toEqual(expect.arrayContaining(['orders', 'accounts']));

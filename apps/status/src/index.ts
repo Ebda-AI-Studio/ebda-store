@@ -1,4 +1,4 @@
-import { composeAlert, sendTelegram, type SendFetch } from './alert';
+import { composeAlert, mirrorToBrain, sendTelegram, type SendFetch } from './alert';
 import {
   BRAND,
   BRAND_MARKETING_URL,
@@ -72,7 +72,13 @@ export async function alertOnOutcome(
 ): Promise<boolean> {
   if (!outcome.opened.length && !outcome.resolved.length) return false;
   const text = composeAlert(await store(env).snapshot(Date.now()), outcome);
-  return text ? sendTelegram(env, text, send) : false;
+  if (!text) return false;
+  // the AI OS brain gets the same text (Ruling ESC-AIOS-1 / AIOS-8); its outcome never changes the Telegram result
+  const [sent] = await Promise.all([
+    sendTelegram(env, text, send),
+    mirrorToBrain(env, text, outcome.opened.length ? 'p1' : 'info', send),
+  ]);
+  return sent;
 }
 
 async function sha256(s: string): Promise<Uint8Array> {
