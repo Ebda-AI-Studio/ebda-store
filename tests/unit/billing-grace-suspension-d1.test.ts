@@ -173,3 +173,62 @@ describe('InstaPay grace -> suspension through the billing cycle (BILL-NOTICE-1)
     expect(kinds(db)).toEqual([]);
   });
 });
+
+describe('a failure mid-suspension is finished by the next cycle (BILL-NOTICE-2: D1 writes are not atomic)', () => {
+  const pastDue = async (db: DatabaseSync) => {
+    await runBillingCycle(new Date(PERIOD_END.getTime() + 1000), undefined, {
+      subscriptionIds: [SUB],
+    });
+    expect(subRow(db).status).toBe('past_due');
+    return new Date(subRow(db).retry! + 60_000);
+  };
+
+  it('the suspend call fails once: the row stays due, the next run suspends and claims the stage', async () => {
+    const db = rig(true);
+    const after = await pastDue(db);
+    const real = h.suspend!;
+    h.suspend = async () => {
+      throw new Error('injected: transient failure before the store flips');
+    };
+    expect((await runBillingCycle(after, undefined, { subscriptionIds: [SUB] })).errors).toBe(1);
+    expect(storeStatus(db).status).toBe('active');
+    expect(subRow(db).retry).not.toBeNull(); // still due: this is what lets the next run find it
+
+    h.suspend = real;
+    expect(await runBillingCycle(after, undefined, { subscriptionIds: [SUB] })).toMatchObject({
+      errors: 0,
+      suspended: 1,
+    });
+    expect(storeStatus(db)).toEqual({ status: 'suspended', reason: 'unpaid' });
+    expect(kinds(db)).toContain('suspended');
+    expect(subRow(db).retry).toBeNull();
+  });
+
+  it('the store flips but the claim write fails: the next run finds it still due, finishes the claim, owns the notice once', async () => {
+    const db = rig(true);
+    const after = await pastDue(db);
+    db.exec(
+      `CREATE TRIGGER inject BEFORE INSERT ON billing_reminders WHEN NEW.kind = 'suspended' BEGIN SELECT RAISE(ABORT, 'injected'); END`
+    );
+    expect((await runBillingCycle(after, undefined, { subscriptionIds: [SUB] })).errors).toBe(1);
+    expect(storeStatus(db).status).toBe('suspended'); // step 1 done
+    expect(kinds(db)).not.toContain('suspended'); // step 2 not
+    expect(subRow(db).retry).not.toBeNull();
+
+    db.exec('DROP TRIGGER inject');
+    expect(await runBillingCycle(after, undefined, { subscriptionIds: [SUB] })).toMatchObject({
+      errors: 0,
+      suspended: 1,
+    });
+    expect(kinds(db)).toContain('suspended');
+    expect(subRow(db).retry).toBeNull();
+    const effects = vi
+      .mocked(
+        (await import('../../apps/api/src/services/billing/billing-notify')).runBillingEffects
+      )
+      .mock.calls.flatMap(c => c[0]) as Array<{ kind: string; applied?: boolean }>;
+    expect(effects.filter(e => e.kind === 'store_suspended' && e.applied === true)).toHaveLength(1);
+    // and a third run is a no-op
+    expect((await runBillingCycle(after, undefined, { subscriptionIds: [SUB] })).suspended).toBe(0);
+  });
+});

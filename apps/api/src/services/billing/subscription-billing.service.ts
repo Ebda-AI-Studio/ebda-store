@@ -88,7 +88,12 @@ import {
   shiftedByGrants,
   sweepFreeMonthGrants,
 } from './grants.service';
-import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
+import {
+  assertPayableStore,
+  isBillableStoreId,
+  restoreFromBilling,
+  suspendForBilling,
+} from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
 import { claimGraceStage, findReminderCandidates, sendDueReminder } from './reminders.service';
@@ -1174,28 +1179,39 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
   if (!sub.nextRetryAt || sub.nextRetryAt.getTime() > now.getTime()) {
     return { action: 'skipped', reason: 'not_due' };
   }
-  // Ruling BILL-NOTICE-1: the suspension notice stage is claimed with the compare-and-set that clears
-  // the retry, so exactly one run owns the notice.
-  const { count, claimed } = await withStore(sub.storeId, async tx => {
-    const upd = await tx.storeSubscription.updateMany({
+  // Ruling BILL-NOTICE-2: D1 has no interactive transaction, so the writes below are NOT atomic. The ORDER makes a crash
+  // between any two of them self-healing, because the retry (what keeps the row in the due scan) is cleared LAST:
+  // (1) suspend the store (idempotent: only an `active` store flips); (2) claim the `suspended` notice stage (once-only
+  // insert); (3) clear the retry. A failure after (1) or (2) leaves the row due, so the next cycle re-runs (1) as a no-op,
+  // (2) as a no-op and finishes (3). Clearing the retry first (the old order) stranded the store: the row left the due
+  // scan and nothing ever suspended it.
+  const suspended = await suspendForBilling(sub.storeId, 'unpaid', now);
+  const claimed = await withStore(sub.storeId, tx =>
+    claimGraceStage(tx, {
+      storeId: sub.storeId,
+      subscriptionId: sub.id,
+      dueAt: periodEnd,
+      kind: 'suspended',
+    })
+  );
+  const { count } = await withStore(sub.storeId, tx =>
+    tx.storeSubscription.updateMany({
       where: { id: sub.id, storeId: sub.storeId, status: 'past_due', nextRetryAt: sub.nextRetryAt },
       data: { nextRetryAt: null },
-    });
-    const won =
-      upd.count === 1 &&
-      (await claimGraceStage(tx, {
-        storeId: sub.storeId,
-        subscriptionId: sub.id,
-        dueAt: periodEnd,
-        kind: 'suspended',
-      }));
-    return { count: upd.count, claimed: won };
-  });
-  if (count === 0) return { action: 'skipped', reason: 'already_advanced' };
-  const suspended = await suspendForBilling(sub.storeId, 'unpaid', now);
-  await runBillingEffects([
-    { kind: 'store_suspended', storeId: sub.storeId, applied: suspended && claimed },
-  ]);
+    })
+  );
+  if (count === 0) {
+    // Lost the compare-and-set. If the row is no longer past_due a payment landed between (1) and now: undo OUR suspension.
+    if (suspended) {
+      const cur = await withStore(sub.storeId, tx =>
+        tx.storeSubscription.findUnique({ where: { id: sub.id, storeId: sub.storeId } })
+      );
+      if (cur && cur.status !== 'past_due') await restoreFromBilling(sub.storeId, 'unpaid');
+    }
+    return { action: 'skipped', reason: 'already_advanced' };
+  }
+  // `applied` = this run owns the notice (the stage row is claimed once), even when a previous run did the suspension.
+  await runBillingEffects([{ kind: 'store_suspended', storeId: sub.storeId, applied: claimed }]);
   return { action: 'suspended' };
 }
 
