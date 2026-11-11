@@ -1733,6 +1733,9 @@ export function matchRefundToClaim(
  * caller's next step (OrderService.updateStatus), resumable: a replay of a full refund on an order not yet `refunded`
  * tells the caller to run it.
  */
+/** The order-level key of a merchant-recorded InstaPay refund (DO marker and GL entry share it). */
+export const instapayRefundKey = (referenceKey: string): string => `instapay:${referenceKey}`;
+
 export function recordInstapayRefund(
   db: SyncSql,
   a: {
@@ -1805,6 +1808,19 @@ export function recordInstapayRefund(
         "UPDATE orders SET payment_status = 'refunded', updated_at = ? WHERE id = ? AND store_id = ?",
         [now, a.orderId, a.storeId]
       );
+    // #629: a PARTIAL InstaPay refund is booked on the order like a gateway partial (completeRefund): the amount-only
+    // marker, in this same section as the payment write, keyed on the bank reference (a replay above never reaches here).
+    // The merchant already sent the money (an external fact): recorded in full, a state or ceiling problem is `review`.
+    // The full refund keeps its own path (the caller flips the order to `refunded`, which runs the whole reversal).
+    if (!full)
+      refundOrder(db, {
+        storeId: a.storeId,
+        orderId: a.orderId,
+        amount: a.amountMinor,
+        refundKey: instapayRefundKey(a.referenceKey),
+        external: true,
+        now,
+      });
     addPaymentEvent(db, {
       storeId: a.storeId,
       paymentId: p.id,
