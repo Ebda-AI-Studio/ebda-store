@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error plain CommonJS build, no types
-import ExcelJS from '../src/cf/stubs/exceljs-workers.cjs';
+import ExcelJS from '../src/cf/modules/exceljs.cjs';
 
 // Ruling BUNDLE-BUDGET-6: the exceljs the Worker bundles leaves crypto/events/buffer/stream to nodejs_compat. On real workerd it
 // must still write and read a workbook and hash a protected sheet.

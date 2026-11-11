@@ -175,7 +175,6 @@ const BUSINESS_CODES = new Set([
   'COUPON_USER_LIMIT',
   'INSUFFICIENT_WALLET',
   'TOTAL_TOO_LARGE',
-  'NEGATIVE_TOTAL',
   'GOLD_PRICE_DRIFT',
   'GOLD_PREPAID_REQUIRED',
   'NO_STORE',
@@ -196,6 +195,8 @@ export function refusalOf(e: unknown, variantIds: string[]): PortError | null {
         ? err.status
         : null;
   const message = typeof err.message === 'string' ? err.message : code;
+  // A 5xx is an engine BUG or outage, never a business rule (Ruling WA-RPC-9, #662): it propagates so it is logged and retried, whatever its code.
+  if (status !== null && status >= 500) return null;
   if (UNAVAILABLE_CODES.has(code)) return new PortError('out_of_stock', message, variantIds, code);
   if (BUSINESS_CODES.has(code) || (status !== null && status >= 400 && status < 500))
     return new PortError('invalid', message, undefined, code);
