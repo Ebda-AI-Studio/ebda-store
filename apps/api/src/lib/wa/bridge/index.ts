@@ -7,5 +7,5 @@ export const waBridge = () =>
   createBridge({
     port: createDoPort(),
     storefrontUrl: storefrontUrlFor,
-    log: (msg, ctx) => logger.error(ctx, msg),
+    log: (msg, ctx) => logger.error({ storeId: ctx.storeId, err: ctx.err }, msg),
   });

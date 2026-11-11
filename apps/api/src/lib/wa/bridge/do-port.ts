@@ -14,6 +14,7 @@ import { paymentWebhookUrl } from '../../../services/payment-providers/webhook-u
 import { buildPaymentLineItems } from '../../payment-line-items';
 import { auditLog } from '../../../middleware/security';
 import { inngest } from '../../inngest/client';
+import { ANONYMOUS_BUYER } from '../../buyer-identity';
 import logger from '../../logger';
 import { config } from '../../../config';
 import {
@@ -295,7 +296,7 @@ export function createDoPort(): BridgePort {
       const first = (a.buyer.name ?? '').trim();
       const args: CreateOrderArgs = {
         lines,
-        buyer: { kind: 'anonymous' },
+        buyer: ANONYMOUS_BUYER,
         paymentMethod: a.paymentMethod,
         idempotencyKey: `wa:${a.idempotencyKey}`,
         source: 'whatsapp',

@@ -9,7 +9,7 @@
  *  - Prices, totals and stock come from the Store only; the caller sends variant ids and quantities, never an amount.
  *  - Writes (`createOrderFromChat`, `recordCodOutcome`) require an idempotency key and are replay-safe in the port.
  */
-import type { z } from 'zod';
+import type { z } from 'zod/v3';
 import { args } from './schemas';
 import { signCheckoutToken } from './checkout-token';
 

@@ -4,7 +4,7 @@
  * against the shared fixtures in `tests/vectors/ebda-wa/bridge-v1.json`, so a one-sided drift fails here.
  * Amounts are integer minor units (piasters). Nothing here trusts a price from the caller.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export const UUID = z
   .string()
