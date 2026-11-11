@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useToast } from '@ebda/ui';
+import { useToast, PlusGlyph } from '@ebda/ui';
 import { recommendedSizeText } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../../components/AdminLayout';
@@ -524,7 +524,7 @@ function BlockColumn({
               ))}
             </select>
             <Button size="sm" type="button" onClick={addBlock} className="gap-1 font-semibold">
-              {/* sign-ok: button label glyph, not a number */}+ {t('addBlock')}
+              <PlusGlyph /> {t('addBlock')}
             </Button>
           </div>
         </div>
@@ -771,7 +771,7 @@ function ItemListEditor({
         </div>
       ))}
       <Button variant="outline" size="sm" type="button" onClick={addItem} className="gap-1">
-        {/* sign-ok: button label glyph, not a number */}+ {t('addItem')}
+        <PlusGlyph /> {t('addItem')}
       </Button>
     </div>
   );

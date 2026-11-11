@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { SearchTermsField } from '@/components/SearchTermsField';
-import { Input, Textarea, Select, useToast } from '@ebda/ui';
+import { Input, Textarea, Select, useToast, MinusGlyph, PlusGlyph } from '@ebda/ui';
 import { FormFooter } from '@/components/FormFooter';
 import { AITranslateMissingButton } from '@/components/AITranslateMissingButton';
 import {
@@ -365,8 +365,7 @@ export default function NewProductPage() {
                 </span>
               </span>
               <span aria-hidden="true" className="text-muted-foreground">
-                {/* sign-ok: disclosure glyph, not a number */}
-                {showDetails ? '−' : '+'}
+                {showDetails ? <MinusGlyph /> : <PlusGlyph />}
               </span>
             </button>
             {showDetails && (

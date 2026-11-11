@@ -20,6 +20,7 @@ import {
   type DecisionKind,
 } from './_components/ApplicationDecisionModal';
 import { Button } from '@/components/ui/Button';
+import { Sep } from '@ebda/ui';
 
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
 
@@ -194,7 +195,8 @@ export default function WholesaleApplicationsPage() {
                         <bdi>{row.businessName}</bdi>
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        <bdi>{`${row.user.firstName} ${row.user.lastName}`.trim()}</bdi> -{' '}
+                        <bdi>{`${row.user.firstName} ${row.user.lastName}`.trim()}</bdi>
+                        <Sep />
                         <bdi dir="ltr">{row.user.email}</bdi>
                       </p>
                       <p className="text-sm text-muted-foreground">
@@ -202,8 +204,8 @@ export default function WholesaleApplicationsPage() {
                         {row.commercialRegNo ? (
                           <>
                             {' '}
-                            {/* sign-ok: button label glyph, not a number */}- {t('regNo')}{' '}
-                            <bdi dir="ltr">{row.commercialRegNo}</bdi>
+                            <Sep />
+                            {t('regNo')} <bdi dir="ltr">{row.commercialRegNo}</bdi>
                           </>
                         ) : null}
                       </p>

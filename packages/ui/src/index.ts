@@ -17,6 +17,7 @@ export * from './components/Skeleton';
 export * from './components/CartIcon';
 export * from './components/Price';
 export * from './components/SignedNumber';
+export * from './components/Glyphs';
 export * from './components/AddToCartButton';
 export * from './components/ProductBadge';
 export * from './components/Rating';

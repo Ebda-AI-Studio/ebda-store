@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useToast } from '@ebda/ui';
+import { useToast, PlusGlyph } from '@ebda/ui';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import {
   apiGet,
@@ -293,7 +293,7 @@ export default function StoreFaqsPage() {
                 }}
                 className="gap-1.5 font-semibold"
               >
-                {/* sign-ok: button label glyph, not a number */}+ {t('addFaq')}
+                <PlusGlyph /> {t('addFaq')}
               </Button>
             )}
           </div>
@@ -554,7 +554,7 @@ export default function StoreFaqsPage() {
                 }}
                 className="gap-1.5 font-semibold"
               >
-                {/* sign-ok: button label glyph, not a number */}+ {t('addHowto')}
+                <PlusGlyph /> {t('addHowto')}
               </Button>
             )}
           </div>
@@ -753,7 +753,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
               }))
             }
           >
-            {/* sign-ok: button label glyph, not a number */}+ {t('addStep')}
+            <PlusGlyph /> {t('addStep')}
           </Button>
         </div>
         {draft.steps.map((step, i) => {

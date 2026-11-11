@@ -5,7 +5,7 @@ import { MINUS, SignedAmount } from '@/lib/bidi';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from '../../components/StoreLink';
 import Image from 'next/image';
-import { Button, useToast, CartIcon, VariantText } from '@ebda/ui';
+import { Button, useToast, CartIcon, VariantText, Sep } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { useCart } from '../../contexts/CartContext';
@@ -1110,8 +1110,9 @@ export default function CartClient() {
                                         d="M5 13l4 4L19 7"
                                       />
                                     </svg>
-                                    {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)}{' '}
-                                    off)
+                                    {promoCode.toUpperCase()}
+                                    <Sep />
+                                    {promoName} ({formatPrice(discount)} off)
                                   </p>
                                 )}
                                 {promoApplied && cartBundles.length > 0 && (

@@ -243,7 +243,7 @@ export default function WholesaleClient() {
                 </Link>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {formatPrice(p.price)}
-                  {p.moq ? ` - ${t(`minimum order ${p.moq}`, `الحد الأدنى للطلب ${p.moq}`)}` : ''}
+                  {p.moq ? ` · ${t(`minimum order ${p.moq}`, `الحد الأدنى للطلب ${p.moq}`)}` : ''}
                 </p>
               </li>
             ))}

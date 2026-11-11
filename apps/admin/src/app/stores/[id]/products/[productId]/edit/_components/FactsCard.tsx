@@ -9,7 +9,7 @@
  */
 
 import { useRef, useState } from 'react';
-import { Input } from '@ebda/ui';
+import { Input, PlusGlyph } from '@ebda/ui';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { PRODUCT_FACTS_MAX, PRODUCT_FACTS_ON_CARD_MAX, type ProductFact } from '@ebda/shared';
@@ -119,7 +119,7 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
         <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={t('presets')}>
           {PRESETS.map(p => (
             <Button key={p.key} type="button" onClick={() => add(p)} variant="outline" size="sm">
-              {/* sign-ok: button label glyph, not a number */}+ {locale === 'ar' ? p.keyAr : p.key}
+              <PlusGlyph /> {locale === 'ar' ? p.keyAr : p.key}
             </Button>
           ))}
         </div>

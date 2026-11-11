@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { formatSigned, signedParts, MINUS } from '@ebda/shared';
-import { SignedNumber } from '@ebda/ui';
+import { SignedNumber, PlusGlyph, MinusGlyph, Sep } from '@ebda/ui';
 
 const strip = (s: string) => s.replace(/[⁦⁩]/g, '');
 
@@ -82,5 +82,14 @@ describe('formatSigned isolate option', () => {
   it('isolate:false returns a plain string for badges/dialogs that are LTR already', () => {
     expect(formatSigned(-21, { isolate: false, format: abs => `${abs}%` })).toBe(`${MINUS}21%`);
     expect(formatSigned(0, { isolate: false })).toBe('0');
+  });
+});
+
+describe('glyphs', () => {
+  it('PlusGlyph, MinusGlyph and Sep render explicit, aria-hidden characters', () => {
+    expect(renderToStaticMarkup(<PlusGlyph />)).toBe('<span aria-hidden="true">+</span>');
+    expect(renderToStaticMarkup(<PlusGlyph decorative={false} />)).toBe('<span>+</span>');
+    expect(renderToStaticMarkup(<MinusGlyph />)).toBe(`<span aria-hidden="true">${MINUS}</span>`);
+    expect(renderToStaticMarkup(<Sep />)).toBe('<span aria-hidden="true"> – </span>');
   });
 });

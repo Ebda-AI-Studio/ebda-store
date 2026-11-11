@@ -13,7 +13,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Input, Textarea, useToast } from '@ebda/ui';
+import { Input, Textarea, useToast, PlusGlyph } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
@@ -522,7 +522,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
               />
             ) : (
               <Button type="button" variant="outline" size="sm" onClick={startNew} className="mt-2">
-                {/* sign-ok: button label glyph, not a number */}+ {t('addFaq')}
+                <PlusGlyph /> {t('addFaq')}
               </Button>
             )}
           </>

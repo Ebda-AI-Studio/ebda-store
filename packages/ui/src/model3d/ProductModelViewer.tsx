@@ -19,6 +19,10 @@ import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js';
 import type { ActiveModel3dLook } from '@ebda/shared';
 import { arPlatform, sceneViewerIntent, type ArPlatform } from './ar';
 
+/** Keyboard keys for zoom (they are keys, not signs). */
+const ZOOM_IN_KEYS = ['+', '='];
+const ZOOM_OUT_KEYS = ['-', '_'];
+
 export type ArSource = 'usdz' | 'generated' | 'scene-viewer';
 
 export interface ProductModelViewerLabels {
@@ -199,9 +203,8 @@ export const ProductModelViewer = forwardRef<ProductModelViewerHandle, ProductMo
         else if (e.key === 'ArrowRight') controls.rotateLeft(-step);
         else if (e.key === 'ArrowUp') controls.rotateUp(step);
         else if (e.key === 'ArrowDown') controls.rotateUp(-step);
-        // sign-ok: keyboard key, not a number
-        else if (e.key === '+' || e.key === '=') controls.dollyIn(1.1);
-        else if (e.key === '-' || e.key === '_') controls.dollyOut(1.1);
+        else if (ZOOM_IN_KEYS.includes(e.key)) controls.dollyIn(1.1);
+        else if (ZOOM_OUT_KEYS.includes(e.key)) controls.dollyOut(1.1);
         else handled = false;
         if (handled) {
           e.preventDefault();

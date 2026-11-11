@@ -39,6 +39,7 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { useIsCanvasHovered } from '../_lib/canvas-hover-store';
+import { PlusGlyph } from '@ebda/ui';
 
 export interface Selection {
   sectionId: string;
@@ -359,7 +360,7 @@ function Group({
         data-testid={`add-section-${list}`}
         data-setting-id="builder.add-section"
       >
-        {/* sign-ok: button label glyph, not a number */}+ {t('addSection')}
+        <PlusGlyph /> {t('addSection')}
       </Button>
     </section>
   );

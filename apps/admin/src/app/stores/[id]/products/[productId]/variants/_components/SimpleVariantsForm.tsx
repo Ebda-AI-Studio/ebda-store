@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Input, useToast } from '@ebda/ui';
+import { Input, useToast, PlusGlyph } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/hooks/useConfirm';
 import {
@@ -581,7 +581,7 @@ export function SimpleVariantsForm({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         {!multiAxis ? (
           <Button variant="outline" onClick={addRow} disabled={saving}>
-            {/* sign-ok: button label glyph, not a number */}+ {t('addRow')}
+            <PlusGlyph /> {t('addRow')}
           </Button>
         ) : (
           <p className="text-xs text-muted-foreground">{t('multiAxisLockNote')}</p>
