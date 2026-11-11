@@ -250,7 +250,7 @@ export default function DeadstockPage() {
         </div>
 
         {/* Error */}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
         {/* Loading */}
         {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}

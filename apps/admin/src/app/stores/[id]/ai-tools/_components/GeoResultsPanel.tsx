@@ -102,7 +102,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
             <span>
               {t('llmsTxt.label')}{' '}
               {llmsLength > 0 ? (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 ms-1">
+                <span className="text-xs text-success-ink ms-1">
                   ✓ {llmsLength} {t('llmsTxt.charsSuffix')}
                 </span>
               ) : (
@@ -138,7 +138,7 @@ export function GeoResultsPanel({ storeId, refreshTrigger }: Props) {
             <span>
               {t('brandFacts.label')}{' '}
               {factsKeys > 0 ? (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 ms-1">
+                <span className="text-xs text-success-ink ms-1">
                   ✓ {factsKeys} {t('brandFacts.keysSuffix')}
                 </span>
               ) : (

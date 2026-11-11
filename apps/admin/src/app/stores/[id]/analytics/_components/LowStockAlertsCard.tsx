@@ -76,7 +76,7 @@ export function LowStockAlertsCard({ products }: LowStockAlertsCardProps) {
                     </span>
                   )}
                   {product.acceptsBackorder && (
-                    <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-info/10 text-info-ink">
                       {t('acceptsBackorder')}
                     </span>
                   )}

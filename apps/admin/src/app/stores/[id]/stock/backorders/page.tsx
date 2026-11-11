@@ -117,7 +117,7 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
               required
             />
           </div>
-          {error && <p className="text-red-600 text-xs">{error}</p>}
+          {error && <p className="text-destructive-ink text-xs">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button
               type="button"
@@ -180,7 +180,7 @@ export default function BackordersPage() {
   if (error) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
+        <div className="p-6 text-destructive-ink text-sm">{error}</div>
       </AdminLayout>
     );
   }

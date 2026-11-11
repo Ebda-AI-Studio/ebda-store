@@ -187,7 +187,7 @@ export default function InsightsDashboardPage() {
               {aovChange !== 0 && (
                 <span
                   className={`ms-2 font-medium ${
-                    aovChange >= 0 ? 'text-green-700' : 'text-red-600'
+                    aovChange >= 0 ? 'text-success-ink' : 'text-destructive-ink'
                   }`}
                 >
                   {aovChange >= 0 ? '+' : ''}
@@ -200,7 +200,9 @@ export default function InsightsDashboardPage() {
           {/* MRR / 30d revenue */}
           <div className="rounded-xl border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('mrr30d')}</p>
-            <p className="text-2xl font-semibold font-mono text-green-700">{major(data.mrr30d)}</p>
+            <p className="text-2xl font-semibold font-mono text-success-ink">
+              {major(data.mrr30d)}
+            </p>
             <p className="text-xs text-muted-foreground">{tc('egp')}</p>
           </div>
 

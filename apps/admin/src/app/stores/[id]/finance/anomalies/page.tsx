@@ -49,7 +49,7 @@ type AckFilter = 'all' | 'false' | 'true';
 function SeverityBadge({ severity, t }: { severity: AnomalySeverity; t: (k: string) => string }) {
   if (severity === 'p0') {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive-ink">
         {t('severity.p0')}
       </span>
     );
@@ -135,7 +135,7 @@ function AnomalyRow({
           <p className="text-muted-foreground">{t('delta')}</p>
           <p
             className={`font-mono font-medium ${
-              item.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
+              item.deltaPercent < 0 ? 'text-destructive-ink' : 'text-success-ink'
             }`}
           >
             {deltaSign}
@@ -266,7 +266,7 @@ export default function AnomaliesPage() {
         </div>
 
         {/* Error */}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
         {/* Loading */}
         {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}

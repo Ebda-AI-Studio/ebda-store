@@ -182,7 +182,7 @@ export default function AccountsPage() {
   if (error && !tree) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
+        <div className="p-6 text-destructive-ink text-sm">{error}</div>
       </AdminLayout>
     );
   }
@@ -210,8 +210,8 @@ export default function AccountsPage() {
           )}
         </div>
 
-        {seedMsg && <p className="text-sm text-emerald-600">{seedMsg}</p>}
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {seedMsg && <p className="text-sm text-success-ink">{seedMsg}</p>}
+        {error && <p className="text-destructive-ink text-sm">{error}</p>}
 
         {/* Create custom account form */}
         {showCreate && parentOptions.length > 0 && (
@@ -267,7 +267,7 @@ export default function AccountsPage() {
                 />
               </label>
             </div>
-            {createErr && <p className="text-red-600 text-sm">{createErr}</p>}
+            {createErr && <p className="text-destructive-ink text-sm">{createErr}</p>}
             <div className="flex items-center gap-2">
               <Button type="submit" disabled={creating} variant="default">
                 {creating ? t('creating') : t('createSubmit')}

@@ -182,9 +182,7 @@ export default function NewsletterPage() {
       cell: s => (
         <span
           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-            s.isActive
-              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-              : 'bg-muted text-muted-foreground'
+            s.isActive ? 'bg-success/10 text-success-ink' : 'bg-muted text-muted-foreground'
           }`}
         >
           {s.isActive ? tTable('active') : tTable('unsubscribed')}
@@ -298,9 +296,9 @@ export default function NewsletterPage() {
 
             {broadcastResult ? (
               <div className="px-6 py-8 text-center">
-                <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-14 h-14 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg
-                    className="w-7 h-7 text-emerald-600"
+                    className="w-7 h-7 text-success-ink"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

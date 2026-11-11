@@ -270,7 +270,7 @@ export default function MerchantKeysPage() {
         <span
           className={
             row.active
-              ? 'rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+              ? 'rounded bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success-ink'
               : 'rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground'
           }
           dir="auto"

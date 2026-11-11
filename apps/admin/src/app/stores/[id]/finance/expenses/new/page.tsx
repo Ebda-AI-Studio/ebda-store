@@ -407,9 +407,9 @@ export default function NewExpensePage() {
             <p
               className={`text-xs ${
                 ocrStatus === 'error' || ocrStatus === 'timeout'
-                  ? 'text-red-600'
+                  ? 'text-destructive-ink'
                   : ocrStatus === 'success'
-                    ? 'text-green-600'
+                    ? 'text-success-ink'
                     : 'text-muted-foreground'
               }`}
             >
@@ -425,7 +425,7 @@ export default function NewExpensePage() {
         {/* Expense Date */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
-            {t('expenseDate')} <span className="text-red-500">*</span>
+            {t('expenseDate')} <span className="text-destructive-ink">*</span>
           </span>
           <input
             type="date"
@@ -456,7 +456,7 @@ export default function NewExpensePage() {
         {/* Expense Account */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
-            {t('expenseCategoryLabel')} <span className="text-red-500">*</span>
+            {t('expenseCategoryLabel')} <span className="text-destructive-ink">*</span>
           </span>
           <select
             value={expenseAccountId}
@@ -476,7 +476,7 @@ export default function NewExpensePage() {
         {/* Paid From Account */}
         <label className="block space-y-1">
           <span className="text-sm font-medium">
-            {t('paidFromAccountLabel')} <span className="text-red-500">*</span>
+            {t('paidFromAccountLabel')} <span className="text-destructive-ink">*</span>
           </span>
           <select
             value={paidFromAccountId}
@@ -517,7 +517,7 @@ export default function NewExpensePage() {
             {requiresFxRate(currency) && (
               <label className="block space-y-1">
                 <span className="text-sm font-medium">
-                  {t('fxRateLabel', { currency })} <span className="text-red-500">*</span>
+                  {t('fxRateLabel', { currency })} <span className="text-destructive-ink">*</span>
                 </span>
                 <input
                   type="number"
@@ -540,7 +540,7 @@ export default function NewExpensePage() {
           <label className="block space-y-1">
             <span className="text-sm font-medium">
               {t('amount')} {isNonBase ? t('minorUnitsSuffix', { currency }) : ''}{' '}
-              <span className="text-red-500">*</span>
+              <span className="text-destructive-ink">*</span>
             </span>
             <input
               type="number"

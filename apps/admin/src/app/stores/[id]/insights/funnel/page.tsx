@@ -224,7 +224,7 @@ export default function InsightsFunnelPage() {
                         <span className="text-sm font-medium">{step.label}</span>
                         <div className="flex items-center gap-3">
                           {prevValue !== null && step.value !== null && (
-                            <span className="text-xs text-red-500">
+                            <span className="text-xs text-destructive-ink">
                               {dropoff(prevValue, step.value)}
                             </span>
                           )}
@@ -258,7 +258,7 @@ export default function InsightsFunnelPage() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('revenue')}
                   </p>
-                  <p className="text-2xl font-semibold font-mono text-green-700">
+                  <p className="text-2xl font-semibold font-mono text-success-ink">
                     {minorToMajor(totals.revenueFils)}
                   </p>
                   <p className="text-xs text-muted-foreground">{tc('egp')}</p>

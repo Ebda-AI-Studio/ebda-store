@@ -52,12 +52,12 @@ interface AgentKeyPanelProps {
 function StatusChip({ tone, label }: { tone: 'green' | 'gray' | 'amber'; label: string }) {
   const chip =
     tone === 'green'
-      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
+      ? 'bg-success/10 text-success-ink border-success/30'
       : tone === 'amber'
         ? 'bg-warning/10 text-warning-ink border-warning/40'
         : 'bg-muted text-muted-ink border-border';
   const dot =
-    tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-warning' : 'bg-muted-foreground';
+    tone === 'green' ? 'bg-success' : tone === 'amber' ? 'bg-warning' : 'bg-muted-foreground';
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${chip}`}

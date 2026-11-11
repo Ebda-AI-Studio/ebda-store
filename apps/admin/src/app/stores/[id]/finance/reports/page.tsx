@@ -248,7 +248,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
       {rows && !loading && (
         <div className="space-y-3">
@@ -410,7 +410,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
       {data && !loading && (
         <div className="space-y-6 max-w-2xl">
@@ -437,7 +437,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                     <td className="px-3 py-2 font-semibold" colSpan={2}>
                       {tp('totalRevenue')}
                     </td>
-                    <td className="px-3 py-2 text-end font-mono font-semibold text-green-700">
+                    <td className="px-3 py-2 text-end font-mono font-semibold text-success-ink">
                       {major(data.revenue.total)} {tc('egp')}
                     </td>
                   </tr>
@@ -469,7 +469,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                     <td className="px-3 py-2 font-semibold" colSpan={2}>
                       {tp('totalExpenses')}
                     </td>
-                    <td className="px-3 py-2 text-end font-mono font-semibold text-red-600">
+                    <td className="px-3 py-2 text-end font-mono font-semibold text-destructive-ink">
                       {major(data.expenses.total)} {tc('egp')}
                     </td>
                   </tr>
@@ -483,7 +483,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
             <span className="font-semibold">{tp('netIncome')}</span>
             <span
               className={`text-xl font-semibold font-mono ${
-                data.netIncome >= 0 ? 'text-green-700' : 'text-red-600'
+                data.netIncome >= 0 ? 'text-success-ink' : 'text-destructive-ink'
               }`}
             >
               {data.netIncome < 0 ? '−' : ''}
@@ -644,7 +644,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
       {data && !loading && (
         <div className="space-y-6 max-w-2xl">
@@ -652,9 +652,9 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
           {renderSection(tbs('liabilities'), data.liabilities, tbs('totalLiabilities'))}
           {renderSection(tbs('equity'), data.equity, tbs('totalEquity'))}
           {balanced ? (
-            <p className="text-sm text-green-700">{tbs('balanced')}</p>
+            <p className="text-sm text-success-ink">{tbs('balanced')}</p>
           ) : (
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-destructive-ink">
               {tbs('unbalanced', { amount: major(Math.abs(difference)) })}
             </p>
           )}
@@ -789,7 +789,7 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
       {data && !loading && (
         <div className="space-y-6">

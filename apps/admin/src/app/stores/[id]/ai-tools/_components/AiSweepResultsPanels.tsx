@@ -454,7 +454,7 @@ function FaqPanel({ data, storeId }: { data: FaqResult; storeId: string }) {
                     </span>
                   )}
                   {f.manuallyEdited && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success-ink">
                       {t('editedBadge')}
                     </span>
                   )}
@@ -523,7 +523,7 @@ function HowtoPanel({ data, storeId }: { data: HowtoResult; storeId: string }) {
                     </span>
                   )}
                   {h.manuallyEdited && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success-ink">
                       {t('editedBadge')}
                     </span>
                   )}
@@ -812,7 +812,7 @@ function FillRateCard({
 }) {
   const percentage = pct(rate);
   const color =
-    rate >= 0.8 ? 'text-emerald-600' : rate >= 0.4 ? 'text-warning-ink' : 'text-destructive-ink';
+    rate >= 0.8 ? 'text-success-ink' : rate >= 0.4 ? 'text-warning-ink' : 'text-destructive-ink';
 
   return (
     <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-center">

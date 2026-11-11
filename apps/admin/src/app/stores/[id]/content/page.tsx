@@ -216,9 +216,7 @@ function PageRowCard({
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span
             className={`rounded-full px-2 py-0.5 ${
-              authored
-                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                : 'bg-warning/15 text-warning-ink'
+              authored ? 'bg-success/15 text-success-ink' : 'bg-warning/15 text-warning-ink'
             }`}
           >
             {authored ? authoredLabel : fallbackLabel}

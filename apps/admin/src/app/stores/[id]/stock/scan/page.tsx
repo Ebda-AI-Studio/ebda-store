@@ -453,13 +453,13 @@ function ReceiveMode({ storeId }: { storeId: string }) {
       )}
 
       {result && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+        <div className="rounded-xl border border-success/30 bg-success/10 p-4 text-sm text-success-ink">
           {t('receiving.success', {
             qty: String(result.qtyReceived),
             name: '',
             newQty: String(result.newInventory),
           })}
-          <p className="text-xs mt-1 text-green-700">
+          <p className="text-xs mt-1 text-success-ink">
             {result.previousInventory} → {result.newInventory}
           </p>
         </div>
@@ -591,7 +591,7 @@ function PickMode({ storeId }: { storeId: string }) {
             </div>
             <div className="flex items-center gap-2">
               {order.fullyPicked && (
-                <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-success/10 text-success-ink">
                   {t('picking.orderComplete')}
                 </span>
               )}
@@ -645,7 +645,7 @@ function PickMode({ storeId }: { storeId: string }) {
                   const done = item.pickedQty >= item.quantity;
                   return (
                     <span className={`font-mono text-xs ${done ? 'opacity-60' : ''}`}>
-                      <span className={done ? 'text-green-700 font-semibold' : ''}>
+                      <span className={done ? 'text-success-ink font-semibold' : ''}>
                         {item.pickedQty}/{item.quantity}
                       </span>
                       {done && ' ✓'}
@@ -691,7 +691,7 @@ function PickMode({ storeId }: { storeId: string }) {
               {picking && <p className="text-xs text-muted-foreground">…</p>}
 
               {pickResult && (
-                <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-800">
+                <div className="rounded-lg bg-success/10 border border-success/30 px-4 py-2 text-sm text-success-ink">
                   {t('picking.success', {
                     qty: String(pickResult.pickedQtyAfter - pickResult.pickedQtyBefore),
                     name: pickResult.productName,
@@ -1060,9 +1060,9 @@ function CountMode({ storeId }: { storeId: string }) {
                 <span
                   className={`font-mono text-xs font-semibold ${
                     line.variance > 0
-                      ? 'text-green-700'
+                      ? 'text-success-ink'
                       : line.variance < 0
-                        ? 'text-red-600'
+                        ? 'text-destructive-ink'
                         : 'text-muted-foreground'
                   }`}
                 >
@@ -1101,11 +1101,11 @@ function CountMode({ storeId }: { storeId: string }) {
       {reconcileErr && <p className="text-sm text-destructive-ink">{reconcileErr}</p>}
 
       {reconcileResult && (
-        <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+        <div className="rounded-lg bg-success/10 border border-success/30 px-4 py-3 text-sm text-success-ink">
           {reconcileResult.adjustmentId
             ? t('counting.reconciled', { id: reconcileResult.adjustmentId.slice(0, 8) + '…' })
             : t('counting.noVariances')}
-          <p className="text-xs mt-1 text-green-700">
+          <p className="text-xs mt-1 text-success-ink">
             {t('linesAdjusted', { count: reconcileResult.linesReconciled })}
           </p>
         </div>

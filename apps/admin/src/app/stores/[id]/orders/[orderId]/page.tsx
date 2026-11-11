@@ -264,7 +264,7 @@ export default function OrderDetailPage() {
                   <OrderStatusBadge
                     status="agent"
                     label={t('agent')}
-                    colorMap={{ agent: { className: 'bg-violet-50 text-violet-700' } }}
+                    colorMap={{ agent: { className: 'bg-primary/10 text-primary-ink' } }}
                   />
                 )}
               </div>

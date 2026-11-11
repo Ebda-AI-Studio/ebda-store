@@ -267,7 +267,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
       cell: loc => (
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
-            loc.isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-warning/10 text-warning-ink'
+            loc.isPublished ? 'bg-success/10 text-success-ink' : 'bg-warning/10 text-warning-ink'
           }`}
         >
           {loc.isPublished ? t('statusPublished') : t('statusDraft')}

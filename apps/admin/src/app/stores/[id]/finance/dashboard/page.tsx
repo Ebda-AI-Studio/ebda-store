@@ -217,11 +217,11 @@ export default function FinanceDashboardPage() {
         const isNeg = row.balance < 0;
         return (
           <span
-            className={isNeg ? 'font-mono text-red-600' : 'font-mono'}
+            className={isNeg ? 'font-mono text-destructive-ink' : 'font-mono'}
             title={isNeg ? t('negativeBalanceTooltip') : undefined}
           >
             {isNeg && (
-              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-red-100 text-red-700 rounded">
+              <span className="inline-flex items-center me-1 px-1 py-0.5 text-xs bg-destructive/10 text-destructive-ink rounded">
                 !
               </span>
             )}
@@ -264,7 +264,7 @@ export default function FinanceDashboardPage() {
                 </p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr ? 'text-muted-foreground' : 'text-green-700'
+                    dashboardErr ? 'text-muted-foreground' : 'text-success-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -286,7 +286,7 @@ export default function FinanceDashboardPage() {
                 </p>
                 <p
                   className={`text-2xl font-semibold font-mono ${
-                    dashboardErr ? 'text-muted-foreground' : 'text-red-600'
+                    dashboardErr ? 'text-muted-foreground' : 'text-destructive-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -309,8 +309,8 @@ export default function FinanceDashboardPage() {
                     dashboardErr
                       ? 'text-muted-foreground'
                       : netPositive
-                        ? 'text-green-700'
-                        : 'text-red-600'
+                        ? 'text-success-ink'
+                        : 'text-destructive-ink'
                   }`}
                   title={dashboardErr ?? undefined}
                 >
@@ -356,7 +356,7 @@ export default function FinanceDashboardPage() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('salesOrdersRevenue')}
                   </p>
-                  <p className="text-2xl font-semibold font-mono text-green-700">
+                  <p className="text-2xl font-semibold font-mono text-success-ink">
                     {major(salesStats.totalRevenue)}
                   </p>
                   <p className="text-xs text-muted-foreground">{tc('egp')}</p>
@@ -499,7 +499,7 @@ export default function FinanceDashboardPage() {
                             <span
                               className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
                                 a.severity === 'p0'
-                                  ? 'bg-red-100 text-red-700'
+                                  ? 'bg-destructive/10 text-destructive-ink'
                                   : 'bg-warning/10 text-warning-ink'
                               }`}
                             >
@@ -510,7 +510,7 @@ export default function FinanceDashboardPage() {
                             </span>
                             <span
                               className={`text-xs font-mono ms-auto ${
-                                a.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
+                                a.deltaPercent < 0 ? 'text-destructive-ink' : 'text-success-ink'
                               }`}
                             >
                               {sign}

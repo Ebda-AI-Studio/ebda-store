@@ -102,7 +102,7 @@ export function ProviderRow({
         </div>
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            config.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
+            config.enabled ? 'bg-success/10 text-success-ink' : 'bg-muted text-muted-foreground'
           }`}
         >
           {config.enabled ? t('statusActive') : t('statusOff')}
@@ -160,7 +160,7 @@ function GeminiCard() {
           <h3 className="text-base font-semibold text-foreground">{t('geminiTitle')}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{t('geminiHint')}</p>
         </div>
-        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+        <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success-ink">
           {t('geminiActiveBadge')}
         </span>
       </div>

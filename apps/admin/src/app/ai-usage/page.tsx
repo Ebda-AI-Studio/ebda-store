@@ -87,7 +87,7 @@ function planLabel(plan: string): string {
 
 const PLAN_COLORS: Record<string, string> = {
   free: 'bg-muted text-muted-foreground',
-  starter: 'bg-blue-100 text-blue-700',
+  starter: 'bg-info/10 text-info-ink',
   professional: 'bg-primary/10 text-primary-ink',
   enterprise: 'bg-warning/10 text-warning-ink',
 };

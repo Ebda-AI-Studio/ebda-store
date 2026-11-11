@@ -561,7 +561,7 @@ export default function NewStockAdjustmentPage() {
           disabled={items.length <= 1}
           variant="link"
           size="sm"
-          className="text-red-600"
+          className="text-destructive-ink"
         >
           ✕
         </Button>

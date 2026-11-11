@@ -258,7 +258,7 @@ export default function NewJournalEntryPage() {
                       disabled={lines.length <= 2}
                       variant="link"
                       size="sm"
-                      className="text-red-600"
+                      className="text-destructive-ink"
                     >
                       ✕
                     </Button>
@@ -277,9 +277,11 @@ export default function NewJournalEntryPage() {
                 </td>
                 <td className="px-3 py-2" colSpan={2}>
                   {!balanced && totals.debit + totals.credit > 0 && (
-                    <span className="text-red-600 text-xs">{tNew('errors.unbalanced')}</span>
+                    <span className="text-destructive-ink text-xs">
+                      {tNew('errors.unbalanced')}
+                    </span>
                   )}
-                  {balanced && <span className="text-green-700 text-xs">{tNew('balanced')}</span>}
+                  {balanced && <span className="text-success-ink text-xs">{tNew('balanced')}</span>}
                 </td>
               </tr>
             </tfoot>

@@ -327,7 +327,7 @@ export default function AiToolsPage() {
     {
       header: t('recentRuns.colFilled'),
       alignEnd: true,
-      cell: j => <span className="font-medium text-emerald-600">{j.filled}</span>,
+      cell: j => <span className="font-medium text-success-ink">{j.filled}</span>,
     },
     {
       header: t('recentRuns.colSkipped'),
@@ -914,7 +914,7 @@ function MasterSweepButton({
 function StatusBadge({ status, t }: { status: string; t: TFn }) {
   const styles =
     status === 'completed'
-      ? 'bg-emerald-100 text-emerald-700'
+      ? 'bg-success/10 text-success-ink'
       : status === 'failed'
         ? 'bg-destructive/15 text-destructive-ink'
         : status === 'cancelled'
@@ -1044,7 +1044,7 @@ function ActiveJobCard({
 
       {filledList.length > 0 && (
         <details className="mt-3">
-          <summary className="cursor-pointer text-xs font-medium text-emerald-600">
+          <summary className="cursor-pointer text-xs font-medium text-success-ink">
             {filledList.length === 1
               ? t('activeJob.viewFilled', { count: filledList.length })
               : t('activeJob.viewFilledPlural', { count: filledList.length })}
@@ -1220,7 +1220,7 @@ function Stat({
 }) {
   const color =
     tone === 'ok'
-      ? 'text-emerald-700'
+      ? 'text-success-ink'
       : tone === 'bad'
         ? 'text-destructive-ink'
         : 'text-muted-foreground';

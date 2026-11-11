@@ -31,11 +31,11 @@ interface CohortData {
 
 /** Returns a Tailwind bg class based on retention 0..1 */
 function retentionColor(rate: number): string {
-  if (rate >= 0.7) return 'bg-green-200 text-green-900';
-  if (rate >= 0.5) return 'bg-green-100 text-green-800';
+  if (rate >= 0.7) return 'bg-success/20 text-success-ink';
+  if (rate >= 0.5) return 'bg-success/10 text-success-ink';
   if (rate >= 0.3) return 'bg-warning/10 text-warning-ink';
-  if (rate >= 0.1) return 'bg-red-100 text-red-700';
-  return 'bg-red-50 text-red-500';
+  if (rate >= 0.1) return 'bg-destructive/10 text-destructive-ink';
+  return 'bg-destructive/10 text-destructive-ink';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

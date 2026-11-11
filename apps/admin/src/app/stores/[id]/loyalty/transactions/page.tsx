@@ -61,7 +61,7 @@ const TYPE_FILTERS = [
 function TypeBadge({ type, label }: { type: string; label: string }) {
   let className = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ';
   if (type === 'tier_changed') {
-    className += 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
+    className += 'bg-primary/10 text-primary-ink';
   } else if (type.startsWith('earn_')) {
     className += 'bg-success/10 text-success-ink';
   } else if (type.startsWith('redeem_')) {
@@ -75,8 +75,7 @@ function TypeBadge({ type, label }: { type: string; label: string }) {
 }
 
 function PointsCell({ points }: { points: number }) {
-  if (points > 0)
-    return <span className="font-semibold text-emerald-600 dark:text-emerald-400">+{points}</span>;
+  if (points > 0) return <span className="font-semibold text-success-ink">+{points}</span>;
   if (points < 0) return <span className="font-semibold text-destructive-ink">{points}</span>;
   return <span className="text-muted-foreground">0</span>;
 }

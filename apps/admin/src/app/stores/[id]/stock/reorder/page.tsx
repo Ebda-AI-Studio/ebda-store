@@ -69,7 +69,7 @@ function UrgencyBadge({
 }) {
   if (days < 3) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive-ink">
         {t('card.urgencyDays', { days })}
       </span>
     );
@@ -301,7 +301,7 @@ export default function ReorderPage() {
         </div>
 
         {/* Error */}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive-ink">{error}</p>}
 
         {/* Loading */}
         {loading && <p className="text-sm text-muted-foreground">{tc('loading')}</p>}

@@ -199,7 +199,7 @@ export default function PurchaseOrderDetailPage() {
       header: tDetail('qtyReceived'),
       alignEnd: true,
       className: 'w-24',
-      cell: item => <span className="font-mono text-xs text-green-700">{item.qtyReceived}</span>,
+      cell: item => <span className="font-mono text-xs text-success-ink">{item.qtyReceived}</span>,
     },
     {
       header: tDetail('qtyRemaining'),

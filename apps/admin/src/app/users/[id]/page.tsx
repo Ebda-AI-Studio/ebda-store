@@ -26,7 +26,7 @@ interface UserDetail {
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-  active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  active: { bg: 'bg-success/10', text: 'text-success-ink', dot: 'bg-success' },
   inactive: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted-foreground' },
   suspended: { bg: 'bg-destructive/5', text: 'text-destructive-ink', dot: 'bg-destructive' },
 };
@@ -433,7 +433,7 @@ export default function UserDetailPage() {
                 <div
                   className={`rounded-lg p-4 text-sm ${
                     saveMessage.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                      ? 'bg-success/10 text-success-ink'
                       : 'bg-destructive/5 text-destructive-ink dark:bg-destructive/20 dark:text-destructive-ink'
                   }`}
                 >

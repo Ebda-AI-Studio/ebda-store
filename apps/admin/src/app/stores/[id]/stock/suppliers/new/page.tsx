@@ -158,7 +158,7 @@ export default function NewSupplierPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="space-y-1">
             <span className="text-sm font-medium">
-              {t('name')} <span className="text-red-500">*</span>
+              {t('name')} <span className="text-destructive-ink">*</span>
             </span>
             <input
               type="text"
@@ -297,7 +297,7 @@ export default function NewSupplierPage() {
           </label>
         </div>
 
-        {error && <div className="text-red-600 text-sm">{error}</div>}
+        {error && <div className="text-destructive-ink text-sm">{error}</div>}
 
         <div className="flex gap-2 flex-wrap">
           <Button type="submit" disabled={submitting} variant="default">

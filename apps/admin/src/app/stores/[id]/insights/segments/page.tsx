@@ -29,13 +29,13 @@ interface SegmentsData {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const SEGMENT_COLORS: Record<string, string> = {
-  vip: 'bg-purple-100 text-purple-900 border-purple-200',
-  loyal: 'bg-blue-100 text-blue-900 border-blue-200',
-  potential: 'bg-cyan-100 text-cyan-900 border-cyan-200',
-  new_customer: 'bg-green-100 text-green-900 border-green-200',
+  vip: 'bg-primary/10 text-primary-ink border-primary/30',
+  loyal: 'bg-info/10 text-info-ink border-info/30',
+  potential: 'bg-info/10 text-info-ink border-info/30',
+  new_customer: 'bg-success/10 text-success-ink border-success/30',
   at_risk: 'bg-warning/10 text-warning-ink border-warning/30',
-  hibernating: 'bg-yellow-100 text-yellow-900 border-yellow-200',
-  lost: 'bg-red-100 text-red-900 border-red-200',
+  hibernating: 'bg-warning/10 text-warning-ink border-warning/30',
+  lost: 'bg-destructive/10 text-destructive-ink border-destructive/30',
 };
 
 const SEGMENT_ICONS: Record<string, string> = {
@@ -123,7 +123,7 @@ export default function InsightsSegmentsPage() {
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 {t('totalMonetaryValue')}
               </p>
-              <p className="text-2xl font-semibold font-mono text-green-700">
+              <p className="text-2xl font-semibold font-mono text-success-ink">
                 {minorToMajor(totalRevenue)}
               </p>
               <p className="text-xs text-muted-foreground">{tc('egp')}</p>

@@ -252,7 +252,7 @@ export default function NewPurchaseOrderPage() {
           disabled={lines.length <= 1}
           variant="link"
           size="sm"
-          className="text-red-600"
+          className="text-destructive-ink"
         >
           ✕
         </Button>
@@ -336,7 +336,7 @@ export default function NewPurchaseOrderPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="space-y-1">
               <span className="text-sm font-medium">
-                {t('supplier')} <span className="text-red-500">*</span>
+                {t('supplier')} <span className="text-destructive-ink">*</span>
               </span>
               <select
                 value={supplierId}

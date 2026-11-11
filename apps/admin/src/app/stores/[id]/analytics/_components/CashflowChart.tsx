@@ -73,7 +73,7 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
               width={barW}
               height={barH}
               rx={1}
-              className={positive ? 'fill-emerald-500 dark:fill-emerald-400' : 'fill-destructive'}
+              className={positive ? 'fill-success' : 'fill-destructive'}
               opacity={0.85}
             >
               <title>{`${point.day}: ${formatCurrency(point.net)}`}</title>

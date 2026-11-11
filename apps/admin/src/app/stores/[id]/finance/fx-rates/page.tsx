@@ -233,8 +233,8 @@ export default function FxRatesPage() {
             </p>
           )}
 
-          {formError && <p className="text-red-600 text-sm">{formError}</p>}
-          {formSuccess && <p className="text-green-700 text-sm">{t('rateSaved')}</p>}
+          {formError && <p className="text-destructive-ink text-sm">{formError}</p>}
+          {formSuccess && <p className="text-success-ink text-sm">{t('rateSaved')}</p>}
 
           <Button type="button" onClick={handleSubmit} disabled={submitting} variant="default">
             {submitting ? t('saving') : t('saveRate')}

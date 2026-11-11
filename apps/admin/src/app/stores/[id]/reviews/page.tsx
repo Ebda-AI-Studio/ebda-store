@@ -59,7 +59,7 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${i < rating ? 'text-warning-ink fill-yellow-400' : 'text-muted-foreground/60'}`}
+          className={`h-4 w-4 ${i < rating ? 'text-warning-ink fill-warning' : 'text-muted-foreground/60'}`}
           viewBox="0 0 20 20"
           fill="currentColor"
         >

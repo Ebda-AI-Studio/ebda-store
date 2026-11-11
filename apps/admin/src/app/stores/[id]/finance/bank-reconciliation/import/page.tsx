@@ -180,18 +180,18 @@ export default function ImportStatementPage() {
 
         {/* Error */}
         {errorMsg && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-ink">
             {errorMsg}
           </div>
         )}
 
         {/* Success result */}
         {result && (
-          <div className="rounded-xl border border-green-100 bg-green-50 p-5 space-y-3">
-            <p className="text-sm font-medium text-green-800">
+          <div className="rounded-xl border border-success/30 bg-success/10 p-5 space-y-3">
+            <p className="text-sm font-medium text-success-ink">
               {ti('success', { count: result.imported })}
             </p>
-            <div className="text-sm text-green-700 space-y-1">
+            <div className="text-sm text-success-ink space-y-1">
               <p>
                 {t('imported')}: <strong>{result.imported}</strong>
               </p>

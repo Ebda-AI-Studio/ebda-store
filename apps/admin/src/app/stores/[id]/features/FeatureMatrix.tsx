@@ -83,15 +83,13 @@ function TriStateBadge({ state, plan }: { state: TriState; plan: StorePlan }) {
   const planLabel = locale === 'ar' ? PLAN_LABELS[plan].ar : PLAN_LABELS[plan].en;
   const configs: Record<TriState, { color: string; dot: string; label: string }> = {
     baseline_on: {
-      color:
-        'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-      dot: 'bg-emerald-500',
+      color: 'bg-success/10 text-success-ink border-success/30',
+      dot: 'bg-success',
       label: t('badges.includedIn', { plan: planLabel }),
     },
     override_on: {
-      color:
-        'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
-      dot: 'bg-blue-500',
+      color: 'bg-info/10 text-info-ink border-info/30',
+      dot: 'bg-info',
       label: t('badges.grantedByOverride'),
     },
     override_off: {
