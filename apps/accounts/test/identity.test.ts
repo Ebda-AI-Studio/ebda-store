@@ -113,16 +113,17 @@ describe('login and the access token contract', () => {
     expect(a.status).toBe(401);
     expect(b.status).toBe(401);
     expect(await a.json()).toEqual(await b.json());
+    // M-066: the lock is per (email, address), so the 5th failure from ONE address locks that address only
     for (let i = 0; i < 4; i++)
       await call('/login', {
         json: { email: u.email, password: 'nope' },
-        headers: { 'cf-connecting-ip': `198.51.100.${10 + i}` },
+        headers: { 'cf-connecting-ip': '198.51.100.1' },
       });
     const locked = await call('/login', {
       json: { email: u.email, password: u.password },
-      headers: { 'cf-connecting-ip': '198.51.100.99' },
+      headers: { 'cf-connecting-ip': '198.51.100.1' },
     });
-    expect(locked.status).toBe(429); // even the right password is refused while locked
+    expect(locked.status).toBe(429); // even the right password is refused to the address that failed 5 times
   });
 
   it('a suspended account cannot sign in and cannot be told apart from a wrong password', async () => {

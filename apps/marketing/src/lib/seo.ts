@@ -9,6 +9,21 @@ import {
 import { CAPABILITIES } from './capabilities';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
+
+/**
+ * The studio's founder, Ahmad Sharaf, under the same Person @id mypovonai.com and whisky11.com publish, so the three
+ * sites' entity graphs join for answer engines (Ahmad, 2026-11-11). Identity only: no role claims beyond founder. Not on
+ * the legal pages (operator without a personal name). Declared once, on the studio home (studioJsonLd), where the
+ * Organization is described in full; the other graphs reference the same @id (and stay inside their HTML budgets).
+ */
+export const FOUNDER = {
+  '@type': 'Person',
+  '@id': 'https://mypovonai.com/#person',
+  name: 'Ahmad Sharaf',
+  // mypovonai.com only: no customer-facing ebda.app surface links whisky11.com (marketing-site.test "marketing honesty");
+  // the shared @id already joins this node to the whisky11.com graph.
+  sameAs: ['https://mypovonai.com'],
+} as const;
 import { WHATSAPP_APP_URL, WHATSAPP_PAGE } from './whatsapp-page';
 import { STUDIO_HOME } from './studio-home';
 import { SERVICE_LINE_CONTENT, type LineId } from './service-lines-content';
@@ -376,6 +391,7 @@ export function studioJsonLd(locale: Locale) {
         ...orgServices(locale),
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
+        founder: FOUNDER,
         email: BRAND.supportEmail,
       },
       {

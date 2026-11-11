@@ -110,7 +110,11 @@ export default function OrderDetailPage() {
         toastError(t('errors.statusUpdateFailed'), apiError.message ?? '');
       } else {
         setOrder(o => (o ? { ...o, status: newStatus } : o));
-        toastSuccess(t('toast.statusUpdated'));
+        // QA-D6: name the new status (same toast the orders list shows) so the change is unmistakable.
+        toastSuccess(
+          tList('toast.statusUpdatedTitle'),
+          tList('toast.statusUpdatedDescription', { status: tList(`status.${newStatus}`) })
+        );
       }
     } catch {
       toastError(t('errors.statusUpdateFailed'));

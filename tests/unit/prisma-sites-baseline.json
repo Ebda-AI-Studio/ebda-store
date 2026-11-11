@@ -22,7 +22,6 @@
   "lib/inngest/functions/wa-store-events.ts": 1,
   "lib/order-search-ids.ts": 1,
   "lib/wa/consent.ts": 14,
-  "mcp/tools/admin-read.tools.ts": 1,
   "services/abandoned-cart.service.ts": 7,
   "services/accounting/analytics-rollup.service.ts": 1,
   "services/accounting/backorder.service.ts": 1,
