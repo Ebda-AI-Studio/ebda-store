@@ -1,0 +1,157 @@
+/**
+ * Admin design-token guard (ruling docs/rulings/ADM-DS-1.md; tokens in apps/admin/src/components/ui/tokens.ts).
+ *
+ * Fails when apps/admin/src uses a value outside the tokens:
+ *   G1  a raw Tailwind palette colour (text-red-500, bg-emerald-50, ...): use the semantic roles
+ *       (primary, success, warning, info, destructive, muted + their `-ink` text pair).
+ *   G2  a one-off type size `text-[13px]`: use the type scale (text-xs / sm / base / lg / xl / 2xl / 3xl).
+ *   G3  a hex colour literal: colours come from the CSS variables in styles/globals.css.
+ *   G4  the bare `rounded` class (4px): control = rounded-md, surface = rounded-lg, pill = rounded-full.
+ *   G5  letter-spacing (`tracking-*` other than tracking-normal): it breaks Arabic letter joining.
+ *   G6  a `data-ui="nav"` item that does not take its classes from navItemClasses() / bottomNavClasses().
+ *
+ * G1-G5 are a RATCHET: tests/unit/admin-design-tokens.baseline.json holds the per-file count of pages not yet
+ * migrated (waves W2/W3 of the 2026-11-11 audit). A file may not exceed its count, a new file may not appear,
+ * and a file below its count fails until the baseline is tightened (UPDATE_BASELINE=1 npx vitest run
+ * tests/unit/admin-design-tokens.test.ts). The baseline reaching {} is the exit gate. G6 has no baseline.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+const SRC = join(__dirname, '../../apps/admin/src');
+const BASELINE = join(__dirname, 'admin-design-tokens.baseline.json');
+const TOKENS = 'components/ui/tokens.ts';
+
+const PALETTE =
+  'gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+export const RULES: Record<string, RegExp> = {
+  G1: new RegExp(
+    `(?<![\\w-])(?:[a-z-]+:)*(?:text|bg|border|ring|from|to|via|fill|stroke|divide|outline|decoration|accent|caret|placeholder)-(?:${PALETTE})-\\d{2,3}(?:/\\d+)?(?![\\w-])`,
+    'g'
+  ),
+  G2: /(?<![\w-])(?:[a-z-]+:)*text-\[\d+(?:\.\d+)?(?:px|rem)\](?![\w-])/g,
+  G3: /#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b/g,
+  G4: /(?<=[\s'"`:])(?:[a-z-]+:)*rounded(?=[\s'"`])/g,
+  G5: /(?<![\w-])(?:[a-z-]+:)*tracking-(?:tighter|tight|wide|wider|widest)(?![\w-])/g,
+};
+
+function walk(dir: string): string[] {
+  return readdirSync(dir).flatMap(n => {
+    const p = join(dir, n);
+    if (statSync(p).isDirectory()) return n === 'node_modules' || n === '__tests__' ? [] : walk(p);
+    return /\.tsx?$/.test(n) && !/\.(test|spec)\./.test(n) ? [p] : [];
+  });
+}
+
+/** The source with line comments and block comments blanked (so prose never trips a rule). */
+export function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:'"`])\/\/[^\n]*/g, (m, a) => a + ' '.repeat(m.length - a.length));
+}
+
+export function countRule(rule: string, src: string): number {
+  return (stripComments(src).match(RULES[rule]) ?? []).length;
+}
+
+/** The JSX opening tag starting at `i` (brace-balanced, so `=>` inside handlers does not end it). */
+function openingTag(src: string, i: number): string {
+  let depth = 0;
+  for (let j = i; j < src.length; j++) {
+    const c = src[j];
+    if (c === '{') depth++;
+    else if (c === '}') depth--;
+    else if (c === '>' && depth === 0 && src[j - 1] !== '=') return src.slice(i, j + 1);
+  }
+  return src.slice(i);
+}
+
+/** Everything the className attribute can resolve to (static string or the whole expression). */
+function classAttr(tag: string): string {
+  const s = tag.match(/\bclassName="([^"]*)"/);
+  if (s) return s[1];
+  const at = tag.search(/\bclassName=\{/);
+  if (at < 0) return '';
+  let depth = 0;
+  const start = tag.indexOf('{', at);
+  for (let j = start; j < tag.length; j++) {
+    if (tag[j] === '{') depth++;
+    else if (tag[j] === '}' && --depth === 0) return tag.slice(start + 1, j);
+  }
+  return tag.slice(start + 1);
+}
+
+type Counts = Record<string, Record<string, number>>; // rule -> file -> n
+
+function scan(): { counts: Counts; nav: string[] } {
+  const counts: Counts = { G1: {}, G2: {}, G3: {}, G4: {}, G5: {} };
+  const nav: string[] = [];
+  for (const p of walk(SRC)) {
+    const file = relative(SRC, p);
+    if (file === TOKENS) continue;
+    const src = readFileSync(p, 'utf8');
+    for (const r of Object.keys(RULES)) {
+      const n = countRule(r, src);
+      if (n) counts[r][file] = n;
+    }
+    if (p.endsWith('.tsx')) {
+      const re = /<[A-Za-z.]+(?=[\s>])/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(src))) {
+        const tag = openingTag(src, m.index);
+        if (!/\bdata-ui=["']nav["']/.test(tag)) continue;
+        if (!/\b(?:navItemClasses|bottomNavClasses)\(/.test(classAttr(tag)))
+          nav.push(`${file}:${src.slice(0, m.index).split('\n').length}`);
+      }
+    }
+  }
+  return { counts, nav };
+}
+
+describe('admin design tokens', () => {
+  it('rule self-tests', () => {
+    expect(countRule('G1', '<p className="text-red-500 bg-emerald-50/10">')).toBe(2);
+    expect(countRule('G1', '<p className="text-destructive-ink bg-primary/10">')).toBe(0);
+    expect(countRule('G1', 'className="hover:text-gray-900 dark:bg-blue-900/30"')).toBe(2);
+    expect(countRule('G2', 'className="text-[13px] sm:text-sm"')).toBe(1);
+    expect(countRule('G2', 'className="text-xs"')).toBe(0);
+    expect(countRule('G3', "style={{ color: '#a6b0ac' }}")).toBe(1);
+    expect(countRule('G3', "href='#abc'")).toBe(0);
+    expect(countRule('G4', 'className="rounded border"')).toBe(1);
+    expect(countRule('G4', 'className="rounded-md rounded-full"')).toBe(0);
+    expect(countRule('G4', 'className="sm:rounded"')).toBe(1);
+    expect(countRule('G5', 'className="tracking-tight font-bold"')).toBe(1);
+    expect(countRule('G5', 'className="tracking-normal"')).toBe(0);
+    expect(countRule('G1', '// text-red-500 in a comment\nconst a = 1;')).toBe(0);
+    expect(countRule('G1', '/* bg-blue-500 */ const a = 1;')).toBe(0);
+  });
+
+  it('nav items take their classes from the tokens (G6)', () => {
+    expect(scan().nav).toEqual([]);
+  });
+
+  it('G1-G5 never grow past the baseline and the baseline never goes stale', () => {
+    const { counts } = scan();
+    if (process.env.UPDATE_BASELINE === '1' || !existsSync(BASELINE)) {
+      const sorted = Object.fromEntries(
+        Object.entries(counts).map(([r, f]) => [r, Object.fromEntries(Object.entries(f).sort())])
+      );
+      writeFileSync(BASELINE, JSON.stringify(sorted, null, 2) + '\n');
+    }
+    const base: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
+    const grew: string[] = [];
+    const stale: string[] = [];
+    for (const rule of Object.keys(RULES)) {
+      const files = new Set([...Object.keys(counts[rule]), ...Object.keys(base[rule] ?? {})]);
+      for (const f of files) {
+        const now = counts[rule][f] ?? 0;
+        const was = base[rule]?.[f] ?? 0;
+        if (now > was) grew.push(`${rule} ${f}: ${now} > baseline ${was}`);
+        if (now < was) stale.push(`${rule} ${f}: ${now} < baseline ${was}`);
+      }
+    }
+    expect(grew, 'outside the design tokens (see components/ui/tokens.ts)').toEqual([]);
+    expect(stale, 'baseline is stale: UPDATE_BASELINE=1 vitest run this file').toEqual([]);
+  });
+});

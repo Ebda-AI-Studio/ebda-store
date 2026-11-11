@@ -1650,6 +1650,8 @@ export function matchRefundToClaim(
     claimId: string;
     providerRefundId: string;
     actorUserId: string;
+    /** The order the operator matched from (the route's :orderId): a claim of another order is not found. */
+    orderId?: string;
     now?: number;
   }
 ): 'matched' | 'already_matched' {
@@ -1659,6 +1661,8 @@ export function matchRefundToClaim(
   return db.transactionSync(() => {
     const claim = findClaim(db, a.storeId, a.claimId);
     const p = loadPayment(db, a.storeId, claim.paymentId);
+    if (a.orderId !== undefined && p.order_id !== a.orderId)
+      throw err('CLAIM_NOT_FOUND', 'no such refund claim on this order', 404);
     const has = (type: string) =>
       db.all(
         "SELECT 1 AS x FROM payment_events WHERE payment_id = ? AND event_type = ? AND json_extract(details, '$.claimId') = ?",
@@ -1717,5 +1721,114 @@ export function matchRefundToClaim(
       p.id,
     ]);
     return 'matched';
+  });
+}
+
+/**
+ * Record a refund the merchant made OUTSIDE the platform (InstaPay: sent from their bank app) against the order's confirmed
+ * InstaPay payment, in ONE section (Ruling NZ-MONEY-6; the Postgres twin is InstapayService.recordRefund under a row lock).
+ * Idempotent on `referenceKey` (the normalised bank reference): a replay answers `duplicate: true` and writes nothing.
+ * Refuses: no confirmed InstaPay payment (409), nothing left to refund (409), an amount above what is left (400).
+ * A full refund flips `orders.payment_status` to refunded; the ORDER status flip (stock / coupon / loyalty effects) is the
+ * caller's next step (OrderService.updateStatus), resumable: a replay of a full refund on an order not yet `refunded`
+ * tells the caller to run it.
+ */
+export function recordInstapayRefund(
+  db: SyncSql,
+  a: {
+    storeId: string;
+    orderId: string;
+    referenceKey: string;
+    amountMinor: number;
+    record: Record<string, unknown>;
+    actorUserId: string | null;
+    now?: number;
+  }
+): {
+  duplicate: boolean;
+  full: boolean;
+  paymentId: string;
+  fromStatus: string;
+  status: string;
+  refundedAmount: number;
+  orderStatus: string;
+} {
+  need(a.orderId, 'orderId');
+  need(a.referenceKey, 'referenceKey');
+  if (!Number.isInteger(a.amountMinor) || a.amountMinor < 1)
+    throw err('INVALID_REFUND_AMOUNT', 'amountMinor', 400);
+  const now = a.now ?? Date.now();
+  return db.transactionSync(() => {
+    const order = loadOrder(db, a.storeId, a.orderId);
+    const row = db.all(
+      `SELECT id FROM payments WHERE order_id = ? AND provider = 'instapay'
+         AND status IN ('completed', 'partially_refunded', 'refunded') ORDER BY created_at DESC LIMIT 1`,
+      [a.orderId]
+    )[0];
+    if (!row) throw err('NO_INSTAPAY_PAYMENT', 'This order has no confirmed InstaPay payment', 409);
+    const p = loadPayment(db, a.storeId, row.id as string);
+    const meta = parse(p.metadata);
+    const refunds = Array.isArray(meta.refunds)
+      ? (meta.refunds as Array<Record<string, unknown>>)
+      : [];
+    if (refunds.some(r => r.referenceKey === a.referenceKey))
+      return {
+        duplicate: true,
+        full: p.status === 'refunded',
+        paymentId: p.id,
+        fromStatus: p.status,
+        status: p.status,
+        refundedAmount: p.refunded_amount,
+        orderStatus: order.status,
+      };
+    const remaining = p.amount - p.refunded_amount;
+    if (remaining <= 0) throw err('ALREADY_REFUNDED', 'This payment is fully refunded', 409);
+    if (a.amountMinor > remaining)
+      throw err('INVALID_REFUND_AMOUNT', `Refund must be between 1 and ${remaining} piastres`, 400);
+    const full = a.amountMinor === remaining;
+    const status = full ? 'refunded' : 'partially_refunded';
+    db.run(
+      'UPDATE payments SET status = ?, refunded_amount = refunded_amount + ?, metadata = ?, updated_at = ? WHERE id = ?',
+      [
+        status,
+        a.amountMinor,
+        JSON.stringify({
+          ...meta,
+          refunds: [...refunds, { ...a.record, referenceKey: a.referenceKey }],
+        }),
+        now,
+        p.id,
+      ]
+    );
+    if (full)
+      db.run(
+        "UPDATE orders SET payment_status = 'refunded', updated_at = ? WHERE id = ? AND store_id = ?",
+        [now, a.orderId, a.storeId]
+      );
+    addPaymentEvent(db, {
+      storeId: a.storeId,
+      paymentId: p.id,
+      orderId: a.orderId,
+      eventType: 'refund',
+      from: p.status,
+      to: status,
+      provider: 'instapay',
+      details: {
+        reason: 'merchant_recorded_instapay_refund',
+        amountMinor: a.amountMinor,
+        reference: a.record.reference ?? null,
+      },
+      userId: a.actorUserId,
+      now,
+    });
+    return {
+      duplicate: false,
+      full,
+      paymentId: p.id,
+      fromStatus: p.status,
+      status,
+      refundedAmount: p.refunded_amount + a.amountMinor,
+      orderStatus: order.status,
+    };
   });
 }

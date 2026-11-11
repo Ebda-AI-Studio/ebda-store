@@ -94,3 +94,13 @@ describe('StoreMailer refuses *.invalid recipients', () => {
     expect(m.id).toBe('skipped-undeliverable');
   });
 });
+
+describe('invalid addresses are never deliverable', () => {
+  it('deliverableOnly drops empty, blank and domainless addresses', async () => {
+    const { deliverableOnly } = await import('@api/lib/undeliverable-email');
+    expect(deliverableOnly(['', ' ', 'a@', '@b.co', 'real@example.com'])).toEqual([
+      'real@example.com',
+    ]);
+    expect(deliverableOnly('')).toEqual([]);
+  });
+});

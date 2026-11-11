@@ -246,6 +246,38 @@ describe('COMMIT → response → deferred work (buffered lane)', () => {
 // Deferred work must not sit on the request's latency path
 // ---------------------------------------------------------------------------
 
+describe('holdResponse: the response waits for a task the client depends on (S5-12)', () => {
+  it('a held task finishes after the commit and BEFORE the response is released', async () => {
+    const app = buildApp((_req, res) => {
+      void deferAfterTenantCommit(
+        'probe.held',
+        async () => {
+          await sleep(30);
+          events.push('deferred:held');
+        },
+        { holdResponse: true }
+      );
+      void deferAfterTenantCommit('probe.after', async () => {
+        events.push('deferred:after');
+      });
+      res.json({ ok: true });
+    });
+
+    await withServer(app, async base => {
+      const r = await fetch(`${base}/stores/${STORE_ID}/probe`);
+      await r.json();
+      events.push('client-received');
+    });
+    await waitFor(() => events.includes('deferred:after'));
+    expect(ordering().slice(0, 4)).toEqual([
+      'commit',
+      'deferred:held',
+      'released',
+      'deferred:after',
+    ]);
+  });
+});
+
 describe('deferred work does not block the response', () => {
   it('the client has its body while a slow deferred task is still running', async () => {
     const app = buildApp((_req, res) => {

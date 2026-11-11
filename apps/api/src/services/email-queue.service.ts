@@ -6,10 +6,11 @@
 import crypto from 'crypto';
 import { redis } from './redis.service';
 import { EmailService, EmailOptions } from './email.service';
-import { SKIPPED_UNDELIVERABLE_ID } from './mail-transport';
+import { SKIPPED_UNDELIVERABLE_ID, isBadRecipientError } from './mail-transport';
 import { withCircuitBreaker } from './circuit-breaker.service';
 import logger from '../lib/logger';
 import { maskEmailList } from '../lib/pii-mask';
+import { validRecipients } from '../lib/undeliverable-email';
 import { sendAlert } from './alerts.service';
 import { CORRUPT_CAP, replayDeadLetters, setAsideUnreadable } from '../lib/dead-letter';
 import { isWorkers } from '../lib/runtime';
@@ -25,6 +26,9 @@ export interface QueuedEmail {
   lastAttempt?: string;
   error?: string;
 }
+
+/** `enqueue` id when the recipient list had no valid address: nothing was queued. */
+export const SKIPPED_INVALID_RECIPIENT_ID = 'skipped-invalid-recipient';
 
 const QUEUE_KEY = 'email:queue';
 const FAILED_KEY = 'email:failed';
@@ -59,6 +63,17 @@ class EmailQueueService {
    * Add email to queue
    */
   async enqueue(storeId: string | null, options: EmailOptions): Promise<string> {
+    // A customer email with no valid recipient is customer data, not a send: never enqueue it
+    // (it would only fail permanently at the provider and page an operator).
+    const to = validRecipients(options.to);
+    if (to.length === 0) {
+      logger.warn(
+        { storeId, subject: options.subject },
+        '[EMAIL QUEUE] Not enqueued: no valid recipient address'
+      );
+      return SKIPPED_INVALID_RECIPIENT_ID;
+    }
+    options = { ...options, to: Array.isArray(options.to) ? to : to[0]! };
     const id = `email_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     const queuedEmail: QueuedEmail = {
@@ -119,6 +134,26 @@ class EmailQueueService {
         .catch(() => false);
     }
     await this.reportPermanentFailure(email, why, parked ? 'listed' : 'lost');
+  }
+
+  /**
+   * A permanent failure caused by the recipient's address (the provider rejected it as invalid) is
+   * customer data, not a platform outage: record it on the dead-letter entry (`failureClass`) and
+   * log it, never page. Provider-side failures keep the P1 (`parkDeadLetter`).
+   */
+  async recordBadRecipient(email: QueuedEmail, why: string): Promise<void> {
+    email.error = why;
+    (email as QueuedEmail & { failureClass?: string }).failureClass = 'bad_recipient';
+    if (redis.isAvailable()) {
+      await redis
+        .getClient()
+        ?.lpush(FAILED_KEY, JSON.stringify(email))
+        .catch(() => undefined);
+    }
+    logger.warn(
+      { emailId: email.id, storeId: email.storeId, why },
+      '[EMAIL QUEUE] Email not delivered: bad recipient address (recorded, no page)'
+    );
   }
 
   /**
@@ -230,6 +265,10 @@ class EmailQueueService {
     } catch (error) {
       email.error = error instanceof Error ? error.message : 'Unknown error';
 
+      if (!opts.inline && isBadRecipientError(error)) {
+        await this.recordBadRecipient(email, 'bad recipient: E_VALIDATION_ERROR');
+        return;
+      }
       if (opts.inline) {
         logger.error(
           { emailId: email.id, storeId: email.storeId, err: error },

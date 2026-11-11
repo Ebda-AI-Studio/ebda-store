@@ -133,3 +133,16 @@ describe('undeliverable recipients (Ruling WA-LEGACY-1) on the Cloudflare path',
     expect(h.send.mock.calls[0]![0].to).toEqual(['buyer@example.com']);
   });
 });
+
+describe('isBadRecipientError', () => {
+  it('matches only a provider rejection of the address itself', async () => {
+    const { EmailSendError, isBadRecipientError } = await import('@api/services/mail-transport');
+    expect(
+      isBadRecipientError(
+        new EmailSendError('E_VALIDATION_ERROR', 'Invalid email address: Missing domain or user')
+      )
+    ).toBe(true);
+    expect(isBadRecipientError(new EmailSendError('E_SENDER_NOT_VERIFIED', 'x'))).toBe(false);
+    expect(isBadRecipientError(new Error('Invalid email address'))).toBe(false);
+  });
+});

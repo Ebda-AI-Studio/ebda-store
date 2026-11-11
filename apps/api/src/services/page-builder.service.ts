@@ -739,19 +739,23 @@ async function applyPublishedLayout(
  */
 const PURGE_ATTEMPTS = 3;
 export function purgePublishedCaches(storeId: string, slug: string, domain: string | null): void {
-  void deferAfterTenantCommit('page-builder.publish.purge', async () => {
-    let lastErr: unknown;
-    for (let attempt = 1; attempt <= PURGE_ATTEMPTS; attempt++) {
-      try {
-        await bustStoreCaches(storeId, slug, domain);
-        return;
-      } catch (err) {
-        lastErr = err;
-        if (attempt < PURGE_ATTEMPTS) await new Promise(r => setTimeout(r, 200 * attempt));
+  void deferAfterTenantCommit(
+    'page-builder.publish.purge',
+    async () => {
+      let lastErr: unknown;
+      for (let attempt = 1; attempt <= PURGE_ATTEMPTS; attempt++) {
+        try {
+          await bustStoreCaches(storeId, slug, domain);
+          return;
+        } catch (err) {
+          lastErr = err;
+          if (attempt < PURGE_ATTEMPTS) await new Promise(r => setTimeout(r, 200 * attempt));
+        }
       }
-    }
-    throw lastErr;
-  }).catch(err =>
+      throw lastErr;
+    },
+    { holdResponse: true }
+  ).catch(err =>
     logger.error({ err, storeId }, '[page-builder] publish cache purge failed after retries')
   );
 }

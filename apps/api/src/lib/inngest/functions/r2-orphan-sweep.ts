@@ -11,6 +11,7 @@ import {
 import { platformDb } from '../../platform-directory';
 import { platformD1ReferencedKeys } from '../../r2-platform-d1-references';
 import { collectDoStoreReferencedKeys } from '../../r2-do-references';
+import { storeHasNoDataHere } from '../../store-pg-gone';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -133,6 +134,7 @@ export async function collectDoReferencedKeys(): Promise<string[]> {
   );
   const keys = new Set<string>();
   for (const { id } of stores) {
+    if (await storeHasNoDataHere(id)) continue; // a gone `pg` store (qa-merchant-test) has no DO to read
     const storeKeys = await collectDoStoreReferencedKeys(id, urlToR2Key);
     if (storeKeys) for (const k of storeKeys) keys.add(k);
   }

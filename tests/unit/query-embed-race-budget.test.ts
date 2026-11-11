@@ -22,8 +22,14 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn(
 
 const { setEmbeddingProviderForTests, EMBED_MODEL, EMBED_DIMS } =
   await import('../../apps/api/src/lib/search/embedding-provider');
-const { semanticProductIds, clearQueryVectorCacheForTests, QUERY_EMBED_BUDGET_MS } =
-  await import('../../apps/api/src/services/product-search.service');
+const {
+  semanticProductIds,
+  clearQueryVectorCacheForTests,
+  QUERY_EMBED_BUDGET_MS,
+  QUERY_EMBED_COLD_BUDGET_MS,
+  BUDGET_STEP_TIMEOUT_MS,
+  setLastQueryEmbedOkAtForTests,
+} = await import('../../apps/api/src/services/product-search.service');
 const { clearQueryBudgetSpentForTests } =
   await import('../../apps/api/src/lib/search/embed-budget');
 
@@ -37,6 +43,7 @@ describe('query embed race covers the budget step (M3)', () => {
     clearQueryVectorCacheForTests();
     clearQueryBudgetSpentForTests();
     embed.mockClear();
+    setLastQueryEmbedOkAtForTests(Date.now()); // warm unless a test says otherwise
   });
   afterEach(() => {
     setEmbeddingProviderForTests(undefined);
@@ -44,13 +51,40 @@ describe('query embed race covers the budget step (M3)', () => {
     incrDelayMs = 0;
   });
 
-  it('a budget step slower than the race ends the leg on time, and the provider is never called', async () => {
+  it('REALISTIC DO latency (150 ms per call): a WARM, uncached query is NOT degraded (the 6/6 production failure)', async () => {
+    incrDelayMs = 150;
+    const t0 = Date.now();
+    const ids = await semanticProductIds(STORE, 'kotshy abyad', { searcher: 'ip:1.2.3.4' });
+    expect(embed).toHaveBeenCalledTimes(1);
+    expect(ids).toEqual([]); // no DB in this test: the leg ran, found nothing, did not time out
+    // ONE parallel DO round trip: far under the old serial 4+ x 150 ms that lost the 400 ms race
+    expect(Date.now() - t0).toBeLessThan(450);
+    expect(client.incr).toHaveBeenCalledTimes(4); // searcher + 3 daily counters, together
+  });
+
+  it('a slow EMBED still loses the race (warm 400 ms), with the provider aborted', async () => {
+    embed.mockImplementationOnce(
+      (async (_t: string[], o?: { signal?: AbortSignal }) =>
+        new Promise((_res, rej) =>
+          o?.signal?.addEventListener('abort', () => rej(new Error('aborted')))
+        )) as never
+    );
+    const t0 = Date.now();
+    await semanticProductIds(STORE, 'kotshy abyad', { searcher: 'ip:1.2.3.4' });
+    expect(Date.now() - t0).toBeLessThan(QUERY_EMBED_BUDGET_MS + 300);
+  });
+
+  it('COLD isolate keeps the 1200 ms safety net for the embed', () => {
+    expect(QUERY_EMBED_COLD_BUDGET_MS).toBe(1200);
+    setLastQueryEmbedOkAtForTests(0);
+  });
+
+  it('a budget step slower than BUDGET_STEP_TIMEOUT_MS fails CLOSED: no provider call, ends on time', async () => {
     incrDelayMs = 1500;
     const t0 = Date.now();
     const ids = await semanticProductIds(STORE, 'kotshy abyad', { searcher: 'ip:1.2.3.4' });
-    const took = Date.now() - t0;
     expect(ids).toEqual([]);
-    expect(took).toBeLessThan(QUERY_EMBED_BUDGET_MS + 300);
+    expect(Date.now() - t0).toBeLessThan(BUDGET_STEP_TIMEOUT_MS + 300);
     await new Promise(r => setTimeout(r, 1700)); // let the slow budget answer arrive
     expect(embed).not.toHaveBeenCalled();
   });

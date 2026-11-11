@@ -37,6 +37,7 @@ import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
+import { isStoreGoneError } from '../../lib/jobs/store-gone';
 import { sendAlert } from '../alerts.service';
 import {
   acrossBilling,
@@ -989,9 +990,27 @@ export type RenewalResult =
   | { action: 'charged'; status: 'succeeded' | 'failed' | 'pending'; eventId: string }
   | { action: 'canceled' | 'no_payment_method_downgrade' | 'suspended' };
 
+/** One subscription. A closed / removed store is skipped with a log, never thrown (it would fail the whole daily run). */
 export async function renewSubscription(
   subscriptionId: string,
   now: Date = new Date(),
+  providerArg?: BillingProvider
+): Promise<RenewalResult> {
+  try {
+    return await renewSubscriptionInner(subscriptionId, now, providerArg);
+  } catch (err) {
+    if (!isStoreGoneError(err)) throw err;
+    logger.warn(
+      { subscriptionId, code: (err as { code?: string }).code },
+      '[billing] store gone; renewal skipped'
+    );
+    return { action: 'skipped', reason: 'store_gone' };
+  }
+}
+
+async function renewSubscriptionInner(
+  subscriptionId: string,
+  now: Date,
   providerArg?: BillingProvider
 ): Promise<RenewalResult> {
   const subStoreId = await getEntityStoreId('store_subscription', subscriptionId);

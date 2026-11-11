@@ -346,6 +346,13 @@ describe('limiters key on the resolved address (real storefront wrapper -> API r
   const realFetch = globalThis.fetch;
   beforeAll(async () => {
     const app = express();
+    // One connection per request: undici pools sockets, and under host load a pooled socket the server had already
+    // closed (keep-alive timeout) was reused -> "fetch failed / SocketError: other side closed" (26/26 alone, 3 failed
+    // in the loaded pre-push run).
+    app.use((_req, res, next) => {
+      res.setHeader('Connection', 'close');
+      next();
+    });
     app.set('trust proxy', 1); // as the Worker's Express: X-Forwarded-For is set by worker.ts only
     // app.ts: the Worker's no-address marker leaves req.ip empty (workers-test/search-limiter-key.test.ts proves the
     // whole chain on workerd).
@@ -423,6 +430,13 @@ describe('limiters key on the resolved address (real storefront wrapper -> API r
     ['storeResolveLimiter', storeResolveLimiter],
   ])('%s does not count (no shared bucket) a request with no address', async (_n, limiter) => {
     const app = express();
+    // One connection per request: undici pools sockets, and under host load a pooled socket the server had already
+    // closed (keep-alive timeout) was reused -> "fetch failed / SocketError: other side closed" (26/26 alone, 3 failed
+    // in the loaded pre-push run).
+    app.use((_req, res, next) => {
+      res.setHeader('Connection', 'close');
+      next();
+    });
     app.use((req, _res, next) => {
       Object.defineProperty(req, 'ip', { value: undefined });
       next();

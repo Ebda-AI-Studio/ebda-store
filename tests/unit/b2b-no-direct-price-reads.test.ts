@@ -39,6 +39,12 @@ interface AllowEntry {
 }
 
 const ALLOW: Record<string, AllowEntry> = {
+  'lib/wa/bridge/do-port.ts': {
+    category: 'retail-display',
+    reason:
+      'Ruling WA-RPC-6: the Ebda Chat catalog feed shows the ANONYMOUS retail price (product / variant `price`, the same the public storefront shows) as Meta catalog rows. It never decides a charged price: createOrderFromChat hands lines to the DO money core (placeOrder), which resolves every price, tier, group price and fee itself; a quote shown in chat is re-priced at order time',
+    reads: { '<module>': 1, rowsForProducts: 3 },
+  },
   'cf/store-do/repo.ts': {
     category: 'unrelated',
     reason:
