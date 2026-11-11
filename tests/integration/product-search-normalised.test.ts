@@ -261,7 +261,7 @@ describe.skipIf(!hasDb)('normalised product search', () => {
       }
     });
 
-    it('search suggestions fold category names and skip deleted categories', async () => {
+    it('search suggestions fold category names and skip deleted and empty categories', async () => {
       const u = uniq();
       const made: string[] = [];
       try {
@@ -269,6 +269,19 @@ describe.skipIf(!hasDb)('normalised product search', () => {
           data: { storeId, name: `Shoes ${u}`, nameAr: `أحذية ${u}`, slug: `cat-${u}` },
         });
         made.push(live.id);
+        // QA-B2: a suggestion must lead to a page with a product; an empty live category is not suggested.
+        await prisma.productCategory.create({
+          data: { productId: ids.shoes, categoryId: live.id },
+        });
+        const empty = await prisma.category.create({
+          data: {
+            storeId,
+            name: `Empty shoes ${u}`,
+            nameAr: `أحذية فاضية ${u}`,
+            slug: `cat-empty-${u}`,
+          },
+        });
+        made.push(empty.id);
         const gone = await prisma.category.create({
           data: {
             storeId,

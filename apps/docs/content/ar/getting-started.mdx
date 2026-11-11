@@ -1,0 +1,56 @@
+---
+title: البدء السريع
+description: نفّذ أول استدعاء لواجهة ابدأ ستور البرمجية خلال دقائق.
+section: ابدأ
+order: 2
+---
+
+## الرابط الأساسي
+
+كل النقاط تقع تحت بادئة واحدة مرقّمة بالإصدار:
+
+```text
+https://api.ebda.app/api/v1
+```
+
+الطلبات والاستجابات بصيغة JSON (`Content-Type: application/json`). ويتوفر فحص الحالة على `GET /api/v1/public/health`.
+
+## أول استدعاء: عرض منتجات متجر
+
+نقاط واجهة المتجر العامة لا تحتاج تسجيل دخول، وكل ما تحتاجه معرفة **أي متجر** تقصد، عبر الهيدر `x-store-domain` (نطاق المتجر) أو `x-store-id`.
+
+```bash
+curl https://api.ebda.app/api/v1/public/products \
+  -H "x-store-domain: amelia.ebda.app"
+```
+
+الاستجابة الناجحة تستخدم الغلاف القياسي:
+
+```json
+{
+  "success": true,
+  "data": {
+    "products": [],
+    "meta": { "page": 1, "limit": 20, "total": 0, "totalPages": 0 }
+  }
+}
+```
+
+## الغلاف والأخطاء
+
+كل استجابة تحمل الحقل `success`، والإخفاقات لا تغيّر شكلها أبداً:
+
+```json
+{
+  "success": false,
+  "error": { "code": "STORE_NOT_RESOLVED", "message": "Unable to resolve store context." }
+}
+```
+
+اعتمد في المعالجة على `error.code` وليس على نص الرسالة. فالرسائل للبشر وقد تُعاد صياغتها.
+
+## الخطوات التالية
+
+- سجّل الدخول واستدعِ النقاط المصادَق عليها: [المصادقة](/ar/authentication/).
+- افهم نطاقات المتاجر التي ستخاطبها: [النطاقات والدومينات](/ar/hosts/).
+- كل الأسعار أعداد صحيحة بالقروش: [المبالغ](/ar/money/).

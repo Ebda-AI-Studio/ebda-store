@@ -80,6 +80,7 @@ export type StoreReads = {
 /** Delegates the StoreDO accepts writes for (equal to DO_WRITABLE_MODELS, lower-camel; see tests/unit/repo-factory-writes.test.ts). */
 export type WritableModel =
   | 'paymentConfig'
+  | 'storeCredential'
   | 'shippingCarrierConfig'
   | 'storeTaxProfile'
   | 'taxRate'
@@ -913,6 +914,8 @@ export interface MoneyClient {
     returningCustomers: number;
     top: Array<{ customerId: string | null; total: number; count: number }>;
   }>;
+  /** Paid orders since `sinceMs` grouped by the dashboard buyer key (insights repeat-purchase rate). */
+  analyticsRepeatBuyers(a: { sinceMs: number }): Promise<{ repeat: number; buyers: number }>;
   analyticsStock(a: Record<string, never>): Promise<{
     stockValue: number;
     backorderCount: number;
@@ -1537,6 +1540,7 @@ export function makeMoneyClient(
     analyticsItems: a => call('analyticsItems', a),
     analyticsOrdersBy: a => call('analyticsOrdersBy', a),
     analyticsCustomers: a => call('analyticsCustomers', a),
+    analyticsRepeatBuyers: a => call('analyticsRepeatBuyers', a),
     analyticsLowStock: a => call('analyticsLowStock', a),
     analyticsStock: a => call('analyticsStock', a),
     analyticsCashflow: a => call('analyticsCashflow', a),

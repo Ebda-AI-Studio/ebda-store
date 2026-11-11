@@ -1,7 +1,7 @@
 import { z } from 'zod/v3';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { storeDb } from '../../lib/repo-factory';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { readInStoreContext } from '../../lib/store-scoped-read';
 import type { McpStore } from '../resolve-store';
 import { ProductService } from '../../services/product.service';
 import { effectiveInventory } from '../../lib/effective-inventory';
@@ -29,7 +29,7 @@ import { maskAddress, maskEmail, redactFreeText } from '../../lib/pii-mask';
  * here, plus a second reason specific to this router — `tenantContext` reads
  * `req.params.storeId || req.params.id`, and this router's param is
  * `:storeSlug`, so it would be a SILENT no-op that merely looks like
- * protection. Each tool wraps its own reads in `runInTenantContext`.
+ * protection. Each tool wraps its own reads in `readInStoreContext`.
  *
  * ## Why reads still need a scope check
  *
@@ -193,7 +193,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
       extra: any
     ) => {
       assertScope(extra?.authInfo, MERCHANT_SCOPES.read, 'admin_list_products');
-      const result: any = await runInTenantContext(store.id, () =>
+      const result: any = await readInStoreContext(store.id, () =>
         ProductService.list(store.id, {
           search: args.search,
           status: args.status,
@@ -222,7 +222,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
       // ProductService.getById is store-scoped and throws AppError(404) for an
       // id owned by another store — the SDK turns a thrown Error into
       // `{ isError: true }`, so no try/catch and no leak of the other tenant.
-      const p: any = await runInTenantContext(store.id, () =>
+      const p: any = await readInStoreContext(store.id, () =>
         ProductService.getById(store.id, productId)
       );
       return ok({
@@ -286,7 +286,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
         if (Number.isNaN(d.getTime())) throw new Error(`INVALID_ARGUMENT: ${label} is not a date`);
         return d;
       };
-      const result: any = await runInTenantContext(store.id, () =>
+      const result: any = await readInStoreContext(store.id, () =>
         OrderService.list(store.id, {
           status: args.status,
           from: parseDate(args.from, 'from'),
@@ -299,7 +299,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
       const orderIds: string[] = (result.orders ?? []).map((o: any) => o.id);
       const shipments =
         orderIds.length > 0
-          ? await runInTenantContext(store.id, async () =>
+          ? await readInStoreContext(store.id, async () =>
               (await storeDb(store.id)).shipment.findMany({
                 where: { storeId: store.id, orderId: { in: orderIds } },
                 select: SHIPMENT_SUMMARY_SELECT,
@@ -339,7 +339,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
     },
     async ({ orderId }: { orderId: string }, extra: any) => {
       assertScope(extra?.authInfo, MERCHANT_SCOPES.read, 'admin_get_order');
-      return runInTenantContext(store.id, async () => {
+      return readInStoreContext(store.id, async () => {
         // Store-scoped: throws 404 for another store's order id.
         const o: any = await OrderService.getById(store.id, orderId);
         const [shipment, events] = await Promise.all([
@@ -347,7 +347,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
             where: { storeId: store.id, orderId: o.id },
             select: SHIPMENT_SUMMARY_SELECT,
           }),
-          prisma.orderEvent.findMany({
+          (await storeDb(store.id)).orderEvent.findMany({
             where: { storeId: store.id, orderId: o.id },
             select: { fromStatus: true, toStatus: true, createdAt: true },
             orderBy: { createdAt: 'asc' },
@@ -480,7 +480,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
       // happens here, once.
       const range = from && to ? { startDate: from, endDate: to } : undefined;
 
-      return runInTenantContext(store.id, async () => {
+      return readInStoreContext(store.id, async () => {
         const [stats, topProducts, lowStock] = await Promise.all([
           AnalyticsService.getDashboardStats(store.id, range),
           AnalyticsService.getTopProducts(store.id, args.topProductsLimit ?? 10, range),

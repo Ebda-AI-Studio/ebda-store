@@ -54,7 +54,14 @@ vi.mock('@ebda/database', () => ({
 }));
 
 // the snapshot reads follow the store's backend (Ruling CF-JOBS-4); a Postgres store reads `prisma`
-vi.mock('@api/lib/repo-factory', () => ({ storeDb: async () => mockPrisma }));
+// the Postgres-store leg (storeMoney null): the DO leg is proven on workerd by workers-test/merchant-orders-do.test.ts
+vi.mock('@api/lib/repo-factory', () => ({
+  storeDb: async () => mockPrisma,
+  storeMoney: async () => null,
+}));
+vi.mock('@api/lib/store-scoped-read', () => ({
+  readInStoreContext: (_storeId: string, fn: () => unknown) => fn(),
+}));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };

@@ -1,6 +1,7 @@
 import { z, type ZodRawShape } from 'zod/v3';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { runInTenantContext, withStore } from '@ebda/database';
+import { withStore } from '@ebda/database';
+import { runInStoreTenantContext } from '../lib/store-scoped-read';
 import type { FeatureKey } from '@ebda/shared';
 import { featureService } from '../services/feature.service';
 import { auditLog } from '../middleware/security';
@@ -267,7 +268,7 @@ export function registerMerchantWriteTool<S extends ZodRawShape>(
       const ctx: WriteToolContext = {
         store,
         auth,
-        inStore: fn => runInTenantContext(store.id, fn),
+        inStore: fn => runInStoreTenantContext(store.id, fn),
       };
 
       // 3. Destructive: confirm round-trip.
