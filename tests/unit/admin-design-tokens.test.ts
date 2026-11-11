@@ -87,6 +87,42 @@ function scan(): { counts: Counts; nav: string[] } {
   return { counts, nav };
 }
 
+/** Base ref: BASE_REF, else the PR's base branch (GITHUB_BASE_REF; stacked PRs target their parent), else main. */
+function readBaseBaseline(
+  env: NodeJS.ProcessEnv = process.env
+): { ref: string; counts: Counts } | null {
+  const ref = env.BASE_REF ?? `origin/${env.GITHUB_BASE_REF || 'main'}`;
+  try {
+    const txt = execFileSync(
+      'git',
+      ['show', `${ref}:tests/unit/admin-design-tokens.baseline.json`],
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    );
+    return { ref, counts: JSON.parse(txt) as Counts };
+  } catch {
+    if (env.CI)
+      throw new Error(
+        `cannot read the base baseline from ${ref}: fetch it in the CI job ` +
+          `(git fetch --no-tags --depth=1 origin <base>:refs/remotes/origin/<base>)`
+      );
+    return null;
+  }
+}
+
+function loosenedAgainst(base: Counts, now: Counts): string[] {
+  const loosened: string[] = [];
+  for (const rule of Object.keys(now)) {
+    if (!base[rule]) continue; // a rule introduced by this PR has no base to compare with
+    for (const [f, n] of Object.entries(now[rule]!))
+      if (n > (base[rule]![f] ?? 0))
+        loosened.push(`${rule} ${f}: ${n} > base ${base[rule]![f] ?? 0}`);
+  }
+  return loosened;
+}
+
 describe('admin design tokens', () => {
   it('rule self-tests', () => {
     expect(countRule('G1', '<p className="text-red-500 bg-emerald-50/10">')).toBe(2);
@@ -123,30 +159,21 @@ describe('admin design tokens', () => {
   });
 
   it('no count exceeds the BASE branch baseline (the ratchet only shrinks)', () => {
-    const ref = process.env.BASE_REF ?? 'origin/main';
-    let baseTxt: string;
-    try {
-      baseTxt = execFileSync(
-        'git',
-        ['show', `${ref}:tests/unit/admin-design-tokens.baseline.json`],
-        {
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'ignore'],
-        }
-      );
-    } catch {
-      return; // no base ref in this checkout (shallow clone): CI fetches it; the local ratchet below still holds
-    }
-    const base: Counts = JSON.parse(baseTxt);
+    const base = readBaseBaseline();
+    if (base === null) return; // local checkout without a base ref; the local ratchet below still holds
     const now: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
-    const loosened: string[] = [];
-    for (const rule of Object.keys(now)) {
-      if (!base[rule]) continue; // a rule introduced by this PR has no base to compare with
-      for (const [f, n] of Object.entries(now[rule]!))
-        if (n > (base[rule]![f] ?? 0))
-          loosened.push(`${rule} ${f}: ${n} > base ${base[rule]![f] ?? 0}`);
-    }
-    expect(loosened, `baseline loosened against ${ref}`).toEqual([]);
+    expect(loosenedAgainst(base.counts, now), `baseline loosened against ${base.ref}`).toEqual([]);
+  });
+
+  it('under CI an unreadable base ref FAILS instead of passing (fail-closed)', () => {
+    expect(() =>
+      readBaseBaseline({ CI: 'true', BASE_REF: 'origin/does-not-exist-ratchet' })
+    ).toThrow(/cannot read the base baseline/);
+    expect(() =>
+      readBaseBaseline({ CI: 'true', GITHUB_BASE_REF: 'does-not-exist-ratchet' })
+    ).toThrow(/origin\/does-not-exist-ratchet/);
+    // locally (no CI) the same miss is a skip, not a failure
+    expect(readBaseBaseline({ BASE_REF: 'origin/does-not-exist-ratchet' })).toBeNull();
   });
 
   it('nav items take their classes from the tokens (G6)', () => {

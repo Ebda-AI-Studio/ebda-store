@@ -362,6 +362,12 @@ jobs:
         # The unit suite measures chart layout in a real browser, including on Umbra.
         run: npx playwright install --with-deps chromium
 
+      - name: Fetch the base branch (admin design ratchet compares baselines against it)
+        # actions/checkout is shallow and never fetches main, so tests/unit/admin-design-tokens.test.ts could not
+        # read the base baseline. It fails closed under CI, so the base ref must exist. No --depth on purpose: tests/unit/migration-order-gate.test.ts bans a bare
+        # shallow `git fetch` in workflows; this fetches ONE branch, which is cheap enough.
+        run: git fetch --no-tags origin "${{ github.base_ref || 'main' }}:refs/remotes/origin/${{ github.base_ref || 'main' }}"
+
       - name: Run unit tests (affected paths)
         if: matrix.shard != 7
         env:
@@ -856,6 +862,12 @@ jobs:
       - name: Install Chromium and its system dependencies
         # The unit suite measures chart layout in a real browser, including on Umbra.
         run: npx playwright install --with-deps chromium
+
+      - name: Fetch the base branch (admin design ratchet compares baselines against it)
+        # actions/checkout is shallow and never fetches main, so tests/unit/admin-design-tokens.test.ts could not
+        # read the base baseline. It fails closed under CI, so the base ref must exist. No --depth on purpose: tests/unit/migration-order-gate.test.ts bans a bare
+        # shallow `git fetch` in workflows; this fetches ONE branch, which is cheap enough.
+        run: git fetch --no-tags origin "${{ github.base_ref || 'main' }}:refs/remotes/origin/${{ github.base_ref || 'main' }}"
 
       - name: Run unit tests with coverage
         if: matrix.shard != 7
