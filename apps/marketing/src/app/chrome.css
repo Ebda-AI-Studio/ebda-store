@@ -136,7 +136,7 @@
   min-height: 44px;
   padding-inline-end: 18px;
   border-inline-end: 1px solid var(--line);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--fg);
   text-decoration: none;
   white-space: nowrap;

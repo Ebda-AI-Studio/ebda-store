@@ -178,16 +178,17 @@ export const BRAND = {
     lift: '#CBA873',
   },
   fonts: {
-    sans: 'Geist',
+    // DS-FONT-1: one family for every Ebda surface; sans and arabic are the same face.
+    sans: 'IBM Plex Sans Arabic',
     mono: 'Geist Mono',
     arabic: 'IBM Plex Sans Arabic',
     stacks: {
-      sans: '"Geist", ui-sans-serif, system-ui, sans-serif',
+      sans: '"IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif',
       mono: '"Geist Mono", ui-monospace, "SFMono-Regular", monospace',
       arabic: '"IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif',
     },
     googleFontsUrl:
-      'https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500&display=swap',
+      'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap',
   },
   domains: {
     marketing: 'ebda.app',
