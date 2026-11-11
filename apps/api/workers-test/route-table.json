@@ -486,6 +486,7 @@
   "POST /auth/login",
   "POST /auth/logout",
   "POST /auth/logout-all",
+  "POST /auth/me/close-account",
   "POST /auth/me/erase",
   "POST /auth/merchant/resend-verification",
   "POST /auth/merchant/signup",

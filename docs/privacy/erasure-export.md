@@ -49,4 +49,4 @@ Not covered here, on purpose: a merchant-wide portability bundle for a whole sto
 
 ## Trigger (not wired, on purpose)
 
-The job is a library plus a flag. The trigger belongs with the jobs work (G5): an `erasure.requested` queue message, or the existing `/auth/me/erase` route and the merchant-delete flow calling `runErasure` when the flag is on. Bindings needed on the consuming Worker: `STORE_DO`, `MEDIA_BUCKET` (ebda-media), `CI_BUCKET` (ebda-ci), `STORE_BACKUPS` (ebda-private), `ACCOUNTS` (identity service binding).
+**Merchant / staff closure trigger (M-024, Ruling M024-1): `POST /auth/me/close-account` calls the job; flag off records the request (audit row `account.closure.requested`) and erases nothing.** The job is a library plus a flag. The trigger belongs with the jobs work (G5): an `erasure.requested` queue message, or the existing `/auth/me/erase` route and the merchant-delete flow calling `runErasure` when the flag is on. Bindings needed on the consuming Worker: `STORE_DO`, `MEDIA_BUCKET` (ebda-media), `CI_BUCKET` (ebda-ci), `STORE_BACKUPS` (ebda-private), `ACCOUNTS` (identity service binding).
