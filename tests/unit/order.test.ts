@@ -1348,6 +1348,8 @@ describe('OrderService', () => {
       vi.mocked(prisma.$transaction).mockImplementationOnce(async (fn: any) =>
         fn({
           order: { create, count: txOrderCount },
+          // the admin order's stock_not_taken marker (#633, STOCK-SYMMETRY-1)
+          orderEvent: { create: vi.fn() },
           coupon: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
           $executeRaw: vi.fn().mockResolvedValue(1),
           $queryRaw: vi.fn().mockResolvedValue([]),

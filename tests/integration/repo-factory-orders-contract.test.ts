@@ -977,12 +977,29 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     });
     expect(t.state.products[0].inventory).toBe(10);
     expect(t.state.history).toEqual([]);
+    // #633 (STOCK-SYMMETRY-1): the order records that it took no stock, line by line, on BOTH backends
+    expect(t.out.ok.events).toEqual([
+      { to: 'stock_not_taken', meta: { items: [{ orderItemId: '<id>', quantity: 3 }] } },
+    ]);
     expect(t.state.orders[0]).toMatchObject({
       subtotal: 30_000,
       status: 'pending',
       notes: 'phone order',
     });
     expect(t.state.fiscal).toHaveLength(1);
+  });
+
+  it('admin (manual) order cancelled: nothing goes back on the shelf, it never took any (#633, STOCK-SYMMETRY-1)', async () => {
+    const t = await parity(10, async w => {
+      const o = await admin(w, [{ productId: w.product, quantity: 3 }]);
+      await OrderService.updateStatus(STORE, o.id, 'cancelled');
+      if ((await (await import('../../apps/api/src/lib/repo-factory')).storeMoney(STORE)) === null)
+        await handleOrderRefunded(o.id, STORE, true, false, inlineStep);
+      return 'done';
+    });
+    expect(t.state.orders[0].status).toBe('cancelled');
+    // was 13 on both backends before #633: the cancel restocked 3 units the phone order never took
+    expect(t.state.products[0].inventory).toBe(10);
   });
 
   it('admin order: a coupon is claimed once, discounts like checkout, a negotiated shipping fee replaces the computed one', async () => {
@@ -1052,7 +1069,10 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(o['used enforced'].err.code).toBe('COUPON_LIMIT_REACHED');
     expect(o['expired staff'].err.status).toBe(403);
     expect(o['no reason'].err.status).toBe(400);
-    expect(o.events).toHaveLength(3);
+    // one override event per overridden order, and (#633, STOCK-SYMMETRY-1) each manual order's stock_not_taken marker
+    expect(o.events.filter((e: { to: string }) => e.to === 'coupon_override')).toHaveLength(3);
+    expect(o.events.filter((e: { to: string }) => e.to === 'stock_not_taken')).toHaveLength(3);
+    expect(o.events).toHaveLength(6);
     expect(o.unknown.err.status).toBe(404);
   });
 
@@ -1079,7 +1099,11 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(o.refused.err).toMatchObject({ status: 422, code: 'BELOW_MOQ' });
     expect(o.staff.err.status).toBe(403);
     expect(o.override.total).toBeGreaterThan(0);
-    expect(o.events).toHaveLength(1);
+    // the override event, plus (#633, STOCK-SYMMETRY-1) the manual order's stock_not_taken marker
+    expect(o.events.map((e: { to: string }) => e.to).sort()).toEqual([
+      'moq_override',
+      'stock_not_taken',
+    ]);
   });
 
   it('admin order: refusals (unknown product, variant required / unknown / disabled) carry the same status and code, and a variant line is priced from the variant', async () => {

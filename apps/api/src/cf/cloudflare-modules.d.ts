@@ -58,6 +58,8 @@ interface DurableObjectStateLike {
     getAlarm(): Promise<number | null>;
     deleteAlarm(): Promise<void>;
     deleteAll(): Promise<void>;
+    /** Resolves once every write so far is durable (also closes the open implicit transaction). */
+    sync(): Promise<void>;
   };
   acceptWebSocket(ws: WebSocket, tags?: string[]): void;
   getWebSockets(tag?: string): WebSocket[];
