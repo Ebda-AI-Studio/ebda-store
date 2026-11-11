@@ -14,6 +14,7 @@ import path from 'node:path';
 import {
   LOCALE_PATH_ROOTS,
   isLocalePathRoute,
+  isLocaleServedRoute,
   splitLocalePrefix,
 } from '../../apps/web/src/lib/locale-paths';
 import { LocalePathProvider } from '../../apps/web/src/contexts/LocalePathContext';
@@ -106,7 +107,7 @@ const internalHrefs = (html: string) =>
 /** An indexable-route link without the language prefix: the thing this guard forbids. */
 const unprefixedIndexable = (hrefs: string[]) =>
   hrefs.filter(
-    h => !splitLocalePrefix(h.split(/[?#]/)[0]) && isLocalePathRoute(h.split(/[?#]/)[0])
+    h => !splitLocalePrefix(h.split(/[?#]/)[0]) && isLocaleServedRoute(h.split(/[?#]/)[0])
   );
 
 describe('rendered chrome carries zero unprefixed internal links on a locale-path page', () => {

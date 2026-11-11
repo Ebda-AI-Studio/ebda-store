@@ -37,6 +37,30 @@ export const LOCALE_PATH_ROOTS: readonly string[] = [
 ];
 const ROOTS = new Set(LOCALE_PATH_ROOTS);
 
+/**
+ * Routes that are served UNDER a language prefix but are not indexable (Ruling LOCALE-PATHS-4, QA 2026-11-11: `/en/cart`
+ * 301'd to `/cart` and an English shopper fell into Arabic). `/en/cart` is rewritten to `/cart` with the URL's language
+ * on the request; the unprefixed `/cart` is NOT redirected (no `pending`: it is noindex and has no canonical to protect).
+ * RULE: every storefront route honours the locale prefix and never strips it (ebda-foundation standard/storefront-locale-routes.md).
+ */
+export const LOCALE_SERVED_ROOTS: readonly string[] = [
+  'cart',
+  'checkout',
+  'account',
+  'auth',
+  'search',
+  'wishlist',
+  'compare',
+  'review',
+  'bundles',
+  'looks',
+  'size-guide',
+  'affiliate',
+  'collections',
+  'q',
+];
+const SERVED_ROOTS = new Set(LOCALE_SERVED_ROOTS);
+
 /** Request headers the middleware asserts on a prefixed page, read by the root layout and the metadata helpers. */
 export const LOCALE_PATH_HEADER = 'x-locale-path';
 export const LOCALE_REST_HEADER = 'x-locale-rest';
@@ -97,6 +121,12 @@ export function isLocalePathRoute(rest: string): boolean {
   return ROOTS.has(rest.replace(/^\//, '').split('/')[0]);
 }
 
+/** Whether `rest` is a route served under a language prefix, indexable or not. */
+export function isLocaleServedRoute(rest: string): boolean {
+  if (isLocalePathRoute(rest)) return true;
+  return SERVED_ROOTS.has(rest.replace(/^\//, '').split('/')[0]);
+}
+
 /** The prefixed path of `rest`: (`ar`, `/`) -> `/ar`, (`ar`, `/products`) -> `/ar/products`. */
 export function prefixedPath(locale: PathLocale, rest: string): string {
   return `/${locale}${rest === '/' || rest === '' ? '' : rest}`;
@@ -104,7 +134,7 @@ export function prefixedPath(locale: PathLocale, rest: string): string {
 
 export type LocalePathDecision =
   | { kind: 'none' }
-  /** `/ar/cart` -> `/cart`: no such prefixed page, never a duplicate URL. */
+  /** `/ar/nonexistent` -> `/nonexistent`: no such prefixed page, never a duplicate URL (a served route never lands here). */
   | { kind: 'redirect'; location: string }
   /** `/ar/products` -> serve `/products` in Arabic. */
   | { kind: 'rewrite'; locale: PathLocale; rest: string }
@@ -143,7 +173,7 @@ export function decideLocalePath(a: {
   if (a.method !== 'GET' && a.method !== 'HEAD') return { kind: 'none' };
   const prefixed = splitLocalePrefix(a.pathname);
   if (prefixed) {
-    if (isLocalePathRoute(prefixed.rest))
+    if (isLocaleServedRoute(prefixed.rest))
       return { kind: 'rewrite', locale: prefixed.locale, rest: prefixed.rest };
     // Exactly this path, before the redirect below: redirected to the shared URL it would answer in the
     // store's default language again, which is the defect (Ruling PWA-MANIFEST-2).
@@ -189,7 +219,7 @@ export function localizeHref(href: string, locale: PathLocale | null): string {
   const path = q === -1 ? href : href.slice(0, q);
   const tail = q === -1 ? '' : href.slice(q);
   if (splitLocalePrefix(path)) return href;
-  if (!isLocalePathRoute(path)) return href;
+  if (!isLocaleServedRoute(path)) return href;
   return prefixedPath(locale, path) + tail;
 }
 
