@@ -18,6 +18,10 @@ const { uploadMock, sendMock } = vi.hoisted(() => ({
   sendMock: vi.fn(async () => undefined),
 }));
 
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertStorageRoom: vi.fn(async () => undefined),
+}));
+
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin', storeId: 'store-1' };
