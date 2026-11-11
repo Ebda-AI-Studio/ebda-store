@@ -19,13 +19,21 @@ export function BillingStatusBanner({ storeId }: { storeId: string }) {
   const t = useT('billing.notice');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const pathname = usePathname() ?? '';
-  const [billing, setBilling] = useState<{ storeId: string; info: BillingInfo } | null>(null);
+  const [billing, setBilling] = useState<{
+    storeId: string;
+    info: BillingInfo;
+    storeStatus: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!storeId) return;
     let cancelled = false;
-    void apiGet<{ billing?: BillingInfo }>(`/api/v1/stores/${storeId}/billing`).then(({ data }) => {
-      if (!cancelled && data?.billing) setBilling({ storeId, info: data.billing });
+    void apiGet<{ billing?: BillingInfo; storeStatus?: string | null }>(
+      `/api/v1/stores/${storeId}/billing`
+    ).then(({ data }) => {
+      if (!cancelled && data?.billing) {
+        setBilling({ storeId, info: data.billing, storeStatus: data.storeStatus ?? null });
+      }
     });
     return () => {
       cancelled = true;
@@ -34,11 +42,12 @@ export function BillingStatusBanner({ storeId }: { storeId: string }) {
 
   if (pathname.endsWith('/billing')) return null;
   const info = billing?.storeId === storeId ? billing.info : null;
-  const kind = billingNotice(info);
+  const kind = billingNotice(info, billing?.storeId === storeId ? billing.storeStatus : null);
   if (!info || !kind) return null;
 
   const { title } = noticeText(kind, info, t, locale);
-  const urgent = kind === 'unpaid' || kind === 'overdue' || kind === 'overStoreLimit';
+  const urgent =
+    kind === 'suspended' || kind === 'unpaid' || kind === 'overdue' || kind === 'overStoreLimit';
   return (
     <div
       role={urgent ? 'alert' : 'status'}

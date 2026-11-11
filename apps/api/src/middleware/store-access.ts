@@ -7,6 +7,55 @@ import { gateRead, onAccessD1 } from '../services/platform/access-d1';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+/**
+ * The ONE place that knows which paths are the store's billing routes (Ruling TEN-6: it was an unanchored `/billing(/|$)` that
+ * matched any segment, so `/stores/:id/products/billing` slipped the over-limit gate). Anchored at the `/stores/:id/billing`
+ * mount (case-insensitive, like Express routing).
+ */
+const BILLING_ROUTE_RE = /^(?:\/api\/v\d+)?\/stores\/[^/]+\/billing(?:\/|$)/i;
+export function isStoreBillingRoute(path: string): boolean {
+  return BILLING_ROUTE_RE.test(path);
+}
+
+export const STORE_SUSPENDED_MESSAGES = {
+  /** Suspended by the platform (no billing reason): nothing but reads. */
+  platform: {
+    en: 'This store is suspended, so you can view your data but not change anything. Contact support to bring it back.',
+    ar: 'المتجر ده موقوف حاليًا، فتقدر تشوف بياناتك بس ومش هتقدر تعدّل أي حاجة. كلّم الدعم عشان نرجّعه تاني.',
+  },
+  /** Suspended for a billing reason: reads plus billing, so the owner can pay. */
+  billing: {
+    en: 'This store is suspended over billing, so you can view your data but not change anything. Settle your subscription from the Billing page to bring it back.',
+    ar: 'المتجر ده موقوف بسبب الاشتراك، فتقدر تشوف بياناتك بس ومش هتقدر تعدّل أي حاجة. جدّد اشتراكك من صفحة الفواتير عشان المتجر يرجع يشتغل تاني.',
+  },
+} as const;
+
+/**
+ * Ruling TEN-1 (live state beats token claims, ebda-foundation PR #28): a merchant/staff token is minted while the store is
+ * live and stays valid for hours, so suspension is read from the store row on EVERY request. A `suspended` store is READ-ONLY
+ * for everyone but a super-admin: every write is refused 403 STORE_SUSPENDED. Exception: with a billing reason
+ * (`billingSuspendedReason` set: unpaid, over_store_limit) the billing routes stay open so the owner can pay.
+ * `over_store_limit` keeps its own 402 upsell, decided before this. Returns the error to throw, or null.
+ */
+export function suspendedWriteBlock(
+  store: { status: string; billingSuspendedReason?: string | null },
+  role: string,
+  method: string,
+  fullPath: string
+): AppError | null {
+  if (role === 'super_admin' || store.status !== 'suspended') return null;
+  if (READ_METHODS.includes(method.toUpperCase())) return null;
+  const billingReason = store.billingSuspendedReason ?? null;
+  if (billingReason && isStoreBillingRoute(fullPath)) return null;
+  const m = billingReason ? STORE_SUSPENDED_MESSAGES.billing : STORE_SUSPENDED_MESSAGES.platform;
+  return new AppError(403, 'STORE_SUSPENDED', m.en, {
+    reason: billingReason ?? 'platform',
+    messageEn: m.en,
+    messageAr: m.ar,
+  });
+}
+
 /** The store row an access check decides on, read in that store's own scope; null if none. */
 async function readStoreForAccess<S extends Prisma.StoreSelect>(storeId: string, select: S) {
   if (!UUID_RE.test(storeId)) return null;
@@ -89,8 +138,8 @@ export async function requireStoreAccess(
     if (
       user.role !== 'super_admin' &&
       store.billingSuspendedReason === 'over_store_limit' &&
-      !['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
-      !/\/billing(\/|$)/.test(`${req.baseUrl}${req.path}`)
+      !READ_METHODS.includes(req.method) &&
+      !isStoreBillingRoute(`${req.baseUrl}${req.path}`)
     ) {
       const messageEn =
         'This store is read-only: your plan covers fewer stores. Upgrade to Business to edit it again.';
@@ -103,6 +152,12 @@ export async function requireStoreAccess(
         messageAr,
       });
     }
+
+    // Suspension is enforced AFTER the ownership/membership decision below, so a stranger never learns a store's status.
+    const refuseIfSuspended = (): void => {
+      const block = suspendedWriteBlock(store, user.role, req.method, `${req.baseUrl}${req.path}`);
+      if (block) throw block;
+    };
 
     // Super admin can access any store; log only WRITES, not reads.
     // Logging every GET (dashboard polling, notification refresh,
@@ -154,6 +209,8 @@ export async function requireStoreAccess(
         throw new AppError(403, 'FORBIDDEN', 'You do not have access to this store');
       }
 
+      refuseIfSuspended();
+
       // Attach store to request for downstream use
       req.store = store;
       return next();
@@ -186,6 +243,7 @@ export async function requireStoreAccess(
         throw new AppError(403, 'FORBIDDEN', 'You do not have access to this store');
       }
 
+      refuseIfSuspended();
       req.store = store;
       return next();
     }
@@ -213,16 +271,47 @@ export async function requireStoreAccess(
  */
 export async function checkStoreAccess(
   storeId: string,
+  user: { userId: string; role: string },
+  /** Pass for a WRITE (upload, delete): a suspended store then refuses exactly like `requireStoreAccess` (TEN-1). */
+  opts?: { write?: boolean }
+): Promise<StoreAccessResult> {
+  const r = await decideStoreAccess(storeId, user);
+  if (r.ok && opts?.write) {
+    // Callers are non-billing routes, so the billing exemption never applies here.
+    const block = suspendedWriteBlock(r.store, user.role, 'POST', '/');
+    if (block) {
+      return { ok: false, status: block.statusCode, code: block.code, message: block.message };
+    }
+  }
+  return r;
+}
+
+type StoreAccessResult =
+  | {
+      ok: true;
+      store: {
+        id: string;
+        ownerId: string;
+        status: string;
+        billingSuspendedReason?: string | null;
+      };
+    }
+  | { ok: false; status: number; code: string; message: string };
+
+async function decideStoreAccess(
+  storeId: string,
   user: { userId: string; role: string }
-): Promise<
-  | { ok: true; store: { id: string; ownerId: string; status: string } }
-  | { ok: false; status: number; code: string; message: string }
-> {
+): Promise<StoreAccessResult> {
   const onD1 = UUID_RE.test(storeId) && (await onAccessD1());
   const d1Gate = onD1 ? await gateRead(storeId, user.userId) : null;
   const store = onD1
     ? (d1Gate?.store ?? null)
-    : await readStoreForAccess(storeId, { id: true, ownerId: true, status: true });
+    : await readStoreForAccess(storeId, {
+        id: true,
+        ownerId: true,
+        status: true,
+        billingSuspendedReason: true,
+      });
   if (!store) {
     return { ok: false, status: 404, code: 'STORE_NOT_FOUND', message: 'Store not found' };
   }
