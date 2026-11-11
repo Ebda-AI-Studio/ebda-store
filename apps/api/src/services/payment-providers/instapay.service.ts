@@ -1100,6 +1100,45 @@ export class InstapayService {
         })
       ).key;
     }
+    // A store on its Durable Object (no Postgres, Ruling NZ-MONEY-6): the checks and every money write are ONE DO section
+    // (`instapayRefundRecord`); the order status flip is the resumable next step.
+    const money = await storeMoney(storeId);
+    if (money) {
+      let committed = false;
+      try {
+        const r = await money.instapayRefundRecord({
+          orderId,
+          referenceKey: refundRef,
+          amountMinor: input.amountMinor,
+          record: {
+            reference: input.reference.trim(),
+            refundedAt: refundedAt.toISOString(),
+            recipientName: input.recipientName.trim(),
+            amountMinor: input.amountMinor,
+            note: input.note?.trim() || null,
+            screenshotKey,
+            recordedBy: args.actorUserId,
+            recordedAt: now.toISOString(),
+          },
+          actorUserId: args.actorUserId,
+        });
+        committed = !r.duplicate;
+        // a replay's screenshot is referenced by nothing: the first record keeps its own
+        if (r.duplicate && screenshotKey)
+          await StorageService.deletePrivate(screenshotKey).catch(() => undefined);
+        // Forward completion: a full refund moves the order to `refunded` (stock, coupon, loyalty, notice). A crash or a
+        // failure here leaves the money recorded; the merchant's retry with the same reference is a `duplicate` that runs
+        // this step again until the order converges.
+        if (r.full && r.orderStatus !== 'refunded')
+          await OrderService.updateStatus(storeId, orderId, 'refunded');
+        return { duplicate: r.duplicate, refundedAmount: r.refundedAmount, status: r.status };
+      } catch (err) {
+        // only an UNcommitted record frees its screenshot: a committed one points at it
+        if (screenshotKey && !committed)
+          await StorageService.deletePrivate(screenshotKey).catch(() => undefined);
+        throw err;
+      }
+    }
     try {
       return await withStore(storeId, async () => {
         const order = await prisma.order.findFirst({

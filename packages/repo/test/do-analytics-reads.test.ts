@@ -68,6 +68,7 @@ describe('registration', () => {
     'analyticsOrdersBy',
     'analyticsCustomers',
     'analyticsLowStock',
+    'analyticsRepeatBuyers',
   ])('%s is a money op', n => expect(MONEY_OP_NAMES).toContain(n));
 });
 
@@ -183,6 +184,23 @@ describe('analyticsCustomers', () => {
     expect(r.returningCustomers).toBe(1);
     expect(r.top[0]).toEqual({ customerId: 'new', total: 1000, count: 2 });
     expect(r.top[1]).toEqual({ customerId: 'old', total: 500, count: 2 });
+  });
+});
+
+describe('analyticsRepeatBuyers', () => {
+  it('keys buyers like customerKeyOf (id, lowercased email, verbatim phone), paid orders in the window only', () => {
+    const { op, order } = rig();
+    order('a1', T0, 'delivered', 'paid', 100, 'cust-1');
+    order('a2', T0, 'delivered', 'paid', 100, 'cust-1'); // repeat (registered)
+    order('g1', T0, 'pending', 'paid', 100, null, '{"email":"Guest@X.eg"}');
+    order('g2', T0, 'pending', 'paid', 100, null, '{"email":"guest@x.eg"}'); // repeat (email lowercased)
+    order('p1', T0, 'pending', 'paid', 100, null, '{"phone":"+201000000001"}'); // one order only
+    order('n1', T0, 'pending', 'paid', 100, null, '{"phone":123}'); // not a string: no key, skipped
+    order('u1', T0, 'pending', 'failed', 100, 'cust-2'); // unpaid: not counted
+    order('o1', T0 - 40 * D, 'delivered', 'paid', 100, 'cust-3'); // before the window
+    expect(op('analyticsRepeatBuyers', { sinceMs: T0 - D })).toEqual({ repeat: 2, buyers: 3 });
+    expect(op('analyticsRepeatBuyers', { sinceMs: T0 + D })).toEqual({ repeat: 0, buyers: 0 });
+    expect(() => op('analyticsRepeatBuyers', {})).toThrow();
   });
 });
 

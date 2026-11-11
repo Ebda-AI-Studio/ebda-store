@@ -30,6 +30,8 @@ export type WriteOp = (typeof WRITE_OPS)[number];
 export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   // a store's payment gateway configuration; `credentials` is ciphertext written by the route (Ruling NEON-ZERO-2)
   'PaymentConfig',
+  // the encrypted agent (MCP) write key of a store: ciphertext only, written by the agent-credential route (Ruling NZ-AGENT-KEY-1)
+  'StoreCredential',
   'ShippingCarrierConfig', // the provider connection-test result lives on this row (Test connection re-run for a DO store)
   // the store's VAT registration profile and its evidence rows (Ruling NEON-ZERO-2; status transitions stay in TaxProfileService)
   'StoreTaxProfile',
@@ -93,6 +95,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'AnswerEngineCheck',
   // the carrier booking job claims and updates the shipment row (INFRA-CF-1, Ruling CF-JOBS-4)
   'Shipment',
+  // a carrier pickup request (claim -> carrier call -> requested / cancelled); the partial unique index keeps one active
+  'ShipmentPickup',
   // merchant shipping zones and per-area rates (NEON-ZERO-1 group A, Ruling NZ-A-1)
   'ShippingZone',
   'ShippingAreaRate',
@@ -349,7 +353,8 @@ export const DO_PROCS: Record<string, Proc> = {
    * with the write. Returns the written / stale field names and the product's category count at write time.
    */
   guardedAiWrite(sql, a) {
-    const { productId, baseline, writes, extra } = a as {
+    const { productId, baseline, writes, extra, fillOnly } = a as {
+      fillOnly?: unknown;
       productId: unknown;
       baseline: unknown;
       writes: unknown;
@@ -381,7 +386,12 @@ export const DO_PROCS: Record<string, Proc> = {
       const c = col(field);
       const changed =
         String((row[c] as string | null) ?? '') !== String((base[field] as string | null) ?? '');
-      if (sources[field] === 'human' || changed) {
+      // Fill-only (Ruling NEVER-OVERWRITE-1): same predicate as aiMayWriteOver in ai-autofill.service.ts.
+      const cur = row[c];
+      const blank = cur === null || cur === undefined || String(cur).trim() === '';
+      const nm = String(row.name ?? '').trim();
+      const placeholder = field === 'name' && nm !== '' && nm === String(row.name_ar ?? '').trim();
+      if (sources[field] === 'human' || changed || (fillOnly !== false && !blank && !placeholder)) {
         stale.push(field);
         continue;
       }

@@ -615,3 +615,69 @@ describe('customer.consent_changed (envelope v1.1)', () => {
     expect(await emitStoreEventsFor(ev)).toBe(0);
   });
 });
+
+// WA-C5: the contract's `order.created.paymentMethod` carries `instapay` as its own value (never folded into `card`), the producer
+// emits it for an InstaPay order, and a raw gateway name that is not in the enum fails the envelope instead of leaking out.
+describe('order.created paymentMethod: instapay (WA-C5)', () => {
+  const instapayEvent = {
+    id: 'src-ip',
+    name: 'order/created',
+    data: { orderId: 'o1', storeId: STORE, paymentMethod: 'instapay', locale: 'ar' },
+  };
+
+  it('an InstaPay order emits ONE valid order.created with paymentMethod instapay and no COD confirmation request', async () => {
+    h.order.mockResolvedValue({
+      ...ORDER,
+      status: 'awaiting_payment_confirmation',
+      payments: [{ provider: 'instapay', status: 'pending' }],
+    });
+    expect(await emitStoreEventsFor(instapayEvent)).toBe(1);
+    const [created] = sent();
+    expect(storeEventSchema.safeParse(created).success).toBe(true);
+    expect(created).toMatchObject({ type: 'order.created', data: { paymentMethod: 'instapay' } });
+    expect(sent().map(e => e.type)).not.toContain('order.cod_confirmation_requested');
+  });
+
+  it('the contract enum accepts instapay and rejects a raw gateway or unknown method', () => {
+    const base = {
+      id: '22222222-2222-4222-8222-222222222222',
+      v: 1,
+      storeId: STORE,
+      occurredAt: '2026-10-25T10:00:00.000Z',
+      type: 'order.created',
+      data: {
+        orderId: 'o1',
+        orderNumber: '1001',
+        buyerKey: 'a'.repeat(64),
+        phoneE164: '+201001234567',
+        locale: 'ar',
+        totalMinor: 100,
+        currency: 'EGP',
+        paymentMethod: 'instapay',
+        channel: 'web',
+      },
+    };
+    expect(storeEventSchema.safeParse(base).success).toBe(true);
+    for (const bad of ['paymob', 'bank_transfer', 'INSTAPAY', ''])
+      expect(
+        storeEventSchema.safeParse({ ...base, data: { ...base.data, paymentMethod: bad } }).success
+      ).toBe(false);
+  });
+
+  it('every method the producer can output is accepted by the contract, and instapay is never folded into card', () => {
+    for (const raw of [
+      'cod',
+      'wallet',
+      'instapay',
+      'link',
+      'paymob',
+      'kashier',
+      'fawry',
+      undefined,
+      '',
+    ])
+      expect(['cod', 'link', 'card', 'wallet', 'instapay']).toContain(contractPaymentMethod(raw));
+    expect(contractPaymentMethod('instapay')).not.toBe('card');
+    expect(contractPaymentMethod('InstaPay')).toBe('instapay');
+  });
+});

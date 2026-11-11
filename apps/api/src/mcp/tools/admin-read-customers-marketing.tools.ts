@@ -1,6 +1,7 @@
 import { z } from 'zod/v3';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { runInTenantContext, type RfmSegment } from '@ebda/database';
+import type { RfmSegment } from '@ebda/database';
+import { readInStoreContext } from '../../lib/store-scoped-read';
 import type { McpStore } from '../resolve-store';
 import { assertScope, MERCHANT_SCOPES } from '../merchant-auth';
 import { ok } from './tool-result';
@@ -30,7 +31,7 @@ import { AppError } from '../../middleware/error-handler';
  *
  * Same contract as `admin-read.tools.ts` — read that header first:
  *  - every handler calls `assertScope(merchant:read)` before touching data;
- *  - every read runs inside `runInTenantContext(store.id)`, and the store id
+ *  - every read runs inside `readInStoreContext(store.id)`, and the store id
  *    is the one the router resolved from the slug AND verified the key
  *    against — no tool accepts a storeId argument, so there is nothing a
  *    caller can point at another tenant;
@@ -136,7 +137,7 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
       extra: ToolExtra
     ) => {
       assertScope(extra?.authInfo, MERCHANT_SCOPES.read, 'admin_list_coupons');
-      const result = await runInTenantContext(store.id, () =>
+      const result = await readInStoreContext(store.id, () =>
         CouponService.list(store.id, {
           search: args.search,
           isActive: args.isActive,
@@ -201,7 +202,7 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
       const page = args.page ?? 1;
       const limit = args.limit ?? 25;
 
-      return runInTenantContext(store.id, async () => {
+      return readInStoreContext(store.id, async () => {
         const { customers: all, truncated, summary } = await aggregateCustomers(store.id);
         // A search is resolved in SQL (Arabic-normalised names, any phone form, email), the same
         // match as the Customers page, so it also finds customers beyond the aggregate's order-scan
@@ -254,7 +255,7 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
     async ({ customerRef }: { customerRef: string }, extra: ToolExtra) => {
       assertScope(extra?.authInfo, MERCHANT_SCOPES.read, 'admin_get_customer');
 
-      return runInTenantContext(store.id, async () => {
+      return readInStoreContext(store.id, async () => {
         const { customers } = await aggregateCustomers(store.id);
         // Resolve the opaque ref to a row of THIS store's aggregation. A ref
         // from another store — or an invented one — matches nothing here and
@@ -344,7 +345,7 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
     async (args: { days?: 7 | 30 | 90 }, extra: ToolExtra) => {
       assertScope(extra?.authInfo, MERCHANT_SCOPES.read, 'admin_get_funnel');
       const days = args.days ?? 30;
-      const rows = await runInTenantContext(store.id, () => listFunnelSnapshots(store.id, days));
+      const rows = await readInStoreContext(store.id, () => listFunnelSnapshots(store.id, days));
       return ok({ currency: store.currency, ...summarizeFunnel(rows, days) });
     }
   );
@@ -373,7 +374,7 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
       extra: ToolExtra
     ) => {
       assertScope(extra?.authInfo, MERCHANT_SCOPES.read, 'admin_list_reviews');
-      const result = await runInTenantContext(store.id, () =>
+      const result = await readInStoreContext(store.id, () =>
         ReviewService.listForStore(store.id, {
           status: args.status ?? 'all',
           productId: args.productId,
