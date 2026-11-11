@@ -2,7 +2,7 @@ name: PR quality
 
 # Anti-slop gate. Copy of ebda-foundation/.github/workflows/pr-quality.yml with `on:` = pull_request_target (foundation Ruling AIR-3 applies:
 # switch to `uses:` once the foundation's Actions access is `organization`). Everything under `jobs:` must stay identical.
-# Runs from the base branch and judges the PR against the base's baseline and eslint suppressions (foundation PRQ-3).
+# Runs from the base branch and judges the PR against the base's baseline and eslint suppressions (foundation PRQ-3). Forks are checked, not skipped (PRQ-5).
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, edited, ready_for_review]
@@ -21,7 +21,7 @@ jobs:
     name: PR body sections
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 5
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # fork-guard-exempt: forks must be checked too (a skipped check is a pass); only the base branch's scripts run, the PR body is data
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,7 +47,7 @@ jobs:
     name: Slop baselines
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 10
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # fork-guard-exempt: forks must be checked too (a skipped check is a pass); the PR is only scanned as data, symlinks are never followed
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,6 +55,7 @@ jobs:
           path: base
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
           path: pr
           persist-credentials: false

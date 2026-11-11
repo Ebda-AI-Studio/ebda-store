@@ -12,7 +12,7 @@
 //     A DIR with no baseline yet (the adoption PR) falls back to the plain check.
 // Config (.pr-quality.json): { "roots": ["apps","packages"], "locales": ["apps/web/messages"], "baseline": ".pr-quality-baseline.json",
 //   "skip": ["generated"], "frameworkExports": ["extra names"] }.   Inline escape on the same or previous line:  pq-allow(rule): reason
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, lstatSync, existsSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -24,6 +24,12 @@ const FRAMEWORK = new Set(['metadata', 'generateMetadata', 'generateStaticParams
 const isTest = (p) => /(?:^|\/)(?:__tests__|tests?|e2e|__mocks__|fixtures|scripts|loadtests|spikes)\/|\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\.d\.ts$|\.config\.[cm]?[jt]s$/.test(p);
 const h = (s) => createHash('sha1').update(s).digest('hex').slice(0, 10);
 
+/** JSON from a regular file inside the checkout; a symlink (possibly out of it) is refused, and a parse error never echoes file content */
+export function readJsonRegular(path) {
+  if (lstatSync(path).isSymbolicLink()) throw new Error(`${path} is a symlink: refused`);
+  try { return JSON.parse(readFileSync(path, 'utf8')); } catch { throw new Error(`${path} is not valid JSON`); }
+}
+
 export function walk(root, dirs, skip = []) {
   const out = [];
   const bad = new Set([...SKIP_DIRS, ...skip]);
@@ -31,12 +37,17 @@ export function walk(root, dirs, skip = []) {
     for (const name of readdirSync(d)) {
       if (bad.has(name)) continue;
       const p = join(d, name);
-      const st = statSync(p);
+      // lstat, never stat: a symlink in a PR checkout could point out of it (/etc, ~/.ssh) and the scanner would read it
+      const st = lstatSync(p);
+      if (st.isSymbolicLink()) continue;
       if (st.isDirectory()) rec(p);
-      else out.push(relative(root, p).split('\\').join('/'));
+      else if (st.isFile()) out.push(relative(root, p).split('\\').join('/'));
     }
   };
-  for (const d of dirs) if (existsSync(join(root, d))) rec(join(root, d));
+  for (const d of dirs) {
+    const top = join(root, d);
+    if (existsSync(top) && !lstatSync(top).isSymbolicLink()) rec(top);
+  }
   return out.sort();
 }
 
@@ -123,10 +134,11 @@ export function scan({ root, config = {} }) {
 
 /** sum of counts per `suppressions-file|rule` over every eslint-suppressions.json under root (a moved file keeps its total) */
 export function eslintTotals(root, roots = ['apps', 'packages']) {
-  const names = [...(existsSync(join(root, 'eslint-suppressions.json')) ? ['eslint-suppressions.json'] : []), ...walk(root, roots).filter((f) => f.endsWith('/eslint-suppressions.json'))];
+  const rootFile = join(root, 'eslint-suppressions.json');
+  const names = [...(existsSync(rootFile) && lstatSync(rootFile).isFile() ? ['eslint-suppressions.json'] : []), ...walk(root, roots).filter((f) => f.endsWith('/eslint-suppressions.json'))];
   const totals = new Map();
   for (const f of names) {
-    const data = JSON.parse(readFileSync(join(root, f), 'utf8'));
+    const data = readJsonRegular(join(root, f));
     for (const rules of Object.values(data)) for (const [rule, v] of Object.entries(rules)) totals.set(`${f}|${rule}`, (totals.get(`${f}|${rule}`) ?? 0) + (v?.count ?? 0));
   }
   return { totals, files: names.length };
@@ -153,13 +165,13 @@ function main() {
   const arg = (k, d) => (a.includes(k) ? a[a.indexOf(k) + 1] : d);
   const root = arg('--root', process.cwd());
   const baseRoot = arg('--base-root', null);
-  const readCfg = (dir) => (existsSync(join(dir, '.pr-quality.json')) ? JSON.parse(readFileSync(join(dir, '.pr-quality.json'), 'utf8')) : null);
+  const readCfg = (dir) => (existsSync(join(dir, '.pr-quality.json')) ? readJsonRegular(join(dir, '.pr-quality.json')) : null);
   const cfgPath = arg('--config', join(root, '.pr-quality.json'));
-  const config = (baseRoot && readCfg(baseRoot)) || (existsSync(cfgPath) ? JSON.parse(readFileSync(cfgPath, 'utf8')) : {});
+  const config = (baseRoot && readCfg(baseRoot)) || (existsSync(cfgPath) ? readJsonRegular(cfgPath) : {});
   const basePath = arg('--baseline', join(root, config.baseline ?? '.pr-quality-baseline.json'));
   const current = scan({ root, config });
   if (a.includes('--list')) { for (const d of current.values()) console.log(d); console.log(`${current.size} violation(s)`); return; }
-  const baseline = existsSync(basePath) ? JSON.parse(readFileSync(basePath, 'utf8')).ids ?? [] : null;
+  const baseline = existsSync(basePath) ? readJsonRegular(basePath).ids ?? [] : null;
   if (baseline === null && !a.includes('--update')) { console.error(`slop-guard: no baseline at ${basePath}; create it once with --update --init`); process.exit(1); }
   const { added, stale } = compare(current, baseline ?? []);
   if (a.includes('--update')) {
@@ -174,7 +186,7 @@ function main() {
   if (baseRoot) {
     const bp = join(baseRoot, config.baseline ?? '.pr-quality-baseline.json');
     if (existsSync(bp)) {
-      const B = new Set(JSON.parse(readFileSync(bp, 'utf8')).ids ?? []);
+      const B = new Set(readJsonRegular(bp).ids ?? []);
       for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
       for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
     }
