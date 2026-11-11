@@ -58,9 +58,9 @@ const ALLOW: Record<string, { count: number; reason: string }> = {
       'inventory flag / stock reads by id inside an already-priced, already-gated order (create gate: wholesale-only line refused 409)',
   },
   'services/order.service.ts :: product.findMany': {
-    count: 2,
+    count: 3,
     reason:
-      'merchant manual order (authenticated admin surface): the merchant may sell wholesale-only products; createOnDo: lead time (leadTimeDays only) of the ids of cart lines the create gate already refused if wholesale-only (Ruling CF-FINAL-1)',
+      "merchant manual order (authenticated admin surface): the merchant may sell wholesale-only products; createOnDo: lead time (leadTimeDays only) of the ids of cart lines the create gate already refused if wholesale-only (Ruling CF-FINAL-1); createAdminOrder stock reservation (order.service.ts ~4685): id-only trackInventory read of the order's own lines, admin surface, merchant may sell wholesale-only; an audience filter would drop wholesale-only lines from the stock take.",
   },
   'services/product.service.ts :: product.findMany': {
     count: 8,
