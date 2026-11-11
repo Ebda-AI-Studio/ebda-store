@@ -93,7 +93,13 @@ jobs:
         # Into this job's RUNNER_TEMP, never --global: a global install writes into the shared Mac host's Homebrew prefix.
         run: |
           npm install --prefix "$RUNNER_TEMP/claude-cli" --no-save --ignore-scripts @anthropic-ai/claude-code@2.1.310
-          echo "$RUNNER_TEMP/claude-cli/node_modules/.bin" >> "$GITHUB_PATH"
+          # --ignore-scripts skips the package's postinstall, which copies the per-platform native binary over the bin/claude.exe
+          # stub ("claude native binary not installed"); link the binary npm installed for this platform ourselves.
+          bin="$(ls "$RUNNER_TEMP"/claude-cli/node_modules/@anthropic-ai/claude-code-*/claude 2>/dev/null | head -1)"
+          [ -n "$bin" ] && [ -x "$bin" ] || { echo "::error::no native claude binary was installed for $(uname -s)-$(uname -m)"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/claude-cli/bin" && ln -sf "$bin" "$RUNNER_TEMP/claude-cli/bin/claude"
+          echo "$RUNNER_TEMP/claude-cli/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/claude-cli/bin/claude" --version
       - name: Build the diff (fail closed when it is too large)
         env:
           PR: ${{ github.event.pull_request.number }}
