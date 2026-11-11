@@ -16,10 +16,24 @@ import { setSessionCookies } from './auth.routes';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { redis } from '../services/redis.service';
+import { customerAuthRoute } from '../lib/customer-auth';
+import { mfaUnavailable } from '../services/customer-auth-flows';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 
 import { JWT_ISSUERS_ACCEPTED, JWT_MFA_AUDIENCES_ACCEPTED } from '@ebda/shared';
 const router = Router();
 const authLimiters = [authIpFailureLimiter, authLimiter];
+
+/**
+ * Ruling NZ-ACCT-1 (builds on NZ-N9-1): TOTP is not ported to the StoreDO, so a customer whose store runs its auth on the
+ * DO gets the same MFA_UNAVAILABLE refusal the DO login / passkey paths give, BEFORE any Postgres `withUser` (which has
+ * no Postgres to reach on the Worker). It refuses; it never enrols, verifies or disables anything.
+ */
+async function refuseMfaOnDoStore(req: Request): Promise<void> {
+  const u = req.user;
+  if (u?.role !== 'customer') return;
+  if ((await customerAuthRoute(u.storeId, { write: false })).kind === 'do') throw mfaUnavailable();
+}
 
 // TOTP codes are always 6 digits (see MfaService.verifyCode).
 const codeSchema = z.object({
@@ -67,6 +81,7 @@ router.post(
   rejectImpersonated,
   async (req, res, next) => {
     try {
+      await refuseMfaOnDoStore(req);
       // `code` is optional here (only required to re-enroll when MFA is already
       // enabled). Validate its shape only when supplied so first-time enrollment
       // (no code) still works.
@@ -125,6 +140,7 @@ router.post(
   authLimiter,
   async (req, res, next) => {
     try {
+      await refuseMfaOnDoStore(req);
       const parsed = codeSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
@@ -204,6 +220,10 @@ router.post('/verify', authLimiters, async (req: Request, res: Response, next: N
     if (payload.purpose !== 'mfa') {
       throw new AppError(401, 'MFA_CHALLENGE_INVALID', 'Bad challenge token');
     }
+
+    // A Postgres-less Worker has no user row to verify against, and DO-store logins never issue a challenge
+    // (NZ-N9-1): refuse instead of reaching `withUser` (500).
+    if (postgresRemovedOnThisWorker()) throw mfaUnavailable();
 
     // H2: per-challenge brute-force guard keyed by jti.
     // Each login attempt issues a unique challenge token (jti = randomUUID),
@@ -299,6 +319,7 @@ router.post(
   authLimiter,
   async (req, res, next) => {
     try {
+      await refuseMfaOnDoStore(req);
       const parsed = codeSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');

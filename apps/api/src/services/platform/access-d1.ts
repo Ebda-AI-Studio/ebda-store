@@ -190,6 +190,15 @@ export async function ownedStoreIdsD1(ownerId: string): Promise<string[]> {
   return (r.results ?? []).map(x => x.id);
 }
 
+/** `stores.owner_id` of a live store (null when unknown / deleted). */
+export async function storeOwnerIdD1(storeId: string): Promise<string | null> {
+  const r = await raw()
+    .prepare('SELECT owner_id FROM stores WHERE id = ?1 AND deleted_at IS NULL')
+    .bind(storeId)
+    .first<{ owner_id: string }>();
+  return r?.owner_id ?? null;
+}
+
 /** Is `userId` the owner of a live store `storeId`? (merchant MCP key check). */
 export async function isOwnerD1(storeId: string, userId: string): Promise<boolean> {
   const r = await gateRead(storeId, null);

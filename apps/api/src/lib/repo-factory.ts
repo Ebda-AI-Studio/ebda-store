@@ -930,6 +930,18 @@ export interface MoneyClient {
     fromMs: number;
     toMs: number;
   }): Promise<Array<{ dayMs: number; net: number }>>;
+  /** Tax report lines (analytics-reads.ts taxReportLinesOp); the Postgres twin is raw SQL in tax-report.service.ts. */
+  taxReportLines(a: { fromMs: number; toMs: number }): Promise<
+    Array<{
+      postedAtMs: number;
+      orderNumber: string;
+      customerName: string | null;
+      taxDelta: number;
+      baseDelta: number;
+      orderTotal: number;
+      isSale: boolean;
+    }>
+  >;
   analyticsLowStock(a: { threshold: number }): Promise<
     Array<{
       id: string;
@@ -1550,6 +1562,7 @@ export function makeMoneyClient(
     analyticsLowStock: a => call('analyticsLowStock', a),
     analyticsStock: a => call('analyticsStock', a),
     analyticsCashflow: a => call('analyticsCashflow', a),
+    taxReportLines: a => call('taxReportLines', a),
     analyticsImportReset: a => call('analyticsImportReset', a),
     vectorStale: a => call('vectorStale', a),
     vectorStatus: a => call('vectorStatus', a),

@@ -101,6 +101,7 @@ import {
   analyticsOrdersByOp,
   analyticsPeriodOp,
   analyticsRepeatBuyersOp,
+  taxReportLinesOp,
   analyticsSalesOp,
   analyticsStockOp,
 } from './analytics-reads';
@@ -300,6 +301,7 @@ export type MoneyOpName =
   | 'analyticsLowStock'
   | 'analyticsStock'
   | 'analyticsCashflow'
+  | 'taxReportLines'
   | 'analyticsImportReset';
 function boundedInt(v: unknown, name: string, min: number, max: number): number {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
@@ -436,6 +438,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'analyticsLowStock',
   'analyticsStock',
   'analyticsCashflow',
+  'taxReportLines',
   'analyticsImportReset',
 ];
 
@@ -894,6 +897,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   analyticsLowStock: (db, storeId, a) => analyticsLowStockOp(db, storeId, a),
   analyticsStock: (db, storeId) => analyticsStockOp(db, storeId),
   analyticsCashflow: (db, storeId, a) => analyticsCashflowOp(db, storeId, a),
+  taxReportLines: (db, storeId, a) => taxReportLinesOp(db, storeId, a),
   analyticsImportReset: (db, storeId, a) => analyticsImportResetOp(db, storeId, a),
   vectorStale: (db, storeId) => vectorStaleOp(db, storeId),
   vectorStatus: (db, storeId) => vectorStatusOp(db, storeId),

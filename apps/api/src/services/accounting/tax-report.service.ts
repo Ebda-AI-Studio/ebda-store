@@ -1,4 +1,5 @@
 import { prisma } from '@ebda/database';
+import { storeMoney } from '../../lib/repo-factory';
 import { DEFAULT_STORE_TIME_ZONE, zonedIsoDay } from '@ebda/shared';
 
 /**
@@ -139,18 +140,39 @@ export async function generateTaxReport(
    * Entries with source != 'order' (manual entries) are excluded — manual
    * 2100 movement is not an order tax-collection event.
    */
-  const rows = await prisma.$queryRawUnsafe<
-    Array<{
-      posted_at: Date;
-      order_number: string;
-      customer_name: string | null;
-      tax_delta: bigint;
-      base_delta: bigint;
-      order_total: bigint;
-      is_sale: boolean;
-    }>
-  >(
-    `
+  type TaxLine = {
+    posted_at: Date;
+    order_number: string;
+    customer_name: string | null;
+    tax_delta: bigint | number;
+    base_delta: bigint | number;
+    order_total: bigint | number;
+    is_sale: boolean;
+  };
+  // NEON-ZERO (Ruling NZ-ACCT-1): a store on its Durable Object reads the SQLite twin of this query there.
+  const money = await storeMoney(storeId);
+  const rows: TaxLine[] = money
+    ? (await money.taxReportLines({ fromMs: from.getTime(), toMs: to.getTime() })).map(r => ({
+        posted_at: new Date(r.postedAtMs),
+        order_number: r.orderNumber,
+        customer_name: r.customerName,
+        tax_delta: r.taxDelta,
+        base_delta: r.baseDelta,
+        order_total: r.orderTotal,
+        is_sale: r.isSale,
+      }))
+    : await prisma.$queryRawUnsafe<
+        Array<{
+          posted_at: Date;
+          order_number: string;
+          customer_name: string | null;
+          tax_delta: bigint;
+          base_delta: bigint;
+          order_total: bigint;
+          is_sale: boolean;
+        }>
+      >(
+        `
     SELECT
       e.posted_at,
       o.order_number,
@@ -180,13 +202,13 @@ export async function generateTaxReport(
     HAVING SUM(CASE WHEN a.code = '2100' THEN l.credit - l.debit ELSE 0 END) <> 0
     ORDER BY e.posted_at ASC, o.order_number ASC
     `,
-    storeId,
-    // Prisma 6.19 $queryRawUnsafe rejects JS Date objects — pass ISO strings.
-    // `posted_at` is `timestamp without time zone`, so the SQL casts the
-    // string params with `$n::timestamp` (no `timestamp >= text` operator).
-    from.toISOString(),
-    to.toISOString()
-  );
+        storeId,
+        // Prisma 6.19 $queryRawUnsafe rejects JS Date objects — pass ISO strings.
+        // `posted_at` is `timestamp without time zone`, so the SQL casts the
+        // string params with `$n::timestamp` (no `timestamp >= text` operator).
+        from.toISOString(),
+        to.toISOString()
+      );
 
   // ─── Build per-transaction rows ──────────────────────────────────────────────
   const txRows: TaxReportRow[] = rows.map(r => {
