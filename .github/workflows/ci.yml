@@ -318,13 +318,13 @@ jobs:
   # <= 3 min. `vitest --shard=i/N` splits by file; fail-fast is off so every shard reports. The roll-up job
   # `Unit Tests (affected)` below keeps the check name stable.
   unit:
-    name: Unit shard ${{ matrix.shard }}/6
+    name: ${{ matrix.shard == 7 && 'Unit workerd extras' || format('Unit shard {0}/6', matrix.shard) }}
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4, 5, 6, 7] # 7 = the workerd extras (no vitest shard), so they run in parallel with 1-6
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 35, not 20: on a congested Umbra runner the SETUP (npm ci, builds, chromium) took 16.5 of the 20 minutes and
     # the job was CANCELLED while its 3.7 minutes of tests were still running (#253, #256: cancelled, not failed).
@@ -363,6 +363,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run unit tests (affected paths)
+        if: matrix.shard != 7
         env:
           UNIT_PATHS: ${{ needs.changes.outputs.unit }}
           NODE_OPTIONS: --max-old-space-size=4096
@@ -372,29 +373,29 @@ jobs:
       # Task 5): the committed docs/ebda/templates/editor-matrix.* must be current and every not-wired row
       # accepted in scripts/editor-audit/baseline.json. Cheap (a few seconds), so it always runs.
       - name: Editor matrix check
-        if: matrix.shard == 1
+        if: matrix.shard == 7
         run: npm run editor:matrix:check
 
       # apps/status runs on workerd via @cloudflare/vitest-pool-workers, outside
       # the root vitest config.
       - name: Run status worker tests
-        if: matrix.shard == 1 && needs.changes.outputs.status_tests == 'true'
+        if: matrix.shard == 7 && needs.changes.outputs.status_tests == 'true'
         run: npm run test:status
 
       # apps/accounts (the shared identity service) runs on workerd with a local D1.
       - name: Run accounts worker tests
-        if: matrix.shard == 1 && needs.changes.outputs.accounts_tests == 'true'
+        if: matrix.shard == 7 && needs.changes.outputs.accounts_tests == 'true'
         run: npm run test:accounts
       # prisma-lite on a real Durable Object (workerd): the transaction runner contract. ~5 s.
       - name: Run prisma-lite Durable Object tests
-        if: matrix.shard == 1
+        if: matrix.shard == 7
         run: npm run test:repo-workers
 
   unit-gate:
     name: Unit Tests (affected)
     needs: [changes, unit]
     if: always() && github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     steps:
       - name: Require every unit shard to have passed
@@ -595,7 +596,9 @@ jobs:
       # One Next/OpenNext production build at a time: each is ~2 GB resident and ~13 MB/s of I/O, and two at once on the 5 GiB
       # guest repeated the 2026-10-26 swap storm. app-build is HEAVY-lane by design: its job id is not in the guest's
       # light-jobs.conf, so it takes one of the 2 heavy slots (tests/unit/ci-lean-structure.test.ts pins both).
-      max-parallel: 1
+      # On hosted runners (EBDA_RUNS_ON unset) every build has its own VM, so they run in parallel (CI-SHARD-1);
+      # the one-at-a-time limit applies only to the shared Umbra guest.
+      max-parallel: ${{ (vars.EBDA_RUNS_ON == '' && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 6 || 1 }}
       matrix:
         app: ${{ fromJSON(needs.changes.outputs.build_apps) }}
     steps:
@@ -808,12 +811,12 @@ jobs:
   # CI-SHARD-1: the full unit suite is sharded 6 ways (hosted 2 vCPU ran it 17-28 min as one job). Each shard writes a
   # vitest blob report with coverage; `test-unit` below merges them and enforces the coverage threshold once.
   test-unit-shard:
-    name: Unit shard ${{ matrix.shard }}/6
+    name: ${{ matrix.shard == 7 && 'Unit workerd extras' || format('Unit shard {0}/6', matrix.shard) }}
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4, 5, 6, 7] # 7 = the workerd extras (no vitest shard), so they run in parallel with 1-6
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 50, not 20: on hosted ubuntu-24.04 (2 vCPU) the coverage step alone took 16m47s in run 42820243819 and the
     # job was cancelled at 20:00 inside the accounts worker tests, with every assertion so far green; green runs then
@@ -853,6 +856,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run unit tests with coverage
+        if: matrix.shard != 7
         # Globs BEYOND tests/unit are load-bearing, not tidiness. vitest.config.ts
         # has a broad `include`, so a colocated `__tests__` file passes locally and
         # is silently never executed by CI unless its directory is named here.
@@ -892,18 +896,18 @@ jobs:
 
       # apps/status and apps/accounts run on workerd, outside the root vitest config.
       - name: Run status worker tests
-        if: matrix.shard == 1
+        if: matrix.shard == 7
         run: npm run test:status
 
       - name: Run accounts worker tests
-        if: matrix.shard == 1
+        if: matrix.shard == 7
         run: npm run test:accounts
       - name: Run prisma-lite Durable Object tests
-        if: matrix.shard == 1
+        if: matrix.shard == 7
         run: npm run test:repo-workers
 
       - name: Upload shard blob report
-        if: always()
+        if: always() && matrix.shard != 7
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-blob-${{ matrix.shard }}
@@ -915,7 +919,7 @@ jobs:
     name: Unit Tests
     needs: [test-unit-shard]
     if: always() && github.event_name != 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

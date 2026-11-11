@@ -538,7 +538,11 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
 describe('app-build is one-at-a-time and heavy-lane (guest memory)', () => {
   const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   const job = ci.slice(ci.indexOf('\n  app-build:\n'), ci.indexOf('\n  app-builds:\n'));
-  it('runs one production build at a time', () => expect(job).toMatch(/max-parallel: 1/));
+  it('runs one production build at a time on a shared Umbra guest, in parallel on hosted runners', () => {
+    expect(job).toMatch(
+      /max-parallel: \$\{\{ \(vars\.EBDA_RUNS_ON == '' && [^}]*\) && 6 \|\| 1 \}\}/
+    );
+  });
   it('is not a light-lane job id (umbra DefaultLightJobs globs)', () => {
     const light = [
       'notify-failure*',
