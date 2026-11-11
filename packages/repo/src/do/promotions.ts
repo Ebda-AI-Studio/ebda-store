@@ -3,8 +3,8 @@
  * single `transactionSync`.
  *
  * Ported from: apps/api/src/services/promotion-resolver.ts (resolveCustomerContext, resolveBestPromotion),
- * promotion-targeting.ts (matchesTargeting, computeDiscount: copied, `Math.round` kept, differential-tested against the
- * original in do-promotions.test.ts), order.service.ts ~1275-1305 (coupon vs promotion best-of, exact-tie rule),
+ * promotion-targeting.ts (matchesTargeting, computeDiscount: now the SAME function, imported from packages/shared
+ * `commerce/coupon-math.ts`, Ruling PRICE-1), order.service.ts ~1275-1305 (coupon vs promotion best-of, exact-tie rule),
  * bundle.service.ts (resolveBundle: purchasability, availability, price) and order.service.ts ~905-990 (allocation guard,
  * bundlesSubtotal, bundleDiscount). The bundle price/allocation maths is the shared package's own pure code
  * (packages/shared/src/bundle-pricing.ts), imported, not copied.
@@ -56,65 +56,20 @@ function now(v: number | undefined): number {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Targeting maths (copied from promotion-targeting.ts, keep in sync; differential-tested)
+// Targeting maths: imported from the single source shared with apps/api (Ruling PRICE-1), never copied
 // ---------------------------------------------------------------------------------------------------------------------
 
-export interface CartItemForTargeting {
-  productId: string;
-  categoryIds: string[];
-  quantity: number;
-  lineTotal: number;
-}
-export interface TargetingCtx {
-  customerGroupId: string | null;
-  isFirstOrder: boolean;
-  cartItems: CartItemForTargeting[];
-}
-export interface Targeting {
-  customerGroupId: string | null;
-  firstOrderOnly: boolean;
-  minOrderAmount: number | null;
-  minQuantity: number | null;
-  scopeProductIds: string[];
-  scopeCategoryIds: string[];
-}
-export interface TargetingResult {
-  eligible: boolean;
-  matchingSubtotal: number;
-  matchingQty: number;
-}
-
-export function matchesTargeting(t: Targeting, ctx: TargetingCtx): TargetingResult {
-  const miss: TargetingResult = { eligible: false, matchingSubtotal: 0, matchingQty: 0 };
-  if (t.customerGroupId && t.customerGroupId !== ctx.customerGroupId) return miss;
-  if (t.firstOrderOnly && !ctx.isFirstOrder) return miss;
-  const scoped = t.scopeProductIds.length > 0 || t.scopeCategoryIds.length > 0;
-  const inScope = (i: CartItemForTargeting) =>
-    t.scopeProductIds.includes(i.productId) ||
-    i.categoryIds.some(c => t.scopeCategoryIds.includes(c));
-  const matching = scoped ? ctx.cartItems.filter(inScope) : ctx.cartItems;
-  const matchingSubtotal = matching.reduce((s, i) => s + i.lineTotal, 0);
-  const matchingQty = matching.reduce((s, i) => s + i.quantity, 0);
-  if (scoped && matchingSubtotal <= 0) return miss;
-  if (t.minOrderAmount != null && matchingSubtotal < t.minOrderAmount) return miss;
-  if (t.minQuantity != null && matchingQty < t.minQuantity) return miss;
-  return { eligible: true, matchingSubtotal, matchingQty };
-}
-
-export function computeDiscount(
-  type: 'percentage' | 'fixed' | 'free_shipping',
-  value: number,
-  maxDiscount: number | null,
-  base: number
-): number {
-  if (type === 'percentage') {
-    const d = Math.min(base, Math.round((base * value) / 100)); // never more than the goods (a legacy value above 100)
-    // a cap of 0 (or less) means no cap: parity with apps/api promotion-targeting.ts (QA-COUPON-1)
-    return maxDiscount != null && maxDiscount > 0 && d > maxDiscount ? maxDiscount : d;
-  }
-  if (type === 'fixed') return value > base ? base : value;
-  return 0;
-}
+import {
+  computeDiscount,
+  couponCartDiscount,
+  matchesTargeting,
+  type CartItemForTargeting,
+  type Targeting,
+  type TargetingCtx,
+  type TargetingResult,
+} from '../../../shared/src/commerce/coupon-math';
+export { computeDiscount, couponCartDiscount, matchesTargeting };
+export type { CartItemForTargeting, Targeting, TargetingCtx, TargetingResult };
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Customer context + best automatic promotion

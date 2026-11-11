@@ -3,9 +3,9 @@ import { assertCustomerGroupInStore } from '../lib/customer-group-scope';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import type { Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
-import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
+import { computeDiscount, TargetingCtx } from './promotion-targeting';
 
-import { fromMinor, REGION, minorToDecimalString } from '@ebda/shared';
+import { couponCartDiscount, fromMinor, REGION, minorToDecimalString } from '@ebda/shared';
 /** One coupon rule an admin order broke. `code` is the checkout error code. */
 export interface CouponRuleViolation {
   code:
@@ -387,20 +387,7 @@ export class CouponService {
     subtotal: number,
     override: boolean
   ): number {
-    if (!override) return CouponService.evaluateForCart(coupon, ctx).discount;
-    const scopeOnly = matchesTargeting(
-      {
-        customerGroupId: null,
-        firstOrderOnly: false,
-        minOrderAmount: null,
-        minQuantity: null,
-        scopeProductIds: coupon.scopeProductIds,
-        scopeCategoryIds: coupon.scopeCategoryIds,
-      },
-      ctx
-    );
-    const base = scopeOnly.eligible ? scopeOnly.matchingSubtotal : subtotal;
-    return computeDiscount(coupon.type, coupon.value, coupon.maxDiscount, base);
+    return couponCartDiscount(coupon, ctx, { override, overrideBase: subtotal }).discount;
   }
 
   /**
@@ -422,14 +409,8 @@ export class CouponService {
     },
     ctx: TargetingCtx
   ): { eligible: boolean; discount: number; reason?: string } {
-    const r = matchesTargeting(coupon, ctx);
+    const r = couponCartDiscount(coupon, ctx);
     if (!r.eligible) return { eligible: false, discount: 0, reason: 'COUPON_NOT_ELIGIBLE' };
-    const discount = computeDiscount(
-      coupon.type,
-      coupon.value,
-      coupon.maxDiscount,
-      r.matchingSubtotal
-    );
-    return { eligible: true, discount };
+    return { eligible: true, discount: r.discount };
   }
 }

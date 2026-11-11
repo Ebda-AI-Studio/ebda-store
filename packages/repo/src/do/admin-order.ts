@@ -7,7 +7,7 @@ import { indexEntity } from './payments';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
 import {
   cartItemsForTargeting,
-  computeDiscount,
+  couponCartDiscount,
   matchesTargeting,
   resolveCustomerContext,
 } from './promotions';
@@ -251,33 +251,17 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
       if (violations.length > 0 && !override)
         throw new MoneyError(violations[0], violations[0], 400);
       if (freeShip) shipping = 0;
-      else if (!override)
-        couponDiscount = computeDiscount(
-          coupon.type as 'percentage' | 'fixed',
-          coupon.value as number,
-          (coupon.max_discount as number | null) ?? null,
-          targeting.matchingSubtotal
-        );
-      else {
-        // the eligibility gates are ignored; a scoped coupon still discounts only its in-scope lines when the order has any
-        const scopeOnly = matchesTargeting(
+      else
+        couponDiscount = couponCartDiscount(
           {
-            customerGroupId: null,
-            firstOrderOnly: false,
-            minOrderAmount: null,
-            minQuantity: null,
-            scopeProductIds: t.scopeProductIds,
-            scopeCategoryIds: t.scopeCategoryIds,
+            ...t,
+            type: coupon.type as 'percentage' | 'fixed',
+            value: coupon.value as number,
+            maxDiscount: (coupon.max_discount as number | null) ?? null,
           },
-          targetingCtx
-        );
-        couponDiscount = computeDiscount(
-          coupon.type as 'percentage' | 'fixed',
-          coupon.value as number,
-          (coupon.max_discount as number | null) ?? null,
-          scopeOnly.eligible ? scopeOnly.matchingSubtotal : priced.couponBasisSubtotal
-        );
-      }
+          targetingCtx,
+          { override, overrideBase: priced.couponBasisSubtotal }
+        ).discount;
       couponCode = coupon.code as string;
 
       // per-customer limit (identity: the customer, else the guest's phone / e-mail)

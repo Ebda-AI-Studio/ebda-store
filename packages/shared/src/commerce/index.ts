@@ -7,3 +7,4 @@ export * from './size-chart';
 export * from './instalments';
 export * from './gold-price';
 export * from './payment-policy';
+export * from './coupon-math';
