@@ -267,7 +267,7 @@ export default function CustomerGroupsPage() {
 
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg">
+            <div className="w-full max-w-md rounded-lg bg-background p-5 shadow-md">
               <h2 className="mb-4 text-lg font-semibold">
                 {editing ? t('editTitle') : t('createTitle')}
               </h2>

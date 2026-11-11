@@ -225,7 +225,7 @@ export function PaymentLinkButton({
           onClick={close}
         >
           <div
-            className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl"
+            className="w-full max-w-md rounded-lg bg-card p-6 shadow-xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-4">

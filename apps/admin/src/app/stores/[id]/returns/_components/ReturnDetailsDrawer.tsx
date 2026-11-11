@@ -105,7 +105,7 @@ export function ReturnDetailsDrawer({
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-md shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-card rounded-md shadow-md max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b p-4">

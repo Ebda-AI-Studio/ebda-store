@@ -74,7 +74,7 @@ export function BottomSheet({
       aria-modal="true"
     >
       <div
-        className={`relative flex w-full flex-col rounded-t-lg bg-card shadow-2xl ${desktopSheetClass}`}
+        className={`relative flex w-full flex-col rounded-t-lg bg-card shadow-xl ${desktopSheetClass}`}
         style={{ maxHeight: `${maxHeightVh}vh` }}
         onClick={e => e.stopPropagation()}
       >

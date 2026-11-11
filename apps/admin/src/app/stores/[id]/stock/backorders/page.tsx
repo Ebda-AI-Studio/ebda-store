@@ -84,7 +84,7 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
   if (owed !== null) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className="bg-background rounded-md border border-border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
+        <div className="bg-background rounded-md border border-border shadow-md w-full max-w-md mx-4 p-6 space-y-4">
           <h2 className="text-base font-semibold">{t('cancelModal.doneTitle')}</h2>
           <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive-ink">
             {t('cancelModal.owedNotice', { amount: formatPrice(owed) })}
@@ -101,7 +101,7 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-background rounded-md border border-border shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
+      <div className="bg-background rounded-md border border-border shadow-md w-full max-w-md mx-4 p-6 space-y-4">
         <h2 className="text-base font-semibold">{t('cancelModal.title')}</h2>
         <p className="text-xs text-muted-foreground">{t('cancelModal.body')}</p>
         <form onSubmit={handleSubmit} className="space-y-4">

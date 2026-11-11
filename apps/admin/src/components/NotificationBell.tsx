@@ -161,7 +161,7 @@ export function NotificationBell() {
           <div
             ref={panelRef}
             style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width }}
-            className="bg-card rounded-md shadow-2xl border border-border z-[100] overflow-hidden"
+            className="bg-card rounded-md shadow-xl border border-border z-[100] overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">

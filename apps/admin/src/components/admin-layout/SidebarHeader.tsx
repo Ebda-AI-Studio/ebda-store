@@ -39,7 +39,7 @@ export function SidebarHeader({
         {isStoreAdminWithBranding && storeBranding?.logo ? (
           // Store Branding Logo
           <>
-            <div className="flex h-9 w-9 items-center justify-center rounded-md overflow-hidden bg-muted shadow-lg">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md overflow-hidden bg-muted shadow-md">
               <Image
                 src={storeBranding.logo}
                 alt={storeBranding.name}
@@ -62,7 +62,7 @@ export function SidebarHeader({
         ) : (
           // Ebda Branding (default)
           <>
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary/90 shadow-lg shadow-primary/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary/90 shadow-md shadow-sm">
               <Image
                 src="/logo-white.svg"
                 alt={tb('brandAlt')}

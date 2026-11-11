@@ -153,7 +153,7 @@ export function SettingsSearch({ storeId: storeIdProp }: { storeId?: string } = 
           id="settings-search-results"
           role="listbox"
           aria-label={t('placeholder')}
-          className="absolute z-50 mt-1.5 w-full rounded-md border border-border bg-card shadow-lg overflow-hidden"
+          className="absolute z-50 mt-1.5 w-full rounded-md border border-border bg-card shadow-md overflow-hidden"
         >
           {results.length === 0 ? (
             <p className="px-4 py-3 text-sm text-muted-foreground">{t('noResults')}</p>

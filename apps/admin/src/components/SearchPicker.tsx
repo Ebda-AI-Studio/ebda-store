@@ -136,7 +136,7 @@ export function SearchPicker<T>({
         {shown ? announce : ''}
       </p>
       {shown && (
-        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-card shadow-lg">
+        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-card shadow-md">
           {live.status === 'loading' && (
             <p className="px-3 py-2 text-sm text-muted-foreground">{t('loading')}</p>
           )}

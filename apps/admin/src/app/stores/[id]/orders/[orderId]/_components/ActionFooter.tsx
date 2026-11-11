@@ -222,7 +222,7 @@ export function ActionFooter({
           {menuOpen && (
             <div
               role="menu"
-              className="absolute end-0 bottom-full mb-2 w-64 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-lg"
+              className="absolute end-0 bottom-full mb-2 w-64 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-md"
             >
               <button
                 type="button"

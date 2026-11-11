@@ -36,7 +36,7 @@ export function StoresEmpty({ search, statusFilter }: StoresEmptyProps) {
           {hasFilters ? t('emptyHintSearch') : t('emptyHintDefault')}
         </p>
         <Link href="/stores/new">
-          <Button className="gap-2 shadow-lg shadow-primary/25">
+          <Button className="gap-2 shadow-md shadow-sm">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"

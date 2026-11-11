@@ -883,7 +883,7 @@ export function BuilderEditor({
       >
         {announcement}
       </div>
-      <div className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:start-2 focus-within:top-2 focus-within:z-50 focus-within:flex focus-within:gap-2 focus-within:rounded-lg focus-within:bg-background focus-within:p-2 focus-within:shadow-lg">
+      <div className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:start-2 focus-within:top-2 focus-within:z-50 focus-within:flex focus-within:gap-2 focus-within:rounded-lg focus-within:bg-background focus-within:p-2 focus-within:shadow-md">
         <Button
           variant="outline"
           size="sm"
@@ -1125,7 +1125,7 @@ export function BuilderEditor({
         <aside
           ref={startRef}
           aria-label={t('panes.start')}
-          className={`${drawer === 'start' ? 'absolute inset-y-0 start-0 z-20 flex w-80 max-w-[85vw] shadow-2xl' : 'hidden'} flex-col border-e border-border bg-card lg:static lg:flex lg:w-72 lg:shadow-none`}
+          className={`${drawer === 'start' ? 'absolute inset-y-0 start-0 z-20 flex w-80 max-w-[85vw] shadow-xl' : 'hidden'} flex-col border-e border-border bg-card lg:static lg:flex lg:w-72 lg:shadow-none`}
         >
           {startPane}
         </aside>
@@ -1149,7 +1149,7 @@ export function BuilderEditor({
           id="builder-settings"
           tabIndex={-1}
           aria-label={t('panes.end')}
-          className={`${drawer === 'end' ? 'absolute inset-y-0 end-0 z-20 flex w-80 max-w-[85vw] shadow-2xl' : 'hidden'} flex-col border-s border-border bg-card lg:static lg:flex lg:w-80 lg:shadow-none`}
+          className={`${drawer === 'end' ? 'absolute inset-y-0 end-0 z-20 flex w-80 max-w-[85vw] shadow-xl' : 'hidden'} flex-col border-s border-border bg-card lg:static lg:flex lg:w-80 lg:shadow-none`}
         >
           {endPane}
         </aside>

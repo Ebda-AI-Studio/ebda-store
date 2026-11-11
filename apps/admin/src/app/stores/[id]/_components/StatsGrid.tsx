@@ -104,7 +104,7 @@ export function StatsGrid({ storeId }: StatsGridProps) {
               <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{stat.value}</p>
             </div>
             <div
-              className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
+              className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.iconBg} text-white shadow-md transition-transform duration-200 group-hover:scale-110`}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path

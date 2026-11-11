@@ -106,7 +106,7 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
             <div
               id={menuId}
               role="menu"
-              className="absolute end-0 top-full z-30 mt-1 min-w-48 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+              className="absolute end-0 top-full z-30 mt-1 min-w-48 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-md"
             >
               {ordered.map((item, i) => {
                 const close = () => {

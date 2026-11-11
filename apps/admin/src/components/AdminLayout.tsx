@@ -498,7 +498,7 @@ export function AdminLayout({
       {/* Mobile Sidebar */}
       <aside
         id="admin-mobile-sidebar"
-        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
+        className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-xl transition-transform duration-300 ease-out lg:hidden ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
         }`}
         aria-hidden={!isSidebarOpen}

@@ -45,7 +45,7 @@ export function ApplicationDecisionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="wholesale-decision-title"
-        className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg"
+        className="w-full max-w-md rounded-lg bg-background p-5 shadow-md"
       >
         <h2 id="wholesale-decision-title" className="mb-1 text-lg font-semibold">
           {t(`${kind}Title`)}

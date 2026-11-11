@@ -13,6 +13,8 @@
  *   G8  `text-xs` (12px) on a content element (<p> <th> <td> <label> <li> <dt> <dd> <legend> <h3-6>): content is 14px or more;
  *       12px is for counters and badges (<span>, <Badge>), never the sole carrier of meaning.
  *   G9  `rounded-xl/2xl/3xl`: xl duplicates control (12px), 2xl/3xl are off-scale. Control = rounded-md, surface = rounded-lg, pill = rounded-full.
+ *   G10 `shadow-lg` / `shadow-2xl` / a coloured shadow (`shadow-primary/25`): elevation is flat (default), shadow-sm (cards),
+ *       shadow-md (menus), shadow-xl (modals), never coloured.
  *   G6  a `data-ui="nav"` item that does not take its classes from navItemClasses() / bottomNavClasses().
  *
  * G1-G5 are a RATCHET: tests/unit/admin-design-tokens.baseline.json holds the per-file count of pages not yet
@@ -56,6 +58,12 @@ export function countOffScaleRadius(src: string): number {
   return (stripComments(src).match(G9) ?? []).length;
 }
 
+const G10 =
+  /(?<![\w-])(?:[a-z-]+:)*shadow-(?:lg|2xl|(?:primary|black|gold|warning|success|destructive|info)(?:-\d+)?\/\d+)(?![\w-])/g;
+export function countOffScaleShadow(src: string): number {
+  return (stripComments(src).match(G10) ?? []).length;
+}
+
 /** G8: content elements set in 12px. */
 export function countSmallContent(src: string): number {
   return (stripComments(src).match(CONTENT_TAG) ?? []).filter(t =>
@@ -85,7 +93,17 @@ export function countFields(src: string): number {
 type Counts = Record<string, Record<string, number>>; // rule -> file -> n
 
 function scan(): { counts: Counts; nav: string[] } {
-  const counts: Counts = { G1: {}, G2: {}, G3: {}, G4: {}, G5: {}, G7: {}, G8: {}, G9: {} };
+  const counts: Counts = {
+    G1: {},
+    G2: {},
+    G3: {},
+    G4: {},
+    G5: {},
+    G7: {},
+    G8: {},
+    G9: {},
+    G10: {},
+  };
   const nav: string[] = [];
   for (const p of walk(SRC)) {
     const file = relative(SRC, p);
@@ -102,6 +120,8 @@ function scan(): { counts: Counts; nav: string[] } {
       if (sm) counts.G8![file] = sm;
       const rx = countOffScaleRadius(src);
       if (rx) counts.G9![file] = rx;
+      const sh = countOffScaleShadow(src);
+      if (sh) counts.G10![file] = sh;
     }
     if (p.endsWith('.tsx'))
       nav.push(...navIssues(file, src, ['navItemClasses', 'bottomNavClasses']));
@@ -159,6 +179,11 @@ describe('admin design tokens', () => {
     );
   });
 
+  it('G10 self-test', () => {
+    expect(countOffScaleShadow('className="shadow-lg hover:shadow-2xl shadow-primary/25"')).toBe(3);
+    expect(countOffScaleShadow('className="shadow-sm shadow-md shadow-xl shadow-none"')).toBe(0);
+  });
+
   it('no count exceeds the BASE branch baseline (the ratchet only shrinks)', () => {
     const ref = process.env.BASE_REF ?? 'origin/main';
     let baseTxt: string;
@@ -201,7 +226,7 @@ describe('admin design tokens', () => {
     const base: Counts = JSON.parse(readFileSync(BASELINE, 'utf8'));
     const grew: string[] = [];
     const stale: string[] = [];
-    for (const rule of [...Object.keys(RULES), 'G7', 'G8', 'G9']) {
+    for (const rule of [...Object.keys(RULES), 'G7', 'G8', 'G9', 'G10']) {
       const files = new Set([...Object.keys(counts[rule]), ...Object.keys(base[rule] ?? {})]);
       for (const f of files) {
         const now = counts[rule][f] ?? 0;

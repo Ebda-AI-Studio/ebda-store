@@ -274,7 +274,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
       aria-label={t('title')}
     >
       <div
-        className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-background shadow-xl"
         onClick={e => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >

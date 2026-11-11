@@ -357,7 +357,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           }`}
         >
           <span
-            className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${
+            className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-md ring-0 transition-transform ${
               isEnabled ? 'translate-x-5' : 'translate-x-0'
             }`}
           />
