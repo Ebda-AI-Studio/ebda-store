@@ -7,10 +7,10 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BRAND } from '../../packages/shared/src/brand';
 
-const css = readFileSync(
-  path.resolve(__dirname, '../../apps/marketing/src/app/globals.css'),
-  'utf8'
-);
+// globals.css holds :root; chrome.css holds .band-dark (the generated site-footer block, the one that wins the cascade).
+const css = ['globals.css', 'chrome.css']
+  .map(f => readFileSync(path.resolve(__dirname, '../../apps/marketing/src/app', f), 'utf8'))
+  .join('\n');
 
 function block(selector: string): Record<string, string> {
   const m = css.match(new RegExp(`(?:^|\\n)${selector.replace('.', '\\.')} \\{([^}]*)\\}`));

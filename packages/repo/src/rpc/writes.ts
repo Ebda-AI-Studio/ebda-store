@@ -351,7 +351,8 @@ export const DO_PROCS: Record<string, Proc> = {
    * with the write. Returns the written / stale field names and the product's category count at write time.
    */
   guardedAiWrite(sql, a) {
-    const { productId, baseline, writes, extra } = a as {
+    const { productId, baseline, writes, extra, fillOnly } = a as {
+      fillOnly?: unknown;
       productId: unknown;
       baseline: unknown;
       writes: unknown;
@@ -383,7 +384,12 @@ export const DO_PROCS: Record<string, Proc> = {
       const c = col(field);
       const changed =
         String((row[c] as string | null) ?? '') !== String((base[field] as string | null) ?? '');
-      if (sources[field] === 'human' || changed) {
+      // Fill-only (Ruling NEVER-OVERWRITE-1): same predicate as aiMayWriteOver in ai-autofill.service.ts.
+      const cur = row[c];
+      const blank = cur === null || cur === undefined || String(cur).trim() === '';
+      const nm = String(row.name ?? '').trim();
+      const placeholder = field === 'name' && nm !== '' && nm === String(row.name_ar ?? '').trim();
+      if (sources[field] === 'human' || changed || (fillOnly !== false && !blank && !placeholder)) {
         stale.push(field);
         continue;
       }

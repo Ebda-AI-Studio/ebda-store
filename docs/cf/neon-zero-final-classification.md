@@ -200,5 +200,6 @@ Non-merchant or agent surfaces: mcp/merchant-write.ts:270 (every admin MCP write
 ## Port status (one line per merged slice; the table above stays the 2026-11-10 classification)
 
 - 2026-11-11 `routes/insights.routes.ts` (row 1): PORTED, Ruling NZ-INSIGHTS-1, proof `apps/api/workers-test/merchant-orders-do.test.ts`. Also fixed: prisma-lite `_count: true` answered `{ _all }` instead of a number.
+
 - 2026-11-11 merchant paths (rows 3-5, 9-16: variant toggle, store status audit, bulk barcode lock, payment events, promotion first-order count, carrier config, provider verification, shipment pickups, dead-stock clearance, SKU search, orders-app push, back-in-stock): PORTED, Rulings NZ-MERCHANT-1 + NZ-CARRIER-1, proof `apps/api/workers-test/merchant-orders-do.test.ts` (second case). Also fixed: prisma-lite omitted scalar list -> `[]`; prisma-lite Json `{ path, equals }` filter. Money/auth rows (6-8, grants, tax report, MFA/passkeys, WA consumer) follow in the money/auth slice.
 - 2026-11-11 money (rows 6-8 and `lib/wa/store-events-consumer.ts`: InstaPay refund record, refund match-claim, gateway refunds verified, WhatsApp COD outcome / cancel after erasure; plus `OrderService.applyRefundEffects` on a DO store): PORTED, Ruling NZ-MONEY-6, proof `apps/api/workers-test/merchant-orders-do.test.ts` (third case). Agent COD payment: PR #546 (Ruling NZ-MONEY-AGENT-1).
