@@ -781,6 +781,9 @@ export class AuthService {
     if (typeof email !== 'string') throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
     const route = await customerAuthRoute(storeId, { write: true });
     if (route.kind === 'do') return CustomerAuthFlows.resend(route.client, email);
+    // NEON-ZERO (Ruling NZ-ACCT-1): no store + no Postgres = a merchant/staff address (identity-managed, ID-1..ID-11);
+    // there is no user row to read, so answer the same enumeration-safe generic success a missing user gets.
+    if (postgresRemovedOnThisWorker()) return { ...GENERIC_RESEND_VERIFICATION_RESULT };
     const user = await findUserInScope(
       email,
       storeId,
@@ -2003,6 +2006,17 @@ export class AuthService {
     if (typeof email !== 'string') throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
     const route = await customerAuthRoute(storeId, { write: true });
     if (route.kind === 'do') return CustomerAuthFlows.requestReset(route.client, email);
+    // NEON-ZERO (Ruling NZ-ACCT-1): no store + no Postgres = a merchant/staff address; the credential lives in the
+    // identity service, which issues + mails its own code (and answers generically for an unknown address). Never
+    // reach `withUser`; return null (the route's generic response) as a missing user does.
+    if (postgresRemovedOnThisWorker()) {
+      cfWaitUntil(
+        forgotIdentityPassword(email).catch(err =>
+          logger.error({ err }, 'identity password-reset request failed')
+        )
+      );
+      return null;
+    }
     // Tenant-scoped lookup so a Store A reset request doesn't leak the
     // existence of an account on Store B with the same email.
     const user = await findUserInScope(

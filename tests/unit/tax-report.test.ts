@@ -14,6 +14,11 @@ vi.mock('@ebda/database', () => ({
   },
 }));
 
+const mockStoreMoney = vi.fn();
+vi.mock('../../apps/api/src/lib/repo-factory', () => ({
+  storeMoney: (...a: unknown[]) => mockStoreMoney(...a),
+}));
+
 import { generateTaxReport } from '../../apps/api/src/services/accounting/tax-report.service';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -50,6 +55,8 @@ const TO = new Date('2026-01-31');
 
 beforeEach(() => {
   mockQueryRawUnsafe.mockReset();
+  mockStoreMoney.mockReset();
+  mockStoreMoney.mockResolvedValue(null);
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -305,5 +312,68 @@ describe('generateTaxReport — basic aggregation', () => {
     // rejects raw JS Date objects.
     expect(f).toBe(FROM.toISOString());
     expect(t).toBe(TO.toISOString());
+  });
+});
+
+describe('generateTaxReport on a Durable Object store (Ruling NZ-ACCT-1)', () => {
+  const WIN = { from: new Date('2026-01-01T00:00:00Z'), to: new Date('2026-01-31T23:59:59Z') };
+  const line = (o: Record<string, unknown>) => ({
+    postedAtMs: Date.parse('2026-01-15T10:00:00Z'),
+    orderNumber: 'ORD-9',
+    customerName: 'Mona Ali',
+    taxDelta: 140,
+    baseDelta: 1000,
+    orderTotal: 1140,
+    isSale: true,
+    ...o,
+  });
+
+  it('reads the DO op with the window in ms and never touches Postgres', async () => {
+    const taxReportLines = vi.fn().mockResolvedValue([line({})]);
+    mockStoreMoney.mockResolvedValue({ taxReportLines });
+    const r = await generateTaxReport('s1', { ...WIN, timeZone: 'UTC' });
+    expect(taxReportLines).toHaveBeenCalledWith({
+      fromMs: WIN.from.getTime(),
+      toMs: WIN.to.getTime(),
+    });
+    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]).toMatchObject({
+      kind: 'sale',
+      orderNumber: 'ORD-9',
+      customerName: 'Mona Ali',
+      subtotal: 1000,
+      taxCollected: 140,
+      taxRate: '14.00',
+      total: 1140,
+    });
+  });
+
+  it('an empty window is an empty report, and a reversal row keeps its negative tax with no order total', async () => {
+    mockStoreMoney.mockResolvedValue({ taxReportLines: vi.fn().mockResolvedValue([]) });
+    const empty = await generateTaxReport('s1', { ...WIN, timeZone: 'UTC' });
+    expect(empty.rows).toEqual([]);
+    mockStoreMoney.mockResolvedValue({
+      taxReportLines: vi
+        .fn()
+        .mockResolvedValue([
+          line({ isSale: false, taxDelta: -140, baseDelta: -1000, customerName: null }),
+        ]),
+    });
+    const rev = await generateTaxReport('s1', { ...WIN, timeZone: 'UTC' });
+    expect(rev.rows[0]).toMatchObject({
+      kind: 'reversal',
+      taxCollected: -140,
+      total: null,
+      customerName: null,
+    });
+  });
+
+  it('a DO refusal propagates (never falls back to Postgres)', async () => {
+    mockStoreMoney.mockResolvedValue({
+      taxReportLines: vi.fn().mockRejectedValue(new Error('DO down')),
+    });
+    await expect(generateTaxReport('s1', WIN)).rejects.toThrow('DO down');
+    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
   });
 });
