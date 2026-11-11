@@ -25,6 +25,7 @@ import { errorHandler, AppError } from '@api/middleware/error-handler';
 import { StoreService } from '@api/services/store.service';
 import { config } from '@api/config';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { safeRun } from '../helpers/safe-run';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 function appUrl(): string {
@@ -38,7 +39,7 @@ const asApp = <T>(fn: () => Promise<T>) =>
     beforeDisconnect: () => awaitDeferredWork(5000),
   });
 
-const run = crypto.randomUUID().slice(0, 8);
+const run = safeRun();
 const userIds: string[] = [];
 const slugs: string[] = [];
 
