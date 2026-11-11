@@ -1787,7 +1787,7 @@ export function matchRefundToClaim(
  * tells the caller to run it.
  */
 /** The order-level key of a merchant-recorded InstaPay refund (DO marker and GL entry share it). */
-export const instapayRefundKey = (referenceKey: string): string => `instapay:${referenceKey}`;
+const instapayRefundKey = (referenceKey: string): string => `instapay:${referenceKey}`;
 
 export function recordInstapayRefund(
   db: SyncSql,

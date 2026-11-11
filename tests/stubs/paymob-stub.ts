@@ -338,7 +338,9 @@ export function createPaymobControl(stub: PaymobStub): ContractControl {
         is_voided: false,
         is_refunded: false,
         integration_id: order.methods[0],
-        created_at: existing?.created_at ?? '2026-10-04T10:00:00.000000',
+        // now, not a fixed date: the provider refuses a callback whose signed created_at is older than its window
+        // (38 d), so the old '2026-10-04' constant expired on 2026-11-11 and turned the contract suite red on main
+        created_at: existing?.created_at ?? new Date().toISOString(),
       });
       return deliver(body, hmac);
     },
