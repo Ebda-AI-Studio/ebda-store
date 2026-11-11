@@ -3676,8 +3676,8 @@ export class OrderService {
     // armed: the sweep re-sends restoreInventory:true, which would invent
     // stock that was never reserved. Partial events never claim the ORDER; they
     // arm their own Return instead (below).
-    // A DO store armed both stamps inside the DO section that completed the money step (above): its `prisma` is POSTGRES_REMOVED
-    // (found by the WA-RPC DO test: a cancel of a DO order threw after it had committed, Ruling WA-RPC-7).
+    // A DO store armed both claims in the SAME section as its refund (do/refund.ts reverseWholeOrder, do/returns.ts), so
+    // only a Postgres store arms them here (Ruling NZ-MONEY-6: a POSTGRES_REMOVED 500 on every DO refund to `refunded`).
     if (!doMoney && restoreInventory && !options.partial) {
       await prisma.order.updateMany({
         where: { id: orderId, storeId },

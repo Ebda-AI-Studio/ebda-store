@@ -45,12 +45,31 @@ interface RecordPaymentEventInput {
   occurredAt?: Date;
 }
 
+/** The DO `paymentEventRecord` argument for an event (the DO stamps the store and the time). */
+function doEvent(input: RecordPaymentEventInput) {
+  return {
+    paymentId: input.paymentId,
+    orderId: input.orderId,
+    eventType: input.eventType,
+    fromStatus: input.fromStatus ?? null,
+    toStatus: input.toStatus ?? null,
+    provider: input.provider ?? null,
+    details: (input.details ?? {}) as Record<string, unknown>,
+  };
+}
+
 /**
  * Append a row to `payment_events`. Never throws — if the write fails
  * (DB hiccup, missing FK), the caller's transaction is unaffected.
  */
 export async function recordPaymentEvent(input: RecordPaymentEventInput): Promise<void> {
   try {
+    // A store on its Durable Object (the Worker has no Postgres): the event goes to the DO's payment_events table.
+    const money = await storeMoney(input.storeId);
+    if (money) {
+      await money.paymentEventRecord(doEvent(input));
+      return;
+    }
     // Savepointed (issue 2215's class): order routes write this inside the
     // request's tenant transaction, AFTER the payment/status writes it
     // records; a failure the catch below swallows must not abort them.
@@ -95,15 +114,7 @@ export async function recordPaymentEventForStore(input: RecordPaymentEventInput)
   try {
     const money = await storeMoney(input.storeId);
     if (money) {
-      await money.paymentEventRecord({
-        paymentId: input.paymentId,
-        orderId: input.orderId,
-        eventType: input.eventType,
-        fromStatus: input.fromStatus ?? null,
-        toStatus: input.toStatus ?? null,
-        provider: input.provider ?? null,
-        details: (input.details ?? {}) as Record<string, unknown>,
-      });
+      await money.paymentEventRecord(doEvent(input));
       return;
     }
     await withStore(input.storeId, () => recordPaymentEvent(input));

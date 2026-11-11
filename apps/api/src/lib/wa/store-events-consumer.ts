@@ -15,13 +15,15 @@
  * losing the event. Tenant-scoped: every read and write runs in the event's store context.
  */
 import { applyOptOutChanged } from './consent';
-import { storeRepo } from '../repo-factory';
+import { prisma } from '@ebda/database';
+import { storeRepo, storeDb } from '../repo-factory';
+import { runInStoreTenantContext } from '../store-scoped-read';
 import { outboundStoreEventSchema, type OutboundStoreEvent } from '../../contracts/wa-v1';
 import { redis } from '../../services/redis.service';
 import { OrderService } from '../../services/order.service';
 import { auditLog } from '../../middleware/security';
 import { AppError } from '../../middleware/error-handler';
-import { applyCodOutcomeOnDo } from './cod-outcome';
+import { withDeferredWork } from '../after-tenant-commit';
 import { WhatsAppLinkService, isWhatsAppLinked } from './link';
 import logger from '../logger';
 
@@ -30,18 +32,119 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type StoreEventResult = 'applied' | 'ignored' | 'duplicate' | 'invalid' | 'unknown_order';
 
-async function applyCodOutcome(
+/**
+ * Lock the order row for the rest of the transaction, then read it. The check ("still pending and
+ * unpaid COD?") and the status write run in ONE tenant transaction on a locked row, so a merchant
+ * shipping the order in the same instant either wins first (we then see `shipped` and ignore the
+ * answer) or waits for us. Without the lock a late "refused" could cancel, and restock, a parcel
+ * that had just been handed to the courier.
+ */
+const ORDER_SELECT = {
+  id: true,
+  status: true,
+  paymentStatus: true,
+  createdAt: true,
+  payments: { select: { provider: true, status: true } },
+} as const;
+
+async function lockedOrder(storeId: string, orderId: string) {
+  // A store on its Durable Object (no Postgres, Ruling NZ-MONEY-6): a plain read. There is no row lock across two DO calls;
+  // the status change below re-validates its FROM status inside its own DO section, and `transition()` treats a refusal
+  // as "no longer eligible", so a ship that lands in between is never cancelled.
+  if ((await storeRepo(storeId)).backend === 'do')
+    return (await storeDb(storeId)).order.findUnique({
+      where: { id: orderId, storeId },
+      select: ORDER_SELECT,
+    });
+  await prisma.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} AND store_id = ${storeId} FOR UPDATE`;
+  return prisma.order.findUnique({
+    where: { id: orderId, storeId },
+    select: {
+      id: true,
+      status: true,
+      paymentStatus: true,
+      createdAt: true,
+      payments: { select: { provider: true, status: true } },
+    },
+  });
+}
+
+/** A real COD order still waiting for its money: the only thing a COD answer may act on. */
+/**
+ * The status change of a COD outcome / an erasure cancel. A transition the order state machine refuses (the order moved on
+ * between the read and this call: shipped, already cancelled) is "not acted", never a retry loop.
+ */
+async function transition(
+  storeId: string,
+  orderId: string,
+  to: 'confirmed' | 'cancelled'
+): Promise<{ acted: boolean; refused?: string }> {
+  try {
+    await OrderService.updateStatus(storeId, orderId, to);
+    return { acted: true };
+  } catch (err) {
+    if (err instanceof AppError && (err.statusCode === 400 || err.statusCode === 409))
+      return { acted: false, refused: err.code };
+    throw err;
+  }
+}
+
+function isOpenCodOrder(o: NonNullable<Awaited<ReturnType<typeof lockedOrder>>>): boolean {
+  return (
+    o.paymentStatus === 'unpaid' &&
+    (o.payments ?? []).some(p => p.provider === 'cod' && p.status === 'cod_pending')
+  );
+}
+
+export async function applyCodOutcome(
   e: Extract<OutboundStoreEvent, { type: 'whatsapp.cod_outcome' }>
 ): Promise<StoreEventResult> {
-  // The Worker has no Postgres (NEON-ZERO N-17): the answer is applied on the store's Durable Object (Ruling WA-RPC-7), the same
-  // function the `recordCodOutcome` RPC uses.
-  return applyCodOutcomeOnDo(e.storeId, {
-    orderId: e.data.orderId,
-    outcome: e.data.outcome,
-    occurredAt: e.occurredAt,
-    ref: e.id,
-    source: e.data.source,
-  });
+  const { storeId } = e;
+  const { orderId, outcome } = e.data;
+  // The deferral scope wraps the transaction: the cancel's follow-up work (refund fan-out, cache
+  // busts) fires AFTER COMMIT, never inside it, and is dropped if the transaction rolls back.
+  // a DO store has no Postgres transaction: its deferred work (the status fanout) drains under the store scope
+  const noPgTx = (await storeRepo(storeId)).backend === 'do';
+  return withDeferredWork({ storeId, noPgTx }, () =>
+    runInStoreTenantContext(storeId, async () => {
+      const order = await lockedOrder(storeId, orderId);
+      if (!order) return 'unknown_order';
+      // An answer that predates the order (clock skew, replay of an old id) is not about this order.
+      const stale = new Date(e.occurredAt).getTime() < order.createdAt.getTime();
+
+      let acted = false;
+      let refused: string | undefined;
+      // Only an open COD order can be moved by an answer: an online-paid, shipped, delivered or
+      // already cancelled one has moved on (a late "yes"), and an unpaid card order is NOT a COD
+      // order, so "confirmed" must never make it shippable.
+      if (!stale && isOpenCodOrder(order)) {
+        if (outcome === 'confirmed' && order.status === 'pending') {
+          ({ acted, refused } = await transition(storeId, orderId, 'confirmed'));
+        } else if (
+          outcome === 'refused' &&
+          (order.status === 'pending' || order.status === 'confirmed')
+        ) {
+          ({ acted, refused } = await transition(storeId, orderId, 'cancelled'));
+        }
+      }
+      await auditLog({
+        action: 'order.cod_outcome',
+        resourceType: 'order',
+        resourceId: orderId,
+        storeId,
+        details: {
+          outcome,
+          source: e.data.source,
+          acted,
+          stale,
+          status: order.status,
+          eventId: e.id,
+          ...(refused ? { refused } : {}),
+        },
+      });
+      return acted || (outcome === 'no_reply' && !stale) ? 'applied' : 'ignored';
+    })
+  );
 }
 
 async function applyOrderAfterErasure(
@@ -49,32 +152,28 @@ async function applyOrderAfterErasure(
 ): Promise<StoreEventResult> {
   const { storeId } = e;
   const { orderId } = e.data;
-  // On the store's Durable Object (no Postgres, Ruling WA-RPC-7): cancel an order that is still open, so it is never fulfilled for an
-  // erased customer. The DO section behind `updateStatus` re-checks the live status.
-  const order = await (
-    await storeRepo(storeId)
-  ).db.order.findFirst({
-    where: { id: orderId, storeId, deletedAt: null },
-    select: { id: true, status: true },
-  });
-  if (!order) return 'unknown_order';
-  let acted = false;
-  if (order.status === 'pending' || order.status === 'confirmed') {
-    try {
-      await OrderService.updateStatus(storeId, orderId, 'cancelled');
-      acted = true;
-    } catch (err) {
-      if (!(err instanceof AppError) || err.statusCode >= 500 || err.statusCode === 404) throw err;
-    }
-  }
-  await auditLog({
-    action: 'order.cancelled_after_erasure',
-    resourceType: 'order',
-    resourceId: orderId,
-    storeId,
-    details: { acted, status: order.status, eventId: e.id },
-  });
-  return acted ? 'applied' : 'ignored';
+  // The deferral scope wraps the transaction: the cancel's follow-up work (refund fan-out, cache
+  // busts) fires AFTER COMMIT, never inside it, and is dropped if the transaction rolls back.
+  // a DO store has no Postgres transaction: its deferred work (the status fanout) drains under the store scope
+  const noPgTx = (await storeRepo(storeId)).backend === 'do';
+  return withDeferredWork({ storeId, noPgTx }, () =>
+    runInStoreTenantContext(storeId, async () => {
+      const order = await lockedOrder(storeId, orderId);
+      if (!order) return 'unknown_order';
+      let acted = false;
+      let refused: string | undefined;
+      if (order.status === 'pending' || order.status === 'confirmed')
+        ({ acted, refused } = await transition(storeId, orderId, 'cancelled'));
+      await auditLog({
+        action: 'order.cancelled_after_erasure',
+        resourceType: 'order',
+        resourceId: orderId,
+        storeId,
+        details: { acted, status: order.status, eventId: e.id, ...(refused ? { refused } : {}) },
+      });
+      return acted ? 'applied' : 'ignored';
+    })
+  );
 }
 
 /**

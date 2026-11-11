@@ -8,7 +8,7 @@ import { dispatchEventsToAll } from './dispatch';
 import { guardedRun } from './do-guard';
 import { handleJobsBatch, type QueueMessageLike } from './run-queue';
 import { JOBS_MAP } from './jobs-map';
-import { allJobs } from './registry';
+import { allJobs, jobsForEvent } from './registry';
 import { doStoreIdList } from '../store-backend';
 import { inlineStep } from './step-adapter';
 import type { JobStep } from './types';
@@ -75,4 +75,38 @@ export async function runEveryJobBody(): Promise<RunAllReport> {
   }));
   await handleJobsBatch({ queue: 'ebda-jobs', messages });
   return { jobs, queueMessages: bodies.map(b => String(b.kind)) };
+}
+
+/**
+ * Dev/test only (worker.ts `/__dev/run-event`, DEV_STATS=1): run, inline and once, the body of every job an event triggers,
+ * through the same guard the workflow uses. The workerd harness does not execute event jobs (a Workflow instance), so a test
+ * that must prove what a job body does on a DO store (workers-test/merchant-orders-do.test.ts: the CSV import) runs it here.
+ */
+export async function runEventJobs(
+  name: string,
+  data: Record<string, unknown>
+): Promise<RunAllReport['jobs']> {
+  const base = inlineStep({ dispatch: dispatchEventsToAll });
+  const step: JobStep = {
+    ...base,
+    sleep: async () => undefined,
+    sleepUntil: async () => undefined,
+  };
+  const out: RunAllReport['jobs'] = [];
+  for (const def of jobsForEvent(name)) {
+    const event = { name, data };
+    try {
+      await guardedRun(def, event, () =>
+        def.handler({ event, step, runId: `dev-event-${def.id}`, attempt: 0 })
+      );
+      out.push({ id: def.id, ok: true });
+    } catch (err) {
+      out.push({
+        id: def.id,
+        ok: false,
+        error: String((err as Error)?.message ?? err).slice(0, 300),
+      });
+    }
+  }
+  return out;
 }

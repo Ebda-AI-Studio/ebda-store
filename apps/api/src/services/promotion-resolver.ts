@@ -5,7 +5,6 @@
  * discount math itself lives in the pure `promotion-targeting` module; this
  * layer only queries Prisma and feeds it a fully-resolved context.
  */
-import { prisma } from '@ebda/database';
 import { storeDb } from '../lib/repo-factory';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 import { loadBuyerGroup } from './price-resolver.service';
@@ -34,7 +33,9 @@ export async function resolveCustomerContext(
   const customerId = id.customerId ?? (buyer.kind === 'session' ? buyer.userId : null);
 
   if (customerId) {
-    const priorCount = await prisma.order.count({
+    const priorCount = await (
+      await storeDb(storeId)
+    ).order.count({
       where: { storeId, customerId, deletedAt: null, status: { not: 'cancelled' } },
     });
     return { customerGroupId, isFirstOrder: priorCount === 0 };
@@ -43,7 +44,9 @@ export async function resolveCustomerContext(
   // Guest checkout: no reliable identity beyond what was typed into the shipping form this order. Used ONLY for
   // first-order status, never for group membership.
   if (!id.phone && !id.email) return { customerGroupId, isFirstOrder: true };
-  const priorCount = await prisma.order.count({
+  const priorCount = await (
+    await storeDb(storeId)
+  ).order.count({
     where: {
       storeId,
       deletedAt: null,

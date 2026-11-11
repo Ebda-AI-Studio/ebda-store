@@ -7,7 +7,8 @@ import { storefrontOrigin } from '@ebda/shared';
 import { storeRepo, storeMoney, storeWriter, type CreateOrderArgs } from '../../repo-factory';
 import { lookupStore } from '../../definer';
 import { isWhatsAppLinked } from '../link';
-import { applyCodOutcomeOnDo } from '../cod-outcome';
+import { applyCodOutcome } from '../store-events-consumer';
+import { createHash } from 'crypto';
 import { PaymentService } from '../../../services/payment-providers/payment.factory';
 import { InstapayService } from '../../../services/payment-providers/instapay.service';
 import { paymentWebhookUrl } from '../../../services/payment-providers/webhook-url';
@@ -468,13 +469,20 @@ export function createDoPort(): BridgePort {
         select: { orderNumber: true },
       });
       if (!o) return null;
-      // Same function the queue consumer uses; replay-safe by state (see cod-outcome.ts). The key is audited as the reference.
-      const r = await applyCodOutcomeOnDo(storeId, {
-        orderId: a.orderId,
-        outcome: a.outcome,
+      // ONE implementation: the queue consumer's `applyCodOutcome` (Ruling WA-RPC-7). Open-COD-only, one-way transitions through the
+      // DO status writer (which re-checks the live status), audited `source: whatsapp`; a replay is a no-op by state. The key is audited
+      // as the event id (a uuid derived from it).
+      const h = createHash('sha256')
+        .update(`wa-rpc-cod:v1:${storeId}:${a.idempotencyKey}`)
+        .digest('hex');
+      const id = `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+      const r = await applyCodOutcome({
+        id,
+        type: 'whatsapp.cod_outcome',
+        v: 1,
+        storeId,
         occurredAt: a.at,
-        ref: a.idempotencyKey,
-        source: 'whatsapp',
+        data: { orderId: a.orderId, outcome: a.outcome, source: 'whatsapp' },
       });
       return r === 'unknown_order' ? null : { orderNumber: o.orderNumber };
     },

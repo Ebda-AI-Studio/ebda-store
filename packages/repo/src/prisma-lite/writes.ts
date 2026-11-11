@@ -252,6 +252,9 @@ export class WriteEngine extends Engine {
         else {
           const d = this.defaultValue(f, now);
           if (d.has) v = d.value;
+          // An omitted scalar LIST answers `[]` in Prisma (Postgres gives the column DEFAULT '{}'); the DO column is NOT NULL
+          // with no default, so the clearance coupon's `scopeProductIds` failed P2011 (Ruling NZ-MERCHANT-1).
+          else if (f.list) v = [];
           else if (f.default === 'autoincrement()') {
             autoId = true;
             continue;

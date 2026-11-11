@@ -656,3 +656,56 @@ describe('`_count: true` answers a number, as Prisma does (insights dashboard re
     ]);
   });
 });
+
+describe('Json path filter (promotion-resolver first-order check on a DO store)', () => {
+  it('`{ path, equals }` matches the JSON value at the path, type-strict; anything else is refused', async () => {
+    const { db, lite } = setup();
+    const O = db.prepare(
+      `INSERT INTO orders (id, store_id, order_number, status, payment_status, subtotal, total, shipping_address, billing_address, created_at, updated_at)
+       VALUES (?, 's1', ?, 'pending', 'paid', 100, 100, ?, '{}', 1, 1)`
+    );
+    O.run('o1', 1, '{"phone":"+201000000001","email":"a@x.eg"}');
+    O.run('o2', 2, '{"phone":"+201000000001"}');
+    O.run('o3', 3, '{"phone":201000000001}');
+    O.run('o4', 4, '{"nested":{"phone":"+201000000001"}}');
+    const n = (where: unknown) =>
+      lite.order.count({ where: { storeId: 's1', ...(where as object) } });
+    expect(await n({ shippingAddress: { path: ['phone'], equals: '+201000000001' } })).toBe(2);
+    expect(await n({ shippingAddress: { path: ['phone'], equals: 201000000001 } })).toBe(1);
+    expect(
+      await n({ shippingAddress: { path: ['nested', 'phone'], equals: '+201000000001' } })
+    ).toBe(1);
+    expect(
+      await n({
+        OR: [
+          { shippingAddress: { path: ['phone'], equals: '+209999' } },
+          { shippingAddress: { path: ['email'], equals: 'a@x.eg' } },
+        ],
+      })
+    ).toBe(1);
+    await expect(
+      n({ shippingAddress: { path: ["phone') OR 1=1 --"], equals: 'x' } })
+    ).rejects.toThrow(/plain keys/);
+    await expect(n({ shippingAddress: { path: ['phone'], string_contains: 'x' } })).rejects.toThrow(
+      /equals` only/
+    );
+    await expect(n({ name: { path: ['x'], equals: 'y' } })).rejects.toThrow();
+  });
+});
+
+describe('an omitted scalar list is `[]` on create, as Prisma answers it', () => {
+  it('a coupon created without its scope lists stores and reads them as []', async () => {
+    const { lite } = setup();
+    const c = await lite.coupon.create({
+      data: {
+        id: 'c1',
+        storeId: 's1',
+        code: 'CLEAR-X',
+        name: 'Clearance',
+        type: 'percentage',
+        value: 10,
+      },
+    });
+    expect([c.scopeProductIds, c.scopeCategoryIds]).toEqual([[], []]);
+  });
+});

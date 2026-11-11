@@ -95,6 +95,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'AnswerEngineCheck',
   // the carrier booking job claims and updates the shipment row (INFRA-CF-1, Ruling CF-JOBS-4)
   'Shipment',
+  // a carrier pickup request (claim -> carrier call -> requested / cancelled); the partial unique index keeps one active
+  'ShipmentPickup',
   // merchant shipping zones and per-area rates (NEON-ZERO-1 group A, Ruling NZ-A-1)
   'ShippingZone',
   'ShippingAreaRate',

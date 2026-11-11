@@ -131,6 +131,7 @@ export type WritableModel =
   | 'customerRfmSnapshot'
   | 'answerEngineCheck'
   | 'shipment'
+  | 'shipmentPickup'
   | 'shippingZone'
   | 'shippingAreaRate'
   | 'reorderSuggestion'
@@ -247,6 +248,11 @@ export interface StockClient {
     failed: number;
     results: Array<{ variantId: string; success: boolean }>;
   }>;
+  /** Disable / re-enable a variant; a variant holding units gets its stock-history row in the same DO transaction. */
+  setVariantActive(
+    a: { productId: string; variantId: string; isActive: boolean; userId?: string },
+    key?: string
+  ): Promise<{ changed: boolean; historyId: string | null }>;
   setWarehouseStock(
     a: { warehouseId: string; productId: string; variantId?: string | null; quantity: number },
     key?: string
@@ -701,6 +707,27 @@ export interface MoneyClient {
     a: { claimId: string; refundId: string; providerStatus?: string; reason?: string },
     key?: string
   ): Promise<{ orderStatus: string; booked: boolean; review: boolean }>;
+  refundMatchClaim(a: {
+    claimId: string;
+    providerRefundId: string;
+    actorUserId: string;
+    orderId?: string;
+  }): Promise<{ result: 'matched' | 'already_matched' }>;
+  instapayRefundRecord(a: {
+    orderId: string;
+    referenceKey: string;
+    amountMinor: number;
+    record: Record<string, unknown>;
+    actorUserId: string | null;
+  }): Promise<{
+    duplicate: boolean;
+    full: boolean;
+    paymentId: string;
+    fromStatus: string;
+    status: string;
+    refundedAmount: number;
+    orderStatus: string;
+  }>;
   refundRelease(
     a: { claimId: string; reason: string; error?: string },
     key?: string
@@ -1440,6 +1467,7 @@ export function makeStockClient(
     setProduct: (a, key) => call('setProduct', a, key),
     bulkAdjustProducts: (a, key) => call('bulkAdjustProducts', a, key),
     setVariantInventory: (a, key) => call('setVariantInventory', a, key),
+    setVariantActive: (a, key) => call('setVariantActive', a, key),
     setWarehouseStock: (a, key) => call('setWarehouseStock', a, key),
     adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', a, key),
     createStockAdjustment: (a, key) => call('createStockAdjustment', a, key),
@@ -1507,6 +1535,8 @@ export function makeMoneyClient(
     refundBegin: (a, key) => call('refundBegin', a, key),
     refundComplete: (a, key) => call('refundComplete', a, key),
     refundRelease: (a, key) => call('refundRelease', a, key),
+    refundMatchClaim: a => call('refundMatchClaim', a),
+    instapayRefundRecord: a => call('instapayRefundRecord', a),
     refundIndeterminate: (a, key) => call('refundIndeterminate', a, key),
     refundBook: (a, key) => call('refundBook', a, key),
     journalSale: (a, key) => call('journalSale', a, key),

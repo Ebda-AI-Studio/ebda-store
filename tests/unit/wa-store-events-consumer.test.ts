@@ -5,19 +5,42 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
+  inScope: { v: false },
   alert: vi.fn(),
   applyEntitlement: vi.fn(),
   linked: vi.fn(),
+  lock: vi.fn(),
   order: vi.fn(),
   updateStatus: vi.fn(),
   audit: vi.fn(),
   exists: vi.fn(),
   set: vi.fn(),
+  scope: vi.fn(),
   optOut: vi.fn(),
 }));
-// The Worker has no Postgres: the order is read from the store's Durable Object repo (Ruling WA-RPC-7).
-vi.mock('@api/lib/repo-factory', () => ({
-  storeRepo: async () => ({ db: { order: { findFirst: (...a: unknown[]) => h.order(...a) } } }),
+vi.mock('@ebda/database', () => ({
+  prisma: {
+    // tagged template: SELECT ... FOR UPDATE
+    $queryRaw: (...a: unknown[]) => {
+      expect(h.inScope.v, 'row lock taken outside the tenant context').toBe(true);
+      return h.lock(...a);
+    },
+    order: {
+      findUnique: (...a: unknown[]) => {
+        expect(h.inScope.v, 'order read outside the tenant context').toBe(true);
+        return h.order(...a);
+      },
+    },
+  },
+  runInTenantContext: async (s: string, fn: () => unknown) => {
+    h.scope(s);
+    h.inScope.v = true;
+    try {
+      return await fn();
+    } finally {
+      h.inScope.v = false;
+    }
+  },
 }));
 vi.mock('@api/lib/wa/consent', () => ({ applyOptOutChanged: h.optOut }));
 vi.mock('@api/lib/wa/link', () => ({
@@ -26,7 +49,10 @@ vi.mock('@api/lib/wa/link', () => ({
 }));
 vi.mock('@api/services/order.service', () => ({
   OrderService: {
-    updateStatus: (...a: unknown[]) => h.updateStatus(...a),
+    updateStatus: (...a: unknown[]) => {
+      expect(h.inScope.v, 'status written outside the tenant context').toBe(true);
+      return h.updateStatus(...a);
+    },
   },
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: h.audit }));
@@ -64,20 +90,23 @@ const order = (extra: object = {}) => ({
 
 beforeEach(() => {
   h.linked.mockReset().mockResolvedValue(true);
+  h.lock.mockReset().mockResolvedValue([{ id: 'o1' }]);
   h.order.mockReset().mockResolvedValue(order());
   h.updateStatus.mockReset().mockResolvedValue(undefined);
   h.audit.mockReset().mockResolvedValue(undefined);
   h.exists.mockReset().mockResolvedValue(false);
   h.set.mockReset().mockResolvedValue(undefined);
+  h.scope.mockReset();
   h.alert.mockReset().mockResolvedValue(undefined);
   h.applyEntitlement.mockReset().mockResolvedValue(true);
   h.optOut.mockReset().mockResolvedValue('applied');
 });
 
 describe('whatsapp.cod_outcome', () => {
-  it('confirmed: a pending COD order becomes confirmed, tagged source whatsapp', async () => {
+  it('confirmed: a pending COD order becomes confirmed, tagged source whatsapp, in the store scope', async () => {
     expect(await handleStoreEvent(cod('confirmed'))).toBe('applied');
     expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'confirmed');
+    expect(h.scope).toHaveBeenCalledWith(STORE);
     expect(h.audit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'order.cod_outcome',
@@ -89,11 +118,28 @@ describe('whatsapp.cod_outcome', () => {
 
   it('refused: a pending or confirmed order is cancelled', async () => {
     await handleStoreEvent(cod('refused'));
-    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled', { unpaidOnly: true });
+    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled');
     h.updateStatus.mockClear();
     h.order.mockResolvedValue(order({ status: 'confirmed' }));
     await handleStoreEvent(cod('refused'));
-    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled', { unpaidOnly: true });
+    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled');
+  });
+
+  it('the order moved on between the read and the change (a refused transition): not acted, audited, never a retry', async () => {
+    const { AppError } = await import('@api/middleware/error-handler');
+    h.updateStatus.mockRejectedValueOnce(new AppError(400, 'INVALID_STATUS_TRANSITION', 'shipped'));
+    await expect(handleStoreEvent(cod('refused'))).resolves.toBe('ignored');
+    expect(h.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'order.cod_outcome',
+        details: expect.objectContaining({ acted: false, refused: 'INVALID_STATUS_TRANSITION' }),
+      })
+    );
+  });
+
+  it('any other failure of the change still throws (the queue retries it)', async () => {
+    h.updateStatus.mockRejectedValueOnce(new Error('DO unreachable'));
+    await expect(handleStoreEvent(cod('refused'))).rejects.toThrow('DO unreachable');
   });
 
   it('no_reply: recorded, nothing changes', async () => {
@@ -120,9 +166,13 @@ describe('whatsapp.cod_outcome', () => {
     expect(h.updateStatus).not.toHaveBeenCalled();
   });
 
-  it('a refusal can only cancel an UNPAID order (the DO refuses when a payment landed first)', async () => {
+  it('the order row is locked before it is read, and the write happens in the same tenant context', async () => {
     await handleStoreEvent(cod('refused'));
-    expect(h.updateStatus).toHaveBeenCalledWith(STORE, 'o1', 'cancelled', { unpaidOnly: true });
+    expect(h.lock).toHaveBeenCalledTimes(1);
+    expect(h.lock.mock.invocationCallOrder[0]).toBeLessThan(h.order.mock.invocationCallOrder[0]!);
+    expect(h.order.mock.invocationCallOrder[0]).toBeLessThan(
+      h.updateStatus.mock.invocationCallOrder[0]!
+    );
   });
 
   it('an unpaid CARD order (no COD payment) is never moved by a COD answer', async () => {
