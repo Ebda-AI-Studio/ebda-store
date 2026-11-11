@@ -24,16 +24,17 @@ permissions:
   issues: write
 
 concurrency:
-  # label events and non-base edits (title/body) get their own groups: a person adding a label or fixing a typo must not cancel a bot review that is running
-  group: ai-review-${{ github.event.pull_request.number || github.run_id }}-${{ github.event.action == 'labeled' && 'label' || github.event.action == 'edited' && github.event.changes.base.ref.from == null && 'edit' || 'review' }}
-  cancel-in-progress: true
+  # ONE group per PR for every event, queued (never cancelled): a later check always runs after the earlier strip, and a running review is never killed
+  # by a label or an edit. (GitHub keeps at most one pending run per group; the freshness rule in label-fresh.mjs covers a skipped strip.)
+  group: ai-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   classify:
     name: AI review classify
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
-    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft && github.event.action != 'labeled' && (github.event.action != 'edited' || github.event.changes.base.ref.from != null)
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'labeled' && (github.event.action != 'edited' || github.event.changes.base.ref.from != null)
     outputs:
       risky: ${{ steps.paths.outputs.risky }}
     steps:
@@ -74,7 +75,7 @@ jobs:
     needs: classify
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'labeled' && needs.classify.outputs.risky == 'true'
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'labeled' && !github.event.pull_request.draft && needs.classify.outputs.risky == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,8 +92,13 @@ jobs:
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. This PR cannot merge unreviewed. Ahmad: run 'claude setup-token', then 'gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <owner>/<repo>' (or once at org level)."
             exit 1
           fi
-      - name: Install the Claude CLI (pinned)
-        run: npm install --global --ignore-scripts @anthropic-ai/claude-code@2.1.310
+      - name: Install the Claude CLI (pinned; install scripts stay off, only the package's own installer runs)
+        run: |
+          set -euo pipefail
+          npm install --global --ignore-scripts @anthropic-ai/claude-code@2.1.310
+          # --ignore-scripts skipped the postinstall that fetches the native binary ("claude native binary not installed"): run exactly that one script
+          node "$(npm root --global)/@anthropic-ai/claude-code/install.cjs"
+          claude --version
       - name: Build the diff (fail closed when it is too large)
         env:
           PR: ${{ github.event.pull_request.number }}
@@ -129,10 +135,57 @@ jobs:
         if: steps.gate.outputs.passed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          set -euo pipefail
+          # the review is queued, not cancelled, so a push may have landed while it ran: never label a head that was not reviewed
+          [ "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" = "$HEAD_SHA" ] || { echo "::error::the PR head moved during the review; not labelling (the next run reviews the new head)"; exit 1; }
           gh label create ai-review-passed --color 0E8A16 --description "independent AI review found no criticals on this head" 2>/dev/null || true
           gh pr edit "$PR" --add-label ai-review-passed
+
+  # Every subscribed event must end in a REAL "AI review" conclusion: a skipped required check can read as green. Review runs only on pushes and base
+  # changes; for every other event (non-risky PR, label other than ai-review-passed, title/body edit, draft) one of these two jobs states the current verdict.
+  not-risky:
+    name: AI review
+    needs: classify
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    if: github.event.pull_request.head.repo.full_name == github.repository && needs.classify.outputs.risky == 'false'
+    steps:
+      - run: echo "all-safe diff - docs, markdown and newly added tests only - no review required"
+
+  state-check:
+    name: AI review
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    if: github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name != 'ai-review-passed') || (github.event.action == 'edited' && github.event.changes.base.ref.from == null) || (github.event.pull_request.draft && github.event.action != 'labeled'))
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Enforce the current state (never strips, never reviews)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+          [ "$(git rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
+          git diff --name-status --no-renames "origin/$BASE_REF...refs/pr/head" > changed.txt
+          node .github/ai-review/risky-paths.mjs < changed.txt > risky.txt
+          if [ ! -s risky.txt ]; then echo "all-safe diff: no review required"; exit 0; fi
+          # the label counts only when it was applied AFTER the head commit (the drain's rule): a push makes it stale even before a strip run removes it
+          node .github/ai-review/label-fresh.mjs || { echo "::error::This PR needs a current ai-review-passed (absent or older than the head commit). Nothing was stripped by this event."; exit 1; }
 
   # A same-repo PR a maintainer labelled by hand (reviewed a diff the bot could not, e.g. over 400 KB). Same check name as `review`, so the
   # newest run on this head (green) supersedes the red one. Passes only while the label is really on the PR.
@@ -152,29 +205,41 @@ jobs:
           gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx ai-review-passed || { echo "::error::the ai-review-passed label is no longer on the PR"; exit 1; }
           echo "ai-review-passed applied by hand by $ACTOR; the bot review is superseded by that human review"
 
-  # Fork PRs: no secret is ever used and nothing is skipped. Red until a maintainer reviews the PR and labels it ai-review-passed.
+  # Fork PRs: no secret is ever used and nothing is skipped (this job runs on EVERY event). Red until a maintainer reviews the PR and labels it ai-review-passed.
   fork-gate:
     # fork-guard-exempt: this job IS the fork handler; it runs only gh label/view commands from the base workflow and never touches PR content
     name: AI review
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
-    if: github.event.pull_request.head.repo.full_name != github.repository && (github.event.action != 'edited' || github.event.changes.base.ref.from != null)
+    if: github.event.pull_request.head.repo.full_name != github.repository
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           ACTION: ${{ github.event.action }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_FROM: ${{ github.event.changes.base.ref.from }}
         run: |
           set -euo pipefail
-          if [ "$ACTION" != labeled ]; then
+          # strip only on a push-like event or a base-branch change; a label event or a title/body edit only re-evaluates the current state
+          strip=1
+          [ "$ACTION" = labeled ] && strip=0
+          [ "$ACTION" = edited ] && [ -z "$BASE_FROM" ] && strip=0
+          if [ "$strip" = 1 ]; then
             # a new head invalidates an earlier manual pass
             gh pr edit "$PR" --remove-label ai-review-passed 2>/dev/null || true
             gh label create risky-path --color B60205 --description "needs ai-review-passed" 2>/dev/null || true
             gh pr edit "$PR" --add-label risky-path
           fi
-          if gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx ai-review-passed; then
-            echo "fork PR: ai-review-passed was applied by a maintainer"
+          if node .github/ai-review/label-fresh.mjs; then
+            echo "fork PR: ai-review-passed was applied by a maintainer after the head commit"
           else
             echo "::error::Fork PR: it is never reviewed with secrets and never skipped. A maintainer must review it, then add the label ai-review-passed (that re-runs this check)."
             exit 1
