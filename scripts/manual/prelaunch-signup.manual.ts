@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-// MANUAL (needs an inbox): signs a new merchant up at store.ebda.app/signup and stops at
+// MANUAL, deliberately outside every test glob (Ruling LIC-HYGIENE-1). Needs an inbox: signs a new merchant up at store.ebda.app/signup and stops at
 // "check your email". The verification code is read from the inbox by the operator.
 // Run: PRELAUNCH_SIGNUP_EMAIL=... PRELAUNCH_SIGNUP_PHONE=... PRELAUNCH_SIGNUP_PASSWORD=... \
-//      npx playwright test -c playwright.prelaunch.config.ts signup.manual --project=desktop
+//      npx playwright test -c playwright.manual.config.ts
 const email = process.env.PRELAUNCH_SIGNUP_EMAIL;
 const phone = process.env.PRELAUNCH_SIGNUP_PHONE;
 const password = process.env.PRELAUNCH_SIGNUP_PASSWORD;
