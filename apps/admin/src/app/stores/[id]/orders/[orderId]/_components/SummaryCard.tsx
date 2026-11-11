@@ -2,9 +2,10 @@
 
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
-import { orderTaxPlacement, formatSigned } from '@ebda/shared';
+import { orderTaxPlacement } from '@ebda/shared';
 import { formatMoney } from './format';
 import type { OrderDetail } from './types';
+import { SignedNumber } from '@ebda/ui';
 
 interface SummaryCardProps {
   order: OrderDetail;
@@ -159,7 +160,10 @@ export function SummaryCard({ order }: SummaryCardProps) {
             <div className="flex items-center justify-between">
               <dt className="text-foreground">{t('paidFromWallet')}</dt>
               <dd className="font-medium text-foreground">
-                {formatSigned(-walletAmount, { format: abs => formatMoney(abs, order.currency) })}
+                <SignedNumber
+                  value={-walletAmount}
+                  format={abs => formatMoney(abs, order.currency)}
+                />
               </dd>
             </div>
             <div className="flex items-center justify-between">

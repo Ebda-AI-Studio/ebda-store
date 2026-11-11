@@ -1,6 +1,6 @@
 'use client';
 
-import { storeNumerals, formatSigned } from '@ebda/shared';
+import { storeNumerals } from '@ebda/shared';
 import { useEffect, useState } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -8,6 +8,7 @@ import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useWallet } from '../../../hooks/useWallet';
 import { api } from '../../../lib/api';
 import { formatDate as formatStoreDate } from '../../../lib/format-date';
+import { SignedNumber } from '@ebda/ui';
 
 interface WalletEntry {
   id: string;
@@ -211,7 +212,7 @@ export default function WalletClient() {
                     }`}
                   >
                     <span dir="ltr">
-                      {formatSigned(entry.amount, { plus: true, format: abs => money(abs) })}
+                      <SignedNumber value={entry.amount} plus format={abs => money(abs)} />
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground">

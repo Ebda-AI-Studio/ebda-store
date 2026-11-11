@@ -115,7 +115,7 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
             {discountLabel ||
               (isRtl
                 ? `${localizeDigits(discount, numerals)}% خصم`
-                : formatSigned(-discount, { format: abs => `${abs}%` }))}
+                : formatSigned(-discount, { format: abs => `${abs}%`, isolate: false }))}
           </span>
         )}
       </div>

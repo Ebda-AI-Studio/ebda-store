@@ -857,7 +857,8 @@ function ProductListPicker({
                 onClick={() => onChange([...value, p.id])}
                 className="w-full truncate justify-start"
               >
-                + {locale === 'ar' && p.nameAr ? p.nameAr : p.name}
+                {/* sign-ok: button label glyph, not a number */}+{' '}
+                {locale === 'ar' && p.nameAr ? p.nameAr : p.name}
               </Button>
             </li>
           ))}

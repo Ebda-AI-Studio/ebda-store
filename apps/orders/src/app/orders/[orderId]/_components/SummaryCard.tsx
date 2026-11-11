@@ -1,6 +1,6 @@
 'use client';
 
-import { orderTaxPlacement, withNumerals, formatSigned } from '@ebda/shared';
+import { orderTaxPlacement, withNumerals, signedParts, splitNumber } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney } from '@/lib/format';
 import type { OrderDetail } from '@/lib/orders';
@@ -38,6 +38,19 @@ export function SummaryCard({ order }: SummaryCardProps) {
   const otherDiscountPct =
     order.subtotal > 0 ? Math.round((otherDiscount / order.subtotal) * 100) : 0;
   const walletAmount = order.walletAmount ?? 0;
+  // SIGN-1: the minus and its number are one LTR isolate (markup, no hidden characters); the currency keeps its place.
+  const wallet = signedParts(-walletAmount, { format: abs => formatMoney(abs, order.currency) });
+  const [walletBefore, walletNum, walletAfter] = splitNumber(wallet.body);
+  const walletDeducted = (
+    <>
+      {walletBefore}
+      <bdi dir="ltr">
+        {wallet.sign}
+        {walletNum}
+      </bdi>
+      {walletAfter}
+    </>
+  );
   const promotionName = order.appliedPromotion
     ? locale === 'ar' && order.appliedPromotion.nameAr
       ? order.appliedPromotion.nameAr
@@ -143,9 +156,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
           <>
             <div className="flex items-center justify-between">
               <dt className="text-foreground">{t.detail.paidFromWallet}</dt>
-              <dd className="font-medium text-foreground">
-                {formatSigned(-walletAmount, { format: abs => formatMoney(abs, order.currency) })}
-              </dd>
+              <dd className="font-medium text-foreground">{walletDeducted}</dd>
             </div>
             <div className="flex items-center justify-between">
               <dt className="font-semibold text-foreground">{t.detail.amountDue}</dt>

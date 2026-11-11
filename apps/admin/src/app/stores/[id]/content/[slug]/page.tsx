@@ -524,7 +524,7 @@ function BlockColumn({
               ))}
             </select>
             <Button size="sm" type="button" onClick={addBlock} className="gap-1 font-semibold">
-              + {t('addBlock')}
+              {/* sign-ok: button label glyph, not a number */}+ {t('addBlock')}
             </Button>
           </div>
         </div>
@@ -771,7 +771,7 @@ function ItemListEditor({
         </div>
       ))}
       <Button variant="outline" size="sm" type="button" onClick={addItem} className="gap-1">
-        + {t('addItem')}
+        {/* sign-ok: button label glyph, not a number */}+ {t('addItem')}
       </Button>
     </div>
   );

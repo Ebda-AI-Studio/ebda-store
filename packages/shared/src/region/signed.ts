@@ -41,6 +41,8 @@ export interface SignedOptions {
   fractionDigits?: number;
   /** Format the ABSOLUTE value (e.g. money). Default: grouped Western digits. */
   format?: (abs: number) => string;
+  /** String form only: wrap sign + number in an LRI...PDI isolate (default true). JSX uses <SignedNumber> and never needs it. */
+  isolate?: boolean;
 }
 
 /** Sign and body for a value, with the zero rule applied. `sign` is '' for zero. */
@@ -65,5 +67,10 @@ export function signedParts(
 /** `\u2212450` / `+450` / `0` as a string; sign + number are one LTR isolate, a currency in `format` keeps its place. */
 export function formatSigned(value: number, opts: SignedOptions = {}): string {
   const { sign, body } = signedParts(value, opts);
-  return sign ? signedText(sign, body) : body;
+  if (!sign) return body;
+  if (opts.isolate === false) {
+    const [before, num, after] = splitNumber(body);
+    return `${before}${sign}${num}${after}`;
+  }
+  return signedText(sign, body);
 }

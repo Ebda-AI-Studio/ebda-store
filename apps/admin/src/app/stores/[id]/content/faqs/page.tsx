@@ -293,7 +293,7 @@ export default function StoreFaqsPage() {
                 }}
                 className="gap-1.5 font-semibold"
               >
-                + {t('addFaq')}
+                {/* sign-ok: button label glyph, not a number */}+ {t('addFaq')}
               </Button>
             )}
           </div>
@@ -554,7 +554,7 @@ export default function StoreFaqsPage() {
                 }}
                 className="gap-1.5 font-semibold"
               >
-                + {t('addHowto')}
+                {/* sign-ok: button label glyph, not a number */}+ {t('addHowto')}
               </Button>
             )}
           </div>
@@ -753,7 +753,7 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
               }))
             }
           >
-            + {t('addStep')}
+            {/* sign-ok: button label glyph, not a number */}+ {t('addStep')}
           </Button>
         </div>
         {draft.steps.map((step, i) => {

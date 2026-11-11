@@ -8,7 +8,8 @@ import { apiGet } from '../../../../../../lib/api';
 import { formatPrice, intlLocaleForUi } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { Button } from '@/components/ui/Button';
-import { formatSigned } from '@ebda/shared';
+import {} from '@ebda/shared';
+import { SignedNumber } from '@ebda/ui';
 
 // ---------------------------------------------------------------------------
 // Types — shape returned by GET /affiliates/:id/audit-trail
@@ -323,10 +324,11 @@ export default function AffiliateAuditTrailPage() {
                             <p>
                               {t('commissionLabel')}{' '}
                               <span className="font-medium text-success-ink">
-                                {formatSigned(Number(event.details.commissionAmount), {
-                                  plus: true,
-                                  format: abs => formatPrice(abs),
-                                })}
+                                <SignedNumber
+                                  value={Number(event.details.commissionAmount)}
+                                  plus
+                                  format={abs => formatPrice(abs)}
+                                />
                               </span>
                             </p>
                           )}

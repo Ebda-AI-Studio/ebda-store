@@ -202,7 +202,8 @@ export default function WholesaleApplicationsPage() {
                         {row.commercialRegNo ? (
                           <>
                             {' '}
-                            - {t('regNo')} <bdi dir="ltr">{row.commercialRegNo}</bdi>
+                            {/* sign-ok: button label glyph, not a number */}- {t('regNo')}{' '}
+                            <bdi dir="ltr">{row.commercialRegNo}</bdi>
                           </>
                         ) : null}
                       </p>

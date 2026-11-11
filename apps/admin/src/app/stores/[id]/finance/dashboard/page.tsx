@@ -9,14 +9,10 @@ import { apiGet, apiGetPage } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import {
-  reportRangeQueryString,
-  minorToDecimalString,
-  withNumerals,
-  formatSigned,
-} from '@ebda/shared';
+import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { SignedNumber } from '@ebda/ui';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CashAccountRow {
@@ -319,7 +315,13 @@ export default function FinanceDashboardPage() {
                   }`}
                   title={dashboardErr ?? undefined}
                 >
-                  {dashboardErr ? '—' : <>{formatSigned(thisMonth.net, { format: major })}</>}
+                  {dashboardErr ? (
+                    '—'
+                  ) : (
+                    <>
+                      <SignedNumber value={thisMonth.net} format={major} />
+                    </>
+                  )}
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
@@ -510,11 +512,12 @@ export default function FinanceDashboardPage() {
                                 a.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
                               }`}
                             >
-                              {formatSigned(deltaPercentDisplay, {
-                                plus: true,
-                                fractionDigits: 1,
-                                format: abs => `${abs.toFixed(1)}%`,
-                              })}
+                              <SignedNumber
+                                value={deltaPercentDisplay}
+                                plus
+                                fractionDigits={1}
+                                format={abs => `${abs.toFixed(1)}%`}
+                              />
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-1">

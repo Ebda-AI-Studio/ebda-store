@@ -12,12 +12,8 @@ import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ErrorState';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import {
-  reportRangeQueryString,
-  minorToDecimalString,
-  withNumerals,
-  formatSigned,
-} from '@ebda/shared';
+import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
+import { SignedNumber } from '@ebda/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,17 +119,17 @@ export default function StockAdjustmentsPage() {
       header: t('impact'),
       alignEnd: true,
       cell: adj => {
-        const impactStr = formatSigned(adj.totalValueImpact, {
-          plus: true,
-          format: abs => minorToDecimalString(abs),
-        });
         return (
           <span
             className={`font-mono text-xs font-semibold ${
               adj.totalValueImpact < 0 ? 'text-red-600' : 'text-green-700'
             }`}
           >
-            {impactStr}
+            <SignedNumber
+              value={adj.totalValueImpact}
+              plus
+              format={abs => minorToDecimalString(abs)}
+            />
           </span>
         );
       },

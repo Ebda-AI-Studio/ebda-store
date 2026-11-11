@@ -96,7 +96,9 @@ export const ProductBadge = forwardRef<HTMLSpanElement, ProductBadgeProps>(
       if (label) return label;
 
       if (variant === 'sale' && discount) {
-        return isRtl ? `${discount}% خصم` : formatSigned(-discount, { format: abs => `${abs}%` });
+        return isRtl
+          ? `${discount}% خصم`
+          : formatSigned(-discount, { format: abs => `${abs}%`, isolate: false });
       }
 
       return defaultLabels[isRtl ? 'ar' : 'en'][variant] || '';

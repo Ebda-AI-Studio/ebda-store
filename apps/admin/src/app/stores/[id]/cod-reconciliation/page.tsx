@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useToast } from '@ebda/ui';
+import { useToast, SignedNumber } from '@ebda/ui';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { OrderStatusBadge } from '../../../../components/OrderStatusBadge';
@@ -12,7 +12,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { formatMoney } from '../orders/[orderId]/_components/format';
 import { Button } from '@/components/ui/Button';
-import { formatSigned } from '@ebda/shared';
+import {} from '@ebda/shared';
 
 type ReconStatus = 'awaiting' | 'partial' | 'settled' | 'over_remitted' | 'mismatch';
 
@@ -361,12 +361,15 @@ export default function CodReconciliationPage() {
                       <td className="px-3 py-2">{formatMoney(r.result.fees)}</td>
                       <td className="px-3 py-2">{formatMoney(r.result.net)}</td>
                       <td className="px-3 py-2">
-                        {r.result.over > 0
-                          ? formatSigned(r.result.over, {
-                              plus: true,
-                              format: abs => formatMoney(abs),
-                            })
-                          : formatMoney(r.result.outstanding)}
+                        {r.result.over > 0 ? (
+                          <SignedNumber
+                            value={r.result.over}
+                            plus
+                            format={abs => formatMoney(abs)}
+                          />
+                        ) : (
+                          formatMoney(r.result.outstanding)
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <OrderStatusBadge

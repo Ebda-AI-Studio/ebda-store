@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { useToast } from '@ebda/ui';
+import { useToast, SignedNumber } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { minorToMajor, intlLocaleForUi } from '@/lib/format';
-import { withNumerals, formatSigned } from '@ebda/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -376,9 +376,10 @@ export default function StatementDetailPage() {
                   {t('difference.bankBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {formatSigned(difference.bankBalanceFils, {
-                    format: abs => `${tc('egp')} ${major(abs)}`,
-                  })}
+                  <SignedNumber
+                    value={difference.bankBalanceFils}
+                    format={abs => `${tc('egp')} ${major(abs)}`}
+                  />
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
@@ -386,9 +387,10 @@ export default function StatementDetailPage() {
                   {t('difference.ledgerBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {formatSigned(difference.ledgerBalanceFils, {
-                    format: abs => `${tc('egp')} ${major(abs)}`,
-                  })}
+                  <SignedNumber
+                    value={difference.ledgerBalanceFils}
+                    format={abs => `${tc('egp')} ${major(abs)}`}
+                  />
                 </p>
               </div>
               <div
@@ -412,10 +414,11 @@ export default function StatementDetailPage() {
                     difference.isReconciled ? 'text-success-ink' : 'text-destructive-ink'
                   }`}
                 >
-                  {formatSigned(difference.differenceFils, {
-                    plus: true,
-                    format: abs => `${tc('egp')} ${major(abs)}`,
-                  })}
+                  <SignedNumber
+                    value={difference.differenceFils}
+                    plus
+                    format={abs => `${tc('egp')} ${major(abs)}`}
+                  />
                 </p>
               </div>
             </div>
@@ -439,9 +442,10 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedLedgerSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
-                    {formatSigned(difference.unmatchedLedgerFils, {
-                      format: abs => `${tc('egp')} ${major(abs)}`,
-                    })}
+                    <SignedNumber
+                      value={difference.unmatchedLedgerFils}
+                      format={abs => `${tc('egp')} ${major(abs)}`}
+                    />
                   </p>
                   <p className="mt-0.5 text-xs text-info-ink">
                     {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}

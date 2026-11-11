@@ -581,7 +581,7 @@ export function SimpleVariantsForm({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         {!multiAxis ? (
           <Button variant="outline" onClick={addRow} disabled={saving}>
-            + {t('addRow')}
+            {/* sign-ok: button label glyph, not a number */}+ {t('addRow')}
           </Button>
         ) : (
           <p className="text-xs text-muted-foreground">{t('multiAxisLockNote')}</p>

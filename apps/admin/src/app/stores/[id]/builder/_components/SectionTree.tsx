@@ -359,7 +359,7 @@ function Group({
         data-testid={`add-section-${list}`}
         data-setting-id="builder.add-section"
       >
-        + {t('addSection')}
+        {/* sign-ok: button label glyph, not a number */}+ {t('addSection')}
       </Button>
     </section>
   );

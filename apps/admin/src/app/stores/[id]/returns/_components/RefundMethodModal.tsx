@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Modal } from '@ebda/ui';
+import { Modal, SignedNumber } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 
-import { formatMoney, tryToMinor, formatSigned } from '@ebda/shared';
+import { formatMoney, tryToMinor } from '@ebda/shared';
 type RefundMethod = 'original' | 'store_credit' | 'bank_transfer' | 'manual';
 
 // 'manual' ("Already refunded — record only") is offered ONLY when a refund for
@@ -322,10 +322,11 @@ export function RefundMethodModal({
                             {t('tierAdjustment.adjustment')}
                           </dt>
                           <dd className="tabular-nums">
-                            {formatSigned(-l.adjustment, {
-                              plus: true,
-                              format: abs => formatCurrency(abs),
-                            })}
+                            <SignedNumber
+                              value={-l.adjustment}
+                              plus
+                              format={abs => formatCurrency(abs)}
+                            />
                           </dd>
                           <dt className="font-semibold text-foreground">
                             {t('tierAdjustment.adjusted')}

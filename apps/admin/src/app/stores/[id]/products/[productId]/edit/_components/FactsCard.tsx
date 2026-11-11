@@ -119,7 +119,7 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
         <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={t('presets')}>
           {PRESETS.map(p => (
             <Button key={p.key} type="button" onClick={() => add(p)} variant="outline" size="sm">
-              + {locale === 'ar' ? p.keyAr : p.key}
+              {/* sign-ok: button label glyph, not a number */}+ {locale === 'ar' ? p.keyAr : p.key}
             </Button>
           ))}
         </div>

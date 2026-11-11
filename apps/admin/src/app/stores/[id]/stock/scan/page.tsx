@@ -22,7 +22,7 @@ import { useT } from '@/i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useLocale } from 'next-intl';
-import { VariantText } from '@ebda/ui';
+import { VariantText, SignedNumber } from '@ebda/ui';
 import { apiGet, apiPost } from '@/lib/api';
 import {
   orderLineVariantTitle,
@@ -1070,7 +1070,7 @@ function CountMode({ storeId }: { storeId: string }) {
                         : 'text-muted-foreground'
                   }`}
                 >
-                  {formatSigned(line.variance, { plus: true })}
+                  <SignedNumber value={line.variance} plus />
                 </span>
               ),
             },

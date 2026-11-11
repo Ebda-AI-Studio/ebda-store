@@ -40,15 +40,47 @@ describe('formatSigned', () => {
 });
 
 describe('<SignedNumber>', () => {
-  it.each(['en', 'ar'])('[%s] renders a bdi dir=ltr, never -0', language => {
-    expect(renderToStaticMarkup(<SignedNumber value={-0} language={language} />)).toBe(
-      '<bdi dir="ltr">0</bdi>'
-    );
-    expect(renderToStaticMarkup(<SignedNumber value={-30} language={language} />)).toBe(
+  it.each(['en', 'ar'])('[%s] zero is plain, negative/positive sit in a bdi dir=ltr', language => {
+    const html = (el: JSX.Element) => renderToStaticMarkup(el);
+    expect(html(<SignedNumber value={-0} language={language} />)).toBe('0');
+    expect(html(<SignedNumber value={-30} language={language} />)).toBe(
       `<bdi dir="ltr">${MINUS}30</bdi>`
     );
-    expect(renderToStaticMarkup(<SignedNumber value={30} plus language={language} />)).toBe(
+    expect(html(<SignedNumber value={30} plus language={language} />)).toBe(
       '<bdi dir="ltr">+30</bdi>'
     );
+    expect(html(<SignedNumber value={30} language={language} />)).toBe('30');
+  });
+  it('markup isolation: no hidden bidi characters reach the DOM text (copy-paste into Excel stays a number)', () => {
+    const html = renderToStaticMarkup(<SignedNumber value={-1250} />);
+    expect(html).not.toMatch(/[⁦-⁩]/);
+    expect(html.replace(/<[^>]+>/g, '')).toBe(`${MINUS}1,250`);
+  });
+  it('a currency in `format` stays outside the isolate, in ar and en', () => {
+    expect(renderToStaticMarkup(<SignedNumber value={-450} format={abs => `EGP ${abs}`} />)).toBe(
+      `EGP <bdi dir="ltr">${MINUS}450</bdi>`
+    );
+    expect(
+      renderToStaticMarkup(<SignedNumber value={-450} language="ar" format={abs => `${abs} ج.م`} />)
+    ).toBe(`<bdi dir="ltr">${MINUS}450</bdi> ج.م`);
+    expect(renderToStaticMarkup(<SignedNumber value={0} format={abs => `EGP ${abs}`} />)).toBe(
+      'EGP 0'
+    );
+  });
+  it('a 12% gain is +12.0%, a 12% drop is a minus (plus is explicit)', () => {
+    const f = (v: number) =>
+      renderToStaticMarkup(
+        <SignedNumber value={v} plus fractionDigits={1} format={abs => `${abs.toFixed(1)}%`} />
+      );
+    expect(f(12)).toBe('<bdi dir="ltr">+12.0%</bdi>');
+    expect(f(-12)).toBe(`<bdi dir="ltr">${MINUS}12.0%</bdi>`);
+    expect(f(-0.04)).toBe('0.0%');
+  });
+});
+
+describe('formatSigned isolate option', () => {
+  it('isolate:false returns a plain string for badges/dialogs that are LTR already', () => {
+    expect(formatSigned(-21, { isolate: false, format: abs => `${abs}%` })).toBe(`${MINUS}21%`);
+    expect(formatSigned(0, { isolate: false })).toBe('0');
   });
 });

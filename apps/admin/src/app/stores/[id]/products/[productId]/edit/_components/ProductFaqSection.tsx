@@ -522,7 +522,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
               />
             ) : (
               <Button type="button" variant="outline" size="sm" onClick={startNew} className="mt-2">
-                + {t('addFaq')}
+                {/* sign-ok: button label glyph, not a number */}+ {t('addFaq')}
               </Button>
             )}
           </>

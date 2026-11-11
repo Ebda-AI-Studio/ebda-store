@@ -7,9 +7,10 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { useRequireFeature } from '@/hooks/useRequireFeature';
-import { withNumerals, formatSigned } from '@ebda/shared';
+import { withNumerals } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
+import { SignedNumber } from '@ebda/ui';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AnomalySeverity = 'p0' | 'warning';
@@ -137,11 +138,12 @@ function AnomalyRow({
               item.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
             }`}
           >
-            {formatSigned(deltaPercentDisplay, {
-              plus: true,
-              fractionDigits: 1,
-              format: abs => `${abs.toFixed(1)}%`,
-            })}
+            <SignedNumber
+              value={deltaPercentDisplay}
+              plus
+              fractionDigits={1}
+              format={abs => `${abs.toFixed(1)}%`}
+            />
           </p>
         </div>
       </div>
