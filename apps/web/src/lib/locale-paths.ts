@@ -56,7 +56,6 @@ export const LOCALE_SERVED_ROOTS: readonly string[] = [
   'looks',
   'size-guide',
   'affiliate',
-  'collections',
   'q',
 ];
 const SERVED_ROOTS = new Set(LOCALE_SERVED_ROOTS);

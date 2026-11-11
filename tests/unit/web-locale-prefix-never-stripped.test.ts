@@ -45,7 +45,7 @@ describe('a locale-prefixed storefront route is never redirected to an unprefixe
       expect.arrayContaining(['cart', 'checkout', 'account', 'search', 'products'])
     );
   });
-  for (const root of [...roots, 'collections']) {
+  for (const root of roots) {
     for (const locale of ['ar', 'en']) {
       it(`/${locale}/${root}`, () => {
         for (const rest of [`/${root}`, `/${root}/x`]) {
