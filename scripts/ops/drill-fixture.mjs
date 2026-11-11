@@ -126,6 +126,25 @@ console.log(`fixture rows in ${seeded.length}/${tables.length} StoreDO tables`);
 if (seeded.length < 3)
   throw new Error('fixture seeded fewer than 3 tables: the generic row generator needs work');
 
+// A gold-rate product + variant (P2-3 of the 2026-11-12 data-jobs audit): the ebda_gold_price_guard_* triggers abort writing one unless
+// do_flags.gold_reprice = 1, so a restore path that does not raise the flag fails the drill (digest mismatch or import error).
+// The fixture raises it itself for the seed and clears it again; a failure here means the seed, not the restore, is broken.
+await sql(
+  "INSERT INTO do_flags (name, value) VALUES ('gold_reprice', 1) ON CONFLICT (name) DO UPDATE SET value = 1"
+);
+await sql(
+  "INSERT INTO products (id, store_id, name, slug, price, status, pricing_mode, gold_karat, gold_weight_mg, making_charge_type, making_charge_value, gold_margin_bps) VALUES ('fx-gold-1', ?, 'Gold ring', 'fx-gold-ring', 1000, 'active', 'gold_rate', 21, 3250, 'per_gram', 15000, 0)",
+  [storeId]
+);
+await sql(
+  "INSERT INTO product_variants (id, product_id, title, sku, price, pricing_mode) VALUES ('fx-gold-v1', 'fx-gold-1', 'Size 7', 'FX-GOLD-1', 1200, 'gold_rate')"
+);
+await sql("UPDATE do_flags SET value = 0 WHERE name = 'gold_reprice'");
+const goldRows = (await sql("SELECT count(*) AS n FROM products WHERE pricing_mode = 'gold_rate'"))
+  .rows[0].n;
+if (goldRows !== 1) throw new Error('fixture: gold-rate product missing');
+console.log('fixture gold-rate product + variant seeded');
+
 // D1 stand-in: the REAL platform schema (all migrations) plus one store row that points at the DO backend.
 const d1 = new DatabaseSync(':memory:');
 const migDir = path.join(ROOT, 'packages/cf-schema/migrations/platform');

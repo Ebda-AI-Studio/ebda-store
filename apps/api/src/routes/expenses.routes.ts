@@ -7,6 +7,7 @@ import { AppError } from '../middleware/error-handler';
 import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
+import { assertStorageRoom } from '../services/plan-limit.service';
 import { enforceMaxDimensions } from '../services/image-resize.service';
 import { sniffImage, IMAGE_EXT, renameByKind, uploadContentError } from '../lib/upload-sniff';
 
@@ -320,6 +321,8 @@ router.post(
       const receiptBuffer = await enforceMaxDimensions(req.file!.buffer);
       // Named and typed by the bytes actually stored, never the client's filename or mime.
       const storedKind = sniffImage(receiptBuffer) ?? receiptKind;
+
+      await assertStorageRoom(req.params.storeId, receiptBuffer.length);
 
       // Upload to R2 under stores/<storeId>/receipts/
       const uploaded = await runInStoreCtx(req.params.storeId, () =>
