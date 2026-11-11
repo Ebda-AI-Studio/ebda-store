@@ -1472,6 +1472,7 @@
       "unpaid": "Unpaid",
       "remain": "Remain {amount}",
       "paymentMethod": "Payment method",
+      "methodCod": "Cash on delivery",
       "paymentTransactionId": "Transaction ID",
       "paymentLink": "Payment link",
       "summary": "Summary",

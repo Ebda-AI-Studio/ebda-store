@@ -54,7 +54,9 @@ export function formatAddressLines(
   const a = addr as ExtendedAddressJson;
   const lines: string[] = [];
 
-  const country = a.country?.trim();
+  const rawCountry = a.country?.trim();
+  // QA-D2: Arabic UI never prints «Egypt».
+  const country = isAr && rawCountry && /^(egypt|eg)$/i.test(rawCountry) ? 'مصر' : rawCountry;
 
   // Resolve city: prefer Arabic on AR locale, fall back to English.
   // When both exist and differ, show the preferred one only (not both)
@@ -92,7 +94,14 @@ export function formatAddressLines(
 
   const blockBits: string[] = [];
   if (a.block) blockBits.push(`${labels.block} ${a.block}`);
-  if (street) blockBits.push(`${labels.street} ${street}`);
+  // QA-D2: shoppers type «شارع التحرير»: do not print the label twice («شارع شارع التحرير»).
+  if (street) {
+    blockBits.push(
+      street.toLowerCase().startsWith(labels.street.toLowerCase())
+        ? street
+        : `${labels.street} ${street}`
+    );
+  }
   if (a.avenue) blockBits.push(`${labels.avenue} ${a.avenue}`);
   if (a.house) blockBits.push(`${labels.house} ${a.house}`);
   // Fallback: when no structured Egypt fields (block/street) are present,

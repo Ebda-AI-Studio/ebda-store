@@ -43,10 +43,12 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
     const provider = detailPayment.provider?.trim();
     const method = detailPayment.method?.trim();
     if (!provider) return null;
+    // QA-D1: a raw provider code («cod») is never shown; known codes get a localised name.
+    const known = provider.toLowerCase() === 'cod' ? t('methodCod') : provider;
     if (method && method.toLowerCase() !== provider.toLowerCase()) {
-      return `${provider} · ${method}`;
+      return `${known} · ${method}`;
     }
-    return provider;
+    return known;
   })();
 
   return (

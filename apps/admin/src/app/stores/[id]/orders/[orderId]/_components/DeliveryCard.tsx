@@ -218,18 +218,18 @@ export function DeliveryCard({ order, locale, onEdit }: DeliveryCardProps) {
             </div>
           )}
 
-          <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex gap-2">
-              <dt className="text-muted-foreground shrink-0">{t('deliverBy')}:</dt>
-              <dd className="text-foreground font-medium">{t('selfShipping')}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="text-muted-foreground shrink-0">{t('deliverAt')}:</dt>
-              <dd className="text-foreground font-medium">
-                {formatDateTime(order.shippedAt ?? order.createdAt, locale)}
-              </dd>
-            </div>
-          </dl>
+          {/* QA-D3: this card used to print a hard-coded "self delivery" and the ORDER time as the delivery
+              time. The carrier is on the shipment card; the time shown is the real delivery time, or nothing. */}
+          {order.deliveredAt && (
+            <dl className="mt-4 space-y-2 text-sm">
+              <div className="flex gap-2">
+                <dt className="text-muted-foreground shrink-0">{t('deliverAt')}:</dt>
+                <dd className="text-foreground font-medium">
+                  {formatDateTime(order.deliveredAt, locale)}
+                </dd>
+              </div>
+            </dl>
+          )}
         </div>
       </div>
     </section>
