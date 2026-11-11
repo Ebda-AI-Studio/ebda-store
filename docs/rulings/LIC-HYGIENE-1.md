@@ -11,5 +11,3 @@ An offline licensing analyzer counted static `test.skip(...)` calls. Read in con
 - `tests/smoke/commerce-b0.spec.ts` (1, ~50 assertions): skips only when the local B0 stack is down; with `B0_REQUIRE_STACK=1` it FAILS instead, so a gate run cannot pass by skipping (guard test `tests/unit/commerce-b0-spec-guards.test.ts`). Kept.
 - `tests/prelaunch/signup.manual.spec.ts`: manual by design (needs a real inbox, hits production). Moved to `scripts/manual/prelaunch-signup.manual.ts` with `playwright.manual.config.ts`, so no test glob picks it up.
   Cost if wrong: an env-gated suite nobody sets the env for silently never runs; mitigated by `B0_REQUIRE_STACK` for the revenue flow, residual for the editor e2e pair.
-
-**Ruling LIC-HYGIENE-2 - test-only dead helper files are deleted only when nothing imports them.** See the PR body for the list. Cost if wrong: a helper loaded by a dynamic path string is removed; CI typecheck + tests would fail loudly.
