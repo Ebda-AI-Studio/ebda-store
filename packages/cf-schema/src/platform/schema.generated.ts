@@ -651,6 +651,7 @@ export const stores = sqliteTable('stores', {
   storageBackend: text('storage_backend', { enum: ['pg', 'do'] })
     .notNull()
     .default('pg'),
+  templateOriginal: text('template_original'),
 });
 
 export const systemSettings = sqliteTable('system_settings', {

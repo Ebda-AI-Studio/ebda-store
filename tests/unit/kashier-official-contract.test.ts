@@ -393,6 +393,7 @@ describe('getStatus: GET /v3/payment/orders?search=', () => {
       amountMinor: 0,
       capturedMinor: 0,
       refundedMinor: 0,
+      amountsKnown: false, // #625: the zeros are placeholders, flagged so no caller reads them as money
     });
   });
 });

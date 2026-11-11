@@ -1953,7 +1953,7 @@ router.get(
               ]);
               return { count, revenue: revenue._sum.total ?? 0 };
             },
-            { storeIds: dashboardStoreIds }
+            { storeIds: dashboardStoreIds, abortOnError: true }
           ),
           onHub
             ? hubStorePage({ ownerId: ownerScope, skip: 0, take: 5 }).then(async r => {
@@ -2451,7 +2451,7 @@ router.get(
               );
               return out;
             })()
-          : await acrossStores(perStoreFn, { storeIds: storeIdsForAi });
+          : await acrossStores(perStoreFn, { storeIds: storeIdsForAi, abortOnError: true });
         const platformToday = perStore.reduce((n, p) => n + p.value.today, 0);
         const platformMonth = perStore.reduce((n, p) => n + p.value.month, 0);
         const platformCached = perStore.reduce((n, p) => n + p.value.cached, 0);
@@ -2655,7 +2655,7 @@ export async function loadUsageHistoryRowsAcrossStores(months: number) {
   }
   const perStore = await acrossStores(
     storeId => loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId),
-    { storeIds: await boundedFanoutStoreIds() }
+    { storeIds: await boundedFanoutStoreIds(), abortOnError: true }
   );
   const rows = perStore.flatMap(p => p.value);
   const keep = new Set(
@@ -2970,6 +2970,7 @@ router.get(
             storeIds:
               storeIdsFromFilter(storeId) ??
               ((await hubOnD1()) ? await boundedFanoutStoreIds() : undefined),
+            abortOnError: true,
           }
         )
       )

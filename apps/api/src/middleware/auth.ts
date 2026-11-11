@@ -11,7 +11,10 @@ import { needsLiveIdentity } from '../lib/auth-sensitivity';
 import logger from '../lib/logger';
 import { runWithImpersonation } from '../lib/impersonation-context';
 import { recordTiming } from '../lib/request-timing';
-import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
+import {
+  customerTokenMatchesRequestStore,
+  nonCustomerTokenAllowedForRequest,
+} from '../lib/customer-store-binding';
 import { customerAuthRoute } from '../lib/customer-auth';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import {
@@ -276,6 +279,10 @@ export async function authenticate(
 
   // Identity-service (ES256) token: merchants, staff and super admins. Customer and impersonation tokens stay HS256.
   if (isAccountsToken(token)) {
+    // #622 / Ruling CORS-TB-1: never an identity from a store (merchant-controlled) origin. Same 401 as a dead token.
+    if (!nonCustomerTokenAllowedForRequest(req)) {
+      return next(new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token'));
+    }
     try {
       const timing: { identityMs?: number } = {};
       const authStart = performance.now();
@@ -359,6 +366,11 @@ export async function authenticate(
     ) {
       return next(new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token'));
     }
+    // #622 / Ruling CORS-TB-1: any other HS256 token (impersonation of a merchant/staff, legacy admin) is no identity
+    // from a store origin — credentialed cross-origin is same-tenant only.
+    if (payload.role !== 'customer' && !nonCustomerTokenAllowedForRequest(req)) {
+      return next(new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token'));
+    }
 
     req.user = payload;
     // Expose the jti on the request so downstream middleware (e.g. logout)
@@ -421,6 +433,8 @@ export async function optionalAuthenticate(
   // safe default — we do not want to grant an identity we could not confirm
   // is unrevoked), but now logs loudly instead of silently.
   if (isAccountsToken(token)) {
+    // #622 / Ruling CORS-TB-1: from a store origin a merchant/staff/admin token is a guest.
+    if (!nonCustomerTokenAllowedForRequest(req)) return next();
     try {
       const { user, claims } = await authenticateAccounts(token);
       req.user = user;
@@ -476,6 +490,8 @@ export async function optionalAuthenticate(
     ) {
       return next();
     }
+    // #622 / Ruling CORS-TB-1: same rule as `authenticate` — a guest, not an error.
+    if (payload.role !== 'customer' && !nonCustomerTokenAllowedForRequest(req)) return next();
 
     req.user = payload;
   } catch (err) {
