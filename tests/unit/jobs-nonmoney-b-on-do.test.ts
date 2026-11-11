@@ -32,6 +32,7 @@ const h = vi.hoisted(() => {
       review: { findUnique: vi.fn() },
       product: { count: vi.fn() },
       shippingZone: { count: vi.fn() },
+      shippingAreaRate: { count: vi.fn().mockResolvedValue(0) },
       paymentConfig: { count: vi.fn() },
       abandonedCart: { count: vi.fn() },
       storeWhatsAppLink: { findUnique: vi.fn() },
