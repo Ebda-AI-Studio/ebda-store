@@ -1,0 +1,4 @@
+// scrubs env via test-git-env.sh (comment only, no real scrub)
+import { execFileSync } from 'node:child_process';
+delete process.env.GIT_DIR;
+execFileSync('git', ['init', '-q'], { cwd: '/tmp/x' });
