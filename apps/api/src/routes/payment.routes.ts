@@ -125,6 +125,20 @@ const refundSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
+// GET /payments/methods is public: its query is parsed, not cast (F-9-prune triage). Shapes only; the service decides which
+// provider / currency exist, so a valid value is never refused here.
+const methodsQuerySchema = z.object({
+  amount: z.coerce.number().int().min(1).max(1_000_000_000).optional(),
+  currency: z
+    .string()
+    .regex(/^[A-Za-z]{3}$/)
+    .optional(),
+  provider: z
+    .string()
+    .regex(/^[a-z_]{2,32}$/)
+    .optional(),
+});
+
 // BE:S-13: the retry body names at most a provider.
 const retryBodySchema = z.object({ provider: z.enum(['paymob', 'kashier', 'fawry']).optional() });
 
@@ -321,9 +335,10 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
  */
 router.get('/methods', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const amount = parseInt(req.query.amount as string) || 1000;
-    const currency = (req.query.currency as Currency) || REGION.currency;
-    const provider = req.query.provider as PaymentProvider | undefined;
+    const q = methodsQuerySchema.parse(req.query);
+    const amount = q.amount ?? 1000;
+    const currency = (q.currency?.toUpperCase() as Currency | undefined) || REGION.currency;
+    const provider = q.provider as PaymentProvider | undefined;
     const storeId = await resolvePublicStoreId(req);
     if (!storeId) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found'); // BE:S-22
 
