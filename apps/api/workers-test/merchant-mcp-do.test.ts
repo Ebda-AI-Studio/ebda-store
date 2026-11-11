@@ -182,6 +182,14 @@ describe.skipIf(e.E2E_DB === '1')(
       )
         .bind('mcp-do-accounting', storeId, 'accounting.basic', Date.now())
         .run();
+      // The agent-key MINT and the StoreCredential row are not on the DO yet (STORE_RECORD_REFUSED / MODEL_NOT_WRITABLE), so
+      // the key-less grant is used (set before any request, the feature map is cached): the store's own `agent_checkout_open_writes` override (merchant-switched, same write gate).
+      await e.PLATFORM_DB.prepare(
+        'INSERT OR REPLACE INTO store_features (id, store_id, feature_key, enabled, enabled_at) VALUES (?1, ?2, ?3, 1, ?4)'
+      )
+        .bind('mcp-do-open-writes', storeId, 'agent_checkout_open_writes', Date.now())
+        .run();
+
       for (const u of [owner, customerId])
         await authState(`user:tv:${u}`, [['set', `user:tv:${u}`, '0', {}]]);
       const sa = await accessToken({
@@ -383,6 +391,90 @@ describe.skipIf(e.E2E_DB === '1')(
         }),
       });
       expect(r.status, await r.clone().text()).toBeLessThan(500);
+      expect(reachReport(await pgReaches(true))).toBe('');
+    }, 60_000);
+
+    it('agent place_order (cod): one cod_pending payment + created event in the DO, a replay adds none (Ruling NZ-MONEY-AGENT-1)', async () => {
+      await pgReaches(true);
+      const buyer = async (tool: string, args: Record<string, unknown>) => {
+        const r = await api('/mcp/mcp-do-shop', {
+          method: 'POST',
+          headers: {
+            accept: 'application/json, text/event-stream',
+            host: 'api.ebda.app',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'tools/call',
+            params: { name: tool, arguments: args },
+          }),
+        });
+        const text = await r.text();
+        const frame = text.startsWith('{')
+          ? text
+          : (text.split('\n').find(l => l.startsWith('data:')) ?? 'data: {}').slice(5);
+        const body = JSON.parse(frame) as {
+          result?: { isError?: boolean; content?: Array<{ text: string }> };
+        };
+        return { status: r.status, text, body };
+      };
+
+      const ordersBefore = (await doRead<{ id: string }>(storeId, 'Order', { where: { storeId } }))
+        .length;
+      const cart = await buyer('add_to_cart', { productId: productIds[0], quantity: 1 });
+      expect(cart.status, cart.text).toBeLessThan(500);
+      expect(cart.body.result?.isError, cart.text).not.toBe(true);
+      const cartId = JSON.parse(cart.body.result!.content![0].text).cartId as string;
+      const place = {
+        cartId,
+        paymentMethod: 'cod',
+        customer: {
+          name: 'Agent Buyer',
+          phone: '+201000000909',
+          email: 'agent-buyer@example.com',
+          address: '1 Agent St',
+          city: 'Cairo',
+        },
+      };
+      const first = await buyer('place_order', place);
+      expect(first.status, first.text).toBeLessThan(500);
+      expect(first.body.result?.isError, first.text).not.toBe(true);
+
+      const orders = await doRead<{ id: string; customerId: string | null }>(storeId, 'Order', {
+        where: { storeId },
+      });
+      expect(orders.length).toBe(ordersBefore + 1);
+      const known = new Set(
+        (await doRead<{ orderId: string }>(storeId, 'Payment', { where: { provider: 'cod' } })).map(
+          p => p.orderId
+        )
+      );
+      const fresh = orders.find(o => !known.has(o.id));
+      expect(fresh, 'the agent order has a cod payment row').toBeUndefined();
+      const pays = await doRead<{ id: string; orderId: string; status: string }>(
+        storeId,
+        'Payment',
+        { where: { provider: 'cod', status: 'cod_pending' } }
+      );
+      expect(pays.length).toBe(1);
+      const events = await doRead<{ paymentId: string; eventType: string }>(
+        storeId,
+        'PaymentEvent',
+        { where: { paymentId: pays[0].id } }
+      );
+      expect(events.filter(e => e.eventType === 'created').length).toBe(1);
+
+      // the same call again: the cart is gone (EMPTY_CART), and no second payment or order appears
+      const second = await buyer('place_order', place);
+      expect(second.status, second.text).toBeLessThan(500);
+      const paysAfter = await doRead<{ id: string }>(storeId, 'Payment', {
+        where: { orderId: pays[0].orderId },
+      });
+      expect(paysAfter.length).toBe(1);
+      expect((await doRead(storeId, 'Order', { where: { storeId } })).length).toBe(
+        ordersBefore + 1
+      );
       expect(reachReport(await pgReaches(true))).toBe('');
     }, 60_000);
 

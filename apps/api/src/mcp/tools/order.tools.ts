@@ -2,14 +2,12 @@ import { z } from 'zod/v3';
 import { storeDb } from '../../lib/repo-factory';
 import { storefrontOrigin } from '@ebda/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { withTenantContext } from '@ebda/database';
 import { runInStoreTenantContext } from '../../lib/store-scoped-read';
 import type { McpStore } from '../resolve-store';
 import { CartService } from '../../services/cart.service';
 import { OrderService } from '../../services/order.service';
 import { PaymentService } from '../../services/payment-providers/payment.factory';
 import type { Currency } from '../../services/payment-providers/types';
-import { recordPaymentEvent } from '../../services/payment-event.service';
 import { auditLog } from '../../middleware/security';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
@@ -188,35 +186,28 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           const codFee = order.codFee;
           const total = order.total;
 
-          // Tenant-scoped AND atomic: `withTenantContext` runs both writes
-          // inside ONE Prisma interactive transaction with `app.current_store_id`
-          // SET LOCAL (same RLS discipline the human `payment.routes.ts` cod
-          // branch gets from its request-level `runInTenantContext` wrap). Doing
-          // this in a single transaction is a correctness improvement over even
-          // the human path: if `payment.create` throws, the `order.update` total
-          // bump rolls back with it instead of leaving the order permanently
-          // overcharged with no `cod_pending` Payment row to show for it.
+          // The COD payment goes through the SAME service as the storefront COD path (below).
           //
           // But the ORDER above already committed (inventory decremented, cart
           // cleared), so a failure here must undo it — the same compensating
           // rollback the online branch below and the human path
           // (payment.routes.ts) run. Otherwise the agent is left with an
           // orphan order it cannot retry: its cart is gone (EMPTY_CART). #956
-          let payment;
+          // The storefront COD path (Ruling NZ-MONEY-1): on a DO store `paymentCreate` writes the payment, its `created`
+          // event and the index rows in ONE section and reuses the order's open COD row (a replay creates nothing); on a
+          // Postgres store the same service writes both inside this store's tenant scope.
+          let payment: { id: string; replayed: boolean };
           try {
-            payment = await withTenantContext(store.id, async tx => {
-              return tx.payment.create({
-                data: {
-                  orderId: order.id,
-                  provider: 'cod',
-                  method: 'cod',
-                  status: 'cod_pending',
-                  amount: total,
-                  currency: order.currency,
-                  metadata: { codFee, originalTotal: order.total - codFee, source: 'agent' },
-                },
-              });
-            });
+            payment = await runInStoreTenantContext(store.id, () =>
+              PaymentService.recordCodPayment({
+                storeId: store.id,
+                orderId: order.id,
+                amount: total,
+                currency: order.currency,
+                metadata: { codFee, originalTotal: order.total - codFee, source: 'agent' },
+                userId: null,
+              })
+            );
           } catch (err) {
             // Its own fresh tenant wrap, like the two sibling rollbacks: the
             // payment transaction above has rolled back, so there is no
@@ -234,66 +225,29 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           }
           const codPayment = payment;
 
-          // Non-fatal bookkeeping (each call swallows its own error via
-          // .catch), tenant-scoped like the human path. The order AND its
-          // cod_pending Payment are committed by now, so nothing past this
-          // point may surface as a failed checkout: the transaction envelope
-          // itself can reject before the callback runs (P2024 pool wait,
-          // P2028), and letting that reach the outer catch would audit a real,
-          // shippable order as `agent.write.failed` and tell the agent its
-          // checkout failed — while its retry hits EMPTY_CART. #1648
-          await runInStoreTenantContext(store.id, async () => {
-            await recordPaymentEvent({
-              paymentId: codPayment.id,
-              storeId: store.id,
-              orderId: order.id,
-              eventType: 'created',
-              toStatus: 'cod_pending',
-              provider: 'cod',
-              details: {
-                amount: total,
-                codFee,
-                originalTotal: order.total - codFee,
-                source: 'agent',
-              },
-            }).catch(err =>
-              logger.error(
-                { err, orderId: order.id },
-                '[MCP place_order] recordPaymentEvent failed'
-              )
-            );
-
-            // Attribution: this row used to carry no `ip`, no `userAgent` and no
-            // agent identity at all, so a completed agent order was
-            // indistinguishable in `audit_logs` from a row with no origin. All
-            // three are real columns on `audit_logs` — `auditLog` just was not
-            // being given them.
-            await auditLog({
-              action: 'payment.created',
-              resourceType: 'payment',
-              resourceId: codPayment.id,
-              storeId: store.id,
-              ip: context.ip,
-              userAgent: context.userAgent,
-              details: {
-                orderId: order.id,
-                amount: total,
-                codFee,
-                provider: 'cod',
-                source: 'agent',
-                agentClientId: context.grant === 'credential' ? 'credentialed' : context.grant,
-                credential: context.credential,
-                requestId: context.requestId,
-              },
-            }).catch(err =>
+          if (!codPayment.replayed)
+            await runInStoreTenantContext(store.id, () =>
+              auditLog({
+                action: 'payment.created',
+                resourceType: 'payment',
+                resourceId: codPayment.id,
+                storeId: store.id,
+                ip: context.ip,
+                userAgent: context.userAgent,
+                details: {
+                  orderId: order.id,
+                  amount: total,
+                  codFee,
+                  provider: 'cod',
+                  source: 'agent',
+                  agentClientId: context.grant === 'credential' ? 'credentialed' : context.grant,
+                  credential: context.credential,
+                  requestId: context.requestId,
+                },
+              })
+            ).catch(err =>
               logger.error({ err, orderId: order.id }, '[MCP place_order] auditLog failed')
             );
-          }).catch(err =>
-            logger.error(
-              { err, orderId: order.id },
-              '[MCP place_order] post-commit bookkeeping failed'
-            )
-          );
 
           return ok({
             orderId: order.id,
