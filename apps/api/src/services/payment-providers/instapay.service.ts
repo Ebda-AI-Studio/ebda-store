@@ -1131,6 +1131,16 @@ export class InstapayService {
         // this step again until the order converges.
         if (r.full && r.orderStatus !== 'refunded')
           await OrderService.updateStatus(storeId, orderId, 'refunded');
+        // #629: a PARTIAL refund gets the same booking as a gateway partial outside a return: the GL revenue refund and the
+        // fiscal credit note, keyed on the bank reference (idempotent, so a replay re-sends it until it lands). The DO wrote
+        // the order marker in the same section as the payment.
+        if (!r.full)
+          await OrderService.recordRefundOutsideReturn(
+            storeId,
+            orderId,
+            { providerRefundId: `instapay:${refundRef}`, amount: input.amountMinor },
+            { sendNow: true }
+          );
         return { duplicate: r.duplicate, refundedAmount: r.refundedAmount, status: r.status };
       } catch (err) {
         // only an UNcommitted record frees its screenshot: a committed one points at it

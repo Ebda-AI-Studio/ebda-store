@@ -1,0 +1,72 @@
+{
+  "src/app/account/AccountDashboardClient.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/account/orders/OrdersClient.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/account/orders/[id]/OrderDetailClient.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/account/settings/SettingsClient.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/api/revalidate/route.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/checkout/CheckoutClient.tsx": {
+    "no-console": {
+      "count": 3
+    }
+  },
+  "src/app/compare/CompareClient.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/sitemap.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/wishlist/WishlistClient.tsx": {
+    "no-console": {
+      "count": 3
+    }
+  },
+  "src/components/OneSignalStorefrontInit.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/hooks/useTemplateComponents.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/lib/pwa/store-manifest.ts": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/lib/store-resolve-cache.ts": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/lib/store-resolver.ts": {
+    "no-console": {
+      "count": 11
+    }
+  }
+}

@@ -12,12 +12,13 @@ import { storeDo } from '../store-backend';
 
 const PAGE = 200;
 
-export interface VectorPurgeDeps {
+interface VectorPurgeDeps {
   index: VectorizeLike | null;
   /** Product ids of the store with id > `after`, ascending, at most `limit`. */
   listProductIds(storeId: string, after: string, limit: number): Promise<string[]>;
 }
 
+// pq-allow(unused-export): test seam, imported by tests/unit/store-delete-vectors.test.ts
 export async function purgeStoreVectorsWith(
   storeId: string,
   deps: VectorPurgeDeps

@@ -1,0 +1,12 @@
+{
+  "src/auth/jwt-claims.ts": {
+    "slop/todo-needs-issue": {
+      "count": 1
+    }
+  },
+  "src/auth/session-hint-cookie.ts": {
+    "slop/todo-needs-issue": {
+      "count": 1
+    }
+  }
+}

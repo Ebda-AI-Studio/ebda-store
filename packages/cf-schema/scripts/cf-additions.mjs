@@ -49,7 +49,11 @@ export const COMMERCE_OUTCOME_KINDS = [
 // Columns that exist only in D1 and were added after `0001_init.sql` reached the production database. `since` is the
 // migration number that adds the column (generated into `migrations/platform/<since>_late_columns.sql`); 0001 is generated
 // WITHOUT it, so a fresh database gets the column exactly once and a live one gets it from the numbered migration.
-export const LATE_COLUMN_MIGRATIONS = { 3: 'late_columns', 7: 'billing_eta_fields' };
+export const LATE_COLUMN_MIGRATIONS = {
+  3: 'late_columns',
+  7: 'billing_eta_fields',
+  10: 'store_template_original',
+};
 
 export const extraColumns = {
   // TAX-1 (NEON-FOLD-1 9.1): Ebda's own invoices are VAT / ETA ready. Filled and policed by 0004_billing_tax_ready.sql.
@@ -112,6 +116,13 @@ export const extraColumns = {
       enumValues: ['pg', 'do'],
       default: 'pg',
       note: 'Per-store backend selector (task 2.4 + flip-backend): pg = Postgres, do = this store runs on its StoreDO. Lives in D1 (the directory) so the router can read it before it knows which DO to call.',
+    }),
+    // Ruling SKIN-DEL-10 (expand step of expand/contract): 0009 remapped retired skins lossily and kept nothing. This keeps
+    // the pre-remap value for the rows 0011 can still name (best effort), so the remap can be reverted. Never read by code.
+    f('templateOriginal', 'String', {
+      optional: true,
+      since: 10,
+      note: 'the template before 0009 remapped a retired skin (revert path); NULL = never remapped or not recorded',
     }),
   ],
   Customer: [

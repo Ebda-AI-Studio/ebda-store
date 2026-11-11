@@ -12,13 +12,34 @@
  * On Node (socket.io) these routes are unused; socket.service.ts authenticates in its
  * own handshake middleware.
  */
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { withUser } from '@ebda/database';
 import { authenticate } from '../middleware/auth';
 import { getAuthUser } from '../utils/store-helpers';
 import { currentImpersonator } from '../lib/impersonation-context';
+import { isStoreOriginRequest } from '../lib/customer-store-binding';
 
 const router = Router();
+
+/**
+ * #622 follow-up / Ruling CORS-TB-3: these routes are the StoreRealtime Durable Object's
+ * authority. Its only caller is that DO, server-to-server (`cf/store-realtime.ts` fetch, no
+ * Origin). No browser page calls them, and they must not depend on the Worker's
+ * `/socket.io/` upgrade check (platform origins only) to stay out of reach: a page on a
+ * store origin (merchant-controlled, even when verified) is refused here explicitly, before
+ * any token is read. Platform origins and Origin-less callers pass to `authenticate`.
+ */
+function refuseStoreOrigin(req: Request, res: Response, next: NextFunction): void {
+  if (isStoreOriginRequest(req)) {
+    res.status(403).json({
+      success: false,
+      error: { code: 'ORIGIN_NOT_PERMITTED', message: 'Origin not permitted' },
+    });
+    return;
+  }
+  next();
+}
+router.use(refuseStoreOrigin);
 
 // GET /api/v1/realtime/session -> who the token is
 router.get('/session', authenticate, (req: Request, res: Response) => {

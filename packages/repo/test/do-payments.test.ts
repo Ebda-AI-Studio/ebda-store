@@ -1383,6 +1383,22 @@ describe('recordInstapayRefund (merchant-recorded InstaPay refund, Ruling NZ-MON
     expect(rec(f, p.orderId, 'R-3', amount - 100)).toMatchObject({ duplicate: true, full: true });
   });
 
+  it('#629: a partial InstaPay refund books the order marker in the same section; a replay books nothing more; the full one books none', async () => {
+    const { f, p, amount } = await instapayPaid();
+    const markers = () =>
+      f.raw
+        .prepare(
+          "SELECT json_extract(metadata, '$.refundKey') k, json_extract(metadata, '$.amount') a FROM order_events WHERE order_id = ? AND to_status = 'partial_refund_recorded'"
+        )
+        .all(p.orderId) as Array<{ k: string; a: number }>;
+    rec(f, p.orderId, 'R-1', 100);
+    expect(markers()).toEqual([{ k: 'instapay:R-1', a: 100 }]);
+    rec(f, p.orderId, 'R-1', 100); // replay
+    expect(markers()).toHaveLength(1);
+    rec(f, p.orderId, 'R-2', amount - 100); // full: the caller's status flip runs the whole reversal
+    expect(markers()).toHaveLength(1);
+  });
+
   it('refuses an order with no confirmed InstaPay payment, an unknown order, a bad amount', async () => {
     const f = fx();
     const p = await f.paid(3, 'paymob');
