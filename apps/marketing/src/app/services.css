@@ -48,7 +48,7 @@
 }
 .sv-crumb {
   margin: 0 0 20px;
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .sv-crumb a {
@@ -283,7 +283,7 @@ html[lang='en'] .sv-hero h1 {
 .sv-items span,
 .sv-points span {
   color: var(--muted);
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
 }
 
 /* how we work */

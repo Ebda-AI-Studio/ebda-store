@@ -521,7 +521,7 @@ html[lang='en'] .wm-name {
      and the full studio name stays on one line at 15px+ (never wraps, never shortened). */
   .wm-name {
     white-space: nowrap;
-    font-size: var(--fs-base);
+    font-size: var(--fs-sm);
     line-height: 1.25;
   }
   .header-actions .wa-compact {
@@ -647,7 +647,7 @@ html[lang='en'] .wm-name {
 .btn-lg {
   min-height: 54px;
   padding: 0 30px;
-  font-size: var(--fs-base);
+  font-size: var(--fs-md);
 }
 .actions {
   display: flex;
@@ -687,7 +687,7 @@ html[lang='ar'] .hero h1 {
   margin: -14px 0 28px;
   max-width: 46ch;
   color: var(--muted);
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   line-height: 1.65;
 }
 .hero-sub {
@@ -1275,7 +1275,7 @@ html[lang='ar'] .story h2 {
 .looks-item figcaption p {
   margin: 0 0 6px;
   color: var(--muted);
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   line-height: 1.7;
 }
 .look-idea b {
@@ -1956,7 +1956,7 @@ html[lang='ar'] .legal-head h1 {
 }
 .legal-meta {
   color: var(--accent-text);
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   margin-bottom: var(--space-2);
 }
 .legal-notice {
@@ -3301,7 +3301,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
 .wa-chat-head {
   margin: 0;
   padding: calc(var(--w) * 0.15) var(--space-4) var(--space-3);
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   font-weight: 600;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
@@ -3542,7 +3542,7 @@ html[lang='en'] .studio-home h1 {
   margin: 0;
   max-width: 40ch;
   color: var(--muted);
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   line-height: 1.65;
   text-wrap: pretty;
 }

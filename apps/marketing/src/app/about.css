@@ -203,7 +203,7 @@ html[dir='rtl'] .ab-h2::after {
 .svc-items li {
   position: relative;
   padding-inline-start: var(--space-4);
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--fg);
 }
