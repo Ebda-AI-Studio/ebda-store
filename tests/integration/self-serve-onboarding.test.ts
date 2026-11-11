@@ -45,10 +45,11 @@ import {
 } from '@api/services/platform-mailer';
 import { configureIdentityClient } from '@api/lib/identity-client';
 import { hasDb, storeAdminAccessTokenFor } from '../helpers/bundle-fixtures';
+import { safeRun } from '../helpers/safe-run';
 
 // Card paths are exercised explicitly; the product default is InstaPay-only.
 process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
-const run = crypto.randomUUID().slice(0, 8);
+const run = safeRun();
 const PASSWORD = 'Str0ng!Passw0rd';
 const emails: string[] = [];
 const slugs: string[] = [];

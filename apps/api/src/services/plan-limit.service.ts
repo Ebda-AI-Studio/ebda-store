@@ -26,7 +26,9 @@
  *                MCP is Growth + Business (`planIncludesMerchantMcp`), not `apiAccess`.
  *   analyticsTier  `requireAnalyticsTier` on the insights routes (see below)
  *   maxOrdersPerMonth  blocks after a seven-day grace; see `assertOrderAllowed`.
- *   maxStorageMb  /uploads/{image,images,video,font} via `assertStorageRoom`; usage = R2
+ *   maxStorageMb  every merchant upload into the PUBLIC bucket via `assertStorageRoom`: /uploads/{image,images,video,font},
+ *                 product-models glb+usdz, expense receipts, PWA icons (guard: tests/unit/storage-gate-every-upload.test.ts);
+ *                 PRIVATE-bucket writes (`putPrivate`) are not in the listing and not gated; usage = R2
  *                 listing under stores/<id>/ (lib/storage-usage.ts, 60 s BOUNDED-stale).
  */
 

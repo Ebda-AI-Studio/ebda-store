@@ -21,6 +21,14 @@ const B = (n: number) => BigInt(n);
 /** Above this the two sources are in disagreement and nothing is auto-applied. */
 export const CROSS_CHECK_BPS = 200;
 /**
+ * The fallback is ONE daily file: most of the day it is a snapshot up to ~36 h old while the primary is live, so
+ * a gold/FX move since that snapshot is lag, not a disagreement (measured 2026-11-11: fallback dated the day
+ * before, 281 bps from a correct live primary). When the fallback's own time is older than
+ * `STALE_FALLBACK_AFTER_MS` the gate widens to this; the sanity bound is unchanged (Ruling GOLD-FALLBACK-LAG-1).
+ */
+export const STALE_FALLBACK_CROSS_CHECK_BPS = 600;
+export const STALE_FALLBACK_AFTER_MS = 6 * 60 * 60 * 1000;
+/**
  * Above this the two sources are not "a choice between two prices", they are a platform fault (a broken
  * feed or conversion): the merchant is NOT asked to pick, nothing is stored, the operator gets a P1
  * (Ruling GOLD-DISAGREE-MERCHANT-1).
@@ -151,7 +159,10 @@ export function goldFeed(deps: FeedDeps = {}): GoldFeedAdapter {
 
       if (primary && fallback) {
         const diffBps = goldRateJumpBps(primary.per24kGramPiastres, fallback.per24kGramPiastres);
-        if (diffBps > CROSS_CHECK_BPS) return { kind: 'disagree', primary, fallback, diffBps };
+        const lagging =
+          now.getTime() - Date.parse(fallback.reference.quotedAt) > STALE_FALLBACK_AFTER_MS;
+        if (diffBps > (lagging ? STALE_FALLBACK_CROSS_CHECK_BPS : CROSS_CHECK_BPS))
+          return { kind: 'disagree', primary, fallback, diffBps };
         return { kind: 'ok', quote: primary };
       }
       if (primary) return { kind: 'ok', quote: primary };
