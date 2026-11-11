@@ -1275,7 +1275,10 @@ jobs:
           fi
           echo "integration targets: $targets"
           PLANNER_EXCLUDES="$(bash scripts/ci/planner-lane.sh excludes)"
-          npx vitest run $targets $PLANNER_EXCLUDES --reporter=verbose --retry=1
+          # --passWithNoTests: a narrowed PR run can select ONLY planner-lane files (payment-outage-isolation), which
+          # PLANNER_EXCLUDES removes from this parallel pass; they run in the serial pass below, so an empty parallel
+          # pass is correct, not a failure (it died with "No test files found" on #565).
+          npx vitest run $targets $PLANNER_EXCLUDES --passWithNoTests --reporter=verbose --retry=1
           # serial planner pass: the whole lane on a full run, only the selected planner files on a narrowed PR run
           lane="$(bash scripts/ci/planner-lane.sh list)"
           if [ "$targets" != "tests/integration apps/api/src" ]; then
