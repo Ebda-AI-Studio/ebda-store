@@ -28,11 +28,34 @@ export function statusClass(status: number): string {
   return `${Math.floor(status / 100)}xx`;
 }
 
-/** The matched Express route template, or a fixed label. Never the raw path. */
-export function routeTemplate(req: Pick<Request, 'baseUrl' | 'route'>): string {
+/** The store id segment of a mount path (`/stores/<id>/...`), the one raw id the mount carries. */
+const STORE_SEGMENT = /(^|\/)stores\/([^/]+)/;
+
+/**
+ * The matched Express route template, or a fixed label. Never the raw path: `baseUrl` holds the CONCRETE mount path
+ * (`/api/v1/stores/<uuid>/products`), so every param value in it goes back to `:name`, and whatever follows `/stores/` is
+ * `:storeId` even when the router did not merge its parent params. Read it while the router stack is intact.
+ */
+export function routeTemplate(req: Pick<Request, 'baseUrl' | 'route' | 'params'>): string {
   const p = req.route?.path;
   if (typeof p !== 'string') return 'unmatched';
-  return `${req.baseUrl || ''}${p}`.replace(/\/+$/, '') || '/';
+  let base = req.baseUrl || '';
+  for (const [name, value] of Object.entries(req.params ?? {})) {
+    if (typeof value !== 'string' || !value) continue;
+    base = base
+      .split('/')
+      .map(seg => (seg === value ? `:${name}` : seg))
+      .join('/');
+  }
+  base = base.replace(STORE_SEGMENT, (_m, lead: string) => `${lead}stores/:storeId`);
+  return `${base}${p}`.replace(/\/+$/, '') || '/';
+}
+
+/** The store id of this request, from the params or the mount path. Read while the router stack is intact. */
+export function requestStoreId(req: Pick<Request, 'baseUrl' | 'params'>): string | undefined {
+  const fromParams = req.params?.storeId;
+  if (typeof fromParams === 'string' && fromParams) return fromParams;
+  return STORE_SEGMENT.exec(req.baseUrl || '')?.[2];
 }
 
 /** 0 = drop; otherwise the weight of the point (requests it represents). Errors and slow requests are always kept at weight 1. */
@@ -48,10 +71,13 @@ export function requestBudget(
   return function requestBudgetMw(req: Request, res: Response, next: NextFunction): void {
     const start = performance.now();
     let template = 'unmatched';
+    let storeId: string | undefined;
     const end = res.end.bind(res) as (...a: unknown[]) => Response;
-    // Capture the template while the router stack is still intact (baseUrl is unwound by 'finish').
+    // Capture template AND store id while the router stack is still intact: by 'finish' the routers have reset
+    // `baseUrl` and `params` (the store bucket was always `none` when read there).
     res.end = ((...a: unknown[]) => {
       template = routeTemplate(req);
+      storeId = requestStoreId(req);
       return end(...a);
     }) as typeof res.end;
     res.once('finish', () => {
@@ -62,7 +88,6 @@ export function requestBudget(
         const status = res.statusCode;
         const weight = sampleWeight(status, ms, rand);
         if (!weight) return;
-        const storeId = (req.params?.storeId as string | undefined) ?? undefined;
         ae.writeDataPoint({
           indexes: [template.slice(0, 96)],
           blobs: [storeShard(storeId), req.method, statusClass(status)],

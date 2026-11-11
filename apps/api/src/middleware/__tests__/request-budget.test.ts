@@ -4,7 +4,7 @@ import request from 'supertest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { requestBudget, sampleWeight, storeShard } from '../../lib/request-budget';
-import { breaches, runRequestBudgetAlert } from '../../lib/request-budget-alert';
+import { breaches, runRequestBudgetAlert, type AlertedStore } from '../../lib/request-budget-alert';
 
 function appWith(points: Array<Record<string, unknown>>, rand = () => 0) {
   const app = express();
@@ -82,6 +82,49 @@ describe('requestBudget (FOLD-COUNTERS)', () => {
   });
 });
 
+describe('requestBudget with the store id in the MOUNT path (as app.ts mounts routers)', () => {
+  const UUID = 'aeaea239-5508-4ad7-82bd-4d89104dd24a';
+  for (const mergeParams of [true, false]) {
+    it(`labels the route with :storeId and buckets the store (mergeParams=${mergeParams})`, async () => {
+      const points: Array<Record<string, unknown>> = [];
+      const app = express();
+      app.use(
+        requestBudget(
+          () => ({ writeDataPoint: p => void points.push(p) }),
+          () => 0
+        )
+      );
+      const r = express.Router({ mergeParams });
+      r.get('/:id', (_q, s) => void s.json({ ok: true }));
+      const mw = (_q: express.Request, _s: express.Response, next: express.NextFunction) => next();
+      app.use('/api/v1/stores/:storeId/products', mw, r);
+      await request(app).get(`/api/v1/stores/${UUID}/products/p-1?x=1`);
+      await settle();
+      expect(points).toHaveLength(1);
+      expect(points[0]!.indexes).toEqual(['/api/v1/stores/:storeId/products/:id']);
+      expect(JSON.stringify(points[0])).not.toContain(UUID);
+      expect((points[0]!.blobs as string[])[0]).toBe(storeShard(UUID));
+      expect((points[0]!.blobs as string[])[0]).not.toBe('none');
+    });
+  }
+  it('a 404 inside a store mount still carries no raw id', async () => {
+    const points: Array<Record<string, unknown>> = [];
+    const app = express();
+    app.use(
+      requestBudget(
+        () => ({ writeDataPoint: p => void points.push(p) }),
+        () => 0
+      )
+    );
+    const r = express.Router({ mergeParams: true });
+    r.get('/known', (_q, s) => void s.send('ok'));
+    app.use('/api/v1/stores/:storeId/cart', r);
+    await request(app).get(`/api/v1/stores/${UUID}/cart/missing`);
+    await settle();
+    expect(JSON.stringify(points)).not.toContain(UUID);
+  });
+});
+
 describe('request budget alert', () => {
   it('flags p95 and 5xx-rate breaches, ignores quiet routes', () => {
     expect(
@@ -112,5 +155,46 @@ describe('request budget alert', () => {
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'p1', source: 'cron.request-budget' })
     );
+  });
+
+  it('pages once per incident: a sustained breach is silent until the route recovers', async () => {
+    let saved: string[] = [];
+    const state: AlertedStore = { get: async () => saved, put: async r => void (saved = r) };
+    const send = vi.fn(async () => 'sent') as never;
+    const run = (rows: Array<Record<string, unknown>>) =>
+      runRequestBudgetAlert(
+        { accountId: 'a', token: 't' },
+        vi.fn(async () => ({ ok: true, json: async () => ({ data: rows }) })) as never,
+        send,
+        state
+      );
+    const bad = { route: '/slow', requests: 400, p95_ms: 3000, errors_5xx: 0 };
+    const good = { route: '/slow', requests: 400, p95_ms: 100, errors_5xx: 0 };
+    expect((await run([bad])).alerted).toBe(1);
+    expect((await run([bad])).alerted).toBe(0); // hourly tick, same incident
+    expect((await run([bad])).alerted).toBe(0);
+    expect((await run([])).alerted).toBe(0); // no data is not recovery
+    expect((await run([bad])).alerted).toBe(0);
+    expect((await run([good])).alerted).toBe(0); // recovered: state cleared
+    expect(saved).toEqual([]);
+    expect((await run([bad])).alerted).toBe(1); // a NEW incident pages again
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+  it('an alert that failed to go out is retried next tick', async () => {
+    let saved: string[] = [];
+    const state: AlertedStore = { get: async () => saved, put: async r => void (saved = r) };
+    const outcomes = ['failed', 'sent'];
+    const send = vi.fn(async () => outcomes.shift()) as never;
+    const f = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ data: [{ route: '/x', requests: 400, p95_ms: 3000, errors_5xx: 0 }] }),
+    })) as never;
+    expect(
+      (await runRequestBudgetAlert({ accountId: 'a', token: 't' }, f, send, state)).alerted
+    ).toBe(0);
+    expect(
+      (await runRequestBudgetAlert({ accountId: 'a', token: 't' }, f, send, state)).alerted
+    ).toBe(1);
+    expect(send).toHaveBeenCalledTimes(2);
   });
 });

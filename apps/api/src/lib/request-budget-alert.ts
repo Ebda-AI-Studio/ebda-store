@@ -5,10 +5,17 @@
  * mirror and throttles identical (level, title) pairs.
  *
  * Needs the Worker secrets CF_ANALYTICS_ACCOUNT_ID + CF_ANALYTICS_TOKEN (an Account Analytics:Read token). Unset = skipped and
- * reported as such, never an error (a missing secret must not break the hourly cron). Cost if wrong: one missed or extra P1 per hour.
+ * reported as such, never an error (a missing secret must not break the hourly cron).
+ *
+ * Dedupe PER INCIDENT, not per hour: sendAlert only throttles 5 minutes, so a sustained breach would page every hourly tick. The set of
+ * routes currently alerted lives in KV (`request-budget-alerted`); a route in it is not re-alerted until a later run sees it HEALTHY
+ * (present in the result and under budget). A route absent from the result (traffic below MIN_REQUESTS) keeps its state: no data is not
+ * recovery. An alert that did not go out ('failed' / 'skipped') is not recorded, so the next tick retries it.
+ * Cost if wrong: a lost state row (KV unbound or expired after 3 days) re-alerts a standing breach once; never a missed first alert.
  */
 import logger from './logger';
 import { sendAlert } from '../services/alerts.service';
+import { cfBindings, type KVNamespaceLike } from '../cf/bindings';
 
 export const P95_BUDGET_MS = 1500;
 export const ERROR_RATE_MAX = 0.05;
@@ -42,13 +49,39 @@ export function breaches(stats: RouteStat[]): Array<{ route: string; reason: str
   return out;
 }
 
+export const ALERTED_KEY = 'request-budget-alerted';
+const ALERTED_TTL_S = 3 * 86_400;
+
+export interface AlertedStore {
+  get(): Promise<string[]>;
+  put(routes: string[]): Promise<void>;
+}
+
+export function kvAlertedStore(
+  kv: Pick<KVNamespaceLike, 'get' | 'put'> | undefined = cfBindings()?.KV_CACHE
+): AlertedStore | undefined {
+  if (!kv) return undefined;
+  return {
+    async get() {
+      try {
+        const v = JSON.parse((await kv.get(ALERTED_KEY)) ?? '[]');
+        return Array.isArray(v) ? v.filter((r): r is string => typeof r === 'string') : [];
+      } catch {
+        return [];
+      }
+    },
+    put: routes => kv.put(ALERTED_KEY, JSON.stringify(routes), { expirationTtl: ALERTED_TTL_S }),
+  };
+}
+
 export async function runRequestBudgetAlert(
   env: { accountId?: string; token?: string } = {
     accountId: process.env.CF_ANALYTICS_ACCOUNT_ID,
     token: process.env.CF_ANALYTICS_TOKEN,
   },
   fetchImpl: typeof fetch = fetch,
-  send: typeof sendAlert = sendAlert
+  send: typeof sendAlert = sendAlert,
+  state: AlertedStore | undefined = kvAlertedStore()
 ): Promise<{ skipped: boolean; alerted: number }> {
   if (!env.accountId || !env.token) return { skipped: true, alerted: 0 };
   const res = await fetchImpl(
@@ -64,13 +97,29 @@ export async function runRequestBudgetAlert(
     errors5xx: Number(r.errors_5xx),
   }));
   const hits = breaches(stats);
+  const breaching = new Set(hits.map(h => h.route));
+  const seen = new Set(stats.map(s => s.route));
+  const prev = new Set(state ? await state.get() : []);
+  // Next state: still breaching + recorded earlier and not seen healthy (no data keeps its state).
+  const next = new Set<string>([...prev].filter(r => breaching.has(r) || !seen.has(r)));
+  let alerted = 0;
   for (const h of hits) {
-    await send({
+    if (prev.has(h.route)) continue; // same incident, already paged
+    const outcome = await send({
       level: 'p1',
       source: 'cron.request-budget',
       title: `Route over its request budget: ${h.route}`,
-      body: `${h.route}: ${h.reason} over the last hour (dataset ebda_request_budget, weighted sample).`,
-    }).catch(err => logger.warn({ err }, '[request-budget] alert send failed'));
+      body: `${h.route}: ${h.reason} over the last hour (dataset ebda_request_budget, weighted sample). Not re-alerted until it recovers.`,
+    }).catch(err => {
+      logger.warn({ err }, '[request-budget] alert send failed');
+      return 'failed' as const;
+    });
+    if (outcome === 'sent' || outcome === 'throttled') next.add(h.route);
+    if (outcome === 'sent') alerted++;
   }
-  return { skipped: false, alerted: hits.length };
+  if (state)
+    await state
+      .put([...next])
+      .catch(err => logger.warn({ err }, '[request-budget] state write failed'));
+  return { skipped: false, alerted };
 }
