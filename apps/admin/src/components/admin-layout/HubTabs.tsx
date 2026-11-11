@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
+import { navItemClasses } from '../ui/tokens';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '../../hooks/useFeatures';
 import { featureForStorePath } from '../../lib/route-feature-gates';
@@ -91,14 +92,7 @@ export function HubTabs({ items }: Props) {
               data-ui="nav"
               ref={active === t.href ? activeRef : undefined}
               href={t.href}
-              className={
-                /* min-h-11 = 44px satisfies Apple HIG / WCAG 2.5.5 touch target on mobile;
-                 md:min-h-9 relaxes to 36px on desktop to keep the tab bar compact. */
-                'inline-flex items-center px-3 min-h-11 md:min-h-9 rounded-md whitespace-nowrap transition-colors ' +
-                (active === t.href
-                  ? 'bg-primary text-primary-foreground font-medium'
-                  : 'hover:bg-muted text-muted-foreground hover:text-foreground')
-              }
+              className={navItemClasses({ kind: 'tab', active: active === t.href })}
             >
               {t.label}
               {navFeatureState(
@@ -115,10 +109,7 @@ export function HubTabs({ items }: Props) {
                   data-testid="wholesale-pending-badge"
                   aria-label={tr('wholesalePendingBadge', { count: pendingCount })}
                   className={
-                    'ms-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold tabular-nums ' +
-                    (active === t.href
-                      ? 'bg-primary-foreground text-primary'
-                      : 'bg-primary text-primary-foreground')
+                    'ms-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold tabular-nums text-primary-foreground'
                   }
                 >
                   {pendingCount > 99 ? '99+' : pendingCount}

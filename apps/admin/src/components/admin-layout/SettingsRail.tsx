@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { navItemClasses } from '../ui/tokens';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '../../hooks/useFeatures';
 import { navFeatureState } from '../../lib/nav-lock';
@@ -48,11 +49,7 @@ export function SettingsRail({ storeId }: { storeId: string }) {
                         data-ui="nav"
                         href={href}
                         aria-current={active ? 'page' : undefined}
-                        className={`flex min-h-9 items-center rounded-lg px-2 text-sm transition-colors ${
-                          active
-                            ? 'bg-primary/10 font-medium text-primary-ink'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        }`}
+                        className={navItemClasses({ kind: 'rail', active })}
                       >
                         {tCards(`${i.card}.title`)}
                         {navFeatureState(i.featureKey, ctx) === 'locked' && <LockBadge />}

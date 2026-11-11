@@ -16,6 +16,8 @@ import { buildBackup, sha256Hex, type BackupManifest } from '../store-do/backup'
 export interface R2PutGet {
   put(key: string, value: string): Promise<unknown>;
   get(key: string): Promise<{ text(): Promise<string> } | null>;
+  /** Optional (real R2 has it): lets the sweep tell a brand-new store from one whose nightly alarm stopped. */
+  list?(opts: { prefix: string; limit?: number }): Promise<{ objects: unknown[] }>;
 }
 export interface D1Like {
   prepare(sql: string): { all(): Promise<{ results: Array<Record<string, unknown>> }> };
@@ -25,6 +27,7 @@ export interface D1Like {
 }
 interface StoreStub {
   ensureBackupAlarm(): Promise<number>;
+  backupNow(storeId: string): Promise<unknown>;
 }
 export interface SweepEnv {
   STORE_BACKUPS?: unknown;
@@ -129,8 +132,16 @@ export async function runBackupSweep(env: SweepEnv, deps: SweepDeps): Promise<Sw
       const stub = ns.get(ns.idFromName(id)) as unknown as StoreStub;
       await stub.ensureBackupAlarm();
       report.stores.armed++;
-      if (!(await r2.get(storeBackupManifestKey(id, yesterday))))
-        report.stores.missingYesterday.push(id);
+      if (!(await r2.get(storeBackupManifestKey(id, yesterday)))) {
+        // A store that has NEVER been backed up is new: its first alarm is armed above for +24h, so yesterday's manifest
+        // cannot exist (Amelia, created 2026-11-10, false P1 2026-11-11). Take its baseline backup now instead of
+        // flagging it; a failure there lands in `errors`. A store WITH history but no yesterday means the alarm failed.
+        const hasHistory =
+          !r2.list ||
+          (await r2.list({ prefix: `store-do-backups/${id}/`, limit: 1 })).objects.length > 0;
+        if (hasHistory) report.stores.missingYesterday.push(id);
+        else await stub.backupNow(id);
+      }
     } catch (e) {
       report.stores.errors.push(`${id}: ${(e as Error).message}`);
     }

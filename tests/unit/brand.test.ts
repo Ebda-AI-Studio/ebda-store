@@ -26,7 +26,7 @@ describe('BRAND', () => {
       url: 'https://ebda.app',
     });
     expect(BRAND.colors).toEqual({ night: '#0A0B0C', gold: '#B08D57', lift: '#CBA873' });
-    expect(BRAND.fonts.sans).toBe('Geist');
+    expect(BRAND.fonts.sans).toBe('IBM Plex Sans Arabic'); // DS-FONT-1
     expect(BRAND.fonts.arabic).toBe('IBM Plex Sans Arabic');
     expect(BRAND.supportEmail).toBe('ahlan@ebda.app');
     expect(BRAND.noReplyEmail).toBe('no-reply@ebda.app');

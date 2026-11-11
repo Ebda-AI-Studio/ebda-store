@@ -18,9 +18,11 @@ describe('Ebda merchant identity', () => {
       '210 9% 4.3%',
     ]);
   });
-  it('loads Geist and applies the loaded Arabic font to the body', () => {
-    expect(layout).toContain('const geist = Geist(');
-    expect(css).toMatch(/html\[dir='rtl'\] body\s*\{\s*font-family: var\(--font-arabic\)/);
+  it('DS-FONT-1: one family (IBM Plex Sans Arabic, Arabic + Latin) is applied to the body, no Geist', () => {
+    expect(layout).toContain('IBM_Plex_Sans_Arabic({');
+    expect(layout).toMatch(/subsets:\s*\['arabic',\s*'latin'\]/);
+    expect(layout).not.toMatch(/\bGeist\(/);
+    expect(css).toMatch(/body\s*\{[^}]*font-family: var\(--font-sans\)/);
   });
   it('gives the existing skip link a destination on the public funnel', () => {
     expect(layout).toContain('href="#admin-main-content"');

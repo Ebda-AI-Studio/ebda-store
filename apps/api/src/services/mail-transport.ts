@@ -66,6 +66,15 @@ export class EmailSendError extends Error {
   }
 }
 
+/** The provider rejected the RECIPIENT address itself as malformed: customer data, not an outage. */
+export function isBadRecipientError(err: unknown): boolean {
+  return (
+    err instanceof EmailSendError &&
+    err.code === 'E_VALIDATION_ERROR' &&
+    /invalid email address/i.test(err.message)
+  );
+}
+
 /** True when a real send can leave this process (the binding is present). */
 export function isMailTransportConfigured(): boolean {
   return !!cfBindings()?.EMAIL;
