@@ -79,10 +79,9 @@ describe('the vector leg of a DO store (Ruling CF-VEC-1)', () => {
     h.visible = ['pA', 'pB', 'pFar'];
     const r = await rankedSearchWithMode(DO_STORE, 'brass lamp', { searcher: 'ip:1' });
     expect(r).toEqual({ ids: ['pA', 'pB'], degraded: false });
-    expect(h.index.query.mock.calls[0][1]).toMatchObject({
-      namespace: DO_STORE,
-      filter: { storeId: DO_STORE },
-    });
+    expect(h.index.query.mock.calls[0][1]).toMatchObject({ namespace: DO_STORE });
+    // production has no metadata index: a filter matches nothing (Ruling SEARCH-SEMANTIC-LIVE-2)
+    expect(h.index.query.mock.calls[0][1]).not.toHaveProperty('filter');
     // the DO is asked only about products inside the distance bound
     expect(h.visibleAsked[0].sort()).toEqual(['pA', 'pB', 'pHidden']);
   });
