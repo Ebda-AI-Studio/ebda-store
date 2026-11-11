@@ -1620,6 +1620,43 @@ router.get(
   }
 );
 
+// POST /orders/:id/cancel - the signed-in shopper cancels their own pending, unpaid COD order (Ruling T01-CANCEL-1).
+// Customer-only (a guest has no account to prove ownership; they contact the store). Another customer's order is a 404.
+router.post(
+  '/orders/:id/cancel',
+  authenticate,
+  rejectImpersonated,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Customer account required' },
+        });
+        return;
+      }
+      const outcome = await OrderService.customerCancel(storeId, req.params.id, customerId);
+      if (outcome.changed) {
+        await auditLog({
+          action: 'order.cancelled_by_customer',
+          userId: customerId,
+          resourceType: 'order',
+          resourceId: req.params.id,
+          details: { newStatus: 'cancelled' },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
+      res.json({ success: true, data: outcome });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /orders/:id/verify-payment — GUEST-SAFE verify-on-return.
 //
 // THE PRIMARY payment-confirmation path. A gateway's webhook can be late,

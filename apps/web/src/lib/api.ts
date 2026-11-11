@@ -1576,6 +1576,14 @@ class ApiClient {
     return this.request<{ order: Order }>(`/public/orders/${orderId}`);
   }
 
+  /** The signed-in shopper cancels their own pending, unpaid COD order (Ruling T01-CANCEL-1). */
+  async cancelOrder(orderId: string) {
+    return this.request<{ changed: boolean; status: string }>(`/public/orders/${orderId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
   /**
    * Verify-on-return: ask the API to re-check this order's payment with the
    * provider and reconcile our DB. The reliable primary confirmation path

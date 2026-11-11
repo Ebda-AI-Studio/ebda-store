@@ -546,6 +546,7 @@
   "POST /public/lifecycle-emails/unsubscribe",
   "POST /public/newsletter/subscribe",
   "POST /public/orders",
+  "POST /public/orders/:id/cancel",
   "POST /public/orders/:id/verify-payment",
   "POST /public/orders/quote",
   "POST /public/pricing/resolve",

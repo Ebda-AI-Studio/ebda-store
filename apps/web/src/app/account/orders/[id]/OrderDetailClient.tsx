@@ -181,6 +181,9 @@ export default function OrderDetailClient() {
   const [error, setError] = useState<string | null>(null);
   // Controls visibility of the tracking number modal (shown when trackingUrl is absent)
   const [showTrackingModal, setShowTrackingModal] = useState(false);
+  // Shopper cancel (Ruling T01-CANCEL-1)
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // Order timeline (collapsible, lazy-loaded)
   const [timelineExpanded, setTimelineExpanded] = useState(false);
@@ -224,6 +227,36 @@ export default function OrderDetailClient() {
       );
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function cancelThisOrder() {
+    if (cancelling) return;
+    if (
+      !window.confirm(
+        t('Cancel this order? This cannot be undone.', 'تلغي الطلب ده؟ مفيش رجوع بعد كده.')
+      )
+    )
+      return;
+    setCancelError(null);
+    setCancelling(true);
+    try {
+      const result = await api.cancelOrder(orderId);
+      if (result.success) await fetchOrder();
+      else
+        setCancelError(
+          result.error?.message ||
+            t('Could not cancel the order. Contact the store.', 'معرفناش نلغي الطلب. كلّم المتجر.')
+        );
+    } catch {
+      setCancelError(
+        t(
+          'Could not cancel the order. Check your connection and try again.',
+          'معرفناش نلغي الطلب. اتأكد من اتصالك وجرّب تاني.'
+        )
+      );
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -429,6 +462,25 @@ export default function OrderDetailClient() {
 
       <div className="flex flex-wrap items-center gap-3">
         <WaMeOrderQuestionButton orderNumber={order.orderNumber} className="self-start" />
+        {/* Ruling T01-CANCEL-1: only a pending, unpaid, cash-on-delivery order; the API enforces the same rule. */}
+        {order.status === 'pending' &&
+          order.paymentStatus !== 'paid' &&
+          order.payments.length > 0 &&
+          order.payments.every(p => p.provider === 'cod') && (
+            <button
+              type="button"
+              onClick={cancelThisOrder}
+              disabled={cancelling}
+              className="self-start rounded-lg border px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-muted disabled:opacity-60"
+            >
+              {cancelling ? t('Cancelling…', 'بنلغي…') : t('Cancel order', 'إلغاء الطلب')}
+            </button>
+          )}
+        {cancelError && (
+          <p role="alert" className="w-full text-sm text-destructive-ink">
+            {cancelError}
+          </p>
+        )}
         {/* Ruling B4-8: only on an order that was paid or delivered (never a cancelled one). */}
         {(order.paymentStatus === 'paid' || order.status === 'delivered') &&
           order.status !== 'cancelled' &&

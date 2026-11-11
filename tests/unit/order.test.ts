@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OrderService } from '@api/services/order.service';
+import { ShippingService } from '@api/services/shipping.service';
 import { prisma } from '@ebda/database';
 import { EmailService } from '@api/services/email.service';
 import { socketService } from '@api/services/socket.service';
@@ -436,6 +437,13 @@ describe('OrderService', () => {
     const txCouponUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 
     beforeEach(() => {
+      // a failed shipping lookup is refused (T01-SHIP-1), so the default answer is "store has no zones: 0"
+      vi.spyOn(ShippingService, 'calculateShipping').mockResolvedValue({
+        shippingCost: 0,
+        freeShipping: false,
+        matched: false,
+        storeHasAreaRates: false,
+      } as never);
       vi.mocked(CartService.getOrCreate).mockResolvedValue(mockCartWithItems as any);
       vi.mocked(prisma.taxRate.findMany).mockResolvedValue([]);
       txOrderCount.mockReset().mockResolvedValue(0);
@@ -818,6 +826,15 @@ describe('OrderService', () => {
       it('control: without the coupon the delivery fee is charged', async () => {
         await OrderService.create(mockStoreId, mockCustomerId, mockSessionId, createOrderData);
         expect(capturedOrderData?.shipping).toBe(1500);
+      });
+
+      // Ruling T01-SHIP-1: a shipping-lookup failure used to ship at 0 (silent undercharge).
+      it('refuses the order with SHIPPING_UNAVAILABLE when the shipping lookup throws, writing nothing', async () => {
+        vi.spyOn(ShippingService, 'calculateShipping').mockRejectedValueOnce(new Error('db blip'));
+        await expect(
+          OrderService.create(mockStoreId, mockCustomerId, mockSessionId, createOrderData)
+        ).rejects.toMatchObject({ code: 'SHIPPING_UNAVAILABLE', statusCode: 503 });
+        expect(capturedOrderData).toBeUndefined();
       });
     });
 
@@ -1207,7 +1224,43 @@ describe('OrderService', () => {
     const txOrderCount = vi.fn().mockResolvedValue(0);
     const txCouponReserve = vi.fn().mockResolvedValue({ count: 1 });
 
+    // Ruling T01-SHIP-1: no silent 0 shipping on the admin path either; an explicit override is the way past a failed lookup.
+    it('refuses with SHIPPING_UNAVAILABLE when the lookup throws and no override is set', async () => {
+      vi.spyOn(ShippingService, 'calculateShipping').mockRejectedValueOnce(new Error('db blip'));
+      await expect(
+        OrderService.createAdminOrder(mockStoreId, mockAdminUserId, baseAdminOrderData)
+      ).rejects.toMatchObject({ code: 'SHIPPING_UNAVAILABLE', statusCode: 503 });
+    });
+
+    it('proceeds with the admin override when the lookup throws', async () => {
+      vi.spyOn(ShippingService, 'calculateShipping').mockRejectedValueOnce(new Error('db blip'));
+      const create = vi.fn().mockResolvedValue(mockOrder);
+      vi.mocked(prisma.$transaction).mockImplementationOnce(async (fn: any) =>
+        fn({
+          order: { create, count: txOrderCount },
+          orderEvent: { create: vi.fn() },
+          coupon: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+          $executeRaw: vi.fn().mockResolvedValue(1),
+          $queryRaw: vi.fn().mockResolvedValue([]),
+        } as any)
+      );
+      await OrderService.createAdminOrder(
+        mockStoreId,
+        mockAdminUserId,
+        { ...baseAdminOrderData, shippingOverride: 2500 },
+        { role: 'store_admin' }
+      );
+      expect(create.mock.calls[0][0].data.shipping).toBe(2500);
+    });
+
     beforeEach(() => {
+      // the shipping lookup answers (a failed lookup is refused now, T01-SHIP-1); a store with no zones charges 0
+      vi.spyOn(ShippingService, 'calculateShipping').mockResolvedValue({
+        shippingCost: 0,
+        freeShipping: false,
+        matched: false,
+        storeHasAreaRates: false,
+      } as never);
       txCouponReserve.mockReset().mockResolvedValue({ count: 1 });
       vi.mocked(prisma.product.findMany).mockResolvedValue([mockProductForAdmin] as any);
       vi.mocked(prisma.taxRate.findMany).mockResolvedValue([]);
@@ -1500,6 +1553,22 @@ describe('OrderService', () => {
         await expect(
           OrderService.updateStatus(mockStoreId, 'order-123', 'confirmed')
         ).resolves.toBeDefined();
+      });
+
+      // Ruling T01-CANCEL-1: `unpaidOnly` (the shopper's own cancel) never cancels over captured money on a Postgres store.
+      it('unpaidOnly refuses a paid order with ORDER_ALREADY_PAID and writes nothing', async () => {
+        vi.mocked(prisma.order.findFirst).mockResolvedValue({
+          ...mockOrder,
+          status: 'pending',
+          paymentStatus: 'paid',
+          payments: [{ status: 'completed' }],
+        } as any);
+        vi.mocked(prisma.order.update).mockClear();
+
+        await expect(
+          OrderService.updateStatus(mockStoreId, 'order-123', 'cancelled', { unpaidOnly: true })
+        ).rejects.toMatchObject({ code: 'ORDER_ALREADY_PAID' });
+        expect(prisma.order.update).not.toHaveBeenCalled();
       });
 
       it('should allow pending -> cancelled', async () => {

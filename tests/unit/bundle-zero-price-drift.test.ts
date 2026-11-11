@@ -285,6 +285,7 @@ vi.mock('@api/lib/logger', () => ({
 
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
+import { ShippingService } from '@api/services/shipping.service';
 
 let app: Express;
 
@@ -321,6 +322,13 @@ const ORDER_DATA = {
 };
 
 beforeEach(() => {
+  // a failed shipping lookup is refused (T01-SHIP-1); these tests are about bundles, so the store has no zones: 0
+  vi.spyOn(ShippingService, 'calculateShipping').mockResolvedValue({
+    shippingCost: 0,
+    freeShipping: false,
+    matched: false,
+    storeHasAreaRates: false,
+  } as never);
   vi.clearAllMocks();
   mockPrisma.cartBundle.findFirst.mockResolvedValue(null);
   mockPrisma.product.findMany.mockResolvedValue([

@@ -1,0 +1,5 @@
+# T01-COD-1
+
+> Section: 2026-11-11 - open recount track T01, order money edges (S3-O7)
+
+Ruling T01-COD-1 - cash on delivery is paid when the order reaches Delivered (Ruling MONEYB-7, unchanged, both the Postgres path and the Durable Object `orderStatus` op) or when the merchant marks it paid by hand. A courier remittance statement (`cod_remittances`) is a reconciliation fact and never flips an order or payment to paid: the lines can be partial, duplicated, mismatched or for the wrong parcel, and an automatic flip from them would let one bad statement change money status; the match and the over/short flags stay report-only. So the absence of an auto-mark on remittance is by design. Evidence: `packages/repo/test/do-order-status.test.ts` (delivered settles COD), `packages/repo/test/do-stock-books.test.ts` (an import changes no order or payment status). Cost if wrong: a merchant whose courier remits before the order is moved to Delivered sees the order unpaid until they mark it Delivered or Paid, which is a visible, one-click catch-up rather than a wrong ledger entry.

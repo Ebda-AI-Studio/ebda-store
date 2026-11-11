@@ -391,6 +391,20 @@ describe('COD settlement import (Ruling CF-R7-2)', () => {
     ]);
   });
 
+  // Ruling T01-COD-1 (audit S3-O7): a courier remittance statement is a reconciliation fact, never the thing that marks an
+  // order paid. COD is settled on Delivered (MONEYB-7); an import, matched or not, leaves order and payment status alone.
+  it('importing remittance lines never changes an order or payment status (T01-COD-1)', () => {
+    const r = withShipments();
+    const before = r.q('SELECT id, status, payment_status FROM orders ORDER BY id');
+    const pays = r.q('SELECT count(*) AS n FROM payments')[0].n;
+    r.op('importCodRemittances', {
+      carrier: 'bosta',
+      rows: [row('T1', 'L1', 5000), row('T2', 'L2', 3000), row('T9', 'L9', 700)],
+    });
+    expect(r.q('SELECT id, status, payment_status FROM orders ORDER BY id')).toEqual(before);
+    expect(r.q('SELECT count(*) AS n FROM payments')[0].n).toBe(pays);
+  });
+
   it('importing the same file twice books every amount once', () => {
     const r = withShipments();
     const rows = [row('T1', 'L1', 5000), row('T2', 'L2', 3000)];

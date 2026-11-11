@@ -1425,11 +1425,18 @@ export class OrderService {
       // The not-deliverable guard is a deliberate rejection — re-throw it so
       // the order is refused (don't swallow it into a 0-shipping fallback).
       if (err instanceof AppError) throw err;
-      // Defensive: if the shipping lookup throws, fall back to 0 rather
-      // than fail the entire checkout. Worst case is a one-off undercharge
-      // that surfaces in the merchant's order detail with shipping=0
-      // (visible vs the cart UI shipping line — easy to spot).
-      logger.error({ err, storeId, shippingArea }, 'Shipping calculation failed; defaulting to 0');
+      // Ruling T01-SHIP-1: a failed shipping lookup is NOT a free delivery. It used to log and ship at 0, so a DB blip
+      // silently undercharged the order (and the merchant ate the courier fee). Nothing has been written yet, so refuse
+      // with a retryable 503; the shopper retries and gets the real fee.
+      logger.error(
+        { err, storeId, shippingArea },
+        'Shipping calculation failed; refusing the order'
+      );
+      throw new AppError(
+        503,
+        'SHIPPING_UNAVAILABLE',
+        'Could not work out the delivery fee right now. Please try again in a moment.'
+      );
     }
     // Free-shipping coupon: zero out shipping after we resolved the
     // base fee, so a "Free shipping over X" coupon stacks correctly
@@ -2992,6 +2999,58 @@ export class OrderService {
     await bustProductCaches(storeId);
   }
 
+  /**
+   * The shopper cancels their OWN order (Ruling T01-CANCEL-1, audit S3-O10). Allowed only while it is `pending`, unpaid,
+   * and paid for on delivery (a COD payment row, never an online/InstaPay one that could still be settled). Refused with
+   * 409 otherwise; a repeat on an already-cancelled order is an idempotent no-op (`changed: false`). The cancel itself is
+   * the merchant's cancel: stock, coupon, loyalty and wallet are reversed by the same section (`updateStatus`), and
+   * `unpaidOnly` + `onlyFrom` make "still pending and still unpaid" part of that one atomic write.
+   */
+  static async customerCancel(
+    storeId: string,
+    orderId: string,
+    customerId: string
+  ): Promise<{ changed: boolean; status: string }> {
+    const order = await this.getById(storeId, orderId);
+    // another customer's order answers exactly like a missing one
+    if (order.customerId !== customerId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    if (order.status === 'cancelled') return { changed: false, status: 'cancelled' };
+    if (hasCapturedPayment(order))
+      throw new AppError(
+        409,
+        'ORDER_ALREADY_PAID',
+        'This order is already paid. Ask the store for a return or refund.'
+      );
+    const payments = order.payments ?? [];
+    if (
+      order.status !== 'pending' ||
+      payments.length === 0 ||
+      payments.some(p => p.provider !== 'cod')
+    )
+      throw new AppError(
+        409,
+        'ORDER_NOT_CANCELLABLE',
+        'This order can no longer be cancelled here. Contact the store.'
+      );
+    try {
+      await OrderService.updateStatus(storeId, orderId, 'cancelled', {
+        unpaidOnly: true,
+        onlyFrom: ['pending'],
+        exceptionNote: 'cancelled by the shopper',
+      });
+    } catch (err) {
+      // the order moved (merchant confirmed it, or a payment landed) between the read and the section
+      if (err instanceof AppError && err.code === 'ORDER_STATUS_MOVED')
+        throw new AppError(
+          409,
+          'ORDER_NOT_CANCELLABLE',
+          'This order can no longer be cancelled here. Contact the store.'
+        );
+      throw err;
+    }
+    return { changed: true, status: 'cancelled' };
+  }
+
   static async updateStatus(
     storeId: string,
     orderId: string,
@@ -3022,14 +3081,22 @@ export class OrderService {
       const money = await storeMoney(storeId);
       if (money) return OrderService.cancelOnDo(money, storeId, orderId, opts);
       // Postgres store: the caller holds the row lock (lib/wa/store-events-consumer.ts), so this read is current.
-      if (opts.onlyFrom) {
+      if (opts.onlyFrom || opts.unpaidOnly) {
         const cur = await (
           await storeDb(storeId)
         ).order.findFirst({
           where: { id: orderId, storeId },
-          select: { status: true },
+          select: { status: true, paymentStatus: true, payments: { select: { status: true } } },
         });
-        if (cur && !opts.onlyFrom.includes(cur.status))
+        // `unpaidOnly` (the shopper's own cancel, T01-CANCEL-1) never cancels over captured money; the DO store checks the
+        // same thing inside its section.
+        if (opts.unpaidOnly && cur && hasCapturedPayment(cur))
+          throw new AppError(
+            409,
+            'ORDER_ALREADY_PAID',
+            'This order is already paid; it was not cancelled'
+          );
+        if (cur && opts.onlyFrom && !opts.onlyFrom.includes(cur.status))
           throw new AppError(
             409,
             'ORDER_STATUS_MOVED',
@@ -4331,8 +4398,7 @@ export class OrderService {
     // after the coupon discount below (#193).
     const activeTax = await resolveActiveTaxRate(storeId);
 
-    // Shipping: try to resolve via ShippingService; fall back to 0 on
-    // error (same defensive posture as public checkout).
+    // Shipping: resolve via ShippingService; a lookup failure is refused unless the admin set an override (T01-SHIP-1).
     const shippingArea =
       typeof data.shippingAddress.area === 'string'
         ? (data.shippingAddress.area as string)
@@ -4355,9 +4421,22 @@ export class OrderService {
       );
       shipping = res.freeShipping ? 0 : res.shippingCost;
     } catch (err) {
+      // Ruling T01-SHIP-1: with no explicit override a failed lookup is refused, never booked as 0 shipping.
+      // A negotiated `shippingOverride` does not need the lookup, so it may proceed.
+      if (typeof data.shippingOverride !== 'number') {
+        logger.error(
+          { err: err instanceof Error ? err.message : err, storeId, shippingArea },
+          '[Admin-Order] shipping calculation failed; refusing the order'
+        );
+        throw new AppError(
+          503,
+          'SHIPPING_UNAVAILABLE',
+          'Could not work out the delivery fee. Try again, or set the shipping fee yourself.'
+        );
+      }
       logger.warn(
         { err: err instanceof Error ? err.message : err, storeId, shippingArea },
-        '[Admin-Order] shipping calculation failed; defaulting to 0'
+        '[Admin-Order] shipping calculation failed; using the admin override'
       );
     }
 
