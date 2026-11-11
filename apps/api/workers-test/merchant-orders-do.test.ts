@@ -472,6 +472,18 @@ describe.skipIf(e.E2E_DB === '1')(
       );
       expect.soft(fresh.status, `${steps.join('\n')}\n${JSON.stringify(fresh.json)}`).toBe(200);
 
+      // the checkout auto-promotion preview (the live 01:14:48Z POSTGRES_REMOVED on the QA store: order.count in the resolver)
+      const preview = await call(
+        'promotions preview (guest phone)',
+        `/stores/public/${storeId}/promotions/preview`,
+        {
+          method: 'POST',
+          headers: { 'x-store-id': storeId },
+          body: { items: [{ productId: productIds[0], quantity: 1 }], phone: '+201000000202' },
+        }
+      );
+      expect.soft(preview.status, steps.join('\n')).toBe(200);
+
       // 4. a carrier configuration: save, make default, rotate the webhook secret, delete (shipping-carrier.service)
       const put = await call('carrier config save', `${S}/shipping-carriers/configs/bosta`, {
         method: 'PUT',
