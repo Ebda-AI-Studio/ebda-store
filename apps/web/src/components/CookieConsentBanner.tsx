@@ -5,6 +5,7 @@ import Link from './StoreLink';
 import { useConsent } from '../contexts/ConsentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStoreUrl } from '../contexts/StoreContext';
+import { CONSENT_UI } from '@ebda/shared/tracking';
 
 /**
  * Bottom-anchored cookie consent banner. Only renders when the visitor
@@ -24,11 +25,11 @@ import { useStoreUrl } from '../contexts/StoreContext';
  * as "dark patterns" / non-compliant).
  */
 const CONSENT_BTN =
-  'inline-flex min-h-11 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:px-5';
+  'inline-flex min-h-11 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors md:px-5';
 
 export function CookieConsentBanner() {
   const { hasDecided, setConsent, openPreferences } = useConsent();
-  const { t, isRtl } = useLanguage();
+  const { isRtl } = useLanguage();
   const storeUrl = useStoreUrl();
   // Admin live-preview iframe (see below). Read AFTER mount: window.top / location are not
   // known on the server, so reading them during render hydrated differently in the iframe.
@@ -78,67 +79,58 @@ export function CookieConsentBanner() {
 
   if (!fontsReady) return null;
 
+  const c = CONSENT_UI[isRtl ? 'ar' : 'en'];
+
+  // COOKIE-UI-1: the family's one cookie bar (words, order and height budget in @ebda/shared consent-ui).
+  // On a phone it is a single compact bar (<= 12% of the viewport) above the tab bar: one short sentence with
+  // the Customize link, then Reject and Accept as equals. Customize is a link, not a third button. From md it
+  // is the roomy bar across the page.
   return (
     <div
       role="dialog"
       data-cookie-banner
       aria-modal="false"
-      aria-labelledby="cookie-banner-title"
+      aria-label={c.label}
       aria-describedby="cookie-banner-body"
       className="fixed bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 z-[100] border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-lg"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-6 lg:px-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="flex-1">
-            {/* Audit 2026-11-03 #6: on a phone the banner is a compact strip (the title is read by
-                assistive tech only, the sentence is 12 px), so it no longer takes a third of the
-                hero. From sm it is the roomy bar it was. */}
-            <h2
-              id="cookie-banner-title"
-              className="sr-only text-base font-semibold text-foreground sm:not-sr-only"
+      <div className="mx-auto max-w-7xl px-4 py-2 sm:px-6 md:py-4 lg:px-8">
+        <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between md:gap-6">
+          <p
+            id="cookie-banner-body"
+            className="text-xs leading-snug text-muted-foreground md:text-sm md:leading-relaxed"
+          >
+            {c.text}{' '}
+            <Link
+              href={storeUrl('/privacy')}
+              prefetch={false}
+              className="underline hover:text-foreground"
             >
-              {t('We use cookies', 'نستخدم ملفات تعريف الارتباط')}
-            </h2>
-            <p
-              id="cookie-banner-body"
-              className="text-xs leading-snug text-muted-foreground sm:mt-1 sm:text-sm sm:leading-relaxed"
+              {c.more}
+            </Link>
+            {' · '}
+            <button
+              type="button"
+              data-consent="customize"
+              onClick={openPreferences}
+              className="underline underline-offset-4 hover:text-foreground"
             >
-              {t(
-                'We use essential cookies to run the store and optional marketing cookies to measure ads. You can accept, reject, or choose what to allow.',
-                'نستخدم ملفات أساسية لتشغيل المتجر وملفات تسويقية اختيارية لقياس الإعلانات. يمكنك القبول أو الرفض أو اختيار ما تسمح به.'
-              )}{' '}
-              <Link
-                href={storeUrl('/privacy')}
-                prefetch={false}
-                className="underline hover:text-foreground"
-              >
-                {t('Learn more', 'اعرف المزيد')}
-              </Link>
-            </p>
-          </div>
+              {c.customize}
+            </button>
+          </p>
 
-          {/* Accept and Reject are the SAME control (same fill, size, weight, one tap each): a
-              regulator reads an accept-in-brand-colour / reject-outline pair as a dark pattern, and
-              the old markup did exactly that (bg-primary vs border). Both take the neutral ink fill,
-              so neither pushes the brand. Customize is the quieter outline between them. Three equal
-              columns on a phone, so nothing wraps into a stack of full-width bars. */}
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-shrink-0 sm:gap-3">
+          {/* Reject and Accept are the SAME control (same fill, size, weight, one tap each): a regulator
+              reads an accept-in-brand-colour / reject-outline pair as a dark pattern. Both take the neutral
+              ink fill so neither pushes the brand. Two equal columns on a phone. */}
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-shrink-0 md:gap-3">
             <button
               type="button"
               data-consent="reject"
               onClick={() => setConsent({ marketing: false })}
               className={`${CONSENT_BTN} bg-foreground text-background hover:bg-foreground/90`}
             >
-              {t('Reject all', 'رفض الكل')}
-            </button>
-            <button
-              type="button"
-              data-consent="customize"
-              onClick={openPreferences}
-              className={`${CONSENT_BTN} border border-input bg-background text-foreground hover:bg-muted`}
-            >
-              {t('Customize', 'تخصيص')}
+              {c.reject}
             </button>
             <button
               type="button"
@@ -146,7 +138,7 @@ export function CookieConsentBanner() {
               onClick={() => setConsent({ marketing: true })}
               className={`${CONSENT_BTN} bg-foreground text-background hover:bg-foreground/90`}
             >
-              {t('Accept all', 'قبول الكل')}
+              {c.accept}
             </button>
           </div>
         </div>
