@@ -14,6 +14,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import ts from 'typescript';
+import { all, calleeText, callsIn, declNamed, parseFile, prop } from './helpers/ast-statements';
 
 const revalidateSpy = vi.fn();
 
@@ -146,18 +148,14 @@ describe('order-driven purge is coalesced per store (#1220)', () => {
 });
 
 describe('the order path uses the coalesced bust (#1220)', () => {
-  it('OrderService.bustProductCaches calls the order variant, not the content purge', async () => {
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../../apps/api/src/services/order.service.ts'),
-      'utf8'
+  it('OrderService.bustProductCaches calls the order variant, not the content purge', () => {
+    // Structural (AST): the real calls inside the function, so a comment naming the content purge cannot trip or satisfy it.
+    const fn = declNamed(parseFile('apps/api/src/services/order.service.ts'), 'bustProductCaches');
+    const calls = callsIn(fn).map(
+      c => `${calleeText(c)}(${c.arguments.map(x => x.getText()).join(',')})`
     );
-    const start = src.indexOf('async function bustProductCaches(');
-    expect(start).toBeGreaterThan(-1);
-    const body = src.slice(start, src.indexOf('\n}\n', start));
-    expect(body).toContain('invalidateStoreProductCachesAfterOrder(storeId)');
-    expect(body).not.toMatch(/invalidateStoreProductCaches\(/);
+    expect(calls).toContain('invalidateStoreProductCachesAfterOrder(storeId)');
+    expect(callsIn(fn, 'invalidateStoreProductCaches')).toEqual([]);
   });
 });
 
@@ -176,6 +174,15 @@ describe('the bundles:<storeId> purge tag matches a storefront fetch', () => {
   });
 });
 
+function inventoryMethods(): Record<string, ts.MethodDeclaration> {
+  const sf = parseFile('apps/api/src/services/inventory.service.ts');
+  return Object.fromEntries(
+    all(sf, ts.isMethodDeclaration)
+      .filter(m => m.modifiers?.some(x => x.kind === ts.SyntaxKind.StaticKeyword))
+      .map(m => [m.name.getText(), m])
+  );
+}
+
 describe('every InventoryService stock writer busts the product caches', () => {
   // Enumerated from inventory.service.ts: every method that writes
   // `inventory`. reduceOnSale/returnToStock have no caller today, but a
@@ -186,34 +193,25 @@ describe('every InventoryService stock writer busts the product caches', () => {
     'setInventory',
     'reduceOnSale',
     'returnToStock',
-  ])('%s calls invalidateStoreProductCaches', async method => {
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../../apps/api/src/services/inventory.service.ts'),
-      'utf8'
-    );
-    const start = src.indexOf(`static async ${method}(`);
-    expect(start).toBeGreaterThan(-1);
-    const next = src.indexOf('static async ', start + 1);
-    const body = src.slice(start, next === -1 ? undefined : next);
-    expect(body).toContain('invalidateStoreProductCaches(storeId)');
+  ])('%s calls invalidateStoreProductCaches', method => {
+    // Structural (AST): the method node's own calls, never a window that could run into the next method.
+    expect(
+      callsIn(inventoryMethods()[method]!, 'invalidateStoreProductCaches').map(c => c.getText())
+    ).toContain('invalidateStoreProductCaches(storeId)');
   });
 
-  it('the list above is every method that writes inventory', async () => {
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../../apps/api/src/services/inventory.service.ts'),
-      'utf8'
-    );
-    const methods = [...src.matchAll(/static async (\w+)\(/g)].map(m => m[1]!);
-    const writers = methods.filter(name => {
-      const start = src.indexOf(`static async ${name}(`);
-      const next = src.indexOf('static async ', start + 1);
-      const body = src.slice(start, next === -1 ? undefined : next);
-      return /data:\s*\{[^}]*\binventory\b/.test(body);
-    });
+  it('the list above is every method that writes inventory', () => {
+    // A writer = a method with an object literal `data: { ..., inventory ... }` anywhere in its body.
+    const writers = Object.entries(inventoryMethods())
+      .filter(([, m]) =>
+        all(m, ts.isPropertyAssignment).some(
+          p =>
+            p.name.getText() === 'data' &&
+            ts.isObjectLiteralExpression(p.initializer) &&
+            !!prop(p.initializer, 'inventory')
+        )
+      )
+      .map(([name]) => name);
     expect(writers.sort()).toEqual(
       [
         'adjustInventory',
@@ -230,16 +228,17 @@ describe('bundle writes fire ONE storefront purge (issue 2202)', () => {
   // invalidateStoreProductCaches clears the bundle-list key and sends
   // `bundles:<storeId>` in the same request; a bundles-only purge next to it
   // was a second outbound POST per write (that function is now deleted).
-  it('bundle.routes.ts busts via invalidateStoreProductCaches only', async () => {
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../../apps/api/src/routes/bundle.routes.ts'),
-      'utf8'
+  it('bundle.routes.ts busts via invalidateStoreProductCaches only', () => {
+    // Real call nodes (a commented-out call is not counted).
+    const sf = parseFile('apps/api/src/routes/bundle.routes.ts');
+    const awaited = all(sf, ts.isAwaitExpression).filter(
+      a =>
+        ts.isCallExpression(a.expression) &&
+        a.expression.getText() === 'invalidateStoreProductCaches(storeId)'
     );
-    expect(src.match(/await invalidateStoreProductCaches\(storeId\)/g)?.length).toBe(3);
+    expect(awaited).toHaveLength(3);
     // one bust per bundle write: create, update, deactivate
-    expect(src.match(/\.bundle\.(create|update)\(/g)?.length).toBe(5); // DO + Postgres create/update, deactivate
-    expect(src).not.toContain('invalidateStoreBundlesCache(');
+    expect(callsIn(sf, /\.bundle\.(create|update)$/)).toHaveLength(5); // DO + Postgres create/update, deactivate
+    expect(callsIn(sf, 'invalidateStoreBundlesCache')).toEqual([]);
   });
 });

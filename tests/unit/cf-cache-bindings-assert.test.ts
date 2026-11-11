@@ -17,6 +17,9 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+// @ts-expect-error plain .mjs script, no types
+import { contractVersion } from '../../scripts/ci/fetch-contract-version.mjs';
+import { seedFetchContract } from '../helpers/fetch-contract-fixture';
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = mkdtempSync(path.join(tmpdir(), 'cf-cache-assert-'));
@@ -31,6 +34,8 @@ writeFileSync(
 );
 for (const app of ['web', 'admin', 'orders'])
   mkdirSync(path.join(scratch, 'apps', app), { recursive: true });
+// The web generator bakes the storefront's fetch-cache data-contract hash into the config (Ruling WEB-COLD-2).
+seedFetchContract(scratch);
 
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -64,6 +69,10 @@ describe('cf-setup-local.sh → assert-cf-cache-bindings.sh', () => {
     expect(readFileSync(path.join(scratch, 'apps/web/wrangler.jsonc'), 'utf8')).toMatch(
       /NEXT_TAG_CACHE_DO_SHARDED/
     );
+    // WEB-COLD-2: the data-contract hash of THESE files is baked into the shared fetch cache, never the placeholder.
+    const onc = readFileSync(path.join(scratch, 'apps/web/open-next.config.ts'), 'utf8');
+    expect(onc).toContain(`createSharedFetchCache('${contractVersion(scratch)}')`);
+    expect(onc).not.toContain('__FETCH_CONTRACT__');
   });
 
   it('web, OPENNEXT_CACHE=false: the documented escape hatch passes', () => {

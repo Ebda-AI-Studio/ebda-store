@@ -23,6 +23,7 @@ import { Footer } from '../../apps/marketing/src/components/Footer';
 import { Home } from '../../apps/marketing/src/components/Home';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import ts from 'typescript';
 
 const MK = path.resolve(__dirname, '../../apps/marketing');
 const pub = (p: string) => path.join(MK, 'public', p);
@@ -79,11 +80,32 @@ describe('serum liquid stays opaque (Ruling MKT-3D-FIX-1)', () => {
       path.resolve(__dirname, '../../apps/marketing/scripts/3d/make-models.mjs'),
       'utf8'
     );
-    const block = src.slice(
-      src.indexOf("const serum = P('serum'"),
-      src.indexOf('g.add(mk(lathe(liquid)')
-    );
-    expect(block).not.toMatch(/transmission|thickness/);
+    // Structural, not a text window: parse the generator and read the names inside the `serum`
+    // declaration's initializer (comments carry no AST nodes, so they cannot satisfy or trip it).
+    // Behaviour is covered by the glb test above; this guards the generator the glb comes from,
+    // a three.js build script that cannot be run inside a unit test.
+    const sf = ts.createSourceFile('make-models.mjs', src, ts.ScriptTarget.Latest, true);
+    const serumInits: ts.Node[] = [];
+    const find = (n: ts.Node): void => {
+      if (
+        ts.isVariableDeclaration(n) &&
+        ts.isIdentifier(n.name) &&
+        n.name.text === 'serum' &&
+        n.initializer
+      )
+        serumInits.push(n.initializer);
+      ts.forEachChild(n, find);
+    };
+    find(sf);
+    expect(serumInits.length, 'exactly one `serum` declaration').toBe(1);
+    const names: string[] = [];
+    const collect = (n: ts.Node): void => {
+      if (ts.isIdentifier(n) || ts.isStringLiteralLike(n)) names.push(n.text);
+      ts.forEachChild(n, collect);
+    };
+    collect(serumInits[0]);
+    expect(names).toContain('serum'); // P('serum', {...}) really is the material this guards
+    expect(names.filter(x => /transmission|thickness/i.test(x))).toEqual([]);
   });
 });
 

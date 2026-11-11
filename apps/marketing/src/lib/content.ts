@@ -302,7 +302,7 @@ export const COPY: Record<Locale, Copy> = {
     meta: {
       title: `${PN.nameAr} — اعمل متجرك أونلاين في دقايق`,
       description:
-        'ابدأ ستور من ابدأ ستوديو للذكاء الاصطناعي: اعمل متجرك أونلاين في دقايق، بلينك باسمك ودفع أونلاين وكاش وإنستاباي، وشحن مع بوسطة وShipBlu ومايلرز وأرامكس.',
+        'ابدأ ستور من ابدأ ستوديو للذكاء الاصطناعي: متجرك أونلاين في دقايق بلينك باسمك، كاش وإنستاباي من أول يوم والكارت ببوابتك، وشحن مع بوسطة وShipBlu ومايلرز وأرامكس.',
     },
     skip: 'روح للمحتوى',
     nav: {
@@ -666,7 +666,7 @@ export const COPY: Record<Locale, Copy> = {
         { t: 'بالعربي الأول', d: 'كل حاجة متصممة من اليمين للشمال، بمصري بسيط، والإنجليزي جنبها.' },
         {
           t: 'مبني لمصر',
-          d: 'دفع أونلاين وكاش وإنستاباي، وشحن مع شركات الشحن اللي بتتعامل معاها.',
+          d: 'كاش وإنستاباي من أول يوم، والكارت لما تربط بوابة الدفع بتاعتك، وشحن مع شركات الشحن اللي بتتعامل معاها.',
         },
         { t: 'حساب واحد', d: 'حساب واحد يفتح ابدأ ستور وابدأ شات.' },
         { t: 'أسعار واضحة', d: 'الأسعار معلنة بالجنيه المصري، من غير مفاجآت.' },
@@ -731,7 +731,7 @@ export const COPY: Record<Locale, Copy> = {
     meta: {
       title: `${PN.nameEn} — Open your store online in minutes`,
       description:
-        'Ebda Store by Ebda AI Studio: your online store in minutes, with your own link, online payments, cash, InstaPay, and Bosta, ShipBlu, Mylerz or Aramex shipping.',
+        'Ebda Store by Ebda AI Studio: your store online in minutes, cash and InstaPay from day one, cards via your own gateway, and Bosta, ShipBlu, Mylerz or Aramex.',
     },
     skip: 'Skip to content',
     nav: {
@@ -1107,7 +1107,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           t: 'Built for Egypt',
-          d: 'Online payments, cash and InstaPay, and shipping with the carriers you already use.',
+          d: 'Cash and InstaPay from day one, cards once you connect your own payment gateway, and shipping with the carriers you already use.',
         },
         { t: 'One account', d: 'One account opens Ebda Store and Ebda Chat.' },
         { t: 'Clear pricing', d: 'Prices are published in Egyptian pounds, with no surprises.' },

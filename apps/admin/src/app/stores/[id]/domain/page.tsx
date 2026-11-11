@@ -305,7 +305,7 @@ export default function StoreDomainPage() {
         <div className="rounded-xl border bg-card shadow-sm">
           <div className="flex items-center justify-between border-b p-4">
             <h2 className="font-semibold text-foreground">
-              {store.name} {t('storeDomainSuffix')}
+              {t('storeDomainTitle', { name: store.name })}
             </h2>
             <div className="flex gap-2">
               {!isEditing && (

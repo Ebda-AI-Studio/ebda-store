@@ -141,23 +141,17 @@ jobs:
             --probe "https://ebda-deploy-probe.ebda.app/|404" \
             --probe "https://ebda-deploy-probe.ebda.app/health|200|commit=$GITHUB_SHA" \
             --rollback-probe "https://ebda-deploy-probe.ebda.app/|404"
-      - name: Warm the storefront (one GET per demo store and language, never fails the deploy)
-        # Ruling WEB-COLD-1. After a deploy the first storefront render pays the cold costs together (new isolate + wasm,
-        # empty data cache, cold API stores/layout/product reads): measured 10-13 s against 0.7-3.8 s warm. One plain GET of
-        # each demo store's /ar and /en page (hosts read from demo-hosts.ts, so a new demo is covered with no edit here) moves
-        # that cost off the first real visitor. Both languages since EDGE-BUILD-1: the HTML edge cache is keyed by the Worker
-        # version, so every deploy starts it empty and /en is its own entry. Footprint: 10 GETs per deploy (5 before; the /en
-        # half is not timed yet, read it in this step's log). Best effort: the deploy is already verified. The cap covers the
-        # worst case (10 GETs x 30 s); tests/unit/web-deploy-warm.test.ts pins both.
-        timeout-minutes: 6
+      - name: Warm the storefront (home, listing and one product page per demo store and language, never fails the deploy)
+        # Ruling WEB-COLD-1. After a deploy the first storefront render pays the cold costs together (new isolate, empty
+        # per-build caches, cold API reads): measured 10-13 s against 0.7-3.8 s warm. Since WEB-COLD-2 the API data cache
+        # survives the deploy (apps/web/shared-fetch-cache.ts), so this step mostly warms the isolate, the page code and the
+        # HTML edge caches (keyed by the Worker version, EDGE-BUILD-1). It GETs what shoppers open first on every demo store
+        # in BOTH languages (home, /products, one product page; hosts read from demo-hosts.ts), retries a 5xx or a network
+        # failure ONCE and logs both attempts. Footprint: hosts x 2 x 3 GETs (+ retries) + one API read per host. Best effort:
+        # the deploy is already verified. The cap covers the worst case; tests/unit/web-deploy-warm.test.ts pins both.
+        timeout-minutes: 22
         continue-on-error: true
-        run: |
-          for label in $(grep -oE "'storedemo[a-z-]*'" apps/web/src/lib/demo-hosts.ts | tr -d "'"); do
-            for lang in ar en; do
-              curl -sS -o /dev/null --max-time 30 -w "warm $label/$lang: %{http_code} ttfb=%{time_starttransfer}s total=%{time_total}s\n" \
-                "https://$label.ebda.app/$lang" || echo "warm $label/$lang: failed (ignored)"
-            done
-          done
+        run: node scripts/ci/warm-storefront.mjs
 
   # OPS-5: a failed deploy used to be silent (the storefront stayed on an old build for days). Alerts the Telegram bridge;
   # no secrets configured = skip, never fail.

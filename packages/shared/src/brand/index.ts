@@ -154,6 +154,21 @@ export const BRAND = {
       shortAr: 'إعلاناتك ومبيعاتك في مكان واحد',
       shortEn: 'Your ads and sales in one place',
     },
+    // CRM + ERP (Ahmad 2026-11-10, Ruling COMING-SOON-CRM-ERP-1): the names of the live crm.ebda.app / erp.ebda.app coming-soon pages
+    {
+      id: 'crm',
+      nameAr: 'ابدأ CRM',
+      nameEn: 'Ebda CRM',
+      shortAr: 'عملاؤك ومتابعاتهم في مكان واحد',
+      shortEn: 'Your customers and follow-ups in one place',
+    },
+    {
+      id: 'erp',
+      nameAr: 'ابدأ ERP',
+      nameEn: 'Ebda ERP',
+      shortAr: 'المخزون والمشتريات والحسابات والفروع',
+      shortEn: 'Inventory, purchasing, accounts and branches',
+    },
   ],
   tagline: 'Your store, live today.',
   taglineAr: 'متجرك أونلاين النهاردة.',

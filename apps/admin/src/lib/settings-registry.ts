@@ -734,6 +734,17 @@ export const SETTINGS: SettingEntry[] = [
     { feature: 'seo' }
   ),
   setting(
+    'seo.hide-from-search',
+    '/seo',
+    'seo.page.hideFromSearchTitle',
+    'owner',
+    {
+      en: 'hide store from google search engines noindex private draft not live launch',
+      ar: 'اخفاء المتجر من جوجل محركات البحث مخفي قبل الاطلاق',
+    },
+    { feature: 'seo' }
+  ),
+  setting(
     'seo.aeo',
     '/seo',
     'seo.page.aeoTitle',

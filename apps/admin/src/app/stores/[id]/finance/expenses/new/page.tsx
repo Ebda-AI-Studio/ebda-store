@@ -198,7 +198,8 @@ export default function NewExpensePage() {
             undefined,
             resolveUploadErrorMessage(body) ??
               t('uploadFailedGeneric', { status: uploadRes.status }),
-            (body as { error?: { details?: Record<string, unknown> } })?.error?.details
+            (body as { error?: { details?: Record<string, unknown> } })?.error?.details,
+            uploadRes.status
           )
         );
         setOcrUploading(false);

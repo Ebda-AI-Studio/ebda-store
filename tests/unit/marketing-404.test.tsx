@@ -48,6 +48,7 @@ describe('marketing 404', () => {
     }
     expect(html).toContain('قريبًا');
     expect(html).toContain('Coming soon');
+    expect(html).not.toMatch(/<a [^>]*>Ebda (CRM|ERP|WhatsApp)<\/a>/);
     // content audit C1: Ebda Chat is live at wa.ebda.app, linked, and never inside a coming-soon item
     expect(html).toContain('href="https://wa.ebda.app/"');
     expect(html).not.toMatch(/(Ebda Chat|ابدأ شات)(<!-- -->|\s)*<b>\s*(Coming soon|قريبًا)/);
