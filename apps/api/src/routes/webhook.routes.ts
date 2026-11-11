@@ -16,6 +16,7 @@ import { PaymentProvider } from '../services/payment-providers/types';
 import {
   detectGatewayProvider,
   extractWebhookSignature,
+  isAmbiguousRefundRepeat,
   isGatewayWebhookProvider,
   webhookRefs,
 } from '../services/payment-providers/webhook-signature';
@@ -742,6 +743,25 @@ async function handleGatewayWebhook(
 
     if (alreadyProcessed) {
       logger.info({ idempotencyKey }, '[WEBHOOK] Duplicate webhook detected');
+      // Ruling FAWRY-REFUND-DEDUPE-1: a repeated Fawry refund notice with no reference number may be a SECOND partial refund
+      // that looks identical to the first. Still acked (Fawry must not loop), never silent: a person checks the dashboard.
+      if (isAmbiguousRefundRepeat(provider, payload))
+        void sendAlert({
+          level: 'p1',
+          scope: 'store',
+          store: { id: storeIdForWebhook, name: storeIdForWebhook },
+          source: 'payment.webhook.fawry_refund_repeat',
+          title: 'Fawry refund notice repeated: check for a second partial refund',
+          body: `Fawry sent a ${String(payload.orderStatus)} notice for ref ${String(payload.fawryRefNumber ?? '?')} (order ${String(payload.merchantRefNumber ?? '?')}) that matches one already processed, with no payment reference number. If Fawry refunded this order twice for the same amount, the second refund was NOT booked: compare the Fawry dashboard's refunds with the order's payment and record any missing one by hand.`,
+          context: {
+            storeId: storeIdForWebhook,
+            idempotencyKey,
+            fawryRefNumber: payload.fawryRefNumber ?? null,
+            merchantRefNumber: payload.merchantRefNumber ?? null,
+            orderStatus: payload.orderStatus ?? null,
+            paymentAmount: payload.paymentAmount ?? null,
+          },
+        }).catch(() => undefined);
 
       await auditLog({
         action: 'WEBHOOK_DUPLICATE',
