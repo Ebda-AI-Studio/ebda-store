@@ -126,20 +126,12 @@ async function primeAllMarkers(ids: readonly string[]): Promise<void> {
  */
 async function storeIdsWithFeature(feature: 'abandoned_cart'): Promise<string[]> {
   const stores = await storeDirectory();
-  const out: string[] = [];
-  // One batched read of the whole sweep's feature maps (no `store_features` / `store_subscriptions` read per store).
-  await featureService.prefetchStoreFeatures(stores.map(st => st.id));
-  const CHUNK = 20;
-  for (let i = 0; i < stores.length; i += CHUNK) {
-    const part = stores.slice(i, i + CHUNK);
-    const flags = await Promise.all(
-      part.map(st => featureService.isFeatureEnabled(st.id, feature).catch(() => false))
-    );
-    part.forEach((st, j) => {
-      if (flags[j]) out.push(st.id);
-    });
-  }
-  return out;
+  // Selection only: one batched entitlement prefetch for the run (no `store_features` / `store_subscriptions` read per store).
+  // `processReminders` re-reads the entitlement live (once per store) just before it sends.
+  return featureService.selectEnabled(
+    stores.map(st => st.id),
+    feature
+  );
 }
 
 // ==========================================
@@ -448,8 +440,23 @@ class AbandonedCartService {
       '[AbandonedCart] Processing due reminders'
     );
 
+    // Entitlements are NEVER-stale: a store downgraded after detection must not get a reminder. One live read per store, only
+    // for stores that have a reminder due now.
+    const stillEntitled = new Map<string, Promise<boolean>>();
     for (const abandonedCart of pending) {
       try {
+        let entitled = stillEntitled.get(abandonedCart.storeId);
+        if (!entitled) {
+          entitled = featureService.isFeatureEnabled(abandonedCart.storeId, 'abandoned_cart');
+          stillEntitled.set(abandonedCart.storeId, entitled);
+        }
+        if (!(await entitled)) {
+          logger.info(
+            { correlationId, storeId: abandonedCart.storeId },
+            '[AbandonedCart] abandoned_cart no longer entitled, reminder skipped'
+          );
+          continue;
+        }
         // Only carts still in the reminder sequence get their next step.
         if (
           abandonedCart.status === 'pending' ||

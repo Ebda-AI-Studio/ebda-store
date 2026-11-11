@@ -8,7 +8,8 @@ import { retryOnWriteConflict } from '../lib/db-retry';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { automationFlagsFromRows, getAutomationFlags } from './plan-entitlements';
 import { platformDb } from '../lib/platform-db';
-import { currentSweepScope, forgetSweepMemo, seedSweepMemo, sweepMemo } from '../lib/sweep-scope';
+import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
+import { currentSweepScope, forgetSweepMemo, seedSweepMemo } from '../lib/sweep-scope';
 import { readStorePlan } from '../lib/store-plan';
 import { storeRepo, storeUpdate } from '../lib/repo-factory';
 
@@ -227,7 +228,7 @@ class FeatureService {
    */
   async invalidateCache(storeId: string): Promise<void> {
     try {
-      forgetSweepMemo(this.cacheKey(storeId));
+      forgetSweepMemo(this.prefetchKey(storeId));
       await redis.delete(this.cacheKey(storeId));
       // B2B: the public product payload lists the public price tiers only while `b2b.wholesale` is on, so any change to the
       // resolved feature map (plan change, plan-limit edit, override) must also drop the cached public product payloads.
@@ -275,39 +276,73 @@ class FeatureService {
    * Checks Redis cache first; on miss reads from DB and populates cache.
    */
   async getStoreFeatures(storeId: string): Promise<Record<FeatureKey, boolean>> {
-    // Inside a cron job run / queue message the map is resolved once per store (lib/sweep-scope.ts; BOUNDED-stale, window = that
-    // invocation, shorter than the 5-min cache below). `prefetchStoreFeatures` fills it for a whole page of stores in 3 reads.
-    return sweepMemo(this.cacheKey(storeId), () => this.resolveStoreFeatures(storeId));
+    // Always live (NEVER-stale entitlements): a paid side effect re-checks through here just before it acts. The prefetched
+    // sweep maps are read ONLY by `selectEnabled`, to decide which stores to scan.
+    return this.resolveStoreFeatures(storeId);
+  }
+
+  private prefetchKey = (storeId: string): string => `features-prefetch:${storeId}`;
+
+  /**
+   * Which of `storeIds` have `featureKey` on, for SELECTING the stores a sweep visits (never as the gate of a paid side effect).
+   * One batched prefetch for the run (`prefetchStoreFeatures`), then a lookup; a store the prefetch could not resolve is checked
+   * live. Entitlements are NEVER-stale, so every paid action (send, charge, AI call, external post) must still call
+   * `isFeatureEnabled` live just before it acts: a downgrade or override revoke landing mid-run is seen there.
+   */
+  async selectEnabled(storeIds: readonly string[], featureKey: FeatureKey): Promise<string[]> {
+    await this.prefetchStoreFeatures(storeIds);
+    const scope = currentSweepScope();
+    const out: string[] = [];
+    for (let i = 0; i < storeIds.length; i += 20) {
+      const part = storeIds.slice(i, i + 20);
+      const flags = await Promise.all(
+        part.map(async id => {
+          const hit = scope?.memo.get(this.prefetchKey(id));
+          if (hit) return ((await hit.p) as Record<FeatureKey, boolean>)[featureKey] ?? false;
+          return this.isFeatureEnabled(id, featureKey).catch(() => false);
+        })
+      );
+      part.forEach((id, j) => {
+        if (flags[j]) out.push(id);
+      });
+    }
+    return out;
   }
 
   /**
-   * STALENESS: the prefetch and the memo it seeds live ONLY in the current sweep scope (one cron job run / one queue message);
-   * nothing is written to Redis, KV or module state, so there is no cross-request or cross-run cache here. Entitlements are
-   * NEVER-stale: the next invocation re-reads, and `invalidateCache` drops a store's memo entry inside the same run.
+   * STALENESS: the prefetch and the maps it seeds live ONLY in the current sweep scope (one cron job run / one queue message)
+   * and are read ONLY by `selectEnabled`; nothing is written to Redis, KV or module state, so there is no cross-request or
+   * cross-run cache. `getStoreFeatures` / `isFeatureEnabled` stay live (entitlements are NEVER-stale).
    *
    * One batched read for many stores (instead of `store_features` + `store_subscriptions` + `plans` per store): only inside a
-   * sweep scope on a Worker with the platform D1. Seeds the scope memo, so every later `getStoreFeatures(id)` of the run is a
-   * hit. A store this cannot resolve exactly (not on its DO, plan unreadable) is left out and resolves per store as before.
+   * sweep scope on a Worker WITHOUT Postgres (there the platform D1 is the only source `getEntitlements` reads; with Postgres
+   * bound it reads the Postgres row first, so the batch would not be equivalent and is skipped). A store this cannot resolve
+   * exactly (gone, not on its DO) is left out alone and resolves per store as before; the rest of its chunk stays batched.
    */
   async prefetchStoreFeatures(storeIds: readonly string[]): Promise<void> {
     const scope = currentSweepScope();
-    const platform = scope ? await platformDb() : undefined;
-    if (!scope || !platform) return;
+    if (!scope || !postgresRemovedOnThisWorker()) return;
+    const platform = await platformDb();
+    if (!platform) return;
     const CHUNK = 50; // D1: 100 bound parameters per statement
-    const ids = [...new Set(storeIds)].filter(id => !scope.memo.has(this.cacheKey(id)));
+    const ids = [...new Set(storeIds)].filter(id => !scope.memo.has(this.prefetchKey(id)));
     for (let i = 0; i < ids.length; i += CHUNK) {
       const part = ids.slice(i, i + CHUNK);
       try {
         const legacy = new Map<string, StorePlan>();
         await Promise.all(
           part.map(async id => {
-            const repo = await storeRepo(id);
-            if (repo.backend !== 'do') return;
-            const row = await (repo.db as unknown as Prisma.TransactionClient).store.findUnique({
-              where: { id },
-              select: { plan: true },
-            });
-            if (row) legacy.set(id, row.plan as StorePlan);
+            try {
+              const repo = await storeRepo(id);
+              if (repo.backend !== 'do') return;
+              const row = await (repo.db as unknown as Prisma.TransactionClient).store.findUnique({
+                where: { id },
+                select: { plan: true },
+              });
+              if (row) legacy.set(id, row.plan as StorePlan);
+            } catch {
+              // gone / unreadable store: left out alone, it resolves per store (and 404s there as before)
+            }
           })
         );
         const known = part.filter(id => legacy.has(id));
@@ -354,7 +389,7 @@ class FeatureService {
         for (const id of known) {
           const { flags } = automationFlagsFromRows(legacy.get(id)!, subBy.get(id), planRows);
           seedSweepMemo(
-            this.cacheKey(id),
+            this.prefetchKey(id),
             this.rowsToMap(legacy.get(id)!, featBy.get(id) ?? [], flags)
           );
         }

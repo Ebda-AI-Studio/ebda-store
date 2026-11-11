@@ -36,7 +36,7 @@ vi.mock('@api/lib/inngest/client', () => ({ inngest: { createFunction: h.createF
 vi.mock('@api/services/feature.service', () => ({
   featureService: {
     isFeatureEnabled: vi.fn(async () => true),
-    prefetchStoreFeatures: async () => undefined,
+    selectEnabled: async (ids: string[]) => ids,
   },
 }));
 vi.mock('@api/services/answer-engine/citation-scan.service', () => ({

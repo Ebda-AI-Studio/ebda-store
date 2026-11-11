@@ -8,15 +8,30 @@ vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn().mockResolvedValue(null), set: vi.fn(), delete: vi.fn() },
 }));
 
-const calls = vi.hoisted(() => ({ n: { feature: 0, sub: 0, plan: 0, perStore: 0 } }));
+const calls = vi.hoisted(() => ({
+  n: { feature: 0, sub: 0, plan: 0, perStore: 0 },
+  gone: new Set<string>(),
+  pgRemoved: true,
+  liveAbandoned: true,
+}));
+vi.mock('@api/lib/postgres-present', () => ({
+  postgresRemovedOnThisWorker: () => calls.pgRemoved,
+}));
 
 vi.mock('@ebda/database', () => ({
   prisma: {},
   Prisma: {},
   withMoneyTx: vi.fn(),
-  withStore: vi.fn(async () => {
+  withStore: vi.fn(async (_id: string, fn: (tx: unknown) => unknown) => {
     calls.n.perStore++;
-    throw new Error('per-store path must not run');
+    return fn({
+      store: { findUnique: async () => ({ plan: 'free' }) },
+      storeFeature: {
+        findMany: async () => [{ featureKey: 'abandoned_cart', enabled: calls.liveAbandoned }],
+      },
+      storeSubscription: { findUnique: async () => null },
+      plan: { findUnique: async () => null },
+    });
   }),
 }));
 vi.mock('@api/lib/platform-db', () => ({
@@ -28,6 +43,7 @@ vi.mock('@api/lib/platform-db', () => ({
       },
     },
     storeSubscription: {
+      findUnique: async () => null,
       findMany: async () => {
         calls.n.sub++;
         return [];
@@ -42,10 +58,13 @@ vi.mock('@api/lib/platform-db', () => ({
   }),
 }));
 vi.mock('@api/lib/repo-factory', () => ({
-  storeRepo: async () => ({
-    backend: 'do',
-    db: { store: { findUnique: async () => ({ plan: 'free' }) } },
-  }),
+  storeRepo: async (id: string) => {
+    if (calls.gone.has(id)) throw new Error('STORE_NOT_FOUND');
+    return {
+      backend: 'do',
+      db: { store: { findUnique: async () => ({ plan: 'free' }) } },
+    };
+  },
   storeUpdate: vi.fn(),
 }));
 
@@ -55,6 +74,9 @@ import { withSweepScope } from '@api/lib/sweep-scope';
 describe('feature maps for N stores in a sweep scope', () => {
   beforeEach(() => {
     calls.n = { feature: 0, sub: 0, plan: 0, perStore: 0 };
+    calls.gone.clear();
+    calls.pgRemoved = true;
+    calls.liveAbandoned = true;
   });
 
   for (const n of [10, 120]) {
@@ -62,7 +84,7 @@ describe('feature maps for N stores in a sweep scope', () => {
       const ids = Array.from({ length: n }, (_, i) => `s${i}`);
       await withSweepScope(async () => {
         await featureService.prefetchStoreFeatures(ids);
-        for (const id of ids) await featureService.isFeatureEnabled(id, 'abandoned_cart');
+        await featureService.selectEnabled(ids, 'abandoned_cart');
       });
       const chunks = Math.ceil(n / 50);
       expect(calls.n.feature).toBe(chunks);
@@ -71,4 +93,43 @@ describe('feature maps for N stores in a sweep scope', () => {
       expect(calls.n.perStore).toBe(0);
     });
   }
+
+  it('1 gone store of 50: only that store resolves per store, the other 49 stay batched', async () => {
+    const ids = Array.from({ length: 50 }, (_, i) => `g${i}`);
+    calls.gone.add('g7');
+    await withSweepScope(async () => {
+      await featureService.prefetchStoreFeatures(ids);
+    });
+    expect(calls.n.feature).toBe(1);
+    expect(calls.n.perStore).toBe(0); // prefetch never falls back by itself; the gone store is simply left out
+    let selected: string[] = [];
+    await withSweepScope(async () => {
+      selected = await featureService.selectEnabled(ids, 'abandoned_cart');
+    });
+    expect(selected).not.toContain('g7'); // live check of the gone store failed -> not selected, sweep goes on
+    expect(selected.length).toBe(0); // free plan baseline has no abandoned_cart override rows here
+    expect(calls.n.perStore).toBe(1); // exactly the gone store, once
+  });
+
+  it('prefetch is skipped when Postgres is bound (getEntitlements reads it first): per-store path', async () => {
+    calls.pgRemoved = false;
+    await withSweepScope(async () => {
+      await featureService.prefetchStoreFeatures(['p1', 'p2']);
+    });
+    expect(calls.n.feature + calls.n.sub + calls.n.plan).toBe(0);
+  });
+
+  it('a downgrade mid-run: selection used the prefetch, the live check before the paid action sees it', async () => {
+    calls.liveAbandoned = true;
+    await withSweepScope(async () => {
+      // prefetch seeds (D1 override rows are empty, so selection comes from the plan baseline)
+      await featureService.prefetchStoreFeatures(['d1']);
+      // the live entitlement (override row) is revoked mid-run
+      calls.liveAbandoned = false;
+      const live = await featureService.isFeatureEnabled('d1', 'abandoned_cart');
+      expect(live).toBe(false); // the paid side effect is skipped on this answer
+      // and invalidateCache drops the prefetched map for the rest of the run
+      await featureService.invalidateCache('d1');
+    });
+  });
 });

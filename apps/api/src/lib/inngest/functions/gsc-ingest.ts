@@ -139,13 +139,21 @@ const gscIngestCronFn = inngest.createFunction(
       ).then(list => list.map(s => ({ id: s.id })))
     );
 
-    // Entitlements for the whole sweep in 3 batched reads (per run only, never cached across runs; Sentry N+1).
-    await step.run('prefetch-features', async () => {
-      await featureService.prefetchStoreFeatures(stores.map(s => s.id));
-      return true; // a step result must be JSON-safe
-    });
+    // Stores to visit: entitlement read in one batched prefetch per run (selection only). The per-store gate below stays a
+    // LIVE read, so a downgrade mid-run is still honoured before any paid action (entitlements are NEVER-stale).
+    const enabledIds = new Set(
+      await step.run('select-enabled-stores', () =>
+        featureService.selectEnabled(
+          stores.map(s => s.id),
+          'answer_engine_insights'
+        )
+      )
+    );
 
-    const batches = chunk(stores, BULK_AI_BATCH_SIZE);
+    const batches = chunk(
+      stores.filter(s => enabledIds.has(s.id)),
+      BULK_AI_BATCH_SIZE
+    );
 
     let ingested = 0;
     let skipped = 0;

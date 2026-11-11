@@ -173,14 +173,13 @@ const selectKeysLive = async (d1: MarkerD1, keys: readonly string[]): Promise<Cu
   ).results ?? [];
 
 /**
- * STALENESS CLASS: BOUNDED-stale. Inside a cron job run / queue message (lib/sweep-scope.ts) the same key set is read once, not
- * once per store or per call (Sentry N+1: `SELECT key, value FROM system_settings WHERE key IN (...)` repeated in one run).
- * RESIDUAL WINDOW: at most OFF_TTL_MS (10 s) per key set, per invocation, never across invocations or isolates. Why safe: a
- * marker / freeze row is written by an operator script, not by the run itself; the in-process "off" verdict above already
- * tolerates the same 10 s, and an unreadable read still fails closed (503, a failed load is never kept). A freeze landing
- * mid-run is therefore seen within 10 s, exactly as without this memo. Request paths open no scope and keep the live read.
+ * MEMOISED read, ONLY for `readCutoverKeysMany` (the per-store customer-auth marker sweep, Sentry N+1: the same key set read once
+ * per store in one run). STALENESS CLASS: BOUNDED-stale; RESIDUAL WINDOW: at most OFF_TTL_MS (10 s) per key set, per cron job run /
+ * queue message (lib/sweep-scope.ts), never across invocations. Why safe: those keys are route markers, the same 10 s the in-process
+ * "off" verdict already tolerates. NEVER used by `readCutoverKeys`, `isFamilyFrozen` or `assertNotFrozen`: a freeze guards writes
+ * against a move snapshot, so it is always a fresh read (a freeze set mid-run must be seen on the very next guard call).
  */
-const selectKeys = (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
+const selectKeysMemo = (d1: MarkerD1, keys: readonly string[]): Promise<CutoverRow[]> =>
   sweepMemo(
     `cutover-keys:${[...keys].sort().join('|')}`,
     () => selectKeysLive(d1, keys),
@@ -192,7 +191,7 @@ export async function readCutoverKeys(
   k: CutoverKeys
 ): Promise<{ moved: boolean; frozen: boolean }> {
   try {
-    return evaluateCutoverRows(await selectKeys(d1, [...k.markers, ...k.freezes]), k);
+    return evaluateCutoverRows(await selectKeysLive(d1, [...k.markers, ...k.freezes]), k);
   } catch {
     throw k.unreadable();
   }
@@ -215,7 +214,7 @@ export async function readCutoverKeysMany(
   const rows: CutoverRow[] = [];
   try {
     for (let i = 0; i < unique.length; i += MAX_KEYS_PER_READ)
-      rows.push(...(await selectKeys(d1, unique.slice(i, i + MAX_KEYS_PER_READ))));
+      rows.push(...(await selectKeysMemo(d1, unique.slice(i, i + MAX_KEYS_PER_READ))));
   } catch {
     throw sets[0]!.unreadable();
   }

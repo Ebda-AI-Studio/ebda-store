@@ -114,7 +114,7 @@ vi.mock('@api/lib/logger', () => ({
 vi.mock('@api/services/feature.service', () => ({
   featureService: {
     isFeatureEnabled: async () => true,
-    prefetchStoreFeatures: async () => undefined,
+    selectEnabled: async (ids: string[]) => ids,
   },
 }));
 vi.mock('@api/services/email.service', () => ({
