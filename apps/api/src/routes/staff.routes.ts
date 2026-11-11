@@ -13,10 +13,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { withStore, withUser, UserRole } from '@ebda/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
-import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { requireMfaEnrolled, requireRecentLogin } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { isStaffRoleConflict, STAFF_ROLE_CONFLICT_MESSAGE } from '../lib/staff-role-conflict';
+import { isStaffRoleConflict } from '../lib/staff-role-conflict';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
@@ -58,9 +58,19 @@ async function addStaffMemberD1(storeId: string, userId: string): Promise<{ id: 
   await assertWithinLimit(storeId, 'maxStaff'); // throws the 402 when the seats are full
   throw new AppError(409, 'STAFF_SEAT_CONFLICT', 'Could not add the staff member, try again.');
 }
+/**
+ * ID-07: an address that cannot be staff (a platform admin, a customer, an unusable account) must be indistinguishable from
+ * one that can. A 409 ROLE_CONFLICT told any store owner which e-mails belong to platform administrators. The invite route
+ * throws this instead and answers the SAME 202 as a real invitation, sending nothing and writing nothing but an audit row.
+ */
+export class SilentInviteRefusal extends Error {
+  constructor(public reason: string) {
+    super(reason);
+  }
+}
 function assertInvitableRole(role: string): void {
   if (isStaffRoleConflict(role)) {
-    throw new AppError(409, 'ROLE_CONFLICT', STAFF_ROLE_CONFLICT_MESSAGE);
+    throw new SilentInviteRefusal('role_conflict');
   }
 }
 
@@ -169,6 +179,7 @@ router.post(
   requireMfaEnrolled,
   // BE:S-2 (Ruling FP-3): adding a staff member grants durable access; not from an impersonated session.
   rejectImpersonated,
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('staff_accounts'),
@@ -213,7 +224,7 @@ router.post(
           // The profile row must carry the id THIS request generated: an identity that answers with another id is someone
           // else's account and is never bound (cross-tenant takeover).
           if (invited.id !== requestedId) {
-            throw new AppError(409, 'ROLE_CONFLICT', 'This email cannot be invited as staff.');
+            throw new SilentInviteRefusal('identity_mismatch');
           }
           const createShadow = () =>
             withUser(invited.id, tx =>
@@ -254,7 +265,7 @@ router.post(
       } else {
         const acc = await getAccountState(exists);
         if (!acc) {
-          throw new AppError(409, 'ROLE_CONFLICT', 'This account cannot be invited as staff.');
+          throw new SilentInviteRefusal('no_account_state');
         }
         assertInvitableRole(acc.role);
         if (!acc.emailVerified || acc.role !== 'staff') {
@@ -268,7 +279,7 @@ router.post(
             role: UserRole.staff,
           });
           if (staffUser.id !== exists) {
-            throw new AppError(409, 'ROLE_CONFLICT', 'This email cannot be invited as staff.');
+            throw new SilentInviteRefusal('identity_mismatch');
           }
         }
       }
@@ -322,7 +333,7 @@ router.post(
 
       // User exists — must already be a staff or store_admin role
       if (staffUser.role === UserRole.customer || staffUser.role === UserRole.super_admin) {
-        throw new AppError(409, 'ROLE_CONFLICT', STAFF_ROLE_CONFLICT_MESSAGE);
+        throw new SilentInviteRefusal('role_conflict');
       }
 
       // Prevent double-add
@@ -429,6 +440,20 @@ router.post(
         },
       });
     } catch (err) {
+      if (err instanceof SilentInviteRefusal) {
+        // ID-07: same answer as a real invitation. Nothing is mailed to the address.
+        await auditLog({
+          action: 'staff.invite_refused',
+          userId: req.user!.userId,
+          resourceType: 'store',
+          resourceId: req.params.storeId,
+          details: { storeId: req.params.storeId, reason: err.reason },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        }).catch(() => undefined);
+        res.status(202).json({ success: true, data: { status: 'invitation_sent' } });
+        return;
+      }
       next(err);
     }
   }
@@ -464,6 +489,7 @@ router.delete(
   '/invites/:inviteId',
   authenticate,
   requireMfaEnrolled, // BE:S-11
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('staff_accounts'),
@@ -499,6 +525,7 @@ router.delete(
   '/:userId',
   authenticate,
   requireMfaEnrolled, // BE:S-11
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('staff_accounts'),

@@ -44,5 +44,23 @@ export async function jwks(env: {
   for (const k of previous) {
     if (k.d || !k.kid) throw new Error('JWT_PREVIOUS_PUBLIC_JWKS must hold public keys with a kid');
   }
-  return { keys: [current, ...previous.filter(k => k.kid !== current.kid)] };
+  // ID-08: a retired key is published only until ITS OWN `exp` (unix seconds, set when it was retired; rotation runbook: now +
+  // 24 h). Without an `exp` the key is not published at all (fail closed: a retired signing key must never verify forever); with
+  // one in the past it is dropped. `exp` is our bookkeeping, not a JWK member, so it is stripped from the published set.
+  const nowS = Math.floor(Date.now() / 1000);
+  const live = previous
+    .filter(k => {
+      const exp = (k as JWK & { exp?: unknown }).exp;
+      if (typeof exp !== 'number') {
+        console.error(JSON.stringify({ msg: 'retired jwk has no exp, not published', kid: k.kid }));
+        return false;
+      }
+      return exp > nowS;
+    })
+    .map(k => {
+      const { exp: _exp, ...rest } = k as JWK & { exp?: number };
+      void _exp;
+      return rest as JWK;
+    });
+  return { keys: [current, ...live.filter(k => k.kid !== current.kid)] };
 }

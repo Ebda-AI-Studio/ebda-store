@@ -215,6 +215,28 @@ export async function revokeAllForUser(
   ]);
 }
 
+/** Sign out every session of the user EXCEPT `keepSid` (the one that just made a security change), refresh tokens included. */
+export async function revokeOtherSessions(
+  db: D1Database,
+  userId: string,
+  keepSid: string,
+  reason: string
+): Promise<void> {
+  const now = nowMs();
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE sessions SET revoked_at = ?3, revoked_reason = ?4 WHERE user_id = ?1 AND sid != ?2 AND revoked_at IS NULL`
+      )
+      .bind(userId, keepSid, now, reason),
+    db
+      .prepare(
+        `UPDATE refresh_tokens SET revoked_at = ?3, revoked_reason = COALESCE(revoked_reason, ?4) WHERE user_id = ?1 AND sid != ?2 AND revoked_at IS NULL`
+      )
+      .bind(userId, keepSid, iso(now), reason),
+  ]);
+}
+
 /** True when the session must be refused: unknown, revoked, expired, or its user is no longer active. */
 export async function isSessionRevoked(db: D1Database, sid: string): Promise<boolean> {
   const row = await db

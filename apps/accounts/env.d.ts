@@ -21,13 +21,24 @@ export interface MailerRpc {
     storeName?: string;
   }): Promise<void>;
   /** A security notice with no code (a sign-in method was added). */
-  sendNotice(input: {
-    to: string;
-    kind: 'factor_added';
-    factor: 'totp' | 'passkey';
-    language: 'en' | 'ar';
-    firstName: string;
-  }): Promise<void>;
+  sendNotice(
+    input:
+      | {
+          to: string;
+          kind: 'factor_added';
+          factor: 'totp' | 'passkey';
+          language: 'en' | 'ar';
+          firstName: string;
+        }
+      | {
+          to: string;
+          /** ID-06: a recovery-relevant credential changed and the other sessions were signed out. */
+          kind: 'credential_changed';
+          change: 'mfa_disabled' | 'passkey_removed' | 'phone_changed';
+          language: 'en' | 'ar';
+          firstName: string;
+        }
+  ): Promise<void>;
 }
 
 /** Service Binding RPC surface of ebda-wa (its `PlatformOtp` entrypoint, src/index.ts in ebda-whatsapp): sends from the PLATFORM number, no store id. Anything but `ok` means: fall back to the email. */

@@ -3,7 +3,8 @@ import { analyticsRead } from '../lib/analytics-backend';
 import { z } from 'zod/v3';
 import { prisma } from '@ebda/database';
 import { FeatureKey } from '@ebda/shared';
-import { authenticate, authorize } from '../middleware/auth';
+import { requireRecentLogin } from '../middleware/require-mfa';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { refuseDemoStore } from '../middleware/demo-store';
@@ -197,6 +198,8 @@ router.get(
 router.put(
   '/:storeId/notifications/configs/:channel',
   ...adminMiddleware,
+  rejectImpersonated, // TEN-3: provider credentials are the owner's own
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, channel } = req.params;
@@ -230,6 +233,8 @@ router.put(
 router.delete(
   '/:storeId/notifications/configs/:channel',
   ...adminMiddleware,
+  rejectImpersonated, // TEN-3: provider credentials are the owner's own
+  requireRecentLogin, // TEN-4: credential-class change needs a recent sign-in
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, channel } = req.params;

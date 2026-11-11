@@ -3169,6 +3169,8 @@ router.post(
           tv: target.tokenVersion,
           // Non-standard claim — allows future guards to detect impersonation
           impersonatedBy: req.user!.userId,
+          // TEN-2: ties the token to the admin's identity session; revoking that session (or demoting the admin) kills it.
+          impSid: (req as Request & { accountsSid?: string }).accountsSid,
         },
         config.jwtSecret,
         {

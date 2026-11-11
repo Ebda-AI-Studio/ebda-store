@@ -8,7 +8,7 @@ const app = createApp();
 
 export interface Fakes {
   stores: Array<{ id: string; role: 'owner' | 'staff' }>;
-  notices: Array<{ to: string; kind: string; factor: string }>;
+  notices: Array<{ to: string; kind: string; factor: string; change?: string }>;
   mails: Array<{ to: string; kind: string; code: string; ttlMinutes?: number; storeName?: string }>;
   directoryDown: boolean;
   /** Store ids the directory reports as deleted. */
@@ -71,8 +71,13 @@ export const testEnv = (): Cloudflare.Env =>
         }
       : { WHATSAPP_OTP: undefined }),
     MAILER: {
-      sendNotice: async (m: { to: string; kind: string; factor: string }) => {
-        fakes.notices.push({ to: m.to, kind: m.kind, factor: m.factor });
+      sendNotice: async (m: { to: string; kind: string; factor: string; change?: string }) => {
+        fakes.notices.push({
+          to: m.to,
+          kind: m.kind,
+          factor: m.factor,
+          ...(m.change ? { change: m.change } : {}),
+        });
       },
       sendCode: async (m: {
         to: string;

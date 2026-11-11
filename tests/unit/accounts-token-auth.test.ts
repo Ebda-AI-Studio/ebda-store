@@ -142,6 +142,30 @@ describe('platform admin (pa) needs a fresh login (Ruling ID-15)', () => {
       claims: { pa: 'super_admin', ...(authTime === undefined ? {} : { auth_time: authTime }) },
     });
 
+  // ID-02: the claim alone is never enough, the account must STILL be a super_admin.
+  beforeEach(() => {
+    rows.get('user-1')!.role = 'super_admin';
+  });
+
+  it('ID-02: a pa token of an account demoted to store_admin is refused on the very next request', async () => {
+    const t = await admin(nowS() - 60);
+    expect((await run(authenticate, t)).err).toBeUndefined();
+    rows.get('user-1')!.role = 'store_admin';
+    const { req, err } = await run(authenticate, t);
+    expect(err).toMatchObject({ statusCode: 401, code: 'TOKEN_REVOKED' });
+    expect(req.user).toBeUndefined();
+  });
+
+  it('ID-02: the role is read LIVE even on a plain GET and is never served from the 30 s account cache', async () => {
+    const t = await admin(nowS() - 60);
+    // warm the shared cache with a NON-pa request for the same user (cacheable positive answer)
+    await run(authenticate, await mint());
+    rows.get('user-1')!.role = 'store_admin';
+    // a path on the NON-sensitive GET allowlist: a merchant would skip the live check here, a platform admin must not
+    const plainRead = await runWith('GET', '/api/v1/admin/stores/store-1/layout', t);
+    expect(plainRead.err).toMatchObject({ statusCode: 401, code: 'TOKEN_REVOKED' });
+  });
+
   it('a pa token whose login is at most 12 h old is a super_admin', async () => {
     const { req, err } = await run(authenticate, await admin(nowS() - 3600));
     expect(err).toBeUndefined();
