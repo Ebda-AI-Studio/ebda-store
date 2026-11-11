@@ -9,9 +9,11 @@
  *  - Prices, totals and stock come from the Store only; the caller sends variant ids and quantities, never an amount.
  *  - Writes (`createOrderFromChat`, `recordCodOutcome`) require an idempotency key and are replay-safe in the port.
  */
+import { timingSafeEqual } from 'node:crypto';
 import type { z } from 'zod/v3';
 import { args } from './schemas';
-import { signCheckoutToken } from './checkout-token';
+import { buyerKeyFor } from '@ebda/shared';
+import { signCheckoutToken, storeBuyerId } from './checkout-token';
 
 export type ChatPaymentMethod = 'cod' | 'link' | 'instapay';
 export type BridgeFailure =
@@ -159,6 +161,11 @@ export interface BridgeDeps {
   port: BridgePort;
   /** Public storefront origin for a store (checkout links). */
   storefrontUrl: (storeId: string) => Promise<string>;
+  /**
+   * The suite buyer-key secret. REQUIRED (no default): a bridge built without it cannot bind a buyer to a phone, so
+   * the two methods that take both fail closed instead of trusting the caller (WA-2). Production wires `suiteBuyerKeySecret`.
+   */
+  buyerKeySecret: () => string;
   now?: () => number;
   log?: (msg: string, ctx: Record<string, unknown>) => void;
 }
@@ -169,6 +176,11 @@ const fail = (reason: BridgeFailure, message?: string): BridgeResult<never> => (
   ...(message ? { message } : {}),
 });
 const GATE_NOTE = 'store not resolved';
+const sameKey = (a: string, b: string) => {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+};
 
 export function createBridge(deps: BridgeDeps) {
   const { port } = deps;
@@ -210,6 +222,15 @@ export function createBridge(deps: BridgeDeps) {
       throw err;
     }
   }
+  /**
+   * WA-2: a buyer is `{ buyerKey, phoneE164 }`, and the key is HMAC(secret, phone). The caller sends both, so the bridge
+   * recomputes the key and refuses any pair that does not match: a Worker on the service binding can no longer read or write as
+   * a buyer whose phone it does not hold. A throw (secret unset or short) propagates: the call fails, nothing is trusted.
+   */
+  async function buyerBound(b: { buyerKey: string; phoneE164: string }): Promise<boolean> {
+    const want = await buyerKeyFor(deps.buyerKeySecret(), b.phoneE164);
+    return want !== null && sameKey(want, b.buyerKey);
+  }
   const ok = <T>(value: T): BridgeResult<T> => ({ ok: true, value });
 
   return {
@@ -230,6 +251,7 @@ export function createBridge(deps: BridgeDeps) {
 
     createCheckoutLink: (storeId: string, req: unknown) =>
       run('createCheckoutLink', storeId, args.createCheckoutLink, req, async (s, a, p) => {
+        if (!(await buyerBound(a.buyer))) return fail('invalid', 'buyer');
         const rows = await port.catalogByIds(
           s,
           a.items.map(i => i.variantId)
@@ -247,7 +269,7 @@ export function createBridge(deps: BridgeDeps) {
         }
         if (missing.length) return { ok: false, reason: 'out_of_stock', outOfStock: missing };
         const token = signCheckoutToken(
-          { storeId: s, items: a.items, buyerKey: a.buyer.buyerKey },
+          { storeId: s, items: a.items, bk: storeBuyerId(s, a.buyer.buyerKey) },
           now()
         );
         const base = (await deps.storefrontUrl(s)).replace(/\/+$/, '');
@@ -261,6 +283,7 @@ export function createBridge(deps: BridgeDeps) {
 
     createOrderFromChat: (storeId: string, req: unknown) =>
       run('createOrderFromChat', storeId, args.createOrderFromChat, req, async (s, a, p) => {
+        if (!(await buyerBound(a.buyer))) return fail('invalid', 'buyer');
         if (!p.paymentMethods.includes(a.paymentMethod))
           return fail('payment_method_disabled', a.paymentMethod);
         const placed = await port.placeOrder(s, a);

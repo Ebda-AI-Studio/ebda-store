@@ -72,6 +72,7 @@ const num = async (id: string, q: string) => (await sql<{ n: number }>(id, q))[0
 const inner = createBridge({
   port: createDoPort(),
   storefrontUrl: async () => 'https://shop.example',
+  buyerKeySecret: () => 'ebda-suite-buyer-key-test-v1',
 });
 const bridge = () =>
   new Proxy(inner, {
