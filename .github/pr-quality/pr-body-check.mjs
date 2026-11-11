@@ -4,8 +4,10 @@
 //   fix PRs:  (title `fix...` or branch `fix/...`) also `## Mutation check` with content, and a changed test file
 //   learning: the PR closes an issue labelled `review-finding` -> `- [x] Test: <changed test path>` and
 //             `- [x] Foundation: <path | PR url | ruling id>` (every finding makes the foundation stronger)
-// CLI env: PR_BODY, PR_TITLE, PR_BRANCH, CHANGED_FILES (newline list), GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_API_URL.
+// CLI env: PR_QUALITY_CONFIG (path of the BASE branch's .pr-quality.json: `bodyCheckEnforceFrom` = ISO date before which problems are only
+//   warnings, so adopting the check does not turn every open PR red), PR_BODY, PR_TITLE, PR_BRANCH, CHANGED_FILES (newline list), GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_API_URL.
 // Exit 1 + one line per problem. Anything unreadable (issue lookup failing) is a failure: unknown is not pass.
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const SECTIONS = ['Verified', 'Not verified', 'Cost-if-wrong'];
@@ -51,6 +53,15 @@ export function checkPrBody({ body = '', title = '', branch = '', files = [], li
 /** issue numbers the body closes (Fixes/Closes/Resolves #N) */
 export const closedIssues = (body) => [...new Set([...body.matchAll(/\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?)\s*:?\s+#(\d+)/gi)].map((m) => Number(m[1])))];
 
+/** epoch ms from `bodyCheckEnforceFrom` in the config file, or null when unset/unreadable (null = enforce now) */
+export function enforceFrom(path) {
+  try {
+    const v = JSON.parse(readFileSync(path, 'utf8')).bodyCheckEnforceFrom;
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? t : null;
+  } catch { return null; }
+}
+
 async function main() {
   const { PR_BODY = '', PR_TITLE = '', PR_BRANCH = '', CHANGED_FILES = '', GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_API_URL = 'https://api.github.com' } = process.env;
   const linked = [];
@@ -66,7 +77,12 @@ async function main() {
     }
   }
   problems.push(...checkPrBody({ body: PR_BODY, title: PR_TITLE, branch: PR_BRANCH, files: CHANGED_FILES.split('\n').map((s) => s.trim()).filter(Boolean), linkedFindings: linked }));
-  if (problems.length) { for (const p of problems) console.error(`pr-body: ${p}`); process.exit(1); }
+  if (problems.length) {
+    const from = enforceFrom(process.env.PR_QUALITY_CONFIG);
+    const grace = from !== null && Date.now() < from;
+    for (const p of problems) console.error(grace ? `::warning::pr-body (warn-only until ${new Date(from).toISOString().slice(0, 10)}): ${p}` : `pr-body: ${p}`);
+    process.exit(grace ? 0 : 1);
+  }
   console.log('pr-body: ok');
 }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) await main();

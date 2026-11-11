@@ -6,6 +6,10 @@
 // exists (a fixed violation must leave the baseline in the same PR, so its slot cannot be reused by a later regression).
 //   node slop-guard.mjs [--root DIR] [--config FILE] [--baseline FILE] [--update] [--list]
 //   --update  rewrite the baseline to the current set; REFUSES when that would add an id
+//   --base-root DIR  (CI) DIR is a checkout of the BASE branch. The guard code runs from DIR, the PR is only scanned (--root). The ratchet is
+//     then enforced against DIR's baseline, not the PR's copy: the PR baseline may not contain an id DIR's lacks, no violation outside DIR's
+//     baseline is allowed, and none of the PR's eslint-suppressions.json may total more per rule than DIR's. DIR's .pr-quality.json also wins.
+//     A DIR with no baseline yet (the adoption PR) falls back to the plain check.
 // Config (.pr-quality.json): { "roots": ["apps","packages"], "locales": ["apps/web/messages"], "baseline": ".pr-quality-baseline.json",
 //   "skip": ["generated"], "frameworkExports": ["extra names"] }.   Inline escape on the same or previous line:  pq-allow(rule): reason
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'node:fs';
@@ -117,6 +121,25 @@ export function scan({ root, config = {} }) {
   return viol;
 }
 
+/** sum of counts per `suppressions-file|rule` over every eslint-suppressions.json under root (a moved file keeps its total) */
+export function eslintTotals(root, roots = ['apps', 'packages']) {
+  const names = [...(existsSync(join(root, 'eslint-suppressions.json')) ? ['eslint-suppressions.json'] : []), ...walk(root, roots).filter((f) => f.endsWith('/eslint-suppressions.json'))];
+  const totals = new Map();
+  for (const f of names) {
+    const data = JSON.parse(readFileSync(join(root, f), 'utf8'));
+    for (const rules of Object.values(data)) for (const [rule, v] of Object.entries(rules)) totals.set(`${f}|${rule}`, (totals.get(`${f}|${rule}`) ?? 0) + (v?.count ?? 0));
+  }
+  return { totals, files: names.length };
+}
+
+/** `file|rule` keys whose total grew over the base's. A base with no suppression files at all is the adoption PR: nothing to compare. */
+export function eslintGrowth(root, baseRoot, roots) {
+  const base = eslintTotals(baseRoot, roots);
+  if (base.files === 0) return [];
+  const cur = eslintTotals(root, roots);
+  return [...cur.totals].filter(([k, n]) => n > (base.totals.get(k) ?? 0)).map(([k, n]) => `${k} ${base.totals.get(k) ?? 0} -> ${n}`);
+}
+
 export function compare(current, baselineIds) {
   const base = new Set(baselineIds);
   return {
@@ -129,8 +152,10 @@ function main() {
   const a = process.argv.slice(2);
   const arg = (k, d) => (a.includes(k) ? a[a.indexOf(k) + 1] : d);
   const root = arg('--root', process.cwd());
+  const baseRoot = arg('--base-root', null);
+  const readCfg = (dir) => (existsSync(join(dir, '.pr-quality.json')) ? JSON.parse(readFileSync(join(dir, '.pr-quality.json'), 'utf8')) : null);
   const cfgPath = arg('--config', join(root, '.pr-quality.json'));
-  const config = existsSync(cfgPath) ? JSON.parse(readFileSync(cfgPath, 'utf8')) : {};
+  const config = (baseRoot && readCfg(baseRoot)) || (existsSync(cfgPath) ? JSON.parse(readFileSync(cfgPath, 'utf8')) : {});
   const basePath = arg('--baseline', join(root, config.baseline ?? '.pr-quality-baseline.json'));
   const current = scan({ root, config });
   if (a.includes('--list')) { for (const d of current.values()) console.log(d); console.log(`${current.size} violation(s)`); return; }
@@ -143,9 +168,19 @@ function main() {
     console.log(`slop-guard: baseline ${baseline === null ? 'created' : 'shrunk'}: ${current.size} id(s)`);
     return;
   }
-  for (const id of added) console.error(`slop-guard: NEW ${current.get(id)}`);
-  for (const id of stale) console.error(`slop-guard: FIXED but still in the baseline: ${id}  (run: node ${relative(root, process.argv[1])} --update)`);
-  if (added.length || stale.length) {
+  let bad = 0;
+  for (const id of added) { console.error(`slop-guard: NEW ${current.get(id)}`); bad++; }
+  for (const id of stale) { console.error(`slop-guard: FIXED but still in the baseline: ${id}  (run: node ${relative(root, process.argv[1])} --update)`); bad++; }
+  if (baseRoot) {
+    const bp = join(baseRoot, config.baseline ?? '.pr-quality-baseline.json');
+    if (existsSync(bp)) {
+      const B = new Set(JSON.parse(readFileSync(bp, 'utf8')).ids ?? []);
+      for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
+      for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
+    }
+    for (const g of eslintGrowth(root, baseRoot, config.roots)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
+  }
+  if (bad) {
     if (added.length) console.error('Fix the new violation, or justify it inline with  pq-allow(<rule>): <reason>');
     process.exit(1);
   }
