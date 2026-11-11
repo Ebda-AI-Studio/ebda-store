@@ -63,7 +63,7 @@ if [ -n "$SCANNERS" ]; then
     # Two layers keep a push at about 2 min with 8 agents pushing: (1) a pass cache keyed by the git TREE hash of HEAD
     # plus the scanner list, used ONLY on a clean working tree (scanners read the working directory, so a dirty tree
     # always runs; a re-push of a clean identical tree costs 0 s); (2) a 4-slot semaphore (prepush-slot.sh) with a fixed --maxWorkers=2.
-    # CI still runs every scanner; this cache lives only on this Mac and only ever records a PASS.
+    # CI still runs every scanner; this cache lives only on this Mac and only ever records a PASS (ignored inputs are in the key).
     # shellcheck disable=SC2086
     if bash scripts/ci/prepush-scanner-cache.sh check $SCANNERS; then
       echo "-> vitest scanners: this exact clean tree + list already passed locally; cache hit, skipped (CI still runs them)"

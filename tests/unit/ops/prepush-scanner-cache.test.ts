@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,8 +12,9 @@ function repo() {
   const git = (...a: string[]) =>
     spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd });
   git('init', '-q');
+  writeFileSync(join(cwd, '.gitignore'), 'dist/\n');
   writeFileSync(join(cwd, 'a.txt'), '1');
-  git('add', 'a.txt');
+  git('add', 'a.txt', '.gitignore');
   git('commit', '-q', '-m', 'init');
   const run = (mode: string, ...files: string[]) =>
     spawnSync('bash', [SCRIPT, mode, ...files], {
@@ -51,5 +52,19 @@ describe('prepush-scanner-cache.sh', () => {
     expect(r.run('record', 'x.test.ts')).toBe(1); // dirty: nothing recorded
     r.git('checkout', 'a.txt');
     expect(r.run('check', 'x.test.ts')).toBe(1); // the new clean tree was never recorded
+  });
+
+  it('a changed GITIGNORED file (built dist the scanners import) is a cache miss', () => {
+    const r = repo();
+    mkdirSync(join(r.cwd, 'dist'));
+    writeFileSync(join(r.cwd, 'dist', 'index.js'), 'v1');
+    r.run('record', 'x.test.ts');
+    expect(r.run('check', 'x.test.ts')).toBe(0); // clean tree, unchanged ignored input
+    writeFileSync(join(r.cwd, 'dist', 'index.js'), 'version-2');
+    expect(r.run('check', 'x.test.ts')).toBe(1);
+    writeFileSync(join(r.cwd, 'dist', 'extra.js'), 'x');
+    r.run('record', 'x.test.ts');
+    rmSync(join(r.cwd, 'dist', 'extra.js'));
+    expect(r.run('check', 'x.test.ts')).toBe(1);
   });
 });
