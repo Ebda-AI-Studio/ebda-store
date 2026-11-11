@@ -8,7 +8,7 @@
  * run the same day sends nothing. Only the most specific due offset is sent: a
  * job that missed days does not replay the older reminders.
  */
-import { prisma, withStore } from '@ebda/database';
+import { prisma, withStore, type Prisma } from '@ebda/database';
 import { acrossBilling } from '../platform/billing-d1';
 import { config } from '../../config';
 import { getEntityStoreId } from '../../lib/definer';
@@ -55,33 +55,40 @@ export function reminderKindAt(dueAt: Date, now: Date): ReminderKind | null {
   return null;
 }
 
-/** Subscriptions with a reminder window open at `now` (one row per store). */
-export async function findReminderCandidates(now: Date): Promise<string[]> {
-  const horizon = new Date(now.getTime() + 7 * DAY);
-  const floor = new Date(now.getTime() - DAY);
+/** Subscription ids matching `where`, per store scope (the ONE prisma site of this file's scans). */
+async function scanSubscriptionIds(
+  where: Prisma.StoreSubscriptionWhereInput,
+  what: string
+): Promise<string[]> {
   const parts = await acrossBilling(
     storeId =>
       prisma.storeSubscription.findMany({
-        where: {
-          ...(storeId ? { storeId } : {}),
-          planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
-          cancelAtPeriodEnd: false,
-          OR: [
-            { status: 'trialing', trialEndsAt: { gt: floor, lte: horizon } },
-            {
-              status: { in: ['active', 'past_due'] },
-              currentPeriodEnd: { gt: floor, lte: horizon },
-            },
-          ],
-        },
+        where: { ...(storeId ? { storeId } : {}), ...where },
         select: { id: true },
       }),
     {
       onStoreError: (storeId, err) =>
-        logger.error({ err, storeId }, '[billing] reminder scan failed'),
+        logger.error({ err, storeId }, `[billing] ${what} scan failed`),
     }
   );
   return parts.flatMap(p => p.value.map(r => r.id));
+}
+
+/** Subscriptions with a reminder window open at `now` (one row per store). */
+export async function findReminderCandidates(now: Date): Promise<string[]> {
+  const horizon = new Date(now.getTime() + 7 * DAY);
+  const floor = new Date(now.getTime() - DAY);
+  return scanSubscriptionIds(
+    {
+      planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
+      cancelAtPeriodEnd: false,
+      OR: [
+        { status: 'trialing', trialEndsAt: { gt: floor, lte: horizon } },
+        { status: { in: ['active', 'past_due'] }, currentPeriodEnd: { gt: floor, lte: horizon } },
+      ],
+    },
+    'reminder'
+  );
 }
 
 export type ReminderResult = { sent: false; reason: string } | { sent: true; kind: ReminderKind };
@@ -199,24 +206,14 @@ export async function claimGraceStage(
 
 /** InstaPay subscriptions in grace whose suspension is within the next day. */
 export async function findGraceEndingCandidates(now: Date): Promise<string[]> {
-  const horizon = new Date(now.getTime() + DAY);
-  const parts = await acrossBilling(
-    storeId =>
-      prisma.storeSubscription.findMany({
-        where: {
-          ...(storeId ? { storeId } : {}),
-          status: 'past_due',
-          billingMethod: 'instapay',
-          nextRetryAt: { gt: now, lte: horizon },
-        },
-        select: { id: true },
-      }),
+  return scanSubscriptionIds(
     {
-      onStoreError: (storeId, err) =>
-        logger.error({ err, storeId }, '[billing] grace-ending scan failed'),
-    }
+      status: 'past_due',
+      billingMethod: 'instapay',
+      nextRetryAt: { gt: now, lte: new Date(now.getTime() + DAY) },
+    },
+    'grace-ending'
   );
-  return parts.flatMap(p => p.value.map(r => r.id));
 }
 
 /** The one-day-left notice for one subscription: claim `grace_d1`, then email + bell. */
