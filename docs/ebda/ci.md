@@ -26,8 +26,10 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
 
 - **Runner install**: `~/actions-runner-ebda` and `~/actions-runner-ebda-2` (actions/runner v2.338.2, sha256 verified),
   launchd user agents `actions.runner.Ebda-AI-Studio.ebda-mac-{1,2}` (`./svc.sh status|stop|start` in each dir). Their
-  `.path` is a clean Homebrew PATH; `.env` sets `PLAYWRIGHT_BROWSERS_PATH` (one local browser cache, never the Actions
-  cache) and `EBDA_NM_STORE=~/.ebda-ci/node-modules` (the npm-ci-reuse store, shared by both runners). Two instances, not
+  `.path` is a clean Homebrew PATH (Homebrew bash 5 first: `/bin/bash` 3.2 breaks `"${arr[@]}"` under `set -u`); `.env` sets
+  `PLAYWRIGHT_BROWSERS_PATH=~/.ebda-ci/ms-playwright`, a browser cache ONLY the runners use (never the Actions cache, never
+  `~/Library/Caches/ms-playwright`: `playwright install` reads every install registered there, and one under `~/Desktop`
+  made the launchd runner block on a macOS privacy prompt for 15+ min, 2026-11-11) and `EBDA_NM_STORE=~/.ebda-ci/node-modules` (the npm-ci-reuse store, shared by both runners). Two instances, not
   more: other orgs' runners on the same Mac count toward a host total of 3.
 - **Databases**: macOS runners cannot start service containers, so `services:` images are `''` when `EBDA_RUNS_ON`
   names `ebda-mac` (the runner then skips the service). `scripts/ci/ci-services.sh up` gives the job its URLs
