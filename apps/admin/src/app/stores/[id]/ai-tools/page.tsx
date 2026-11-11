@@ -835,7 +835,7 @@ function BulkActionCard({
     .replace(/[^a-z0-9-]/g, '')}`;
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="rounded-md border bg-card p-5 shadow-sm">
       <h3 className="mb-2 text-base font-semibold">{title}</h3>
       <p className="mb-3 text-sm text-muted-foreground">{body}</p>
 
@@ -985,7 +985,7 @@ function ActiveJobCard({
   })();
 
   return (
-    <div className="mt-6 rounded-xl border-2 border-primary/30 bg-primary/5 p-5">
+    <div className="mt-6 rounded-md border-2 border-primary/30 bg-primary/5 p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold">
@@ -1025,7 +1025,7 @@ function ActiveJobCard({
           </span>
           <span className="text-muted-foreground">{pct}%</span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded bg-white/70">
+        <div className="h-2 w-full overflow-hidden rounded-md bg-white/70">
           <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
       </div>
@@ -1051,7 +1051,7 @@ function ActiveJobCard({
           </summary>
           <ul className="mt-2 space-y-1 text-xs">
             {filledList.map(p => (
-              <li key={p.id} className="rounded bg-white px-2 py-1.5">
+              <li key={p.id} className="rounded-md bg-white px-2 py-1.5">
                 {storeId ? (
                   <Link
                     href={`/stores/${storeId}/products/${p.id}`}
@@ -1077,7 +1077,7 @@ function ActiveJobCard({
           </summary>
           <ul className="mt-2 space-y-1 text-xs">
             {job.errors.slice(0, 50).map((e, i) => (
-              <li key={i} className="rounded bg-white px-2 py-1.5">
+              <li key={i} className="rounded-md bg-white px-2 py-1.5">
                 <span className="font-medium">
                   {e.entityKind} · {e.entityName}
                 </span>
@@ -1136,7 +1136,7 @@ function MasterSweepCard({
       : 'queued';
 
   return (
-    <div className="mt-6 rounded-xl border-2 border-primary/30 bg-primary/5 p-5">
+    <div className="mt-6 rounded-md border-2 border-primary/30 bg-primary/5 p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold">{label}</h3>
@@ -1178,7 +1178,7 @@ function MasterSweepCard({
           </span>
           <span className="text-muted-foreground">{pct}%</span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded bg-white/70">
+        <div className="h-2 w-full overflow-hidden rounded-md bg-white/70">
           <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
       </div>

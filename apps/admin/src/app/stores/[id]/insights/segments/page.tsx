@@ -104,7 +104,7 @@ export default function InsightsSegmentsPage() {
       <div className="max-w-5xl space-y-6">
         {/* AI narration callout */}
         {narration && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
+          <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
             <span className="not-italic font-semibold text-primary">{t('aiLabel')}</span>{' '}
             {narration}
           </div>
@@ -113,13 +113,13 @@ export default function InsightsSegmentsPage() {
         {/* Summary */}
         {totalCustomers > 0 && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-border p-4 space-y-1">
+            <div className="rounded-md border border-border p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 {t('totalSegmentedCustomers')}
               </p>
               <p className="text-2xl font-semibold font-mono">{totalCustomers}</p>
             </div>
-            <div className="rounded-xl border border-border p-4 space-y-1">
+            <div className="rounded-md border border-border p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 {t('totalMonetaryValue')}
               </p>
@@ -132,7 +132,7 @@ export default function InsightsSegmentsPage() {
         )}
 
         {sorted.length === 0 ? (
-          <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
             {t('noSegmentData')}
           </div>
         ) : (
@@ -158,7 +158,7 @@ export default function InsightsSegmentsPage() {
                   key={seg.segment}
                   href={`/stores/${storeId}/customers?segment=${encodeURIComponent(seg.segment)}`}
                   aria-label={t('viewSegmentCustomers', { segment: t(`segment.${seg.segment}`) })}
-                  className={`block rounded-xl border p-4 space-y-3 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${colorClass}`}
+                  className={`block rounded-md border p-4 space-y-3 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${colorClass}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold">{icon}</span>

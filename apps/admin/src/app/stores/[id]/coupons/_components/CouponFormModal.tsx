@@ -312,7 +312,7 @@ export function CouponFormModal({
             id="isActive"
             checked={formData.isActive}
             onChange={e => onChange({ ...formData, isActive: e.target.checked })}
-            className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+            className="w-4 h-4 text-primary border-border rounded-md focus:ring-primary"
           />
           <label htmlFor="isActive" className="text-sm font-medium text-foreground">
             {tForm('isActiveLabel')}
@@ -364,7 +364,7 @@ export function CouponFormModal({
               id="firstOrderOnly"
               checked={formData.firstOrderOnly}
               onChange={e => onChange({ ...formData, firstOrderOnly: e.target.checked })}
-              className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+              className="w-4 h-4 text-primary border-border rounded-md focus:ring-primary"
             />
             <span className="text-sm font-medium text-foreground">
               {tTargeting('firstOrderOnlyLabel')}

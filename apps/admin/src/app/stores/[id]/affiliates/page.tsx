@@ -386,7 +386,7 @@ export default function AffiliatesPage() {
 
       {showInviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-background shadow-xl border border-border">
+          <div className="w-full max-w-lg rounded-md bg-background shadow-xl border border-border">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div>
                 <h2 className="text-lg font-semibold">{tPage('inviteTitle')}</h2>

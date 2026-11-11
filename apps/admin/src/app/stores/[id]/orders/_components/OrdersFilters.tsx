@@ -22,7 +22,7 @@ export function OrdersFilters({
 
   return (
     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex items-center gap-1 rounded-xl bg-muted p-1 overflow-x-auto">
+      <div className="flex items-center gap-1 rounded-md bg-muted p-1 overflow-x-auto">
         {STATUS_FILTERS.map(status => (
           <Button
             type="button"

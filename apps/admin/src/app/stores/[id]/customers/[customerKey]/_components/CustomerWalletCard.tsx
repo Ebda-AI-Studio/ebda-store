@@ -102,7 +102,7 @@ export function CustomerWalletCard({
   const money = (piastres: number) => formatPrice(piastres, { locale });
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div className="rounded-md border bg-card shadow-sm overflow-hidden">
       <div className="flex flex-col gap-3 border-b bg-muted/40 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>

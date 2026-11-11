@@ -98,7 +98,7 @@ export function PersonalisationCard({ value, onChange }: Props) {
   const set = (patch: Partial<PersonalisationForm>) => onChange({ ...value, ...patch });
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
+    <div className="rounded-md border bg-card p-6 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
         <p className="text-xs text-muted-foreground">{t('hint')}</p>
@@ -171,7 +171,7 @@ export function PersonalisationCard({ value, onChange }: Props) {
                 type="checkbox"
                 checked={value.required}
                 onChange={e => set({ required: e.target.checked })}
-                className="h-4 w-4 rounded border-border accent-primary"
+                className="h-4 w-4 rounded-md border-border accent-primary"
               />
               {t('required')}
             </label>

@@ -99,7 +99,7 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
       <div className="flex items-center justify-center min-h-[60vh] px-4 py-12">
         <div className="w-full max-w-lg">
           {/* Card */}
-          <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
             {/* Brand accent strip */}
             <div className="h-1.5 w-full bg-primary" />
 

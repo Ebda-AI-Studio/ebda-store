@@ -73,7 +73,7 @@ function StatCard({
           {note && <div className="mt-2 text-xs text-muted-foreground">{note}</div>}
         </div>
         <div
-          className={`flex h-12 w-12 items-center justify-center rounded-2xl ${iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
+          className={`flex h-12 w-12 items-center justify-center rounded-lg ${iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
         >
           {icon}
         </div>

@@ -129,7 +129,7 @@ export function ZoneEditor({
   // When embedded inside an existing bordered block, the parent can pass
   // className="" to suppress the outer border (avoids nested double-borders).
   const containerClass =
-    className !== undefined ? className : 'rounded-xl border border-border/60 bg-background p-4';
+    className !== undefined ? className : 'rounded-md border border-border/60 bg-background p-4';
 
   return (
     // data-zone-key is used by e2e tests and browser devtools to identify
@@ -332,7 +332,7 @@ export function ZoneEditor({
           editor column is ~150px wide.
 
           Logical values (start/center/end) so RTL Arabic flips correctly.
-          4-button segmented control with rounded outer corners + dividers
+          4-button segmented control with rounded-md outer corners + dividers
           between options. Each label has an aria-label spelling out the
           LTR/RTL effect for screen readers. */}
       <div className="mt-3 flex flex-col gap-1">

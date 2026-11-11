@@ -109,7 +109,7 @@ function UsageHistoryInner() {
 
   if (error) {
     return (
-      <div className="rounded-xl border bg-card p-6 text-center">
+      <div className="rounded-md border bg-card p-6 text-center">
         <p className="text-sm text-destructive-ink">{t('loadError')}</p>
         <Button variant="link" size="sm" type="button" onClick={fetchData} className="mt-3">
           {tCommon('retry')}
@@ -229,7 +229,7 @@ function UsageHistoryInner() {
           {t('storeCount', { count: rows.length })}
         </span>
       </label>
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-md border bg-card shadow-sm">
         <DataTable<UsageStoreRow>
           ariaLabel={t('title')}
           columns={columns}

@@ -163,7 +163,7 @@ export default function InsightsDashboardPage() {
       <div className="max-w-5xl space-y-6">
         {/* AI narration callout */}
         {narration && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
+          <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
             <span className="not-italic font-semibold text-primary">{t('aiCallout')}</span>{' '}
             {narration}
           </div>
@@ -171,7 +171,7 @@ export default function InsightsDashboardPage() {
 
         {/* No data notice */}
         {!data.yesterdayFunnel && data.topSkus.length === 0 && (
-          <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
             {t('noDataYet')}
           </div>
         )}
@@ -179,7 +179,7 @@ export default function InsightsDashboardPage() {
         {/* KPI tiles */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* AOV */}
-          <div className="rounded-xl border border-border p-4 space-y-1">
+          <div className="rounded-md border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('aov')}</p>
             <p className="text-2xl font-semibold font-mono">{major(aovThis)}</p>
             <p className="text-xs text-muted-foreground">
@@ -198,7 +198,7 @@ export default function InsightsDashboardPage() {
           </div>
 
           {/* MRR / 30d revenue */}
-          <div className="rounded-xl border border-border p-4 space-y-1">
+          <div className="rounded-md border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('mrr30d')}</p>
             <p className="text-2xl font-semibold font-mono text-success-ink">
               {major(data.mrr30d)}
@@ -207,7 +207,7 @@ export default function InsightsDashboardPage() {
           </div>
 
           {/* Repeat purchase rate */}
-          <div className="rounded-xl border border-border p-4 space-y-1">
+          <div className="rounded-md border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">
               {t('repeatPurchase')}
             </p>
@@ -220,7 +220,7 @@ export default function InsightsDashboardPage() {
           </div>
 
           {/* Top segment */}
-          <div className="rounded-xl border border-border p-4 space-y-1">
+          <div className="rounded-md border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">
               {t('topSegment')}
             </p>

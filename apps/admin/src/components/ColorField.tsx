@@ -179,7 +179,7 @@ export function ColorField({
           aria-label={label}
           value={selectValue}
           onChange={e => handleSelectChange(e.target.value)}
-          className="rounded border border-border bg-background px-2 py-1 text-sm"
+          className="rounded-md border border-border bg-background px-2 py-1 text-sm"
         >
           <option value="">{inheritedLabel}</option>
           {COLOR_TOKENS.map(token => (
@@ -200,7 +200,7 @@ export function ColorField({
                 onChange(next);
                 setRawHex(next);
               }}
-              className="h-11 w-11 cursor-pointer rounded border border-border bg-background p-0.5"
+              className="h-11 w-11 cursor-pointer rounded-md border border-border bg-background p-0.5"
               aria-label={t('colorPickerAriaLabel')}
             />
             {/* Hex text field — primary input path; ≥44px touch target. */}

@@ -15,14 +15,14 @@ export function StoreLoadingSkeleton() {
                   <div className="h-3 w-20 force-skeleton" />
                   <div className="h-8 w-28 force-skeleton" />
                 </div>
-                <div className="h-12 w-12 rounded-2xl force-skeleton" />
+                <div className="h-12 w-12 rounded-lg force-skeleton" />
               </div>
             </div>
           ))}
         </div>
         {/* Skeleton content */}
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="lg:col-span-2 rounded-md border bg-card p-6 shadow-sm space-y-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="space-y-2">
                 <div className="h-3 w-24 force-skeleton" />
@@ -30,7 +30,7 @@ export function StoreLoadingSkeleton() {
               </div>
             ))}
           </div>
-          <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
             <div className="flex items-center gap-4">
               <div className="h-12 w-12 rounded-full force-skeleton" />
               <div className="space-y-2">

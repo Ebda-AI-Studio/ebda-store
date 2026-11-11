@@ -141,9 +141,9 @@ export function AbandonmentsTable({
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-md border border-border overflow-hidden">
       <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
           <svg
             className="h-8 w-8 text-muted-foreground"
             fill="none"
@@ -176,7 +176,7 @@ export function AbandonmentsTable({
       />
 
       {records.length > 0 && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between px-6 py-4 rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between px-6 py-4 rounded-md border border-border bg-card">
           <p className="text-sm text-muted-foreground">
             {meta.page} / {meta.totalPages} ({meta.total})
           </p>

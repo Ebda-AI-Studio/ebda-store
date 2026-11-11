@@ -399,7 +399,7 @@ export default function NewPurchaseOrderPage() {
             />
             {/* DataTable has no footer concept, so the subtotal is a summary bar
               right below the table — visible on both layouts. */}
-            <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+            <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
               <span>{tNew('subtotal')}</span>
               <span className="font-mono font-semibold">{formatPrice(subtotalFils)}</span>
             </div>

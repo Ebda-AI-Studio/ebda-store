@@ -350,7 +350,7 @@ export default function NewExpensePage() {
     >
       <div className="max-w-2xl space-y-5">
         {/* ── OCR Upload Section ──────────────────────────────────────────── */}
-        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+        <div className="rounded-md border border-border bg-muted/20 p-4 space-y-3">
           <p className="text-sm font-semibold">{t('ocr.title')}</p>
 
           <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
@@ -369,7 +369,7 @@ export default function NewExpensePage() {
                 }}
                 className="block w-full text-sm text-muted-foreground
                   file:mr-3 file:py-1.5 file:px-3
-                  file:rounded file:border file:border-border
+                  file:rounded-md file:border file:border-border
                   file:text-xs file:font-medium file:bg-background
                   file:cursor-pointer hover:file:bg-muted/50
                   disabled:opacity-50"

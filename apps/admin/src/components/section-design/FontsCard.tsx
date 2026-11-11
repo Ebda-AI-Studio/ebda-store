@@ -122,7 +122,7 @@ export function FontsCard({
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+    <section className="rounded-lg border border-border bg-card p-4 sm:p-5">
       <div className="mb-3">
         <h3 className="text-base font-semibold text-foreground">{t('fonts.title')}</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">{t('fonts.description')}</p>

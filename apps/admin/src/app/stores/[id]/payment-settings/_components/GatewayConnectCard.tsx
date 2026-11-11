@@ -235,7 +235,7 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border bg-card shadow-sm ${
+      className={`overflow-hidden rounded-md border bg-card shadow-sm ${
         config?.isEnabled ? 'border-s-4' : ''
       }`}
       style={config?.isEnabled ? { borderInlineStartColor: entry.logo.color } : undefined}
@@ -262,7 +262,7 @@ export function GatewayConnectCard({ entry, config, storeId, onChanged }: Props)
             {entry.capabilities.methods.map(m => (
               <span
                 key={m}
-                className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
               >
                 {t(`methods.${m}`)}
               </span>

@@ -12,7 +12,7 @@ interface QuickActionsProps {
 }
 
 const CARD =
-  'flex min-h-14 items-center gap-3 rounded-xl border bg-card p-4 text-start shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer';
+  'flex min-h-14 items-center gap-3 rounded-md border bg-card p-4 text-start shadow-sm transition-all duration-200 hover:border-primary hover:shadow-md cursor-pointer';
 
 /**
  * The jobs a merchant actually starts from the dashboard (UX:N-6, D-4): add a product, take a phone order, make a

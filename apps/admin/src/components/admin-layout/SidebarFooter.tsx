@@ -114,8 +114,8 @@ export function SidebarFooter({
 
       {/* User Profile Section */}
       <div className="border-t border-border/50 p-4">
-        <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-3 transition-colors hover:bg-muted">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 text-sm font-bold text-primary">
+        <div className="flex items-center gap-3 rounded-md bg-muted/50 p-3 transition-colors hover:bg-muted">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-primary/20 to-primary/10 text-sm font-bold text-primary">
             {user?.firstName?.[0]}
             {user?.lastName?.[0]}
           </div>

@@ -217,7 +217,7 @@ export default function AccountsPage() {
         {showCreate && parentOptions.length > 0 && (
           <form
             onSubmit={handleCreate}
-            className="space-y-3 rounded-xl border border-border bg-muted/20 p-4"
+            className="space-y-3 rounded-md border border-border bg-muted/20 p-4"
           >
             <h2 className="text-base font-semibold">{t('createTitle')}</h2>
             <div className="grid gap-3 sm:grid-cols-2">

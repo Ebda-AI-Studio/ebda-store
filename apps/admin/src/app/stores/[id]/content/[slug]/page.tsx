@@ -299,7 +299,7 @@ export default function ContentEditorPage() {
     >
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         {isLoading ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             …
           </div>
         ) : (
@@ -314,7 +314,7 @@ export default function ContentEditorPage() {
                 and see an empty editor. Fixes the recurring
                 "where did the data go?" confusion. */}
             {(slug === 'faq' || slug === 'how-to-guides') && (
-              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-foreground">
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm text-foreground">
                 <p className="font-medium">{slug === 'faq' ? t('aiFaqNote') : t('aiHowToNote')}</p>
                 <p className="mt-1 text-muted-foreground">{t('wrapperNote')}</p>
                 <Link
@@ -408,7 +408,7 @@ export default function ContentEditorPage() {
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm sm:p-6">
       <h2 className="mb-4 text-base font-semibold text-foreground">{title}</h2>
       {children}
     </section>

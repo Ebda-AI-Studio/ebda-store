@@ -358,7 +358,7 @@ export default function LoginPage() {
                 id="remember-me"
                 name="rememberMe"
                 type="checkbox"
-                className="h-4 w-4 rounded border-input accent-primary"
+                className="h-4 w-4 rounded-md border-input accent-primary"
                 checked={rememberMe}
                 onChange={e => setRememberMe(e.target.checked)}
               />

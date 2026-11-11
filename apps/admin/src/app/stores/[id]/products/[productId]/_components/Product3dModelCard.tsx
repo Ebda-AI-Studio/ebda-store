@@ -390,8 +390,8 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
 
   if (loading || featuresLoading) {
     return (
-      <div className="rounded-xl border bg-card p-6">
-        <div className="h-6 w-40 animate-pulse rounded bg-muted" />
+      <div className="rounded-md border bg-card p-6">
+        <div className="h-6 w-40 animate-pulse rounded-md bg-muted" />
       </div>
     );
   }
@@ -399,7 +399,7 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
   const hasTargets = !!model && (model.materials.length > 0 || model.gltfVariants.length > 0);
 
   return (
-    <section className="rounded-xl border bg-card p-6" aria-labelledby="model3d-heading">
+    <section className="rounded-md border bg-card p-6" aria-labelledby="model3d-heading">
       <div className="mb-1 flex items-center justify-between gap-3">
         <h2 id="model3d-heading" className="text-lg font-semibold text-foreground">
           {t('title')}

@@ -97,7 +97,7 @@ export default function ContentListPage() {
       }
     >
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
-        <p className="mb-6 rounded-xl bg-muted/40 p-4 text-sm text-muted-foreground">
+        <p className="mb-6 rounded-md bg-muted/40 p-4 text-sm text-muted-foreground">
           {t('emptyHint')}{' '}
           <Link
             href={`/stores/${storeId}/content/faqs`}
@@ -108,7 +108,7 @@ export default function ContentListPage() {
         </p>
 
         {isLoading ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             …
           </div>
         ) : (
@@ -138,7 +138,7 @@ export default function ContentListPage() {
 
             <h2 className="mb-3 text-lg font-semibold text-foreground">{t('customHeading')}</h2>
             {customPages.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+              <p className="rounded-md border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
                 {t('customEmpty')}
               </p>
             ) : (
@@ -201,7 +201,7 @@ function PageRowCard({
   return (
     <Link
       href={`/stores/${storeId}/content/${encodeURIComponent(slug)}`}
-      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/30"
+      className="flex items-center justify-between gap-3 rounded-md border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/30"
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

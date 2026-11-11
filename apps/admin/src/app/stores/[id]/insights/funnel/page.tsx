@@ -178,7 +178,7 @@ export default function InsightsFunnelPage() {
       <div className="max-w-4xl space-y-6">
         {/* AI narration callout */}
         {narration && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
+          <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm italic text-muted-foreground">
             <span className="not-italic font-semibold text-primary">{t('aiLabel')}</span>{' '}
             {narration}
           </div>
@@ -254,7 +254,7 @@ export default function InsightsFunnelPage() {
             {/* Revenue + abandoned summary */}
             {totals && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-border p-4 space-y-1">
+                <div className="rounded-md border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('revenue')}
                   </p>
@@ -263,7 +263,7 @@ export default function InsightsFunnelPage() {
                   </p>
                   <p className="text-xs text-muted-foreground">{tc('egp')}</p>
                 </div>
-                <div className="rounded-xl border border-border p-4 space-y-1">
+                <div className="rounded-md border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
                     {t('abandoned')}
                   </p>
@@ -303,7 +303,7 @@ export default function InsightsFunnelPage() {
         )}
 
         {!loading && !error && data?.days.length === 0 && (
-          <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
             {t('noDataYet')}
           </div>
         )}

@@ -137,7 +137,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
   }
 
   return (
-    <div className="space-y-6 rounded-xl border bg-card p-6">
+    <div className="space-y-6 rounded-md border bg-card p-6">
       {/* ── Brand colors (seeds only) ────────────────────────────────────── */}
       <div className="space-y-4">
         <div>

@@ -67,7 +67,7 @@ export function ProviderCard({
 
   return (
     <div
-      className={`rounded-xl border bg-card shadow-sm overflow-hidden transition-all ${
+      className={`rounded-md border bg-card shadow-sm overflow-hidden transition-all ${
         form.isEnabled ? 'border-s-4' : ''
       }`}
       style={form.isEnabled ? { borderInlineStartColor: provider.color } : undefined}

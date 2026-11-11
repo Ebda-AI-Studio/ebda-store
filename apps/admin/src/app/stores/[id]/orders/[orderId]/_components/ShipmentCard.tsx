@@ -208,7 +208,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
 
   return (
     <section
-      className="rounded-2xl border border-border bg-card p-5"
+      className="rounded-lg border border-border bg-card p-5"
       aria-labelledby="shipment-card-title"
     >
       <h2

@@ -114,7 +114,7 @@ export function PaymentLinkButton({
         // "Issue a new link" caption still opens the original modal
         // for the rare case where the merchant needs a fresh URL.
         <div className="flex-1 min-w-[10rem] inline-flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5 rounded-xl border-2 border-info bg-info/5 px-3 py-2">
+          <div className="flex items-center gap-1.5 rounded-md border-2 border-info bg-info/5 px-3 py-2">
             <svg
               className="h-4 w-4 text-info flex-shrink-0"
               fill="none"
@@ -225,7 +225,7 @@ export function PaymentLinkButton({
           onClick={close}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
+            className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
@@ -305,7 +305,7 @@ export function PaymentLinkButton({
               </>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-xl bg-success/10 border border-success/20 p-4">
+                <div className="rounded-md bg-success/10 border border-success/20 p-4">
                   <p className="text-sm font-semibold text-success-ink">{t('successGenerated')}</p>
                 </div>
 

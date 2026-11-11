@@ -159,7 +159,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="space-y-6">
-        <div className="space-y-6 rounded-xl border border-border bg-card p-5 sm:p-6">
+        <div className="space-y-6 rounded-md border border-border bg-card p-5 sm:p-6">
           <section className="space-y-3" aria-labelledby="lb-items">
             <h2 id="lb-items" className="text-base font-semibold text-foreground">
               {ti('title')}
@@ -195,7 +195,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
                         {variant && <span className="ms-2 text-muted-foreground">{variant}</span>}
                       </span>
                       {!i.barcode && (
-                        <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                           {ti('noBarcode')}
                         </span>
                       )}
@@ -333,9 +333,9 @@ export function LabelsTab({ storeId }: { storeId: string }) {
       </div>
 
       <aside className="lg:sticky lg:top-4 lg:self-start">
-        <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+        <div className="space-y-4 rounded-md border border-border bg-card p-5">
           <h2 className="text-base font-semibold text-foreground">{tp('title')}</h2>
-          <div className="flex min-h-[10rem] items-center justify-center rounded-xl border border-border bg-muted/50 p-4">
+          <div className="flex min-h-[10rem] items-center justify-center rounded-md border border-border bg-muted/50 p-4">
             <canvas
               ref={shown}
               role="img"

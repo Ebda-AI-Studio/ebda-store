@@ -117,7 +117,7 @@ export default function CatalogImportReviewPage() {
       }
     >
       {job && running && (
-        <div className="mb-4 rounded-xl border bg-card p-4" role="status">
+        <div className="mb-4 rounded-md border bg-card p-4" role="status">
           <p className="text-sm text-foreground">
             {job.status === 'creating' ? t('review.creating') : t('review.processing')}
           </p>
@@ -149,7 +149,7 @@ export default function CatalogImportReviewPage() {
       )}
 
       {job?.status === 'failed' && (
-        <p role="alert" className="mb-4 rounded-xl border bg-card p-4 text-sm text-destructive-ink">
+        <p role="alert" className="mb-4 rounded-md border bg-card p-4 text-sm text-destructive-ink">
           {job.errorCode && t.has(`errors.${job.errorCode}`)
             ? t(`errors.${job.errorCode}`)
             : t('errors.GENERIC')}
@@ -157,7 +157,7 @@ export default function CatalogImportReviewPage() {
       )}
 
       {failedFiles.length > 0 && (
-        <ul className="mb-4 divide-y rounded-xl border bg-card text-sm">
+        <ul className="mb-4 divide-y rounded-md border bg-card text-sm">
           {failedFiles.map(f => (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
               <span className="min-w-0">
@@ -204,7 +204,7 @@ export default function CatalogImportReviewPage() {
       )}
 
       {items.length === 0 ? (
-        <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
+        <p className="rounded-md border bg-card p-6 text-sm text-muted-foreground">
           {running ? t('review.waiting') : t('review.empty')}
         </p>
       ) : (

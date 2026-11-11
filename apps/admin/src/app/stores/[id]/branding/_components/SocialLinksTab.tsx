@@ -91,7 +91,7 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
   return (
     <div className="space-y-6">
       {/* URL inputs — one per SOCIAL_PLATFORMS entry */}
-      <div className="bg-card rounded-xl border p-6 space-y-6">
+      <div className="bg-card rounded-md border p-6 space-y-6">
         {SOCIAL_PLATFORMS.map(social => (
           <div key={social.key}>
             <label className="block text-sm font-medium text-foreground mb-1">
@@ -114,7 +114,7 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
       </div>
 
       {/* Reorder control — shows only platforms that have a URL */}
-      <div className="bg-card rounded-xl border p-6">
+      <div className="bg-card rounded-md border p-6">
         <h3 className="text-sm font-semibold text-foreground mb-1">{tOrder('title')}</h3>
         <p className="text-xs text-muted-foreground mb-4">{tOrder('hint')}</p>
 

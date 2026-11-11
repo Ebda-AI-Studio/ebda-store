@@ -95,7 +95,7 @@ export function MembersTable({
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-xl border border-border p-12 text-center">
+    <div className="bg-card rounded-md border border-border p-12 text-center">
       <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
         <svg
           className="w-8 h-8 text-muted-foreground"
@@ -118,7 +118,7 @@ export function MembersTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2 p-4 bg-muted border border-border rounded-xl">
+      <div className="flex flex-wrap gap-2 p-4 bg-muted border border-border rounded-md">
         {FILTER_TIERS.map(tier => (
           <Button
             variant={tierFilter === tier ? 'soft' : 'ghost'}

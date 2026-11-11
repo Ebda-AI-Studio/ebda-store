@@ -41,7 +41,7 @@ export function PayoutsHistory({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card rounded-md shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-semibold text-foreground">{t('title')}</h2>
           <Button

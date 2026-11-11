@@ -58,7 +58,7 @@ export function ImageSwapDialog({
       onClose={onClose}
       onCancel={onClose}
       aria-labelledby="swap-alt-title"
-      className="w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
+      className="w-[min(30rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
       data-testid="image-swap-alt"
     >
       <form

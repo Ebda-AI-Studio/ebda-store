@@ -221,7 +221,7 @@ export default function InsightsSearchesPage() {
             rows={data.terms}
             rowKey={row => row.term}
             emptyState={
-              <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+              <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
                 {nothingSearched ? t('empty') : t('emptyZero')}
               </div>
             }

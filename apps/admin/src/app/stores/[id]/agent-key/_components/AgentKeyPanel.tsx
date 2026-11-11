@@ -74,8 +74,8 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
   if (!status) {
     return (
       <div className="space-y-3">
-        <div className="h-24 rounded-xl border bg-card animate-pulse" />
-        <div className="h-32 rounded-xl border bg-card animate-pulse" />
+        <div className="h-24 rounded-md border bg-card animate-pulse" />
+        <div className="h-32 rounded-md border bg-card animate-pulse" />
       </div>
     );
   }
@@ -92,7 +92,7 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
           accepted without one. A merchant reading "no key issued" and
           concluding "so nothing can write" would be wrong. */}
       {status.openWrites && (
-        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4">
+        <div className="rounded-md border border-warning/40 bg-warning/10 p-4">
           <p className="text-sm font-semibold text-warning-ink" dir="auto">
             {t('hatch.title')}
           </p>
@@ -103,7 +103,7 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
       )}
 
       {/* ── Status ─────────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="rounded-md border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-foreground" dir="auto">
             {t('status.heading')}
@@ -166,7 +166,7 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
       </div>
 
       {/* ── How an agent uses it ───────────────────────────────────────────── */}
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="rounded-md border bg-card p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-foreground" dir="auto">
           {t('howto.heading')}
         </h2>

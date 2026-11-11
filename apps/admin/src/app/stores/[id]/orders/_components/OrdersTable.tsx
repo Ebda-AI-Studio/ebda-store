@@ -92,7 +92,7 @@ export function OrdersTable({
     return (
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div key={i} className="rounded-md border border-border bg-card p-4 shadow-sm">
             <div className="space-y-2">
               <div className="h-4 w-32 force-skeleton" />
               <div className="h-3 w-48 force-skeleton" />
@@ -254,7 +254,7 @@ export function OrdersTable({
                   })}
                   checked={selectedOrders.has(order.id)}
                   onChange={e => onToggleSelected(order.id, e.target.checked)}
-                  className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
+                  className="h-5 w-5 rounded-md border-border text-primary focus:ring-primary"
                 />
                 <Button
                   type="button"

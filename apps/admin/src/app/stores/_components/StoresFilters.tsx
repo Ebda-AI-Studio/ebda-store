@@ -74,7 +74,7 @@ export function StoresFilters({
             options={STATUS_KEYS.map(({ value, labelKey }) => ({ value, label: t(labelKey) }))}
             value={statusFilter}
             onChange={setStatusFilter}
-            className="flex items-center gap-1 rounded-xl bg-muted/50 p-1"
+            className="flex items-center gap-1 rounded-md bg-muted/50 p-1"
           />
         </div>
 
@@ -92,7 +92,7 @@ export function StoresFilters({
         </select>
 
         {/* View Toggle */}
-        <div className="flex items-center gap-1 rounded-xl bg-muted/50 p-1">
+        <div className="flex items-center gap-1 rounded-md bg-muted/50 p-1">
           <Button
             variant={viewMode === 'grid' ? 'soft' : 'ghost'}
             size="icon-sm"

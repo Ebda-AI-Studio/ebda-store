@@ -74,7 +74,7 @@ export function GoldSettingsCard({
   );
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+    <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold">{t('title')}</h2>
       <div className="mt-4 space-y-3">
         {check(t('enabled'), t('enabledHint'), 'enabled')}

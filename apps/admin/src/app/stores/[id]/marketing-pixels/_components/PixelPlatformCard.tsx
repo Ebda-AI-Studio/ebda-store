@@ -43,7 +43,7 @@ export function PixelPlatformCard({
 
   return (
     <div
-      className={`bg-card rounded-xl border transition-all ${
+      className={`bg-card rounded-md border transition-all ${
         isEnabled ? 'border-primary/30 shadow-sm' : 'border-border'
       }`}
     >
@@ -54,7 +54,7 @@ export function PixelPlatformCard({
         onClick={onExpand}
         aria-expanded={isExpanded}
         aria-controls={contentId}
-        className="flex w-full items-center justify-between p-4 bg-transparent border-0 text-start cursor-pointer hover:bg-muted/30 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="flex w-full items-center justify-between p-4 bg-transparent border-0 text-start cursor-pointer hover:bg-muted/30 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         <div className="flex items-center gap-4">
           <div className={`p-2 rounded-lg text-white ${platform.color}`}>{platform.icon}</div>

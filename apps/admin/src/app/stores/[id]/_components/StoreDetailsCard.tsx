@@ -48,7 +48,7 @@ export function StoreDetailsCard({
   // any merchant-visible or super-admin UI.
 
   return (
-    <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm">
+    <div className="lg:col-span-2 rounded-md border bg-card shadow-sm">
       <div className="flex items-center justify-between border-b p-4">
         <h2 className="font-semibold text-foreground">{t('title')}</h2>
         {!isEditing && onEdit && (

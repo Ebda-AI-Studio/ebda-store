@@ -844,7 +844,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       {!hasAnyRate && (
         <section
           data-testid="shipping-first-run"
-          className="space-y-3 rounded-xl border border-primary/30 bg-card p-5"
+          className="space-y-3 rounded-md border border-primary/30 bg-card p-5"
         >
           <div>
             <h2 className="text-base font-semibold text-foreground">{t('firstRunTitle')}</h2>
@@ -898,7 +898,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       {/* Import preview modal */}
       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-background p-5 shadow-xl space-y-4">
+          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-md border border-border bg-background p-5 shadow-xl space-y-4">
             <h3 className="text-lg font-semibold text-foreground">{t('previewTitle')}</h3>
 
             {preview.wouldUpsert > 0 ? (
@@ -947,7 +947,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       )}
 
       {/* ── Global apply-to-all-areas control ───────────────────────────── */}
-      <details className="rounded-xl border border-border bg-muted/20 px-4 py-3" open={false}>
+      <details className="rounded-md border border-border bg-muted/20 px-4 py-3" open={false}>
         <summary className="cursor-pointer text-sm font-medium text-foreground">
           {t('applyAllGlobal')}
         </summary>
@@ -1016,7 +1016,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       <p className="-mt-3 text-sm text-muted-foreground">{t('perGovernorateHint')}</p>
 
       {/* ── Static Egypt governorate accordion ─────────────────────────── */}
-      <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+      <div className="divide-y divide-border rounded-md border border-border overflow-hidden">
         {EGYPT_GOVERNORATES.map(gov => {
           const isOpen = openGov === gov.en;
           const count = feeCount(gov.en);
@@ -1333,7 +1333,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
         return (
           <div
             key={country}
-            className="divide-y divide-border rounded-xl border border-border overflow-hidden"
+            className="divide-y divide-border rounded-md border border-border overflow-hidden"
           >
             {/* Country header */}
             <button
@@ -1540,7 +1540,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
       })}
 
       {/* ── Add custom location panel ─────────────────────────────────────── */}
-      <div className="rounded-xl border border-dashed border-border overflow-hidden">
+      <div className="rounded-md border border-dashed border-border overflow-hidden">
         <button
           type="button"
           onClick={() => setAddLocOpen(v => !v)}

@@ -79,7 +79,7 @@ function FlagCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="rounded-md border border-border bg-card p-4 space-y-3">
       {/* Header */}
       <div className="space-y-0.5">
         <p className="font-medium text-sm">{item.product.name}</p>
@@ -257,7 +257,7 @@ export default function DeadstockPage() {
 
         {/* Empty state */}
         {!loading && !error && items.length === 0 && (
-          <div className="rounded-xl border border-border bg-muted/10 p-6 text-center">
+          <div className="rounded-md border border-border bg-muted/10 p-6 text-center">
             <p className="text-sm text-muted-foreground">{t('empty')}</p>
           </div>
         )}

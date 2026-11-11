@@ -206,7 +206,7 @@ export default function ExpensesPage() {
       mobileBadge: true,
       cell: exp => (
         <span
-          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[exp.status]}`}
+          className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${STATUS_BADGE[exp.status]}`}
         >
           {t(`statuses.${exp.status}`)}
         </span>
@@ -315,7 +315,7 @@ export default function ExpensesPage() {
       </label>
 
       {error && (
-        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
         </div>
       )}

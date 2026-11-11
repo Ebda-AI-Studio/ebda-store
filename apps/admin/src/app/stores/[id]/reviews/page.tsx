@@ -332,12 +332,12 @@ export default function ReviewsPage() {
       </div>
 
       {/* Reviews List */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-md border bg-card shadow-sm">
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">{t('loading')}</div>
         ) : filteredReviews.length === 0 ? (
           <div className="force-empty-state px-6">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
               <svg
                 className="h-8 w-8 text-muted-foreground"
                 fill="none"

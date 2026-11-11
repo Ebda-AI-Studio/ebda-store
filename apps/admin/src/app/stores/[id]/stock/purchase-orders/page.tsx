@@ -143,7 +143,7 @@ export default function PurchaseOrdersPage() {
                 className: 'w-28',
                 cell: po => (
                   <span
-                    className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                    className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
                       STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
                     }`}
                   >

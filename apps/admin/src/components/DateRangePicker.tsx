@@ -112,7 +112,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
 
   return (
     <div className="mb-6 space-y-3">
-      <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted p-1 w-fit">
+      <div className="flex flex-wrap items-center gap-1 rounded-md bg-muted p-1 w-fit">
         {presets.map(p => {
           // 'week' / 'month' / 'year' map to the new equivalents for active highlight.
           const isActive =
@@ -134,7 +134,7 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
         })}
       </div>
       {period === 'custom' && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-4 py-3">
           <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('dateFrom')}
             <input

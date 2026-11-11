@@ -58,7 +58,7 @@ export default function PaymentAbandonmentsPage() {
           <AbandonmentStatsGrid stats={stats} />
 
           {/* Date range filter */}
-          <div className="bg-card rounded-xl border border-border p-4 flex flex-wrap items-end gap-3">
+          <div className="bg-card rounded-md border border-border p-4 flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
               <label htmlFor="pa-from" className="text-sm text-muted-foreground">
                 {t('dateFrom')}

@@ -103,9 +103,9 @@ export function AbandonedCartsTable({
   ];
 
   const emptyState = (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-md border border-border overflow-hidden">
       <div className="force-empty-state px-6">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
           <CartIcon className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
         </div>
         <p className="font-semibold text-foreground">{t('empty')}</p>
@@ -123,7 +123,7 @@ export function AbandonedCartsTable({
 
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-md border border-border overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
@@ -156,7 +156,7 @@ export function AbandonedCartsTable({
       />
 
       {records.length > 0 && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-4 py-3 rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between mt-4 px-4 py-3 rounded-md border border-border bg-card">
           <p className="text-sm text-muted-foreground">
             {t('pagination', {
               page: meta.page,

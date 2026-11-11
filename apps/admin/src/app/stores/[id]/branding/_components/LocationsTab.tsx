@@ -338,7 +338,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
   return (
     <div className="space-y-6">
       {/* Enable Locations toggle */}
-      <div className="flex items-center justify-between rounded-xl border bg-card p-4">
+      <div className="flex items-center justify-between rounded-md border bg-card p-4">
         <div>
           <p data-setting-id="branding.locations" className="text-sm font-semibold text-foreground">
             {t('enableTitle')}
@@ -370,7 +370,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           looks at this tab, not the color/theme one. Reads/writes
           theme.showBranchesInFooter on the shared branding state; the page's
           top "Save" button PUTs it via the existing theme PATCH. */}
-      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-card p-4">
+      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-md border bg-card p-4">
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-foreground">
             {t('showInFooterTitle')}
@@ -422,7 +422,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
 
       {/* Inline form — Create / Edit */}
       {formMode !== null && (
-        <div className="rounded-xl border bg-card p-5 space-y-4">
+        <div className="rounded-md border bg-card p-5 space-y-4">
           <h3 className="text-base font-semibold text-foreground">
             {formMode === 'new' ? t('formNewTitle') : t('formEditTitle')}
           </h3>
@@ -615,7 +615,7 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
               type="checkbox"
               checked={formData.isPublished}
               onChange={e => setFormData(p => ({ ...p, isPublished: e.target.checked }))}
-              className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+              className="h-4 w-4 rounded-md border-input text-primary focus:ring-ring"
             />
             <label htmlFor="loc-published" className="text-sm text-foreground">
               {t('fieldPublished')}
@@ -641,21 +641,21 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
 
       {/* Locations table */}
       {isLoading ? (
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-md border bg-card">
           <ul className="divide-y">
             {Array.from({ length: 3 }).map((_, i) => (
               <li key={i} className="flex items-center gap-3 p-4 animate-pulse">
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-1/2 rounded bg-muted" />
-                  <div className="h-3 w-1/3 rounded bg-muted" />
+                  <div className="h-4 w-1/2 rounded-md bg-muted" />
+                  <div className="h-3 w-1/3 rounded-md bg-muted" />
                 </div>
-                <div className="hidden h-7 w-16 shrink-0 rounded bg-muted sm:block" />
+                <div className="hidden h-7 w-16 shrink-0 rounded-md bg-muted sm:block" />
               </li>
             ))}
           </ul>
         </div>
       ) : locations.length === 0 ? (
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-md border bg-card">
           <div className="p-10 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
               <svg

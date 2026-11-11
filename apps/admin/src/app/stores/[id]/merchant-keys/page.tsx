@@ -238,7 +238,7 @@ export default function MerchantKeysPage() {
           {row.scopes.map(s => (
             <span
               key={s}
-              className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground"
+              className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground"
               dir="ltr"
             >
               {s.replace('merchant:', '')}
@@ -270,8 +270,8 @@ export default function MerchantKeysPage() {
         <span
           className={
             row.active
-              ? 'rounded bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success-ink'
-              : 'rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground'
+              ? 'rounded-md bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success-ink'
+              : 'rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground'
           }
           dir="auto"
         >
@@ -342,7 +342,7 @@ export default function MerchantKeysPage() {
           {data ? (
             <p className="mt-2 text-xs text-muted-foreground" dir="auto">
               {t('intro.headerLabel')}:{' '}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono" dir="ltr">
+              <code className="rounded-md bg-muted px-1 py-0.5 font-mono" dir="ltr">
                 {data.header}
               </code>
               {' · '}

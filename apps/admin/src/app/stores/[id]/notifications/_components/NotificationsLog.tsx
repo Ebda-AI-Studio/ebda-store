@@ -125,7 +125,7 @@ export function NotificationsLog({
 
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-md border border-border overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
@@ -169,7 +169,7 @@ export function NotificationsLog({
       />
 
       {logs.length > 0 && pages > 1 && (
-        <div className="flex items-center justify-between px-6 py-4 rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between px-6 py-4 rounded-md border border-border bg-card">
           <p className="text-sm text-muted-foreground">
             {t('pagination.summary', { page, pages, total })}
           </p>

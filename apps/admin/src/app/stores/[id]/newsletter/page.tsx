@@ -270,7 +270,7 @@ export default function NewsletterPage() {
       {/* Broadcast Modal */}
       {showBroadcast && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl rounded-xl bg-background shadow-xl border border-border">
+          <div className="w-full max-w-2xl rounded-md bg-background shadow-xl border border-border">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div>
                 <h2 className="text-lg font-semibold">{tPage('broadcastTitle')}</h2>

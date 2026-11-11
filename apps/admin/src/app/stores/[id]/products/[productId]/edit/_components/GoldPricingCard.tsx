@@ -197,7 +197,7 @@ export function GoldPricingCard({
   };
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm" data-setting-id="gold.productPricing">
+    <div className="rounded-md border bg-card p-6 shadow-sm" data-setting-id="gold.productPricing">
       <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{t('body')}</p>
 

@@ -215,7 +215,7 @@ function CameraScanner({ onDetected, onStop, onError }: CameraScannerProps) {
   }, []);
 
   return (
-    <div className="relative w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-border bg-black aspect-[4/3]">
+    <div className="relative w-full max-w-sm mx-auto rounded-md overflow-hidden border border-border bg-black aspect-[4/3]">
       <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
       {/* Viewfinder overlay */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -414,7 +414,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
       )}
 
       {lookup && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="rounded-md border border-border bg-card p-4 space-y-3">
           {lookup.ambiguous && <p className="text-xs text-warning-ink">{t('ambiguousWarning')}</p>}
           <div>
             <p className="font-semibold text-sm">{lookup.productName}</p>
@@ -453,7 +453,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
       )}
 
       {result && (
-        <div className="rounded-xl border border-success/30 bg-success/10 p-4 text-sm text-success-ink">
+        <div className="rounded-md border border-success/30 bg-success/10 p-4 text-sm text-success-ink">
           {t('receiving.success', {
             qty: String(result.qtyReceived),
             name: '',
@@ -591,7 +591,7 @@ function PickMode({ storeId }: { storeId: string }) {
             </div>
             <div className="flex items-center gap-2">
               {order.fullyPicked && (
-                <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-success/10 text-success-ink">
+                <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-ink">
                   {t('picking.orderComplete')}
                 </span>
               )}
@@ -931,7 +931,7 @@ function CountMode({ storeId }: { storeId: string }) {
   return (
     <div className="space-y-4">
       {/* Session header */}
-      <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between rounded-md border border-border bg-card p-4">
         <div>
           <p className="text-sm font-medium">{activeSession.note || t('countSession')}</p>
           <p className="text-xs text-muted-foreground">
@@ -985,7 +985,7 @@ function CountMode({ storeId }: { storeId: string }) {
           {lineErr && <p className="text-sm text-destructive-ink">{lineErr}</p>}
 
           {lookupResult && (
-            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <div className="rounded-md border border-border bg-card p-4 space-y-3">
               <div>
                 <p className="font-semibold text-sm">{lookupResult.productName}</p>
                 {lookupResult.variantTitle && (
@@ -1154,21 +1154,21 @@ export default function BarcodeScanPage() {
     <AdminLayout title={t('title')} subtitle={t('description')}>
       {featuresLoading ? (
         <div className="max-w-lg mx-auto space-y-3" data-testid="scan-features-skeleton">
-          <div className="h-12 animate-pulse rounded-xl bg-muted/40" />
-          <div className="h-32 animate-pulse rounded-xl bg-muted/30" />
+          <div className="h-12 animate-pulse rounded-md bg-muted/40" />
+          <div className="h-32 animate-pulse rounded-md bg-muted/30" />
         </div>
       ) : !barcodeEnabled ? (
         <div
           role="status"
           data-testid="scan-feature-off"
-          className="max-w-lg mx-auto rounded-xl border border-border bg-muted/20 p-5 text-sm leading-relaxed text-foreground"
+          className="max-w-lg mx-auto rounded-md border border-border bg-muted/20 p-5 text-sm leading-relaxed text-foreground"
         >
           {t('featureNotOnPlan')}
         </div>
       ) : (
         <div className="max-w-lg mx-auto space-y-5">
           {/* Mode selector */}
-          <div className="flex rounded-xl border border-border bg-muted/20 p-1 gap-1">
+          <div className="flex rounded-md border border-border bg-muted/20 p-1 gap-1">
             {modes.map(m => (
               <Button
                 key={m.key}
@@ -1183,7 +1183,7 @@ export default function BarcodeScanPage() {
           </div>
 
           {/* What this page does — bilingual explainer of the 3 modes */}
-          <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
+          <div className="rounded-md border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
             <p className="font-semibold text-foreground">{t('helpTitle')}</p>
             <p>
               <span className="font-medium text-foreground">{t('modeReceive')}:</span>{' '}

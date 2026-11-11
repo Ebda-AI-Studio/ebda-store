@@ -163,7 +163,7 @@ export default function BlogPostEditorPage({
       {isLoading ? (
         <AdminSkeletonDetail showHeader={false} />
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6 rounded-xl border bg-card p-6">
+        <form onSubmit={handleSubmit} className="space-y-6 rounded-md border bg-card p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">

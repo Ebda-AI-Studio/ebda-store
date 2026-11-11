@@ -25,7 +25,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
   ] as const;
 
   return (
-    <div className="bg-card rounded-xl border p-6 space-y-6">
+    <div className="bg-card rounded-md border p-6 space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">{t('email')}</label>
@@ -57,7 +57,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
         </div>
       </div>
 
-      <fieldset className="space-y-3 rounded-xl border p-4" data-testid="wa-me-toggles">
+      <fieldset className="space-y-3 rounded-md border p-4" data-testid="wa-me-toggles">
         <legend
           data-setting-id="branding.whatsapp-buttons"
           className="px-1 text-sm font-semibold text-foreground"
@@ -163,7 +163,7 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
             type="checkbox"
             checked={branding.addressLink !== false}
             onChange={e => onChange({ ...branding, addressLink: e.target.checked })}
-            className="h-4 w-4 rounded border-input text-primary focus:ring-primary/40"
+            className="h-4 w-4 rounded-md border-input text-primary focus:ring-primary/40"
           />
           <span className="text-sm text-foreground">{t('addressClickable')}</span>
         </label>

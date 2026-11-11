@@ -52,7 +52,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   })();
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           {t('payment')}
@@ -118,7 +118,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               empty section. */}
           {order.status === 'awaiting_payment_confirmation' && (
             <div
-              className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-primary-ink"
+              className="mt-4 rounded-md border border-primary/30 bg-primary/10 p-4 text-sm text-primary-ink"
               data-testid="instapay-panel"
             >
               <p className="font-semibold">{tInstapay('title')}</p>

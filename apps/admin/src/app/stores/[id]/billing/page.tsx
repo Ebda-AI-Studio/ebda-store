@@ -531,7 +531,7 @@ export default function StoreBillingPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       {error && (
-        <div className="rounded-xl border bg-card p-6 text-center">
+        <div className="rounded-md border bg-card p-6 text-center">
           <p className="text-sm text-destructive-ink">{t('loadError')}</p>
           <Button variant="link" size="sm" className="mt-3" type="button" onClick={load}>
             {tCommon('retry')}
@@ -544,7 +544,7 @@ export default function StoreBillingPage() {
           {payOnOtherStore && (
             <div
               role="alert"
-              className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
+              className="rounded-md border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
             >
               <p className="font-semibold">
                 {t(data.payOnStoreIncluded ? 'payOnStoreIncludedTitle' : 'payOnStoreTitle')}
@@ -564,7 +564,7 @@ export default function StoreBillingPage() {
           {noticeCopy && (
             <div
               role={noticeUrgent ? 'alert' : 'status'}
-              className={`rounded-xl border p-4 text-sm ${
+              className={`rounded-md border p-4 text-sm ${
                 noticeUrgent
                   ? 'border-destructive/40 bg-destructive/10 text-destructive-ink'
                   : 'border-warning/30 bg-warning/10 text-warning-ink'
@@ -584,7 +584,7 @@ export default function StoreBillingPage() {
           )}
 
           {cardReturn.state !== 'idle' && (
-            <div role="status" className="rounded-xl border bg-card p-4 text-sm">
+            <div role="status" className="rounded-md border bg-card p-4 text-sm">
               {cardReturn.state === 'pending' && t('pay.returnPending')}
               {cardReturn.state === 'ok' && t('pay.returnOk')}
               {cardReturn.state === 'failed' && t('pay.returnFailed')}
@@ -612,7 +612,7 @@ export default function StoreBillingPage() {
           )}
 
           {data.storeStatus === 'inactive' && (
-            <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+            <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
               <h2 className="mb-1 text-base font-semibold">{t('goLive.title')}</h2>
               <p className="mb-3 text-sm text-muted-foreground">{t('goLive.body')}</p>
               {goLiveError && (
@@ -629,7 +629,7 @@ export default function StoreBillingPage() {
           {overOrders && (
             <div
               role="alert"
-              className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
+              className="rounded-md border border-warning/30 bg-warning/10 p-4 text-sm text-warning-ink"
             >
               <p className="font-semibold">{t('overLimit.title')}</p>
               <p className="mt-1">
@@ -646,7 +646,7 @@ export default function StoreBillingPage() {
           )}
 
           {returnState !== 'idle' && (
-            <div role="status" className="rounded-xl border bg-card p-4 text-sm">
+            <div role="status" className="rounded-md border bg-card p-4 text-sm">
               {returnState === 'pending' && t('checkoutReturnPending')}
               {returnState === 'ok' && t('checkoutReturnOk')}
               {returnState === 'failed' && t('checkoutReturnFailed')}
@@ -663,7 +663,7 @@ export default function StoreBillingPage() {
             });
             if (!paidCharge) {
               return processing ? (
-                <p role="status" className="rounded-xl border bg-card p-4 text-sm">
+                <p role="status" className="rounded-md border bg-card p-4 text-sm">
                   {t('receiptProcessing')}
                 </p>
               ) : null;
@@ -686,7 +686,7 @@ export default function StoreBillingPage() {
             data.billing?.billingMethod !== 'instapay' && (
               <div
                 role="alert"
-                className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-ink"
+                className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-ink"
               >
                 <p className="font-semibold">{t('pastDueTitle')}</p>
                 <p className="mt-1">
@@ -696,13 +696,13 @@ export default function StoreBillingPage() {
             )}
 
           {data.subscription.status === 'canceled' && (
-            <div role="status" className="rounded-xl border bg-card p-4 text-sm">
+            <div role="status" className="rounded-md border bg-card p-4 text-sm">
               <p className="font-semibold">{t('canceledTitle')}</p>
               <p className="mt-1 text-muted-foreground">{t('canceledBody')}</p>
             </div>
           )}
 
-          <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+          <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs text-muted-foreground">{t('currentPlan')}</p>
@@ -769,7 +769,7 @@ export default function StoreBillingPage() {
           </section>
 
           {info && (
-            <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+            <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="text-base font-semibold">{t('trial.title')}</h2>
                 <Badge
@@ -842,7 +842,7 @@ export default function StoreBillingPage() {
           )}
 
           {showPaymentMethod && info && (
-            <section className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+            <section className="space-y-4 rounded-md border bg-card p-4 shadow-sm sm:p-6">
               <h2 className="text-base font-semibold">{t('pay.title')}</h2>
 
               {(showCardControls || info.card) && (
@@ -970,7 +970,7 @@ export default function StoreBillingPage() {
             </section>
           )}
 
-          <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+          <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="mb-4 text-base font-semibold">{t('usageTitle')}</h2>
             <div className="space-y-4">
               {BAR_KEYS.map(k => {
@@ -1003,7 +1003,7 @@ export default function StoreBillingPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+          <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-base font-semibold">{t('includedTitle')}</h2>
             <ul className="grid gap-2 sm:grid-cols-3">
               {FEATURE_KEYS.map(k => (
@@ -1017,7 +1017,7 @@ export default function StoreBillingPage() {
             </ul>
           </section>
 
-          <section id="plans" className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+          <section id="plans" className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
             {/* InstaPay merchants pick a plan here too: it is paid by transfer and
                 activated when the Ebda Store team confirms the receipt. */}
             <h2 className="mb-1 text-base font-semibold">{t('subscribeTitle')}</h2>
@@ -1144,7 +1144,7 @@ export default function StoreBillingPage() {
 
           {data.provider === 'stub' &&
             charges.some(c => c.type === 'checkout' && c.status === 'pending') && (
-              <section className="rounded-xl border border-dashed bg-card p-4 sm:p-6">
+              <section className="rounded-md border border-dashed bg-card p-4 sm:p-6">
                 <h2 className="mb-1 text-base font-semibold">{t('stubTitle')}</h2>
                 <p className="mb-3 text-sm text-muted-foreground">{t('stubBody')}</p>
                 {charges
@@ -1171,7 +1171,7 @@ export default function StoreBillingPage() {
               </section>
             )}
 
-          <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+          <section className="rounded-md border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-base font-semibold">{t('invoicesTitle')}</h2>
             {(() => {
               // Tax-invoice wording only once Ebda actually charged VAT (never while it is OFF).
@@ -1270,7 +1270,7 @@ export default function StoreBillingPage() {
           </section>
 
           {isSuperAdmin && (
-            <section className="rounded-xl border border-dashed bg-card p-4 sm:p-6">
+            <section className="rounded-md border border-dashed bg-card p-4 sm:p-6">
               <h2 className="mb-3 text-base font-semibold">{t('adminTitle')}</h2>
               <div className="flex flex-wrap items-end gap-3">
                 <div className="w-full sm:w-64">

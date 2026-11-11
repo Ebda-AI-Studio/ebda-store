@@ -175,17 +175,17 @@ export default function AuditLogsPage() {
       </div>
 
       {/* Logs List */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-md border bg-card shadow-sm overflow-hidden">
         <div className="divide-y">
           {isLoading ? (
             Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="p-4 flex items-start gap-4">
                 <div className="h-10 w-10 bg-muted rounded-lg animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
-                  <div className="h-3 w-1/2 bg-muted rounded animate-pulse" />
+                  <div className="h-4 w-3/4 bg-muted rounded-md animate-pulse" />
+                  <div className="h-3 w-1/2 bg-muted rounded-md animate-pulse" />
                 </div>
-                <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
               </div>
             ))
           ) : logs.length > 0 ? (

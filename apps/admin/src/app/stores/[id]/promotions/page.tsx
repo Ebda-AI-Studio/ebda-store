@@ -269,17 +269,19 @@ export default function PromotionsPage() {
       cell: promo => (
         <div className="flex flex-wrap gap-1">
           {groupName(promo.customerGroupId) ? (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs">
               {groupName(promo.customerGroupId)}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">{t('allCustomers')}</span>
           )}
           {promo.firstOrderOnly && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{t('firstOrderBadge')}</span>
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs">
+              {t('firstOrderBadge')}
+            </span>
           )}
           {(promo.scopeProductIds.length > 0 || promo.scopeCategoryIds.length > 0) && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{t('scopedBadge')}</span>
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs">{t('scopedBadge')}</span>
           )}
         </div>
       ),

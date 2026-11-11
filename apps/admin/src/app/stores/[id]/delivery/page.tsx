@@ -227,7 +227,7 @@ export default function CheckoutDeliveryPage() {
       <AdminLayout title={tHub('title')}>
         <ShippingTabs />
         <div className="animate-pulse space-y-4">
-          <div className="h-40 rounded-xl bg-muted" />
+          <div className="h-40 rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -238,7 +238,7 @@ export default function CheckoutDeliveryPage() {
       <ShippingTabs />
       <div className="space-y-4 pb-24">
         {/* Delivery info note */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 data-setting-id="delivery.note" className="text-sm font-semibold text-foreground">
@@ -280,7 +280,7 @@ export default function CheckoutDeliveryPage() {
         </section>
 
         {/* Delivery windows */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2
@@ -421,7 +421,7 @@ export default function CheckoutDeliveryPage() {
         {/* Minimum order value — opt-in per-store floor on the items
             subtotal. Platform-level: works for any store via this config,
             never hardcoded to a slug. Empty/0 = disabled. */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div>
             <h2
               data-setting-id="delivery.min-order"
@@ -448,7 +448,7 @@ export default function CheckoutDeliveryPage() {
         {/* Store-wide delivery estimate (business days): the storefront "arrives between"
             line falls back to it when no shipping zone carries a day estimate (area-rate
             stores). Both empty = hidden. */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div>
             <h2 data-setting-id="delivery.days" className="text-sm font-semibold text-foreground">
               {t('deliveryDaysTitle')}
@@ -517,7 +517,7 @@ export default function CheckoutDeliveryPage() {
         {/* Owner order-invoice email — opt-in per-store. Every order in this
             store auto-emails the rendered invoice to this address (e.g. the
             store owner). Empty = disabled. Platform-level, not slug-hardcoded. */}
-        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+        <section className="space-y-3 rounded-md border bg-card p-4 shadow-sm">
           <div>
             <h2
               data-setting-id="delivery.invoice-email"
@@ -542,7 +542,7 @@ export default function CheckoutDeliveryPage() {
         </section>
 
         {!isLoading && (
-          <section className="space-y-1 rounded-xl border bg-card p-4 shadow-sm">
+          <section className="space-y-1 rounded-md border bg-card p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-foreground">
               {t('orderBarcodeMoved.title')}
             </h2>

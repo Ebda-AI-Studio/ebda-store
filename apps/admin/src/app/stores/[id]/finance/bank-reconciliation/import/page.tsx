@@ -114,7 +114,7 @@ export default function ImportStatementPage() {
     >
       <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
         {/* Form card */}
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
+        <div className="rounded-md border border-border bg-card p-6 shadow-sm space-y-5">
           {/* GL Account select */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -142,7 +142,7 @@ export default function ImportStatementPage() {
             </label>
             <div
               onClick={() => fileRef.current?.click()}
-              className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50 py-8 transition hover:bg-muted"
+              className="flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-border bg-muted/50 py-8 transition hover:bg-muted"
             >
               <svg
                 className="mb-2 h-8 w-8 text-muted-foreground"
@@ -187,7 +187,7 @@ export default function ImportStatementPage() {
 
         {/* Success result */}
         {result && (
-          <div className="rounded-xl border border-success/30 bg-success/10 p-5 space-y-3">
+          <div className="rounded-md border border-success/30 bg-success/10 p-5 space-y-3">
             <p className="text-sm font-medium text-success-ink">
               {ti('success', { count: result.imported })}
             </p>

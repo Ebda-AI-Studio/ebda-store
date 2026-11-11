@@ -70,7 +70,7 @@ export function ReviewRow({ item, categories, onPatch, onOpenSource, locked }: P
   );
 
   return (
-    <li className="rounded-xl border bg-card p-4" data-testid="review-row">
+    <li className="rounded-md border bg-card p-4" data-testid="review-row">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span
           className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${BAND_STYLE[band]}`}

@@ -72,7 +72,7 @@ export function AffiliatesTable({
     {
       header: t('columns.referralCode'),
       cell: affiliate => (
-        <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
+        <code className="text-sm bg-muted px-2 py-1 rounded-md font-mono">
           {affiliate.referralCode}
         </code>
       ),
@@ -183,7 +183,7 @@ export function AffiliatesTable({
   );
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div className="rounded-md border border-border overflow-hidden">
       {/* Status filter pills */}
       <div className="flex flex-wrap gap-2 p-4 bg-muted border-b border-border">
         {STATUS_FILTERS.map(s => (

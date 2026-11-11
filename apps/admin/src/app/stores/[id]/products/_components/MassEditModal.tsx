@@ -391,7 +391,7 @@ export function MassEditModal({
                 type="checkbox"
                 checked={changeStatus}
                 onChange={e => setChangeStatus(e.target.checked)}
-                className="rounded border-border"
+                className="rounded-md border-border"
               />
               {t('massEdit.status')}
             </label>
@@ -415,7 +415,7 @@ export function MassEditModal({
                 type="checkbox"
                 checked={changeCat}
                 onChange={e => setChangeCat(e.target.checked)}
-                className="rounded border-border"
+                className="rounded-md border-border"
               />
               {t('massEdit.addToCategory')}
             </label>
@@ -459,7 +459,7 @@ export function MassEditModal({
                 type="checkbox"
                 checked={changePrice}
                 onChange={e => setChangePrice(e.target.checked)}
-                className="rounded border-border"
+                className="rounded-md border-border"
               />
               {t('massEdit.price')}
               <span className="text-xs text-muted-foreground">{t('massEdit.simpleOnly')}</span>
@@ -511,7 +511,7 @@ export function MassEditModal({
                 type="checkbox"
                 checked={changeInventory}
                 onChange={e => setChangeInventory(e.target.checked)}
-                className="rounded border-border"
+                className="rounded-md border-border"
               />
               {t('massEdit.inventory')}
               <span className="text-xs text-muted-foreground">{t('massEdit.simpleOnly')}</span>

@@ -438,7 +438,7 @@ export default function WarehouseStockPage() {
             if (e.target === e.currentTarget) setAdjustModal(null);
           }}
         >
-          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-md border border-border bg-card p-6 shadow-xl">
             <h2 className="mb-1 text-base font-semibold">{t('adjustTitle')}</h2>
             <p className="mb-4 text-sm text-muted-foreground">
               {adjustModal.row.productName}

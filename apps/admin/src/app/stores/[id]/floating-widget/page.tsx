@@ -168,8 +168,8 @@ export default function FloatingWidgetPage() {
     return (
       <AdminLayout title={t('pageTitle')}>
         <div className="animate-pulse space-y-4">
-          <div className="h-24 rounded-2xl bg-muted" />
-          <div className="h-48 rounded-2xl bg-muted" />
+          <div className="h-24 rounded-lg bg-muted" />
+          <div className="h-48 rounded-lg bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -178,7 +178,7 @@ export default function FloatingWidgetPage() {
   if (!featureEnabled) {
     return (
       <AdminLayout title={t('pageTitle')} subtitle={t('premiumSubtitle')}>
-        <div className="max-w-xl rounded-2xl border border-border bg-card p-8 text-center">
+        <div className="max-w-xl rounded-lg border border-border bg-card p-8 text-center">
           <h2 className="mb-2 text-lg font-semibold text-foreground">
             {t('featureNotEnabledTitle')}
           </h2>
@@ -192,7 +192,7 @@ export default function FloatingWidgetPage() {
     <AdminLayout title={t('pageTitle')} subtitle={t('mainSubtitle')}>
       <div className="space-y-6 pb-32">
         {/* Master enable */}
-        <section className="rounded-2xl border border-border bg-card p-6">
+        <section className="rounded-lg border border-border bg-card p-6">
           <label className="flex items-center justify-between gap-4 cursor-pointer">
             <span className="flex-1 min-w-0">
               <span
@@ -215,7 +215,7 @@ export default function FloatingWidgetPage() {
         </section>
 
         {/* Position + expand direction */}
-        <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 md:grid-cols-2">
+        <section className="grid gap-4 rounded-lg border border-border bg-card p-6 md:grid-cols-2">
           <label className="flex flex-col gap-1">
             <span
               data-setting-id="floating-widget.position"
@@ -286,7 +286,7 @@ export default function FloatingWidgetPage() {
         </section>
 
         {/* Toggle button styling */}
-        <section className="space-y-4 rounded-2xl border border-border bg-card p-6">
+        <section className="space-y-4 rounded-lg border border-border bg-card p-6">
           <header>
             <h2 className="text-base font-semibold text-foreground">{t('toggleButtonTitle')}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('toggleButtonHint')}</p>
@@ -339,7 +339,7 @@ export default function FloatingWidgetPage() {
         </section>
 
         {/* Buttons list */}
-        <section className="space-y-4 rounded-2xl border border-border bg-card p-6">
+        <section className="space-y-4 rounded-lg border border-border bg-card p-6">
           <header className="flex items-center justify-between gap-2">
             <div>
               <h2 className="text-base font-semibold text-foreground">{t('buttonsTitle')}</h2>
@@ -354,7 +354,7 @@ export default function FloatingWidgetPage() {
           ) : (
             <ul className="space-y-3">
               {(config.buttons ?? []).map((b, i, arr) => (
-                <li key={b.id} className="rounded-xl border border-border bg-background p-4">
+                <li key={b.id} className="rounded-md border border-border bg-background p-4">
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col gap-1 pt-1">
                       <Button

@@ -45,7 +45,7 @@ export function ReturnsTable({
   const tType = useT('returns.type');
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm">
+    <div className="rounded-md border bg-card shadow-sm">
       {isLoading ? (
         <div className="p-8 text-center text-muted-foreground">{t('loading')}</div>
       ) : returns.length === 0 ? (

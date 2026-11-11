@@ -120,8 +120,8 @@ export default function AnnouncementPage() {
     return (
       <AdminLayout title={t('title')} subtitle={t('subtitle')}>
         <div className="animate-pulse space-y-4" aria-busy="true">
-          <div className="h-20 rounded-xl bg-muted" />
-          <div className="h-64 rounded-xl bg-muted" />
+          <div className="h-20 rounded-md bg-muted" />
+          <div className="h-64 rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -153,7 +153,7 @@ export default function AnnouncementPage() {
 
       <div className="space-y-6 pb-24">
         {/* Content */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-foreground">{t('content')}</h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -229,7 +229,7 @@ export default function AnnouncementPage() {
 
         {/* Text color. The background color is set in the visual editor
             (announcement section) — see the pointer above. */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div className="rounded-md border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-foreground">{t('colors')}</h2>
 
           <div className="grid gap-6 sm:grid-cols-2">

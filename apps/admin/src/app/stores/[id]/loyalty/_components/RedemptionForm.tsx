@@ -20,7 +20,7 @@ export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormP
   const t = useT('loyalty.redemption');
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div>

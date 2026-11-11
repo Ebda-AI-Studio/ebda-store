@@ -94,7 +94,7 @@ export function ProviderRow({
   const hasKey = !!config.apiKeyMasked;
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="rounded-md border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">{meta.label}</h3>
@@ -134,7 +134,7 @@ export function ProviderRow({
             type="checkbox"
             checked={enabled}
             onChange={e => setEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-input"
+            className="h-4 w-4 rounded-md border-input"
           />
           {t('enabledLabel')}
         </label>
@@ -154,7 +154,7 @@ export function ProviderRow({
 function GeminiCard() {
   const t = useT('answerEngineProviders');
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="rounded-md border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">{t('geminiTitle')}</h3>
@@ -208,7 +208,7 @@ function AnswerEngineProvidersPageInner() {
 
   if (error || !configs) {
     return (
-      <div className="rounded-xl border bg-card p-8 text-center">
+      <div className="rounded-md border bg-card p-8 text-center">
         <p className="text-sm text-destructive-ink">{t('loadFailedBody')}</p>
         <Button variant="link" size="sm" type="button" onClick={fetchConfigs} className="mt-4">
           {t('retry')}

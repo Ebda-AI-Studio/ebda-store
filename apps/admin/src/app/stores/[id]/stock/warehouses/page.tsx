@@ -330,7 +330,7 @@ export default function WarehousesPage() {
             if (e.target === e.currentTarget) setModalOpen(false);
           }}
         >
-          <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-md border border-border bg-card p-6 shadow-xl">
             <h2 className="mb-4 text-base font-semibold">
               {editTarget ? t('editTitle') : t('newTitle')}
             </h2>
@@ -447,7 +447,7 @@ export default function WarehousesPage() {
                   type="checkbox"
                   checked={form.isDefault}
                   onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))}
-                  className="h-4 w-4 rounded border-input text-primary"
+                  className="h-4 w-4 rounded-md border-input text-primary"
                 />
                 <span className="text-sm">{t('form.isDefault')}</span>
               </label>

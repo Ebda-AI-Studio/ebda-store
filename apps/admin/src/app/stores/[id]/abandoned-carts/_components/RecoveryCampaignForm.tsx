@@ -74,7 +74,7 @@ export function RecoveryCampaignForm({
   const t = useT('abandonedCarts.campaign');
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-5">{t('title')}</h2>
 
       <div className="space-y-6">

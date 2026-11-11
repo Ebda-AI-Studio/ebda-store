@@ -111,7 +111,7 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-xl">
+      <div className="w-full max-w-sm rounded-md bg-card p-6 shadow-xl">
         <h3 className="mb-4 text-base font-semibold text-foreground">{t('title')}</h3>
         <label className="block text-sm font-medium text-foreground mb-1.5">{t('entryId')}</label>
         <input
@@ -339,7 +339,7 @@ export default function StatementDetailPage() {
             ].map(card => (
               <div
                 key={card.label}
-                className="rounded-xl border border-border bg-card p-3 shadow-sm"
+                className="rounded-md border border-border bg-card p-3 shadow-sm"
               >
                 <p className="text-xs text-muted-foreground leading-tight">{card.label}</p>
                 <p className="mt-1 text-lg font-semibold text-foreground">{card.value}</p>
@@ -351,7 +351,7 @@ export default function StatementDetailPage() {
         {/* Reconciliation difference panel */}
         {difference && (
           <div
-            className={`rounded-xl border p-4 shadow-sm ${
+            className={`rounded-md border p-4 shadow-sm ${
               difference.isReconciled
                 ? 'border-success/40 bg-card'
                 : 'border-destructive/40 bg-card'
@@ -486,7 +486,7 @@ export default function StatementDetailPage() {
         </div>
 
         {/* Transactions table */}
-        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto rounded-md border border-border bg-card shadow-sm">
           {txs.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
               {t('noTransactionsMatch')}

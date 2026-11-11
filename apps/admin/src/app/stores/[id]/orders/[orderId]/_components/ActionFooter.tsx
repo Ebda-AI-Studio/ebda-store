@@ -107,7 +107,7 @@ export function ActionFooter({
     // action buttons aren't hidden behind it — rule 6 "fixed-bottom UI" recipe.
     // md:bottom-0 because the nav is md:hidden (desktop = sidebar).
     <div
-      className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 z-20 -mx-4 mt-6 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:bg-card sm:p-3 print:hidden"
+      className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 z-20 -mx-4 mt-6 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border sm:bg-card sm:p-3 print:hidden"
       role="toolbar"
       aria-label={t('toolbarLabel')}
     >
@@ -222,7 +222,7 @@ export function ActionFooter({
           {menuOpen && (
             <div
               role="menu"
-              className="absolute end-0 bottom-full mb-2 w-64 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-lg"
+              className="absolute end-0 bottom-full mb-2 w-64 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-lg"
             >
               <button
                 type="button"

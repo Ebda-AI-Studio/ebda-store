@@ -99,11 +99,11 @@ export function AiPatchPane({
                       c.op === 'setSectionHidden' ? (
                         <span className="mt-1 flex flex-wrap items-center gap-1 text-muted-foreground">
                           <span>{t('from')}</span>
-                          <bdi className="rounded bg-muted px-1 line-through decoration-muted-foreground/60">
+                          <bdi className="rounded-md bg-muted px-1 line-through decoration-muted-foreground/60">
                             {show(c.before, c.op, t)}
                           </bdi>
                           <span>{t('to')}</span>
-                          <bdi className="rounded bg-primary/15 px-1 text-foreground">
+                          <bdi className="rounded-md bg-primary/15 px-1 text-foreground">
                             {show(c.after, c.op, t)}
                           </bdi>
                         </span>

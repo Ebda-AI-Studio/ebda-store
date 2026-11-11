@@ -139,7 +139,7 @@ export default function NewJournalEntryPage() {
     return (
       <AdminLayout title={tNew('title')} subtitle={tNew('description')}>
         <div className="max-w-4xl">
-          <div className="rounded-xl border border-warning/30 bg-warning/10 p-6 text-sm text-warning-ink">
+          <div className="rounded-md border border-warning/30 bg-warning/10 p-6 text-sm text-warning-ink">
             <p className="font-semibold mb-1">{tNew('superAdminOnly')}</p>
             <p>{tNew('superAdminNotice')}</p>
           </div>
@@ -177,7 +177,7 @@ export default function NewJournalEntryPage() {
         {/* Debit/credit line grid — genuine accounting ledger (columns are
             the point); kept as an isolated horizontal-scroll container per
             the B1 mobile-table exception rather than card-stacked. */}
-        <div className="rounded-xl border border-border overflow-x-auto">
+        <div className="rounded-md border border-border overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-muted/30">
               <tr>

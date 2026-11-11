@@ -192,7 +192,7 @@ function SectionShell({
   const showBody = !collapsedWhenDisabled || enabled !== false;
   return (
     <section
-      className={`rounded-xl border ${
+      className={`rounded-md border ${
         embedded ? 'border-border/60 bg-background' : 'border-border bg-card shadow-sm'
       } overflow-hidden`}
     >
@@ -277,7 +277,7 @@ function LinkRow({
           type="checkbox"
           checked={enabled}
           onChange={e => onToggle(e.target.checked)}
-          className="mt-2.5 h-4 w-4 shrink-0 rounded border-border text-primary focus:ring-primary"
+          className="mt-2.5 h-4 w-4 shrink-0 rounded-md border-border text-primary focus:ring-primary"
           aria-label={primaryLabel}
         />
         <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -750,7 +750,7 @@ export function FooterLinksEditor({
                   type="checkbox"
                   checked={bottomBar[key] !== false}
                   onChange={e => setBottomBar(b => ({ ...b, [key]: e.target.checked }))}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
                 />
                 {t(label)}
               </label>
@@ -790,7 +790,7 @@ export function FooterLinksEditor({
           main Save button persists footer + utility links via the registered
           saver. Otherwise the standalone editor keeps its own sticky save. */}
       {!saveRef && (
-        <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-xl border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
+        <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-md border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
           <p className="text-xs text-muted-foreground hidden sm:block">{t('saveHintEmpty')}</p>
           <Button
             type="button"

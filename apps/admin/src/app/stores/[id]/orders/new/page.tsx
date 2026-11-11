@@ -440,7 +440,7 @@ export default function NewOrderPage() {
     >
       <div className="mx-auto max-w-4xl space-y-6 pb-24">
         {/* Customer card */}
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-md border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('customerSection.heading')}
           </h2>
@@ -538,7 +538,7 @@ export default function NewOrderPage() {
         </section>
 
         {/* Shipping address */}
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-md border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('shippingSection.heading')}
           </h2>
@@ -660,7 +660,7 @@ export default function NewOrderPage() {
         </section>
 
         {/* Products */}
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-md border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('productsSection.heading')}
           </h2>
@@ -790,7 +790,7 @@ export default function NewOrderPage() {
         </section>
 
         {/* Notes + coupon */}
-        <section className="rounded-xl border bg-card p-6 shadow-sm">
+        <section className="rounded-md border bg-card p-6 shadow-sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
               label={t('notesSection.couponLabel')}
@@ -806,7 +806,7 @@ export default function NewOrderPage() {
                   type="checkbox"
                   checked={overrideCouponRules}
                   onChange={e => setOverrideCouponRules(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-border"
+                  className="mt-0.5 h-4 w-4 rounded-md border-border"
                 />
                 <span>
                   <span className="font-medium text-foreground">
@@ -833,7 +833,7 @@ export default function NewOrderPage() {
             56px) + safe-area on mobile so it isn't hidden behind it; rule 6
             "fixed-bottom UI" recipe. md:bottom-0 because the nav is
             md:hidden (desktop = sidebar). */}
-        <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:bg-card sm:p-4">
+        <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border sm:bg-card sm:p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
               {t('footer.itemCount', { count: items.length })} ·{' '}

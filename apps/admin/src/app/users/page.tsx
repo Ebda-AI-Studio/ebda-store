@@ -336,12 +336,12 @@ export default function UsersPage() {
           {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <div key={i} className="rounded-md border border-border bg-card p-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-4 w-32 bg-muted rounded animate-pulse" />
-                      <div className="h-3 w-40 bg-muted rounded animate-pulse" />
+                      <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
+                      <div className="h-3 w-40 bg-muted rounded-md animate-pulse" />
                     </div>
                   </div>
                 </div>
@@ -354,7 +354,7 @@ export default function UsersPage() {
               rows={users}
               rowKey={user => user.id}
               emptyState={
-                <div className="rounded-xl border bg-card shadow-sm px-6 py-12 text-center">
+                <div className="rounded-md border bg-card shadow-sm px-6 py-12 text-center">
                   <div className="flex flex-col items-center">
                     <svg
                       className="h-12 w-12 text-muted-foreground"
@@ -378,7 +378,7 @@ export default function UsersPage() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between rounded-xl border bg-card px-6 py-3 shadow-sm">
+            <div className="mt-4 flex items-center justify-between rounded-md border bg-card px-6 py-3 shadow-sm">
               <p className="text-sm text-muted-foreground">
                 {t('paginationShowing', {
                   from: (pagination.page - 1) * pagination.limit + 1,

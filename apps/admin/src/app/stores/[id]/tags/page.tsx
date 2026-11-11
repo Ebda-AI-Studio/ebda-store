@@ -112,7 +112,7 @@ export default function StoreTagsPage() {
         </div>
       )}
       {rows.length > 0 && (
-        <div className="rounded-xl border bg-card shadow-sm">
+        <div className="rounded-md border bg-card shadow-sm">
           <DataTable
             ariaLabel={t('name')}
             rows={rows}

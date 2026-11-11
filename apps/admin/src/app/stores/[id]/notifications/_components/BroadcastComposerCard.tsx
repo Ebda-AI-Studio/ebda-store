@@ -143,10 +143,10 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
             <svg
               className="w-5 h-5 text-primary"
               fill="none"
@@ -182,9 +182,12 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
           <p className="text-muted-foreground">{t('notConfiguredDescription')}</p>
           <p className="text-muted-foreground mt-2">
             {/* i18n-gate-allow: environment variable name */}
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">ONESIGNAL_APP_ID</code>{' '}
+            <code className="text-xs bg-muted px-1.5 py-0.5 rounded-md">ONESIGNAL_APP_ID</code>{' '}
             {t('and')} {/* i18n-gate-allow: environment variable name */}
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">ONESIGNAL_REST_API_KEY</code>
+            <code className="text-xs bg-muted px-1.5 py-0.5 rounded-md">
+              {/* i18n-gate-allow: environment variable name */}
+              ONESIGNAL_REST_API_KEY
+            </code>
           </p>
         </div>
       )}

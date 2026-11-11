@@ -193,7 +193,7 @@ function CategorySection({
   const t = useT('features.matrix');
   const tFeatures = useT('features');
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-md border border-border overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/40">
         <div>
           <h2 className="font-semibold text-foreground">{tFeatures(`categories.${category}`)}</h2>
@@ -436,7 +436,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   return (
     <div className="space-y-8">
       {/* ── Plan Picker ─────────────────────────────────────────────────────── */}
-      <div className="bg-card rounded-xl border border-border p-6">
+      <div className="bg-card rounded-md border border-border p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="font-semibold text-foreground">{t('storePlanHeading')}</h2>
@@ -491,7 +491,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       {/* ── Danger Zone ──────────────────────────────────────────────────────── */}
       <div className="mt-8">
         <h2 className="mb-4 font-semibold text-destructive-ink">{t('dangerZone.heading')}</h2>
-        <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
+        <div className="rounded-md border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
           {/* Suspend / Reactivate */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

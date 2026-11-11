@@ -97,7 +97,7 @@ export default function JournalDetailPage() {
     >
       <div className="max-w-3xl space-y-5">
         {/* Entry header card */}
-        <div className="rounded-xl border border-border bg-card p-5 space-y-2">
+        <div className="rounded-md border border-border bg-card p-5 space-y-2">
           {entry.memo && <p className="text-sm text-foreground">{entry.memo}</p>}
           {entry.memoAr && (
             <p className="text-sm text-muted-foreground" dir="rtl">
@@ -133,7 +133,7 @@ export default function JournalDetailPage() {
         {/* Lines table — genuine accounting ledger (debit/credit columns are
             the point); kept as an isolated horizontal-scroll container per
             the B1 mobile-table exception rather than card-stacked. */}
-        <div className="rounded-xl border border-border overflow-x-auto">
+        <div className="rounded-md border border-border overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
             <thead className="bg-muted/30">
               <tr>

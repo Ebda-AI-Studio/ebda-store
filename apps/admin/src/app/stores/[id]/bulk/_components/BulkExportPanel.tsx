@@ -32,7 +32,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
   return (
     <div className="space-y-6">
       {/* Export Options */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-md border bg-card p-6 shadow-sm">
         <h3 className="font-semibold text-foreground mb-4">{t('optionsTitle')}</h3>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -69,7 +69,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
                 id="includeDeleted"
                 checked={filters.includeDeleted}
                 onChange={e => setFilters(prev => ({ ...prev, includeDeleted: e.target.checked }))}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                className="h-4 w-4 rounded-md border-border text-primary focus:ring-primary"
               />
               <Label htmlFor="includeDeleted" className="text-sm font-normal">
                 {t('includeDeleted')}
@@ -151,7 +151,7 @@ export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExp
       </div>
 
       {/* Export Info */}
-      <div className="rounded-xl border bg-muted p-6">
+      <div className="rounded-md border bg-muted p-6">
         <h3 className="font-semibold text-foreground">{t('infoTitle')}</h3>
         <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
           {INFO_KEYS.map(key => (

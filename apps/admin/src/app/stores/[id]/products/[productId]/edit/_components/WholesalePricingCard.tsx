@@ -178,7 +178,7 @@ export function WholesalePricingCard(props: Props) {
   };
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm" data-testid="wholesale-pricing-card">
+    <div className="rounded-md border bg-card p-6 shadow-sm" data-testid="wholesale-pricing-card">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
         <p className="text-xs text-muted-foreground">
@@ -226,7 +226,7 @@ export function WholesalePricingCard(props: Props) {
                 <td className="py-2">
                   <bdi>{scopeLabel(r)}</bdi>
                   {r.stale ? (
-                    <span className="ms-2 rounded bg-warning/10 px-1.5 py-0.5 text-xs text-warning-ink">
+                    <span className="ms-2 rounded-md bg-warning/10 px-1.5 py-0.5 text-xs text-warning-ink">
                       {t('stale')}
                     </span>
                   ) : null}

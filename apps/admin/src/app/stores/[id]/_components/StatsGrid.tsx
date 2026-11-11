@@ -47,7 +47,7 @@ export function StatsGrid({ storeId }: StatsGridProps) {
   if (failed) {
     return (
       <div
-        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4"
         role="alert"
       >
         <p className="text-sm text-destructive-ink">{t('loadFailed')}</p>
@@ -104,7 +104,7 @@ export function StatsGrid({ storeId }: StatsGridProps) {
               <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{stat.value}</p>
             </div>
             <div
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl ${stat.iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
+              className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.iconBg} text-white shadow-lg transition-transform duration-200 group-hover:scale-110`}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path

@@ -28,7 +28,7 @@ export function AffiliateCommissionForm({
 
   return (
     <div className="space-y-6">
-      <div className="bg-card rounded-xl border border-border p-6">
+      <div className="bg-card rounded-md border border-border p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">{t('commissionSection')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div>
@@ -89,7 +89,7 @@ export function AffiliateCommissionForm({
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border border-border p-6">
+      <div className="bg-card rounded-md border border-border p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">{t('optionsSection')}</h2>
         <div className="space-y-4">
           <div className="flex items-center justify-between">

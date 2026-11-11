@@ -96,7 +96,7 @@ export default function StockAdjustmentsPage() {
         const isDraft = adj.status === 'draft';
         return (
           <span
-            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+            className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
               isDraft ? 'bg-warning/10 text-warning-ink' : 'bg-success/10 text-success-ink'
             }`}
           >

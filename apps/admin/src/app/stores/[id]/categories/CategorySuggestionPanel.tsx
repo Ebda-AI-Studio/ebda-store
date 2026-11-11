@@ -93,7 +93,7 @@ export function CategorySuggestionPanel({
   if (!drafts)
     return (
       <section
-        className="mb-6 rounded-xl border border-border bg-card p-4"
+        className="mb-6 rounded-md border border-border bg-card p-4"
         data-testid="category-suggest"
       >
         <h2 className="text-sm font-semibold">{t('title')}</h2>
@@ -119,7 +119,7 @@ export function CategorySuggestionPanel({
 
   return (
     <section
-      className="mb-6 rounded-xl border border-border bg-card p-4"
+      className="mb-6 rounded-md border border-border bg-card p-4"
       data-testid="category-suggest-review"
     >
       <h2 className="text-sm font-semibold">{t('reviewTitle')}</h2>

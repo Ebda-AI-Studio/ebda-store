@@ -51,7 +51,7 @@ export function OrderEtaCard({ storeId, orderId }: { storeId: string; orderId: s
 
   return (
     <section
-      className="rounded-2xl border border-border bg-card p-5"
+      className="rounded-lg border border-border bg-card p-5"
       aria-labelledby="order-eta-title"
     >
       <h2

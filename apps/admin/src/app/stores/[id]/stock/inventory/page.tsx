@@ -38,7 +38,7 @@ function IndeterminateCheckbox({
       type="checkbox"
       checked={checked}
       onChange={onChange}
-      className="rounded border-border"
+      className="rounded-md border-border"
       aria-label={ariaLabel}
     />
   );
@@ -368,7 +368,7 @@ export default function StockInventoryPage() {
 
         {/* Inline error banner: products fetch failed but page stays mounted */}
         {productsErr && (
-          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink flex items-center justify-between gap-4">
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink flex items-center justify-between gap-4">
             <span title={productsErr}>{t('loadFailed', { error: productsErr })}</span>
             <Button
               type="button"
@@ -444,7 +444,7 @@ export default function StockInventoryPage() {
                       onChange={() => toggleSelection(p.id)}
                       onClick={e => e.stopPropagation()}
                       aria-label={p.name}
-                      className="rounded border-border"
+                      className="rounded-md border-border"
                     />
                   ),
                 },
@@ -465,12 +465,12 @@ export default function StockInventoryPage() {
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="truncate max-w-[10rem]">{p.name}</span>
                         {hasReorder && (
-                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium bg-destructive/10 text-destructive-ink shrink-0">
+                          <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium bg-destructive/10 text-destructive-ink shrink-0">
                             {t('badgeReorder')}
                           </span>
                         )}
                         {hasDead && (
-                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium bg-warning/10 text-warning-ink shrink-0">
+                          <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium bg-warning/10 text-warning-ink shrink-0">
                             {t('badgeDeadstock')}
                           </span>
                         )}

@@ -172,7 +172,7 @@ export default function FxRatesPage() {
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="max-w-3xl space-y-6">
         {/* ── Add Rate Form ─────────────────────────────────────────────── */}
-        <div className="rounded-xl border border-border bg-muted/10 p-5 space-y-4">
+        <div className="rounded-md border border-border bg-muted/10 p-5 space-y-4">
           <p className="text-sm font-semibold">{t('recordNewRate')}</p>
           <p className="text-xs text-muted-foreground">
             {t('rateMeaning')}

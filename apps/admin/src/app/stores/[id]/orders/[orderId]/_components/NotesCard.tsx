@@ -12,7 +12,7 @@ export function NotesCard({ order }: NotesCardProps) {
   if (!order.customerNotes && !order.notes) return null;
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
+    <section className="rounded-lg border border-border bg-card p-5 space-y-4">
       {order.customerNotes && (
         <div>
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">

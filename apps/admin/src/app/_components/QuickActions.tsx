@@ -52,7 +52,7 @@ export function QuickActions() {
             style={{ animationDelay: `${0.5 + index * 0.05}s` }}
           >
             <div
-              className={`flex h-12 w-12 items-center justify-center rounded-xl ${action.iconBg} transition-transform group-hover:scale-110`}
+              className={`flex h-12 w-12 items-center justify-center rounded-md ${action.iconBg} transition-transform group-hover:scale-110`}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path

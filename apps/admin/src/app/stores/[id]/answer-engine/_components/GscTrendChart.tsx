@@ -25,7 +25,7 @@ export function GscTrendChart({ trend }: GscTrendChartProps) {
   const maxImpressions = Math.max(...trend.map(p => p.impressions), 1);
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+    <div className="bg-card rounded-md border border-border p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('trendTitle')}</h2>
       <div className="flex items-end gap-2 h-32">
         {trend.map(point => {

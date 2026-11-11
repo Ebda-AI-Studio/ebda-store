@@ -178,7 +178,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
           <Link
             key={tile.label}
             href={tile.href}
-            className={`block rounded-2xl border p-4 transition-colors bg-card ${toneClass[tile.tone]}`}
+            className={`block rounded-lg border p-4 transition-colors bg-card ${toneClass[tile.tone]}`}
           >
             <p className="text-xs font-medium text-muted-foreground">{tile.label}</p>
             <p className="mt-2 text-2xl font-bold tracking-tight">

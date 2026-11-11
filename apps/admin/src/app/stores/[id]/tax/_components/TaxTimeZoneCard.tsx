@@ -56,7 +56,7 @@ export function TaxTimeZoneCard({ storeId }: { storeId: string }) {
   }
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6 mb-6">
+    <div className="bg-card rounded-md border border-border p-6 mb-6">
       <h2 data-setting-id="tax.time-zone" className="text-lg font-semibold text-foreground mb-1">
         {t('title')}
       </h2>

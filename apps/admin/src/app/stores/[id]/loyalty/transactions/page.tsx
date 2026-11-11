@@ -299,7 +299,7 @@ export default function LoyaltyTransactionsPage() {
         {loadFailed && !loading && (
           <div
             role="alert"
-            className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink"
+            className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink"
           >
             {t('loadFailed')}
             <button
@@ -314,7 +314,7 @@ export default function LoyaltyTransactionsPage() {
 
         {/* Table */}
         {loading ? (
-          <div className="flex items-center justify-center py-16 rounded-2xl border border-border bg-card">
+          <div className="flex items-center justify-center py-16 rounded-lg border border-border bg-card">
             <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
           </div>
         ) : (
@@ -332,7 +332,7 @@ export default function LoyaltyTransactionsPage() {
         )}
 
         {meta && meta.totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-muted px-4 py-3">
+          <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-muted px-4 py-3">
             <p className="text-sm text-muted-foreground">
               {t('pageOf', {
                 page: meta.page,

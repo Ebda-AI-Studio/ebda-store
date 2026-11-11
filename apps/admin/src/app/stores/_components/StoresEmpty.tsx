@@ -16,7 +16,7 @@ export function StoresEmpty({ search, statusFilter }: StoresEmptyProps) {
   return (
     <div className="force-card py-16">
       <div className="flex flex-col items-center text-center">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5">
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/5">
           <svg
             className="h-10 w-10 text-primary"
             fill="none"

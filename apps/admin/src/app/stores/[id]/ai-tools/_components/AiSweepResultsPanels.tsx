@@ -774,7 +774,7 @@ function CollapsiblePanel({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <div className="overflow-hidden rounded-md border bg-card shadow-sm">
       {/* Header — toggle */}
       <button
         data-ui="row"

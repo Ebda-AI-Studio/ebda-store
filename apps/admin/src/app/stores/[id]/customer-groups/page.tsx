@@ -186,7 +186,7 @@ export default function CustomerGroupsPage() {
             </span>
           )}
           {group.isDefault && (
-            <span className="ms-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink">
+            <span className="ms-2 rounded-md bg-primary/10 px-1.5 py-0.5 text-xs text-primary-ink">
               {t('defaultBadge')}
             </span>
           )}

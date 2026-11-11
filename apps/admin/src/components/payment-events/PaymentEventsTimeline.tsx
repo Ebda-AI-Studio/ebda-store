@@ -226,7 +226,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 function ProviderBadge({ provider }: { provider: string }) {
   const label = PROVIDER_LABELS[provider.toLowerCase()] ?? provider;
   return (
-    <span className="inline-flex items-center rounded border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-foreground">
+    <span className="inline-flex items-center rounded-md border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-foreground">
       {label}
     </span>
   );
@@ -444,7 +444,7 @@ export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTime
     // Super-admin gets the dashed-primary-border panel treatment; store_admin
     // gets a lighter treatment to stay visually subordinate to PaymentCard.
     <div
-      className={`mt-3 rounded-xl border p-3 ${
+      className={`mt-3 rounded-md border p-3 ${
         isSuperAdmin
           ? 'border-dashed border-primary/40 bg-primary/5'
           : 'border-border bg-background'

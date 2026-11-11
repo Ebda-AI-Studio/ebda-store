@@ -264,8 +264,8 @@ export default function StoreFaqsPage() {
     return (
       <AdminLayout title={tPage('title')}>
         <div className="animate-pulse space-y-4">
-          <div className="h-64 rounded-xl bg-muted" />
-          <div className="h-64 rounded-xl bg-muted" />
+          <div className="h-64 rounded-md bg-muted" />
+          <div className="h-64 rounded-md bg-muted" />
         </div>
       </AdminLayout>
     );
@@ -275,7 +275,7 @@ export default function StoreFaqsPage() {
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
       <div className="space-y-6">
         {/* ===== Frequently Asked Questions ===== */}
-        <div id="faqs" className="scroll-mt-24 rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div id="faqs" className="scroll-mt-24 rounded-md border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 data-setting-id="seo.faqs" className="font-semibold text-foreground">
@@ -536,7 +536,7 @@ export default function StoreFaqsPage() {
         </div>
 
         {/* ===== How-To Guides ===== */}
-        <div id="howtos" className="scroll-mt-24 rounded-xl border bg-card p-6 shadow-sm space-y-4">
+        <div id="howtos" className="scroll-mt-24 rounded-md border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 data-setting-id="seo.how-tos" className="font-semibold text-foreground">

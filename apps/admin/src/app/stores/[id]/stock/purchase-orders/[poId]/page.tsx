@@ -292,7 +292,7 @@ export default function PurchaseOrderDetailPage() {
             {/* Header summary */}
             <div className="flex flex-wrap gap-4 items-start">
               <span
-                className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
                   STATUS_CLASSES[po.status] ?? 'bg-muted text-muted-ink'
                 }`}
               >
@@ -328,7 +328,7 @@ export default function PurchaseOrderDetailPage() {
               />
               {/* DataTable has no footer concept, so the total is a summary bar
               right below the table — visible on both layouts. */}
-              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
+              <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2 mt-3 text-sm font-medium">
                 <span>{tDetail('totalLabel')}</span>
                 <span className="font-mono font-semibold">{formatPrice(po.totalCost)}</span>
               </div>

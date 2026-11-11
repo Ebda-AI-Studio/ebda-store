@@ -156,7 +156,7 @@ export function CategoryForm({
   );
 
   return (
-    <div className="mb-6 rounded-xl border bg-card shadow-sm">
+    <div className="mb-6 rounded-md border bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
         <h2 className="font-semibold text-foreground">
           {editingId ? t('editTitle') : t('addTitle')}

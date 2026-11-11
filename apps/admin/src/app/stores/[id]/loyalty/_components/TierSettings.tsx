@@ -28,7 +28,7 @@ export function TierSettings({ settings, disabled, onChange }: TierSettingsProps
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {TIER_KEYS.map(tier => (

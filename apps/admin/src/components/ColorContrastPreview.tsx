@@ -46,7 +46,7 @@ export function ColorContrastPreview({ bg, theme, pickedFg }: ColorContrastPrevi
         {roles.map(role => (
           <div
             key={role}
-            className="rounded p-2 text-center"
+            className="rounded-md p-2 text-center"
             style={{ backgroundColor: resolved, color: autoFg }}
           >
             {role}

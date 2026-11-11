@@ -20,7 +20,7 @@ export function BrandingIdentityTab({ branding, onChange, storeId }: BrandingIde
   const t = useT('branding.identity');
 
   return (
-    <div className="bg-card rounded-xl border p-6 space-y-6">
+    <div className="bg-card rounded-md border p-6 space-y-6">
       <div className="flex items-center justify-end">
         <AITranslateMissingButton
           storeId={storeId}

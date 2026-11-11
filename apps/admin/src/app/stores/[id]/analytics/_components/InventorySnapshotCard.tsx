@@ -27,7 +27,7 @@ export function InventorySnapshotCard({ snapshot }: InventorySnapshotCardProps) 
   ] as const;
 
   return (
-    <div className="bg-card rounded-xl border p-6 shadow-sm">
+    <div className="bg-card rounded-md border p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground mb-4">{t('title')}</h2>
       <dl className="grid grid-cols-2 gap-4">
         {rows.map(row => (

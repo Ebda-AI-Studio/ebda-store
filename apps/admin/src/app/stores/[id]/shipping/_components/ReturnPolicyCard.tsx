@@ -107,7 +107,7 @@ export const ReturnPolicyCard = forwardRef<ReturnPolicyHandle, Props>(function R
   if (loading) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-md border border-border bg-card p-4">
       <h3
         data-setting-id="shipping.return-policy"
         className="text-sm font-semibold text-foreground"

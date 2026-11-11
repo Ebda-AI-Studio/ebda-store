@@ -109,7 +109,7 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
   const cell = 'h-9 sm:h-9 text-sm';
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
+    <div className="rounded-md border bg-card p-6 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
         <p className="text-xs text-muted-foreground">{t('hint')}</p>

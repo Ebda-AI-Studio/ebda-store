@@ -346,7 +346,7 @@ export function SectionPreview({
             {[1, 2, 3].map(i => (
               <div
                 key={i}
-                className={`flex flex-col items-stretch rounded ${widthClass} ${sizeClass} overflow-hidden`}
+                className={`flex flex-col items-stretch rounded-md ${widthClass} ${sizeClass} overflow-hidden`}
                 style={{ borderColor: resolvedFrame, backgroundColor: cardSurface }}
               >
                 <div

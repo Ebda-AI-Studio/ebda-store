@@ -258,7 +258,7 @@ export function SmartPaletteModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-card p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-foreground">{t('title')}</h2>
           <button
@@ -295,7 +295,7 @@ export function SmartPaletteModal({
         </div>
 
         {/* Layer B: Vibe picker */}
-        <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
+        <div className="mb-4 rounded-md border border-border bg-muted/30 p-4">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('vibeSection')}
           </h3>
@@ -315,7 +315,7 @@ export function SmartPaletteModal({
         </div>
 
         {/* Distribution sub-section: pattern + frame thickness */}
-        <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
+        <div className="mb-4 rounded-md border border-border bg-muted/30 p-4">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {t('distributionSection')}
           </h3>

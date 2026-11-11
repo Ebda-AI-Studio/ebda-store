@@ -156,7 +156,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
   );
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6">
+    <div className="bg-card rounded-md border border-border p-6">
       <h2 className="text-lg font-semibold text-foreground mb-1">{t('title')}</h2>
       <p className="text-sm text-muted-foreground mb-4">{t('uploaderHelp')}</p>
 
@@ -234,7 +234,7 @@ export function PwaIconUploader({ storeId, settings, pwaEnabled, onChange }: Pwa
                     alt={t('favicon32Alt')}
                     width={32}
                     height={32}
-                    className="w-8 h-8 rounded object-contain bg-muted border mx-auto"
+                    className="w-8 h-8 rounded-md object-contain bg-muted border mx-auto"
                   />
                   <p className="text-xs text-muted-foreground mt-1">32×32</p>
                 </div>

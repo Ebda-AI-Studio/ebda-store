@@ -131,7 +131,7 @@ function StatCard({
   accent?: boolean;
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
+    <div className="rounded-md border bg-card p-4 shadow-sm">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={`mt-1 text-2xl font-bold tabular-nums ${accent ? 'text-primary' : 'text-foreground'}`}
@@ -315,7 +315,7 @@ function PlatformAiUsagePageInner() {
         <div className="mb-6 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink">
           <strong>{t('noRatesConfiguredTitle')}</strong>{' '}
           {t.rich('noRatesConfiguredBody', {
-            code: chunks => <code className="mx-1 rounded bg-warning/10 px-1">{chunks}</code>,
+            code: chunks => <code className="mx-1 rounded-md bg-warning/10 px-1">{chunks}</code>,
           })}
         </div>
       ) : platform.monthUnpricedCalls > 0 ? (
@@ -326,7 +326,7 @@ function PlatformAiUsagePageInner() {
             })}
           </strong>{' '}
           {t.rich('unpricedCallsBody', {
-            code: chunks => <code className="rounded bg-warning/10 px-1">{chunks}</code>,
+            code: chunks => <code className="rounded-md bg-warning/10 px-1">{chunks}</code>,
           })}
         </div>
       ) : null}
@@ -390,7 +390,7 @@ function PlatformAiUsagePageInner() {
       </div>
 
       {/* ── Per-store breakdown table ────────────────────────────────── */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-md border bg-card shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-base font-semibold text-foreground">{t('perStoreBreakdown')}</h2>
           <span className="text-xs text-muted-foreground">
