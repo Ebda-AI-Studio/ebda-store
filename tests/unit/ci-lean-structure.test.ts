@@ -621,11 +621,41 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
       code.match(/bash scripts\/ci\/install-chromium\.sh/g)?.length ?? 0
     ).toBeGreaterThanOrEqual(4);
   });
-  it('nothing in ci.yml writes to a fixed /tmp path (two runners share the Mac)', () => {
-    const code = ci
+  // Two runners share the Mac: a fixed /tmp path let one PR's AI review read another PR's verdict.
+  const SHARED_HOST_FILES = [
+    ...readdirSync(path.join(ROOT, '.github/workflows'))
+      .filter(f => /\.ya?ml$/.test(f))
+      .map(f => `.github/workflows/${f}`),
+    '.github/ai-review/review.mjs',
+    '.github/scoped-audit/audit.mjs',
+  ];
+  it.each(SHARED_HOST_FILES)('%s writes to no fixed /tmp path and installs nothing globally', f => {
+    const code = readFileSync(path.join(ROOT, f), 'utf8')
       .split('\n')
-      .filter(l => !/^\s*#/.test(l))
+      .filter(l => !/^\s*(#|\/\/|\*)/.test(l))
       .join('\n');
     expect(code).not.toMatch(/[\s'"(=>]\/tmp\//);
+    expect(code).not.toMatch(/npm (install|i) (--global|-g)\b/);
+  });
+  it('the AI review writes and reads its verdict through CLAUDE_OUTPUT in RUNNER_TEMP', () => {
+    const wf = readFileSync(path.join(ROOT, '.github/workflows/ai-review.yml'), 'utf8');
+    expect(wf.match(/CLAUDE_OUTPUT: \$\{\{ runner\.temp \}\}\/claude-out\.json/g)?.length).toBe(2);
+    expect(wf).toContain('> "$CLAUDE_OUTPUT"');
+  });
+  it('the Mac path never ALTERs the shared ebda_app role (Ruling CI-MAC-ROLE-1)', () => {
+    const steps = parsed.jobs['test-integration'].steps;
+    expect(steps.find(st => /ALTER ROLE ebda_app/.test(st.run ?? ''))?.if).toBe(
+      "runner.os == 'Linux'"
+    );
+    expect(steps.find(st => st.run === 'bash scripts/ci/ci-services.sh app-login')?.if).toBe(
+      "runner.os == 'macOS'"
+    );
+    // executable lines only: the comments explain the rule and the error message prints the one-time host setup
+    const svc = readFileSync(path.join(ROOT, 'scripts/ci/ci-services.sh'), 'utf8')
+      .split('\n')
+      .filter(l => !/^\s*#/.test(l) && !/echo /.test(l))
+      .join('\n');
+    expect(svc).not.toMatch(/ALTER ROLE/);
+    expect(svc).not.toMatch(/flushall/i);
   });
 });

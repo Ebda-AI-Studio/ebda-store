@@ -1213,7 +1213,12 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build -w apps/api
 
+      - name: Check the host's ebda_app can log in (Mac runner; the shared role is never altered, Ruling CI-MAC-ROLE-1)
+        if: runner.os == 'macOS'
+        run: bash scripts/ci/ci-services.sh app-login
+
       - name: Give ebda_app a CI-only login for the API server
+        if: runner.os == 'Linux'
         # Production's API runs as the non-bypass `ebda_app` role (created NOLOGIN
         # by migration 20261004000000_ebda_strict_rls; ops gives it a login and a
         # password per environment). The whole integration suite drives an API logged
