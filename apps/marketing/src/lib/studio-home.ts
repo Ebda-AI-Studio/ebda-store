@@ -43,14 +43,14 @@ export const STUDIO_HOME: Record<Locale, StudioHome> = {
   ar: {
     meta: {
       title: `${STUDIO_AR}: ${STORE_AR} و${CHAT_AR}`,
-      desc: `${STUDIO_AR} بيعمل برامج للتجار في مصر: ${STORE_AR} لمتجرك على الإنترنت، و${CHAT_AR} لعملائك على واتساب. حساب واحد للاتنين.`,
+      desc: `${STUDIO_AR} بيعمل برامج للتجار في مصر: ${STORE_AR} لمتجرك أونلاين، و${CHAT_AR} لعملائك على واتساب. حساب واحد للاتنين.`,
     },
     eyebrow: STUDIO_AR,
     h1: 'متجرك وعملاؤك في مكان واحد.',
-    lead: `${STORE_AR} بيفتحلك متجر على الإنترنت، و${CHAT_AR} بيكلّم عملاءك على واتساب. بتدخل للاتنين بنفس الحساب.`,
+    lead: `${STORE_AR} بيفتحلك متجر أونلاين، و${CHAT_AR} بيكلّم عملاءك على واتساب. بتدخل للاتنين بنفس الحساب.`,
     productsH: 'منتجاتنا',
     store: {
-      blurb: 'متجرك على الإنترنت في دقايق، بالعربي وبشكل يشبهك.',
+      blurb: 'متجرك أونلاين في دقايق، بالعربي وبشكل يشبهك.',
       cta: 'افتح متجرك',
       more: `اعرف أكتر عن ${STORE_AR}`,
     },
@@ -59,10 +59,10 @@ export const STUDIO_HOME: Record<Locale, StudioHome> = {
       cta: `ابدأ مع ${CHAT_AR}`,
       more: `اعرف أكتر عن ${CHAT_AR}`,
     },
-    account: 'حساب واحد للاتنين، من غير باسورد تاني.',
+    account: `حساب واحد للاتنين: نفس الإيميل والباسورد بيدخلوك على ${STORE_AR} و${CHAT_AR}.`,
     does: {
       label: 'اللي بنعمله',
-      statement: 'ستوديو مصري بيبني أدوات وخدمات لأصحاب الشغل، علشان يبيعوا أكتر ويتعبوا أقل.',
+      statement: 'ستوديو مصري بيبني أدوات وخدمات لأصحاب الشغل، عشان يبيعوا أكتر ويتعبوا أقل.',
     },
     products: {
       label: 'منتجاتنا',
@@ -120,7 +120,7 @@ export const STUDIO_HOME: Record<Locale, StudioHome> = {
       cta: `Start with ${CHAT_EN}`,
       more: `Learn more about ${CHAT_EN}`,
     },
-    account: 'One account for both, no second password.',
+    account: `One account for both: the same email and password sign you in to ${STORE_EN} and ${CHAT_EN}.`,
     does: {
       label: 'What we do',
       statement:

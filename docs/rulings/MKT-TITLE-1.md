@@ -1,0 +1,5 @@
+# MKT-TITLE-1
+
+> Section: Launch-eve content consistency pass (2026-11-10, branch `fix/marketing-content-consistency`), from the ebda.app content audit (findings C1-C28)
+
+Ruling MKT-TITLE-1 - ONE page-title pattern on ebda.app (audit C13), implemented in `pageMetadata` (`apps/marketing/src/lib/seo.ts`) and pinned by `tests/unit/marketing-seo.test.ts`: every title ends in "(ebda.app)"; a home page (the studio home, /store) is its own full title + " (ebda.app)"; an inner page is "<page> | <product of the page> (ebda.app)" where the product is Ebda Store, Ebda Chat or Ebda AI Studio by NAV-PRODUCT-OF-PAGE-1, and a leading "<product> — " or "<product>: " is dropped from <page> (so /whatsapp no longer says Ebda Chat twice); a studio page whose title already names the studio (About, Contact) is "<page> (ebda.app)", now identical in Arabic and English because both titles carry the full studio name. Legal-page meta descriptions are cut at a word boundary with "…" (`snippet`, C16). Cost if wrong: a SERP title a few characters longer than before on /store and the studio home.

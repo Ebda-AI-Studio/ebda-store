@@ -111,7 +111,7 @@ describe('LEGAL-1 extra legal pages', () => {
     }
   });
 
-  it('P12 / M-034: /refund restates the Terms, is visibly provisional, carries the VAT-0 clause, and BRAND points at it', () => {
+  it('P12 / M-034: /refund restates the Terms, stands as final (LEGAL-FINAL-1), carries the VAT-0 clause, and BRAND points at it', () => {
     const md = readFileSync(path.resolve(__dirname, '../../docs/legal/VAT-0-clause.md'), 'utf8');
     const en = /## English\n\n(.+)\n/.exec(md)![1];
     const ar = /## العربية\n\n(.+)\n/.exec(md)![1];
@@ -121,11 +121,15 @@ describe('LEGAL-1 extra legal pages', () => {
     ] as const) {
       const doc = COPY[l].legalPages.refund;
       const text = doc.sections.flatMap(s => [s.h, ...s.p]).join('\n');
-      expect(doc.note, `${l} note`).toBeTruthy(); // not reviewed by counsel: said under the title
+      expect(doc.note, `${l} note`).toBeTruthy(); // the Terms and the Merchant Agreement prevail: said under the title
+      // Ahmad 2026-11-10 (LEGAL-FINAL-1): the texts stand as our terms from launch, no "provisional" note
+      expect(`${doc.note}\n${text}`).not.toMatch(/counsel|provisional|Provisional|مبدئ|محامٍ/);
       expect(text).toContain(clause);
-      expect(text).toContain('/legal/whatsapp-terms/');
+      // C22: each language points at its own page
       expect(text).toContain(
-        l === 'en' ? '[Provisional, under legal review]' : '[مبدئي، قيد المراجعة القانونية]'
+        l === 'en'
+          ? 'https://ebda.app/en/legal/whatsapp-terms/'
+          : 'https://ebda.app/legal/whatsapp-terms/'
       );
     }
     // the same no-refund rule the Merchant Agreement states (section 11)

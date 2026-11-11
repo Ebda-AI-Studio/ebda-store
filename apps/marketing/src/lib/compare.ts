@@ -40,7 +40,7 @@ const ROWS: readonly RowDef[] = [
     group: 'strength',
     label: { ar: 'السوق الأساسي', en: 'Home market' },
     ebda: {
-      ar: 'مصر أولًا: جنيه مصري، وإنستا باي، وشركات شحن مصرية.',
+      ar: 'مصر أولًا: جنيه مصري، وإنستاباي، وشركات شحن مصرية.',
       en: 'Egypt first: Egyptian pounds, InstaPay and Egyptian carriers.',
     },
   },
@@ -117,7 +117,7 @@ const ROWS: readonly RowDef[] = [
     group: 'strength',
     label: { ar: 'القوالب والتصميم', en: 'Templates and design' },
     ebda: {
-      ar: 'خمس قوالب، في كل قالب ثلاث أشكال، ومحرر صفحات.',
+      ar: '5 قوالب، وكل قالب بـ3 أشكال، ومحرر صفحات.',
       en: 'Five templates with three looks each, and a page builder.',
     },
   },
@@ -364,7 +364,7 @@ export type CompareDef = Record<Locale, CompareCopy> & {
 
 const ebdaChoiceAr = [
   'بتبيع في مصر وعايز تدفع الاشتراك بالجنيه.',
-  'عايز إنستا باي والدفع عند الاستلام وشركات الشحن المصرية جاهزين.',
+  'عايز إنستاباي والدفع عند الاستلام وشركات الشحن المصرية جاهزين.',
   'عايز بحث بيفهم المصري والفرانكو، وذكاء اصطناعي مشمول في السعر.',
   'عايز صفر عمولة على الطلبات.',
 ];
@@ -574,7 +574,7 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
       ),
       payments: same(
         'Says you can connect different electronic payment methods and ship with the largest carriers in Egypt. It names no gateway or carrier, and cash on delivery and InstaPay are not stated. Unverified.',
-        'بتقول إنك تقدر توصّل وسائل دفع إلكترونية مختلفة وتشحن مع أكبر شركات الشحن في مصر. من غير ما تسمّي بوابة أو شركة، والدفع عند الاستلام وإنستا باي مش مذكورين. غير مؤكد.'
+        'بتقول إنك تقدر توصّل وسائل دفع إلكترونية مختلفة وتشحن مع أكبر شركات الشحن في مصر. من غير ما تسمّي بوابة أو شركة، والدفع عند الاستلام وإنستاباي مش مذكورين. غير مؤكد.'
       ),
       ai: same(
         'AI features are not stated on its homepage. Unverified.',
@@ -858,7 +858,7 @@ export const COMPARE_PAGE: Record<
     asOf: `المقارنة بتاريخ ${COMPARE_AS_OF_AR}.`,
     verify:
       'معلومات المنافسين مأخوذة من اللي منشور للعامة وبتتغير. راجع موقعهم الرسمي قبل ما تقرر.',
-    cta: 'ابدأ دلوقتي',
+    cta: 'افتح متجرك',
     allFeatures: 'شوف كل مميزات ابدأ ستور',
     sourcesH: `المصادر (اتقرت بتاريخ ${CHECKED_ON_AR}):`,
     verdict: {
@@ -875,7 +875,7 @@ export const COMPARE_PAGE: Record<
     asOf: `Comparison as of ${COMPARE_AS_OF}.`,
     verify:
       'Competitor information comes from what is publicly published and changes over time. Check their official site before you decide.',
-    cta: 'Start now',
+    cta: 'Open your store',
     allFeatures: 'See all Ebda Store features',
     sourcesH: `Sources (read ${CHECKED_ON}):`,
     verdict: {

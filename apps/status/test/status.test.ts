@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import worker, { alertOnOutcome, runProbes, thresholdsFrom } from '../src/index';
 import { SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS } from '../src/config';
-import { probe, type Fetcher } from '../src/probe';
+import { probe, probeErrorAr, type Fetcher } from '../src/probe';
 import type { ProbeResult, Snapshot } from '../src/types';
 
 const MIN = 60_000;
@@ -42,6 +42,22 @@ const get = (path: string) => worker.fetch(new Request(`https://status.ebda.app$
 const has = (html: string, needle: string) => html.includes(needle);
 const snapshot = async (): Promise<Snapshot> =>
   (await (await get('/api/status.json')).json()) as Snapshot;
+
+describe('content audit C6/C7', () => {
+  it('monitors Ebda Chat (wa.ebda.app/health) under its own product group', () => {
+    const chat = COMPONENTS.find(c => c.id === 'chat');
+    expect(chat?.url).toBe('https://wa.ebda.app/health');
+    expect(chat?.product).toBe('chat');
+  });
+
+  it('words every probe error in Egyptian Arabic', () => {
+    expect(probeErrorAr('timeout after 8000ms')).toBe('مفيش رد خلال 8 ثواني');
+    expect(probeErrorAr('status 503, expected 200')).toBe('رجّع كود 503 بدل 200');
+    expect(probeErrorAr('body did not match')).toBe('الصفحة رجعت من غير المحتوى المتوقع');
+    expect(probeErrorAr('fetch failed (TypeError)')).toBe('الاتصال فشل');
+    expect(probeErrorAr(null)).toBe('خطأ مش معروف');
+  });
+});
 
 describe('probe', () => {
   const api = COMPONENTS.find(c => c.id === 'api')!;
@@ -159,8 +175,12 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     expect(has(html, 'API is not responding')).toBe(true);
     expect(has(html, '3 consecutive probes failed')).toBe(true);
     const ar = await (await get('/')).text();
-    expect(has(ar, 'هناك انقطاع في بعض الخدمات')).toBe(true);
-    expect(has(ar, 'واجهة البرمجة لا يستجيب')).toBe(true);
+    expect(has(ar, 'فيه خدمات واقفة دلوقتي')).toBe(true);
+    expect(has(ar, 'مفيش رد من واجهة البرمجة')).toBe(true);
+    // content audit C7: the Arabic page never shows the raw English probe error
+    expect(ar).not.toMatch(
+      /timeout after|consecutive probes|status \d+, expected|body did not match|fetch failed/
+    );
     expect(has(ar, 'dir="rtl"')).toBe(true);
 
     const snap = await snapshot();

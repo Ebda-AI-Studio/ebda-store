@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { COMPONENTS, HISTORY_DAYS } from './config';
+import { probeErrorAr } from './probe';
 import type {
   ComponentSnapshot,
   ComponentStatus,
@@ -102,12 +103,12 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
           const id = this.insertIncident({
             component: r.id,
             title: `${name?.en ?? r.id} is not responding`,
-            titleAr: `${name?.ar ?? r.id} لا يستجيب`,
+            titleAr: `مفيش رد من ${name?.ar ?? r.id}`,
             impact: 'outage',
             source: 'auto',
             status: 'investigating',
             body: `${fail} consecutive probes failed (${r.error ?? 'unknown error'}).`,
-            bodyAr: `فشل ${fail} فحوصات متتالية (${r.error ?? 'خطأ غير معروف'}).`,
+            bodyAr: `${fail} فحوصات ورا بعض فشلوا (${probeErrorAr(r.error)}).`,
             now,
           });
           outcome.opened.push(id);
@@ -127,7 +128,7 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
             inc.id,
             'resolved',
             `Recovered: ${ok} consecutive probes succeeded.`,
-            `عاد للعمل: نجح ${ok} فحوصات متتالية.`,
+            `رجع اشتغل: ${ok} فحوصات ورا بعض نجحوا.`,
             now
           );
           outcome.resolved.push(inc.id);

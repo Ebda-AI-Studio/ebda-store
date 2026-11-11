@@ -74,6 +74,23 @@ function v12(summary: { ar: string; en: string }): LegalVersion {
   });
 }
 
+/**
+ * Launch-eve wording fix (content audit C8/C9/C18/C22/C23, Ruling LEGAL-NAMES-1), published 2026-11-10: the company, not
+ * the product, is named as the party you pay and as the data controller, with its legal entity; «إنستاباي» is spelt as in
+ * the dashboard; English cross-references point at the English pages. No obligation changes, so NOT material (no notice)
+ * and no fee change.
+ */
+function launchWording(version: string, summary: { ar: string; en: string }): LegalVersion {
+  return Object.freeze({
+    version,
+    publishedAt: '2026-11-10',
+    effectiveAt: '2026-11-10',
+    material: false,
+    feeChange: false,
+    summary: Object.freeze(summary),
+  });
+}
+
 const doc = (...history: LegalVersion[]) =>
   Object.freeze({ history: Object.freeze(history) as readonly LegalVersion[] });
 
@@ -102,6 +119,10 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
         ar: 'قائمة المزودين محدّثة لتطابق البنية الحالية: Cloudflare معالجًا رئيسيًا للبيانات (قاعدة البيانات والتخزين والطوابير والبريد)، ولم تعد Neon وInngest مستخدمتين. وإفصاح عن أداة تحليلات الويب Cloudflare Web Analytics، وهي لا تستخدم ملفات تعريف ارتباط ولا تتطلب موافقة.',
         en: 'The provider list now matches our current infrastructure: Cloudflare as the main data processor (database, storage, queues and email); Neon and Inngest are no longer used. Disclosure of the Cloudflare Web Analytics beacon, which uses no cookies and needs no consent.',
       }),
+    }),
+    launchWording('1.3', {
+      ar: 'تسمية الشركة وكيانها القانوني متحكّمًا في البيانات بدلًا من اسم المنتج، وتوحيد كتابة «إنستاباي»، دون تغيير في طريقة استخدام البيانات.',
+      en: 'The company and its legal entity are named as the data controller instead of the product name, and one Arabic spelling of InstaPay; how data is used does not change.',
     })
   ),
   terms: doc(
@@ -109,6 +130,10 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
     v11(true, {
       ar: 'توضيح أن الأسعار مبالغ نهائية دون ضريبة قيمة مضافة، وإغلاق الحساب بمراسلة privacy@ebda.app، وإشارة إلى شروط ابدأ شات.',
       en: 'Prices are final amounts with no VAT, account closure by writing to privacy@ebda.app, and a pointer to the Ebda Chat terms.',
+    }),
+    launchWording('1.2', {
+      ar: 'تسمية الشركة وكيانها القانوني طرفًا في الاتفاق وجهةً تُدفع لها الرسوم بدلًا من اسم المنتج، وتوحيد كتابة «إنستاباي»، دون تغيير في أي التزام.',
+      en: 'The company and its legal entity are named as the party to the agreement and the one you pay, instead of the product name, and one Arabic spelling of InstaPay; no obligation changes.',
     })
   ),
   acceptableUse: doc(
@@ -131,6 +156,10 @@ export const LEGAL_POLICIES: LegalPolicies = Object.freeze({
     v12({
       ar: 'الأحكام الجديدة في سياسة الاستخدام المقبول (الكحوليات ولحم الخنزير والسحوبات المدفوعة والتقييمات المزيفة)، والتقسيط معطّل افتراضيًا، وطلبات الذهب تُدفع كاملة عبر الإنترنت ما لم يغيّر التاجر الإعداد.',
       en: 'The new Acceptable Use Policy bans (alcohol, pork, paid-entry draws, fake reviews), installments off by default, and gold orders paid in full online unless the merchant changes the setting.',
+    }),
+    launchWording('1.3', {
+      ar: 'توحيد كتابة اسم «إنستاباي» كما يظهر في لوحة التحكم، دون تغيير في أي التزام.',
+      en: 'The Arabic spelling of InstaPay now matches the dashboard; no obligation changes.',
     })
   ),
 });

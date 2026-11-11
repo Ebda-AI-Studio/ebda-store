@@ -60,9 +60,8 @@ export const BRAND = {
    * service categories, each with named sub-items. ONE source for the studio home, About, the contact-form topics, llms.txt and the Organization JSON-LD
    * (`knowsAbout` / `makesOffer`). Benefit lines only: no prices, no claims we cannot back, no client names.
    * Products (Ebda Store, Ebda Chat) are separate from services.
-   * Marketing/advertising/media, home engineering, interior and exterior design, and events were REMOVED from ebda.app
-   * on purpose: they will move to separate subdomains or standalone sites (homes separately; marketing + media + events
-   * separately). Nothing is built or linked for them here yet.
+   * Marketing, design and events are NOT in this list: they are the studio's SERVICE LINES (`serviceLines` below,
+   * `/services/<id>` on ebda.app, Ruling SERVICES-IA-1), live since Ahmad approved their wording (SERVICES-COPY-APPROVED-1).
    *
    * PENDING MATCH TO REGISTRATION PAPERS: Ahmad will share the company registration papers and every `ar` / `en`
    * name below (category and item) must then match the registered activity wording EXACTLY. The wording is a
@@ -112,8 +111,9 @@ export const BRAND = {
   ],
   /**
    * The three SERVICE LINES (Ahmad 2026-11-09, Ruling SERVICES-IA-1): Marketing, Design and Events are lines of the studio on
-   * ebda.app (`/services/<id>`), not standalone sites. They are NOT part of `services` (the core: STUDIO-CORE-1) and stay
-   * hidden in production behind the marketing build flag `EBDA_SERVICE_LINES` until Ahmad approves the wording. An id is also a
+   * ebda.app (`/services/<id>`), not standalone sites. They are NOT part of `services` (the core: STUDIO-CORE-1). They show when the
+   * build flag `EBDA_SERVICE_LINES` is `on`; production builds with `on` since Ahmad approved the wording on 2026-11-10
+   * (Ruling SERVICES-COPY-APPROVED-1). An id is also a
    * contact-form topic id (the API accepts it always; the form lists it only when the lines are published).
    */
   serviceLines: [
@@ -212,8 +212,9 @@ export const BRAND = {
     accounts: 'accounts.ebda.app',
   },
   /**
-   * The ONE public contact address. Only hello@ and security@ receive mail
-   * (Cloudflare Email Routing), so this must stay hello@ (Ruling EBDA-BILLFU-5).
+   * The ONE public contact address (footer, contact page). hello@, ahlan@, privacy@ and security@ all receive mail
+   * (Cloudflare Email Routing, checked by Ahmad 2026-11-10, Ruling MKT-EMAIL-1; supersedes the hello@-only note of
+   * EBDA-BILLFU-5). A new address needs its routing rule BEFORE any page shows it.
    */
   supportEmail: 'ahlan@ebda.app',
   noReplyEmail: 'no-reply@ebda.app',
@@ -655,7 +656,7 @@ export interface SiteNavService extends NavLink {
 
 /**
  * The Services menu (Ruling SERVICES-IA-1), built like Products: one entry per destination, then "All services". Core first (AI and
- * software, on the Services index), then the three service lines. The marketing header renders it ONLY when the service lines are
+ * software, on the Services index), then the three service lines in `BRAND.serviceLines` order (marketing, design, events). The marketing header renders it ONLY when the service lines are
  * published (build flag EBDA_SERVICE_LINES=on); the support sites do not render it.
  */
 export function siteNavServices(lang: NavLang): SiteNavService[] {
@@ -673,17 +674,10 @@ export function siteNavServices(lang: NavLang): SiteNavService[] {
   return [
     item(
       'core',
-      L(lang, 'ذكاء اصطناعي وبرمجيات', 'AI & Software'),
+      L(lang, 'ذكاء اصطناعي وبرمجيات', 'AI and software'),
       '/services/#core',
       'ذكاء اصطناعي وبرمجيات واستشارات وتدريب',
       'AI, software, consulting and training'
-    ),
-    item(
-      'events',
-      L(lang, BRAND.serviceLines[2].nameAr, BRAND.serviceLines[2].nameEn),
-      '/services/events/',
-      'تنظيم فعاليات الشركات والمؤتمرات',
-      'Corporate events and conferences, organised'
     ),
     item(
       'marketing',
@@ -698,6 +692,13 @@ export function siteNavServices(lang: NavLang): SiteNavService[] {
       '/services/design/',
       'تصميم وتنفيذ البيوت',
       'Home design and build'
+    ),
+    item(
+      'events',
+      L(lang, BRAND.serviceLines[2].nameAr, BRAND.serviceLines[2].nameEn),
+      '/services/events/',
+      'تنظيم فعاليات الشركات والمؤتمرات',
+      'Corporate events and conferences, organised'
     ),
     item(
       'all',
@@ -734,7 +735,7 @@ export function siteNavResources(lang: NavLang): (NavLink & { id: NavSite })[] {
 /** The studio's own pages: About, Contact. */
 export function siteNavStudio(lang: NavLang): NavLink[] {
   return [
-    mlink(lang, 'about', L(lang, 'عن ابدأ ستوديو', 'About the studio'), '/about/'),
+    mlink(lang, 'about', L(lang, 'عن الستوديو', 'About the studio'), '/about/'),
     mlink(lang, 'contact', L(lang, 'تواصل معنا', 'Contact'), '/contact/'),
   ];
 }
@@ -876,7 +877,7 @@ export function siteFooter(lang: NavLang): {
     label: L(lang, 'روابط الموقع', 'Site links'),
     brand: {
       name: studioName(lang),
-      mission: L(lang, 'بابك لبدء مشروعك.', 'Your doorway to business.'),
+      mission: L(lang, 'بابك لبدء مشروعك.', 'Your doorway to starting your business.'),
       contacts: [
         {
           id: 'hello',
@@ -969,7 +970,7 @@ export function siteFooter(lang: NavLang): {
     copyright: year =>
       L(
         lang,
-        `© ${year} ${BRAND.company.shortNameAr}. جميع الحقوق محفوظة.`,
+        `© ${year} ${BRAND.company.shortNameAr}. كل الحقوق محفوظة.`,
         `© ${year} ${BRAND.company.shortNameEn}. All rights reserved.`
       ),
   };

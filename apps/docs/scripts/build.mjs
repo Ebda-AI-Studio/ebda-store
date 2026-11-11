@@ -270,7 +270,7 @@ for (const p of waAr) {
       sidebar: arSidebar(p.slug),
       main: `<article class="prose">${renderToc(headings, 'في هذه الصفحة')}<h1>${esc(p.data.title)}</h1>${html}</article>`,
       footer: arFooter,
-      skipLabel: 'تخطَّ إلى المحتوى',
+      skipLabel: 'روح للمحتوى',
     })
   );
   urls.push(arUrl);
@@ -376,7 +376,7 @@ for (const p of arPages) {
     main: `<article class="prose"><h1>${esc(arIndex.data.title)}</h1>${html}${siteMedalHtml('m12')}${cards}</article>`,
     tess: true,
     footer: renderFooter({ lang: 'ar' }),
-    skipLabel: 'تخطَّ إلى المحتوى',
+    skipLabel: 'روح للمحتوى',
   });
   writePage(out, '/ar/', page);
 }
@@ -501,7 +501,7 @@ for (const lang of ['en', 'ar']) {
         ],
       }),
       footer,
-      skipLabel: ar ? 'تخطَّ إلى المحتوى' : EN.skip,
+      skipLabel: ar ? 'روح للمحتوى' : EN.skip,
     }).replace('<head>', '<head>\n<meta name="robots" content="noindex">')
   );
 }

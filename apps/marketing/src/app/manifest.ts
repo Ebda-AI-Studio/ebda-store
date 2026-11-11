@@ -8,7 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: `${BRAND.company.shortNameAr} ${BRAND.company.shortNameEn}`,
     short_name: BRAND.company.shortNameAr,
-    description: 'ابدأ ستوديو بيعمل منتجات لأصحاب الشغل: ابدأ ستور لمتجرك، وابدأ شات لعملائك.',
+    description:
+      'ابدأ ستوديو للذكاء الاصطناعي بيعمل منتجات لأصحاب الشغل: ابدأ ستور لمتجرك، وابدأ شات لعملائك.',
     start_url: '/',
     scope: '/',
     display: 'standalone',

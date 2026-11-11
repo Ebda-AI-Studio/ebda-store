@@ -1,10 +1,9 @@
 /**
  * The copy of the three SERVICE LINES (Marketing, Design, Events; Ruling SERVICES-IA-1), condensed from the rebuilt sub-brand sites
  * (Ebda-AI-Studio/ebda-sites PR #2). One entry per line, Arabic (Egyptian) first, then English, same shape. NO prices, clients, numbers
- * or testimonials are claimed. The service lists, the benefits and the Events scope are confirmed by Ahmad (2026-11-09); everything else
- * here is DRAFT until he approves the wording: the FAQ answers, the five process steps and the "what you get" lists, the "why us"
- * points and "what we will not do" lists, the contact "what happens next" steps, the closing line, and the short hero lines.
- * The lines stay hidden in production until then (lib/service-lines.ts). All images are generated and captioned "illustrative".
+ * or testimonials are claimed. The service lists, the benefits and the Events scope are confirmed by Ahmad (2026-11-09); the rest of the
+ * wording (FAQ, process steps, lists, next steps, closing and hero lines) is APPROVED by Ahmad (2026-11-10, Ruling SERVICES-COPY-APPROVED-1)
+ * and live in production (repo variable EBDA_SERVICE_LINES=on; lib/service-lines.ts). All images are generated and captioned "illustrative".
  */
 export type LineId = 'marketing' | 'design' | 'events';
 export type Td = { t: string; d: string };
@@ -53,12 +52,12 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
       },
       hero: {
         h1: 'محتوى وإعلانات بتجيبلك عملاء، وأرقام بتقولك إيه اللي نفع',
-        lead: 'إحنا فريق تسويق وإنتاج من ابدأ ستوديو. بنخطط معاك، وبنصوّر ونكتب ونصمم، وبنشغّل إعلاناتك، وبنرد على كل عميل بيسأل على واتساب.',
+        lead: 'إحنا فريق تسويق وإنتاج من ابدأ ستوديو للذكاء الاصطناعي. بنخطط معاك، وبنصوّر ونكتب ونصمم، وبنشغّل إعلاناتك، وبنرد على كل عميل بيسأل على واتساب.',
         cta: 'احكيلنا عن مشروعك',
       },
       what: {
         statement:
-          'أربع حاجات بنمسكها معاك من أولها لآخرها، علشان التسويق يبقى شغل واحد مترابط مش حتت متفرقة.',
+          'أربع حاجات بنمسكها معاك من أولها لآخرها، عشان التسويق يبقى شغل واحد مترابط مش حتت متفرقة.',
         groups: [
           {
             id: 'strategy',
@@ -71,7 +70,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
               },
               {
                 t: 'تحليل SWOT',
-                d: 'بنحط نقط قوتك وضعفك والفرص والمخاطر قدامك، علشان تعرف تبدأ منين.',
+                d: 'بنحط نقط قوتك وضعفك والفرص والمخاطر قدامك، عشان تعرف تبدأ منين.',
               },
               {
                 t: 'شخصيات العملاء',
@@ -127,7 +126,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
             items: [
               {
                 t: 'إعلانات رقمية',
-                d: 'حملات على السوشيال ميديا ومحركات البحث، بأكتر من نسخة للإعلان علشان نعرف أنهي فيهم أحسن.',
+                d: 'حملات على السوشيال ميديا ومحركات البحث، بأكتر من نسخة للإعلان عشان نعرف أنهي فيهم أحسن.',
               },
               {
                 t: 'إعلانات مطبوعة',
@@ -281,7 +280,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
         },
         {
           q: 'الرد على واتساب بيشتغل إزاي؟',
-          a: 'بنستخدم ابدأ شات علشان نرد على الرسايل اللي بتيجي من إعلاناتك، ونحوّل لك أي عميل جاهز يشتري أو محتاج رد منك شخصيًا.',
+          a: 'بنستخدم ابدأ شات عشان نرد على الرسايل اللي بتيجي من إعلاناتك، ونحوّل لك أي عميل جاهز يشتري أو محتاج رد منك شخصيًا.',
         },
         {
           q: 'بتشتغلوا مع شركات بره القاهرة؟',
@@ -295,7 +294,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
         },
         {
           t: 'مكالمة قصيرة',
-          d: 'بنتكلم مع بعض علشان نفهم هدفك وجمهورك.',
+          d: 'بنتكلم مع بعض عشان نفهم هدفك وجمهورك.',
         },
         {
           t: 'عرض مكتوب',
@@ -588,7 +587,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
       },
       hero: {
         h1: 'بيتك من جوه ومن بره، تشوفه قبل ما يتنفذ',
-        lead: 'إحنا فريق تصميم وتنفيذ من ابدأ ستوديو. بنصمم الداخلي والخارجي والديكور، وبننفذ الشقة أو البيت بالكامل: نجارة ومطابخ وكل الأثاث.',
+        lead: 'إحنا فريق تصميم وتنفيذ من ابدأ ستوديو للذكاء الاصطناعي. بنصمم الداخلي والخارجي والديكور، وبننفذ الشقة أو البيت بالكامل: نجارة ومطابخ وكل الأثاث.',
         cta: 'احكيلنا عن مكانك',
       },
       what: {
@@ -614,7 +613,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
               },
               {
                 t: 'تصميم ما قبل الديكور',
-                d: 'نجهّز المساحة على البرامج قبل الديكور: التوزيع والكهربا والسباكة، علشان التنفيذ يمشي من غير مفاجآت.',
+                d: 'نجهّز المساحة على البرامج قبل الديكور: التوزيع والكهربا والسباكة، عشان التنفيذ يمشي من غير مفاجآت.',
               },
             ],
           },
@@ -773,7 +772,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
         },
         {
           q: 'الصور الواقعية دي بتطلع إزاي؟',
-          a: 'بتبعتلنا صور المكان زي ما هو، وفريقنا بيصمم وبيستخدم البرامج والذكاء الاصطناعي علشان يطلّع صور قريبة جدًا من الشكل النهائي. وبيراجعها مصمم قبل ما توصلك.',
+          a: 'بتبعتلنا صور المكان زي ما هو، وفريقنا بيصمم وبيستخدم البرامج والذكاء الاصطناعي عشان يطلّع صور قريبة جدًا من الشكل النهائي. وبيراجعها مصمم قبل ما توصلك.',
         },
         {
           q: 'التكلفة المبدئية دقيقة لأي درجة؟',
@@ -1070,7 +1069,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
       },
       hero: {
         h1: 'فعاليتك متنظمة من أول دعوة لحد آخر متابعة',
-        lead: 'إحنا فريق تنظيم فعاليات من ابدأ ستوديو. بننظم فعاليات الشركات والمؤتمرات والمعارض وإطلاق المنتجات، وبنمسك التفاصيل كلها علشان فعاليتك تطلع زي ما إنت عايز.',
+        lead: 'إحنا فريق تنظيم فعاليات من ابدأ ستوديو للذكاء الاصطناعي. بننظم فعاليات الشركات والمؤتمرات والمعارض وإطلاق المنتجات، وبنمسك التفاصيل كلها عشان فعاليتك تطلع زي ما إنت عايز.',
         cta: 'احكيلنا عن فعاليتك',
       },
       what: {
@@ -1100,7 +1099,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
               },
               {
                 t: 'الندوات وورش العمل',
-                d: 'قاعة مظبوطة وبرنامج واضح ومواد جاهزة، علشان الحضور يطلعوا بفايدة.',
+                d: 'قاعة مظبوطة وبرنامج واضح ومواد جاهزة، عشان الحضور يطلعوا بفايدة.',
               },
               {
                 t: 'تجمعات الشركات والمجتمع',
@@ -1312,7 +1311,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
         },
         {
           q: 'بيانات الحضور بتروح فين؟',
-          a: 'بنستخدم أسماء وأرقام الحضور علشان فعاليتك بس، ومش بنشاركها مع حد.',
+          a: 'بنستخدم أسماء وأرقام الحضور عشان فعاليتك بس، ومش بنشاركها مع حد.',
         },
       ],
       next: [
@@ -1322,7 +1321,7 @@ export const SERVICE_LINE_CONTENT: Record<LineId, LineContent> = {
         },
         {
           t: 'مكالمة قصيرة',
-          d: 'بنتكلم مع بعض علشان نفهم هدف فعاليتك وجمهورها.',
+          d: 'بنتكلم مع بعض عشان نفهم هدف فعاليتك وجمهورها.',
         },
         {
           t: 'خطة وميزانية',
