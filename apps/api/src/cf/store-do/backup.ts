@@ -69,6 +69,26 @@ export async function buildBackup(
 export function loadBackup(sql: SqlLike, files: Record<string, string>, tables: string[]): void {
   // Tables arrive in any order: foreign keys are checked at COMMIT, not per row (the caller's transaction).
   sql.exec('PRAGMA defer_foreign_keys = ON');
+  // Gold price guard triggers (store/0002_invariants.sql) ABORT any gold-rate product/variant insert unless do_flags.gold_reprice = 1:
+  // raise it for the load and clear it before commit (same as cf-migrate __import). do_flags rows are INSERT OR IGNOREd so the
+  // backup's own gold_reprice row cannot collide with, or reset, the raised flag.
+  const gold = tables.includes('products') || tables.includes('product_variants');
+  // The flag row's state after the load is the backup's own (a row the backup lacked is deleted again, so the restored do_flags
+  // re-export equals the manifest).
+  let backupFlag: unknown;
+  if (gold) {
+    const [fh, ...fl] = (files['do_flags.ndjson'] ?? '').split('\n').filter(Boolean);
+    if (fh) {
+      const cols = JSON.parse(fh) as string[];
+      for (const l of fl) {
+        const r = JSON.parse(l) as unknown[];
+        if (r[cols.indexOf('name')] === 'gold_reprice') backupFlag = r[cols.indexOf('value')];
+      }
+    }
+    sql.exec(
+      `INSERT INTO do_flags (name, value) VALUES ('gold_reprice', 1) ON CONFLICT (name) DO UPDATE SET value = 1`
+    );
+  }
   for (const t of tables) {
     const body = files[`${t}.ndjson`];
     if (!body) throw new Error(`backup is missing ${t}.ndjson`);
@@ -77,9 +97,13 @@ export function loadBackup(sql: SqlLike, files: Record<string, string>, tables: 
     const ph = columns.map(() => '?').join(',');
     for (const line of lines)
       sql.exec(
-        `INSERT INTO "${t}" (${columns.map(c => `"${c}"`).join(',')}) VALUES (${ph})`,
+        `INSERT ${t === 'do_flags' ? 'OR IGNORE ' : ''}INTO "${t}" (${columns.map(c => `"${c}"`).join(',')}) VALUES (${ph})`,
         ...(JSON.parse(line) as unknown[])
       );
+  }
+  if (gold) {
+    if (backupFlag === undefined) sql.exec(`DELETE FROM do_flags WHERE name = 'gold_reprice'`);
+    else sql.exec(`UPDATE do_flags SET value = ? WHERE name = 'gold_reprice'`, backupFlag);
   }
 }
 

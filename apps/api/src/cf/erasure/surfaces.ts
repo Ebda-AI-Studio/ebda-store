@@ -297,3 +297,21 @@ export function paymentsSurface(
 }
 
 export type { CustomerSubject };
+
+// ---------------------------------------------------------------- Vectorize (product embeddings, audit P2-7)
+/** A merchant's product vectors (namespace = the store id). Customers own none. `purge` is idempotent and throws on failure. */
+export function vectorizeSurface(purge: (storeId: string) => Promise<number>): ErasureSurface {
+  return {
+    name: 'vectorize',
+    async exportSubject(): Promise<ExportPart> {
+      // embeddings are derived from product text that the store-do export already carries
+      return { surface: 'vectorize', ndjson: '', records: 0 };
+    },
+    async eraseSubject(s): Promise<SurfaceResult> {
+      if (s.kind === 'customer')
+        return { surface: 'vectorize', erased: 0, remaining: 0, note: 'customers own no vectors' };
+      if (!s.storeId) return { surface: 'vectorize', erased: 0, remaining: 0 };
+      return { surface: 'vectorize', erased: await purge(s.storeId), remaining: 0 };
+    },
+  };
+}

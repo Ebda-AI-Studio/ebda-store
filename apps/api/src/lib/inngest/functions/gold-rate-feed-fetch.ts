@@ -133,7 +133,7 @@ export async function handleGoldRateFeedFetch(
             fetchedAt: quote.fetchedAt,
             premiumBps: s.premiumBps,
             ...quote.reference,
-            ...(disagree
+            ...(disagree && !s.demo
               ? {
                   disagreeDiffBps: result.diffBps,
                   otherSource24k: result.fallback.per24kGramPiastres,
@@ -153,7 +153,11 @@ export async function handleGoldRateFeedFetch(
             GoldRateService.applyRates(
               s.storeId,
               { rates: GOLD_KARATS.map(k => ({ karat: k, ratePerGram: candidates.get(k)! })) },
-              { feed: reference, forcePending: disagree, ...(s.demo ? { skipJumpGate: true } : {}) }
+              {
+                feed: reference,
+                forcePending: disagree && !s.demo,
+                ...(s.demo ? { skipJumpGate: true } : {}),
+              }
             )
           );
           return {
