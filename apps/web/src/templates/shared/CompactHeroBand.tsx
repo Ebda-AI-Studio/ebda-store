@@ -21,24 +21,33 @@ export function CompactHeroBand({
   ctaText,
   ctaLink,
   bg,
+  echoesBrand = false,
 }: {
   title: string;
   subtitle?: string;
   ctaText: string;
   ctaLink: string;
   bg?: string;
+  /**
+   * UI audit 2026-11-11 (P2 #6): the title IS the store name the header already shows. Repeating it as
+   * 30 px display type pushed the first photo to y 450 on a phone. The h1 stays (SEO, screen readers)
+   * but is visually hidden, and the band shrinks to the call to action.
+   */
+  echoesBrand?: boolean;
 }) {
   const ink = pickReadableForeground(bg);
   const onBg: CSSProperties | undefined = ink ? { color: ink } : undefined;
   const ctaOnBg: CSSProperties | undefined = ink ? { backgroundColor: ink, color: bg } : undefined;
+  const quiet = echoesBrand && !subtitle;
   return (
     <section
       data-hero="compact"
-      className="border-b border-primary/50 px-4 py-8 sm:px-6 sm:py-10 lg:px-8"
+      data-hero-quiet={quiet ? '' : undefined}
+      className={`border-b border-primary/50 px-4 sm:px-6 lg:px-8 ${quiet ? 'py-4 sm:py-6' : 'py-8 sm:py-10'}`}
     >
       <div className="mx-auto flex max-w-7xl flex-col items-start gap-3">
         <h1
-          className="font-display text-3xl leading-tight text-foreground sm:text-4xl rtl:leading-[1.45]"
+          className={`font-display text-3xl leading-tight text-foreground sm:text-4xl rtl:leading-[1.45]${quiet ? ' sr-only' : ''}`}
           style={onBg}
         >
           {title}
