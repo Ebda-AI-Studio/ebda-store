@@ -397,6 +397,11 @@ export interface PaymentStatusV2 {
   method?: string;
   paidAt?: Date;
   raw?: Record<string, unknown>;
+  /**
+   * `false` when the provider's answer carried NO amounts (Kashier's order search projection): `amountMinor`,
+   * `capturedMinor` and `refundedMinor` are then 0 placeholders and must never be read as money (#625). Absent = known.
+   */
+  amountsKnown?: boolean;
 }
 
 export interface RefundV2Request {
