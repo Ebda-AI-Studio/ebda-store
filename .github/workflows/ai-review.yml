@@ -10,7 +10,7 @@ name: AI review
 # `ai-review-passed` (the `labeled` event re-runs it green). A manual label on a same-repo PR (e.g. an oversized diff) is honoured the same way.
 # A diff over 400 KB fails with a clear message: it needs human/controller review, then the label `ai-review-passed` by hand.
 # THE LABEL FOLLOWS THE REVIEWED DIFF, not the head commit: a clean merge of main (gh pr update-branch) keeps it, anything that changes the PR's own
-# diff strips it (ci/ai-review/pass-marker.mjs: git patch-id stored in a github-actions[bot] comment).
+# diff strips it (.github/ai-review/pass-marker.mjs: head sha + sha256 of the PR-only diff in a github-actions[bot] comment).
 # Risky + any infra problem (no secret, CLI crash, bad JSON) = FAIL, never pass. Secret: CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`).
 # Copy of ebda-foundation/.github/workflows/ai-review.yml with `on:` = pull_request_target (foundation Ruling AIR-3: switch to `uses:` once the
 # foundation's Actions access is `organization`). Everything under `jobs:` must stay identical to the foundation file.
@@ -52,11 +52,13 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
           [ "$(git rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
-          # the label must describe the CURRENT diff: kept only when the PR's own diff is unchanged (a clean merge of main), else stripped
+          # the label must describe the CURRENT content: kept only when this head descends from the reviewed head and the PR-only diff is byte-identical
+          # (a clean merge of main), else stripped
           node .github/ai-review/pass-marker.mjs revalidate
           git diff --name-status --no-renames "origin/$BASE_REF...refs/pr/head" > changed.txt
           node .github/ai-review/risky-paths.mjs < changed.txt > risky.txt
@@ -95,16 +97,17 @@ jobs:
           fi
       - name: Install the Claude CLI (pinned)
         run: npm install --global --ignore-scripts @anthropic-ai/claude-code@2.1.310
-      - name: Build the diff (fail closed when it is too large)
+      - name: Build the diff (bound to the event head; fail closed when it is too large)
         env:
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          git fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
-          [ "$(git rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
-          git diff --no-renames --unified=3 "origin/$BASE_REF...refs/pr/head" > pr.diff
+          # the script verifies the PR head is HEAD_SHA and prints the PR-only diff byte for byte; these exact bytes are what the reviewer reads
+          node .github/ai-review/pass-marker.mjs diff > pr.diff
+          echo "REVIEWED_DIFF_SHA256=$(sha256sum pr.diff | cut -d' ' -f1)" >> "$GITHUB_ENV"
           size="$(wc -c < pr.diff | tr -d ' ')"
           if [ "$size" -ge 400000 ]; then
             echo "::error::The diff is $size bytes (limit 400000). A partial review would pass what it never read, so this PR is NOT reviewed automatically: it needs human/controller review, then the label ai-review-passed applied by hand. Splitting the PR is the better fix."
@@ -127,16 +130,28 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           FAIL_CLOSED: 'true'
         run: node .github/ai-review/review.mjs
-      - name: Label ai-review-passed
+      - name: Record the pass (bound to head + the reviewed diff), then label
         if: steps.gate.outputs.passed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DIFF_SHA256: ${{ env.REVIEWED_DIFF_SHA256 }}
         run: |
+          set -euo pipefail
+          # refuses when the PR head moved since the review started or the diff is not the one the reviewer read; then no label
+          node .github/ai-review/pass-marker.mjs record
           gh label create ai-review-passed --color 0E8A16 --description "independent AI review found no criticals on this diff" 2>/dev/null || true
           gh pr edit "$PR" --add-label ai-review-passed
-          node .github/ai-review/pass-marker.mjs record
+      - name: A review that did not pass removes the label
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr edit "$PR" --remove-label ai-review-passed 2>/dev/null || true
 
   # A same-repo PR a maintainer labelled by hand (reviewed a diff the bot could not, e.g. over 400 KB). Same check name as `review`, so the
   # newest run on this head (green) supersedes the red one. Passes only while the label is really on the PR.
@@ -149,6 +164,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
@@ -157,11 +173,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           ACTOR: ${{ github.actor }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LABEL_NAME: ${{ github.event.label.name }}
         run: |
           set -euo pipefail
           gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx ai-review-passed || { echo "::error::the ai-review-passed label is no longer on the PR"; exit 1; }
           echo "ai-review-passed applied by hand by $ACTOR; the bot review is superseded by that human review"
-          # the human reviewed THIS diff: record it so a later merge of main does not strip the label
+          # bind the pass to the head of THIS event and its exact diff (refuses if the PR head moved since the label was added)
           node .github/ai-review/pass-marker.mjs record
 
   # Fork PRs: no secret is ever used and nothing is skipped. Red until a maintainer reviews the PR and labels it ai-review-passed.
@@ -175,6 +194,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
@@ -183,10 +203,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           ACTION: ${{ github.event.action }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LABEL_NAME: ${{ github.event.label.name }}
         run: |
           set -euo pipefail
           if [ "$ACTION" != labeled ]; then
-            # an earlier manual pass survives only while the fork's own diff is unchanged (a clean merge of main keeps it)
+            # an earlier manual pass survives only while this head descends from the approved head and the fork's diff is byte-identical (a clean merge of main)
             node .github/ai-review/pass-marker.mjs revalidate
             gh label create risky-path --color B60205 --description "needs ai-review-passed" 2>/dev/null || true
             gh pr edit "$PR" --add-label risky-path

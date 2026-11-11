@@ -8,4 +8,4 @@ Cost if wrong: while the secret is missing, every risky PR is red by design.
 
 Fork PRs are never skipped and never reviewed with secrets: the check is red until a maintainer adds the label `ai-review-passed` (foundation AIR-5).
 
-The label follows the reviewed DIFF, not the head commit (foundation AIR-6): a clean merge of main (`gh pr update-branch`) keeps `ai-review-passed`, any change to the PR's own diff strips it. `.github/ai-review/pass-marker.mjs` stores a `git patch-id` marker in a github-actions[bot] comment.
+The label is bound to the reviewed HEAD and the byte hash of the PR-only diff (foundation AIR-6): a clean merge of main (`gh pr update-branch`) keeps `ai-review-passed`; a rewritten history, any content or whitespace change, a head that moved between review and record, or an unrelated label event does not. `.github/ai-review/pass-marker.mjs` stores `head=<sha> diff=<sha256>` in a github-actions[bot] comment; a failed review removes the label.
