@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useTransition } from 'react';
 import { useLocale } from 'next-intl';
 import { isLocale, type Locale } from '@/i18n/config';
@@ -35,7 +36,8 @@ export default function AdminLanguageSwitcher({ className = '' }: { className?: 
   };
 
   return (
-    <button
+    <Button
+      variant="outline"
       type="button"
       onClick={change}
       disabled={isPending}
@@ -43,7 +45,7 @@ export default function AdminLanguageSwitcher({ className = '' }: { className?: 
       dir={next === 'ar' ? 'rtl' : 'ltr'}
       aria-label={`${t('ariaLabel')}: ${next === 'ar' ? t('nativeAr') : t('nativeEn')}`}
       data-testid="language-toggle"
-      className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer md:min-h-[36px] ${className}`}
+      className={className}
     >
       <svg
         className="h-4 w-4"
@@ -59,6 +61,6 @@ export default function AdminLanguageSwitcher({ className = '' }: { className?: 
         />
       </svg>
       {next === 'ar' ? t('nativeAr') : t('nativeEn')}
-    </button>
+    </Button>
   );
 }

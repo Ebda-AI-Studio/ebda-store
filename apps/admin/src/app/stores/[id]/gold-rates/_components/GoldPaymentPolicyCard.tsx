@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut } from '../../../../../lib/api';
 
+import { Button } from '@/components/ui/Button';
 /**
  * "Allow cash on delivery and installments for gold" (Ruling SHARIA-GOLD-1). Default OFF. Turning it ON shows the
  * explanation and needs an explicit confirm; the API checks the confirm too and enforces the rule at order time.
@@ -81,14 +82,15 @@ export function GoldPaymentPolicyCard({ storeId, canEdit }: { storeId: string; c
         </p>
       )}
       {canEdit && (
-        <button
+        <Button
           type="button"
           disabled={saving}
           onClick={() => void save()}
-          className="mt-4 min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          variant="default"
+          className="mt-4"
         >
           {t('save')}
-        </button>
+        </Button>
       )}
     </section>
   );

@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import type { ProductSummary } from './ProductSearch';
 
+import { Button } from '@/components/ui/Button';
 interface SelectedProductCardProps {
   product: ProductSummary;
   onRemove: () => void;
@@ -43,11 +44,13 @@ export function SelectedProductCard({ product, onRemove }: SelectedProductCardPr
         )}
       </div>
       <span className="flex-1 text-sm font-medium text-foreground truncate">{displayName}</span>
-      <button
+      <Button
         type="button"
         onClick={onRemove}
-        className="touch-target flex-shrink-0 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive-ink transition-colors"
         aria-label={t('removeAria', { name: displayName })}
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -57,7 +60,7 @@ export function SelectedProductCard({ product, onRemove }: SelectedProductCardPr
             d="M6 18L18 6M6 6l12 12"
           />
         </svg>
-      </button>
+      </Button>
     </div>
   );
 }

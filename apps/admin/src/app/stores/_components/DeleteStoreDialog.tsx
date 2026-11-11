@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button, Input, Modal } from '@ebda/ui';
+import { Input, Modal } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 
 export interface DeletableStore {
@@ -94,12 +95,11 @@ export function DeleteStoreDialog({
             )}
           </div>
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button variant="outline" className="min-h-11" onClick={onClose} disabled={isDeleting}>
+            <Button variant="outline" onClick={onClose} disabled={isDeleting}>
               {t('cancel')}
             </Button>
             <Button
               variant="destructive"
-              className="min-h-11"
               onClick={onSubmit}
               disabled={!ok || isDeleting}
               aria-disabled={!ok || isDeleting}

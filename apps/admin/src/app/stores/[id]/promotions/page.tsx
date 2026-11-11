@@ -24,6 +24,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { fromMinor, roundToMinor } from '@ebda/shared';
 import { formatPrice } from '@/lib/format';
+import { Button } from '@/components/ui/Button';
 type PromotionType = 'percentage' | 'fixed';
 
 interface Promotion {
@@ -300,13 +301,9 @@ export default function PromotionsPage() {
         <RowActions
           menuLabel={t('rowMenu', { name: promo.name })}
           primary={
-            <button
-              type="button"
-              onClick={() => openEdit(promo)}
-              className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium hover:bg-muted"
-            >
+            <Button variant="outline" size="sm" type="button" onClick={() => openEdit(promo)}>
               {t('edit')}
-            </button>
+            </Button>
           }
           items={[{ label: t('delete'), destructive: true, onSelect: () => void remove(promo) }]}
         />
@@ -321,13 +318,9 @@ export default function PromotionsPage() {
       mode="store_admin"
       storeId={storeId}
       actions={
-        <button
-          type="button"
-          onClick={openCreate}
-          className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
+        <Button variant="default" size="md" type="button" onClick={openCreate}>
           {t('addNew')}
-        </button>
+        </Button>
       }
     >
       <div className="mx-auto max-w-5xl px-4 py-6">
@@ -346,13 +339,9 @@ export default function PromotionsPage() {
           <div className="rounded-md border border-dashed py-12 text-center">
             <p className="text-sm font-medium">{t('emptyTitle')}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
-            <button
-              type="button"
-              onClick={openCreate}
-              className="mt-4 min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
+            <Button variant="default" size="md" className="mt-4" type="button" onClick={openCreate}>
               {t('addFirst')}
-            </button>
+            </Button>
           </div>
         ) : (
           <DataTable<Promotion>
@@ -370,21 +359,25 @@ export default function PromotionsPage() {
             title={editing ? t('editTitle') : t('createTitle')}
             footer={
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="outline"
+                  size="md"
+                  className="flex-1"
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="min-h-11 flex-1 rounded-lg border border-border px-4 py-2 text-foreground hover:bg-muted"
                 >
                   {t('cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="default"
+                  size="md"
+                  className="flex-1"
                   type="submit"
                   form="promotion-form"
                   disabled={saving || !form.name.trim() || !form.value || !(Number(form.value) > 0)}
-                  className="min-h-11 flex-1 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   {saving ? t('saving') : t('save')}
-                </button>
+                </Button>
               </div>
             }
           >

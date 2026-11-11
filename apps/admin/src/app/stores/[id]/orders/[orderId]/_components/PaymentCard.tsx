@@ -6,6 +6,7 @@ import { PaymentEventsTimeline } from '../../../../../../components/payment-even
 import { formatMoney } from './format';
 import type { OrderDetail } from './types';
 
+import { Button } from '@/components/ui/Button';
 interface PaymentCardProps {
   order: OrderDetail;
   onEdit?: () => void;
@@ -55,11 +56,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
           {t('payment')}
         </h2>
         {onEdit && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline cursor-pointer"
-          >
+          <Button type="button" onClick={onEdit} variant="link" className="gap-1.5">
             <svg
               className="h-4 w-4"
               fill="none"
@@ -75,7 +72,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
               />
             </svg>
             {t('editPayment')}
-          </button>
+          </Button>
         )}
       </div>
 

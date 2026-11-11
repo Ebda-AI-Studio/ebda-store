@@ -23,6 +23,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 
 import { roundToMinor, REGION } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 type TabKey = 'affiliates' | 'config';
 
 // Narrow type for tolerant unwrapping of legacy `{ data: { ... } }` responses.
@@ -287,16 +288,12 @@ export default function AffiliatesPage() {
       title={tPage('title')}
       subtitle={tPage('subtitle')}
       actions={
-        <button
-          type="button"
-          onClick={openInviteModal}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm font-medium"
-        >
+        <Button variant="default" size="md" type="button" onClick={openInviteModal}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           {tPage('inviteButton')}
-        </button>
+        </Button>
       }
     >
       {loading ? (
@@ -308,28 +305,22 @@ export default function AffiliatesPage() {
           {stats && <AffiliateStatsCards stats={stats} />}
 
           <div className="flex gap-2 mb-6">
-            <button
+            <Button
+              variant={activeTab === 'affiliates' ? 'soft' : 'ghost'}
+              size="md"
               type="button"
               onClick={() => setActiveTab('affiliates')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'affiliates'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-muted/80'
-              }`}
             >
               {tTabs('affiliates')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={activeTab === 'config' ? 'soft' : 'ghost'}
+              size="md"
               type="button"
               onClick={() => setActiveTab('config')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'config'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-muted/80'
-              }`}
             >
               {tTabs('config')}
-            </button>
+            </Button>
           </div>
 
           {activeTab === 'affiliates' && (
@@ -506,21 +497,23 @@ export default function AffiliatesPage() {
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
-                <button
+                <Button
+                  variant="outline"
+                  size="md"
                   type="button"
                   onClick={closeInviteModal}
                   disabled={inviting}
-                  className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
                 >
                   {tPage('inviteCancel')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="default"
+                  size="md"
                   type="submit"
                   disabled={inviting || !inviteName.trim() || !inviteEmail.trim()}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                   {inviting ? tPage('inviting') : tPage('inviteSubmit')}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

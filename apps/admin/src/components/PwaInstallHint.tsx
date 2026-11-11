@@ -13,6 +13,7 @@
  *   if the user clears site data — a fresh device should see the prompt.
  */
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import { useT } from '@/i18n/useT';
 
@@ -81,14 +82,16 @@ export function PwaInstallHint() {
             <li>{t('step3')}</li>
           </ol>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           aria-label={t('dismiss')}
           onClick={() => {
             localStorage.setItem(DISMISSED_KEY, '1');
             setVisible(false);
           }}
-          className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+          className="shrink-0 text-muted-foreground"
         >
           <svg
             className="h-4 w-4"
@@ -104,7 +107,7 @@ export function PwaInstallHint() {
               d="M6 18L18 6M6 6l12 12"
             />
           </svg>
-        </button>
+        </Button>
       </div>
     </div>
   );

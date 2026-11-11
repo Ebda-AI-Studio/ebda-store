@@ -5,6 +5,7 @@ import {
   type LifecycleEmailKind,
 } from '@ebda/shared';
 import logger from '../../logger';
+import { storeActiveForJob } from '../../jobs/store-db';
 import { inngest } from '../client';
 import { getEnrollment, processLifecycleEmail } from '../../../services/lifecycle-emails.service';
 
@@ -57,6 +58,12 @@ const lifecycleEmailsFn = inngest.createFunction(
 
     for (const { kind } of TIMED) {
       await step.sleepUntil(`wait-${kind}`, new Date(created + LIFECYCLE_DELAY_DAYS[kind] * DAY));
+      if (
+        !(await step.run(`check-store-${kind}`, () =>
+          storeActiveForJob(storeId, 'lifecycle-emails')
+        ))
+      )
+        return { stoppedAt: kind, reason: 'store_not_active' };
       const r = await step.run(`send-${kind}`, () => processLifecycleEmail(storeId, kind));
       if (r.status === 'skipped' && STOP.has(r.reason))
         return { stoppedAt: kind, reason: r.reason };
@@ -68,6 +75,12 @@ const lifecycleEmailsFn = inngest.createFunction(
         new Date(enrollment.trialEndsAt).getTime() - TRIAL_RECAP_DAYS_BEFORE_END * DAY
       );
       await step.sleepUntil('wait-trial_recap', due);
+      if (
+        !(await step.run('check-store-trial_recap', () =>
+          storeActiveForJob(storeId, 'lifecycle-emails')
+        ))
+      )
+        return { stoppedAt: 'trial_recap', reason: 'store_not_active' };
       await step.run('send-trial_recap', () => processLifecycleEmail(storeId, 'trial_recap'));
     }
     return { done: true };

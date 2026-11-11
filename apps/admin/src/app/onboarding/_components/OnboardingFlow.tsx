@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
 import { apiGet } from '../../../lib/api';
 import { useT } from '@/i18n/useT';

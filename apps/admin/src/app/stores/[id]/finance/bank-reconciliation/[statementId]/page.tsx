@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -121,19 +122,17 @@ function ManualMatchModal({ txId, onClose, onConfirm }: ManualMatchModalProps) {
         />
         <p className="mt-1 text-xs text-muted-foreground">{t('entryIdHelp')}</p>
         <div className="mt-5 flex gap-3 justify-end">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/50"
-          >
+          <Button onClick={onClose} variant="outline" size="sm">
             {t('cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handle}
             disabled={!entryId.trim() || loading}
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+            variant="default"
+            size="sm"
           >
             {loading ? t('confirming') : t('confirm')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -301,7 +300,7 @@ export default function StatementDetailPage() {
       }
       parent={{ label: t('title'), href: `/stores/${storeId}/finance/bank-reconciliation` }}
       actions={
-        <Button className="min-h-11" onClick={handleAutoMatch} disabled={autoMatchLoading}>
+        <Button onClick={handleAutoMatch} disabled={autoMatchLoading}>
           {autoMatchLoading ? t('autoMatching') : t('autoMatch')}
         </Button>
       }
@@ -466,20 +465,17 @@ export default function StatementDetailPage() {
         {/* Filter tabs */}
         <div className="flex flex-wrap gap-2">
           {FILTER_OPTIONS.map(opt => (
-            <button
+            <Button
               key={opt.value}
               onClick={() => {
                 setFilter(opt.value);
                 setTxPage(1); // a new filter is a new list
               }}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                filter === opt.value
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted text-muted-ink hover:bg-muted/80'
-              }`}
+              variant={filter === opt.value ? 'soft' : 'ghost'}
+              size="sm"
             >
               {opt.label}
-            </button>
+            </Button>
           ))}
           <span className="ml-auto text-xs text-muted-foreground self-center">
             {tx_t('totalCount', {
@@ -563,39 +559,39 @@ export default function StatementDetailPage() {
                       <div className="flex items-center gap-1.5">
                         {tx.matchStatus === 'unmatched' && (
                           <>
-                            <button
-                              onClick={() => setMatchModal(tx.id)}
-                              className="rounded px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/10"
-                            >
+                            <Button onClick={() => setMatchModal(tx.id)} variant="ghost" size="sm">
                               {tx_t('match')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => handleAction(tx.id, 'ignore')}
                               disabled={actionLoading === tx.id}
-                              className="rounded px-1.5 py-0.5 text-xs font-medium text-muted-ink hover:bg-muted disabled:opacity-40"
+                              variant="ghost"
+                              size="sm"
                             >
                               {actionLoading === tx.id ? '…' : tx_t('ignore')}
-                            </button>
+                            </Button>
                           </>
                         )}
                         {(tx.matchStatus === 'auto_matched' ||
                           tx.matchStatus === 'manual_matched') && (
-                          <button
+                          <Button
                             onClick={() => handleAction(tx.id, 'unmatch')}
                             disabled={actionLoading === tx.id}
-                            className="rounded px-1.5 py-0.5 text-xs font-medium text-warning-ink hover:bg-warning/10 disabled:opacity-40"
+                            variant="ghost"
+                            size="sm"
                           >
                             {actionLoading === tx.id ? '…' : tx_t('unmatch')}
-                          </button>
+                          </Button>
                         )}
                         {tx.matchStatus === 'ignored' && (
-                          <button
+                          <Button
                             onClick={() => handleAction(tx.id, 'unmatch')}
                             disabled={actionLoading === tx.id}
-                            className="rounded px-1.5 py-0.5 text-xs font-medium text-muted-ink hover:bg-muted disabled:opacity-40"
+                            variant="ghost"
+                            size="sm"
                           >
                             {actionLoading === tx.id ? '…' : tx_t('unmatch')}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </td>

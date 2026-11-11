@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { AdminLayout } from '../../../../components/AdminLayout';

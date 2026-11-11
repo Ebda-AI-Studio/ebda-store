@@ -13,7 +13,8 @@
  */
 
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Button, Input, Textarea, useToast } from '@ebda/ui';
+import { Input, Textarea, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 
@@ -310,8 +311,9 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
           <button
             type="button"
             onClick={() => setOpen(o => !o)}
-            className="flex items-center gap-2 text-lg font-semibold text-foreground hover:text-primary transition-colors"
             aria-expanded={open}
+            data-ui="row"
+            className="flex items-center gap-2 text-lg font-semibold text-foreground hover:text-primary transition-colors"
           >
             <svg
               className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`}
@@ -331,15 +333,17 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
           </button>
 
           {open && (
-            <button
+            <Button
               type="button"
               onClick={generateWithAi}
               disabled={aiGenerating}
-              className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+              variant="outline"
+              size="sm"
+              className="gap-2 font-semibold"
             >
               <span aria-hidden="true">✨</span>
               {aiGenerating ? t('generating') : t('generateWithAi')}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -355,20 +359,18 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-primary-ink">{t('reviewNote')}</span>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={saveAllAiDrafts}
-                      className="text-xs text-primary hover:underline"
-                    >
+                    <Button type="button" onClick={saveAllAiDrafts} variant="link" size="sm">
                       {t('saveAll')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={discardAllAiDrafts}
-                      className="text-xs text-muted-foreground hover:underline"
+                      variant="link"
+                      size="sm"
+                      className="text-muted-foreground"
                     >
                       {t('discardAll')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 {aiDrafts.map((draft, idx) => (

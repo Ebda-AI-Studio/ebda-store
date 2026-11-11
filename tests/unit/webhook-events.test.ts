@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import ts from 'typescript';
+import { all, callsIn, declNamed, hasAncestor, parseFile } from './helpers/ast-statements';
 
 const loaders = vi.hoisted(() => ({ order: vi.fn(), product: vi.fn() }));
 vi.mock('../../apps/api/src/services/webhook-payload', () => ({
@@ -179,17 +181,25 @@ describe('M8 inventory.low events are batched into ONE step per run', () => {
     expect(evs[1]).toMatchObject({ name: 'webhook/inventory.low', data: { day: '2026-10-21' } });
     expect(evs[1].data.items).toHaveLength(2);
   });
-  it('the cron sends them with a single step.sendEvent after the per-store loop', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const src = readFileSync(
-      resolve(__dirname, '../../apps/api/src/lib/inngest/functions/stock-low-stock-alert.ts'),
-      'utf8'
+  it('the cron sends them with a single step.sendEvent after the per-store loop', () => {
+    // Structural (AST of the cron definition): exactly one real step.sendEvent call, outside every loop and positioned
+    // after the loop that accumulates `totalSkipped`. (Behaviour needs the whole Inngest step harness + store directory.)
+    const cron = declNamed(
+      parseFile('apps/api/src/lib/inngest/functions/stock-low-stock-alert.ts'),
+      'stockLowStockAlertCron'
     );
-    const cron = src.slice(0, src.indexOf('export const stockLowStockAlertOnDemand'));
-    expect(cron.match(/step\.sendEvent\(/g)).toHaveLength(1);
-    expect(cron.indexOf('step.sendEvent(')).toBeGreaterThan(
-      cron.indexOf('totalSkipped += scan.skipped')
+    const sends = callsIn(cron, 'step.sendEvent');
+    expect(sends).toHaveLength(1);
+    const loop = all(cron, ts.isForOfStatement).find(l =>
+      l.getText().includes('totalSkipped += scan.skipped')
     );
+    expect(loop, 'the per-store loop').toBeTruthy();
+    const isLoop = (a: ts.Node) =>
+      ts.isForOfStatement(a) ||
+      ts.isForStatement(a) ||
+      ts.isForInStatement(a) ||
+      ts.isWhileStatement(a);
+    expect(hasAncestor(sends[0]!, isLoop), 'sendEvent is not inside a loop').toBe(false);
+    expect(sends[0]!.getStart()).toBeGreaterThan(loop!.getEnd());
   });
 });

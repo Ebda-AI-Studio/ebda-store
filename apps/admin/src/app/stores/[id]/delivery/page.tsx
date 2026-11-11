@@ -22,6 +22,7 @@ import { useT } from '@/i18n/useT';
 import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/shared';
 
 import { minorToDecimalString } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 const DEFAULT_CONFIG: CheckoutDeliverySettings = {
   note: { enabled: false, text: '', textAr: '' },
   windows: { enabled: false, items: [] },
@@ -396,26 +397,24 @@ export default function CheckoutDeliveryPage() {
                         className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
                       />
                     </label>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => removeWindow(w.id)}
-                      className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-destructive-ink hover:bg-destructive/10"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive-ink"
                     >
                       {t('remove')}
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}
             </ul>
           )}
 
-          <button
-            type="button"
-            onClick={addWindow}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
-          >
+          <Button type="button" onClick={addWindow} variant="outline" size="sm">
             {t('addWindow')}
-          </button>
+          </Button>
         </section>
 
         {/* Minimum order value — opt-in per-store floor on the items
@@ -486,17 +485,19 @@ export default function CheckoutDeliveryPage() {
                 className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
               />
             </label>
-            <button
+            <Button
               type="button"
               onClick={() => {
                 setDeliveryDaysMin('');
                 setDeliveryDaysMax('');
               }}
               disabled={deliveryDaysMin === '' && deliveryDaysMax === ''}
-              className="rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-40"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
             >
               {t('deliveryDaysClear')}
-            </button>
+            </Button>
           </div>
           <div className="space-y-2 border-t border-border pt-3">
             <div>

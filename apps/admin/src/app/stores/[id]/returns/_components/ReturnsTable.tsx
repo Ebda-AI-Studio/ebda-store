@@ -1,6 +1,7 @@
 'use client';
 
-import { Button, Badge } from '@ebda/ui';
+import { Badge } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { RETURN_COLORS } from './types';
@@ -149,7 +150,6 @@ export function ReturnsTable({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              size="sm"
               disabled={meta.page === 1}
               onClick={() => onPageChange(meta.page - 1)}
             >
@@ -157,7 +157,6 @@ export function ReturnsTable({
             </Button>
             <Button
               variant="outline"
-              size="sm"
               disabled={meta.page === meta.totalPages}
               onClick={() => onPageChange(meta.page + 1)}
             >

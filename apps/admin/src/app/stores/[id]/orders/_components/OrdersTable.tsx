@@ -33,6 +33,7 @@ function isInteractive(target: EventTarget | null): boolean {
 
 import { formatDate, minorToMajor } from '@/lib/format';
 
+import { Button } from '@/components/ui/Button';
 /**
  * Build a compact, single-line item summary for the orders list row, e.g.
  * "2x Mastic, 1x Caraway +2 more". Shows the first two DISPLAY ROWS with
@@ -255,22 +256,26 @@ export function OrdersTable({
                   onChange={e => onToggleSelected(order.id, e.target.checked)}
                   className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => onMarkPaid(order.id)}
                   disabled={isUpdating}
-                  className="inline-flex items-center gap-1 px-3 py-2 min-h-9 text-xs font-medium text-success-ink border border-success/30 rounded-lg hover:bg-success/10 transition-colors disabled:opacity-50"
                   title={t('actions.markPaidTitle')}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
                 >
                   {t('actions.markPaid')}
-                </button>
+                </Button>
               </div>
             )}
-            <button
+            <Button
               type="button"
               onClick={() => onOpenInvoice(order.id)}
-              className="inline-flex items-center gap-1 px-3 py-2 min-h-9 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
               title={t('actions.invoiceTitle')}
+              variant="outline"
+              size="sm"
+              className="gap-1"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -281,7 +286,7 @@ export function OrdersTable({
                 />
               </svg>
               {t('actions.invoice')}
-            </button>
+            </Button>
           </div>
         );
       },

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { getPlatformStoreUrl } from '@/lib/store-url';
 import type { FormData, Step } from './types';
@@ -22,13 +23,9 @@ export function ReviewStep({ formData, error, onJumpTo }: ReviewStepProps) {
         <div className="rounded-lg bg-muted p-4">
           <h3 className="flex items-center justify-between font-medium text-foreground">
             {t('storeDetails')}
-            <button
-              type="button"
-              onClick={() => onJumpTo('store')}
-              className="text-sm text-primary hover:underline"
-            >
+            <Button variant="link" size="sm" type="button" onClick={() => onJumpTo('store')}>
               {t('edit')}
-            </button>
+            </Button>
           </h3>
           <dl className="mt-2 space-y-1 text-sm">
             <div className="flex justify-between">
@@ -51,13 +48,9 @@ export function ReviewStep({ formData, error, onJumpTo }: ReviewStepProps) {
         <div className="rounded-lg bg-muted p-4">
           <h3 className="flex items-center justify-between font-medium text-foreground">
             {t('stepOwnerName')}
-            <button
-              type="button"
-              onClick={() => onJumpTo('owner')}
-              className="text-sm text-primary hover:underline"
-            >
+            <Button variant="link" size="sm" type="button" onClick={() => onJumpTo('owner')}>
               {t('edit')}
-            </button>
+            </Button>
           </h3>
           <dl className="mt-2 space-y-1 text-sm">
             <div className="flex justify-between">

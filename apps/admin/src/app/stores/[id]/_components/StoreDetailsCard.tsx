@@ -1,6 +1,7 @@
 'use client';
 
-import { Badge, Button, Input, Label } from '@ebda/ui';
+import { Badge, Input, Label } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatDate } from '../../../../lib/format';
 import { getStoreDisplayUrl } from '../../../../lib/store-url';
 import { useT } from '@/i18n/useT';

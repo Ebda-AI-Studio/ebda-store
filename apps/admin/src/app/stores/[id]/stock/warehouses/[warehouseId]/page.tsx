@@ -10,7 +10,8 @@ import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { Button, VariantText, useToast } from '@ebda/ui';
+import { VariantText, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -229,12 +230,7 @@ export default function WarehouseStockPage() {
       parent={{ label: t('breadcrumb'), href: `/stores/${storeId}/stock/warehouses` }}
       actions={
         multiWarehouseEnabled ? (
-          <Button
-            variant="outline"
-            onClick={handleReconcile}
-            disabled={reconciling}
-            className="min-h-[44px]"
-          >
+          <Button variant="outline" onClick={handleReconcile} disabled={reconciling}>
             {reconciling ? t('reconciling') : t('reconcileAction')}
           </Button>
         ) : undefined
@@ -358,14 +354,15 @@ export default function WarehouseStockPage() {
                     <div className="flex items-center justify-end gap-1">
                       {isEditing ? (
                         <>
-                          <button
+                          <Button
                             onClick={() => handleSetQty(row)}
                             disabled={isSaving}
-                            className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+                            variant="ghost"
+                            size="sm"
                           >
                             {isSaving ? tc('saving') : tc('save')}
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={() =>
                               setEditing(ed => {
                                 const c = { ...ed };
@@ -373,18 +370,20 @@ export default function WarehouseStockPage() {
                                 return c;
                               })
                             }
-                            className="min-h-[44px] rounded-md px-3 text-xs hover:bg-muted"
+                            variant="ghost"
+                            size="sm"
                           >
                             {tc('cancel')}
-                          </button>
+                          </Button>
                         </>
                       ) : (
-                        <button
+                        <Button
                           onClick={() => setAdjustModal({ row, delta: 0, reason: '' })}
-                          className="min-h-[44px] rounded-md px-3 text-xs hover:bg-muted"
+                          variant="ghost"
+                          size="sm"
                         >
                           {t('adjust')}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   );
@@ -406,22 +405,24 @@ export default function WarehouseStockPage() {
                 })}
               </span>
               <div className="flex gap-2">
-                <button
+                <Button
                   disabled={page === 1}
                   onClick={() => setPage(p => p - 1)}
-                  className="min-h-[44px] rounded-md px-3 hover:bg-muted disabled:opacity-40"
                   aria-label={t('pagePrev')}
+                  variant="outline"
+                  size="icon-sm"
                 >
                   <ArrowStart />
-                </button>
-                <button
+                </Button>
+                <Button
                   disabled={page === totalPages}
                   onClick={() => setPage(p => p + 1)}
-                  className="min-h-[44px] rounded-md px-3 hover:bg-muted disabled:opacity-40"
                   aria-label={t('pageNext')}
+                  variant="outline"
+                  size="icon-sm"
                 >
                   <ArrowEnd />
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -484,15 +485,10 @@ export default function WarehouseStockPage() {
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => setAdjustModal(null)}
-                disabled={adjustSaving}
-                className="min-h-[44px]"
-              >
+              <Button variant="ghost" onClick={() => setAdjustModal(null)} disabled={adjustSaving}>
                 {tc('cancel')}
               </Button>
-              <Button onClick={handleAdjust} disabled={adjustSaving} className="min-h-[44px]">
+              <Button onClick={handleAdjust} disabled={adjustSaving}>
                 {adjustSaving ? tc('saving') : t('applyAdjust')}
               </Button>
             </div>

@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AITranslateMissingButton } from '../../../../components/AITranslateMissingButton';
 import { DataTable } from '../../../../components/mobile/DataTable';
@@ -104,10 +105,7 @@ export default function StoreTagsPage() {
       {!loading && rows.length === 0 && !error && (
         <div className="flex flex-col items-start gap-3">
           <p className="text-sm text-muted-foreground">{t('empty')}</p>
-          <Link
-            href={`/stores/${storeId}/products`}
-            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
-          >
+          <Link href={`/stores/${storeId}/products`} className={buttonVariants()}>
             {t('emptyAction')}
           </Link>
         </div>

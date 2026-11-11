@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../lib/api';
@@ -286,38 +287,46 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           {confirmDeleteId === loc.id ? (
             <>
               <span className="text-xs text-destructive-ink font-medium">{t('deleteConfirm')}</span>
-              <button
+              <Button
+                variant="destructive"
+                size="sm"
                 type="button"
                 disabled={deletingId === loc.id}
                 onClick={() => handleDelete(loc.id)}
-                className="max-md:min-h-11 inline-flex items-center rounded-lg bg-destructive px-2.5 py-1 max-md:px-4 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
+                className="font-semibold"
               >
                 {deletingId === loc.id ? '…' : t('deleteYes')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => setConfirmDeleteId(null)}
-                className="max-md:min-h-11 inline-flex items-center rounded-lg border border-border px-2.5 py-1 max-md:px-4 text-xs font-semibold text-foreground hover:bg-muted"
+                className="font-semibold"
               >
                 {t('cancel')}
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => openEdit(loc)}
-                className="max-md:min-h-11 inline-flex items-center rounded-lg border border-border px-3 py-1.5 max-md:px-4 text-xs font-semibold text-foreground hover:bg-muted"
+                className="font-semibold"
               >
                 {t('edit')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => setConfirmDeleteId(loc.id)}
-                className="max-md:min-h-11 inline-flex items-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 max-md:px-4 text-xs font-semibold text-destructive-ink hover:bg-destructive/10"
+                className="font-semibold text-destructive-ink"
               >
                 {t('delete')}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -403,13 +412,9 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
           <p className="text-sm text-muted-foreground">
             {!isLoading && t('count', { count: locations.length })}
           </p>
-          <button
-            type="button"
-            onClick={openNew}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
+          <Button type="button" onClick={openNew}>
             {t('addButton')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -617,21 +622,17 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
 
           {/* Form actions */}
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
               disabled={isSaving}
               onClick={handleSave}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+              className="font-semibold"
             >
               {isSaving ? t('saving') : formMode === 'new' ? t('create') : t('save')}
-            </button>
-            <button
-              type="button"
-              onClick={closeForm}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
-            >
+            </Button>
+            <Button variant="outline" type="button" onClick={closeForm} className="font-semibold">
               {t('cancel')}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -673,13 +674,9 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
             <p className="text-base font-semibold text-foreground">{t('emptyTitle')}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyDescription')}</p>
             {formMode === null && (
-              <button
-                type="button"
-                onClick={openNew}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-              >
+              <Button type="button" onClick={openNew} className="mt-4 gap-2 font-semibold">
                 {t('emptyCta')}
-              </button>
+              </Button>
             )}
           </div>
         </div>

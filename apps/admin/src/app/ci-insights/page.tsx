@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet, apiPut } from '../../lib/api';

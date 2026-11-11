@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { SparkleIcon } from './SparkleIcon';
 import { useState } from 'react';
 import { apiPost } from '../lib/api';
@@ -152,11 +153,12 @@ export function AITranslateMissingButton({
 
   return (
     <div className={className}>
-      <button
+      <Button
+        variant="outline"
         type="button"
         onClick={handleClick}
         disabled={disabled}
-        className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary-ink transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+        className="gap-2 font-semibold"
       >
         {running ? (
           <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -178,7 +180,7 @@ export function AITranslateMissingButton({
           <SparkleIcon />
         )}
         <span>{buttonLabel}</span>
-      </button>
+      </Button>
       {summary && (
         <p className="mt-2 text-xs text-muted-foreground">
           {summary.filled > 0 && <span>{t('summaryFilled', { count: summary.filled })}</span>}

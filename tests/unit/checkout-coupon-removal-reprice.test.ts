@@ -17,6 +17,20 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
+import {
+  code,
+  containsCall,
+  findCaseClause,
+  findFunction,
+  hasTopLevelReturn,
+  indexOfStatement,
+  isIfWithCondition,
+  nodesOf,
+  parseFile,
+  statementsOf,
+  thenStatements,
+} from './helpers/ast-query';
 import {
   repriceAfterCouponRemoval,
   isShippingSettled,
@@ -88,17 +102,29 @@ describe('isShippingSettled (#2067)', () => {
   });
 });
 
-describe('CheckoutClient wiring (source-pinned: no DOM in this repo)', () => {
-  const src = readFileSync(
-    path.resolve(__dirname, '../../apps/web/src/app/checkout/CheckoutClient.tsx'),
-    'utf8'
-  );
+// CheckoutClient is a 3000-line component; this repo has no DOM to render it, so its wiring is pinned structurally:
+// every check below is scoped to a real syntax node (a named function, a case clause, an if/try block) via the
+// TypeScript AST, never a text window. The component's logic that CAN run (repriceAfterCouponRemoval) runs above.
+const csf = parseFile(
+  path.resolve(__dirname, '../../apps/web/src/app/checkout/CheckoutClient.tsx')
+);
+const src = readFileSync(
+  path.resolve(__dirname, '../../apps/web/src/app/checkout/CheckoutClient.tsx'),
+  'utf8'
+);
 
+describe('CheckoutClient wiring (source-pinned: no DOM in this repo)', () => {
   it('the COUPON_NOT_ELIGIBLE refusal awaits the removal and returns to review', () => {
-    const start = src.indexOf("case 'COUPON_NOT_ELIGIBLE':");
-    const body = src.slice(start, src.indexOf('break;', start));
-    expect(body).toMatch(/await removeCoupon\(\);/);
-    expect(body).toMatch(/setStep\(1\);/);
+    // AST: the `case 'COUPON_NOT_ELIGIBLE':` clause's own statements
+    const clause = findCaseClause(csf, 'COUPON_NOT_ELIGIBLE');
+    const awaited = clause.statements.some(
+      s =>
+        ts.isExpressionStatement(s) &&
+        ts.isAwaitExpression(s.expression) &&
+        code(s.expression.expression) === 'removeCoupon()'
+    );
+    expect(awaited, 'removeCoupon() is awaited at the top level of the case').toBe(true);
+    expect(clause.statements.some(s => containsCall(s, 'setStep', '1'))).toBe(true);
   });
 
   it('Place Order stays disabled while shipping is being repriced or quoted', () => {
@@ -108,10 +134,15 @@ describe('CheckoutClient wiring (source-pinned: no DOM in this repo)', () => {
   });
 
   it('a failed or pending quote blocks submit and both Continue buttons (#2067)', () => {
-    const submit = src.slice(src.indexOf('const handleSubmit = async'));
-    const guard = submit.slice(0, submit.indexOf('if (step === 1)'));
-    expect(guard).toMatch(/if \(!shippingSettled\) \{/);
-    expect(guard).toMatch(/setStep\(1\)/);
+    // AST: a top-level `if (!shippingSettled) { ... setStep(1) ...; return; }` BEFORE the `if (step === 1)` advance
+    const sts = statementsOf(findFunction(csf, 'handleSubmit'));
+    const guardAt = indexOfStatement(sts, s => isIfWithCondition(s, '!shippingSettled'));
+    const advanceAt = indexOfStatement(sts, s => isIfWithCondition(s, 'step === 1'));
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(guardAt).toBeLessThan(advanceAt);
+    const guardIf = sts[guardAt] as ts.IfStatement;
+    expect(containsCall(guardIf, 'setStep', '1')).toBe(true);
+    expect(hasTopLevelReturn(thenStatements(guardIf)), 'it returns').toBe(true);
     expect(
       src.match(
         /disabled=\{\s*shippingUnavailable \|\|\s*belowMinimumOrder \|\|\s*goldPriceChanged \|\|\s*!shippingSettled\s*\}/g
@@ -121,39 +152,98 @@ describe('CheckoutClient wiring (source-pinned: no DOM in this repo)', () => {
   });
 
   it('calculateShipping reports a failed quote and drops superseded answers', () => {
-    const start = src.indexOf('const calculateShipping = useCallback(async (): Promise<boolean>');
-    expect(start).toBeGreaterThan(-1);
-    const body = src.slice(start, src.indexOf('}, [selectedArea', start));
-    expect(body).toMatch(/if \(!isLatest\(\)\) return false;/);
-    expect(body).toMatch(/setShippingError\(true\);\s*return false;/);
-    expect(body).toMatch(/finally \{\s*if \(isLatest\(\)\) setShippingQuotePending\(false\);/);
+    const fn = findFunction(csf, 'calculateShipping');
+    const all = nodesOf(fn);
+    // `if (!isLatest()) return false;` : a superseded answer is dropped
+    expect(
+      all.some(
+        n =>
+          ts.isIfStatement(n) &&
+          code(n.expression) === '!isLatest()' &&
+          code(n.thenStatement) === 'return false;'
+      )
+    ).toBe(true);
+    // `setShippingError(true); return false;` : adjacent statements of one block (a failed quote is reported)
+    expect(
+      all.some(
+        n =>
+          ts.isBlock(n) &&
+          n.statements.some(
+            (s, i) =>
+              containsCall(s, 'setShippingError', 'true') &&
+              ts.isExpressionStatement(s) &&
+              n.statements[i + 1] !== undefined &&
+              code(n.statements[i + 1]) === 'return false;'
+          )
+      )
+    ).toBe(true);
+    // finally { if (isLatest()) setShippingQuotePending(false); }
+    expect(
+      all.some(
+        n =>
+          ts.isTryStatement(n) &&
+          n.finallyBlock !== undefined &&
+          n.finallyBlock.statements.some(
+            s =>
+              ts.isIfStatement(s) &&
+              code(s.expression) === 'isLatest()' &&
+              containsCall(s.thenStatement, 'setShippingQuotePending', 'false')
+          )
+      )
+    ).toBe(true);
   });
 
   it('removeCoupon goes through repriceAfterCouponRemoval', () => {
-    const start = src.indexOf('const removeCoupon = async () => {');
-    expect(start).toBeGreaterThan(-1);
-    const body = src.slice(start, src.indexOf('\n  };', start));
-    expect(body).toMatch(/await repriceAfterCouponRemoval\(/);
+    const fn = findFunction(csf, 'removeCoupon');
+    expect(
+      statementsOf(fn).some(
+        s =>
+          ts.isExpressionStatement(s) &&
+          ts.isAwaitExpression(s.expression) &&
+          ts.isCallExpression(s.expression.expression) &&
+          code(s.expression.expression.expression) === 'repriceAfterCouponRemoval'
+      ),
+      'removeCoupon awaits repriceAfterCouponRemoval at its top level'
+    ).toBe(true);
   });
 });
 
 describe('delivery-window clock wiring (#2047/#2050, source-pinned)', () => {
-  const src = readFileSync(
-    path.resolve(__dirname, '../../apps/web/src/app/checkout/CheckoutClient.tsx'),
-    'utf8'
-  );
   it('the picker reads a ticking clock, not a once-per-mount memo', () => {
     expect(src).toMatch(/const \[nowMinutes, setNowMinutes\] = useState\(/);
     expect(src).toMatch(/setInterval\(tick, 30_000\)/);
     expect(src).not.toMatch(/const nowMinutes = useMemo\(/);
   });
   it('submit validates with findStillBookableWindow and syncs the picker on a lapse', () => {
-    const submit = src.slice(src.indexOf('const handleSubmit = async'));
-    expect(submit).toMatch(/const freshSelectedWindow = findStillBookableWindow\(/);
-    const lapse = submit.slice(submit.indexOf('selectedDeliveryWindowId && !freshSelectedWindow'));
-    const block = lapse.slice(0, lapse.indexOf('return;'));
-    expect(block).toMatch(/setNowMinutes\(submitNowMinutes\)/);
-    expect(block).toMatch(/setDeliveryWindowError\(lapsedWindowMessage\)/);
+    const sts = statementsOf(findFunction(csf, 'handleSubmit'));
+    const fresh = sts.find(
+      (s): s is ts.VariableStatement =>
+        ts.isVariableStatement(s) &&
+        s.declarationList.declarations.some(
+          d =>
+            code(d.name) === 'freshSelectedWindow' &&
+            d.initializer !== undefined &&
+            ts.isCallExpression(d.initializer) &&
+            code(d.initializer.expression) === 'findStillBookableWindow'
+        )
+    );
+    expect(
+      fresh,
+      'handleSubmit computes freshSelectedWindow with findStillBookableWindow'
+    ).toBeDefined();
+    // the lapse branch: `if (... selectedDeliveryWindowId && !freshSelectedWindow) { sync clock; message; return; }`
+    const lapse = sts.find(
+      (s): s is ts.IfStatement =>
+        ts.isIfStatement(s) &&
+        /selectedDeliveryWindowId && !freshSelectedWindow$/.test(code(s.expression))
+    );
+    expect(lapse, 'lapse branch').toBeDefined();
+    const block = thenStatements(lapse!);
+    expect(block.some(s => containsCall(s, 'setNowMinutes', 'submitNowMinutes'))).toBe(true);
+    expect(block.some(s => containsCall(s, 'setDeliveryWindowError', 'lapsedWindowMessage'))).toBe(
+      true
+    );
+    expect(hasTopLevelReturn(block), 'the lapse branch returns').toBe(true);
   });
   it('records the day the picker showed when the window was chosen', () => {
     expect(src).toMatch(/setSelectedDeliveryDay\(deliverySelection\.day\)/);

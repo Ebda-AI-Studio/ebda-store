@@ -6,6 +6,7 @@
  * form page builder and the visual editor's theme pane; the CALLER decides where the list is kept
  * (the editor keeps it in the draft document, Ruling VE-4).
  */
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiFetch, localizedApiMessage } from '../../lib/api';
@@ -94,7 +95,8 @@ export function FontsCard({
           localizedApiMessage(
             data.error?.code,
             data.error?.message ?? `Upload failed (HTTP ${res.status})`,
-            data.error?.details
+            data.error?.details,
+            res.status
           )
         );
         return;
@@ -146,13 +148,15 @@ export function FontsCard({
               >
                 {f.family}
               </span>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => remove(i)}
-                className="rounded-lg border border-destructive/40 bg-destructive/5 px-2.5 py-1 text-xs font-semibold text-destructive-ink hover:bg-destructive/10"
+                className="font-semibold text-destructive-ink"
               >
                 {t('fonts.remove')}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -184,25 +188,28 @@ export function FontsCard({
             />
           </label>
           <div className="flex justify-end gap-2 pt-1">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
               onClick={() => {
                 setShowAdd(false);
                 setFamily('');
                 setUrl('');
               }}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+              className="font-semibold"
             >
               {t('common.cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
               type="button"
               disabled={!family.trim()}
               onClick={addGoogle}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+              className="font-semibold"
             >
               {t('fonts.addFont')}
-            </button>
+            </Button>
           </div>
         </div>
       ) : showUpload ? (
@@ -244,7 +251,9 @@ export function FontsCard({
             </p>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
               disabled={isUploading}
               onClick={() => {
@@ -253,36 +262,39 @@ export function FontsCard({
                 setUploadFile(null);
                 setUploadError(null);
               }}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+              className="font-semibold"
             >
               {t('common.cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
               type="button"
               disabled={!uploadFamily.trim() || !uploadFile || isUploading}
               onClick={uploadCustom}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+              className="font-semibold"
             >
               {isUploading ? t('fonts.uploading') : t('fonts.uploadFont')}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={() => setShowAdd(true)}
-            className="rounded-lg border-2 border-dashed border-border bg-card/40 px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="font-semibold text-muted-foreground"
           >
             {t('fonts.addGoogleFont')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
             type="button"
             onClick={() => setShowUpload(true)}
-            className="rounded-lg border-2 border-dashed border-border bg-card/40 px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="font-semibold text-muted-foreground"
           >
             {t('fonts.uploadCustomFont')}
-          </button>
+          </Button>
         </div>
       )}
     </section>

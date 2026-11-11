@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useMemo } from 'react';
 import { useT } from '@/i18n/useT';
 import { SOCIAL_PLATFORMS, type StoreBranding } from './types';
@@ -135,12 +136,13 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
                 </span>
 
                 <div className="flex gap-1" role="group" aria-label={PLATFORM_LABELS[key]}>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     type="button"
                     onClick={() => move(index, -1)}
                     disabled={index === 0}
                     aria-label={tOrder('moveUp')}
-                    className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <svg
                       viewBox="0 0 20 20"
@@ -154,13 +156,14 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
                         clipRule="evenodd"
                       />
                     </svg>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     type="button"
                     onClick={() => move(index, 1)}
                     disabled={index === orderedPlatforms.length - 1}
                     aria-label={tOrder('moveDown')}
-                    className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <svg
                       viewBox="0 0 20 20"
@@ -174,7 +177,7 @@ export function SocialLinksTab({ branding, onChange }: SocialLinksTabProps) {
                         clipRule="evenodd"
                       />
                     </svg>
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}

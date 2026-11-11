@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatMoney } from '@ebda/shared';
 import { apiGet, apiPost } from '../../../lib/api';
 import { useT } from '@/i18n/useT';

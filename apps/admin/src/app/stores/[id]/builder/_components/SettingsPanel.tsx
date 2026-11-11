@@ -15,6 +15,7 @@
  *   own blocks, shared (`components/section-design`), so nothing sends the
  *   merchant to the classic page (Ruling BUILDER2-ADVANCED-1, superseded by VE-6).
  */
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import { rovingKeyDown } from '../_lib/roving';
 import { useLocale } from 'next-intl';
@@ -295,14 +296,15 @@ export function SettingsPanel({
             <ContentElsewhereNotice sectionType={node.type} storeId={storeId} t={t} />
           )}
         {!block && mode === 'content' && onAiFill && node.type in AI_FILL_SECTIONS && (
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={() => onAiFill(node.id)}
             data-testid="ai-fill"
-            className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10"
           >
             {t('aiFill')}
-          </button>
+          </Button>
         )}
         {mainDefs.map(renderDef)}
         {advancedDefs.length > 0 && (
@@ -428,9 +430,9 @@ export function Field({
     <div className="mb-1 flex items-center justify-between gap-2">
       <span className="text-xs font-semibold text-foreground">{label}</span>
       {overridden && (
-        <button type="button" onClick={onReset} className="text-xs text-primary hover:underline">
+        <Button variant="link" size="sm" type="button" onClick={onReset}>
           {t('resetViewport', { viewport: t(`viewport.${viewport}`) })}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -696,23 +698,26 @@ function ImageField({
           />
         )}
         <div className="flex flex-col items-start gap-0.5">
-          <button
+          <Button
+            variant="link"
+            size="sm"
             type="button"
             onClick={() => setOpen(true)}
             aria-label={`${value ? t('changeImage') : t('chooseImage')}: ${tag ? `${label} - ${tag}` : label}`}
-            className="text-xs font-medium text-primary hover:underline"
           >
             {value ? t('changeImage') : t('chooseImage')}
-          </button>
+          </Button>
           {value && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               onClick={() => onChange(undefined)}
               aria-label={`${t('removeImage')}: ${tag ? `${label} - ${tag}` : label}`}
-              className="text-xs text-muted-foreground hover:underline"
+              className="text-muted-foreground"
             >
               {t('removeImage')}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -844,14 +849,16 @@ function ProductListPicker({
           .filter(p => !value.includes(p.id))
           .map(p => (
             <li key={p.id}>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 type="button"
                 disabled={value.length >= max}
                 onClick={() => onChange([...value, p.id])}
-                className="w-full truncate rounded px-2 py-1 text-start text-xs hover:bg-muted disabled:opacity-40"
+                className="w-full truncate justify-start"
               >
                 + {locale === 'ar' && p.nameAr ? p.nameAr : p.name}
-              </button>
+              </Button>
             </li>
           ))}
       </ul>

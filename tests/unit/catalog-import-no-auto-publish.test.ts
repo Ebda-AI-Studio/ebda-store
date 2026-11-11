@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
+import ts from 'typescript';
+import { enclosingFunctionName, nodesOf, parseText } from './helpers/ast-query';
 
 const api = join(__dirname, '../../apps/api/src');
 const read = (p: string) => readFileSync(join(api, p), 'utf8');
@@ -17,14 +19,12 @@ describe('catalogue import never publishes on its own', () => {
   });
 
   it('exactly one site in the service writes an active status: publishItems', () => {
-    const src = read('services/catalog-import.service.ts')
-      .split('\n')
-      .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
-      .join('\n');
-    const hits = [...src.matchAll(/'active'/g)];
-    expect(hits).toHaveLength(1);
-    const publish = src.slice(src.indexOf('export async function publishItems'));
-    expect(publish).toContain("'active'");
+    // AST: every string literal 'active' in the service (comments never count), and where it lives.
+    const lits = nodesOf(
+      parseText(read('services/catalog-import.service.ts'), 'catalog-import.service.ts')
+    ).filter((n): n is ts.StringLiteral => ts.isStringLiteralLike(n) && n.text === 'active');
+    expect(lits).toHaveLength(1);
+    expect(enclosingFunctionName(lits[0])).toBe('publishItems');
   });
 
   it('no job function imports publishItems', () => {

@@ -74,8 +74,10 @@ describe('new product form', () => {
     expect(api.apiPost).toHaveBeenCalledTimes(1);
     expect(refresh).not.toHaveBeenCalled();
     expect(push.mock.calls[0][0]).toContain('/stores/store-1/products/p1/edit?created=1');
-    // the English name is empty: the Arabic one is sent as the required name
-    expect(api.apiPost.mock.calls[0][1].name).toBe('قميص');
+    // the English name is empty: only the Arabic name is sent, the API keeps the English one for the AI
+    // (Ruling NAME-PAIR-1; sending the Arabic as `name` put Arabic on the English storefront)
+    expect(api.apiPost.mock.calls[0][1].name).toBeUndefined();
+    expect(api.apiPost.mock.calls[0][1].nameAr).toBe('قميص');
   });
 
   it('refuses a price under 0.01 at the field without a request', async () => {

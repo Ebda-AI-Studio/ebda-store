@@ -17,7 +17,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { withNumerals } from '@ebda/shared';
@@ -281,14 +282,16 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
       <div className="mt-8 border-t border-border pt-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-foreground">{t('recentTitle')}</h3>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
             type="button"
             onClick={fetchRecent}
             disabled={recentLoading}
-            className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             {recentLoading ? t('refreshing') : t('refresh')}
-          </button>
+          </Button>
         </div>
         {recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('recentEmpty')}</p>

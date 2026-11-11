@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { apiGet } from '../../lib/api';

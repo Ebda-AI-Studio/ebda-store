@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { DELIVERY_WEEK_ORDER } from '../lib/checkout-delivery-payload';
 import { useT } from '@/i18n/useT';
 
@@ -25,19 +26,16 @@ export function DeliveryOffDaysField({
         {DELIVERY_WEEK_ORDER.map(d => {
           const on = value.includes(d);
           return (
-            <button
+            <Button
+              variant={on ? 'soft' : 'outline'}
+              size="sm"
               key={d}
               type="button"
               aria-pressed={on}
               onClick={() => toggle(d)}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
-                on
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-border bg-background text-muted-foreground hover:bg-muted'
-              }`}
             >
               {t(`deliveryOffDay${d}`)}
-            </button>
+            </Button>
           );
         })}
       </div>

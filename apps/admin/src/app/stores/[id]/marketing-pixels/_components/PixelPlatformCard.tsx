@@ -48,6 +48,7 @@ export function PixelPlatformCard({
     >
       {/* Header */}
       <button
+        data-ui="row"
         type="button"
         onClick={onExpand}
         aria-expanded={isExpanded}

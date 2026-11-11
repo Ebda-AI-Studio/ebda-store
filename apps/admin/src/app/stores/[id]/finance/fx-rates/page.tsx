@@ -23,6 +23,7 @@ import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FxRateEntry {
@@ -234,14 +235,9 @@ export default function FxRatesPage() {
           {formError && <p className="text-red-600 text-sm">{formError}</p>}
           {formSuccess && <p className="text-green-700 text-sm">{t('rateSaved')}</p>}
 
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm font-medium disabled:opacity-50"
-          >
+          <Button type="button" onClick={handleSubmit} disabled={submitting} variant="default">
             {submitting ? t('saving') : t('saveRate')}
-          </button>
+          </Button>
         </div>
 
         {/* ── Rate History ──────────────────────────────────────────────── */}

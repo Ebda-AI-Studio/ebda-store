@@ -720,8 +720,7 @@ export async function apiRequest<T = unknown>(
       ) {
         window.location.assign('/account/security');
       }
-      let message = localizedApiMessage(
-        errCode,
+      let message = bilingualOrRaw(
         errMessage || `Request failed with status ${response.status}`,
         errObj?.details
       );
@@ -915,8 +914,7 @@ export async function apiGetPage<T = unknown>(
           message: resolveErrorMessage({
             code: body?.error?.code,
             status: response.status,
-            serverMessage: localizedApiMessage(
-              body?.error?.code,
+            serverMessage: bilingualOrRaw(
               body?.error?.message || `Request failed with status ${response.status}`,
               body?.error?.details
             ),
@@ -1004,15 +1002,33 @@ export function adminUiLocale(): 'ar' | 'en' {
   return typeof document !== 'undefined' && document.documentElement.dir === 'rtl' ? 'ar' : 'en';
 }
 
-export function localizedApiMessage(
-  _code: string | undefined,
-  message: string,
-  details: Record<string, unknown> | undefined
-): string {
+function bilingualOrRaw(message: string, details: Record<string, unknown> | undefined): string {
   // Any code whose details carry both-language text is localized (plan limits,
-  // subscription gates, go-live gates, ...).
+  // subscription gates, go-live gates, ...). apiRequest applies its own gates + the map after this.
   const text = adminUiLocale() === 'ar' ? details?.messageAr : details?.messageEn;
   return typeof text === 'string' && text ? text : message;
+}
+
+/**
+ * The sentence a page shows for an API refusal it read itself (an XHR upload, a raw fetch): the server's
+ * `details.messageAr/messageEn` when it sent them, else the fixed ERROR_AR / ERROR_EN sentence for the code or the
+ * status (`resolveErrorMessage`). Never the raw English server text in the Arabic UI, never a 5xx's text in either
+ * (2026-11-10: the onboarding photo upload printed "Internal server error" on the Arabic page, Ruling ADMIN-ERR-1).
+ */
+export function localizedApiMessage(
+  code: string | undefined,
+  message: string,
+  details: Record<string, unknown> | undefined,
+  status?: number
+): string {
+  const text = bilingualOrRaw(message, details);
+  return resolveErrorMessage({
+    code,
+    status,
+    serverMessage: text,
+    locale: adminUiLocale(),
+    hasBilingualDetails: hasBilingualText(details),
+  });
 }
 
 /** True when the API sent the text in the admin's language itself (`details.messageAr` / `messageEn`). */

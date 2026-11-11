@@ -19,6 +19,7 @@ import { MassEditModal } from './_components/MassEditModal';
 import { ProductsLoadingSkeleton } from './_components/ProductsLoadingSkeleton';
 import type { Product, Pagination, StatusFilter } from './_components/types';
 
+import { Button } from '@/components/ui/Button';
 export default function StoreProductsPage() {
   const params = useParams();
   const { isAuthenticated } = useAuth();
@@ -315,18 +316,12 @@ export default function StoreProductsPage() {
           <span className="text-sm font-medium text-foreground whitespace-nowrap">
             {t('selectionBar.selected', { count: String(selectedMap.size) })}
           </span>
-          <button
-            onClick={() => setIsMassEditOpen(true)}
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
+          <Button onClick={() => setIsMassEditOpen(true)} variant="default" size="sm">
             {t('selectionBar.massEdit')}
-          </button>
-          <button
-            onClick={clearSelection}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-          >
+          </Button>
+          <Button onClick={clearSelection} variant="outline" size="sm">
             {t('selectionBar.clear')}
-          </button>
+          </Button>
         </div>
       )}
 

@@ -85,6 +85,7 @@ export function HubTabs({ items }: Props) {
               </span>
             ) : null}
             <Link
+              data-ui="nav"
               ref={active === t.href ? activeRef : undefined}
               href={t.href}
               className={

@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../../lib/api';
 import { useAuth } from '../../../../../lib/auth';
@@ -442,7 +443,7 @@ export default function CustomerDetailPage() {
       cell: order => (
         <Link
           href={`/stores/${storeId}/orders/${order.id}`}
-          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 max-md:min-h-11 max-md:px-4 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+          className={buttonVariants({ variant: 'outline', size: 'sm', className: 'gap-1' })}
         >
           {t('viewOrder')}
         </Link>

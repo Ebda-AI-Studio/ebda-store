@@ -6,6 +6,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../../lib/api';
 import { ConfirmActionModal } from '../../../../../../components/ConfirmActionModal';
 
+import { Button } from '@/components/ui/Button';
 interface PickupRow {
   id: string;
   status: 'requesting' | 'requested' | 'failed' | 'cancelled';
@@ -183,14 +184,15 @@ export function ShipmentPickupPanel({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <p className="text-sm font-medium text-foreground">{t('title')}</p>
         {state.canRequest && !open && (
-          <button
+          <Button
             type="button"
             onClick={() => setOpen(true)}
             disabled={busy !== null}
-            className="px-3 py-1.5 text-sm rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50"
+            variant="secondary"
+            size="sm"
           >
             {t('request')}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -259,22 +261,22 @@ export function ShipmentPickupPanel({
           )}
           <p className="text-xs text-muted-foreground">{t('addressHint')}</p>
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => void submit()}
               disabled={busy !== null || !date || !windowValid}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              variant="default"
             >
               {t('submit')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => setOpen(false)}
               disabled={busy !== null}
-              className="px-4 py-2 text-sm rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50"
+              variant="secondary"
             >
               {t('close')}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -302,14 +304,16 @@ export function ShipmentPickupPanel({
               {p.error && <p className="text-xs text-destructive-ink">{p.error}</p>}
               {p.status === 'requested' &&
                 (state.cancellable ? (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setConfirmCancel(p.id)}
                     disabled={busy !== null}
-                    className="mt-1 px-3 py-1 text-xs rounded-lg border border-destructive/40 text-destructive-ink hover:bg-destructive/5 disabled:opacity-50"
+                    variant="outline"
+                    size="sm"
+                    className="mt-1 text-destructive-ink"
                   >
                     {t('cancel')}
-                  </button>
+                  </Button>
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     {t('cancelInPortal', { carrier: carrierName })}

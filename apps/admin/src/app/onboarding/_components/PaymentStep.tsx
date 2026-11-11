@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { apiPut } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 

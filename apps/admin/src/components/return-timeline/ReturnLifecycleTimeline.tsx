@@ -195,6 +195,7 @@ export function ReturnLifecycleTimeline({ storeId, returnId }: ReturnLifecycleTi
     <section className="rounded-2xl border border-border bg-card mt-4">
       {/* Collapsible header */}
       <button
+        data-ui="row"
         type="button"
         onClick={() => setExpanded(v => !v)}
         className="flex w-full items-center justify-between p-4 text-start cursor-pointer"

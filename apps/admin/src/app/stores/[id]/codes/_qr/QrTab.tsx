@@ -6,6 +6,7 @@ import { PreviewPanel } from './_components/PreviewPanel';
 import { ScanStats } from './_components/ScanStats';
 import { TargetPicker } from './_components/TargetPicker';
 import { useQr } from './_hooks/useQr';
+import { Button } from '@/components/ui/Button';
 
 /**
  * QR codes (QR-1): design once, print for the store / a product / a category / the WhatsApp chat.
@@ -51,14 +52,15 @@ export function QrTab({ storeId }: { storeId: string }) {
                 />
               </div>
               <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
-                <button
+                <Button
+                  variant="default"
+                  size="md"
                   type="button"
                   onClick={q.save}
                   disabled={q.saving || !q.dirty || !q.check?.ok}
-                  className="h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {q.saving ? ta('saving') : ta('save')}
-                </button>
+                </Button>
                 <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
                   {q.saveState === 'saved' && !q.dirty
                     ? ta('saved')

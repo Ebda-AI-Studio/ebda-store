@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState, useEffect } from 'react';
 import { useT } from '@/i18n/useT';
 import { ANALYTICS_PERIOD_PRESETS } from '@ebda/shared';
@@ -119,18 +120,15 @@ export function DateRangePicker({ period, custom, onChange, exclude = [] }: Date
             (p === 'this_month' && period === 'month') ||
             (p === 'this_year' && period === 'year');
           return (
-            <button
+            <Button
+              variant={isActive ? 'soft' : 'ghost'}
+              size="sm"
               type="button"
               key={p}
               onClick={() => handlePresetClick(p)}
-              className={`cursor-pointer rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
-                isActive
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
             >
               {labelFor(p)}
-            </button>
+            </Button>
           );
         })}
       </div>

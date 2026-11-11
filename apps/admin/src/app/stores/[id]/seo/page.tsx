@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, unwrapObject } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -22,6 +23,7 @@ interface SeoSettings {
   twitterHandle: string;
   googleSiteVerification: string;
   emailSenderLocalPart: string;
+  hideFromSearchEngines: boolean;
 }
 
 interface SocialLinks {
@@ -67,6 +69,7 @@ const DEFAULT_SETTINGS: SeoSettings = {
   twitterHandle: '',
   googleSiteVerification: '',
   emailSenderLocalPart: 'orders',
+  hideFromSearchEngines: false,
 };
 
 // Approved sender prefixes (mirrors MERCHANT_SENDER_PREFIXES in apps/api/src/services/email-sender.ts;
@@ -153,6 +156,7 @@ export default function StoreSeoPage() {
           ogImage: seo.ogImage || '',
           twitterHandle: seo.twitterHandle || '',
           googleSiteVerification: seo.googleSiteVerification || '',
+          hideFromSearchEngines: seo.hideFromSearchEngines === true,
           emailSenderLocalPart: SENDER_PREFIXES.includes(seo.emailSenderLocalPart ?? '')
             ? (seo.emailSenderLocalPart as string)
             : 'orders',
@@ -459,7 +463,6 @@ export default function StoreSeoPage() {
           <Button
             type="button"
             variant="outline"
-            className="min-h-11"
             onClick={() => handleGenerate('fill-empty')}
             disabled={isGenerating || isSaving}
             isLoading={isGenerating}
@@ -586,6 +589,32 @@ export default function StoreSeoPage() {
                       className="flex-1 rounded-e-lg border border-input px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label
+                    data-setting-id="seo.hide-from-search"
+                    className="flex items-start gap-3 text-sm font-medium text-foreground"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={settings.hideFromSearchEngines}
+                      onChange={e =>
+                        setSettings(prev => ({ ...prev, hideFromSearchEngines: e.target.checked }))
+                      }
+                      className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+                      data-testid="hide-from-search-toggle"
+                    />
+                    <span>
+                      {t('hideFromSearchLabel')}
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        {settings.hideFromSearchEngines
+                          ? t('hideFromSearchOn')
+                          : t('hideFromSearchOff')}
+                      </span>
+                    </span>
+                  </label>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('hideFromSearchHint')}</p>
                 </div>
 
                 <div>

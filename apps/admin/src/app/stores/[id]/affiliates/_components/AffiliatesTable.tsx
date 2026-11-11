@@ -11,6 +11,7 @@ import {
   type AffiliateStatusAction,
   type Meta,
 } from './types';
+import { Button } from '@/components/ui/Button';
 
 interface AffiliatesTableProps {
   storeId: string;
@@ -109,42 +110,49 @@ export function AffiliatesTable({
           </Link>
           {affiliate.status === 'pending' && (
             <>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-success-ink"
                 type="button"
                 onClick={() => onStatusAction(affiliate, 'approve')}
                 disabled={saving}
-                className="min-h-11 inline-flex items-center px-3 py-2 text-success-ink hover:text-success-ink text-sm font-medium disabled:opacity-50"
               >
                 {t('actions.approve')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive-ink"
                 type="button"
                 onClick={() => onStatusAction(affiliate, 'reject')}
                 disabled={saving}
-                className="min-h-11 inline-flex items-center px-3 py-2 text-destructive-ink hover:text-destructive-ink text-sm font-medium disabled:opacity-50"
               >
                 {t('actions.reject')}
-              </button>
+              </Button>
             </>
           )}
           {affiliate.status === 'approved' && (
             <>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => onOpenPayout(affiliate)}
                 disabled={saving || Number(affiliate.pendingBalance) <= 0}
-                className="min-h-11 inline-flex items-center px-3 py-2 text-primary hover:text-primary/90 text-sm font-medium disabled:opacity-30"
               >
                 {t('actions.payout')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
                 type="button"
                 onClick={() => onStatusAction(affiliate, 'suspend')}
                 disabled={saving}
-                className="min-h-11 inline-flex items-center px-3 py-2 text-muted-foreground hover:text-foreground text-sm font-medium disabled:opacity-50"
               >
                 {t('actions.suspend')}
-              </button>
+              </Button>
             </>
           )}
         </>
@@ -179,18 +187,15 @@ export function AffiliatesTable({
       {/* Status filter pills */}
       <div className="flex flex-wrap gap-2 p-4 bg-muted border-b border-border">
         {STATUS_FILTERS.map(s => (
-          <button
+          <Button
+            variant={statusFilter === s ? 'soft' : 'ghost'}
+            size="sm"
             type="button"
             key={s}
             onClick={() => onStatusFilterChange(s)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              statusFilter === s
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-card text-foreground hover:bg-muted border border-border'
-            }`}
           >
             {t(`filters.${s}`)}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -212,22 +217,22 @@ export function AffiliatesTable({
             })}
           </p>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={() => onPageChange(p => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-1 border border-border rounded text-sm disabled:opacity-50 hover:bg-card"
             >
               {t('pagination.previous')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
               type="button"
               onClick={() => onPageChange(p => Math.min(meta.totalPages, p + 1))}
               disabled={page >= meta.totalPages}
-              className="px-3 py-1 border border-border rounded text-sm disabled:opacity-50 hover:bg-card"
             >
               {t('pagination.next')}
-            </button>
+            </Button>
           </div>
         </div>
       )}

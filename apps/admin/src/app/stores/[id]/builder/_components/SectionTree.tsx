@@ -10,6 +10,7 @@
  * delete; cardinality is enforced by the reducer, which refuses and says why.
  * Logical CSS only (`ps-`, `ms-`, `text-start`), so the tree mirrors in Arabic.
  */
+import { Button } from '@/components/ui/Button';
 import { useEffect } from 'react';
 import { useLocale } from 'next-intl';
 import {
@@ -108,6 +109,7 @@ function Row({
         }`}
       >
         <button
+          data-ui="handle"
           type="button"
           className="min-h-6 min-w-6 cursor-grab touch-none rounded px-1 text-muted-foreground hover:text-foreground"
           aria-label={t('drag', { name })}
@@ -218,6 +220,7 @@ function Row({
                 data-testid={`tree-block-${node.id}-${b.id}`}
               >
                 <button
+                  data-ui="row"
                   type="button"
                   onClick={() => onSelect({ sectionId: node.id, blockId: b.id })}
                   onKeyDown={e => {
@@ -272,15 +275,16 @@ function Row({
           })}
           {blockDef && (
             <li>
-              <button
+              <Button
+                variant="link"
+                size="sm"
                 type="button"
                 onClick={() =>
                   dispatch({ type: 'addBlock', sectionId: node.id, blockType: blockDef.type })
                 }
-                className="rounded px-2 py-1 text-xs font-medium text-primary hover:bg-muted"
               >
                 {t('addBlock', { name: locale === 'ar' ? blockDef.labelAr : blockDef.labelEn })}
-              </button>
+              </Button>
             </li>
           )}
         </ul>
@@ -301,16 +305,18 @@ function IconButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="icon-sm"
       type="button"
       aria-label={label}
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="min-h-8 min-w-8 rounded px-1.5 py-0.5 text-xs max-lg:min-h-11 max-lg:min-w-11 text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-30"
+      className="text-muted-foreground"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -344,15 +350,17 @@ function Group({
           </ul>
         </SortableContext>
       </DndContext>
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
         onClick={() => rest.onAddSection(list)}
-        className="mt-1 w-full rounded-lg border border-dashed border-border px-2 py-1.5 text-start text-xs font-medium text-primary hover:bg-muted"
+        className="mt-1 w-full justify-start"
         data-testid={`add-section-${list}`}
         data-setting-id="builder.add-section"
       >
         + {t('addSection')}
-      </button>
+      </Button>
     </section>
   );
 }

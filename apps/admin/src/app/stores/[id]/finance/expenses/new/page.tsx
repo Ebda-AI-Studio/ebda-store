@@ -18,6 +18,7 @@ import {
   REGION,
 } from '@ebda/shared';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountNode {
@@ -198,7 +199,8 @@ export default function NewExpensePage() {
             undefined,
             resolveUploadErrorMessage(body) ??
               t('uploadFailedGeneric', { status: uploadRes.status }),
-            (body as { error?: { details?: Record<string, unknown> } })?.error?.details
+            (body as { error?: { details?: Record<string, unknown> } })?.error?.details,
+            uploadRes.status
           )
         );
         setOcrUploading(false);
@@ -373,11 +375,11 @@ export default function NewExpensePage() {
               />
             </label>
 
-            <button
+            <Button
               type="button"
               onClick={handleOcrUpload}
               disabled={ocrUploading || !ocrFile}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm font-medium disabled:opacity-50 whitespace-nowrap"
+              variant="default"
             >
               {ocrUploading ? (
                 <span className="flex items-center gap-1.5">
@@ -397,7 +399,7 @@ export default function NewExpensePage() {
               ) : (
                 t('ocr.upload')
               )}
-            </button>
+            </Button>
           </div>
 
           {ocrMessage && (

@@ -13,7 +13,8 @@
       "@/*": ["./src/*"],
       "@ebda/shared": ["../../packages/shared/src"],
       "@ebda/ui": ["../../packages/ui/src"],
-      "@ebda/ui/model3d": ["../../packages/ui/src/model3d"]
+      "@ebda/ui/model3d": ["../../packages/ui/src/model3d"],
+      "@ebda/ui/cn": ["../../packages/ui/src/utils/cn"]
     },
     "plugins": [
       {

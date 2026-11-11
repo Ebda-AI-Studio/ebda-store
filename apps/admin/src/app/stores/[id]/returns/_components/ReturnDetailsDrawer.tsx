@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
-import { Button, Badge } from '@ebda/ui';
+import { Badge } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';

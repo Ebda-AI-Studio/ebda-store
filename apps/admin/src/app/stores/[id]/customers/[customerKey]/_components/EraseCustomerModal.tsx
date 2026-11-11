@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Input, Modal } from '@ebda/ui';
+import { Input, Modal } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 
 interface EraseCustomerModalProps {

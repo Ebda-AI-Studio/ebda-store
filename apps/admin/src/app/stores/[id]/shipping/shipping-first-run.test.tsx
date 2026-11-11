@@ -16,6 +16,7 @@ const { apiGet, apiPut, t, toast } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/i18n/useT', () => ({ useT: () => t }));
+vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
 vi.mock('@ebda/ui', async importOriginal => ({
   ...(await importOriginal<typeof import('@ebda/ui')>()),
   useToast: () => toast,

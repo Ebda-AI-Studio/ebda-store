@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 
 interface DangerZoneProps {
@@ -59,7 +59,7 @@ export function DangerZone({
             </ul>
           </div>
           <div className="shrink-0">
-            <Button variant="destructive" className="min-h-11" onClick={onRequestDelete}>
+            <Button variant="destructive" onClick={onRequestDelete}>
               {t('deleteButton')}
             </Button>
           </div>

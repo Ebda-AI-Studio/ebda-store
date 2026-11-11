@@ -12,6 +12,7 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/shared';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
@@ -216,15 +217,15 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
           />
         </label>
         <div className="flex gap-2 ms-auto">
-          <button
+          <Button
             type="button"
             onClick={exportCsv}
             disabled={loading || !rows || rows.length === 0}
-            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
+            variant="outline"
           >
             {t('exportCsv')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={loading || !rows || rows.length === 0 || exportingXlsx}
             onClick={async () => {
@@ -238,10 +239,10 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
                 setExportingXlsx(false);
               }
             }}
-            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
+            variant="outline"
           >
             {exportingXlsx ? t('exporting') : t('exportXlsx')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -383,15 +384,10 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
           />
         </label>
         <div className="flex gap-2 ms-auto">
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={loading || !data}
-            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
-          >
+          <Button type="button" onClick={exportCsv} disabled={loading || !data} variant="outline">
             {t('exportCsv')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={loading || !data || exportingXlsx}
             onClick={async () => {
@@ -405,10 +401,10 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                 setExportingXlsx(false);
               }
             }}
-            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
+            variant="outline"
           >
             {exportingXlsx ? t('exporting') : t('exportXlsx')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -622,15 +618,10 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
           />
         </label>
         <div className="flex gap-2 ms-auto">
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={loading || !data}
-            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
-          >
+          <Button type="button" onClick={exportCsv} disabled={loading || !data} variant="outline">
             {t('exportCsv')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={loading || !data || exportingXlsx}
             onClick={async () => {
@@ -644,10 +635,10 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                 setExportingXlsx(false);
               }
             }}
-            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
+            variant="outline"
           >
             {exportingXlsx ? t('exporting') : t('exportXlsx')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -767,15 +758,15 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
           />
         </label>
         <div className="flex gap-2 ms-auto">
-          <button
+          <Button
             type="button"
             onClick={exportCsv}
             disabled={loading || !data || data.rows.length === 0}
-            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
+            variant="outline"
           >
             {t('exportCsv')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={loading || !data || data.rows.length === 0 || exportingXlsx}
             onClick={async () => {
@@ -789,10 +780,10 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                 setExportingXlsx(false);
               }
             }}
-            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
+            variant="outline"
           >
             {exportingXlsx ? t('exporting') : t('exportXlsx')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -981,18 +972,14 @@ export default function FinanceReportsPage() {
         {/* Tabs */}
         <div className="flex border-b border-border">
           {tabs.map(({ key, label }) => (
-            <button
+            <Button
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                tab === key
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
+              variant={tab === key ? 'soft' : 'ghost'}
             >
               {label}
-            </button>
+            </Button>
           ))}
         </div>
 

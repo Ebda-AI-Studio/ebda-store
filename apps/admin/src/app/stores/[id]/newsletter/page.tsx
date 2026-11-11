@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, getApiUrl, apiFetch, apiPost } from '../../../../lib/api';
@@ -368,15 +368,16 @@ export default function NewsletterPage() {
 
                   {html.trim() && (
                     <div className="mt-3">
-                      <button
+                      <Button
+                        variant="link"
+                        size="sm"
                         type="button"
                         onClick={() => setShowPreview(p => !p)}
-                        className="text-sm font-medium text-primary hover:underline"
                       >
                         {showPreview
                           ? tPage('broadcastPreviewHide')
                           : tPage('broadcastPreviewShow')}
-                      </button>
+                      </Button>
                       {showPreview && (
                         <div className="mt-2 rounded-lg border border-border overflow-hidden bg-white">
                           {/* sandbox="" blocks script execution + same-origin

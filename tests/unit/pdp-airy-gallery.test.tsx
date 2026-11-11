@@ -288,14 +288,13 @@ describe('sold-out PDP steppers are disabled (P2-N11)', () => {
 // breadcrumb's stand-in below md) measured 33-41px wide for a short category name.
 describe('the phone category link is 44px in both directions', () => {
   it('min-h-11 and min-w-11', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const src = readFileSync(
-      join(__dirname, '../../apps/web/src/app/products/[slug]/ProductDetailClient.tsx'),
-      'utf8'
-    );
-    const i = src.lastIndexOf('href={storeUrl(`/products?category=${cat0.category.slug}`)}');
-    const tag = src.slice(i, src.indexOf('>', i));
-    expect(tag).toMatch(/className="inline-flex min-h-11 min-w-11 /);
+    // Rendered DOM, not source text: the phone-only (`md:hidden`) wrapper's link to the category PLP.
+    const { container } = await renderPdp({}, undefined, undefined, {
+      categories: [{ category: { slug: 'abayas', name: 'Abayas', nameAr: 'عبايات' } }],
+    });
+    const link = container.querySelector('div.md\\:hidden > a[href="/products?category=abayas"]');
+    expect(link, 'phone category link not rendered').not.toBeNull();
+    expect(link!.className).toMatch(/\bmin-h-11\b/);
+    expect(link!.className).toMatch(/\bmin-w-11\b/);
   });
 });

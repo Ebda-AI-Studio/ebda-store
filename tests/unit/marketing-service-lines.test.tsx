@@ -89,8 +89,11 @@ describe('ON publishes everything together', () => {
     const { StudioHomePage: Home } = await import('../../apps/marketing/src/components/StudioHome');
     const home = html(<Home locale="en" />);
     expect(home).toContain('on-the-ground');
-    for (const id of ['quote-studio', 'invite', 'ads'])
+    for (const id of ['quote-studio', 'invite', 'ads', 'crm', 'erp'])
       expect(home).toContain(`data-coming-soon="${id}"`);
+    // the cards link to their own live coming-soon pages (SUBDOMAIN-SOON-2)
+    for (const h of ['crm', 'erp', 'invite', 'ads', 'quote'])
+      expect(home).toContain(`href="https://${h}.ebda.app/"`);
     expect(home).toMatch(/\/en\/contact\/?\?topic=products#form/);
     const seo = await import('../../apps/marketing/src/lib/seo');
     expect(JSON.stringify(seo.studioJsonLd('en'))).toContain('/en/services/marketing/');
@@ -110,6 +113,9 @@ describe('names and the header dropdowns', () => {
       ['Ebda Quote Studio', 'ابدأ ستوديو للتسعير'],
       ['Ebda Invite', 'ابدأ إنفايت'],
       ['Ebda Ads', 'ابدأ آدز'],
+      // the names of the live crm.ebda.app / erp.ebda.app coming-soon pages (studio-pages), kept identical
+      ['Ebda CRM', 'ابدأ CRM'],
+      ['Ebda ERP', 'ابدأ ERP'],
     ]);
     // «كوت» reads as "coat" in Egyptian Arabic (Ahmad 2026-11-09)
     expect(JSON.stringify(BRAND.comingProducts)).not.toContain('كوت');
@@ -138,7 +144,7 @@ describe('names and the header dropdowns', () => {
         t.indexOf('>' + (l === 'ar' ? 'المصادر' : 'Resources') + '<')
       );
       expect(t).toMatch(/services\/?#core/);
-      expect((t.match(/np-soon/g) ?? []).length).toBeGreaterThanOrEqual(3);
+      expect((t.match(/np-soon/g) ?? []).length).toBeGreaterThanOrEqual(5);
       for (const p of BRAND.comingProducts) expect(t).toContain(l === 'ar' ? p.nameAr : p.nameEn);
       expect(t).toContain(l === 'ar' ? 'قريبًا' : 'Coming soon');
     }
@@ -192,6 +198,8 @@ describe('post-build step', () => {
     const t = readFileSync(path.join(out, 'llms.txt'), 'utf8');
     expect(t.match(/## Services/g)).toHaveLength(1);
     expect(t).toContain('Ebda Invite');
+    expect(t).toContain('Ebda CRM (ابدأ CRM)');
+    expect(t).toContain('https://erp.ebda.app/');
   });
 });
 
@@ -252,12 +260,25 @@ describe('coming-soon cards (software only, names distinct from the services)', 
     expect(comingSoonItems('en')).toEqual([]);
     vi.stubEnv('EBDA_SERVICE_LINES', 'on');
     const names = comingSoonItems('en').map(i => i.name);
-    expect(names).toEqual(['Ebda Quote Studio', 'Ebda Invite', 'Ebda Ads']);
+    expect(names).toEqual(['Ebda Quote Studio', 'Ebda Invite', 'Ebda Ads', 'Ebda CRM', 'Ebda ERP']);
     expect(comingSoonItems('ar').map(i => i.name)).toEqual([
       'ابدأ ستوديو للتسعير',
       'ابدأ إنفايت',
       'ابدأ آدز',
+      'ابدأ CRM',
+      'ابدأ ERP',
     ]);
+    // every coming-soon product links to its own live coming-soon subdomain page (SUBDOMAIN-SOON-2)
+    expect(comingSoonItems('en').map(i => [i.id, i.href])).toEqual([
+      ['quote-studio', 'https://quote.ebda.app/'],
+      ['invite', 'https://invite.ebda.app/'],
+      ['ads', 'https://ads.ebda.app/'],
+      ['crm', 'https://crm.ebda.app/'],
+      ['erp', 'https://erp.ebda.app/'],
+    ]);
+    // ar/en copy parity: same fact count per card
+    const ar = comingSoonItems('ar');
+    comingSoonItems('en').forEach((i, n) => expect(ar[n].facts).toHaveLength(i.facts.length));
     for (const i of comingSoonItems('en'))
       expect(i.blurb + i.facts.join(' ')).not.toMatch(/\d{4}|EGP \d|waitlist/i);
   });

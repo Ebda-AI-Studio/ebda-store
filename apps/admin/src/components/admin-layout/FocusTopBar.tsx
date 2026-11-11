@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { NotificationBell } from '../NotificationBell';
 import { useFocusMode } from '@/contexts/FocusModeContext';
 import { useT } from '@/i18n/useT';
@@ -45,10 +46,12 @@ export function FocusTopBar({ storeBranding }: FocusTopBarProps) {
         <NotificationBell />
 
         {/* Exit focus mode */}
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           type="button"
           onClick={exitFocusMode}
-          className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="justify-center text-muted-foreground"
           aria-label={t('focusMode.exitFocusMode')}
           title={t('focusMode.exitFocusMode')}
         >
@@ -67,7 +70,7 @@ export function FocusTopBar({ storeBranding }: FocusTopBarProps) {
               d="M6 18L18 6M6 6l12 12"
             />
           </svg>
-        </button>
+        </Button>
       </div>
     </header>
   );

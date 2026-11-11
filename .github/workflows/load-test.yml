@@ -9,11 +9,11 @@ on:
         required: true
         type: string
       scenario:
-        description: 'smoke | storefront-mix | flash-sale'
+        description: 'smoke | storefront-mix | flash-sale | pages'
         required: true
         default: smoke
         type: choice
-        options: [smoke, storefront-mix, flash-sale]
+        options: [smoke, storefront-mix, flash-sale, pages]
       duration:
         description: 'k6 duration, e.g. 60s'
         required: false
@@ -36,6 +36,11 @@ on:
         type: string
       product_slug:
         description: 'flash-sale / storefront-mix product slug'
+        required: false
+        default: ''
+        type: string
+      urls:
+        description: 'pages: comma list of full storefront page URLs (base_url = any one of them)'
         required: false
         default: ''
         type: string
@@ -63,6 +68,7 @@ on:
       paths: { required: false, type: string, default: /public/health }
       store_ids: { required: false, type: string, default: '' }
       product_slug: { required: false, type: string, default: '' }
+      urls: { required: false, type: string, default: '' }
       p95_ms: { required: false, type: string, default: '500' }
       error_rate: { required: false, type: string, default: '0' }
       allow_prod: { required: false, type: boolean, default: false }
@@ -87,7 +93,7 @@ jobs:
           ALLOW_PROD: ${{ inputs.allow_prod }}
         run: |
           case "$BASE_URL" in https://*) ;; *) echo "base_url must be https://"; exit 1;; esac
-          case "$SCENARIO" in smoke|storefront-mix|flash-sale) ;; *) echo "unknown scenario"; exit 1;; esac
+          case "$SCENARIO" in smoke|storefront-mix|flash-sale|pages) ;; *) echo "unknown scenario"; exit 1;; esac
           host=$(printf '%s' "$BASE_URL" | sed -E 's#https://([^/]+).*#\1#')
           case "$host" in
             api.ebda.app|*.ebda.app|ebda.app) prod=true;;
@@ -109,6 +115,7 @@ jobs:
           PATHS: ${{ inputs.paths }}
           STORE_IDS: ${{ inputs.store_ids }}
           PRODUCT_SLUG: ${{ inputs.product_slug }}
+          URLS: ${{ inputs.urls }}
           P95_MS: ${{ inputs.p95_ms }}
           ERROR_RATE: ${{ inputs.error_rate }}
         run: |

@@ -13,6 +13,8 @@
  * (jsdom is not a dependency of this repo).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import ts from 'typescript';
+import { all, callsIn, declNamed, parseFile, strVal } from './helpers/ast-statements';
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -108,17 +110,19 @@ describe('web client — refresh token read is iOS-gated (#1945)', () => {
 });
 
 describe('admin + orders logout — same iOS gate on the read (#1945 sibling)', () => {
-  // Their logout() lives in React providers (auth.tsx); the one-line read is
-  // pinned at source level so a revert to an ungated read goes red.
-  it.each(['apps/admin/src/lib/auth.tsx', 'apps/orders/src/lib/auth.tsx'])('%s', async file => {
-    const { readFileSync } = await import('fs');
-    const path = await import('path');
-    const src = readFileSync(path.resolve(__dirname, '../..', file), 'utf-8');
-    const logout = src.slice(src.indexOf('async function logout()'));
-    const body = logout.slice(0, logout.indexOf('/auth/logout'));
+  // Their logout() lives in React providers (auth.tsx); the one-line read is pinned on the parsed function (AST:
+  // real call nodes, so a comment cannot satisfy or trip it) so a revert to an ungated read goes red.
+  it.each(['apps/admin/src/lib/auth.tsx', 'apps/orders/src/lib/auth.tsx'])('%s', file => {
+    const logout = declNamed(parseFile(file), 'logout');
     // #2034: the gated read is the helper that also removes non-iOS residue.
-    expect(body).toMatch(/readStoredRefreshToken\(isIosWebkit\(\)\)/);
-    expect(body).not.toMatch(/localStorage\.getItem\('refreshToken'\)/);
+    const gated = callsIn(logout, 'readStoredRefreshToken').map(c =>
+      c.arguments.map(a => a.getText())
+    );
+    expect(gated).toEqual([['isIosWebkit()']]);
+    const ungated = callsIn(logout, 'localStorage.getItem').filter(
+      c => strVal(c.arguments[0]) === 'refreshToken'
+    );
+    expect(ungated).toEqual([]);
   });
 });
 
@@ -138,15 +142,17 @@ describe('admin + orders — a non-iOS refresh removes the residue copy (#2034)'
   // HttpOnly cookie. Their refresh asks it for a Store token and exchanges that for the API cookie.
   it.each(['apps/admin/src/lib/api.ts', 'apps/orders/src/lib/api.ts'])(
     '%s: refreshAccessToken uses the identity service and reads/writes no refresh token',
-    async file => {
-      const { readFileSync } = await import('fs');
-      const path = await import('path');
-      const src = readFileSync(path.resolve(__dirname, '../..', file), 'utf-8');
-      const start = src.indexOf('export function refreshAccessToken(');
-      const fn = src.slice(start, src.indexOf('\n  return refreshInFlight;\n}', start));
-      expect(fn).toMatch(/accountsToken\(\)/);
-      expect(fn).toMatch(/establishApiSession\(/);
-      expect(fn).not.toMatch(/refreshToken|\/auth\/refresh/);
+    file => {
+      // AST of the exported function: its calls and its identifiers / string literals, comments excluded.
+      const fn = declNamed(parseFile(file), 'refreshAccessToken');
+      expect(callsIn(fn, 'accountsToken').length).toBeGreaterThan(0);
+      expect(callsIn(fn, 'establishApiSession').length).toBeGreaterThan(0);
+      const tokens = [
+        ...all(fn, ts.isIdentifier).map(i => i.text),
+        ...all(fn, ts.isStringLiteral).map(l => l.text),
+        ...all(fn, ts.isNoSubstitutionTemplateLiteral).map(l => l.text),
+      ];
+      expect(tokens.filter(t => /refreshToken|\/auth\/refresh/.test(t))).toEqual([]);
     }
   );
 });

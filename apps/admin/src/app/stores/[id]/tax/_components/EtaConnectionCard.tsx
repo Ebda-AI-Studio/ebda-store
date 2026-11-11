@@ -5,6 +5,7 @@ import type { EtaConnectionInput } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 
+import { Button } from '@/components/ui/Button';
 interface Connection {
   connected: boolean;
   enabled: boolean;
@@ -278,22 +279,17 @@ export function EtaConnectionCard({ storeId }: { storeId: string }) {
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={save}
-          disabled={busy !== null}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
+        <Button type="button" onClick={save} disabled={busy !== null} variant="default">
           {busy === 'save' ? t('saving') : t('save')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={check}
           disabled={busy !== null || !conn.connected}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          variant="outline"
         >
           {busy === 'check' ? t('checking') : t('check')}
-        </button>
+        </Button>
         {msg ? (
           <p
             role={msg.tone === 'error' ? 'alert' : 'status'}

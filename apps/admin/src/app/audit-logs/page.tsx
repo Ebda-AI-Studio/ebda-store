@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Badge } from '@ebda/ui';
+import { Badge } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -248,13 +249,15 @@ export default function AuditLogsPage() {
 
                     {/* Expandable Details */}
                     {Object.keys(log.details || {}).length > 0 && (
-                      <button
+                      <Button
+                        variant="link"
+                        size="sm"
                         type="button"
                         onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
-                        className="mt-2 text-xs text-primary hover:underline"
+                        className="mt-2"
                       >
                         {expandedLog === log.id ? t('hideDetails') : t('showDetails')}
-                      </button>
+                      </Button>
                     )}
                     {expandedLog === log.id && (
                       <pre className="mt-2 p-3 bg-muted rounded-lg text-xs text-foreground overflow-x-auto">
@@ -303,7 +306,6 @@ export default function AuditLogsPage() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                size="sm"
                 disabled={pagination.page === 1}
                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
               >
@@ -311,7 +313,6 @@ export default function AuditLogsPage() {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 disabled={pagination.page === pagination.totalPages}
                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
               >

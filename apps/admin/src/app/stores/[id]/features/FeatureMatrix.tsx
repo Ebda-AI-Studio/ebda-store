@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Button, Modal, useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPut, apiDelete, apiPatch } from '@/lib/api';
 import {

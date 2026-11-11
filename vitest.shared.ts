@@ -68,6 +68,8 @@ export function workspaceAliases(root: string): Record<string, string> {
     '@ebda/shared/legal': path.resolve(root, './packages/shared/src/legal'),
     // The 3D viewer subpath (apps map it in tsconfig `paths`; vite needs it here).
     '@ebda/ui/model3d': path.resolve(root, './packages/ui/src/model3d'),
+    // The bare class merger: the admin Button imports it here so a test's vi.mock('@ebda/ui') cannot drop it.
+    '@ebda/ui/cn': path.resolve(root, './packages/ui/src/utils/cn'),
     // StoreDO sources, imported under names the API's tsc cannot resolve (apps/api/src/cf/repo-modules.d.ts).
     '@ebda-src/repo': path.resolve(root, './packages/repo/src/index.ts'),
     '@ebda-src/cf-schema': path.resolve(

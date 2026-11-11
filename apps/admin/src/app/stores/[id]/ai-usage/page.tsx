@@ -25,6 +25,7 @@ import { useT } from '../../../../i18n/useT';
 import { formatSpend } from '../../../../lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
+import { Button } from '@/components/ui/Button';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -219,25 +220,27 @@ export default function AiUsagePage() {
               {/* Pagination */}
               {log.pages > 1 && (
                 <div className="flex items-center justify-between border-t px-6 py-3">
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="text-sm text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
                   >
                     {t('table.prevPage')}
-                  </button>
+                  </Button>
                   <span className="text-xs text-muted-foreground">
                     {t('table.pageInfo', { page: log.page, pages: log.pages })}
                   </span>
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     onClick={() => setPage(p => Math.min(log.pages, p + 1))}
                     disabled={page >= log.pages}
-                    className="text-sm text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
                   >
                     {t('table.nextPage')}
-                  </button>
+                  </Button>
                 </div>
               )}
             </>

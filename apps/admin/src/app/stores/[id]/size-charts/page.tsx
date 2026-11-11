@@ -21,6 +21,7 @@ import {
   SizeChartEditor,
   type SizeChartDraft,
 } from './_components/SizeChartEditor';
+import { Button } from '@/components/ui/Button';
 
 interface StoredSizeChart extends SizeChartDraft {
   id: string;
@@ -128,13 +129,9 @@ export default function SizeChartsPage() {
       storeId={storeId}
       actions={
         editing === null ? (
-          <button
-            type="button"
-            onClick={openNew}
-            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-          >
+          <Button variant="default" size="md" type="button" onClick={openNew}>
             {t('addNew')}
-          </button>
+          </Button>
         ) : undefined
       }
     >

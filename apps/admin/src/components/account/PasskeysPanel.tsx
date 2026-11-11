@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Button, Input, useToast } from '@ebda/ui';
+import { Input, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { withNumerals } from '@ebda/shared';
 import { AccountsError, accountsFetch, accountsToken } from '../../lib/accounts';
 import { isPasskeyCancel, passkeyRegistration, passkeysSupported } from '../../lib/passkeys';
@@ -355,7 +356,6 @@ export function PasskeysPanel({
                 <Button
                   type="button"
                   variant="outline"
-                  className="min-h-11"
                   disabled={busy || !password}
                   onClick={async () => {
                     setStepUpError('');
@@ -376,7 +376,7 @@ export function PasskeysPanel({
             <Button
               type="button"
               variant="outline"
-              className="min-h-11 flex-1"
+              className="flex-1"
               onClick={() => {
                 pending.current = null;
                 setAskStepUp(false);
@@ -388,7 +388,7 @@ export function PasskeysPanel({
             </Button>
             <Button
               type="submit"
-              className="min-h-11 flex-1"
+              className="flex-1"
               disabled={
                 busy ||
                 !password ||
@@ -424,7 +424,7 @@ export function PasskeysPanel({
                   required
                   autoFocus
                 />
-                <Button type="submit" className="min-h-11" disabled={busy || !renameValue.trim()}>
+                <Button type="submit" disabled={busy || !renameValue.trim()}>
                   {t('save')}
                 </Button>
               </form>
@@ -443,7 +443,6 @@ export function PasskeysPanel({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="min-h-11"
                     onClick={() => {
                       setRenameId(p.id);
                       setRenameValue(p.name);
@@ -456,7 +455,6 @@ export function PasskeysPanel({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="min-h-11"
                     onClick={() => {
                       setRemoveId(p.id);
                       setRenameId(null);
@@ -474,7 +472,7 @@ export function PasskeysPanel({
                   <Button
                     type="button"
                     variant="outline"
-                    className="min-h-11 flex-1"
+                    className="flex-1"
                     onClick={() => setRemoveId(null)}
                   >
                     {tc('cancel')}
@@ -482,7 +480,7 @@ export function PasskeysPanel({
                   <Button
                     type="button"
                     variant="destructive"
-                    className="min-h-11 flex-1"
+                    className="flex-1"
                     disabled={busy}
                     onClick={() => void run(removePasskey(p.id))}
                   >
@@ -510,12 +508,7 @@ export function PasskeysPanel({
               className="mt-1"
             />
           </div>
-          <Button
-            type="button"
-            className="min-h-11"
-            disabled={busy}
-            onClick={() => void run(addPasskey)}
-          >
+          <Button type="button" disabled={busy} onClick={() => void run(addPasskey)}>
             {t('add')}
           </Button>
         </div>

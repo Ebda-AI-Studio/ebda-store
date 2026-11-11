@@ -103,6 +103,7 @@ export function TargetPicker({ storeId, target, onChange, hasWhatsapp, link }: P
                   {results.map(p => (
                     <li key={p.id}>
                       <button
+                        data-ui="row"
                         type="button"
                         className="w-full px-3 py-2 text-start text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                         onClick={() =>

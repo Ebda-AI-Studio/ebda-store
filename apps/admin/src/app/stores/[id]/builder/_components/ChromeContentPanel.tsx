@@ -14,6 +14,7 @@
  * that is not a relative path or http(s)/mailto/tel stays in the field with an
  * inline error and is never dispatched (the API schema rejects it too).
  */
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
@@ -178,44 +179,49 @@ function LinkList({
               </p>
             )}
             <div className="flex items-center gap-1 text-xs">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => move(i, -1)}
                 disabled={i === 0}
-                className="rounded px-2 py-1 hover:bg-muted disabled:opacity-30"
               >
                 {t('chromeUp')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => move(i, 1)}
                 disabled={i === rows.length - 1}
-                className="rounded px-2 py-1 hover:bg-muted disabled:opacity-30"
               >
                 {t('chromeDown')}
-              </button>
+              </Button>
               <span className="flex-1" />
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 type="button"
                 onClick={() => update(rows.filter((_, idx) => idx !== i))}
-                className="rounded px-2 py-1 text-destructive-ink hover:bg-destructive/10"
+                className="text-destructive-ink"
                 data-testid={`${testId}-remove-${i}`}
               >
                 {t('chromeRemove')}
-              </button>
+              </Button>
             </div>
           </div>
         );
       })}
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
         disabled={rows.length >= max}
         onClick={() => update([...rows, { label: '', labelAr: '', href: '/', enabled: true }])}
-        className="rounded-lg border border-dashed border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
         data-testid={`${testId}-add`}
       >
         {t('chromeAdd')}
-      </button>
+      </Button>
     </fieldset>
   );
 }
