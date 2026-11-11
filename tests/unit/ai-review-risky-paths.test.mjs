@@ -27,6 +27,10 @@ describe('ai-review classifier (fail closed: only docs, markdown and NEWLY ADDED
     expect(riskyPaths(['A\tREADME.md', 'A\ta.test.ts', ''])).toEqual([]);
     expect(riskyPaths(['M\ttests/guard.test.ts', 'A\ttests/new.test.ts', 'A\tapps/api/src/x.ts'])).toEqual(['tests/guard.test.ts', 'apps/api/src/x.ts']);
   });
+  it('a label event gets its own concurrency group, so adding a label never cancels a running bot review', () => {
+    const wf = readFileSync('.github/workflows/ai-review.yml', 'utf8');
+    expect(/^  group: (.*)$/m.exec(wf)?.[1] ?? '').toMatch(/github\.event\.action == 'labeled' && 'label' \|\| 'review'/);
+  });
   it('the workflow: base checkout, 400 KB fails, name-status, fork-gate red until labelled', () => {
     const wf = readFileSync('.github/workflows/ai-review.yml', 'utf8');
     expect((wf.match(/ref: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/g) ?? []).length).toBe(2);

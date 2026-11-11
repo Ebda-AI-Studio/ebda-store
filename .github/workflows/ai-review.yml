@@ -22,7 +22,8 @@ permissions:
   issues: write
 
 concurrency:
-  group: ai-review-${{ github.event.pull_request.number || github.run_id }}
+  # label events get their own group: a person adding any label must not cancel a bot review that is running (only a new push should)
+  group: ai-review-${{ github.event.pull_request.number || github.run_id }}-${{ github.event.action == 'labeled' && 'label' || 'review' }}
   cancel-in-progress: true
 
 jobs:
