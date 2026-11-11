@@ -61,7 +61,7 @@
   },
   "src/lib/repo-factory.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 32
+      "count": 31
     }
   },
   "src/lib/wa/bridge/do-port.ts": {
