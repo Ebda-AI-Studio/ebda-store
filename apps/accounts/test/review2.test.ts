@@ -423,7 +423,7 @@ describe('throttle: namespaced IP budgets, no inserts over budget, successes ref
         ).toBe(200);
     expect(
       await env.DB.prepare(`SELECT count(*) AS n FROM login_attempts WHERE key = ?1`)
-        .bind(`i:login:${ip}`)
+        .bind(`i:login:${ipPrefix(ip)}`)
         .first()
     ).toMatchObject({ n: 0 });
   });

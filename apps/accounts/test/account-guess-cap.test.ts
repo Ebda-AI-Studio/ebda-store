@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { env } from 'cloudflare:test';
 import { call, seedUser } from './helpers';
-import { ACCOUNT_CAP } from '../src/throttle';
+import { ACCOUNT_CAP, hit, LOGIN } from '../src/throttle';
 import { issueOtp, verifyOtp } from '../src/otp';
 
 const login = (email: string, password: string, ip: string) =>
@@ -52,5 +52,60 @@ describe('issue 618: concurrent guesses are capped before evaluation', () => {
     const wrong = code === '000000' ? '111111' : '000000';
     await verifyOtp(env.DB, { id: u.id }, 'password_reset', wrong);
     expect((await verifyOtp(env.DB, { id: u.id }, 'password_reset', code)).ok).toBe(true);
+  });
+});
+
+describe('issue 664: a refused address never claims an account slot', () => {
+  const key = 'victim-664@example.com';
+  const acctRows = async () =>
+    (await env.DB.prepare(`SELECT count(*) AS n FROM login_attempts WHERE key = ?1`)
+      .bind(`a:login:${key}`)
+      .first<{ n: number }>())!.n;
+
+  it('the account statement of a request refused by its own address inserts nothing (decided inside the batch)', async () => {
+    for (let i = 0; i < 5; i++)
+      expect((await hit(env.DB, key, '203.0.113.9', LOGIN)).ok).toBe(true);
+    const seen: Array<Array<{ results: unknown[] }>> = [];
+    const spy = {
+      prepare: (q: string) => env.DB.prepare(q),
+      batch: async (st: D1PreparedStatement[]) => {
+        const r = (await env.DB.batch(st)) as unknown as Array<{ results: unknown[] }>;
+        seen.push(r);
+        return r;
+      },
+    } as unknown as D1Database;
+    expect((await hit(spy, key, '203.0.113.9', LOGIN)).ok).toBe(false); // pair budget spent
+    expect(seen[0][2].results).toEqual([]); // no account slot was claimed, not even briefly
+  });
+
+  it('one locked-out address firing 100 parallel requests leaves the account its capacity', async () => {
+    for (let i = 0; i < 5; i++) await hit(env.DB, key, '203.0.113.9', LOGIN);
+    const before = await acctRows();
+    const res = await Promise.all(
+      Array.from({ length: 100 }, () => hit(env.DB, key, '203.0.113.9', LOGIN))
+    );
+    expect(res.every(a => !a.ok)).toBe(true);
+    expect(await acctRows()).toBe(before);
+    expect((await hit(env.DB, key, '198.51.100.30', LOGIN)).ok).toBe(true); // the owner is not locked out
+  });
+
+  it('an admitted request always produces exactly one account row (never zero, never two)', async () => {
+    const k = 'exactly-one@example.com';
+    const rows = async () =>
+      (await env.DB.prepare(`SELECT count(*) AS n FROM login_attempts WHERE key = ?1`)
+        .bind(`a:login:${k}`)
+        .first<{ n: number }>())!.n;
+    for (let i = 1; i <= 4; i++) {
+      expect((await hit(env.DB, k, `192.0.${i}.9`, LOGIN)).ok).toBe(true);
+      expect(await rows()).toBe(i);
+    }
+    // a burst of admitted requests from distinct networks: each adds one row
+    const before = await rows();
+    const res = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => hit(env.DB, k, `192.1.${i}.9`, LOGIN))
+    );
+    const admitted = res.filter(a => a.ok).length;
+    expect(admitted).toBe(10);
+    expect(await rows()).toBe(before + admitted);
   });
 });
