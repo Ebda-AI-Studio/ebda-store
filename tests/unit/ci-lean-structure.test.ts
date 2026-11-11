@@ -611,6 +611,16 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     expect(rel.run).toBe('bash scripts/ci/heavy-lock.sh release');
     expect(rel.if).toBe('always()');
   });
+  it('Chromium installs through scripts/ci/install-chromium.sh (no apt/--with-deps on the Mac)', () => {
+    const code = ci
+      .split('\n')
+      .filter(l => !/^\s*#/.test(l))
+      .join('\n');
+    expect(code).not.toMatch(/playwright install/);
+    expect(
+      code.match(/bash scripts\/ci\/install-chromium\.sh/g)?.length ?? 0
+    ).toBeGreaterThanOrEqual(4);
+  });
   it('nothing in ci.yml writes to a fixed /tmp path (two runners share the Mac)', () => {
     const code = ci
       .split('\n')

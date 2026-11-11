@@ -362,7 +362,7 @@ jobs:
 
       - name: Install Chromium and its system dependencies
         # The unit suite measures chart layout in a real browser, including on Umbra.
-        run: npx playwright install --with-deps chromium
+        run: bash scripts/ci/install-chromium.sh
 
       - name: Run unit tests (affected paths)
         if: matrix.shard != 7
@@ -453,7 +453,7 @@ jobs:
       - name: Build shared package
         run: npm run build -w packages/shared
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: bash scripts/ci/install-chromium.sh
       - name: Run builder E2E
         run: npx playwright test -c playwright.builder.config.ts
         env:
@@ -554,7 +554,7 @@ jobs:
         if: matrix.app == 'marketing'
         timeout-minutes: 12
         run: |
-          npx playwright install --with-deps chromium
+          bash scripts/ci/install-chromium.sh
           node scripts/ci/marketing-perf-budget.mjs --lcp
 
       - name: Dry-run the ${{ matrix.app }} deploy (wrangler starts on the deploy's Node)
@@ -882,7 +882,7 @@ jobs:
 
       - name: Install Chromium and its system dependencies
         # The unit suite measures chart layout in a real browser, including on Umbra.
-        run: npx playwright install --with-deps chromium
+        run: bash scripts/ci/install-chromium.sh
 
       - name: Run unit tests with coverage
         if: matrix.shard != 7
