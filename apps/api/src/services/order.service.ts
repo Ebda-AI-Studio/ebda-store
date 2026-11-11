@@ -3007,13 +3007,34 @@ export class OrderService {
      * the shelf (a return to origin the merchant chose not to restock,
      * ruling MONEYB-5). Every other caller restores stock as before.
      */
-    opts: { restoreInventory?: boolean; unpaidOnly?: boolean } = {}
+    opts: {
+      restoreInventory?: boolean;
+      unpaidOnly?: boolean;
+      /** Cancel only from these states, decided atomically on a DO store (Fixes #614); see MoneyClient.cancel. */
+      onlyFrom?: string[];
+      exceptionNote?: string;
+    } = {}
   ) {
     // Cancel on a store's Durable Object (Ruling CF-ORDERS-1): the status flip AND the whole reversal (stock, coupon, loyalty,
     // wallet, backorders) are one section there. The state machine is checked on the DO's own status first.
     if (status === 'cancelled') {
       const money = await storeMoney(storeId);
       if (money) return OrderService.cancelOnDo(money, storeId, orderId, opts);
+      // Postgres store: the caller holds the row lock (lib/wa/store-events-consumer.ts), so this read is current.
+      if (opts.onlyFrom) {
+        const cur = await (
+          await storeDb(storeId)
+        ).order.findFirst({
+          where: { id: orderId, storeId },
+          select: { status: true },
+        });
+        if (cur && !opts.onlyFrom.includes(cur.status))
+          throw new AppError(
+            409,
+            'ORDER_STATUS_MOVED',
+            `The order is already ${cur.status}; it was not cancelled`
+          );
+      }
     }
     // Refund by status (Ruling CF-PAY-1) and every other status (Ruling CF-FINAL-1) on a Durable Object store.
     {
@@ -3449,7 +3470,12 @@ export class OrderService {
     money: MoneyClient,
     storeId: string,
     orderId: string,
-    opts: { restoreInventory?: boolean; unpaidOnly?: boolean }
+    opts: {
+      restoreInventory?: boolean;
+      unpaidOnly?: boolean;
+      onlyFrom?: string[];
+      exceptionNote?: string;
+    }
   ) {
     const db = await storeDb(storeId);
     const before = await db.order.findFirst({
@@ -3463,14 +3489,22 @@ export class OrderService {
       },
     });
     if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
-    assertValidTransition(before.status, 'cancelled');
+    // an `onlyFrom` cancel is decided by the DO in its own section (the state read here may already be stale, #614)
+    if (!opts.onlyFrom) assertValidTransition(before.status, 'cancelled');
     const requestedAt = new Date();
     const r = await money.cancel({
       orderId,
       restoreInventory: opts.restoreInventory !== false,
       // the auto-cancel sweep: the DO refuses (ORDER_ALREADY_PAID) when a payment landed first, in the same section
       ...(opts.unpaidOnly ? { unpaidOnly: true } : {}),
+      ...(opts.onlyFrom ? { onlyFrom: opts.onlyFrom, exceptionNote: opts.exceptionNote } : {}),
     });
+    if (r.skipped === 'status_moved')
+      throw new AppError(
+        409,
+        'ORDER_STATUS_MOVED',
+        `The order is already ${r.status}; it was not cancelled`
+      );
     if (!r.replayed) {
       // the same tail as the Postgres path: refund fanout, the status fanout, the customer push
       const hadCapturedPayment = hasCapturedPayment(before);
