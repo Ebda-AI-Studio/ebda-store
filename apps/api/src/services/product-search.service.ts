@@ -257,6 +257,21 @@ export const HYBRID_LEG = 50;
  * storefront GET (Ruling SEARCH-T12-1): losing the race aborts the call and the list is keyword-only.
  */
 export const QUERY_EMBED_BUDGET_MS = 400;
+/**
+ * The budget for the FIRST query embed of an isolate that has not completed one in the last
+ * QUERY_EMBED_WARM_WINDOW_MS (Ruling SEARCH-WARM-1): the budget accounting (AuthState DO round trips) and the
+ * Workers AI model are cold then, and a 400 ms race lost every time degraded the first search to keyword-only.
+ * Warm isolates keep QUERY_EMBED_BUDGET_MS. Applies to the in-isolate state only: a new isolate counts as idle.
+ */
+export const QUERY_EMBED_COLD_BUDGET_MS = 1200;
+/** Most a storefront request waits for the budget charge (one parallel DO round trip); past it: no embed, keyword-only. */
+export const BUDGET_STEP_TIMEOUT_MS = 800;
+export const QUERY_EMBED_WARM_WINDOW_MS = 4 * 60 * 1000;
+let lastEmbedOkAt = 0;
+/** Test seam: forget (0) or set when this isolate last completed a query embed. */
+export function setLastQueryEmbedOkAtForTests(t: number): void {
+  lastEmbedOkAt = t;
+}
 /** Queries shorter than this (letters/digits, spaces ignored) are keyword-only. */
 export const QUERY_EMBED_MIN_CHARS = 3;
 /** Most characters of a query that are embedded (the same 100 the route caps the term at). */
@@ -361,28 +376,34 @@ async function queryVector(
     if (hit.exp > Date.now()) return Array.from(hit.v);
     qCache.delete(key);
   }
-  // ONE timer bounds the whole step (E11 + review M3): the budget round trips (AuthState DO on the
-  // Worker) AND the provider call. Losing it aborts the provider call; a budget answer that lands
-  // after the race was lost never reaches the provider (it may have charged one call: over-count,
-  // never overspend).
+  // TWO bounded steps (Ruling SEARCH-WARM-1, amending E11 + review M3). 1) The charge: ONE parallel AuthState
+  // round trip (embed-budget.ts), bounded by BUDGET_STEP_TIMEOUT_MS and fail-CLOSED: a slow or failed charge means no
+  // provider call (a late `ok` only over-counts, never overspends). 2) The race covers ONLY the provider call
+  // (budget `budgetMs`): measured in production, 4+ serial DO calls inside the old single 400 ms timer lost it on
+  // every uncached query. The TTL writes of the counters overlap with the embed.
+  const t0 = Date.now();
+  const cold = t0 - lastEmbedOkAt > QUERY_EMBED_WARM_WINDOW_MS;
+  const budgetMs = cold ? QUERY_EMBED_COLD_BUDGET_MS : QUERY_EMBED_BUDGET_MS;
+  let ttlWrites: Promise<void> = Promise.resolve();
+  let stepTimer: ReturnType<typeof setTimeout> | undefined;
+  const charged = await Promise.race([
+    takeQueryEmbed(storeId, searcher, { overlap: p => (ttlWrites = p) }).catch(() => false),
+    new Promise<false>(r => {
+      stepTimer = setTimeout(() => r(false), BUDGET_STEP_TIMEOUT_MS);
+    }),
+  ]);
+  clearTimeout(stepTimer);
+  if (!charged) return null;
+  const tCharged = Date.now();
   const ctl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const lost = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       ctl.abort();
-      reject(
-        new EmbeddingError('timeout', `query embed lost the ${QUERY_EMBED_BUDGET_MS} ms race`)
-      );
-    }, QUERY_EMBED_BUDGET_MS);
+      reject(new EmbeddingError('timeout', `query embed lost the ${budgetMs} ms race`));
+    }, budgetMs);
   });
-  const work = (async (): Promise<number[] | null> => {
-    // The ONE charge point (SEARCH-T12-6): once per real provider call, right before it, never on
-    // a cache hit. Budgets + per-searcher limit; no searcher = no call (default deny); fails closed.
-    if (!(await takeQueryEmbed(storeId, searcher))) return null;
-    if (ctl.signal.aborted) return null;
-    const [v] = await provider.embed([text], { signal: ctl.signal });
-    return v;
-  })();
+  const work = provider.embed([text], { signal: ctl.signal }).then(r => r[0] ?? null);
   work.catch(() => undefined); // the race's loser may reject later (aborted): never unhandled
   try {
     const v = await Promise.race([work, lost]);
@@ -390,6 +411,13 @@ async function queryVector(
     if (!Array.isArray(v) || v.length !== EMBED_DIMS)
       throw new EmbeddingError('shape', `embedding: expected ${EMBED_DIMS} dims`);
     qCache.set(key, { v: Float32Array.from(v), exp: Date.now() + QUERY_VECTOR_TTL_MS });
+    lastEmbedOkAt = Date.now();
+    // Measured in production so the budgets can be re-tuned from logs (Ruling SEARCH-WARM-1).
+    await ttlWrites;
+    logger.info(
+      { cold, budgetMs, chargeMs: tCharged - t0, embedMs: lastEmbedOkAt - tCharged },
+      '[search] query embed ok'
+    );
     return v;
   } finally {
     clearTimeout(timer);
