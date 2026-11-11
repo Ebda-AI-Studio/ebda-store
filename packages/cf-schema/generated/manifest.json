@@ -162,7 +162,7 @@
         "billing_events": 33,
         "instapay_receipts": 38,
         "manual_payment_claims": 17,
-        "billing_reminders": 7,
+        "billing_reminders": 9,
         "store_lifecycle_emails": 6,
         "billing_webhook_events": 7,
         "provider_activation_requests": 11,

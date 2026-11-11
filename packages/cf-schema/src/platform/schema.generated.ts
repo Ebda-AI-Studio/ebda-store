@@ -128,6 +128,8 @@ export const billingReminders = sqliteTable('billing_reminders', {
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
   noticeSentAt: integer('notice_sent_at', { mode: 'timestamp_ms' }),
+  noticeLeaseUntil: integer('notice_lease_until', { mode: 'timestamp_ms' }),
+  noticeAttempts: integer('notice_attempts').notNull().default(0),
 });
 
 export const billingWebhookEvents = sqliteTable('billing_webhook_events', {

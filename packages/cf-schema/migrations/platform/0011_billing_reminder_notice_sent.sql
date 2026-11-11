@@ -3,3 +3,5 @@
 -- @once: ALTER TABLE ADD COLUMN is not idempotent; the migration runner applies each numbered file exactly once.
 
 ALTER TABLE "billing_reminders" ADD COLUMN "notice_sent_at" INTEGER;
+ALTER TABLE "billing_reminders" ADD COLUMN "notice_lease_until" INTEGER;
+ALTER TABLE "billing_reminders" ADD COLUMN "notice_attempts" INTEGER NOT NULL DEFAULT 0;

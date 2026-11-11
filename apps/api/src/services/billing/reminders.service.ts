@@ -232,15 +232,22 @@ export async function deliverGraceStage(stage: StageKey, effect: BillingEffect):
   return true;
 }
 
-/** A claimed-but-unsent stage is re-sent only after this long (the first run is still in its send), and not forever. */
+/**
+ * A claimed-but-unsent stage is re-sent only after this long (the first run is still in its send), and not forever:
+ * never once it is older than RESEND_GIVE_UP_MS, nor after RESEND_MAX_ATTEMPTS resends. `created_at` is immutable.
+ */
 export const RESEND_AFTER_MS = 5 * 60_000;
 export const RESEND_GIVE_UP_MS = 2 * DAY;
+export const RESEND_MAX_ATTEMPTS = 5;
+/** How long one worker holds a row it is re-sending. */
+export const RESEND_LEASE_MS = 5 * 60_000;
 const GRACE_STAGES = ['grace_start', 'grace_d1', 'suspended'] as const;
 
 /**
- * Re-send every grace stage claimed but not confirmed sent (see `deliverGraceStage`). A lease (bumping `created_at` from the
- * value read, so one worker wins) keeps two workers from re-sending the same row. A stage whose moment has passed (the store
- * paid, so the subscription is no longer past_due) is stamped without sending. Returns how many notices went out.
+ * Re-send every grace stage claimed but not confirmed sent (see `deliverGraceStage`). A lease (`notice_lease_until` +
+ * `notice_attempts`, taken with one conditional UPDATE so exactly one worker wins) keeps two workers from re-sending the
+ * same row, and the attempts cap stops a notice that keeps failing. A stage whose moment has passed (the store paid, so the
+ * subscription is no longer past_due) is stamped without sending. Returns how many notices went out.
  */
 export async function resendUnsentGraceNotices(now: Date = new Date()): Promise<number> {
   if (!(await onD1())) return 0;
@@ -251,13 +258,18 @@ export async function resendUnsentGraceNotices(now: Date = new Date()): Promise<
     due_at: number;
     kind: GraceStage;
     created_at: number;
+    notice_attempts: number;
   }>(
-    `SELECT id, store_id, subscription_id, due_at, kind, created_at FROM billing_reminders
-     WHERE kind IN (${GRACE_STAGES.map(() => '?').join(', ')}) AND notice_sent_at IS NULL AND created_at BETWEEN ? AND ?
+    `SELECT id, store_id, subscription_id, due_at, kind, created_at, notice_attempts FROM billing_reminders
+     WHERE kind IN (${GRACE_STAGES.map(() => '?').join(', ')}) AND notice_sent_at IS NULL
+       AND created_at BETWEEN ? AND ? AND notice_attempts < ?
+       AND (notice_lease_until IS NULL OR notice_lease_until <= ?)
      ORDER BY created_at LIMIT 200`,
     ...GRACE_STAGES,
     now.getTime() - RESEND_GIVE_UP_MS,
-    now.getTime() - RESEND_AFTER_MS
+    now.getTime() - RESEND_AFTER_MS,
+    RESEND_MAX_ATTEMPTS,
+    now.getTime()
   );
   let sent = 0;
   for (const f of found) {
@@ -270,12 +282,7 @@ export async function resendUnsentGraceNotices(now: Date = new Date()): Promise<
       createdAt: new Date(f.created_at),
     };
     try {
-      const leased = await d1Run(
-        `UPDATE billing_reminders SET created_at = ?1 WHERE id = ?2 AND notice_sent_at IS NULL AND created_at = ?3`,
-        now.getTime(),
-        row.id,
-        f.created_at
-      );
+      const leased = await leaseGraceStage(row.id, f.notice_attempts, now);
       if (leased !== 1) continue;
       const sub = await withStore(row.storeId, tx =>
         tx.storeSubscription.findUnique({
@@ -300,6 +307,28 @@ export async function resendUnsentGraceNotices(now: Date = new Date()): Promise<
     }
   }
   return sent;
+}
+
+/**
+ * Take the resend lease on one outbox row: ONE conditional UPDATE, so of any number of concurrent workers exactly one sees
+ * `changes = 1`. It re-checks everything the scan filtered on (still unsent, no live lease, under the attempts cap, the
+ * attempts value it read) and never touches `created_at`.
+ */
+export async function leaseGraceStage(
+  id: string,
+  attemptsSeen: number,
+  now: Date
+): Promise<number> {
+  return d1Run(
+    `UPDATE billing_reminders SET notice_lease_until = ?1, notice_attempts = notice_attempts + 1
+     WHERE id = ?2 AND notice_sent_at IS NULL AND notice_attempts = ?3 AND notice_attempts < ?4
+       AND (notice_lease_until IS NULL OR notice_lease_until <= ?5)`,
+    now.getTime() + RESEND_LEASE_MS,
+    id,
+    attemptsSeen,
+    RESEND_MAX_ATTEMPTS,
+    now.getTime()
+  );
 }
 
 /** InstaPay subscriptions in grace whose suspension is within the next day. */
