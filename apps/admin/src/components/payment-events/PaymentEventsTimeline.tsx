@@ -6,6 +6,7 @@ import { Modal } from '@ebda/ui';
 import { apiGet } from '@/lib/api';
 import { useT } from '@/i18n/useT';
 import { intlLocaleForUi } from '@/lib/format';
+import { minorToDecimalString } from '@ebda/shared';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,17 @@ function getLabel(
 // `details` may be a string OR a JSON object (payment-confirm writes
 // `{ source, reason, providerStatus }`). Reduce it to a human-readable
 // string so it can never be rendered as a raw React child (error #31).
+/** A wallet give-back the order's one refundable balance cut short (#659): the merchant settles the rest by hand. */
+function walletTrimOf(
+  details: unknown
+): { planned: number; credited: number; short: number } | null {
+  if (!details || typeof details !== 'object') return null;
+  const d = details as Record<string, unknown>;
+  if (d.reason !== 'wallet_giveback_trimmed') return null;
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  return { planned: n(d.planned), credited: n(d.credited), short: n(d.short) };
+}
+
 function formatDetails(details: unknown): string | null {
   if (details == null) return null;
   if (typeof details === 'string') return details.trim() || null;
@@ -301,7 +313,14 @@ function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
     event.eventType
   );
   const iconVariant = getIconVariant(event.eventType);
-  const detailsText = formatDetails(event.details);
+  const trim = walletTrimOf(event.details);
+  const detailsText = trim
+    ? t('walletTrimmed', {
+        planned: minorToDecimalString(trim.planned),
+        credited: minorToDecimalString(trim.credited),
+        short: minorToDecimalString(trim.short),
+      })
+    : formatDetails(event.details);
 
   return (
     <li className="relative flex gap-3">

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Modal, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
-import { apiPost } from '../../../../../../lib/api';
+import { apiRequest } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 import { minorToDecimalString } from '@ebda/shared';
@@ -48,6 +48,9 @@ export function RefundButton({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState('');
+  // One Idempotency-Key per dialog open (#628): a retry of THIS refund (double click, a timeout) reuses it, so the API
+  // answers the first result or refuses; a new dialog is a new refund.
+  const [attemptKey, setAttemptKey] = useState(() => crypto.randomUUID());
   const { success: toastSuccess, error: toastError } = useToast();
 
   const closeIfIdle = () => {
@@ -59,13 +62,15 @@ export function RefundButton({
   const handleRefund = async () => {
     setBusy(true);
     try {
-      const { data, error } = await apiPost<{
+      const { data, error } = await apiRequest<{
         refundId: string;
         refundAmount: number;
         provider: string;
         status: string;
       }>(`/api/v1/stores/${storeId}/orders/${orderId}/refund-via-provider`, {
-        reason: reason.trim() || undefined,
+        method: 'POST',
+        headers: { 'Idempotency-Key': attemptKey },
+        body: JSON.stringify({ reason: reason.trim() || undefined }),
       });
       if (error || !data) {
         toastError(t('toastFailedTitle'), error?.message ?? '');
@@ -97,7 +102,10 @@ export function RefundButton({
     <>
       <Button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setAttemptKey(crypto.randomUUID());
+          setOpen(true);
+        }}
         disabled={disabled || busy}
         title={t('buttonTooltip')}
         variant="outline"

@@ -260,8 +260,8 @@ export async function forEachPaidOrderPage(
 }
 
 /** RFM snapshot rows read per query / ids deleted per statement (a DO's SQLite binds at most ~100 parameters). */
-export const RFM_SNAPSHOT_PAGE = 1000;
-export const RFM_DELETE_CHUNK = 100;
+const RFM_SNAPSHOT_PAGE = 1000;
+const RFM_DELETE_CHUNK = 100;
 
 type RfmSnapshotRef = { id: string; customerId: string; segment: RfmSegment };
 
@@ -270,7 +270,7 @@ type RfmSnapshotRef = { id: string; customerId: string; segment: RfmSegment };
  * whose parameter list grows with the customer count (Postgres caps bind parameters at 32767, a DO's SQLite at ~100), and
  * `notIn: <every customer key>` for the stale sweep, which has the same bound and cannot be chunked.
  */
-export async function readAllRfmSnapshots(
+async function readAllRfmSnapshots(
   db: Awaited<ReturnType<typeof storeDb>>,
   storeId: string,
   pageSize = RFM_SNAPSHOT_PAGE
@@ -295,7 +295,7 @@ export async function readAllRfmSnapshots(
  * Deletes the snapshots whose customer key no paid order produces any more (see the sweep note in `runRfmRollup`). Runs for
  * a store with ZERO paid orders too: refunding or deleting a store's last paid order must empty its segments, not freeze them.
  */
-export async function sweepStaleRfm(
+async function sweepStaleRfm(
   sw: Awaited<ReturnType<typeof storeWriter>>,
   existing: RfmSnapshotRef[],
   keep: Set<string>,

@@ -544,11 +544,33 @@ function warehouseTarget(db: SyncSql, storeId: string, a: Record<string, unknown
   return { warehouseId, productId, variantId, code: wh.code as string };
 }
 
+/**
+ * #632: a sale decrements only the aggregate (`products` / `product_variants`), never a warehouse row, so the warehouse
+ * shadow runs AHEAD of the real stock between reconciles. `syncAggregate` overwrites the aggregate with the shadow's SUM,
+ * so a warehouse edit on a stale shadow resurrected every unit sold since (aggregate 6, shadow 10, +5 -> 15, not 11).
+ * Bring the shadow back to the aggregate FIRST, in the same section, so the edit lands on the real numbers. A SKU with no
+ * warehouse row yet keeps the old meaning (its first warehouse row defines the stock).
+ */
+function shadowInSync(
+  db: SyncSql,
+  storeId: string,
+  t: { productId: string; variantId: string | null }
+): void {
+  const has = db.all(
+    t.variantId
+      ? 'SELECT 1 AS x FROM warehouse_stock WHERE store_id = ? AND product_id = ? AND variant_id = ? LIMIT 1'
+      : 'SELECT 1 AS x FROM warehouse_stock WHERE store_id = ? AND product_id = ? AND variant_id IS NULL LIMIT 1',
+    t.variantId ? [storeId, t.productId, t.variantId] : [storeId, t.productId]
+  ).length;
+  if (has) reconcileToAggregate(db, storeId, t.productId, t.variantId);
+}
+
 /** WarehouseService.setStock */
 function setWarehouseStock(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const quantity = int(a.quantity, 'quantity');
   if (quantity < 0) return fail('INVALID_QUANTITY', 'Quantity cannot be negative');
   const t = warehouseTarget(db, storeId, a);
+  shadowInSync(db, storeId, t);
   const q = upsertWarehouseStock(db, { storeId, ...t, mode: 'set', value: quantity });
   syncAggregate(db, storeId, t.productId, t.variantId);
   return { quantity: q };
@@ -558,6 +580,7 @@ function setWarehouseStock(db: SyncSql, storeId: string, a: Record<string, unkno
 function adjustWarehouseStock(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const delta = int(a.delta, 'delta');
   const t = warehouseTarget(db, storeId, a);
+  shadowInSync(db, storeId, t);
   const before = db.all(
     t.variantId
       ? 'SELECT quantity FROM warehouse_stock WHERE store_id = ? AND warehouse_id = ? AND product_id = ? AND variant_id = ?'

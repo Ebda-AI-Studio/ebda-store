@@ -76,4 +76,14 @@ describe('withIdempotencyKey', () => {
     expect(idempotencyKeyOf(undefined)).toBeUndefined();
     expect(() => idempotencyKeyOf('bad key!')).toThrow();
   });
+
+  it('#628: a required scope refuses a missing key with 400 and runs nothing', async () => {
+    const effect = vi.fn(async () => 1);
+    await expect(
+      withIdempotencyKey('refund', undefined, effect, never, { required: true })
+    ).rejects.toMatchObject({ statusCode: 400, code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    expect(effect).not.toHaveBeenCalled();
+    await withIdempotencyKey('refund', 'key-00099', effect, never, { required: true });
+    expect(effect).toHaveBeenCalledTimes(1);
+  });
 });
