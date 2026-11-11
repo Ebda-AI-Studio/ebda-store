@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '@/lib/api';
-import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@ebda/shared';
+import { parseStockAdjustCsv, generateStockAdjustCsvTemplate, formatSigned } from '@ebda/shared';
 import type { StockAdjustParseResult, StockAdjustParsedRow } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           alignEnd: true,
           cell: row => (
             <span className="font-mono">
-              {row.delta !== null ? (row.delta >= 0 ? `+${row.delta}` : row.delta) : '—'}
+              {row.delta !== null ? formatSigned(row.delta, { plus: true }) : '—'}
             </span>
           ),
         },

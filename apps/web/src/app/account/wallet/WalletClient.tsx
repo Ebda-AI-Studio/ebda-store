@@ -1,6 +1,6 @@
 'use client';
 
-import { storeNumerals } from '@ebda/shared';
+import { storeNumerals, formatSigned } from '@ebda/shared';
 import { useEffect, useState } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -211,8 +211,7 @@ export default function WalletClient() {
                     }`}
                   >
                     <span dir="ltr">
-                      {entry.amount > 0 ? '+' : '−'}
-                      {money(Math.abs(entry.amount))}
+                      {formatSigned(entry.amount, { plus: true, format: abs => money(abs) })}
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground">

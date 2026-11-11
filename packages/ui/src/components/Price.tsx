@@ -2,7 +2,7 @@
 
 import { forwardRef } from 'react';
 import { cn } from '../utils/cn';
-import { formatPrice, localizeDigits, REGION, type Numerals } from '@ebda/shared';
+import { formatPrice, localizeDigits, REGION, type Numerals, formatSigned } from '@ebda/shared';
 
 export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Price in piastres (1 EGP = 100 piastres). For products with variants
@@ -113,7 +113,9 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
         {hasDiscount && showDiscount && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-destructive text-destructive-foreground">
             {discountLabel ||
-              (isRtl ? `${localizeDigits(discount, numerals)}% خصم` : `-${discount}%`)}
+              (isRtl
+                ? `${localizeDigits(discount, numerals)}% خصم`
+                : formatSigned(-discount, { format: abs => `${abs}%` }))}
           </span>
         )}
       </div>

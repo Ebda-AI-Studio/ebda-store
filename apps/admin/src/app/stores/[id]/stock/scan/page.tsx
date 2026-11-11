@@ -24,7 +24,12 @@ import { useFeatures } from '@/hooks/useFeatures';
 import { useLocale } from 'next-intl';
 import { VariantText } from '@ebda/ui';
 import { apiGet, apiPost } from '@/lib/api';
-import { orderLineVariantTitle, searchQueryHeaders, withNumerals } from '@ebda/shared';
+import {
+  orderLineVariantTitle,
+  searchQueryHeaders,
+  withNumerals,
+  formatSigned,
+} from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
 // ─────────────────────────────────────────────────────────────────────────────
@@ -848,7 +853,7 @@ function CountMode({ storeId }: { storeId: string }) {
     const ok = await askConfirm({
       object: t('counting.reconcileObject', {
         count: changed.length,
-        units: `${netUnits > 0 ? '+' : ''}${netUnits}`,
+        units: formatSigned(netUnits, { plus: true }),
       }),
       consequence: t('counting.reconcileConsequence'),
       confirmLabel: t('counting.reconcileAction'),
@@ -1065,7 +1070,7 @@ function CountMode({ storeId }: { storeId: string }) {
                         : 'text-muted-foreground'
                   }`}
                 >
-                  {line.variance > 0 ? `+${line.variance}` : line.variance}
+                  {formatSigned(line.variance, { plus: true })}
                 </span>
               ),
             },

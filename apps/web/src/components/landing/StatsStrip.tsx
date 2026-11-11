@@ -53,6 +53,7 @@ interface StatItem {
 }
 
 const STATS: StatItem[] = [
+  // sign-ok: "200+" marketing suffix, not a signed value
   { value: 200, suffix: '+', labelEn: 'products imported', labelAr: 'منتج مستورد' },
   { value: 2, suffix: '', labelEn: 'languages, AR + EN', labelAr: 'لغتان، عربي + إنجليزي' },
   { value: 7, suffix: '', labelEn: 'days to launch', labelAr: 'أيام للإطلاق' },

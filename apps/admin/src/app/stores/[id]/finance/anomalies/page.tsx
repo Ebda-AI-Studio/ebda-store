@@ -7,7 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { useRequireFeature } from '@/hooks/useRequireFeature';
-import { withNumerals } from '@ebda/shared';
+import { withNumerals, formatSigned } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -76,7 +76,6 @@ function AnomalyRow({
 }) {
   const [acking, setAcking] = useState(false);
 
-  const deltaSign = item.deltaPercent >= 0 ? '+' : '';
   // `deltaPercent` is persisted as a RATIO (e.g. -0.35 for a 35% drop) by
   // profit-anomaly.service.ts — the AI narration multiplies by 100, so the
   // displayed delta must too, otherwise a real -35% shows as -0.4%.
@@ -138,8 +137,11 @@ function AnomalyRow({
               item.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
             }`}
           >
-            {deltaSign}
-            {deltaPercentDisplay.toFixed(1)}%
+            {formatSigned(deltaPercentDisplay, {
+              plus: true,
+              fractionDigits: 1,
+              format: abs => `${abs.toFixed(1)}%`,
+            })}
           </p>
         </div>
       </div>

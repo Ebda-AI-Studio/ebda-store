@@ -2,6 +2,7 @@
 
 import { forwardRef } from 'react';
 import { cn } from '../utils/cn';
+import { formatSigned } from '@ebda/shared';
 
 export type ProductBadgeVariant =
   | 'sale'
@@ -95,7 +96,7 @@ export const ProductBadge = forwardRef<HTMLSpanElement, ProductBadgeProps>(
       if (label) return label;
 
       if (variant === 'sale' && discount) {
-        return isRtl ? `${discount}% خصم` : `-${discount}%`;
+        return isRtl ? `${discount}% خصم` : formatSigned(-discount, { format: abs => `${abs}%` });
       }
 
       return defaultLabels[isRtl ? 'ar' : 'en'][variant] || '';

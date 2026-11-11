@@ -23,7 +23,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Select, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
-import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
+import { formatMoney, type PlanLimits, withNumerals, formatSigned } from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
@@ -1214,8 +1214,9 @@ export default function StoreBillingPage() {
                     header: t('invoiceCols.amount'),
                     cell: c => (
                       <span className="tabular-nums">
-                        {c.type === 'refund' ? '−' : ''}
-                        {formatMoney(c.amountMinor, locale, { fixedDecimals: true })}
+                        {formatSigned(c.type === 'refund' ? -c.amountMinor : c.amountMinor, {
+                          format: abs => formatMoney(abs, locale, { fixedDecimals: true }),
+                        })}
                         {c.vat && (c.vatMinor ?? 0) > 0 && (
                           <span className="block text-xs text-muted-foreground">
                             {t('invoiceVat', {

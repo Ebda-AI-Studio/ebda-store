@@ -10,7 +10,7 @@ import { apiGet, apiFetch } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
-import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/shared';
+import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay, formatSigned } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -485,8 +485,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                 data.netIncome >= 0 ? 'text-green-700' : 'text-red-600'
               }`}
             >
-              {data.netIncome < 0 ? '−' : ''}
-              {major(Math.abs(data.netIncome))} {tc('egp')}
+              {formatSigned(data.netIncome, { format: abs => `${major(abs)} ${tc('egp')}` })}
             </span>
           </div>
         </div>

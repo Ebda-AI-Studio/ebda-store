@@ -9,7 +9,12 @@ import { apiGet, apiGetPage } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
+import {
+  reportRangeQueryString,
+  minorToDecimalString,
+  withNumerals,
+  formatSigned,
+} from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -314,14 +319,7 @@ export default function FinanceDashboardPage() {
                   }`}
                   title={dashboardErr ?? undefined}
                 >
-                  {dashboardErr ? (
-                    '—'
-                  ) : (
-                    <>
-                      {netPositive ? '' : '−'}
-                      {major(Math.abs(thisMonth.net))}
-                    </>
-                  )}
+                  {dashboardErr ? '—' : <>{formatSigned(thisMonth.net, { format: major })}</>}
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
@@ -489,7 +487,6 @@ export default function FinanceDashboardPage() {
                 ) : (
                   <div className="divide-y divide-border/40">
                     {recentAnomalies.map(a => {
-                      const sign = a.deltaPercent >= 0 ? '+' : '';
                       // `deltaPercent` is stored as a ratio (e.g. -0.35); ×100
                       // to show a real percentage, matching the anomalies page.
                       const deltaPercentDisplay = a.deltaPercent * 100;
@@ -513,8 +510,11 @@ export default function FinanceDashboardPage() {
                                 a.deltaPercent < 0 ? 'text-red-600' : 'text-green-700'
                               }`}
                             >
-                              {sign}
-                              {deltaPercentDisplay.toFixed(1)}%
+                              {formatSigned(deltaPercentDisplay, {
+                                plus: true,
+                                fractionDigits: 1,
+                                format: abs => `${abs.toFixed(1)}%`,
+                              })}
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-1">

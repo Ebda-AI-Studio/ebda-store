@@ -199,6 +199,7 @@ export const ProductModelViewer = forwardRef<ProductModelViewerHandle, ProductMo
         else if (e.key === 'ArrowRight') controls.rotateLeft(-step);
         else if (e.key === 'ArrowUp') controls.rotateUp(step);
         else if (e.key === 'ArrowDown') controls.rotateUp(-step);
+        // sign-ok: keyboard key, not a number
         else if (e.key === '+' || e.key === '=') controls.dollyIn(1.1);
         else if (e.key === '-' || e.key === '_') controls.dollyOut(1.1);
         else handled = false;

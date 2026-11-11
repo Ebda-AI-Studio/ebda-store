@@ -10,7 +10,7 @@ import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api'
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { minorToMajor, intlLocaleForUi } from '@/lib/format';
-import { withNumerals } from '@ebda/shared';
+import { withNumerals, formatSigned } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -376,8 +376,9 @@ export default function StatementDetailPage() {
                   {t('difference.bankBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.bankBalanceFils < 0 ? '−' : ''}
-                  {tc('egp')} {major(Math.abs(difference.bankBalanceFils))}
+                  {formatSigned(difference.bankBalanceFils, {
+                    format: abs => `${tc('egp')} ${major(abs)}`,
+                  })}
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
@@ -385,8 +386,9 @@ export default function StatementDetailPage() {
                   {t('difference.ledgerBalance')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-foreground font-mono">
-                  {difference.ledgerBalanceFils < 0 ? '−' : ''}
-                  {tc('egp')} {major(Math.abs(difference.ledgerBalanceFils))}
+                  {formatSigned(difference.ledgerBalanceFils, {
+                    format: abs => `${tc('egp')} ${major(abs)}`,
+                  })}
                 </p>
               </div>
               <div
@@ -410,8 +412,10 @@ export default function StatementDetailPage() {
                     difference.isReconciled ? 'text-success-ink' : 'text-destructive-ink'
                   }`}
                 >
-                  {difference.differenceFils < 0 ? '−' : difference.differenceFils > 0 ? '+' : ''}
-                  {tc('egp')} {major(Math.abs(difference.differenceFils))}
+                  {formatSigned(difference.differenceFils, {
+                    plus: true,
+                    format: abs => `${tc('egp')} ${major(abs)}`,
+                  })}
                 </p>
               </div>
             </div>
@@ -435,8 +439,9 @@ export default function StatementDetailPage() {
                     {t('difference.unmatchedLedgerSide')}
                   </p>
                   <p className="mt-0.5 text-sm font-semibold text-info-ink font-mono">
-                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}
-                    {tc('egp')} {major(Math.abs(difference.unmatchedLedgerFils))}
+                    {formatSigned(difference.unmatchedLedgerFils, {
+                      format: abs => `${tc('egp')} ${major(abs)}`,
+                    })}
                   </p>
                   <p className="mt-0.5 text-xs text-info-ink">
                     {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}

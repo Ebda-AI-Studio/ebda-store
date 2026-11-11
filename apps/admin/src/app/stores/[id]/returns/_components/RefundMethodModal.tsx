@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 
-import { formatMoney, tryToMinor } from '@ebda/shared';
+import { formatMoney, tryToMinor, formatSigned } from '@ebda/shared';
 type RefundMethod = 'original' | 'store_credit' | 'bank_transfer' | 'manual';
 
 // 'manual' ("Already refunded — record only") is offered ONLY when a refund for
@@ -322,8 +322,10 @@ export function RefundMethodModal({
                             {t('tierAdjustment.adjustment')}
                           </dt>
                           <dd className="tabular-nums">
-                            {l.adjustment > 0 ? '-' : l.adjustment < 0 ? '+' : ''}
-                            {formatCurrency(Math.abs(l.adjustment))}
+                            {formatSigned(-l.adjustment, {
+                              plus: true,
+                              format: abs => formatCurrency(abs),
+                            })}
                           </dd>
                           <dt className="font-semibold text-foreground">
                             {t('tierAdjustment.adjusted')}

@@ -1,6 +1,6 @@
 'use client';
 
-import { orderTaxPlacement, withNumerals } from '@ebda/shared';
+import { orderTaxPlacement, withNumerals, formatSigned } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney } from '@/lib/format';
 import type { OrderDetail } from '@/lib/orders';
@@ -144,7 +144,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
             <div className="flex items-center justify-between">
               <dt className="text-foreground">{t.detail.paidFromWallet}</dt>
               <dd className="font-medium text-foreground">
-                −{formatMoney(walletAmount, order.currency)}
+                {formatSigned(-walletAmount, { format: abs => formatMoney(abs, order.currency) })}
               </dd>
             </div>
             <div className="flex items-center justify-between">

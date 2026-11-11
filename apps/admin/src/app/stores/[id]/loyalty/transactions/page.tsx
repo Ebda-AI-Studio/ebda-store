@@ -9,7 +9,7 @@ import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
 import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
-import { localDayRange, reportRangeParams, withNumerals } from '@ebda/shared';
+import { localDayRange, reportRangeParams, withNumerals, formatSigned } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 
@@ -75,8 +75,13 @@ function TypeBadge({ type, label }: { type: string; label: string }) {
 
 function PointsCell({ points }: { points: number }) {
   if (points > 0)
-    return <span className="font-semibold text-emerald-600 dark:text-emerald-400">+{points}</span>;
-  if (points < 0) return <span className="font-semibold text-destructive-ink">{points}</span>;
+    return (
+      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+        {formatSigned(points, { plus: true })}
+      </span>
+    );
+  if (points < 0)
+    return <span className="font-semibold text-destructive-ink">{formatSigned(points)}</span>;
   return <span className="text-muted-foreground">0</span>;
 }
 

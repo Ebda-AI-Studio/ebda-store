@@ -24,7 +24,7 @@ import { DataTable, type DataTableColumn } from '../../components/mobile/DataTab
 import { useT } from '../../i18n/useT';
 import { PageState } from '@/components/PageState';
 import { formatSpend } from '@/lib/ai-spend';
-import { withNumerals } from '@ebda/shared';
+import { withNumerals, formatSigned } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -265,8 +265,7 @@ function PlatformAiUsagePageInner() {
           <div className="font-medium text-foreground">{formatSpend(store.monthCostMicros)}</div>
           {store.monthUnpricedCalls > 0 && (
             <div className="text-xs text-warning-ink" title={t('unpricedTooltip')}>
-              +{store.monthUnpricedCalls.toLocaleString(undefined, withNumerals())}{' '}
-              {t('unpricedRowSuffix')}
+              {formatSigned(store.monthUnpricedCalls, { plus: true })} {t('unpricedRowSuffix')}
             </div>
           )}
         </div>

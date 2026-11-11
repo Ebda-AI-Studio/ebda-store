@@ -12,7 +12,7 @@ import { apiGet } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
-import { withNumerals } from '@ebda/shared';
+import { withNumerals, formatSigned } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ interface FunnelData {
 function dropoff(from: number, to: number): string {
   if (from === 0) return '—';
   const pct = ((from - to) / from) * 100;
-  return `-${pct.toFixed(1)}%`;
+  return formatSigned(-pct, { fractionDigits: 1, format: abs => `${abs.toFixed(1)}%` });
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

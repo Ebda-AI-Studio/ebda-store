@@ -11,7 +11,7 @@ import { apiGet } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 
-import { minorToDecimalString, withNumerals } from '@ebda/shared';
+import { minorToDecimalString, withNumerals, formatSigned } from '@ebda/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TopSku {
@@ -190,8 +190,11 @@ export default function InsightsDashboardPage() {
                     aovChange >= 0 ? 'text-green-700' : 'text-red-600'
                   }`}
                 >
-                  {aovChange >= 0 ? '+' : ''}
-                  {num(aovChange, 1)}%
+                  {formatSigned(aovChange, {
+                    plus: true,
+                    fractionDigits: 1,
+                    format: abs => `${num(abs, 1)}%`,
+                  })}
                 </span>
               )}
             </p>

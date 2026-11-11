@@ -12,6 +12,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { ShippingTabs } from '../shipping/_components/ShippingTabs';
 import { formatMoney } from '../orders/[orderId]/_components/format';
 import { Button } from '@/components/ui/Button';
+import { formatSigned } from '@ebda/shared';
 
 type ReconStatus = 'awaiting' | 'partial' | 'settled' | 'over_remitted' | 'mismatch';
 
@@ -361,7 +362,10 @@ export default function CodReconciliationPage() {
                       <td className="px-3 py-2">{formatMoney(r.result.net)}</td>
                       <td className="px-3 py-2">
                         {r.result.over > 0
-                          ? `+${formatMoney(r.result.over)}`
+                          ? formatSigned(r.result.over, {
+                              plus: true,
+                              format: abs => formatMoney(abs),
+                            })
                           : formatMoney(r.result.outstanding)}
                       </td>
                       <td className="px-3 py-2">

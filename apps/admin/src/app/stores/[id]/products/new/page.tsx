@@ -365,6 +365,7 @@ export default function NewProductPage() {
                 </span>
               </span>
               <span aria-hidden="true" className="text-muted-foreground">
+                {/* sign-ok: disclosure glyph, not a number */}
                 {showDetails ? '−' : '+'}
               </span>
             </button>

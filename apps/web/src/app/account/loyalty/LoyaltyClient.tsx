@@ -1,6 +1,6 @@
 'use client';
 
-import { storeNumerals } from '@ebda/shared';
+import { storeNumerals, formatSigned } from '@ebda/shared';
 import { useState, useEffect } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -505,8 +505,7 @@ export default function LoyaltyClient() {
                           isPositive ? 'text-success-ink' : 'text-destructive-ink'
                         }`}
                       >
-                        {isPositive ? '+' : ''}
-                        {localize(txn.points.toLocaleString('en-US'))}
+                        {localize(formatSigned(txn.points, { plus: true }))}
                       </td>
                     </tr>
                   );

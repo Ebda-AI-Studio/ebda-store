@@ -3,7 +3,7 @@
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { TIER_COLORS, TIER_KEYS, type LoyaltyMember, type TierKey } from './types';
-import { withNumerals } from '@ebda/shared';
+import { withNumerals, formatSigned } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 
 interface MembersTableProps {
@@ -69,18 +69,12 @@ export function MembersTable({
     {
       header: t('columns.totalEarned'),
       cell: member => (
-        <span className="text-success-ink">
-          +{member.totalEarned.toLocaleString(undefined, withNumerals())}
-        </span>
+        <span className="text-success-ink">{formatSigned(member.totalEarned, { plus: true })}</span>
       ),
     },
     {
       header: t('columns.totalRedeemed'),
-      cell: member => (
-        <span className="text-primary">
-          -{member.totalRedeemed.toLocaleString(undefined, withNumerals())}
-        </span>
-      ),
+      cell: member => <span className="text-primary">{formatSigned(-member.totalRedeemed)}</span>,
     },
     {
       header: t('columns.actions'),
