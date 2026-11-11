@@ -49,7 +49,7 @@ export function SidebarHeader({
               />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-lg font-bold tracking-tight text-foreground truncate block">
+              <span className="text-lg font-bold text-foreground truncate block">
                 {storeBranding.name}
               </span>
               {storeBranding.nameAr && (
@@ -72,8 +72,8 @@ export function SidebarHeader({
               />
             </div>
             <div>
-              <span className="text-lg font-bold tracking-tight">
-                <span className="text-primary">{tb('brandAlt')}</span>
+              <span className="text-lg font-bold">
+                <span className="text-primary-ink">{tb('brandAlt')}</span>
                 {mode === 'super_admin' && (
                   <span className="text-foreground"> {t('forcePlatformBrand')}</span>
                 )}
