@@ -29,7 +29,7 @@ describe('ai-review classifier (fail closed: only docs, markdown and NEWLY ADDED
   });
   it('a label event gets its own concurrency group, so adding a label never cancels a running bot review', () => {
     const wf = readFileSync('.github/workflows/ai-review.yml', 'utf8');
-    expect(/^  group: (.*)$/m.exec(wf)?.[1] ?? '').toMatch(/github\.event\.action == 'labeled' && 'label' \|\| 'review'/);
+    expect(/^  group: (.*)$/m.exec(wf)?.[1] ?? '').toMatch(/github\.event\.action == 'labeled' && 'label' \|\|/);
   });
   it('the workflow: base checkout, 400 KB fails, name-status, fork-gate red until labelled', () => {
     const wf = readFileSync('.github/workflows/ai-review.yml', 'utf8');
@@ -41,5 +41,26 @@ describe('ai-review classifier (fail closed: only docs, markdown and NEWLY ADDED
     expect(fork).toMatch(/head\.repo\.full_name != github\.repository/);
     expect(fork).toMatch(/exit 1/);
     expect(fork).not.toMatch(/CLAUDE_CODE_OAUTH_TOKEN/);
+  });
+});
+
+describe('approval is never carried across pushes by automation (Ruling AIR-6)', () => {
+  const wf2 = readFileSync('.github/workflows/ai-review.yml', 'utf8');
+  const classify2 = wf2.slice(wf2.indexOf('  classify:'), wf2.indexOf('  review:'));
+  const fork2 = wf2.slice(wf2.indexOf('  fork-gate:'));
+  const BASE_CHANGED = /github\.event\.action != 'edited' \|\| github\.event\.changes\.base\.ref\.from != null/;
+  it('every non-label event strips ai-review-passed unconditionally in classify, with no marker or diff comparison', () => {
+    expect(classify2).toMatch(/gh pr edit "\$PR" --remove-label ai-review-passed/);
+    expect(wf2).not.toMatch(/pass-marker|patch-id|REVIEWED_DIFF/);
+  });
+  it('the copy listens for the edited event', () => {
+    expect(wf2).toMatch(/types: \[[^\]]*'?edited/);
+  });
+  it('a base-branch change (edited event with changes.base) re-runs classify and the fork gate; a title/body edit does not', () => {
+    expect(classify2).toMatch(BASE_CHANGED);
+    expect(fork2).toMatch(BASE_CHANGED);
+  });
+  it('a non-base edit has its own concurrency group so it cannot cancel a running review', () => {
+    expect(/^  group: (.*)$/m.exec(wf2)?.[1] ?? '').toMatch(/github\.event\.action == 'edited' && github\.event\.changes\.base\.ref\.from == null && 'edit'/);
   });
 });
