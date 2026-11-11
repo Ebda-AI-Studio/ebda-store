@@ -518,6 +518,30 @@ export function cancelOrder(
 /** Units a backordered line never took from stock (qty - stock_taken - qty_fulfilled): they must never be restocked. */
 function neverTakenByItem(db: SyncSql, storeId: string, orderId: string): Map<string, number> {
   const neverTaken = new Map<string, number>();
+  // #633: a manual (phone) order takes no stock at all; its marker lists every line it never took, so a cancel / refund
+  // restocks none of it (it used to add the whole order back: phantom inventory, then an oversell)
+  for (const e of db.all(
+    `SELECT metadata FROM order_events WHERE store_id = ? AND order_id = ? AND to_status = 'stock_not_taken'`,
+    [storeId, orderId]
+  )) {
+    let items: unknown = null;
+    try {
+      items = (JSON.parse(String(e.metadata)) as { items?: unknown }).items;
+    } catch {
+      items = null;
+    }
+    if (Array.isArray(items))
+      for (const it of items as Array<{ orderItemId?: unknown; quantity?: unknown }>)
+        if (
+          typeof it.orderItemId === 'string' &&
+          Number.isInteger(it.quantity) &&
+          (it.quantity as number) > 0
+        )
+          neverTaken.set(
+            it.orderItemId,
+            (neverTaken.get(it.orderItemId) ?? 0) + (it.quantity as number)
+          );
+  }
   for (const bl of db.all(
     `SELECT order_item_id, qty, stock_taken, qty_fulfilled FROM backorder_lines
      WHERE store_id = ? AND order_item_id IN (SELECT id FROM order_items WHERE order_id = ?)`,

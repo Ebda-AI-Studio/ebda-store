@@ -359,4 +359,37 @@ describe('order money operations: the door', () => {
     r.raw.exec(`UPDATE orders SET created_at = created_at - 25 * 3600 * 1000`); // yesterday's, still pending
     expect(r.code('createOrder', o('01011111111'))).toBe('no error');
   });
+
+  describe('#633: a manual (phone) order takes no stock, so its cancel / refund puts none back', () => {
+    const admin = (qty: number) => ({
+      lines: [{ productId: 'sku', quantity: qty }],
+      shippingAddress: { firstName: 'A', lastName: 'B', phone: '01012345678' },
+      actorId: 'admin',
+      actorRole: 'store_admin',
+    });
+    const stock = (r: ReturnType<typeof rig>) =>
+      r.n(`SELECT inventory n FROM products WHERE id = 'sku'`);
+
+    it('cancel adds nothing back (was +3 phantom units)', () => {
+      const r = rig(10);
+      const o = r.op('createAdminOrder', admin(3));
+      expect(stock(r)).toBe(10);
+      r.op('cancel', { orderId: o.orderId });
+      expect(stock(r)).toBe(10);
+    });
+
+    it('a refund after confirming adds nothing back either; a storefront order still restocks', () => {
+      const r = rig(10);
+      const o = r.op('createAdminOrder', admin(2));
+      r.raw.exec(
+        `UPDATE orders SET status = 'confirmed', payment_status = 'paid' WHERE id = '${o.orderId}'`
+      );
+      r.op('refundBook', { orderId: o.orderId });
+      expect(stock(r)).toBe(10);
+      const s = r.op('createOrder', r.order({ lines: [{ productId: 'sku', quantity: 4 }] }));
+      expect(stock(r)).toBe(6);
+      r.op('cancel', { orderId: s.orderId });
+      expect(stock(r)).toBe(10);
+    });
+  });
 });

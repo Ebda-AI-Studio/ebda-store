@@ -345,18 +345,18 @@ describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
     expect(claim.ok ? 'ok' : claim.code).toBe('GUEST_RETURN_NO_WALLET');
   });
 
-  it('a DO already migrated at the old schema is upgraded: cf-0006 makes customer_id nullable and turns the old guest rows into NULL', async () => {
+  it('a DO already migrated at the old schema is upgraded: cf-0008 makes customer_id nullable and turns the old guest rows into NULL', async () => {
     const store = 'guest-ret-upgrade';
     const stub = await seed(store);
     await runInDurableObject(stub, (_i, state) => {
       const sql = state.storage.sql;
       const x = (q: string, ...p: unknown[]) => sql.exec(q, ...p);
-      // put returns.customer_id back to the pre-0006 shape: NOT NULL, and drop cf-0006 from the history
+      // put returns.customer_id back to the pre-0008 shape: NOT NULL, and drop cf-0008 from the history
       x('DROP INDEX IF EXISTS returns_customer_id_idx');
       x('ALTER TABLE returns RENAME COLUMN customer_id TO customer_id_new');
       x(`ALTER TABLE returns ADD COLUMN customer_id TEXT NOT NULL DEFAULT ''`);
       x('ALTER TABLE returns DROP COLUMN customer_id_new');
-      x("DELETE FROM _migrations WHERE id = 'cf-0006_returns_customer_nullable'");
+      x("DELETE FROM _migrations WHERE id = 'cf-0008_returns_customer_nullable'");
       const notNull = () =>
         x(
           "SELECT \"notnull\" AS n FROM pragma_table_info('returns') WHERE name = 'customer_id'"
@@ -391,7 +391,7 @@ describe('StoreDO guest returns (Ruling GUEST-RET-1)', () => {
         now
       );
 
-      expect(runMigrations(state.storage)).toEqual(['cf-0006_returns_customer_nullable']);
+      expect(runMigrations(state.storage)).toEqual(['cf-0008_returns_customer_nullable']);
 
       expect(notNull()).toBe(0);
       expect(x("SELECT customer_id AS c FROM returns WHERE id = 'r-guest'").one().c).toBeNull();

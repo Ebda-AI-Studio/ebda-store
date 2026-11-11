@@ -699,6 +699,7 @@ export interface MoneyClient {
       paymentId: string;
       amount?: number;
       refundKey?: string;
+      attemptKey?: string;
       reason?: string;
       itemLevel?: boolean;
     },
@@ -1315,6 +1316,8 @@ export interface DoWebhookInput {
     refundReference?: string | null;
   };
   rawPayload?: unknown;
+  /** #625: a status poll's amount is ours, not the gateway's (see the DO's PaymentWebhookInput) */
+  amountUnverified?: boolean;
 }
 export interface DoWebhookResult {
   outcome: 'applied' | 'replayed' | 'ignored' | 'held';

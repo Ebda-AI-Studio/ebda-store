@@ -483,6 +483,7 @@
   "POST /admin/stores/:storeId/push/broadcast",
   "POST /admin/tax-verification/:storeId/decision",
   "POST /admin/users",
+  "POST /admin/wa/buyer-key-backfill",
   "POST /admin/webhook-events/:id/replay",
   "POST /auth/change-password",
   "POST /auth/forgot-password",
