@@ -23,10 +23,14 @@ describe('generated schema is current', () => {
       'cf-0002_invariants',
       'cf-0003_analytics',
       'cf-0004_template_current',
+      'cf-0005_reorder_rules_one_per_item',
     ]);
     expect(STORE_MIGRATIONS[0].sql).toBe(read('migrations/store/0001_init.sql'));
     expect(STORE_MIGRATIONS[1].sql).toBe(read('migrations/store/0002_invariants.sql'));
     expect(STORE_MIGRATIONS[3].sql).toBe(read('migrations/store/0004_template_current.sql'));
+    expect(STORE_MIGRATIONS[4].sql).toBe(
+      read('migrations/store/0005_reorder_rules_one_per_item.sql')
+    );
     expect(typeof emitStoreMigrationsTs).toBe('function');
   });
   it('platform migration', () => {

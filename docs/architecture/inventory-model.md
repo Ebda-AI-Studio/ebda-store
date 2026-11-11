@@ -188,9 +188,12 @@ product.costPrice`. Order lines snapshot it at sale time
   deleted only through `reorder-rules.routes.ts`
   (`/stores/:storeId/stock/reorder-rules`, admin page
   `stock/reorder/rules`), via `storeWriter` (`ReorderRule` is in the DO write
-  allow-list). Unique per (store, product, variant): the service checks first
-  and answers 409 `REORDER_RULE_EXISTS`, because a NULL `variant_id` is
-  distinct in the DB unique index. Every write is audit-logged
+  allow-list). Unique per (store, product, variant), enforced by the
+  database: `reorder_rules_one_per_item` on (store_id, product_id,
+  COALESCE(variant_id, '')), because a NULL `variant_id` is distinct in a plain
+  unique index (Postgres migration 20261111000100, StoreDO `cf-0005`; both
+  dedupe first, keeping the newest). A duplicate, including the loser of a
+  simultaneous create, answers 409 `REORDER_RULE_EXISTS`. Every write is audit-logged
   (`reorder_rule.created|updated|deleted`); no money or stock effect.
 - **A product-scoped write aimed at a variant product must fail loud.**
   `InventoryService.adjustInventory` / `bulkAdjustInventory` return a 400
