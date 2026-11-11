@@ -61,19 +61,18 @@ if [ -n "$SCANNERS" ]; then
   if [ -d packages/database/dist ] && [ -d packages/shared/dist ]; then
     # PREPUSH-5: scanners are light (about 100 s CPU, 0.5 GB, measured), so they do NOT take the host-wide heavy lock.
     # Two layers keep a push at about 2 min with 8 agents pushing: (1) a pass cache keyed by the git TREE hash of HEAD
-    # plus the scanner list (every scanner reads the tracked tree, so identical tree + list = identical result; a
-    # re-push, amend or retry costs 0 s); (2) a 4-slot semaphore (prepush-slot.sh) with a fixed --maxWorkers=2.
+    # plus the scanner list, used ONLY on a clean working tree (scanners read the working directory, so a dirty tree
+    # always runs; a re-push of a clean identical tree costs 0 s); (2) a 4-slot semaphore (prepush-slot.sh) with a fixed --maxWorkers=2.
     # CI still runs every scanner; this cache lives only on this Mac and only ever records a PASS.
-    CACHE_DIR="${PREPUSH_CACHE_DIR:-$HOME/.cache/ebda-prepush}"
-    KEY=$( { git rev-parse 'HEAD^{tree}'; printf '%s\n' $SCANNERS; } | shasum -a 256 | cut -c1-40)
-    if [ -f "$CACHE_DIR/scanners-$KEY.ok" ]; then
-      echo "-> vitest scanners: this exact tree + list already passed locally; cache hit, skipped (CI still runs them)"
+    # shellcheck disable=SC2086
+    if bash scripts/ci/prepush-scanner-cache.sh check $SCANNERS; then
+      echo "-> vitest scanners: this exact clean tree + list already passed locally; cache hit, skipped (CI still runs them)"
     else
-      echo "-> vitest scanners ($(printf '%s\n' $SCANNERS | wc -l | tr -d ' ') repo-scanning tests, always run on a cache miss)"
+      echo "-> vitest scanners ($(printf '%s\n' $SCANNERS | wc -l | tr -d ' ') repo-scanning tests, always run on a cache miss or dirty tree)"
       # shellcheck disable=SC2086
       bash scripts/ci/prepush-slot.sh npx vitest run --passWithNoTests --maxWorkers=2 $SCANNERS
-      mkdir -p "$CACHE_DIR" && : > "$CACHE_DIR/scanners-$KEY.ok"
-      find "$CACHE_DIR" -name 'scanners-*.ok' -mtime +7 -delete 2>/dev/null || true
+      # shellcheck disable=SC2086
+      bash scripts/ci/prepush-scanner-cache.sh record $SCANNERS || true
     fi
   else
     echo "! scanner tests skipped (packages not built); CI runs them"
