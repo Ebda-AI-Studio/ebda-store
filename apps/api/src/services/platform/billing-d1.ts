@@ -305,7 +305,10 @@ export async function commitManualPaymentD1(
       ],
     },
   ]);
-  if (changes[0] === 1 && changes[1] >= 1) {
+  // `meta.changes` of workerd's D1 counts the rows a TRIGGER writes too (billing_events_tax_fill UPDATEs the inserted row, so a
+  // real insert reports 2). The ledger insert is `ON CONFLICT DO NOTHING` / compare-and-set guarded: 0 = nothing written, so
+  // "at least 1" is the applied test. `=== 1` reported every first payment as a replay (duplicate: no post-commit effects).
+  if (changes[0] >= 1 && changes[1] >= 1) {
     // wa-plan: observer notified here (raw D1 write; tests/unit/wa-plan-observer-wiring.test.ts)
     notifyModelWrite(
       'StoreSubscription',

@@ -384,6 +384,7 @@ describe('guardedAiWrite: the in-DO twin of the guarded AI product write', () =>
       baseline: { description: 'old', name: 'P' },
       writes: { description: 'new', name: 'Renamed' },
       extra: {},
+      fillOnly: false,
     });
     expect(out).toMatchObject({ found: true, written: ['description'], stale: ['name'] });
     const row = r.q('SELECT name, description, ai_field_sources s FROM products')[0];
@@ -404,6 +405,7 @@ describe('guardedAiWrite: the in-DO twin of the guarded AI product write', () =>
       baseline: { description: 'old' },
       writes: { description: 'ai text' },
       extra: {},
+      fillOnly: false,
     };
     expect(await call(r, args)).toMatchObject({ written: [], stale: ['description'] });
     expect(r.q('SELECT description d FROM products')[0].d).toBe('edited by merchant');
@@ -431,11 +433,29 @@ describe('guardedAiWrite: the in-DO twin of the guarded AI product write', () =>
       baseline: { description: 'd' },
       writes: { description: 'e' },
       extra: { aiBalanceBackup: { description: 'd' } },
+      fillOnly: false,
     });
     expect(out.categoryCount).toBe(0);
     expect(JSON.parse(r.q('SELECT ai_balance_backup b FROM products')[0].b)).toEqual({
       description: 'd',
     });
+  });
+
+  it('is fill-only by default: a stored value is never replaced, an empty one is filled (NEVER-OVERWRITE-1)', async () => {
+    const r = rig();
+    r.db
+      .prepare(
+        "INSERT INTO products (id, store_id, name, name_ar, slug, price, description, ai_field_sources) VALUES ('p1', ?, 'Signal Signet', 'خاتم الإشارة', 'p', 1, NULL, '{\"nameAr\":\"ai\"}')"
+      )
+      .run(STORE);
+    const out = await call(r, {
+      productId: 'p1',
+      baseline: { nameAr: 'خاتم الإشارة', description: null },
+      writes: { nameAr: 'سيجنال سيجنيت', description: 'new' },
+      extra: {},
+    });
+    expect(out).toMatchObject({ written: ['description'], stale: ['nameAr'] });
+    expect(r.q('SELECT name_ar n FROM products')[0].n).toBe('خاتم الإشارة');
   });
 
   it('refuses hostile field names (no SQL text is ever accepted)', async () => {

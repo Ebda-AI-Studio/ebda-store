@@ -19,6 +19,7 @@ import { withStore, type Prisma } from '@ebda/database';
 import {
   paymentLimiter,
   auditLog,
+  auditLogStrict,
   uploadLimiter,
   dailyUploadLimiter,
 } from '../middleware/security';
@@ -1278,40 +1279,96 @@ async function refundOnce(
 
   const refundStoreId = paymentRow.order.storeId;
 
-  // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
-  // time this returns the refund HAS happened at the provider; nothing below may turn that into an error (M-128).
-  const refund = await runInStoreCtx(refundStoreId, () =>
-    // The store is named (and the provider when the caller gave one): a Durable Object store's refund is the claim /
-    // completion sections on its DO (`refundOnDo`); without it the service would look the payment up in Postgres.
-    PaymentService.refund(
-      {
-        transactionId: data.transactionId,
-        amount: data.amount,
-        reason: data.reason,
-      },
-      data.provider,
-      refundStoreId
-    )
-  );
+  // Compensating-rollback order (M-128, Ruling M128-1): INTENT row first, on its own transaction, then the money,
+  // then the OUTCOME row. The intent is the durable proof an admin asked for this refund, so a crash or a failed
+  // outcome write after the money moved leaves a trail and never an unexplained refund. No intent row, no money:
+  // the write failing refuses the refund before anything leaves the building.
+  const auditBase = {
+    userId: user.userId,
+    storeId: refundStoreId,
+    resourceType: 'payment',
+    resourceId: data.transactionId,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+  };
+  try {
+    await runInStoreCtx(refundStoreId, () =>
+      auditLogStrict({
+        ...auditBase,
+        action: 'payment.refund_requested',
+        details: { amount: data.amount ?? null, reason: data.reason || null },
+      })
+    );
+  } catch (err) {
+    logger.error(
+      { err, paymentId: paymentRow.id },
+      '[payments] refund refused: intent audit row not written'
+    );
+    throw new AppError(
+      503,
+      'AUDIT_UNAVAILABLE',
+      'تعذّر تسجيل عملية الاسترداد، فلم يتم تحويل أي مبلغ. حاول مرة أخرى بعد قليل.'
+    );
+  }
 
-  // The audit trail, on its OWN transaction after the money moved, best effort + alert: a failing audit write
-  // must not make the admin see a 5xx for a refund that left the building (the next click is blocked by the
-  // claim, and the trail would have no row). The final status is read back from the payment, not guessed from
-  // a pre-refund snapshot.
+  // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
+  // time this returns the refund HAS happened at the provider; nothing below may turn that into an error.
+  let refund: Awaited<ReturnType<typeof PaymentService.refund>>;
+  try {
+    refund = await runInStoreCtx(refundStoreId, () =>
+      // The store is named (and the provider when the caller gave one): a Durable Object store's refund is the claim /
+      // completion sections on its DO (`refundOnDo`); without it the service would look the payment up in Postgres.
+      PaymentService.refund(
+        {
+          transactionId: data.transactionId,
+          amount: data.amount,
+          reason: data.reason,
+        },
+        data.provider,
+        refundStoreId
+      )
+    );
+  } catch (err) {
+    // The compensating row: the intent is not left dangling. Best effort; the provider outcome (maybe executed)
+    // is the claim-stuck sweep's job, not this write's.
+    void runInStoreCtx(refundStoreId, () =>
+      auditLogStrict({
+        ...auditBase,
+        action: 'payment.refund_failed',
+        details: { error: err instanceof Error ? err.message.slice(0, 200) : 'unknown' },
+      })
+    ).catch(() => undefined);
+    throw err;
+  }
+
+  // Each trail write is its OWN transaction and its own failure: neither can turn a refund that left the building
+  // into a 5xx, and one failing never takes the other with it. The money fact itself is the payment row plus its
+  // refund_initiated / refund_completed events, written by the service above.
+  const alertLost = (what: string, err: unknown) => {
+    logger.error(
+      { err, paymentId: paymentRow.id, refundId: refund.refundId },
+      `[payments] refund committed but its ${what} failed`
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'store',
+      store: { id: refundStoreId, name: refundStoreId },
+      source: 'payment.refund.audit_failed',
+      title: 'payment.refund.audit_failed',
+      body: `Refund ${refund.refundId} of ${refund.amount} piastres on payment ${paymentRow.id} was made; its ${what} could not be written (the intent row and the payment events are intact).`,
+      context: { paymentId: paymentRow.id, refundId: refund.refundId, amount: refund.amount, what },
+    }).catch(() => undefined);
+  };
+  const outcomeEntry = {
+    ...auditBase,
+    resourceId: refund.transactionId,
+    action: 'payment.refunded',
+    details: { refundId: refund.refundId, amount: refund.amount, reason: data.reason || null },
+  };
+  await runInStoreCtx(refundStoreId, () => auditLogStrict(outcomeEntry))
+    .catch(() => runInStoreCtx(refundStoreId, () => auditLogStrict(outcomeEntry)))
+    .catch(err => alertLost('outcome audit row', err));
   await runInStoreCtx(refundStoreId, async () => {
-    await auditLog({
-      action: 'payment.refunded',
-      userId: user.userId,
-      resourceType: 'payment',
-      resourceId: refund.transactionId,
-      details: {
-        refundId: refund.refundId,
-        amount: refund.amount,
-        reason: data.reason || null,
-      },
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
     const after = await (
       await storeDb(refundStoreId)
     ).payment.findUnique({
@@ -1339,21 +1396,7 @@ async function refundOnce(
         initiatedBy: user.role,
       },
     });
-  }).catch(err => {
-    logger.error(
-      { err, paymentId: paymentRow.id, refundId: refund.refundId },
-      '[payments] refund committed but its audit rows failed'
-    );
-    void sendAlert({
-      level: 'p1',
-      scope: 'store',
-      store: { id: refundStoreId, name: refundStoreId },
-      source: 'payment.refund.audit_failed',
-      title: 'payment.refund.audit_failed',
-      body: `Refund ${refund.refundId} of ${refund.amount} piastres on payment ${paymentRow.id} was made, but its audit rows could not be written. Add them by hand.`,
-      context: { paymentId: paymentRow.id, refundId: refund.refundId, amount: refund.amount },
-    }).catch(() => undefined);
-  });
+  }).catch(err => alertLost('payment event row', err));
 
   return refund;
 }

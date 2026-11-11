@@ -13,6 +13,7 @@ import { PostHogProvider } from '../components/PostHogProvider';
 import { UpsellDialog } from '../components/billing/UpsellDialog';
 import { PushClickListener } from '../components/PushClickListener';
 import { EbdaFunnelTracking } from '../components/EbdaFunnelTracking';
+import { FlashToast } from '../components/FlashToast';
 
 function AuthenticatedProviders({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -32,6 +33,7 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
               <PwaInstallHint />
               <UpsellDialog />
               <PushClickListener />
+              <FlashToast />
               {children}
             </ToastProvider>
           </FocusModeProvider>
