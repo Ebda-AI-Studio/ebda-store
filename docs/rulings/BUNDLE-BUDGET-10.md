@@ -1,0 +1,11 @@
+# BUNDLE-BUDGET-10
+
+> Section: "Worker dry-run (api)" red on ~20 open PRs (2026-11-11)
+
+**Ruling BUNDLE-BUDGET-10 - the red check is the gzip ceiling (2,200,000 B), not startup CPU; exceljs leaves `worker.js` as its own CommonJS Worker module (-475 KB raw, -132 KB gzip) and no ceiling moves.**
+
+What failed. Every PR touching the API failed `gzipped bundle size 22000xx-2201688 B is over the budget of 2200000 B` (#653 2,201,688; #682 2,200,017; #674 2,200,459; #660 2,200,218; #681 2,200,296). Startup CPU is NOT the failure: PRs run the RELATIVE gate (PR vs main in the same job: 371.6 vs 374.0 ms on #653, 371.2 vs 372.0 on #682); ~370 ms is what the hosted 2-vCPU runner measures for this Worker (local: 194 ms), the 140 ms ceiling applies only to non-PR runs, which skip the api job (Ruling BUNDLE-BUDGET-9). Main's own CI runs are green because main pushes run only the marketing dry-run. Main has no headroom left (local gzip 2,187,903 B), so any PR adding a few KB trips the ceiling; no single merge regressed.
+
+Fix. `exceljs` (a 474 KB minified build, BUNDLE-BUDGET-6) was already behind a dynamic `import()`, but esbuild inlines it into `worker.js`. It is now `apps/api/src/cf/modules/exceljs.cjs`, uploaded as a separate CommonJS module (`rules` entry in wrangler.jsonc, same mechanism as pdf-lib, BUNDLE-BUDGET-7) and evaluated on the first xlsx import/export only; the `exceljs` alias is gone and `loadExcelJS` (apps/api/src/lib/lazy-modules.ts) picks the module on Workers and the installed package in Node. Measured: `worker.js` 7,962,633 -> 7,486,993 B raw, 2,187,903 -> 2,055,635 B gzip; worker startup CPU is unchanged or lower (exceljs was already lazy). The workerd test harness (`apps/api/vitest.workers.config.mts`) now uploads `dist-cf/cf/modules/*` to the `api` Worker; before that the xlsx route 500'd there (verified: harness without it fails `account-books-do` tax-report.xlsx, with it passes).
+
+Cost if wrong: if the deploy omits `cf/modules/exceljs.cjs` every xlsx export/import answers 500 (the workerd test `account-books-do` tax-report.xlsx and `exceljs-workers` pin it, and `cf:dry-run` lists the module); revert = restore the alias and move the file back to `src/cf/stubs/`.
