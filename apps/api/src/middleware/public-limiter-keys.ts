@@ -61,17 +61,31 @@ export function isTrustedSsr(req: Request): boolean {
  */
 export const LOCAL_WINDOW_MS = 60_000;
 export const LOCAL_HOT = { ip: 60, tenant: 1200 } as const;
-const LOCAL_MAX_KEYS = 20_000;
+export const LOCAL_MAX_KEYS = 20_000;
 const local = new Map<string, { n: number; resetAt: number }>();
 const decided = new WeakMap<object, boolean>();
 let clock = (): number => Date.now();
 
+/**
+ * Fixed window per key. At the cap, make room WITHOUT forgetting live counters (a full clear would hand a large botnet fresh
+ * free hits): first sweep every key whose window already ended, then drop the least recently touched keys (a touched key moves
+ * to the end of the Map's insertion order), one at a time, until there is room.
+ */
 function bump(key: string, hot: number): boolean {
   const now = clock();
-  if (local.size >= LOCAL_MAX_KEYS) local.clear();
   let e = local.get(key);
-  if (!e || e.resetAt <= now) local.set(key, (e = { n: 0, resetAt: now + LOCAL_WINDOW_MS }));
+  if (e)
+    local.delete(key); // re-inserted below: most recently used goes last
+  else if (local.size >= LOCAL_MAX_KEYS) {
+    for (const [k, v] of local) if (v.resetAt <= now) local.delete(k);
+    for (const k of local.keys()) {
+      if (local.size < LOCAL_MAX_KEYS) break;
+      local.delete(k);
+    }
+  }
+  if (!e || e.resetAt <= now) e = { n: 0, resetAt: now + LOCAL_WINDOW_MS };
   e.n += 1;
+  local.set(key, e);
   return e.n > hot;
 }
 

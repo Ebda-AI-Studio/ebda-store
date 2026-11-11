@@ -27,6 +27,7 @@ import {
 } from '@api/cf/ssr-client-ip';
 import { publicLimiter, storeResolveLimiter } from '@api/middleware/security';
 import {
+  LOCAL_MAX_KEYS,
   __resetSsrLocalLimitForTests,
   isTrustedSsr,
   ssrWithinLocalBudget,
@@ -608,5 +609,27 @@ describe('Ruling DO-BUDGET-2 (v2): only a fresh, request-bound, derived-key sign
 
   it('an UNtrusted caller never gets the local budget', () => {
     expect(ssrWithinLocalBudget({ ip: '203.0.113.5', headers: {} } as never)).toBe(false);
+  });
+
+  it('at the key cap an existing hot key keeps its count (no full clear); expired windows are swept first', () => {
+    let now = 1_000_000;
+    __resetSsrLocalLimitForTests(() => now);
+    const fake = (ip: string) => {
+      const r = { ip, headers: { 'x-store-id': 'cap-store' }, params: {} } as never;
+      trustedSsrRequests.add(r);
+      return r;
+    };
+    // the hot shopper: 61 hits = over the 60/min line
+    for (let i = 0; i < 61; i++) ssrWithinLocalBudget(fake('198.51.100.1'));
+    expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(false);
+    // a botnet fills the map well past the cap (one new key per request, plus the shared store key)
+    for (let i = 0; i < LOCAL_MAX_KEYS + 500; i++) {
+      ssrWithinLocalBudget(fake(`10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}`));
+      if (i % 1000 === 0) ssrWithinLocalBudget(fake('198.51.100.1')); // the scraper keeps going
+    }
+    expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(false); // still hot, count intact
+    // once the window ends everything is cold again (swept, not leaked)
+    now += 61_000;
+    expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(true);
   });
 });
