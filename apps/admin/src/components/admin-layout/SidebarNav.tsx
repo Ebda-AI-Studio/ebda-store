@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { navItemClasses } from '../ui/tokens';
 import type { NavItem } from './buildStoreAdminNav';
 
 interface SidebarNavProps {
@@ -35,24 +36,18 @@ export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: Sid
                 data-ui="nav"
                 href={item.href}
                 onClick={onNavigate}
-                className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-primary/10 text-primary-ink'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
-                }`}
+                className={navItemClasses({
+                  kind: 'sidebar',
+                  active: !!isActive,
+                  className: 'group',
+                })}
                 aria-current={isActive ? 'page' : undefined}
               >
                 {/* Start-side active indicator */}
                 {isActive && (
                   <span className="absolute start-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
                 )}
-                <span
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${
-                    isActive
-                      ? 'bg-primary/15 text-primary-ink'
-                      : 'text-muted-foreground group-hover:bg-muted group-hover:text-foreground'
-                  }`}
-                >
+                <span className="flex h-8 w-8 items-center justify-center rounded-md">
                   <svg
                     className="h-4 w-4"
                     fill="none"
@@ -68,7 +63,7 @@ export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: Sid
                     />
                   </svg>
                 </span>
-                <span className={isActive ? 'font-semibold' : ''}>{item.name}</span>
+                <span>{item.name}</span>
               </Link>
             </li>
           );
