@@ -1,7 +1,7 @@
 /**
  * Expense receipt OCR via Gemini Vision (Batch 3 — Task 6).
  *
- * Fetches an image from a public R2 URL, encodes it to base64, calls
+ * Reads the receipt image from the private bucket (`private:<key>`; legacy rows may still hold a URL), encodes it to base64, calls
  * Gemini Vision to extract structured receipt data, then creates a draft
  * Expense with OCR metadata attached.
  *
@@ -14,6 +14,7 @@
 import https from 'https';
 import http from 'http';
 import { prisma } from '@ebda/database';
+import { StorageService } from '../storage.service';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { createExpense } from './expense.service';
@@ -94,8 +95,28 @@ function detectMime(url: string): string | null {
   return SUPPORTED_MIME[ext] ?? null;
 }
 
+/** Receipts live in the PRIVATE bucket and are referenced as `private:<key>` (never a public URL). */
+export const PRIVATE_RECEIPT_PREFIX = 'private:';
+
+/** The private key of a receipt reference, only when it is inside this store's own prefix. */
+export function privateReceiptKey(ref: string, storeId: string): string | null {
+  if (!ref.startsWith(PRIVATE_RECEIPT_PREFIX)) return null;
+  const key = ref.slice(PRIVATE_RECEIPT_PREFIX.length);
+  return key.startsWith(`stores/${storeId}/`) && !key.includes('..') ? key : null;
+}
+
+/** Fetch a receipt (private reference or legacy URL) and return the body as a Buffer. */
+async function fetchBuffer(url: string, storeId: string): Promise<Buffer> {
+  if (url.startsWith(PRIVATE_RECEIPT_PREFIX)) {
+    const key = privateReceiptKey(url, storeId);
+    if (!key) throw new Error('receipt reference is outside the store prefix');
+    return (await StorageService.getPrivate(key)).body;
+  }
+  return fetchUrlBuffer(url);
+}
+
 /** Fetch a URL and return the body as a Buffer. Handles http + https. */
-function fetchBuffer(url: string): Promise<Buffer> {
+function fetchUrlBuffer(url: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith('https://') ? https : http;
     lib
@@ -158,7 +179,7 @@ export async function processExpenseReceipt(
   // ── 2. Fetch image ────────────────────────────────────────────────────────
   let imageBase64: string;
   try {
-    const buffer = await fetchBuffer(receiptUrl);
+    const buffer = await fetchBuffer(receiptUrl, storeId);
     imageBase64 = buffer.toString('base64');
   } catch (fetchErr) {
     logger.error({ err: fetchErr, storeId, receiptUrl }, 'expense-ocr: failed to fetch image');

@@ -83,3 +83,24 @@ describe('no job writes audit-archive/ or backup keys to the public bucket', () 
     expect(code(f)).not.toMatch(/STORAGE_BUCKET|storageBucket|StorageService\.upload(Multiple)?\(/);
   });
 });
+
+describe('expense receipts are merchant financial documents: private bucket only', () => {
+  const code = (f: string) =>
+    readFileSync(join(root, f), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+  it('the upload route writes with putPrivate and never the public StorageService.upload', () => {
+    const src = code('apps/api/src/routes/expenses.routes.ts');
+    expect(src).toMatch(/StorageService\.putPrivate\(/);
+    expect(src).not.toMatch(/StorageService\.upload(Multiple)?\(/);
+  });
+  it('a receipt reference only resolves inside its own store prefix', async () => {
+    const { privateReceiptKey } = await import('@api/services/accounting/expense-ocr.service');
+    expect(privateReceiptKey('private:stores/s1/receipts/a.jpg', 's1')).toBe(
+      'stores/s1/receipts/a.jpg'
+    );
+    expect(privateReceiptKey('private:stores/s2/receipts/a.jpg', 's1')).toBeNull();
+    expect(privateReceiptKey('private:stores/s1/../s2/a.jpg', 's1')).toBeNull();
+    expect(privateReceiptKey('https://media.example/stores/s1/misc/a.jpg', 's1')).toBeNull();
+  });
+});

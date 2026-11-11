@@ -9,11 +9,8 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 
 const { uploadMock, sendMock } = vi.hoisted(() => ({
-  uploadMock: vi.fn(async (buf: Buffer, _name: string, opts: { contentType: string }) => ({
-    key: 'stores/store-1/misc/r',
-    url: 'https://cdn.example/r',
-    size: buf.length,
-    contentType: opts.contentType,
+  uploadMock: vi.fn(async (_buf: Buffer, _args: { contentType: string; ext: string }) => ({
+    key: 'stores/store-1/receipts/r.jpg',
   })),
   sendMock: vi.fn(async () => undefined),
 }));
@@ -40,7 +37,7 @@ vi.mock('@api/middleware/security', () => ({
   dailyUploadLimiter: (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/services/storage.service', () => ({
-  StorageService: { upload: uploadMock, isAvailable: vi.fn(() => true) },
+  StorageService: { putPrivate: uploadMock, isAvailable: vi.fn(() => true) },
 }));
 vi.mock('@api/services/image-resize.service', () => ({
   enforceMaxDimensions: vi.fn(async (buf: Buffer) => buf),
@@ -100,7 +97,9 @@ describe('expense receipt upload is judged by its bytes', () => {
       .attach('file', JPEG, { filename: 'receipt.png', contentType: 'image/png' });
     expect(res.status).toBe(202);
     const call = uploadMock.mock.calls.at(-1)!;
-    expect(call[1]).toBe('receipt.jpg');
-    expect(call[2].contentType).toBe('image/jpeg');
+    expect(call[1].ext).toBe('.jpg');
+    expect(call[1].contentType).toBe('image/jpeg');
+    // private reference, never a public URL
+    expect(res.body.receiptUrl).toBe('private:stores/store-1/receipts/r.jpg');
   });
 });
