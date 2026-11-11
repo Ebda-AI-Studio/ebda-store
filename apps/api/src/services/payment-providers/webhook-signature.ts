@@ -137,3 +137,15 @@ export function detectGatewayProvider(
   if (typeof payload.fawryRefNumber === 'string') return 'fawry';
   return null;
 }
+
+/**
+ * A Fawry REFUND notice (`REFUNDED` / `PARTIALLY_REFUNDED`). When its dedupe key repeats, the route raises a P1 instead of
+ * dropping it silently: Fawry does not sign the refund amount, and nothing proves `paymentRefrenceNumber` changes per refund,
+ * so a repeat may be a SECOND partial refund that looks identical to the first (Ruling FAWRY-REFUND-DEDUPE-1). Paymob and
+ * Kashier refunds are their own transactions with their own ids, so a repeat there is a real redelivery.
+ */
+export function isFawryRefundNotice(provider: string, payload: Record<string, unknown>): boolean {
+  if (provider !== 'fawry') return false;
+  const status = typeof payload.orderStatus === 'string' ? payload.orderStatus.toUpperCase() : '';
+  return status === 'REFUNDED' || status === 'PARTIALLY_REFUNDED';
+}
