@@ -6,7 +6,8 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
 import { apiGetPage, apiPost, type PageMeta } from '@/lib/api';
@@ -221,7 +222,6 @@ export default function ExpensesPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="min-h-11 md:min-h-9"
                 disabled={isActing}
                 onClick={() => performAction(exp.id, 'approve')}
               >
@@ -232,7 +232,6 @@ export default function ExpensesPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="min-h-11 md:min-h-9"
                 disabled={isActing}
                 onClick={() => performAction(exp.id, 'post')}
               >
@@ -263,10 +262,7 @@ export default function ExpensesPage() {
       title={t('title')}
       subtitle={t('description')}
       actions={
-        <Button
-          className="min-h-11"
-          onClick={() => router.push(`/stores/${storeId}/finance/expenses/new`)}
-        >
+        <Button onClick={() => router.push(`/stores/${storeId}/finance/expenses/new`)}>
           {t('newButton')}
         </Button>
       }
@@ -274,16 +270,17 @@ export default function ExpensesPage() {
       {receiptOnly ? (
         <div className="mb-3 flex w-fit items-center gap-2 rounded-lg border border-border bg-muted px-3 py-1.5 text-sm">
           <span>{t('receiptOnly')}</span>
-          <button
+          <Button
             type="button"
             onClick={() => {
               setReceiptOnly(false);
               setPage(1); // a new filter is a new list, in the same batch (issue 2436)
             }}
-            className="text-xs text-primary hover:underline"
+            variant="link"
+            size="sm"
           >
             {t('receiptOnlyClear')}
-          </button>
+          </Button>
         </div>
       ) : (
         <DateRangePicker
@@ -345,31 +342,33 @@ export default function ExpensesPage() {
               />
               {meta && meta.totalPages > 1 && (
                 <div className="mt-4 flex items-center gap-2 text-sm">
-                  <button
+                  <Button
                     type="button"
                     disabled={meta.page <= 1}
                     onClick={() => setPage(meta.page - 1)}
                     aria-label={t('pager.previous')}
-                    className="px-3 py-1 rounded border border-border disabled:opacity-40"
+                    variant="outline"
+                    size="sm"
                   >
                     <span aria-hidden="true" className="inline-block rtl:rotate-180">
                       ←
                     </span>
-                  </button>
+                  </Button>
                   <span className="text-muted-foreground">
                     {t('pager.pageOf', { page: meta.page, totalPages: meta.totalPages })}
                   </span>
-                  <button
+                  <Button
                     type="button"
                     disabled={meta.page >= meta.totalPages}
                     onClick={() => setPage(meta.page + 1)}
                     aria-label={t('pager.next')}
-                    className="px-3 py-1 rounded border border-border disabled:opacity-40"
+                    variant="outline"
+                    size="sm"
                   >
                     <span aria-hidden="true" className="inline-block rtl:rotate-180">
                       →
                     </span>
-                  </button>
+                  </Button>
                 </div>
               )}
             </>

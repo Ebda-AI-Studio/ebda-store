@@ -11,6 +11,7 @@ import { InstapayRefundButton } from './InstapayRefundButton';
 import { RefreshRefundStatusButton } from './RefreshRefundStatusButton';
 import type { OrderDetail } from './types';
 
+import { Button } from '@/components/ui/Button';
 interface ActionFooterProps {
   order: OrderDetail;
   storeId: string;
@@ -113,22 +114,24 @@ export function ActionFooter({
       <div className="flex flex-wrap items-center gap-2">
         {/* InstaPay: the one primary action. Idempotent on the server, so a second tap is safe. */}
         {showConfirmInstapay && onConfirmInstapay && userRole !== 'super_admin' && (
-          <button
+          <Button
             type="button"
             onClick={onConfirmInstapay}
             disabled={isUpdating}
             data-testid="confirm-instapay"
-            className="flex-1 min-w-0 basis-[8rem] inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-success px-3 py-2.5 text-center text-sm font-semibold leading-tight text-success-foreground hover:bg-success/90 disabled:opacity-60 transition-colors cursor-pointer"
+            variant="ghost"
+            className="flex-1 min-w-0 justify-center gap-2 text-center font-semibold"
           >
             {isUpdating ? '…' : t('confirmInstapay')}
-          </button>
+          </Button>
         )}
         {nextStatus && !isFinal && (
-          <button
+          <Button
             type="button"
             onClick={() => onStatusChange(nextStatus)}
             disabled={isUpdating}
-            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center gap-2 rounded-xl bg-success px-3 py-2.5 text-center text-sm font-semibold leading-tight text-success-foreground hover:bg-success/90 disabled:opacity-60 transition-colors cursor-pointer"
+            variant="ghost"
+            className="flex-1 min-w-0 justify-center gap-2 text-center font-semibold"
           >
             {isUpdating ? (
               '…'
@@ -151,7 +154,7 @@ export function ActionFooter({
                 <span className="min-w-0">{tStatus(nextStatus) || t('processed')}</span>
               </>
             )}
-          </button>
+          </Button>
         )}
         {/* Payment Link — surface the existing payment URL when the
             order already has one (WhatsApp-origin orders mint a link
@@ -175,11 +178,12 @@ export function ActionFooter({
           />
         )}
         {showManualMarkPaid && (
-          <button
+          <Button
             type="button"
             onClick={onMarkPaid}
             disabled={isUpdating}
-            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 py-2.5 text-center text-sm font-semibold leading-tight text-primary-ink hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
+            variant="outline"
+            className="flex-1 min-w-0 justify-center gap-2 text-center font-semibold"
           >
             <svg
               className="h-4 w-4 shrink-0"
@@ -196,23 +200,25 @@ export function ActionFooter({
               />
             </svg>
             <span className="min-w-0">{t('markPaid')}</span>
-          </button>
+          </Button>
         )}
         <div className="relative ms-auto" ref={menuRef}>
-          <button
+          <Button
             type="button"
             onClick={() => setMenuOpen(o => !o)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label={t('more')}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <circle cx="5" cy="12" r="1.6" />
               <circle cx="12" cy="12" r="1.6" />
               <circle cx="19" cy="12" r="1.6" />
             </svg>
-          </button>
+          </Button>
           {menuOpen && (
             <div
               role="menu"

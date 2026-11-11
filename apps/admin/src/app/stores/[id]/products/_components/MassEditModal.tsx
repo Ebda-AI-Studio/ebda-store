@@ -2,7 +2,8 @@
 
 import { isVariantProduct } from '../../../../../lib/variant-product';
 import { useState, useEffect } from 'react';
-import { Button, Modal, useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
@@ -365,26 +366,18 @@ export function MassEditModal({
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle}>
       {/* Tabs */}
       <div className="flex border-b border-border mb-4">
-        <button
+        <Button
           onClick={() => setActiveTab('fields')}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            activeTab === 'fields'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
+          variant={activeTab === 'fields' ? 'soft' : 'ghost'}
         >
           {t('massEdit.tabFields')}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setActiveTab('variants')}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            activeTab === 'variants'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
+          variant={activeTab === 'variants' ? 'soft' : 'ghost'}
         >
           {t('massEdit.tabVariants')}
-        </button>
+        </Button>
       </div>
 
       {/* ── TAB A: Fields ──────────────────────────────────────────────── */}

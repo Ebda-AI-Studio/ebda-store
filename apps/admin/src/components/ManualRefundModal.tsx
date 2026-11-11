@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
-import { Button, Modal } from '@ebda/ui';
+import { Modal } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import {
   MANUAL_REFUND_METHODS,

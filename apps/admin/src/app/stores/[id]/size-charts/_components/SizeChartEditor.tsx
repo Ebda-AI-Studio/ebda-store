@@ -10,7 +10,8 @@
  */
 
 import { useState } from 'react';
-import { Button, Input } from '@ebda/ui';
+import { Input } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import {
   SIZE_CHART_CELL_MAX,
   SIZE_CHART_MAX_COLUMNS,
@@ -148,13 +149,15 @@ function RemoveButton({
   disabled: boolean;
 }) {
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="text-muted-foreground hover:text-destructive-ink"
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive-ink disabled:pointer-events-none disabled:opacity-30"
     >
       <svg
         aria-hidden="true"
@@ -166,7 +169,7 @@ function RemoveButton({
       >
         <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
       </svg>
-    </button>
+    </Button>
   );
 }
 

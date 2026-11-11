@@ -6,6 +6,7 @@ import { ETA_RETURN_NO_REF_REASONS } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../../lib/api';
 
+import { Button } from '@/components/ui/Button';
 interface EtaReceiptRow {
   id: string;
   kind: 'sale' | 'return';
@@ -113,10 +114,9 @@ export function OrderEtaCard({ storeId, orderId }: { storeId: string; orderId: s
                     </option>
                   ))}
                 </select>
-                <button
+                <Button
                   type="button"
                   disabled={!picked[r.id] || busy === r.id}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
                   onClick={async () => {
                     setBusy(r.id);
                     await apiPost(`/api/v1/stores/${storeId}/eta/receipts/${r.id}/return-reason`, {
@@ -125,27 +125,31 @@ export function OrderEtaCard({ storeId, orderId }: { storeId: string; orderId: s
                     setBusy(null);
                     void load();
                   }}
+                  variant="outline"
+                  size="sm"
                 >
                   {t('reasonSubmit')}
-                </button>
+                </Button>
               </div>
             ) : null}
             {latest(r) &&
             (r.status === 'failed' || r.status === 'rejected') &&
             r.kind === 'sale' ? (
-              <button
+              <Button
                 type="button"
                 disabled={busy === r.id}
-                className="mt-2 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
                 onClick={async () => {
                   setBusy(r.id);
                   await apiPost(`/api/v1/stores/${storeId}/eta/receipts/${r.id}/retry`, {});
                   setBusy(null);
                   void load();
                 }}
+                variant="outline"
+                size="sm"
+                className="mt-2"
               >
                 {t('issueAgain')}
-              </button>
+              </Button>
             ) : null}
           </li>
         ))}

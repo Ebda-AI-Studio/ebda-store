@@ -5,6 +5,7 @@
  * publishes a NEW revision with that content (history is never rewritten).
  * Every data has a UI: this is the surface for `store_page_revisions`.
  */
+import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useState } from 'react';
 import { useFormatter } from 'next-intl';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -92,14 +93,15 @@ export function RevisionsPanel({
                 </span>
               </span>
               {r.status === 'archived' && (
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   type="button"
                   disabled={busy !== null}
                   onClick={() => setAsking(r.rev)}
-                  className="text-xs font-medium text-primary hover:underline disabled:opacity-40"
                 >
                   {busy === r.rev ? t('restoring') : t('restore')}
-                </button>
+                </Button>
               )}
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -135,13 +137,15 @@ export function RevisionsPanel({
         />
       )}
       {cursor && (
-        <button
+        <Button
+          variant="link"
+          size="sm"
           type="button"
           onClick={() => void load(cursor)}
-          className="mt-3 text-sm text-primary hover:underline"
+          className="mt-3"
         >
           {t('more')}
-        </button>
+        </Button>
       )}
     </div>
   );

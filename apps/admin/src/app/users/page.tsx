@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Badge, Modal, ModalBody, ModalFooter, Input, Label } from '@ebda/ui';
+import { Badge, Modal, ModalBody, ModalFooter, Input, Label } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ErrorState } from '../../components/ErrorState';
 import { apiGet, apiPost } from '../../lib/api';
@@ -387,7 +388,6 @@ export default function UsersPage() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
                   disabled={pagination.page === 1}
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                 >
@@ -395,7 +395,6 @@ export default function UsersPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
                   disabled={pagination.page === pagination.totalPages}
                   onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
                 >

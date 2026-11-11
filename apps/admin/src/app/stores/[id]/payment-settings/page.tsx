@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { BRAND, PROVIDER_CATALOG, providerRequestMailto } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
@@ -253,7 +253,7 @@ export default function StorePaymentSettingsPage() {
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-ink">
           {error}
-          <Button type="button" variant="outline" className="ms-4 min-h-11" onClick={fetchConfigs}>
+          <Button type="button" variant="outline" className="ms-4" onClick={fetchConfigs}>
             {t('errors.retry')}
           </Button>
         </div>

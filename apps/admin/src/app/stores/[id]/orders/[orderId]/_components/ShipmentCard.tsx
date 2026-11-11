@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Modal, useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPost } from '../../../../../../lib/api';
@@ -256,36 +257,40 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
 
           <div className="flex flex-wrap gap-2">
             {current?.capabilities.label && (
-              <button
+              <Button
                 type="button"
                 onClick={printLabel}
                 disabled={busy !== null}
-                className="px-3 py-1.5 text-sm rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50"
+                variant="secondary"
+                size="sm"
               >
                 {t('printLabel')}
-              </button>
+              </Button>
             )}
             {current?.capabilities.polling && (
-              <button
+              <Button
                 type="button"
                 onClick={() =>
                   run('track', () => apiPost(`${base}/shipments/${shipment.id}/track`))
                 }
                 disabled={busy !== null}
-                className="px-3 py-1.5 text-sm rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50"
+                variant="secondary"
+                size="sm"
               >
                 {t('refresh')}
-              </button>
+              </Button>
             )}
             {!['delivered', 'returned'].includes(shipment.status) && (
-              <button
+              <Button
                 type="button"
                 onClick={() => setConfirmCancel(true)}
                 disabled={busy !== null}
-                className="px-3 py-1.5 text-sm rounded-lg border border-destructive/40 text-destructive-ink hover:bg-destructive/5 disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="text-destructive-ink"
               >
                 {t('cancel')}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -425,7 +430,7 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
                   />
                 </div>
               )}
-              <button
+              <Button
                 type="button"
                 onClick={() => create(carrier)}
                 disabled={
@@ -433,10 +438,10 @@ export function ShipmentCard({ storeId, orderId, onChanged, courierHints }: Ship
                   !carrier ||
                   (carrier === 'manual' && (!manualName.trim() || !manualTracking.trim()))
                 }
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                variant="default"
               >
                 {failed ? t('retry') : t('create')}
-              </button>
+              </Button>
             </>
           )}
         </div>

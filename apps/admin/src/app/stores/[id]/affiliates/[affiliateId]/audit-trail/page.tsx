@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../../lib/api';
 import { formatPrice, intlLocaleForUi } from '@/lib/format';
 import { useT } from '@/i18n/useT';
+import { Button } from '@/components/ui/Button';
 
 // ---------------------------------------------------------------------------
 // Types — shape returned by GET /affiliates/:id/audit-trail
@@ -258,13 +259,15 @@ export default function AffiliateAuditTrailPage() {
         {error && !loading && (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
             <p className="text-sm text-destructive-ink">{error}</p>
-            <button
+            <Button
+              variant="outline"
+              size="md"
+              className="mt-3 border-destructive text-destructive-ink"
               type="button"
               onClick={fetchEvents}
-              className="mt-3 rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-destructive/10 cursor-pointer"
             >
               {tCommon('retry')}
-            </button>
+            </Button>
           </div>
         )}
 

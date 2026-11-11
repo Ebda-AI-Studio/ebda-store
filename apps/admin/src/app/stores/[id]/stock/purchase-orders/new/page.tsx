@@ -13,6 +13,7 @@ import { isVariantProduct } from '@/lib/variant-product';
 import { formatPrice } from '@/lib/format';
 
 import { roundToMinor } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SupplierOption {
@@ -244,14 +245,16 @@ export default function NewPurchaseOrderPage() {
       mobileActions: true,
       className: 'w-10 text-center',
       cell: (_line, i) => (
-        <button
+        <Button
           type="button"
           onClick={() => removeLine(i)}
           disabled={lines.length <= 1}
-          className="text-red-600 disabled:opacity-30 hover:underline text-xs max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
+          variant="link"
+          size="sm"
+          className="text-red-600"
         >
           ✕
-        </button>
+        </Button>
       ),
     },
   ];
@@ -402,13 +405,9 @@ export default function NewPurchaseOrderPage() {
           </div>
 
           <div>
-            <button
-              type="button"
-              onClick={addLine}
-              className="px-3 py-1.5 border border-border rounded text-sm"
-            >
+            <Button type="button" onClick={addLine} variant="outline" size="sm">
               {tNew('addItem')}
-            </button>
+            </Button>
           </div>
 
           {error && (

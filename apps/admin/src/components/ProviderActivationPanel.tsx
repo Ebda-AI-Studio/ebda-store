@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { ACTIVATION_HOURS, withNumerals } from '@ebda/shared';
@@ -83,14 +84,9 @@ export function ProviderActivationPanel({ provider, storeId, activation, onChang
       )}
       {!requested && (
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={request}
-            disabled={busy}
-            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
+          <Button type="button" onClick={request} disabled={busy}>
             {busy ? t('requesting') : rejected ? t('requestAgain') : t('request')}
-          </button>
+          </Button>
           {!rejected && (
             <span className="text-xs text-muted-foreground">
               {t('hint', { hours: ACTIVATION_HOURS })}

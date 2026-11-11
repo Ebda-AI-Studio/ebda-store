@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Button, Input, Modal, Select } from '@ebda/ui';
+import { Input, Modal, Select } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import {
   INSTAPAY_RECEIPT_MIME_TYPES,
   normalizeInstapayReference,

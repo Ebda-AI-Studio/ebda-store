@@ -21,6 +21,7 @@ import { Segmented } from '../_qr/_components/Segmented';
 import { ShapePicker } from './_components/ShapePicker';
 import { SheetPreview } from './_components/SheetPreview';
 import { toLabelItem, useLabels } from './useLabels';
+import { Button, buttonVariants } from '@/components/ui/Button';
 
 const MAX_TOTAL_COPIES = 2000;
 
@@ -150,8 +151,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
       </p>
     );
 
-  const btn =
-    'h-10 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50';
+  const btn = buttonVariants({ variant: 'outline' });
   const set = (patch: Partial<typeof settings>) => setSettings({ ...settings, ...patch });
   const toggles = ['name', 'variant', 'price', 'digits', 'qr'] as const;
 
@@ -309,14 +309,15 @@ export function LabelsTab({ storeId }: { storeId: string }) {
           </section>
 
           <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
-            <button
+            <Button
+              variant="default"
+              size="md"
               type="button"
               onClick={L.save}
               disabled={L.saving || !L.dirty || status === 'checking'}
-              className="h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {L.saving ? ta('saving') : ta('save')}
-            </button>
+            </Button>
             <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
               {L.saveState === 'saved' && !L.dirty
                 ? ta('saved')

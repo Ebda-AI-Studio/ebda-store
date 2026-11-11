@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { apiPut } from '../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -54,14 +55,15 @@ export function PackingSlipNoteField({
         className="w-full max-w-md rounded-lg border border-border bg-background px-3 py-2 text-sm"
       />
       <div className="flex items-center gap-3">
-        <button
+        <Button
+          size="sm"
           type="button"
           onClick={save}
           disabled={saving || note.trim() === (value ?? '').trim()}
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+          className="font-semibold"
         >
           {t('noteSave')}
-        </button>
+        </Button>
         {msg && (
           <span
             role="status"

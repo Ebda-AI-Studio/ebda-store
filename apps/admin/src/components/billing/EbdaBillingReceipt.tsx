@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useMemo } from 'react';
 import {
   BRAND,
@@ -128,13 +129,15 @@ export function EbdaBillingReceipt({
             {number}
           </p>
         </div>
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
           onClick={() => window.print()}
-          className="ebda-no-print mb-4 w-full rounded-lg border border-black/20 px-3 py-1.5 text-xs font-semibold"
+          className="mb-4 w-full font-semibold ebda-no-print"
         >
           {t('print')}
-        </button>
+        </Button>
       </ReceiptPrinterShell>
     </div>
   );

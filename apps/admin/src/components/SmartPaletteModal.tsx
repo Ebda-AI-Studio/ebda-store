@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { SparkleIcon } from './SparkleIcon';
 import { useState, useEffect } from 'react';
 import {
@@ -271,11 +272,12 @@ export function SmartPaletteModal({
 
         {/* Layer C: AI logo suggestion button */}
         <div className="mb-4 flex items-center gap-3">
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={handleLogoSuggest}
             disabled={logoLoading || !storeId}
-            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary-ink hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="gap-2"
           >
             {logoLoading ? (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -283,7 +285,7 @@ export function SmartPaletteModal({
               <SparkleIcon />
             )}
             {logoLoading ? t('extracting') : t('suggestFromLogo')}
-          </button>
+          </Button>
           {logoError ? (
             <span className="text-xs text-destructive-ink">{logoError}</span>
           ) : (
@@ -298,18 +300,15 @@ export function SmartPaletteModal({
           </h3>
           <div className="flex flex-wrap gap-2">
             {VIBE_IDS.map(vibeId => (
-              <button
+              <Button
+                variant={activeVibe === vibeId ? 'soft' : 'outline'}
+                size="sm"
                 key={vibeId}
                 type="button"
                 onClick={() => applyVibe(vibeId)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                  activeVibe === vibeId
-                    ? 'border-primary bg-primary/10 text-foreground'
-                    : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                }`}
               >
                 {t(`vibeLabels.${vibeId}` as Parameters<typeof t>[0])}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -325,18 +324,15 @@ export function SmartPaletteModal({
             </label>
             <div className="grid grid-cols-4 gap-2">
               {(['alternating', 'monochrome', 'triad', 'single-bg'] as const).map(p => (
-                <button
+                <Button
+                  variant={pattern === p ? 'soft' : 'outline'}
+                  size="sm"
                   key={p}
                   type="button"
                   onClick={() => setPattern(p)}
-                  className={`rounded border p-2 text-xs font-medium ${
-                    pattern === p
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                  }`}
                 >
                   {t(`patternLabels.${p}` as Parameters<typeof t>[0])}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -346,18 +342,15 @@ export function SmartPaletteModal({
             </label>
             <div className="grid grid-cols-4 gap-2">
               {(['thin', 'normal', 'thick', 'xthick'] as const).map(w => (
-                <button
+                <Button
+                  variant={paletteFrameWidth === w ? 'soft' : 'outline'}
+                  size="sm"
                   key={w}
                   type="button"
                   onClick={() => setPaletteFrameWidth(w)}
-                  className={`rounded border p-2 text-xs font-medium ${
-                    paletteFrameWidth === w
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                  }`}
                 >
                   {t(`frame${w.charAt(0).toUpperCase()}${w.slice(1)}` as Parameters<typeof t>[0])}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -367,18 +360,16 @@ export function SmartPaletteModal({
             </label>
             <div className="grid grid-cols-4 gap-2">
               {(['compact', 'normal', 'comfortable', 'spacious'] as const).map(s => (
-                <button
+                <Button
+                  variant={paletteFrameSize === s ? 'soft' : 'outline'}
+                  size="sm"
                   key={s}
                   type="button"
                   onClick={() => setPaletteFrameSize(s)}
-                  className={`rounded border p-2 text-xs font-medium capitalize ${
-                    paletteFrameSize === s
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                  }`}
+                  className="capitalize"
                 >
                   {s}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -402,13 +393,15 @@ export function SmartPaletteModal({
           {/* Layer A: reset link — only shown when template has a preset */}
           {getTemplatePresets(storeTemplate) ? (
             <div className="flex justify-end">
-              <button
+              <Button
+                variant="link"
+                size="sm"
                 type="button"
                 onClick={resetToTemplateDefaults}
-                className="text-xs text-muted-foreground underline hover:text-foreground"
+                className="text-muted-foreground"
               >
                 {t('resetToDefaults')}
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
@@ -421,6 +414,7 @@ export function SmartPaletteModal({
               {SECTION_KEYS.map(key => (
                 <div key={key} className="min-h-[180px]">
                   <button
+                    data-ui="tile"
                     type="button"
                     onClick={() => setExpandedSection(prev => (prev === key ? null : key))}
                     className={`h-full w-full rounded-lg border-2 transition-colors ${
@@ -453,14 +447,16 @@ export function SmartPaletteModal({
                     {t('overridePrefix')}{' '}
                     {t(`sectionLabels.${expandedSection}` as Parameters<typeof t>[0])}
                   </span>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     type="button"
                     onClick={() => setExpandedSection(null)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground"
                     aria-label={t('closeOverrideEditor')}
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <ColorField
@@ -514,7 +510,9 @@ export function SmartPaletteModal({
                     </select>
                   </label>
                 </div>
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   type="button"
                   onClick={() =>
                     setOverrides(prev => {
@@ -523,10 +521,10 @@ export function SmartPaletteModal({
                       return next;
                     })
                   }
-                  className="mt-3 text-xs text-muted-foreground underline hover:text-foreground"
+                  className="mt-3 text-muted-foreground"
                 >
                   {t('resetSection')}
-                </button>
+                </Button>
               </div>
             ) : null}
             <p className="mt-2 text-xs text-muted-foreground">{t('tokenHint')}</p>
@@ -534,14 +532,10 @@ export function SmartPaletteModal({
         ) : null}
 
         <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-          >
+          <Button variant="outline" type="button" onClick={onClose}>
             {t('cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={async () => {
               if (!palette) return;
@@ -578,10 +572,10 @@ export function SmartPaletteModal({
               onClose();
             }}
             disabled={!palette}
-            className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+            className="font-semibold"
           >
             {t('applyAll')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

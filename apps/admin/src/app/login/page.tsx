@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Input } from '@ebda/ui';
+import { Input } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useAuth, postLoginDestination, goAfterSignIn, type MfaChallenge } from '../../lib/auth';
 import { isPasskeyCancel, passkeyAutofillSupported, passkeysSupported } from '../../lib/passkeys';
 import { useT } from '@/i18n/useT';

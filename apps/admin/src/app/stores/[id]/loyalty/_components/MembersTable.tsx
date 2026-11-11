@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { TIER_COLORS, TIER_KEYS, type LoyaltyMember, type TierKey } from './types';
 import { withNumerals } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 interface MembersTableProps {
   members: LoyaltyMember[];
@@ -86,13 +87,9 @@ export function MembersTable({
       alignEnd: true,
       mobileActions: true,
       cell: member => (
-        <button
-          type="button"
-          onClick={() => onAwardClick(member)}
-          className="inline-flex items-center px-3 py-2 min-h-9 rounded-lg text-primary hover:bg-primary/5 text-sm font-medium"
-        >
+        <Button variant="ghost" size="sm" type="button" onClick={() => onAwardClick(member)}>
           {t('awardPoints')}
-        </button>
+        </Button>
       ),
     },
   ];
@@ -123,18 +120,15 @@ export function MembersTable({
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 p-4 bg-muted border border-border rounded-xl">
         {FILTER_TIERS.map(tier => (
-          <button
+          <Button
+            variant={tierFilter === tier ? 'soft' : 'ghost'}
+            size="sm"
             type="button"
             key={tier}
             onClick={() => onTierFilterChange(tier)}
-            className={`px-4 py-2 min-h-9 rounded-lg text-sm font-medium transition-colors ${
-              tierFilter === tier
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-card text-foreground hover:bg-muted border border-border'
-            }`}
           >
             {tierLabel(tier)}
-          </button>
+          </Button>
         ))}
       </div>
 

@@ -9,6 +9,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiFetch } from '../../../../../../lib/api';
 import { useRequireFeature } from '../../../../../../hooks/useRequireFeature';
 
+import { Button } from '@/components/ui/Button';
 export default function OrderInvoicePage() {
   const { gate } = useRequireFeature('accounting.invoicing');
 
@@ -83,10 +84,11 @@ export default function OrderInvoicePage() {
       <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6">
         {/* Toolbar */}
         <div className="sticky top-0 z-10 mb-4 flex items-center justify-between gap-2 rounded-2xl border border-border bg-background/95 p-2 backdrop-blur print:hidden">
-          <button
+          <Button
             type="button"
             onClick={() => router.push(`/stores/${storeId}/orders/${orderId}`)}
-            className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
+            variant="secondary"
+            className="gap-2"
           >
             <svg
               className={`h-4 w-4 ${locale === 'ar' ? 'rotate-180' : ''}`}
@@ -103,13 +105,9 @@ export default function OrderInvoicePage() {
               />
             </svg>
             {tDetail('back')}
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleEmail}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
-            >
+            <Button type="button" onClick={handleEmail} variant="outline" className="gap-2">
               <svg
                 className="h-4 w-4"
                 fill="none"
@@ -125,12 +123,8 @@ export default function OrderInvoicePage() {
                 />
               </svg>
               <span className="hidden sm:inline">{t('actions.email')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
-            >
+            </Button>
+            <Button type="button" onClick={handleDownloadPdf} variant="outline" className="gap-2">
               <svg
                 className="h-4 w-4"
                 fill="none"
@@ -146,11 +140,12 @@ export default function OrderInvoicePage() {
                 />
               </svg>
               <span className="hidden sm:inline">{t('actions.downloadPdf')}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+              variant="default"
+              className="gap-2 font-semibold"
             >
               <svg
                 className="h-4 w-4"
@@ -167,7 +162,7 @@ export default function OrderInvoicePage() {
                 />
               </svg>
               {t('actions.print')}
-            </button>
+            </Button>
           </div>
         </div>
 

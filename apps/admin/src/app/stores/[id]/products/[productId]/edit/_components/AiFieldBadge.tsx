@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { apiPost } from '../../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+import { Button } from '@/components/ui/Button';
 /**
  * AI-first autofill badge / hand-back control rendered beside each
  * AI-writable product field (nameAr, descriptionAr, metaTitle*, metaDescription*).
@@ -49,7 +50,7 @@ export function AiFieldBadge({
 
   if (owner === 'human' && storeId && productId) {
     return (
-      <button
+      <Button
         type="button"
         disabled={busy}
         onClick={async () => {
@@ -66,15 +67,13 @@ export function AiFieldBadge({
           }
           onReset?.(field, data.value);
         }}
-        className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium disabled:opacity-50 ${
-          failed
-            ? 'bg-destructive/10 text-destructive-ink'
-            : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-        }`}
         title={failed ? t('failedTitle') : t('handBackTitle')}
+        variant="outline"
+        size="sm"
+        className={failed ? 'text-destructive-ink' : undefined}
       >
         {busy ? '…' : failed ? t('retryLabel') : t('switchToAiLabel')}
-      </button>
+      </Button>
     );
   }
 

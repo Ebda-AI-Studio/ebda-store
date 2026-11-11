@@ -2,6 +2,7 @@
 
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { withNumerals } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 // Split out of page.tsx as a pure function of its props (#903) so it is
 // testable without AdminLayout's context tree (auth/store/features/router) —
@@ -55,14 +56,16 @@ export function RedirectsTable({ rows, deletingId, onDelete, t, ariaLabel }: Red
       mobileActions: true,
       className: 'w-20',
       cell: row => (
-        <button
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-destructive/40 text-destructive-ink"
           type="button"
           onClick={() => onDelete(row.id)}
           disabled={deletingId === row.id}
-          className="px-2 py-1 rounded border border-destructive/40 text-destructive-ink text-xs hover:bg-destructive/10 disabled:opacity-50 max-sm:min-h-11 max-sm:px-4"
         >
           {deletingId === row.id ? '…' : t('redirectsDelete')}
-        </button>
+        </Button>
       ),
     },
   ];

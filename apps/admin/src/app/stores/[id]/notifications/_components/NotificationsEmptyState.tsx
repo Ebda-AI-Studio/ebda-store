@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
@@ -33,7 +34,7 @@ export function NotificationsEmptyState() {
       {storeId && (
         <Link
           href={`/stores/${storeId}/features`}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+          className={buttonVariants({ className: 'mt-6 gap-2' })}
         >
           {t('ctaEnable')} →
         </Link>

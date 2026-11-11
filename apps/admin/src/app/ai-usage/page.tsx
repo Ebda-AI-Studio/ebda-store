@@ -15,6 +15,7 @@
  * Data: GET /api/v1/super-admin/ai-usage/summary
  */
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
@@ -372,16 +373,18 @@ function PlatformAiUsagePageInner() {
         </div>
 
         {(planFilter !== 'all' || featureFilter !== 'all') && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={() => {
               setPlanFilter('all');
               setFeatureFilter('all');
             }}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground"
           >
             {t('filters.clear')}
-          </button>
+          </Button>
         )}
       </div>
 

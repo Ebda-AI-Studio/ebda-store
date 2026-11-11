@@ -8,7 +8,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice, minorToMajor } from '@/lib/format';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { PageState } from '@/components/PageState';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -277,7 +277,7 @@ export default function PurchaseOrderDetailPage() {
               />
             )}
             {canReceive && (
-              <Button className="min-h-11" onClick={handleReceive} disabled={receiving}>
+              <Button onClick={handleReceive} disabled={receiving}>
                 {receiving ? tDetail('receiving') : tDetail('receiveButton')}
               </Button>
             )}

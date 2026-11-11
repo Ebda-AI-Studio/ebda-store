@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Badge, Modal, useToast } from '@ebda/ui';
+import { Badge, Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
@@ -389,8 +390,10 @@ export default function ReviewsPage() {
                         {displayBody}
                       </p>
                       {review.bodyTranslated && (
-                        <button
-                          className="text-xs text-primary underline mb-2"
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="mb-2"
                           onClick={() =>
                             setShowTranslated(prev => ({
                               ...prev,
@@ -401,7 +404,7 @@ export default function ReviewsPage() {
                           {isTranslated
                             ? t('showOriginal')
                             : t('showTranslated', { lang: review.language === 'ar' ? 'AR' : 'EN' })}
-                        </button>
+                        </Button>
                       )}
 
                       {/* Spam reasons */}
@@ -507,7 +510,6 @@ export default function ReviewsPage() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                size="sm"
                 disabled={meta.page === 1}
                 onClick={() => setMeta(prev => ({ ...prev, page: prev.page - 1 }))}
               >
@@ -515,7 +517,6 @@ export default function ReviewsPage() {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 disabled={meta.page === meta.totalPages}
                 onClick={() => setMeta(prev => ({ ...prev, page: prev.page + 1 }))}
               >

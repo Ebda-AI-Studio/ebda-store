@@ -6,6 +6,7 @@
  * content) and this pane lists exactly what changes, before and after. Nothing is saved until Apply, and
  * Apply only writes the DRAFT (Undo works, nothing goes live before Publish).
  */
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
@@ -129,25 +130,27 @@ export function AiPatchPane({
             )}
             <div className="flex gap-2 pt-1">
               {proposal.changes.length > 0 && (
-                <button
+                <Button
+                  size="sm"
                   type="button"
                   onClick={onApply}
                   disabled={busy !== null}
-                  className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  className="font-semibold"
                   data-testid="ai-patch-apply"
                 >
                   {busy === 'apply' ? t('applying') : t('apply')}
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={onDiscard}
                 disabled={busy !== null}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
                 data-testid="ai-patch-discard"
               >
                 {t('discard')}
-              </button>
+              </Button>
             </div>
           </section>
         ) : (
@@ -166,14 +169,15 @@ export function AiPatchPane({
             />
             <div className="flex flex-wrap gap-2">
               {(['example1', 'example2'] as const).map(k => (
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   key={k}
                   type="button"
                   onClick={() => setText(t(k))}
-                  className="rounded-full border border-border px-2.5 py-1 text-xs hover:bg-muted"
                 >
                   {t(k)}
-                </button>
+                </Button>
               ))}
             </div>
             {error && (
@@ -181,18 +185,19 @@ export function AiPatchPane({
                 {error}
               </p>
             )}
-            <button
+            <Button
+              size="sm"
               type="button"
               onClick={() => {
                 const v = text.trim();
                 if (v.length >= 2) onAsk(v);
               }}
               disabled={busy !== null}
-              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="font-semibold"
               data-testid="ai-patch-ask"
             >
               {busy === 'ask' ? t('asking') : t('ask')}
-            </button>
+            </Button>
           </>
         )}
       </div>

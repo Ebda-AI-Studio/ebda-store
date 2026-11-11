@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useLocale } from 'next-intl';
 import { Badge } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { formatPrice, intlLocaleForUi } from '../../../../../../lib/format';
@@ -188,7 +189,10 @@ export function ProductInfoSections({
 
 interface ProductSidebarProps {
   product: {
-    categories: { categoryId: string; category: { id: string; name: string } }[];
+    categories: {
+      categoryId: string;
+      category: { id: string; name: string; nameAr?: string | null };
+    }[];
     tags: { tagId: string; tag: { id: string; name: string; nameAr?: string | null } }[];
     isFeatured: boolean;
     isNew: boolean;
@@ -199,6 +203,7 @@ interface ProductSidebarProps {
 }
 
 export function ProductSidebar({ product }: ProductSidebarProps) {
+  const isAr = useLocale() === 'ar';
   const tSections = useT('products.detail.sections');
   const tFields = useT('products.detail.fields');
 
@@ -210,7 +215,7 @@ export function ProductSidebar({ product }: ProductSidebarProps) {
           <div className="flex flex-wrap gap-2">
             {product.categories.map(c => (
               <Badge key={c.categoryId || c.category?.id} variant="secondary">
-                {c.category?.name || c.categoryId}
+                {(isAr && c.category?.nameAr) || c.category?.name || c.categoryId}
               </Badge>
             ))}
           </div>

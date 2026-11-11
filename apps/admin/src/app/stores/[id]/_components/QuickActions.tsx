@@ -51,7 +51,7 @@ export function QuickActions({ store, isSuperAdmin }: QuickActionsProps) {
             </div>
           </Link>
         ))}
-        <button type="button" onClick={() => void copyLink()} className={CARD}>
+        <button type="button" onClick={() => void copyLink()} data-ui="tile" className={CARD}>
           <div>
             <p className="font-medium text-foreground">{t('shareLink')}</p>
             <p className="text-xs text-muted-foreground">{t('shareLinkBody')}</p>

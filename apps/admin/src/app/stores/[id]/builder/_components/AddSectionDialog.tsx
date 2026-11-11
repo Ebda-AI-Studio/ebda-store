@@ -6,6 +6,7 @@
  * disabled state (with the reason) when the type is at its cardinality cap.
  * Inserting goes through the reducer, which owns the invariants.
  */
+import { Button } from '@/components/ui/Button';
 import { useEffect, useRef } from 'react';
 import { useLocale } from 'next-intl';
 import {
@@ -70,13 +71,9 @@ export function AddSectionDialog({ list, doc, template, look, onPick, onClose }:
         <h2 id="add-section-title" className="text-base font-semibold">
           {t('title')}
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded px-2 py-1 text-sm hover:bg-muted"
-        >
+        <Button variant="ghost" size="sm" type="button" onClick={onClose}>
           {t('close')}
-        </button>
+        </Button>
       </div>
       <ul className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2 lg:grid-cols-3">
         {rows.flatMap(d => [
@@ -97,6 +94,7 @@ export function AddSectionDialog({ list, doc, template, look, onPick, onClose }:
             return (
               <li key={`${d.type}-${i}`}>
                 <button
+                  data-ui="tile"
                   type="button"
                   disabled={full}
                   onClick={() => onPick(d.type, i)}

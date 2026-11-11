@@ -9,6 +9,7 @@ import { useT } from '@/i18n/useT';
 import { formatMoney } from './format';
 import type { OrderDetail, OrderItemDetail } from './types';
 
+import { Button } from '@/components/ui/Button';
 interface ItemsCardProps {
   order: OrderDetail;
   previewLimit?: number;
@@ -131,22 +132,24 @@ export function ItemsCard({ order, previewLimit = 5 }: ItemsCardProps) {
       </ul>
 
       {hiddenRows > 0 && !expanded && (
-        <button
+        <Button
           type="button"
           onClick={() => setExpanded(true)}
-          className="mt-3 w-full rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+          variant="outline"
+          className="mt-3 w-full"
         >
           {t('viewAll')} ({totalRows})
-        </button>
+        </Button>
       )}
       {expanded && totalRows > previewLimit && (
-        <button
+        <Button
           type="button"
           onClick={() => setExpanded(false)}
-          className="mt-3 w-full rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+          variant="outline"
+          className="mt-3 w-full"
         >
           {t('showLess')}
-        </button>
+        </Button>
       )}
     </section>
   );
@@ -310,13 +313,15 @@ function PersonalisationRow({ text }: { text: string }) {
       <bdi className="min-w-0 flex-1 font-medium text-foreground select-all break-words">
         {text}
       </bdi>
-      <button
+      <Button
         type="button"
         onClick={copy}
-        className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        variant="ghost"
+        size="sm"
+        className="shrink-0 text-muted-foreground"
       >
         {copied ? t('copied') : t('copyPersonalisation')}
-      </button>
+      </Button>
     </div>
   );
 }

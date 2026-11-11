@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiGet, apiPut, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -446,14 +447,9 @@ export default function UserDetailPage() {
                     {user.id}
                   </span>
                 </p>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={isSaving || !hasChanges}
-                  className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
-                >
+                <Button type="button" onClick={handleSave} disabled={isSaving || !hasChanges}>
                   {isSaving ? t('saving') : t('save')}
-                </button>
+                </Button>
               </div>
 
               {/* Danger zone — hard-delete the user. The API refuses
@@ -468,13 +464,14 @@ export default function UserDetailPage() {
                       {t('dangerZoneDescription')}
                     </p>
                   </div>
-                  <button
+                  <Button
+                    variant="outline"
                     type="button"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="rounded-lg border border-destructive bg-card px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-destructive hover:text-destructive-foreground"
+                    className="text-destructive-ink"
                   >
                     {t('deleteUserButton')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

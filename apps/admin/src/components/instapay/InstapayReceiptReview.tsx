@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Input } from '@ebda/ui';
+import { Badge, Input } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatMoney, type InstapayReceiptView } from '@ebda/shared';
 import { useT } from '../../i18n/useT';
 import { useBlobUrl } from './api';

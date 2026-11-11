@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import {
   SETUP_GUIDE_ITEMS,
   buildStoreShareMessage,
@@ -78,14 +78,15 @@ export function SetupGuideCard({
     // Finished or hidden: one quiet line, never a wall of chrome.
     return guide.dismissed ? (
       <div className="mb-6">
-        <button
+        <Button
+          variant="link"
+          size="sm"
           type="button"
           onClick={() => setDismissed(false)}
           disabled={busy === 'dismissed'}
-          className="text-sm text-primary-ink hover:underline"
         >
           {t('show')}
-        </button>
+        </Button>
       </div>
     ) : null;
   }
@@ -104,14 +105,16 @@ export function SetupGuideCard({
           </h2>
           <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shrink-0 text-muted-foreground"
           type="button"
           onClick={() => setDismissed(true)}
           disabled={busy === 'dismissed'}
-          className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
         >
           {t('dismiss')}
-        </button>
+        </Button>
       </div>
 
       <div className="mt-3 flex items-center gap-3">

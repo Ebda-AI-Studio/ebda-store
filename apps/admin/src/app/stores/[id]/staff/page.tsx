@@ -2,7 +2,8 @@
 
 import { useParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { Button, Badge, Modal, ModalBody, ModalFooter, Input, Label, useToast } from '@ebda/ui';
+import { Badge, Modal, ModalBody, ModalFooter, Input, Label, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';

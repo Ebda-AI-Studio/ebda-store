@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import { useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { RowActions } from '@/components/RowActions';
@@ -252,7 +253,7 @@ export function ProductsTable({
             primary={
               <Link
                 href={`/stores/${storeId}/products/${product.id}/edit?returnTo=${encodeURIComponent(listUrl)}`}
-                className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-muted"
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
               >
                 {t('actions.edit')}
               </Link>

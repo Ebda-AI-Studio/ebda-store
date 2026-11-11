@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@ebda/ui';
@@ -282,16 +283,18 @@ export default function StoreFaqsPage() {
               <p className="text-xs text-muted-foreground mt-0.5">{t('faqsSubtitle')}</p>
             </div>
             {editingFaqId === null && (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => {
                   setFaqDraft({ ...EMPTY_FAQ, orderIndex: faqs.length });
                   setEditingFaqId('new');
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink hover:bg-primary/10"
+                className="gap-1.5 font-semibold"
               >
                 + {t('addFaq')}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -358,24 +361,20 @@ export default function StoreFaqsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={isSavingFaq}
-                      onClick={handleSaveFaq}
-                      className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                    >
+                    <Button size="sm" type="button" disabled={isSavingFaq} onClick={handleSaveFaq}>
                       {isSavingFaq ? '…' : t('faqSave')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       type="button"
                       onClick={() => {
                         setEditingFaqId(null);
                         setFaqDraft(EMPTY_FAQ);
                       }}
-                      className="px-4 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted"
                     >
                       {t('faqCancel')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -393,32 +392,37 @@ export default function StoreFaqsPage() {
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{faq.answer}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
                       type="button"
                       onClick={() => handleMoveFaq(faq.id, 'up')}
                       disabled={idx === 0}
                       title={t('faqMoveUp')}
-                      className="rounded p-1 hover:bg-muted disabled:opacity-30 text-xs"
                     >
                       ↑
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
                       type="button"
                       onClick={() => handleMoveFaq(faq.id, 'down')}
                       disabled={idx === faqs.length - 1}
                       title={t('faqMoveDown')}
-                      className="rounded p-1 hover:bg-muted disabled:opacity-30 text-xs"
                     >
                       ↓
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant={faq.isActive ? 'soft' : 'outline'}
+                      size="sm"
                       type="button"
                       onClick={() => handleToggleFaqActive(faq)}
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${faq.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
                     >
                       {faq.isActive ? t('faqActive') : t('faqInactive')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
                       type="button"
                       onClick={() => {
                         setFaqDraft({
@@ -431,17 +435,18 @@ export default function StoreFaqsPage() {
                         });
                         setEditingFaqId(faq.id);
                       }}
-                      className="rounded p-1.5 hover:bg-muted text-xs border border-border"
                     >
                       ✎
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
                       type="button"
                       onClick={() => handleDeleteFaq(faq.id)}
-                      className="rounded p-1.5 hover:bg-destructive/10 text-destructive-ink text-xs border border-border"
+                      className="text-destructive-ink"
                     >
                       ✕
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -505,24 +510,25 @@ export default function StoreFaqsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  size="sm"
                   type="button"
                   disabled={isSavingFaq || !faqDraft.question || !faqDraft.answer}
                   onClick={handleSaveFaq}
-                  className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                 >
                   {isSavingFaq ? '…' : t('faqSave')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   onClick={() => {
                     setEditingFaqId(null);
                     setFaqDraft(EMPTY_FAQ);
                   }}
-                  className="px-4 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted"
                 >
                   {t('faqCancel')}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -538,16 +544,18 @@ export default function StoreFaqsPage() {
               <p className="text-xs text-muted-foreground mt-0.5">{t('howtosSubtitle')}</p>
             </div>
             {editingHowtoId === null && (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => {
                   setHowtoDraft({ ...EMPTY_HOWTO, orderIndex: howtos.length });
                   setEditingHowtoId('new');
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink hover:bg-primary/10"
+                className="gap-1.5 font-semibold"
               >
                 + {t('addHowto')}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -583,14 +591,17 @@ export default function StoreFaqsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
+                    <Button
+                      variant={howto.isActive ? 'soft' : 'outline'}
+                      size="sm"
                       type="button"
                       onClick={() => handleToggleHowtoActive(howto)}
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${howto.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
                     >
                       {howto.isActive ? t('howtoActive') : t('howtoInactive')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
                       type="button"
                       onClick={() => {
                         setHowtoDraft({
@@ -608,17 +619,18 @@ export default function StoreFaqsPage() {
                         });
                         setEditingHowtoId(howto.id);
                       }}
-                      className="rounded p-1.5 hover:bg-muted text-xs border border-border"
                     >
                       ✎
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
                       type="button"
                       onClick={() => handleDeleteHowto(howto.id)}
-                      className="rounded p-1.5 hover:bg-destructive/10 text-destructive-ink text-xs border border-border"
+                      className="text-destructive-ink"
                     >
                       ✕
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -729,7 +741,9 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-medium text-foreground">{t('howtoSteps')}</label>
-          <button
+          <Button
+            variant="link"
+            size="sm"
             type="button"
             onClick={() =>
               setDraft(d => ({
@@ -738,10 +752,9 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                 stepsAr: [...(d.stepsAr ?? []), { name: '', text: '' }],
               }))
             }
-            className="text-xs text-primary hover:underline"
           >
             + {t('addStep')}
-          </button>
+          </Button>
         </div>
         {draft.steps.map((step, i) => {
           const stepAr = draft.stepsAr?.[i] ?? { name: '', text: '' };
@@ -783,7 +796,9 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                   />
                 </div>
                 {draft.steps.length > 1 && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     type="button"
                     onClick={() =>
                       setDraft(d => ({
@@ -792,10 +807,10 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
                         stepsAr: (d.stepsAr ?? []).filter((_, idx) => idx !== i),
                       }))
                     }
-                    className="text-destructive-ink hover:text-destructive-ink/80 text-xs"
+                    className="text-destructive-ink"
                   >
                     ✕
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -835,21 +850,12 @@ function HowtoForm({ draft, setDraft, t, isSaving, onSave, onCancel, autoFocus }
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={isSaving || !canSave}
-          onClick={onSave}
-          className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-        >
+        <Button size="sm" type="button" disabled={isSaving || !canSave} onClick={onSave}>
           {isSaving ? '…' : t('howtoSave')}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted"
-        >
+        </Button>
+        <Button variant="outline" size="sm" type="button" onClick={onCancel}>
           {t('howtoCancel')}
-        </button>
+        </Button>
       </div>
     </div>
   );

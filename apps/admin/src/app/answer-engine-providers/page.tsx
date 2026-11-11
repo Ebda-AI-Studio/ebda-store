@@ -20,6 +20,7 @@
  * Bilingual EN + AR throughout (mirrors apps/admin/src/app/ai-usage/page.tsx).
  */
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
@@ -137,14 +138,9 @@ export function ProviderRow({
           {t('enabledLabel')}
         </label>
 
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
+        <Button type="button" onClick={save} disabled={saving}>
           {saving ? t('savingButton') : t('saveButton')}
-        </button>
+        </Button>
       </div>
 
       {message && <p className="mt-2 text-xs text-muted-foreground">{message}</p>}
@@ -213,13 +209,9 @@ function AnswerEngineProvidersPageInner() {
     return (
       <div className="rounded-xl border bg-card p-8 text-center">
         <p className="text-sm text-destructive-ink">{t('loadFailedBody')}</p>
-        <button
-          type="button"
-          onClick={fetchConfigs}
-          className="mt-4 text-sm text-primary hover:underline"
-        >
+        <Button variant="link" size="sm" type="button" onClick={fetchConfigs} className="mt-4">
           {t('retry')}
-        </button>
+        </Button>
       </div>
     );
   }
