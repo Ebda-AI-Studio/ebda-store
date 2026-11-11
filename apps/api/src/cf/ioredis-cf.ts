@@ -312,9 +312,11 @@ export class CfRedis {
     const out = new Array<string | null>(names.length).fill(null);
     await Promise.all(
       [...groups].map(async ([shard, idx]) => {
+        // bounded (API-HANG-1): a read that times out makes the fill skip its write; the BUMP below stays unbounded
         const res = await applyOnShard(
           shard,
-          idx.map(i => ['get', this.key(CACHEGEN_PREFIX + names[i])] as Op)
+          idx.map(i => ['get', this.key(CACHEGEN_PREFIX + names[i])] as Op),
+          { bounded: true }
         );
         idx.forEach((i, j) => (out[i] = (res[j] as string | null) ?? null));
       })

@@ -12,7 +12,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Options, Store, ClientRateLimitInfo } from 'express-rate-limit';
-import { applyOn, shardOf } from './auth-state-client';
+import { AuthStateTimeoutError, applyOn, shardOf } from './auth-state-client';
 import { cfWaitUntil } from './bindings';
 import type { Op } from './auth-state-core';
 
@@ -71,10 +71,14 @@ export function prefetchHits(
   }
   for (const { hits: list, reads } of byShard.values()) {
     // hits first: the reads follow them in the same call
-    const call = applyOn(list[0]?.key ?? reads[0], [
-      ...list.map(e => ['hit', e.key, e.windowMs] as Op),
-      ...reads.flatMap(k => [['get', k] as Op, ['pttl', k] as Op]),
-    ]);
+    const call = applyOn(
+      list[0]?.key ?? reads[0],
+      [
+        ...list.map(e => ['hit', e.key, e.windowMs] as Op),
+        ...reads.flatMap(k => [['get', k] as Op, ['pttl', k] as Op]),
+      ],
+      { bounded: true }
+    );
     reads.forEach((key, j) => {
       const at = list.length + 2 * j;
       const entry: Prefetched = {
@@ -134,6 +138,24 @@ export async function releaseUnconsumed(hits: PrefetchedHits): Promise<unknown> 
   );
 }
 
+/**
+ * API-HANG-2: the limiters that may fail OPEN when AuthState times out: anonymous public READS only (a storefront that cannot
+ * count a browse should still serve it). Keyed by the store prefix `rl:<name>:` (middleware/security.ts makeRateLimitStore).
+ * Anything not listed, including a limiter added later, fails CLOSED. tests/unit/api-hang-limiter-fail-mode.test.ts pins the list.
+ */
+export const RL_FAIL_OPEN_PREFIXES: readonly string[] = [
+  'rl:public:',
+  'rl:public-tenant:',
+  'rl:public-search:',
+  'rl:store-resolve:',
+  'rl:store-miss:',
+  'rl:view-ingest:',
+];
+export const FAIL_CLOSED_HITS = Number.MAX_SAFE_INTEGER;
+export function failsOpen(redisKey: string): boolean {
+  return RL_FAIL_OPEN_PREFIXES.some(p => redisKey.startsWith(p));
+}
+
 export class CfRateLimitStore implements Store {
   readonly localKeys = false;
   private windowMs = 60_000;
@@ -148,6 +170,17 @@ export class CfRateLimitStore implements Store {
     return `${this.prefix}${key}`;
   }
 
+  /**
+   * AuthState did not answer within AUTH_STATE_TIMEOUT_MS (Ruling API-HANG-2). A public read limiter fails OPEN: the error goes to
+   * express-rate-limit, whose `passOnStoreError` serves the request, as on any AuthState outage. Every other limiter (sign-in,
+   * OTP, reset, refresh, signup, passkey, writes, payments, coupons, uploads, the global one) fails CLOSED: the store answers
+   * "over the limit", so the limiter's own handler sends its normal 429 body with `Retry-After` for the rest of the window.
+   */
+  private onTimeout(redisKey: string, err: AuthStateTimeoutError): ClientRateLimitInfo {
+    if (failsOpen(redisKey)) throw err;
+    return { totalHits: FAIL_CLOSED_HITS, resetTime: new Date(Date.now() + this.windowMs) };
+  }
+
   async get(key: string): Promise<ClientRateLimitInfo | undefined> {
     const redisKey = this.k(key);
     // (named `read`, not `pre`: the defence-mutation record finds the hit lookup in `increment` by its exact text)
@@ -157,16 +190,26 @@ export class CfRateLimitStore implements Store {
         const [hits, resetAt] = await read.result;
         if (hits <= 0) return undefined;
         return { totalHits: hits, resetTime: new Date(resetAt || Date.now() + this.windowMs) };
-      } catch {
+      } catch (err) {
+        if (err instanceof AuthStateTimeoutError) return this.onTimeout(redisKey, err);
         // the batched call failed: read directly below (a store error there fails open at the caller)
       }
     }
-    const [value, pttl] = (await applyOn(redisKey, [
-      ['get', redisKey],
-      ['pttl', redisKey],
-    ])) as [string | null, number];
-    if (value === null) return undefined;
-    return { totalHits: Number(value), resetTime: new Date(Date.now() + Math.max(0, pttl)) };
+    try {
+      const [value, pttl] = (await applyOn(
+        redisKey,
+        [
+          ['get', redisKey],
+          ['pttl', redisKey],
+        ],
+        { bounded: true }
+      )) as [string | null, number];
+      if (value === null) return undefined;
+      return { totalHits: Number(value), resetTime: new Date(Date.now() + Math.max(0, pttl)) };
+    } catch (err) {
+      if (err instanceof AuthStateTimeoutError) return this.onTimeout(redisKey, err);
+      throw err;
+    }
   }
 
   async increment(key: string): Promise<ClientRateLimitInfo> {
@@ -177,14 +220,20 @@ export class CfRateLimitStore implements Store {
       try {
         const [hits, resetAt] = await pre.result;
         return { totalHits: hits, resetTime: new Date(resetAt) };
-      } catch {
+      } catch (err) {
+        if (err instanceof AuthStateTimeoutError) return this.onTimeout(redisKey, err);
         // the batched call failed: count directly below (a store error there fails open as before)
       }
     }
-    const [res] = (await applyOn(redisKey, [['hit', redisKey, this.windowMs]])) as [
-      [number, number],
-    ];
-    return { totalHits: res[0], resetTime: new Date(res[1]) };
+    try {
+      const [res] = (await applyOn(redisKey, [['hit', redisKey, this.windowMs]], {
+        bounded: true,
+      })) as [[number, number]];
+      return { totalHits: res[0], resetTime: new Date(res[1]) };
+    } catch (err) {
+      if (err instanceof AuthStateTimeoutError) return this.onTimeout(redisKey, err);
+      throw err;
+    }
   }
 
   /**
@@ -196,7 +245,7 @@ export class CfRateLimitStore implements Store {
    */
   async decrement(key: string): Promise<void> {
     const redisKey = this.k(key);
-    const done = applyOn(redisKey, [['unhit', redisKey]]).catch(() => undefined);
+    const done = applyOn(redisKey, [['unhit', redisKey]], { bounded: true }).catch(() => undefined);
     cfWaitUntil(done);
     await done;
   }
