@@ -53,6 +53,13 @@ describe('upload routes gate on the storage ceiling', () => {
   it('image, images, video and font each call assertStorageRoom', () => {
     expect(src.match(/assertStorageRoom\(/g)?.length).toBe(4);
   });
+  it('a failed bucket listing fails OPEN, with a warning', () => {
+    const svc = readFileSync(
+      join(__dirname, '../../apps/api/src/services/plan-limit.service.ts'),
+      'utf8'
+    );
+    expect(svc).toMatch(/storage usage unavailable, allowing the upload/);
+  });
   it('countUsage no longer returns null for maxStorageMb', () => {
     const svc = readFileSync(
       join(__dirname, '../../apps/api/src/services/plan-limit.service.ts'),

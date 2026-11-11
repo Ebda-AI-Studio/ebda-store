@@ -60,8 +60,14 @@ type Tx = Prisma.TransactionClient;
 
 /** S3-X8: R2 bytes under the store's prefix, rounded UP to whole MB. */
 async function storageUsageMb(storeId: string): Promise<number> {
-  const bytes = await cachedStoreBytes(storeId, c => StorageService.listStoreSizes(storeId, c));
-  return Math.ceil(bytes / BYTES_PER_MB);
+  try {
+    const bytes = await cachedStoreBytes(storeId, c => StorageService.listStoreSizes(storeId, c));
+    return Math.ceil(bytes / BYTES_PER_MB);
+  } catch (err) {
+    // A plan ceiling is not worth refusing a merchant's upload because OUR bucket listing failed: fail OPEN, say so.
+    logger.warn({ err, storeId }, '[plan-limit] storage usage unavailable, allowing the upload');
+    return 0;
+  }
 }
 
 /** S3-X8: gate an upload of `bytes` on the plan's storage ceiling (402 PLAN_LIMIT_REACHED; null = unlimited). */
