@@ -16,6 +16,33 @@ CI-HOSTED-1 scheduled no-op is retired).
 > fixture/helper or anything under `packages/database` runs the whole tier. Outputs `integration` and `integration_paths`
 > feed the `Integration Tests` job's `if` and its vitest targets. #227 merged four edited integration tests that never ran.
 
+## The Mac runner (Ruling CI-MAC-RUNNER-1, 2026-11-11)
+
+The org's 50,000 hosted minutes ran out on 2026-11-11 (ebda-store used 49,451) and paid add-ons are capped at $0, so
+Ahmad chose to run CI on his Mac. **`EBDA_RUNS_ON='["self-hosted","ebda-mac"]'`** (repo variable on ebda-store,
+ebda-whatsapp, ebda-foundation) routes every job to the org runners `ebda-mac-1` / `ebda-mac-2` (runner group
+`ebda-mac`: those three private repos only, no public repos; org fork-PR workflows for private repos are off).
+Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
+
+- **Runner install**: `~/actions-runner-ebda` and `~/actions-runner-ebda-2` (actions/runner v2.338.2, sha256 verified),
+  launchd user agents `actions.runner.Ebda-AI-Studio.ebda-mac-{1,2}` (`./svc.sh status|stop|start` in each dir). Their
+  `.path` is a clean Homebrew PATH; `.env` sets `PLAYWRIGHT_BROWSERS_PATH` (one local browser cache, never the Actions
+  cache) and `EBDA_NM_STORE=~/.ebda-ci/node-modules` (the npm-ci-reuse store, shared by both runners). Two instances, not
+  more: the ForceAI-KW runner on the same Mac counts toward a host total of 3.
+- **Databases**: macOS runners cannot start service containers, so `services:` images are `''` when `EBDA_RUNS_ON`
+  names `ebda-mac` (the runner then skips the service). `scripts/ci/ci-services.sh up` gives the job its URLs
+  (`CI_PG_URL`, `CI_PG_APP_URL`, `CI_REDIS_URL`): on Linux from the service ports; on the Mac a database of its own on the
+  host's ONE Homebrew Postgres 17 + pgvector (shared with other repos), named `ebda_store_ci_<run>_<attempt>_<job>_<runner>`
+  and dropped by `ci-services.sh down` (`if: always()`); `up` also drops this repo's CI databases older than 3 h. Redis is a
+  logical DB per runner instance (1 / 2). Host deviation: brew ships pgvector 0.8.7, CI's container pins 0.8.0.
+- **Heavy jobs one at a time**: the test jobs bind fixed ports (API 4000, web 3000/3001, workerd 8811-8813) and take most of
+  the 16 GB, so each heavy job (unit shards, integration, e2e, builder e2e, worker dry-run, workerd smoke/integration,
+  mutation) holds the host-wide lock `~/.claude/locks/heavy-test.lock` (`scripts/ci/heavy-lock.sh`, the same file
+  `host-lock.sh` uses for local suites) and releases it in its last `if: always()` step. Light jobs (changes, guards, lint,
+  typecheck, app builds, gitleaks, blast-radius) run in parallel on the two runners.
+- Fixed `/tmp` paths are banned in ci.yml (`$RUNNER_TEMP` instead); gitleaks installs the darwin binary into
+  `$RUNNER_TEMP/bin` without sudo. Pinned by `tests/unit/ci-lean-structure.test.ts` ("the Mac runner shape").
+
 ## Per-PR runner routing (Ruling CI-ROUTE-1)
 
 A pull request labelled `ci-umbra` runs every job of every PR workflow on the Umbra runners; unlabelled PRs and all

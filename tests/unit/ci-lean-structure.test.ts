@@ -278,7 +278,8 @@ describe('ci.yml lanes', () => {
 
   it('keeps the integration job on ebda_app (never the superuser) and Redis in the main lane', () => {
     expect(raw).toMatch(/DB role check: current_user=ebda_app rolbypassrls=false/);
-    expect(raw).toMatch(/image: redis:7-alpine/);
+    // Ruling CI-MAC-RUNNER-1: the image is an expression ('' on the Mac runner, where containers cannot run).
+    expect(raw).toMatch(/image: .*'redis:7-alpine'/);
     // Ruling NZ-17-RLS-1: the dedicated RLS proof / payload-parity jobs are gone with the production Postgres
     expect(ci.jobs['test-rls-ebda-app']).toBeUndefined();
     expect(ci.jobs['test-rls-payload-parity']).toBeUndefined();
@@ -514,11 +515,11 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
     const raw = readFileSync(path.join(dir, f), 'utf8');
     const blocks = [
       ...raw.matchAll(
-        /image: (pgvector\/\S+|postgres\S*|redis\S*)\n([\s\S]*?)(?=\n\s{4,6}\w[\w-]*:|\n\s{2}\w)/g
+        /image: (?:\$\{\{[^\n]*?'(pgvector\/[^']+|redis[^']*)'[^\n]*\}\}|(pgvector\/\S+|postgres\S*|redis\S*))\n([\s\S]*?)(?=\n\s{4,6}\w[\w-]*:|\n\s{2}\w)/g
       ),
     ];
     for (const b of blocks) {
-      const image = b[1];
+      const image = b[1] ?? b[2];
       const opts =
         /options: >-\n((?:\s+--.*\n?)+)/.exec(raw.slice(b.index!, b.index! + 1200))?.[1] ?? '';
       it(`${f}: ${image} mounts its data dir on tmpfs`, () => {
@@ -559,5 +560,62 @@ describe('app-build is one-at-a-time and heavy-lane (guest memory)', () => {
     ];
     const glob = (g: string) => new RegExp('^' + g.replace(/\*/g, '.*') + '$');
     expect(light.some(g => glob(g).test('app-build'))).toBe(false);
+  });
+});
+
+// Ruling CI-MAC-RUNNER-1 (Ahmad 2026-11-11): the org's hosted minutes ran out, so EBDA_RUNS_ON routes CI to the
+// self-hosted Mac runner (label ebda-mac). macOS runners cannot start service containers, so the jobs that need a
+// database read their URLs from scripts/ci/ci-services.sh, and every heavy test job holds the host-wide heavy lock.
+describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
+  const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  const parsed = yaml.load(ci) as {
+    jobs: Record<
+      string,
+      { services?: Record<string, { image: string }>; steps: Array<{ run?: string; if?: string }> }
+    >;
+  };
+  const jobsWithServices = Object.entries(parsed.jobs).filter(([, j]) => j.services);
+  it('finds the jobs with service containers', () =>
+    expect(jobsWithServices.map(([n]) => n).sort()).toEqual(['test-e2e', 'test-integration']));
+  it.each(jobsWithServices.map(([n, j]) => [n, j] as const))(
+    '%s: images are skipped on the Mac and URLs come from ci-services.sh',
+    (_n, j) => {
+      for (const svc of Object.values(j.services!))
+        expect(svc.image).toMatch(
+          /^\$\{\{ !contains\(vars\.EBDA_RUNS_ON, 'ebda-mac'\) && '[^']+' \|\| '' \}\}$/
+        );
+      const runs = j.steps.map(s => s.run ?? '');
+      expect(runs).toContain('bash scripts/ci/ci-services.sh up');
+      const down = j.steps.find(s => s.run === 'bash scripts/ci/ci-services.sh down');
+      expect(down?.if).toBe('always()');
+    }
+  );
+  it('no step URL reads a service port directly (empty on the Mac)', () => {
+    const lines = ci.split('\n').filter(l => /job\.services\./.test(l) && !/^\s*#/.test(l));
+    expect(lines.every(l => /^\s+CI_(PG|REDIS)_PORT:/.test(l))).toBe(true);
+  });
+  it.each([
+    'unit',
+    'builder-e2e',
+    'worker-dry-run',
+    'api-workerd-smoke',
+    'workerd-integration',
+    'test-unit-shard',
+    'test-integration',
+    'test-e2e',
+    'mutation',
+  ])('%s holds the heavy lock and always releases it', name => {
+    const steps = parsed.jobs[name].steps;
+    expect(steps.some(s => s.run === 'bash scripts/ci/heavy-lock.sh acquire')).toBe(true);
+    const rel = steps[steps.length - 1];
+    expect(rel.run).toBe('bash scripts/ci/heavy-lock.sh release');
+    expect(rel.if).toBe('always()');
+  });
+  it('nothing in ci.yml writes to a fixed /tmp path (two runners share the Mac)', () => {
+    const code = ci
+      .split('\n')
+      .filter(l => !/^\s*#/.test(l))
+      .join('\n');
+    expect(code).not.toMatch(/[\s'"(=>]\/tmp\//);
   });
 });
