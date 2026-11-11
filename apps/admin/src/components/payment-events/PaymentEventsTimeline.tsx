@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState, useCallback, useEffect } from 'react';
 import { Modal } from '@ebda/ui';
 import { apiGet } from '@/lib/api';
@@ -337,10 +338,12 @@ function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
         {/* Super-admin raw payload button */}
         {isSuperAdmin && (
           <>
-            <button
+            <Button
+              variant="link"
+              size="sm"
               type="button"
               onClick={() => setShowPayload(true)}
-              className="mt-2 inline-flex items-center gap-1.5 text-xs text-primary hover:underline cursor-pointer"
+              className="mt-2 gap-1.5"
             >
               <svg
                 className="h-3 w-3"
@@ -357,7 +360,7 @@ function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
                 />
               </svg>
               {t('viewRawPayload')}
-            </button>
+            </Button>
             {showPayload && (
               <PayloadModal eventId={event.id} onClose={() => setShowPayload(false)} />
             )}
@@ -430,6 +433,7 @@ export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTime
     >
       {/* Toggle button */}
       <button
+        data-ui="row"
         type="button"
         onClick={handleToggle}
         className="flex w-full items-center gap-2 text-sm font-medium text-primary hover:opacity-80 transition-opacity cursor-pointer"

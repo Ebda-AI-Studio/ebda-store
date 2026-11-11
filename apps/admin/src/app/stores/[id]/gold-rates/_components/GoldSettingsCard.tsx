@@ -6,6 +6,7 @@ import { useT } from '@/i18n/useT';
 import { apiPut } from '../../../../../lib/api';
 import type { GoldSettingsView } from './types';
 
+import { Button } from '@/components/ui/Button';
 const STEPS = [1, 100, 500, 1000] as const;
 
 export function GoldSettingsCard({
@@ -131,14 +132,15 @@ export function GoldSettingsCard({
         </p>
       )}
       {canEdit && (
-        <button
+        <Button
           type="button"
           disabled={saving}
           onClick={() => void save()}
-          className="mt-4 min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          variant="default"
+          className="mt-4"
         >
           {t('save')}
-        </button>
+        </Button>
       )}
     </section>
   );

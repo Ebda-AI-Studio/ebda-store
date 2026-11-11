@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { call } from './helpers';
 
-// Ebda Chat sends signed-out people to accounts.ebda.app/login?product=chat&return=<https://wa.ebda.app/...>.
-// The bare entry used to drop both and send them to a Store page (ACCOUNTS-ENTRY-1); now the pair survives the hop
-// (Ruling SIGNIN-RETURN-1). The admin /login is the boundary that validates `return`; this only keeps it intact.
-describe('GET /login keeps product and return', () => {
+// `/sign-in` still hops to the Store sign-in (ACCOUNTS-ENTRY-1) and keeps product + return (Ruling SIGNIN-RETURN-1).
+// The admin /login is the boundary that validates `return`; this only keeps it intact. (`/login` and `/` are the
+// accounts page now, Ruling ACCOUNTS-PAGE-1: test/sign-in-page.test.ts.)
+describe('GET /sign-in keeps product and return', () => {
   it('forwards both, URL-encoded', async () => {
     const r = await call(
-      `/login?product=chat&return=${encodeURIComponent('https://wa.ebda.app/inbox?a=1&b=2')}`,
+      `/sign-in?product=chat&return=${encodeURIComponent('https://wa.ebda.app/inbox?a=1&b=2')}`,
       { redirect: 'manual' }
     );
     expect(r.status).toBe(302);
@@ -19,7 +19,7 @@ describe('GET /login keeps product and return', () => {
 
   it('an unknown product is dropped; the return still travels', async () => {
     const r = await call(
-      `/login?product=crm&return=${encodeURIComponent('https://wa.ebda.app/')}`,
+      `/sign-in?product=crm&return=${encodeURIComponent('https://wa.ebda.app/')}`,
       {
         redirect: 'manual',
       }
@@ -30,7 +30,7 @@ describe('GET /login keeps product and return', () => {
   });
 
   it('forwards nothing else, and nothing when absent', async () => {
-    const r = await call('/login?evil=1&next=//x', { redirect: 'manual' });
+    const r = await call('/sign-in?evil=1&next=//x', { redirect: 'manual' });
     expect(r.headers.get('location')).toBe('https://store.ebda.app/login');
   });
 
@@ -40,7 +40,7 @@ describe('GET /login keeps product and return', () => {
       'javascript:alert(1)',
       'https://wa.ebda.app/' + 'a'.repeat(3000),
     ]) {
-      const r = await call(`/login?product=chat&return=${encodeURIComponent(bad)}`, {
+      const r = await call(`/sign-in?product=chat&return=${encodeURIComponent(bad)}`, {
         redirect: 'manual',
       });
       const loc = new URL(r.headers.get('location')!);
@@ -49,10 +49,17 @@ describe('GET /login keeps product and return', () => {
     }
   });
 
-  it('/ and /sign-in forward the same way', async () => {
-    for (const p of ['/', '/sign-in']) {
-      const r = await call(`${p}?product=chat`, { redirect: 'manual' });
-      expect(new URL(r.headers.get('location')!).searchParams.get('product')).toBe('chat');
-    }
+  it("/ keeps them on the way to this host's /login", async () => {
+    const r = await call(
+      `/?product=chat&return=${encodeURIComponent('https://wa.ebda.app/x')}&evil=1`,
+      {
+        redirect: 'manual',
+      }
+    );
+    const loc = new URL(r.headers.get('location')!, 'https://accounts.ebda.app');
+    expect(loc.origin + loc.pathname).toBe('https://accounts.ebda.app/login');
+    expect(loc.searchParams.get('product')).toBe('chat');
+    expect(loc.searchParams.get('return')).toBe('https://wa.ebda.app/x');
+    expect(loc.searchParams.get('evil')).toBeNull();
   });
 });

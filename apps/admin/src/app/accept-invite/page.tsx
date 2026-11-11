@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiPost } from '../../lib/api';
 import { useAuth } from '../../lib/auth';

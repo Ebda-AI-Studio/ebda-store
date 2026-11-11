@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -90,13 +91,9 @@ export default function ContentListPage() {
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <button
-          type="button"
-          onClick={handleNewPage}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
-        >
+        <Button type="button" onClick={handleNewPage} className="gap-2 font-semibold">
           {t('newPage')}
-        </button>
+        </Button>
       }
     >
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">

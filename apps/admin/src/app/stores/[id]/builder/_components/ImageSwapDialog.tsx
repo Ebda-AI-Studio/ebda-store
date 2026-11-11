@@ -6,6 +6,7 @@
  * tenant-scoped upload API). Pick, then (when the setting has an alt sibling)
  * a short description in Arabic and English, then one undoable commit.
  */
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { MediaPicker } from './MediaPicker';
@@ -102,20 +103,12 @@ export function ImageSwapDialog({
           />
         </label>
         <div className="flex justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => setPicked(null)}
-            className="rounded-lg px-3 py-1.5 text-sm hover:bg-muted"
-          >
+          <Button variant="ghost" type="button" onClick={() => setPicked(null)}>
             {t('altBack')}
-          </button>
-          <button
-            type="submit"
-            data-testid="swap-apply"
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-          >
+          </Button>
+          <Button type="submit" data-testid="swap-apply" className="font-semibold">
             {t('altApply')}
-          </button>
+          </Button>
         </div>
       </form>
     </dialog>

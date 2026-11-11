@@ -14,6 +14,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useT } from '../../../../i18n/useT';
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
 import { withNumerals } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -343,13 +344,14 @@ export default function AiToolsPage() {
       alignEnd: true,
       mobileActions: true,
       cell: j => (
-        <button
+        <Button
+          variant="link"
+          size="sm"
           type="button"
           onClick={() => fetchActiveJob(j.id).then(() => undefined)}
-          className="text-xs text-primary hover:underline"
         >
           {t('recentRuns.details')}
-        </button>
+        </Button>
       ),
     },
   ];
@@ -846,15 +848,17 @@ function BulkActionCard({
         />
       </div>
 
-      <button
+      <Button
+        variant="default"
+        size="md"
+        className="w-full"
         type="button"
         onClick={() => onAction(replaceExisting)}
         disabled={loading || disabled}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
         <span>{loading ? startingLabel : buttonLabel}</span>
-      </button>
+      </Button>
 
       {resultsHref && (
         <Link
@@ -893,15 +897,16 @@ function MasterSweepButton({
     </svg>
   );
   return (
-    <button
+    <Button
+      variant="default"
+      size="md"
       type="button"
       onClick={onClick}
       disabled={loading || disabled}
-      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
       {loading ? startingLabel : label}
-    </button>
+    </Button>
   );
 }
 
@@ -989,22 +994,26 @@ function ActiveJobCard({
         </div>
         <div className="flex items-center gap-2">
           {isActive && onCancel && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-destructive/40 text-destructive-ink"
               type="button"
               onClick={onCancel}
               disabled={cancelling}
-              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive-ink hover:bg-destructive/20 disabled:opacity-50"
             >
               {cancelling ? t('activeJob.cancelling') : t('activeJob.cancel')}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
             type="button"
             onClick={onClose}
-            className="text-sm text-muted-foreground hover:text-foreground"
           >
             {isDone ? t('activeJob.dismiss') : t('activeJob.hide')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1139,21 +1148,25 @@ function MasterSweepCard({
         </div>
         <div className="flex items-center gap-2">
           {anyActive && onCancel && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-destructive/40 text-destructive-ink"
               type="button"
               onClick={onCancel}
-              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive-ink hover:bg-destructive/20"
             >
               {t('activeJob.cancelAll')}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
             type="button"
             onClick={onClose}
-            className="text-sm text-muted-foreground hover:text-foreground"
           >
             {allDone ? t('activeJob.dismiss') : t('activeJob.hide')}
-          </button>
+          </Button>
         </div>
       </div>
 

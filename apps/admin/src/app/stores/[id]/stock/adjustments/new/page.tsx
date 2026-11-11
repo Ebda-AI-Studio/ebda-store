@@ -6,7 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { HelpTip } from '@/components/HelpTip';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '@/lib/api';
@@ -244,10 +244,12 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
           <li>{tNew.rich('csvHelpStep3', { b: chunks => <strong>{chunks}</strong> })}</li>
           <li>{tNew('csvHelpStep4')}</li>
         </ol>
-        <button
+        <Button
           type="button"
           onClick={downloadTemplate}
-          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 border border-info/40 rounded text-xs text-info-ink hover:bg-info/10"
+          variant="outline"
+          size="sm"
+          className="mt-3 gap-1.5"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -258,7 +260,7 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             />
           </svg>
           {tNew('csvDownloadTemplate')}
-        </button>
+        </Button>
       </div>
 
       {/* Adjustment type */}
@@ -429,13 +431,9 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
               </ul>
             </details>
           )}
-          <button
-            type="button"
-            onClick={onSuccess}
-            className="mt-1 px-4 py-2 bg-primary text-primary-foreground rounded text-sm"
-          >
+          <Button type="button" onClick={onSuccess} variant="default" className="mt-1">
             {tNew('csvViewAllAdjustments')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -448,22 +446,18 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
       {/* Actions */}
       {!importResult && (
         <div className="flex gap-2 flex-wrap">
-          <button
+          <Button
             type="button"
             onClick={handleSubmit}
             disabled={submitting || !parseResult?.hasValidRows}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
+            variant="default"
           >
             {submitting ? tNew('csvImporting') : tNew('csvSubmit', { count: validRowCount })}
-          </button>
+          </Button>
           {selectedFileName && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="px-4 py-2 border border-border rounded text-sm"
-            >
+            <Button type="button" onClick={handleClear} variant="outline">
               {tNew('csvClear')}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -560,14 +554,16 @@ export default function NewStockAdjustmentPage() {
       mobileActions: true,
       className: 'w-12 text-center',
       cell: (_item, i) => (
-        <button
+        <Button
           type="button"
           onClick={() => removeItem(i)}
           disabled={items.length <= 1}
-          className="text-red-600 disabled:opacity-30 hover:underline text-xs max-sm:inline-flex max-sm:min-h-11 max-sm:items-center max-sm:px-2"
+          variant="link"
+          size="sm"
+          className="text-red-600"
         >
           ✕
-        </button>
+        </Button>
       ),
     },
   ];
@@ -674,28 +670,22 @@ export default function NewStockAdjustmentPage() {
       <div className="max-w-4xl space-y-5">
         {/* Tab switcher */}
         <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1 w-fit">
-          <button
+          <Button
             type="button"
             onClick={() => setActiveTab('manual')}
-            className={`px-4 py-1.5 rounded text-sm font-medium transition ${
-              activeTab === 'manual'
-                ? 'bg-background shadow text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            variant={activeTab === 'manual' ? 'soft' : 'ghost'}
+            size="sm"
           >
             {tNew('tabManual')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => setActiveTab('csv')}
-            className={`px-4 py-1.5 rounded text-sm font-medium transition ${
-              activeTab === 'csv'
-                ? 'bg-background shadow text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            variant={activeTab === 'csv' ? 'soft' : 'ghost'}
+            size="sm"
           >
             {tNew('tabCsv')}
-          </button>
+          </Button>
         </div>
 
         {/* CSV Import tab */}
@@ -781,13 +771,9 @@ export default function NewStockAdjustmentPage() {
 
             {/* Add product row */}
             <div>
-              <button
-                type="button"
-                onClick={addItem}
-                className="px-3 py-1.5 border border-border rounded text-sm"
-              >
+              <Button type="button" onClick={addItem} variant="outline" size="sm">
                 {tNew('addItem')}
-              </button>
+              </Button>
             </div>
 
             {error && (
@@ -814,7 +800,6 @@ export default function NewStockAdjustmentPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="min-h-11"
                     onClick={submitDraft}
                     disabled={submitting}
                   >
@@ -822,7 +807,6 @@ export default function NewStockAdjustmentPage() {
                   </Button>
                   <Button
                     type="button"
-                    className="min-h-11"
                     onClick={submitPost}
                     disabled={submitting}
                     isLoading={submitting}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { ArrowEnd } from '../../../../../components/ArrowStart';
 import { deriveCoreBrandTokens } from '@ebda/shared';
@@ -170,13 +170,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={generatePalette}
-            disabled={!canGenerate}
-            className="min-h-11"
-          >
+          <Button type="button" variant="outline" onClick={generatePalette} disabled={!canGenerate}>
             {tColors('generateButton')}
           </Button>
           <Link
@@ -200,18 +194,15 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
           {(['auto', 'sm', 'md', 'lg'] as const).map(opt => {
             const active = (theme.logoSize ?? 'auto') === opt;
             return (
-              <button
+              <Button
+                variant={active ? 'soft' : 'ghost'}
+                size="sm"
                 key={opt}
                 type="button"
                 onClick={() => setSeed('logoSize', opt)}
-                className={`min-h-11 min-w-[44px] rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted/60'
-                }`}
               >
                 {t(`logoSize.${opt}`)}
-              </button>
+              </Button>
             );
           })}
         </div>

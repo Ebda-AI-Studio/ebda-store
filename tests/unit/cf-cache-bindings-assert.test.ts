@@ -17,6 +17,9 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+// @ts-expect-error plain .mjs script, no types
+import { contractVersion } from '../../scripts/ci/fetch-contract-version.mjs';
+import { seedFetchContract } from '../helpers/fetch-contract-fixture';
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = mkdtempSync(path.join(tmpdir(), 'cf-cache-assert-'));
@@ -31,6 +34,8 @@ writeFileSync(
 );
 for (const app of ['web', 'admin', 'orders'])
   mkdirSync(path.join(scratch, 'apps', app), { recursive: true });
+// The web generator bakes the storefront's fetch-cache data-contract hash into the config (Ruling WEB-COLD-2).
+seedFetchContract(scratch);
 
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -64,6 +69,10 @@ describe('cf-setup-local.sh → assert-cf-cache-bindings.sh', () => {
     expect(readFileSync(path.join(scratch, 'apps/web/wrangler.jsonc'), 'utf8')).toMatch(
       /NEXT_TAG_CACHE_DO_SHARDED/
     );
+    // WEB-COLD-2: the data-contract hash of THESE files is baked into the shared fetch cache, never the placeholder.
+    const onc = readFileSync(path.join(scratch, 'apps/web/open-next.config.ts'), 'utf8');
+    expect(onc).toContain(`createSharedFetchCache('${contractVersion(scratch)}')`);
+    expect(onc).not.toContain('__FETCH_CONTRACT__');
   });
 
   it('web, OPENNEXT_CACHE=false: the documented escape hatch passes', () => {
@@ -156,10 +165,15 @@ describe('ci.yml worker-dry-run runs generator → assertion → build → dry-r
   it('runs wrangler on Node 22 (wrangler >= 4.110 needs it) and only for apps with a config', () => {
     expect(ci).toMatch(/NODE_VERSION: '22'/);
     expect(job).toMatch(/node-version: \$\{\{ env\.NODE_VERSION \}\}/);
-    // The matrix comes from scripts/ci-affected.mjs, which only lists apps that
-    // have a wrangler config, so an app without one is skipped, not failed.
-    expect(job).toMatch(/app: \$\{\{ fromJSON\(needs\.changes\.outputs\.workers\) \}\}/);
-    expect(job).toMatch(/if: needs\.changes\.outputs\.has_workers == 'true'/);
+    // On a PR the matrix comes from scripts/ci-affected.mjs, which only lists apps that have a wrangler config, so an
+    // app without one is skipped, not failed. The full lane (`changes` skipped) dry-runs marketing alone, so its
+    // page-weight budget is measured on main (Ruling MKT-LEGAL-HTML-BUDGET-2).
+    expect(job).toContain(
+      `app: \${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.workers || '["marketing"]') }}`
+    );
+    expect(job).toContain(
+      `if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true')`
+    );
   });
 
   it('each leg is its own hosted runner: no max-parallel, a roomy budget (issue 2155)', () => {

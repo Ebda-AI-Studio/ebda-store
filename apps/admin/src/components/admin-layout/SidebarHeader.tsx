@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
@@ -155,7 +156,11 @@ export function SidebarHeader({
           </div>
           <Link
             href="/stores"
-            className="mt-2 flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className={buttonVariants({
+              variant: 'outline',
+              size: 'sm',
+              className: 'mt-2 justify-center gap-1.5',
+            })}
           >
             <svg
               className="h-3.5 w-3.5"

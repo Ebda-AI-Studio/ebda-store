@@ -193,15 +193,7 @@ describe('ci.yml lanes', () => {
     };
     return Object.keys(ci.jobs).filter(run).sort();
   };
-  const PR_ONLY = [
-    'changes',
-    'lint',
-    'typecheck',
-    'unit',
-    'worker-dry-run',
-    'app-build',
-    'app-builds',
-  ];
+  const PR_ONLY = ['changes', 'lint', 'typecheck', 'unit', 'app-build', 'app-builds'];
   const FULL_LANE = Object.keys(ci.jobs)
     .filter(j => !PR_ONLY.includes(j) && j !== 'mutation')
     .sort();
@@ -221,6 +213,18 @@ describe('ci.yml lanes', () => {
       'notify-failure',
     ])
       expect(runsOn('push'), j).toContain(j);
+  });
+
+  it('the full lane dry-runs marketing so its page-weight budget is proven on main (Ruling MKT-LEGAL-HTML-BUDGET-2)', () => {
+    for (const ev of ['push', 'workflow_dispatch'])
+      expect(runsOn(ev), ev).toContain('worker-dry-run');
+    const job = ci.jobs['worker-dry-run'] as Job & { strategy: { matrix: { app: string } } };
+    expect(job.strategy.matrix.app).toContain(
+      `github.event_name == 'pull_request' && needs.changes.outputs.workers || '["marketing"]'`
+    );
+    expect(raw).toMatch(
+      /name: Marketing page-weight budget\n\s+if: matrix\.app == 'marketing'\n\s+run: node scripts\/ci\/marketing-perf-budget\.mjs/
+    );
   });
 
   it('the nightly cron runs the full lane, the Sunday cron adds mutation, neither depends on EBDA_RUNS_ON', () => {
@@ -347,6 +351,10 @@ describe('scripts/ci-affected.mjs', () => {
     expect(run('apps/web/edge-build-id.ts').workers).toEqual(['web']);
     expect(run('apps/status/src/index.ts').workers).toEqual(['status']);
     expect(run('apps/accounts/src/app.ts').workers).toEqual(['accounts']);
+    // marketing (static export, cheap) dry-runs on any page-weight change, so its budget fails the PR that grows it
+    expect(run('apps/marketing/src/app/chrome.css').workers).toEqual(['marketing']);
+    expect(run('apps/marketing/src/components/LegalPage.tsx').workers).toEqual(['marketing']);
+    expect(run('scripts/ci/marketing-perf-budget.json').workers).toEqual(['marketing']);
     // the API is a Worker app since SP4 Stage 1 (apps/api/wrangler.jsonc)
     expect(run('apps/api/wrangler.jsonc').workers).toEqual(['api']);
     // root manifest / cf-* scripts hit every Worker app

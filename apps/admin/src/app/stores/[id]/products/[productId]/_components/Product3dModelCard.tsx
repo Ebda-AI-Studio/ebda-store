@@ -8,7 +8,8 @@
  */
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, useToast } from '@ebda/ui';
+import { Input, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/hooks/useConfirm';
 import type { ProductModelViewerHandle } from '@ebda/ui/model3d';
 import {

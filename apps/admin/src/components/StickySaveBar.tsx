@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 
 interface StickySaveBarProps {
@@ -12,6 +12,12 @@ interface StickySaveBarProps {
   saving?: boolean;
   /** Optional outcome label: "احفظ الشحن" beats a page of identical "حفظ" buttons (rule 9). */
   saveLabel?: string;
+  /**
+   * The last save's refusal, already in the admin's language (`apiRequest` maps it). Shown IN the bar, where the merchant
+   * just pressed Save: a banner at the top of a long form is off screen, so a failed save looked like nothing happened
+   * (2026-11-10, the product edit page's 500 showed only "unsaved changes", Ruling ADMIN-ERR-1).
+   */
+  error?: string | null;
 }
 
 /**
@@ -24,6 +30,7 @@ export function StickySaveBar({
   onReset,
   saving = false,
   saveLabel,
+  error,
 }: StickySaveBarProps) {
   const t = useT('components.stickySaveBar');
 
@@ -45,9 +52,15 @@ export function StickySaveBar({
       className="fixed inset-x-0 bottom-[calc(var(--bottom-chrome))] z-30 border-t border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur-md lg:start-72"
     >
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-foreground" role="status">
-          {t('dirtyMessage')}
-        </p>
+        {error ? (
+          <p className="text-sm font-medium text-destructive-ink" role="alert">
+            {error}
+          </p>
+        ) : (
+          <p className="text-sm text-foreground" role="status">
+            {t('dirtyMessage')}
+          </p>
+        )}
         <div className="flex items-center gap-2">
           <Button variant="ghost" onClick={onReset} disabled={saving}>
             {t('reset')}

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, useToast } from '@ebda/ui';
+import { Input, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/hooks/useConfirm';
 import {
   recommendedSizeTextForTemplate,
@@ -560,15 +561,16 @@ export function SimpleVariantsForm({
                   />
                 </div>
                 <div className="flex items-end justify-end pb-1">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => removeRow(row.rowId)}
                     disabled={rows.length === 1 && !row.variantId}
-                    className="text-sm text-destructive-ink hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground/50"
                     aria-label={t('removeRow')}
+                    variant="link"
+                    className="text-destructive-ink"
                   >
                     {t('removeRow')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

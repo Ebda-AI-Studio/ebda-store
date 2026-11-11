@@ -34,6 +34,13 @@ const { holder, sendMarketingEmail, captured, awaitCampaignSendSlot } = vi.hoist
 
 vi.mock('@api/lib/campaign-send-pacer', () => ({ awaitCampaignSendSlot }));
 
+// The store-active guard reads the platform directory; covered in comms-jobs-skip-inactive-store.test.ts.
+const storeActive = vi.hoisted(() => ({ value: true }));
+vi.mock('@api/lib/jobs/store-db', async orig => ({
+  ...(await orig<typeof import('@api/lib/jobs/store-db')>()),
+  storeActiveForJob: vi.fn(async () => storeActive.value),
+}));
+
 vi.mock('@ebda/database', () => ({
   get prisma() {
     return holder.prisma;
@@ -143,6 +150,7 @@ beforeEach(() => {
   sendMarketingEmail.mockImplementation(async () => ({ id: `msg-${++n}` }));
   process.env.CAMPAIGN_SEND_THROTTLE_MS = String(THROTTLE);
   delete process.env.CAMPAIGN_DAILY_SEND_CAP;
+  storeActive.value = true;
 });
 
 afterEach(() => {
@@ -175,6 +183,16 @@ describe('campaign-send', () => {
     for (let i = 0; i < order.length; i++) {
       if (order[i].startsWith('send:')) expect(order[i - 1]).toBe('slot');
     }
+  });
+
+  it('a store that stopped being active while the campaign waited sends nothing and the run is a skip, not a failure', async () => {
+    seed(['a@x.test']);
+    storeActive.value = false;
+
+    await expect(runJob()).resolves.toEqual({ skipped: 'store-not-active' });
+
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(campaign().status).toBe('scheduled');
   });
 
   it('sends ONE email per consented subscriber, to one address each, then marks the campaign sent', async () => {

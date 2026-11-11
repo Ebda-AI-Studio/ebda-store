@@ -238,6 +238,8 @@ declare module '@ebda-src/repo' {
   export function rethrow(r: Extract<DoQueryResult, { ok: false }>): never;
   export function encodeRpc(value: unknown): string;
   export function decodeRpc<T = unknown>(text: string): T;
+  export function wirePrismaNulls<T>(value: T): T;
+  export function revivePrismaNulls<T>(value: T): T;
   export type DoTransport = (queries: DoQuery[]) => Promise<DoQueryResult>;
   export interface DoMutation {
     key?: string;

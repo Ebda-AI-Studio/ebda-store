@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import type { StoreLoadError } from '../_hooks/useDashboardData';
+import { Button } from '@/components/ui/Button';
 
 interface StoreErrorStateProps {
   storeError: StoreLoadError;
@@ -20,13 +21,9 @@ export function StoreErrorState({ storeError, onRetry }: StoreErrorStateProps) {
     >
       <div className="text-center py-12 space-y-4">
         {!isNotFound && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors cursor-pointer"
-          >
+          <Button variant="default" size="md" type="button" onClick={onRetry}>
             {t('retry')}
-          </button>
+          </Button>
         )}
         <div>
           <Link href="/stores" className="text-primary hover:underline text-sm">

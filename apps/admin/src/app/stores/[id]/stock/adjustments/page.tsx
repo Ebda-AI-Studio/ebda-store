@@ -8,7 +8,7 @@ import { SearchInput } from '@/components/SearchInput';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ErrorState';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
@@ -137,10 +137,7 @@ export default function StockAdjustmentsPage() {
       title={t('title')}
       subtitle={t('description')}
       actions={
-        <Button
-          className="min-h-11"
-          onClick={() => router.push(`/stores/${storeId}/stock/adjustments/new`)}
-        >
+        <Button onClick={() => router.push(`/stores/${storeId}/stock/adjustments/new`)}>
           {t('newButton')}
         </Button>
       }

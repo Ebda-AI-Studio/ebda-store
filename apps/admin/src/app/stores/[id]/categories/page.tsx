@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, useToast } from '@ebda/ui';
+import { useLocale } from 'next-intl';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { recommendedSizeTextForTemplate, type TemplateId } from '@ebda/shared';
 import { arrayMove } from '@dnd-kit/sortable';
 import { type DragEndEvent } from '@dnd-kit/core';
@@ -79,6 +81,10 @@ export default function StoreCategoriesPage() {
 
   /** Template of the store — used to show per-theme recommended upload sizes. */
   const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
+  /** The store's default language decides which name is required (same rule as the product form, UX:PN-2). */
+  const [storeLang, setStoreLang] = useState<'ar' | 'en' | null>(null);
+  const uiLocale = useLocale();
+  const arFirst = (storeLang ?? (uiLocale === 'ar' ? 'ar' : 'en')) === 'ar';
 
   // Best Sellers virtual category cover. Lives on the Store row, not on
   // a Category row — so it gets its own tiny GET/PUT pair instead of
@@ -257,6 +263,7 @@ export default function StoreCategoriesPage() {
       apiGet<{
         store: {
           template?: TemplateId;
+          settings?: { defaultLanguage?: string } | null;
           theme?: {
             showBestSellersTile?: boolean;
             categoryCountUnit?: { en: string; ar: string };
@@ -265,6 +272,8 @@ export default function StoreCategoriesPage() {
       }>(`/api/v1/admin/stores/${storeId}`)
         .then(({ data }) => {
           if (data?.store?.template) setStoreTemplate(data.store.template);
+          const lang = data?.store?.settings?.defaultLanguage;
+          if (lang === 'ar' || lang === 'en') setStoreLang(lang);
           // Default true — only an explicit false hides the tile.
           setShowBestSellersTile(data?.store?.theme?.showBestSellersTile !== false);
           // Populate count unit fields from saved theme (fall back to defaults).
@@ -328,7 +337,9 @@ export default function StoreCategoriesPage() {
 
   function validateForm() {
     const errors: Record<string, string> = {};
-    if (!form.name.trim()) errors.name = tForm('errorNameRequired');
+    // An Arabic-first store requires the Arabic name; the English one is optional (and the reverse).
+    if (arFirst ? !form.nameAr.trim() : !form.name.trim())
+      errors[arFirst ? 'nameAr' : 'name'] = tForm('errorNameRequired');
     if (!form.slug.trim()) {
       errors.slug = tForm('errorSlugRequired');
     } else if (!/^[a-z0-9\u0600-\u06FF]+(?:-[a-z0-9\u0600-\u06FF]+)*$/.test(form.slug)) {
@@ -352,7 +363,8 @@ export default function StoreCategoriesPage() {
         : `/api/v1/stores/${storeId}/categories`;
 
       const body = {
-        name: form.name.trim(),
+        // The API needs a name; an Arabic-only category sends its Arabic name there too.
+        name: form.name.trim() || form.nameAr.trim(),
         // null clears, undefined leaves alone — same convention as the meta
         // fields below. This body is reused by the PUT (edit) branch, so an
         // emptied field MUST send null or the merchant can never clear it.
@@ -426,13 +438,9 @@ export default function StoreCategoriesPage() {
             menuLabel={t('moreMenu')}
             items={[{ label: tTags('manage'), href: `/stores/${storeId}/tags` }]}
           />
-          <button
-            type="button"
-            onClick={openAddForm}
-            className="min-h-11 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium"
-          >
+          <Button type="button" onClick={openAddForm} variant="default">
             {t('addCategory')}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -475,6 +483,7 @@ export default function StoreCategoriesPage() {
             onSubmit={handleSubmit}
             onClose={closeForm}
             slugify={slugify}
+            arFirst={arFirst}
             storeId={storeId}
             sizeCharts={sizeCharts}
           />
@@ -584,14 +593,16 @@ export default function StoreCategoriesPage() {
           </div>
         </div>
         <div className="mt-3 flex items-center gap-3">
-          <button
+          <Button
             type="button"
             disabled={savingCountUnit}
             onClick={() => saveCountUnit(countUnitEn, countUnitAr)}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            variant="default"
+            size="sm"
+            className="gap-2"
           >
             {savingCountUnit ? tCommon('saving') : t('saveLabelButton')}
-          </button>
+          </Button>
           <span className="text-xs text-muted-foreground">
             {t('previewLabel')} <strong>{countUnitEn || t('countUnitEnSample')}</strong> /{' '}
             <strong dir="rtl">{countUnitAr || t('countUnitArSample')}</strong>

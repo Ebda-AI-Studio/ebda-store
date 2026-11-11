@@ -9,6 +9,7 @@
  * A device with no value of its own shows the value it inherits (device, then base, then the
  * baseline), so the readout is always the real height.
  */
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import {
   SECTION_SPACING_PRESETS,
@@ -157,13 +158,15 @@ export function SectionSpacingField({
               ))}
             </div>
             {own !== undefined && (
-              <button
+              <Button
+                variant="link"
+                size="sm"
                 type="button"
                 onClick={() => write(axis, editing, undefined)}
-                className="mt-1 text-xs text-primary hover:underline"
+                className="mt-1"
               >
                 {t(editing === 'desktop' ? 'spacing.resetDefault' : 'spacing.resetInherit')}
-              </button>
+              </Button>
             )}
           </div>
         );

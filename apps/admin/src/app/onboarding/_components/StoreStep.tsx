@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Input } from '@ebda/ui';
+import { Input } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { validateStoreSlug } from '@ebda/shared';
 import { storeCreatedEventId } from '@ebda/shared';
 import { apiGet, apiPost } from '../../../lib/api';

@@ -473,6 +473,7 @@
   "POST /admin/sms-queue/failed/retry",
   "POST /admin/stores",
   "POST /admin/stores/:id/manual-payment",
+  "POST /admin/stores/:id/repair-product-names",
   "POST /admin/stores/:storeId/builder/pages/:pageKey/preview-token",
   "POST /admin/stores/:storeId/builder/pages/:pageKey/publish",
   "POST /admin/stores/:storeId/builder/pages/:pageKey/rollback",

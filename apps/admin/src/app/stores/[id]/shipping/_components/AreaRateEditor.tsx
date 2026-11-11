@@ -11,11 +11,13 @@ import {
 } from 'react';
 import { useToast } from '@ebda/ui';
 import { EGYPT_GOVERNORATES, minorToDecimalString, REGION } from '@ebda/shared';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut, apiDelete, apiFetch } from '../../../../../lib/api';
 import { RowActions } from '../../../../../components/RowActions';
 import { majorToMinor, getIncompleteNewRows } from './areaRateValidation';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface AreaRate {
@@ -192,6 +194,8 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
   ref
 ) {
   const t = useT('shipping.areaRates');
+  // One name per row, in the admin's language (the EN + AR pair read as "Cairoالقاهرة").
+  const isAr = useLocale() === 'ar';
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -878,14 +882,14 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                 <span>{t('currency')}</span>
               </span>
             </label>
-            <button
+            <Button
               type="button"
               onClick={saveOnePrice}
               disabled={oneFee.trim() === '' || saving}
-              className="min-h-11 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              variant="default"
             >
               {saving ? t('saving') : t('firstRunSave')}
-            </button>
+            </Button>
           </div>
         </section>
       )}
@@ -921,25 +925,21 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={cancelImport}
-                disabled={importing}
-                className="px-4 py-2 text-sm font-medium border border-border rounded-lg bg-background hover:bg-muted/60 transition-colors disabled:opacity-50"
-              >
+              <Button type="button" onClick={cancelImport} disabled={importing} variant="outline">
                 {t('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={confirmImport}
                 disabled={importing || preview.wouldUpsert === 0}
-                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                variant="default"
+                className="gap-2"
               >
                 {importing && (
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 )}
                 {importing ? t('importing') : t('confirmImport')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -989,22 +989,24 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                 <span className="text-xs text-muted-foreground">{t('currency')}</span>
               </div>
             </div>
-            <button
+            <Button
               type="button"
               onClick={applyGlobalFee}
               disabled={globalBulkFeeMajor.trim() === ''}
-              className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="default"
+              size="sm"
             >
               {t('applyAllGlobalFeeBtn')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={applyGlobalThreshold}
               disabled={globalBulkThresholdMajor.trim() === ''}
-              className="px-3 py-1 text-xs font-medium border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="outline"
+              size="sm"
             >
               {t('applyAllGlobalThresholdBtn')}
-            </button>
+            </Button>
           </div>
         </div>
       </details>
@@ -1028,11 +1030,11 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
               <button
                 type="button"
                 onClick={() => setOpenGov(isOpen ? null : gov.en)}
+                data-ui="row"
                 className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-start"
               >
                 <div className="flex items-center gap-3">
-                  <span className="font-medium text-foreground">{gov.en}</span>
-                  <span className="text-muted-foreground font-arabic text-sm">{gov.ar}</span>
+                  <span className="font-medium text-foreground">{isAr ? gov.ar : gov.en}</span>
                   {count > 0 && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-ink">
                       {count} / {gov.areas.length}
@@ -1068,13 +1070,14 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                       className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => applyBulkFee(gov.en)}
-                      className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                      variant="default"
+                      size="sm"
                     >
                       {t('applyBtn')}
-                    </button>
+                    </Button>
                     {/* Free-over apply for this governorate (decoupled from fee) */}
                     <span className="text-xs text-muted-foreground whitespace-nowrap ms-2">
                       {t('freeOver')}
@@ -1092,14 +1095,15 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                       className="w-24 px-2 py-1 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => applyBulkThreshold(gov.en)}
                       disabled={(bulkThresholdMajor[gov.en] ?? '').trim() === ''}
-                      className="px-3 py-1 text-xs font-medium border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="outline"
+                      size="sm"
                     >
                       {t('applyBtn')}
-                    </button>
+                    </Button>
                   </div>
 
                   {/* Static area rows */}
@@ -1122,9 +1126,8 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                             onChange={v => updateRow(k, { isActive: v })}
                           />
                           <div className="flex-1 min-w-0">
-                            <span className="text-sm text-foreground">{area.en}</span>
-                            <span className="text-xs text-muted-foreground font-arabic ms-2">
-                              {area.ar}
+                            <span className="text-sm text-foreground">
+                              {isAr ? area.ar : area.en}
                             </span>
                           </div>
                           <FeeInputs
@@ -1137,8 +1140,8 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                               })
                             }
                             onThresholdChange={val => updateRow(k, { thresholdMajor: val })}
-                            feeLabel={`${t('feeLabel')} – ${area.en}`}
-                            freeOverLabel={`${t('freeOverLabel')} – ${area.en}`}
+                            feeLabel={`${t('feeLabel')} – ${isAr ? area.ar : area.en}`}
+                            freeOverLabel={`${t('freeOverLabel')} – ${isAr ? area.ar : area.en}`}
                             currencyLabel={t('currency')}
                             optionalLabel={t('optional')}
                             freeOverHint={t('freeOver')}
@@ -1165,12 +1168,9 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                               onChange={v => updateCustomRow(idx, { isActive: v })}
                             />
                             <div className="flex-1 min-w-0">
-                              <span className="text-sm text-foreground">{row.area}</span>
-                              {row.areaAr && (
-                                <span className="text-xs text-muted-foreground font-arabic ms-2">
-                                  {row.areaAr}
-                                </span>
-                              )}
+                              <span className="text-sm text-foreground">
+                                {isAr && row.areaAr ? row.areaAr : row.area}
+                              </span>
                             </div>
                             <FeeInputs
                               feeMajor={row.feeMajor}
@@ -1190,14 +1190,16 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                               optionalLabel={t('optional')}
                               freeOverHint={t('freeOver')}
                             />
-                            <button
+                            <Button
                               type="button"
                               onClick={() => removeCustomRow(idx)}
                               aria-label={`${t('remove')} ${row.area}`}
-                              className="p-1.5 text-muted-foreground hover:text-destructive-ink hover:bg-destructive/10 rounded-md transition-colors"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-muted-foreground"
                             >
                               <TrashIcon />
-                            </button>
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -1207,10 +1209,12 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   {/* Add area inline form for this Egypt governorate */}
                   <div className="border-t border-border/60 px-4 py-2">
                     {!addAreaIsOpen ? (
-                      <button
+                      <Button
                         type="button"
                         onClick={() => toggleAddAreaForm(REGION.countryName.en, gov.en)}
-                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                        variant="link"
+                        size="sm"
+                        className="gap-1"
                       >
                         <svg
                           className="w-3.5 h-3.5"
@@ -1227,7 +1231,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                           />
                         </svg>
                         {t('addArea')}
-                      </button>
+                      </Button>
                     ) : (
                       <div className="flex flex-wrap items-end gap-2 py-1">
                         <div className="flex flex-col gap-1">
@@ -1281,7 +1285,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                             <span className="text-xs text-muted-foreground">{t('currency')}</span>
                           </div>
                         </div>
-                        <button
+                        <Button
                           type="button"
                           onClick={() =>
                             submitAddArea(
@@ -1292,17 +1296,19 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                             )
                           }
                           disabled={!addForm.area.trim()}
-                          className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          variant="default"
+                          size="sm"
                         >
                           {t('addBtn')}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           onClick={() => toggleAddAreaForm(REGION.countryName.en, gov.en)}
-                          className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted/60 transition-colors"
+                          variant="outline"
+                          size="sm"
                         >
                           {t('cancel')}
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -1330,13 +1336,13 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
             <button
               type="button"
               onClick={() => setOpenCustomCountry(isOpen ? null : country)}
+              data-ui="row"
               className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-start"
             >
               <div className="flex items-center gap-3">
-                <span className="font-medium text-foreground">{country}</span>
-                {countryAr && (
-                  <span className="text-muted-foreground font-arabic text-sm">{countryAr}</span>
-                )}
+                <span className="font-medium text-foreground">
+                  {isAr && countryAr ? countryAr : country}
+                </span>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-ink">
                   {countryRows.length}
                 </span>
@@ -1361,10 +1367,9 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                     <div key={gov} className="border-b border-border last:border-b-0">
                       {/* Governorate label */}
                       <div className="flex items-center gap-2 px-4 py-2 bg-muted/20">
-                        <span className="text-sm font-medium text-foreground">{gov}</span>
-                        {govAr && (
-                          <span className="text-xs text-muted-foreground font-arabic">{govAr}</span>
-                        )}
+                        <span className="text-sm font-medium text-foreground">
+                          {isAr && govAr ? govAr : gov}
+                        </span>
                       </div>
 
                       {/* Areas */}
@@ -1381,12 +1386,9 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                 onChange={v => updateCustomRow(idx, { isActive: v })}
                               />
                               <div className="flex-1 min-w-0">
-                                <span className="text-sm text-foreground">{row.area}</span>
-                                {row.areaAr && (
-                                  <span className="text-xs text-muted-foreground font-arabic ms-2">
-                                    {row.areaAr}
-                                  </span>
-                                )}
+                                <span className="text-sm text-foreground">
+                                  {isAr && row.areaAr ? row.areaAr : row.area}
+                                </span>
                               </div>
                               <FeeInputs
                                 feeMajor={row.feeMajor}
@@ -1406,14 +1408,16 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                 optionalLabel={t('optional')}
                                 freeOverHint={t('freeOver')}
                               />
-                              <button
+                              <Button
                                 type="button"
                                 onClick={() => removeCustomRow(idx)}
                                 aria-label={`${t('remove')} ${row.area}`}
-                                className="p-1.5 text-muted-foreground hover:text-destructive-ink hover:bg-destructive/10 rounded-md transition-colors"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="text-muted-foreground"
                               >
                                 <TrashIcon />
-                              </button>
+                              </Button>
                             </div>
                           );
                         })}
@@ -1422,10 +1426,12 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                       {/* Add area to this custom governorate */}
                       <div className="px-4 py-2">
                         {!govAddOpen ? (
-                          <button
+                          <Button
                             type="button"
                             onClick={() => toggleAddAreaForm(country, gov)}
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                            variant="link"
+                            size="sm"
+                            className="gap-1"
                           >
                             <svg
                               className="w-3.5 h-3.5"
@@ -1442,7 +1448,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                               />
                             </svg>
                             {t('addArea')}
-                          </button>
+                          </Button>
                         ) : (
                           <div className="flex flex-wrap items-end gap-2 py-1">
                             <div className="flex flex-col gap-1">
@@ -1500,21 +1506,23 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                                 </span>
                               </div>
                             </div>
-                            <button
+                            <Button
                               type="button"
                               onClick={() => submitAddArea(country, countryAr, gov, govAr)}
                               disabled={!govAddForm.area.trim()}
-                              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              variant="default"
+                              size="sm"
                             >
                               {t('addBtn')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
                               onClick={() => toggleAddAreaForm(country, gov)}
-                              className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted/60 transition-colors"
+                              variant="outline"
+                              size="sm"
                             >
                               {t('cancel')}
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -1532,6 +1540,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
         <button
           type="button"
           onClick={() => setAddLocOpen(v => !v)}
+          data-ui="row"
           className="w-full flex items-center justify-between px-4 py-3 bg-muted/20 hover:bg-muted/40 transition-colors text-start"
         >
           <div className="flex items-center gap-2">
@@ -1652,7 +1661,7 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   setAddLocOpen(false);
@@ -1666,11 +1675,12 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                     feeMajor: '',
                   });
                 }}
-                className="px-3 py-1.5 text-sm font-medium border border-border rounded-lg hover:bg-muted/60 transition-colors"
+                variant="outline"
+                size="sm"
               >
                 {t('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={submitAddLoc}
                 disabled={
@@ -1678,10 +1688,11 @@ export const AreaRateEditor = forwardRef<AreaRateEditorHandle, Props>(function A
                   !addLocForm.governorate.trim() ||
                   !addLocForm.area.trim()
                 }
-                className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="default"
+                size="sm"
               >
                 {t('addBtn')}
-              </button>
+              </Button>
             </div>
           </div>
         )}

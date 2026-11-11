@@ -29,6 +29,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPut } from '../../../../../../../lib/api';
 import { formatPrice } from '../../../../../../../lib/format';
 
+import { Button } from '@/components/ui/Button';
 export interface GoldProductFields {
   id: string;
   pricingMode?: 'fixed' | 'gold_rate' | null;
@@ -335,14 +336,9 @@ export function GoldPricingCard({
             )}
           </div>
 
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void save(true)}
-            className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
-          >
+          <Button type="button" disabled={saving} onClick={() => void save(true)} variant="default">
             {t('save')}
-          </button>
+          </Button>
         </div>
       )}
       {msg && (

@@ -1366,12 +1366,15 @@ export class StoreService {
     // worker hasn't moved the order forward yet). Without the paymentStatus
     // arm, dashboards showed Revenue=0 even when money had been collected.
     // Ahmad 2026-05-21 — Demo Shop had 23 orders, EGP 0.000 revenue.
-    const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
-      [
-        (await storeDb(storeId)).product.count({ where: { storeId, status: 'active' } }),
-        prisma.order.count({ where: { storeId } }),
-        prisma.customer.count({ where: { storeId } }),
-        prisma.order.aggregate({
+    // Every read from the store's own backend (`storeDb`: its DO, or Postgres for a Postgres store). The bare `prisma`
+    // order/customer reads were POSTGRES_REMOVED on every DO store's dashboard (prod 2026-11-10 21:53Z, Ruling NZ-FINAL-1).
+    const db = await storeDb(storeId);
+    const [productCount, orderCount, customerCount, totalRevenue, recentOrdersRaw] =
+      await Promise.all([
+        db.product.count({ where: { storeId, status: 'active' } }),
+        db.order.count({ where: { storeId } }),
+        db.customer.count({ where: { storeId } }),
+        db.order.aggregate({
           where: {
             storeId,
             OR: [
@@ -1381,16 +1384,40 @@ export class StoreService {
           },
           _sum: { total: true },
         }),
-        prisma.order.findMany({
+        // No `include: { customer }`: on a DO store the order is in the StoreDO and the customer is not
+        // (prisma-lite: "Order.customer lives in another database"), so the five customers are read in one query below.
+        db.order.findMany({
           where: { storeId },
           take: 5,
           orderBy: { createdAt: 'desc' },
-          include: {
-            customer: { select: { firstName: true, lastName: true, email: true } },
-          },
         }),
-      ]
-    );
+      ]);
+    const customerIds = [
+      ...new Set(
+        (recentOrdersRaw as Array<{ customerId: string | null }>)
+          .map(o => o.customerId)
+          .filter((id): id is string => !!id)
+      ),
+    ];
+    const customers = customerIds.length
+      ? ((await db.customer.findMany({
+          where: { storeId, id: { in: customerIds } },
+          select: { id: true, firstName: true, lastName: true, email: true },
+        })) as Array<{
+          id: string;
+          firstName: string | null;
+          lastName: string | null;
+          email: string | null;
+        }>)
+      : [];
+    const byId = new Map(customers.map(c => [c.id, c]));
+    const recentOrders = (recentOrdersRaw as Array<{ customerId: string | null }>).map(o => {
+      const c = o.customerId ? byId.get(o.customerId) : undefined;
+      return {
+        ...o,
+        customer: c ? { firstName: c.firstName, lastName: c.lastName, email: c.email } : null,
+      };
+    });
 
     return {
       productCount,
@@ -1902,6 +1929,7 @@ export class StoreService {
       twitterHandle?: string;
       googleSiteVerification?: string;
       emailSenderLocalPart?: string;
+      hideFromSearchEngines?: boolean;
     }
   ) {
     const store = await this.getById(storeId);
@@ -1912,10 +1940,26 @@ export class StoreService {
       appConfig.storagePublicUrl
     );
 
-    const updatedStore = await updateStoreThrough(storeId, tx =>
-      tx.store.update({
+    const updatedStore = await updateStoreThrough(storeId, async tx => {
+      // "Hide from search engines" lives in the `settings` JSON: merge the one key into the live bag so a concurrent
+      // settings write to another key is not clobbered.
+      let settingsPatch: { settings: Prisma.InputJsonValue } | Record<string, never> = {};
+      if (seo.hideFromSearchEngines !== undefined) {
+        const live = await tx.store.findUnique({
+          where: { id: storeId },
+          select: { settings: true },
+        });
+        settingsPatch = {
+          settings: {
+            ...((live?.settings as Record<string, unknown> | null) ?? {}),
+            hideFromSearchEngines: seo.hideFromSearchEngines,
+          } as Prisma.InputJsonValue,
+        };
+      }
+      return tx.store.update({
         where: { id: storeId },
         data: {
+          ...settingsPatch,
           metaTitle: seo.metaTitle,
           metaTitleAr: seo.metaTitleAr,
           metaDescription: seo.metaDescription,
@@ -1931,8 +1975,8 @@ export class StoreService {
           googleSiteVerification: seo.googleSiteVerification,
           emailSenderLocalPart: seo.emailSenderLocalPart,
         },
-      })
-    );
+      });
+    });
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);

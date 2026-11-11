@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { instalmentsSchema, minorToDecimalString } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut } from '../../../../../lib/api';
@@ -154,14 +154,16 @@ export function InstalmentsCard({ storeId }: { storeId: string }) {
         <Button type="button" onClick={() => save(false)} disabled={busy}>
           {t('save')}
         </Button>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
           type="button"
           onClick={() => save(true)}
           disabled={busy}
-          className="rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-40"
         >
           {t('remove')}
-        </button>
+        </Button>
         {msg && (
           <span
             role="status"

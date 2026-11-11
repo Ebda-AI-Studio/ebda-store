@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
@@ -175,7 +175,6 @@ export function NotificationsLog({
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
               className="max-sm:min-h-11 max-sm:px-4"
               onClick={() => onPageChange(p => Math.max(1, p - 1))}
               disabled={page === 1}
@@ -184,7 +183,6 @@ export function NotificationsLog({
             </Button>
             <Button
               variant="outline"
-              size="sm"
               className="max-sm:min-h-11 max-sm:px-4"
               onClick={() => onPageChange(p => Math.min(pages, p + 1))}
               disabled={page === pages}

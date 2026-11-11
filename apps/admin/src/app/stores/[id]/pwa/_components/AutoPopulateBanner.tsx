@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import type { StoreInfo } from './types';
+import { Button } from '@/components/ui/Button';
 
 interface AutoPopulateBannerProps {
   storeInfo: StoreInfo;
@@ -38,13 +39,9 @@ export function AutoPopulateBanner({ storeInfo, onPopulate }: AutoPopulateBanner
           <p className="text-sm text-muted-foreground">{t('description')}</p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onPopulate}
-        className="px-4 py-2 bg-info text-white text-sm rounded-lg hover:bg-info/90 transition-colors whitespace-nowrap"
-      >
+      <Button variant="default" size="md" type="button" onClick={onPopulate}>
         {t('button')}
-      </button>
+      </Button>
     </div>
   );
 }

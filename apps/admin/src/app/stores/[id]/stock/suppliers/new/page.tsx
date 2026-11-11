@@ -9,6 +9,7 @@ import { apiGet, apiPost, apiPatch } from '@/lib/api';
 import { numericFieldValue, textFieldValue } from '@/lib/form-text';
 
 import { REGION } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Supplier {
@@ -298,20 +299,16 @@ export default function NewSupplierPage() {
         {error && <div className="text-red-600 text-sm">{error}</div>}
 
         <div className="flex gap-2 flex-wrap">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
-          >
+          <Button type="submit" disabled={submitting} variant="default">
             {submitting ? tCommon('saving') : tNew('submit')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => router.push(`/stores/${storeId}/stock/suppliers`)}
-            className="px-4 py-2 border border-border rounded text-sm"
+            variant="outline"
           >
             {tCommon('cancel')}
-          </button>
+          </Button>
         </div>
       </form>
     </AdminLayout>

@@ -32,6 +32,7 @@ import { useFeatures } from '@/hooks/useFeatures';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ArrowStart } from '@/components/ArrowStart';
 
+import { Button, buttonVariants } from '@/components/ui/Button';
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -211,7 +212,11 @@ export default function OrderDetailPage() {
         <div className="flex items-center justify-between mb-5">
           <Link
             href={`/stores/${storeId}/orders`}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted/70 transition-colors"
+            className={buttonVariants({
+              variant: 'secondary',
+              size: 'icon',
+              className: 'justify-center',
+            })}
             aria-label={t('back')}
           >
             <ArrowStart className="h-5 w-5" />
@@ -230,13 +235,14 @@ export default function OrderDetailPage() {
         {error && !isLoading && (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
             <p className="text-sm text-destructive-ink">{error}</p>
-            <button
+            <Button
               type="button"
               onClick={fetchOrder}
-              className="mt-3 inline-flex items-center justify-center rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive-ink hover:bg-destructive/10 cursor-pointer"
+              variant="outline"
+              className="mt-3 justify-center text-destructive-ink"
             >
               {tList('errors.retry')}
-            </button>
+            </Button>
           </div>
         )}
 

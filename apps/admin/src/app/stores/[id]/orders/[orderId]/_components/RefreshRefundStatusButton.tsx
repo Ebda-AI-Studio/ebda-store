@@ -5,6 +5,7 @@ import { useToast } from '@ebda/ui';
 import { apiPost } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+import { Button } from '@/components/ui/Button';
 interface RefreshRefundStatusButtonProps {
   storeId: string;
   orderId: string;
@@ -73,12 +74,13 @@ export function RefreshRefundStatusButton({
   };
 
   return (
-    <button
+    <Button
       type="button"
       onClick={handleRefresh}
       disabled={disabled || busy}
       title={t('buttonTooltip')}
-      className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-warning bg-warning/5 px-4 py-2.5 text-sm font-semibold text-warning-ink hover:bg-warning/10 disabled:opacity-60 transition-colors cursor-pointer"
+      variant="outline"
+      className="flex-1 min-w-[8rem] justify-center gap-2 font-semibold"
     >
       <svg
         className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`}
@@ -95,6 +97,6 @@ export function RefreshRefundStatusButton({
         />
       </svg>
       {busy ? t('checkingButton') : t('button')}
-    </button>
+    </Button>
   );
 }

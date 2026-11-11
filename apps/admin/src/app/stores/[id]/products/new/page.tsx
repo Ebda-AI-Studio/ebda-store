@@ -29,6 +29,7 @@ type DiscountType = 'none' | 'percentage' | 'fixed';
 interface Category {
   id: string;
   name: string;
+  nameAr?: string | null;
 }
 
 export default function NewProductPage() {
@@ -185,8 +186,9 @@ export default function NewProductPage() {
       }
 
       const body: Record<string, unknown> = {
-        // The API needs a name; an Arabic-only store types it once, in Arabic.
-        name: formData.name.trim() || formData.nameAr.trim(),
+        // Each name in its own field (Ruling NAME-PAIR-1): an Arabic-only product sends only nameAr and the API keeps the
+        // English name for the AI to fill. Sending the Arabic text as `name` put Arabic on the English storefront.
+        ...(formData.name.trim() ? { name: formData.name.trim() } : {}),
         // CREATE path — nothing to clear, so an empty field omits the key
         // entirely (`undefined`). The EDIT form sends `null` instead; see
         // lib/product-payload.ts.
@@ -240,7 +242,10 @@ export default function NewProductPage() {
 
   const categoryOptions = [
     { value: '', label: t('fields.noCategory') },
-    ...categories.map(c => ({ value: c.id, label: c.name })),
+    ...categories.map(c => ({
+      value: c.id,
+      label: uiLocale === 'ar' && c.nameAr ? c.nameAr : c.name,
+    })),
   ];
 
   const nameField = (lang: 'ar' | 'en', required: boolean) =>
@@ -348,6 +353,7 @@ export default function NewProductPage() {
               type="button"
               aria-expanded={showDetails}
               onClick={() => setShowDetails(v => !v)}
+              data-ui="row"
               className="flex min-h-11 w-full items-center justify-between gap-3 p-6 text-start"
             >
               <span>

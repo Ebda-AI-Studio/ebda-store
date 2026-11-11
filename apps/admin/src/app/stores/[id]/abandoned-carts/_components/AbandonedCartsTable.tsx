@@ -10,6 +10,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
 import { withNumerals } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 const formatMajor = minorToMajor;
 
@@ -163,22 +164,22 @@ export function AbandonedCartsTable({
             })}
           </p>
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={() => onPageChange(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t('previous')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
               type="button"
               onClick={() => onPageChange(Math.min(meta.totalPages, page + 1))}
               disabled={page === meta.totalPages}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t('next')}
-            </button>
+            </Button>
           </div>
         </div>
       )}

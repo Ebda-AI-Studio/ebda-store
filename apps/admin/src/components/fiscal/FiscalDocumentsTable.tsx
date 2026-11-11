@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
@@ -115,10 +116,7 @@ export function FiscalDocumentsTable({
     {
       header: t('columns.actions'),
       cell: d => (
-        <Link
-          href={openHref(d)}
-          className="inline-flex rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
-        >
+        <Link href={openHref(d)} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
           {t('open')}
         </Link>
       ),

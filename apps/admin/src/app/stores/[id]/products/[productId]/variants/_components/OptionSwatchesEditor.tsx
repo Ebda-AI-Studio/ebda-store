@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { DEFAULT_THEME, resolveColor, type StoreTheme } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '@/components/ImageUpload';

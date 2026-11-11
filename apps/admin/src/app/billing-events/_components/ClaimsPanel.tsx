@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Input, Modal } from '@ebda/ui';
+import { Badge, Input, Modal } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatMoney, isSafeUrl, type InstapayReceiptView } from '@ebda/shared';
 import { DataTable, type DataTableColumn } from '../../../components/mobile/DataTable';
 import { apiGet, apiPost } from '../../../lib/api';
@@ -242,17 +243,16 @@ export function ClaimsPanel({
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">{t('statusFilter')}</span>
         {STATUSES.map(s => (
-          <button
+          <Button
+            variant={status === s ? 'soft' : 'ghost'}
+            size="sm"
             key={s}
             type="button"
             aria-pressed={status === s}
             onClick={() => setStatus(s)}
-            className={`rounded-full px-3 py-1 text-sm ${
-              status === s ? 'bg-foreground text-background' : 'bg-muted text-foreground'
-            }`}
           >
             {t(`statuses.${s}`)}
-          </button>
+          </Button>
         ))}
       </div>
       {loading ? (

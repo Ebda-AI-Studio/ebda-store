@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { usePathname, useRouter } from 'next/navigation';
@@ -398,10 +399,11 @@ export function AdminLayout({
         isStoreAdminWithBranding={isStoreAdminWithBranding}
         userRole={user?.role as 'super_admin' | 'store_admin' | 'staff' | 'customer' | undefined}
       />
-      <button
+      <Button
+        variant="outline"
         type="button"
         onClick={() => window.dispatchEvent(new Event('force:open-search'))}
-        className="mx-3 mt-2 flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70"
+        className="mx-3 mt-2 gap-2 text-muted-foreground w-[calc(100%-1.5rem)] justify-start"
       >
         <svg
           className="h-4 w-4 shrink-0"
@@ -422,7 +424,7 @@ export function AdminLayout({
           {/* i18n-gate-allow: keyboard shortcut keycap */}
           ⌘K
         </kbd>
-      </button>
+      </Button>
       <SidebarNav
         navItems={navItems}
         pathname={pathname}
@@ -502,10 +504,12 @@ export function AdminLayout({
         aria-hidden={!isSidebarOpen}
       >
         <div className="flex h-full flex-col">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             type="button"
             onClick={() => setIsSidebarOpen(false)}
-            className="absolute end-3 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+            className="absolute end-3 top-4 justify-center text-muted-foreground lg:hidden"
             aria-label={t('closeSidebar')}
           >
             <svg
@@ -522,7 +526,7 @@ export function AdminLayout({
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-          </button>
+          </Button>
           {sidebarContent}
         </div>
       </aside>

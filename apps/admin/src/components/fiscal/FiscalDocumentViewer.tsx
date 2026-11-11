@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -60,15 +61,14 @@ export function FiscalDocumentViewer({ endpoint, backHref }: FiscalDocumentViewe
     win.print();
   }, [t, toastError]);
 
-  const toggle = 'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer';
-
   return (
     <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6">
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-background/95 p-2 backdrop-blur print:hidden">
-        <button
+        <Button
+          variant="secondary"
           type="button"
           onClick={() => router.push(backHref)}
-          className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
+          className="gap-2"
         >
           <svg
             className={`h-4 w-4 ${adminLocale === 'ar' ? 'rotate-180' : ''}`}
@@ -85,7 +85,7 @@ export function FiscalDocumentViewer({ endpoint, backHref }: FiscalDocumentViewe
             />
           </svg>
           {t('back')}
-        </button>
+        </Button>
         <div className="flex items-center gap-2">
           <div
             role="group"
@@ -93,29 +93,26 @@ export function FiscalDocumentViewer({ endpoint, backHref }: FiscalDocumentViewe
             className="flex rounded-xl border border-border bg-card p-0.5"
           >
             {(['ar', 'en'] as const).map(l => (
-              <button
+              <Button
+                variant={docLocale === l ? 'soft' : 'ghost'}
+                size="sm"
                 key={l}
                 type="button"
                 aria-pressed={docLocale === l}
                 onClick={() => setDocLocale(l)}
-                className={`${toggle} ${
-                  docLocale === l
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted'
-                }`}
               >
                 {t(l === 'ar' ? 'arabic' : 'english')}
-              </button>
+              </Button>
             ))}
           </div>
-          <button
+          <Button
             type="button"
             onClick={handlePrint}
             disabled={!html}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors cursor-pointer"
+            className="gap-2 font-semibold"
           >
             {t('print')}
-          </button>
+          </Button>
         </div>
       </div>
 

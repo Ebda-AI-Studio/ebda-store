@@ -3,6 +3,7 @@
 import { useT } from '@/i18n/useT';
 import { STATUS_FILTERS, type StatusFilter } from './types';
 
+import { Button } from '@/components/ui/Button';
 interface OrdersFiltersProps {
   statusFilter: StatusFilter;
   onStatusFilterChange: (status: StatusFilter) => void;
@@ -22,18 +23,16 @@ export function OrdersFilters({
     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex items-center gap-1 rounded-xl bg-muted p-1 overflow-x-auto">
         {STATUS_FILTERS.map(status => (
-          <button
+          <Button
             type="button"
             key={status}
             onClick={() => onStatusFilterChange(status)}
-            className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-              statusFilter === status
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            variant={statusFilter === status ? 'soft' : 'ghost'}
+            size="sm"
+            className="whitespace-nowrap"
           >
             {t(`filters.${status}`)}
-          </button>
+          </Button>
         ))}
       </div>
 

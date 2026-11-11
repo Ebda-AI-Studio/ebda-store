@@ -9,6 +9,7 @@ import { formatPrice } from '@/lib/format';
 import { useRequireFeature } from '@/hooks/useRequireFeature';
 import { withNumerals } from '@ebda/shared';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AnomalySeverity = 'p0' | 'warning';
@@ -153,14 +154,9 @@ function AnomalyRow({
 
       {/* Acknowledge button */}
       {!item.acknowledged && (
-        <button
-          type="button"
-          onClick={handleAck}
-          disabled={acking}
-          className="px-3 py-1.5 rounded border border-border text-sm text-foreground disabled:opacity-60 hover:bg-muted/40 transition-colors"
-        >
+        <Button type="button" onClick={handleAck} disabled={acking} variant="outline" size="sm">
           {acking ? tc('saving') : t('acknowledge')}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -236,42 +232,36 @@ export default function AnomaliesPage() {
         <div className="flex flex-wrap gap-2">
           {/* Severity filter */}
           {(['all', 'p0', 'warning'] as SeverityFilter[]).map(sev => (
-            <button
+            <Button
               key={sev}
               type="button"
               onClick={() => setSeverityFilter(sev)}
-              className={`px-3 py-1 rounded border text-sm transition-colors ${
-                severityFilter === sev
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'border-border text-muted-foreground hover:bg-muted/40'
-              }`}
+              variant={severityFilter === sev ? 'soft' : 'ghost'}
+              size="sm"
             >
               {sev === 'all'
                 ? t('filter.all')
                 : sev === 'p0'
                   ? t('filter.p0')
                   : t('severity.warning')}
-            </button>
+            </Button>
           ))}
           <span className="border-l border-border mx-1" />
           {/* Acknowledged filter */}
           {(['false', 'all', 'true'] as AckFilter[]).map(ack => (
-            <button
+            <Button
               key={ack}
               type="button"
               onClick={() => setAckFilter(ack)}
-              className={`px-3 py-1 rounded border text-sm transition-colors ${
-                ackFilter === ack
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'border-border text-muted-foreground hover:bg-muted/40'
-              }`}
+              variant={ackFilter === ack ? 'soft' : 'ghost'}
+              size="sm"
             >
               {ack === 'false'
                 ? t('filter.open')
                 : ack === 'all'
                   ? t('filter.all')
                   : t('acknowledged')}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -306,25 +296,27 @@ export default function AnomaliesPage() {
         {/* Pagination */}
         {meta && meta.totalPages > 1 && (
           <div className="flex items-center gap-2 text-sm">
-            <button
+            <Button
               type="button"
               disabled={meta.page === 1}
               onClick={() => load(meta.page - 1)}
-              className="px-3 py-1 rounded border border-border disabled:opacity-40"
+              variant="outline"
+              size="sm"
             >
               ←
-            </button>
+            </Button>
             <span className="text-muted-foreground">
               {meta.page} / {meta.totalPages}
             </span>
-            <button
+            <Button
               type="button"
               disabled={meta.page >= meta.totalPages}
               onClick={() => load(meta.page + 1)}
-              className="px-3 py-1 rounded border border-border disabled:opacity-40"
+              variant="outline"
+              size="sm"
             >
               →
-            </button>
+            </Button>
           </div>
         )}
       </div>

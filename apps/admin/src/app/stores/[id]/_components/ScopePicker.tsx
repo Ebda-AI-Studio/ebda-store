@@ -174,6 +174,7 @@ export function ScopePicker({
               {dropdownOptions.map(o => (
                 <li key={o.id}>
                   <button
+                    data-ui="row"
                     type="button"
                     onClick={() => add(o)}
                     className="block w-full px-3 py-2 text-start hover:bg-muted"

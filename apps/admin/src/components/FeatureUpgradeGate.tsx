@@ -19,7 +19,7 @@
 
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from './AdminLayout';
 import {
   FEATURE_REGISTRY,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { Button } from '@/components/ui/Button';
 
 interface DisableConfirmDialogProps {
   saving: boolean;
@@ -22,21 +23,18 @@ export function DisableConfirmDialog({ saving, onCancel, onConfirm }: DisableCon
         <h2 className="text-lg font-semibold text-foreground mb-2">{t('title')}</h2>
         <p className="text-sm text-muted-foreground mb-6">{t('description')}</p>
         <div className="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted"
-          >
+          <Button variant="outline" size="md" type="button" onClick={onCancel}>
             {t('cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="destructive"
+            size="md"
             type="button"
             onClick={onConfirm}
             disabled={saving}
-            className="px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50"
           >
             {t('confirm')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

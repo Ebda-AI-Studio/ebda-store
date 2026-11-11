@@ -15,7 +15,7 @@ const { apiGet, apiPost, apiPut, replace } = vi.hoisted(() => ({
   apiPut: vi.fn(),
   replace: vi.fn(),
 }));
-vi.mock('../../../lib/api', () => ({ apiGet, apiPost, apiPut }));
+vi.mock('../../../lib/api', () => ({ apiGet, apiPost, apiPut, adminUiLocale: () => 'en' }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace, push: vi.fn() }) }));
 vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
 vi.mock('next/link', () => ({
@@ -332,6 +332,8 @@ describe('onboarding stepper', () => {
     await waitFor(() =>
       expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/s1/products', {
         name: 'Scarf',
+        // the one name field is typed in the admin's language (Ruling NAME-PAIR-1)
+        sourceLang: 'en',
         price: 25050,
         status: 'active',
         inventory: 10,

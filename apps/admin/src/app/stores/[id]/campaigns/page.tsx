@@ -24,6 +24,7 @@ import { DataTable } from '../../../../components/mobile/DataTable';
 import { OrderStatusBadge } from '../../../../components/OrderStatusBadge';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { Button } from '@/components/ui/Button';
 
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
 
@@ -172,14 +173,15 @@ export default function CampaignsListPage() {
       mode="store_admin"
       storeId={storeId}
       actions={
-        <button
+        <Button
+          variant="default"
+          size="md"
           type="button"
           onClick={() => void createCampaign()}
           disabled={creating}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
           {creating ? t('creating') : t('newCampaign')}
-        </button>
+        </Button>
       }
     >
       <div className="mx-auto max-w-5xl px-4 py-6">
@@ -226,13 +228,15 @@ export default function CampaignsListPage() {
                 primaryOnMobile: true,
                 cell: c => (
                   <>
-                    <button
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-start"
                       type="button"
                       onClick={() => router.push(`/stores/${storeId}/campaigns/${c.id}`)}
-                      className="min-h-11 font-medium text-primary hover:underline text-start"
                     >
                       {c.name}
-                    </button>
+                    </Button>
                     {lastErrorText(c.lastError) && (
                       <p className="mt-0.5 text-xs text-destructive-ink">
                         {lastErrorText(c.lastError)}
@@ -278,14 +282,15 @@ export default function CampaignsListPage() {
 
         {nextCursor && (
           <div className="mt-4 flex justify-center">
-            <button
+            <Button
+              variant="outline"
+              size="md"
               type="button"
               onClick={() => void loadMore()}
               disabled={loadingMore}
-              className="rounded-md border px-4 py-2 text-sm hover:bg-muted disabled:opacity-50"
             >
               {loadingMore ? t('loading') : t('loadMore')}
-            </button>
+            </Button>
           </div>
         )}
       </div>

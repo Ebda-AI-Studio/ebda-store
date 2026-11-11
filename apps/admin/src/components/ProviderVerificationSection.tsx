@@ -5,6 +5,7 @@
  * flips to verified by itself after N successful real operations; the recent evidence (store, op,
  * outcome, reference, error code) is listed so a failure is traceable. No credential is shown.
  */
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge } from '@ebda/ui';
@@ -99,9 +100,10 @@ export function ProviderVerificationSection() {
                   })}
                 </span>
                 {!verified && r.readyAt && (
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
-                    className="rounded-md border px-2 py-1 text-sm"
                     disabled={busy === r.provider}
                     onClick={e => {
                       e.preventDefault();
@@ -109,7 +111,7 @@ export function ProviderVerificationSection() {
                     }}
                   >
                     {t('confirm')}
-                  </button>
+                  </Button>
                 )}
               </summary>
               {r.recent.length === 0 ? (

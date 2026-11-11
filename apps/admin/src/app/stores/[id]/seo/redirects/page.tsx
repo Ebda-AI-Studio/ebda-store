@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiDelete } from '@/lib/api';
 import { RedirectsTable, type SlugRedirectRow } from './RedirectsTable';
+import { Button } from '@/components/ui/Button';
 
 // #903: SlugRedirect had no admin UI surface at all — a merchant could not
 // see or remove a spuriously-captured bulk-import alias, or a stale
@@ -140,12 +141,9 @@ export default function SlugRedirectsPage() {
             maxLength={255}
             className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
-          <button
-            type="submit"
-            className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-          >
+          <Button variant="outline" size="md" type="submit">
             {t('redirectsSearch')}
-          </button>
+          </Button>
         </form>
 
         {(loadError || actionError) && (
@@ -186,14 +184,15 @@ export default function SlugRedirectsPage() {
             />
             {list.nextCursor && (
               <div className="flex justify-center">
-                <button
+                <Button
+                  variant="outline"
+                  size="md"
                   type="button"
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
                 >
                   {loadingMore ? t('redirectsLoadingMore') : t('redirectsLoadMore')}
-                </button>
+                </Button>
               </div>
             )}
           </>

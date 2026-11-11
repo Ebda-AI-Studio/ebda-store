@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
@@ -60,7 +61,7 @@ export function OrderDocumentsCard({ storeId, orderId }: OrderDocumentsCardProps
         </h2>
         <Link
           href={`/stores/${storeId}/orders/${orderId}/packing-slip`}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+          className={buttonVariants({ variant: 'outline', size: 'sm' })}
         >
           {tSlip('print')}
         </Link>
@@ -97,7 +98,7 @@ export function OrderDocumentsCard({ storeId, orderId }: OrderDocumentsCardProps
                 </Badge>
                 <Link
                   href={`/stores/${storeId}/invoices/${d.id}`}
-                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
                 >
                   {t('open')}
                 </Link>

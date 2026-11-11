@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { formatLegalDate, type PendingLegalNotice } from '@ebda/shared';
@@ -93,14 +94,9 @@ export function LegalNoticeBanner({ storeId }: { storeId: string }) {
         ))}
       </ul>
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={acknowledge}
-          disabled={saving}
-          className="min-h-9 rounded-md bg-warning-ink px-3 py-1.5 text-xs font-medium text-background disabled:opacity-60"
-        >
+        <Button variant="outline" size="sm" type="button" onClick={acknowledge} disabled={saving}>
           {saving ? t('saving') : t('gotIt')}
-        </button>
+        </Button>
         {failed && <span role="alert">{t('ackFailed')}</span>}
       </div>
     </div>

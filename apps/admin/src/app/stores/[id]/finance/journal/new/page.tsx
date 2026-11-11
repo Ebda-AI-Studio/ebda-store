@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { minorToMajor } from '@/lib/format';
 
 import { roundToMinor } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountRow {
@@ -250,14 +251,16 @@ export default function NewJournalEntryPage() {
                     />
                   </td>
                   <td className="px-3 py-2 text-center">
-                    <button
+                    <Button
                       type="button"
                       onClick={() => removeLine(i)}
                       disabled={lines.length <= 2}
-                      className="text-red-600 disabled:opacity-30 hover:underline text-xs"
+                      variant="link"
+                      size="sm"
+                      className="text-red-600"
                     >
                       ✕
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -283,13 +286,9 @@ export default function NewJournalEntryPage() {
         </div>
 
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={addLine}
-            className="px-3 py-1.5 border border-border rounded text-sm"
-          >
+          <Button type="button" onClick={addLine} variant="outline" size="sm">
             {tNew('addLine')}
-          </button>
+          </Button>
         </div>
 
         {error && (
