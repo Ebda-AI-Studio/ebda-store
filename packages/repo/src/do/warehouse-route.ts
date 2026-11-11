@@ -80,6 +80,17 @@ export function planRoute(
   return { chosen };
 }
 
+/** Override lines skip routing, so bring their shadow to the aggregate right after the take (routed stores only). */
+export function reconcileOverrideSku(
+  db: SyncSql,
+  storeId: string,
+  productId: string,
+  variantId: string | null
+): void {
+  if (activeWarehouses(db, storeId).length >= 2)
+    reconcileToAggregate(db, storeId, productId, variantId);
+}
+
 /** AFTER the aggregate decrement succeeded for the whole `qty`: move the same units out of the chosen warehouse. */
 export function applyRoute(
   db: SyncSql,

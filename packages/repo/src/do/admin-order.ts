@@ -3,7 +3,13 @@ import { MoneyError, type SyncSql } from './sync-sql';
 import { freshOrderNumber } from './order-number';
 import { issueSaleDocument } from './fiscal';
 import { decrementProduct, decrementVariant, recordMovement, takeUpTo } from './stock';
-import { applyRoute, planRoute, recordAllocations, type Allocation } from './warehouse-route';
+import {
+  applyRoute,
+  planRoute,
+  reconcileOverrideSku,
+  recordAllocations,
+  type Allocation,
+} from './warehouse-route';
 import { assertGoldLinesPriceable, type GoldGateLine } from './gold';
 import { indexEntity } from './payments';
 import { assertMoqSatisfied, resolveCartPrices, type Buyer } from './pricing';
@@ -476,6 +482,21 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
         notTaken.push({ orderItemId: row.id as string, quantity: qty - taken });
       }
     }
+    // WAREHOUSE-ROUTE-2: an override took the aggregate without routing; bring each tracked SKU's shadow to it now
+    if (input.overrideStock === true)
+      for (const row of itemRows) {
+        const tracked = db.all(
+          'SELECT track_inventory FROM products WHERE id = ? AND store_id = ?',
+          [row.product_id as string, storeId]
+        )[0]?.track_inventory;
+        if (tracked)
+          reconcileOverrideSku(
+            db,
+            storeId,
+            row.product_id as string,
+            (row.variant_id as string | null) ?? null
+          );
+      }
     if (shortages.length > 0 && input.overrideStock !== true)
       throw new MoneyError('INSUFFICIENT_STOCK', 'not enough stock for this order', 422, {
         shortages,
