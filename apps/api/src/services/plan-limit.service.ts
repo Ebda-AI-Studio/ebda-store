@@ -50,7 +50,9 @@ import { StorageService } from './storage.service';
 import {
   BYTES_PER_MB,
   cachedStoreBytes,
+  NO_RESERVATION,
   releaseStoreBytes,
+  type StorageReservation,
   reserveStoreBytes,
 } from '../lib/storage-usage';
 import { storeRepo, storeDb } from '../lib/repo-factory';
@@ -78,10 +80,14 @@ async function storageUsageMb(storeId: string): Promise<number> {
 }
 
 /** S3-X8: gate an upload of `bytes` on the plan's storage ceiling (402 PLAN_LIMIT_REACHED; null = unlimited). */
-export async function assertStorageRoom(storeId: string, bytes: number): Promise<void> {
+export async function assertStorageRoom(
+  storeId: string,
+  bytes: number
+): Promise<StorageReservation> {
   // #630: the check and the reservation are ONE synchronous step on the cached usage (`reserveStoreBytes`), so a
-  // burst inside the 60 s TTL sees the earlier uploads. Residual: an upload that passes but then fails keeps its
-  // bytes counted until the TTL re-lists the bucket (over-counts, never under-counts).
+  // burst inside the 60 s TTL sees the earlier uploads. The caller hands the result to `releaseOnFailure(res, ...)`,
+  // which gives the bytes back when the request fails. GUARANTEE IS PER ISOLATE: each Worker isolate has its own
+  // cache, so N isolates can each admit up to the headroom inside one TTL (the 20/min upload limit still caps it).
   const e = await getEntitlements(storeId);
   const limit = e?.limits.maxStorageMb;
   if (e && typeof limit === 'number') {
@@ -96,10 +102,11 @@ export async function assertStorageRoom(storeId: string, bytes: number): Promise
           Math.ceil(r.usedBytes / BYTES_PER_MB),
           bytes / BYTES_PER_MB
         );
-      return;
+      return { release: () => releaseStoreBytes(storeId, bytes) };
     }
   }
   await assertWithinLimit(storeId, 'maxStorageMb', { delta: bytes / BYTES_PER_MB });
+  return NO_RESERVATION;
 }
 
 /** Current usage for a limit, or null when the platform does not track it yet. */

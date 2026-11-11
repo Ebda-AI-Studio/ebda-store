@@ -24,7 +24,7 @@ vi.mock('@api/services/storage.service', () => ({
 }));
 
 import { assertStorageRoom } from '@api/services/plan-limit.service';
-import { resetStorageUsageCache } from '@api/lib/storage-usage';
+import { releaseOnFailure, resetStorageUsageCache } from '@api/lib/storage-usage';
 
 const S = '11111111-1111-4111-8111-111111111111';
 beforeEach(() => {
@@ -43,8 +43,30 @@ describe('assertStorageRoom reserves bytes (#630)', () => {
     expect(h.listCalls).toBe(1);
   });
 
-  it('a refused upload releases its reservation', async () => {
+  it('a request that ends >= 400 releases its reservation; a 2xx keeps it', async () => {
+    const fakeRes = (statusCode: number) => {
+      const fns: Array<() => void> = [];
+      return {
+        statusCode,
+        once: (_e: string, fn: () => void) => void fns.push(fn),
+        end: () => fns.forEach(f => f()),
+      };
+    };
+    // 8 of 10 MB used. Two failed 2 MB uploads must not eat the headroom...
+    for (let i = 0; i < 2; i++) {
+      const res = fakeRes(500);
+      releaseOnFailure(res, await assertStorageRoom(S, 2 * MB));
+      res.end();
+    }
+    // ...so a successful 2 MB upload still fits, and once kept, the next one is refused.
+    const ok = fakeRes(200);
+    releaseOnFailure(ok, await assertStorageRoom(S, 2 * MB));
+    ok.end();
+    await expect(assertStorageRoom(S, 1 * MB)).rejects.toMatchObject({ statusCode: 402 });
+  });
+
+  it('a refused upload reserves nothing', async () => {
     await expect(assertStorageRoom(S, 5 * MB)).rejects.toMatchObject({ statusCode: 402 });
-    await expect(assertStorageRoom(S, 2 * MB)).resolves.toBeUndefined();
+    await expect(assertStorageRoom(S, 2 * MB)).resolves.toBeDefined();
   });
 });

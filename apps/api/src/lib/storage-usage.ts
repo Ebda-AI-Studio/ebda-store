@@ -74,6 +74,37 @@ export function reserveStoreBytes(
   return { ok: true, usedBytes: hit.bytes };
 }
 
+/** Undo a reservation (floors at 0). */
+export function releaseStoreBytes(storeId: string, bytes: number): void {
+  const hit = cache.get(storeId);
+  if (hit) hit.bytes = Math.max(0, hit.bytes - bytes);
+}
+
+/** A held reservation; `release()` is idempotent and a no-op when nothing was reserved. */
+export interface StorageReservation {
+  release(): void;
+}
+export const NO_RESERVATION: StorageReservation = { release() {} };
+
+/**
+ * Give the bytes back when the request ends in an error (any status >= 400, thrown or answered), so a failed
+ * upload does not count against the ceiling until the TTL. `room` may be undefined (mocked gate).
+ */
+export function releaseOnFailure(
+  res: { statusCode: number; once(ev: 'finish' | 'close', fn: () => void): unknown },
+  room: StorageReservation | void
+): void {
+  if (!room) return;
+  let done = false;
+  const settle = () => {
+    if (done) return;
+    done = true;
+    if (res.statusCode >= 400) room.release();
+  };
+  res.once('finish', settle);
+  res.once('close', settle);
+}
+
 export function resetStorageUsageCache(): void {
   cache.clear();
   inflight.clear();
