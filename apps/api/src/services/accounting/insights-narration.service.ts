@@ -47,7 +47,7 @@ export async function generateInsightNarration(
 ): Promise<Narration | null> {
   // The snapshot tables read below (customer_cohort_snapshots,
   // customer_rfm_snapshots, funnel_snapshots) carry STRICT RLS policies, and
-  // insights.routes.ts runs this as a sibling of its `runInTenantContext`
+  // insights.routes.ts runs this as a sibling of its `readInStoreContext`
   // reads, i.e. with no context: under `ebda_app` every narration came back
   // null. A store scope, not a transaction, because a Gemini call sits
   // between the reads.
