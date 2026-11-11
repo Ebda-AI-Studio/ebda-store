@@ -104,7 +104,7 @@ const ops: Record<string, string[]> = {};
  * `remote` = D1 + StoreDO + AuthState + other DO + identity calls (KV is edge-local and not counted).
  * PERF-BATCH-1 (Ruling PERF-BATCH-1): every limiter hit of a request is prefetched in ONE call per AuthState shard before the
  * global limiter runs (sign-in rl:global + rl:auth-ip-fail + rl:auth; cart add / order create rl:global + the public family +
- * rl:cart / rl:write), so sign-in 9 -> 7 waves, cart add 15 -> 13 waves (15 -> 14 calls), order create 37 -> 17 waves (the
+ * rl:cart / rl:write), so sign-in 9 -> 7 waves, cart add 15 -> 13 waves (calls unchanged: one per shard, 14-15 by where the store's tenant key lands), order create 37 -> 17 waves (the
  * 37 ceiling was stale: 19 measured before this change).
  * The NEON-SCALE-1 targets (public reads 0 D1 / 0 DO; a cart or order write ONE batched DO call) are NOT met yet: the order and
  * cart paths still make 10 StoreDO calls each (see the PR's follow-ups). Lower a ceiling whenever a change lowers the count.
@@ -114,7 +114,7 @@ const BUDGET: Record<string, { remote: number; waves: number }> = {
   'product list': { remote: 3, waves: 4 },
   pdp: { remote: 3, waves: 4 },
   'cart get': { remote: 2, waves: 2 },
-  'cart add (guest)': { remote: 14, waves: 13 },
+  'cart add (guest)': { remote: 15, waves: 13 },
   'order create (guest, cod)': { remote: 30, waves: 17 },
   'customer sign-in': { remote: 13, waves: 7 },
   'customer /auth/me': { remote: 4, waves: 3 },
