@@ -647,7 +647,16 @@ export interface MoneyClient {
   }): Promise<{ products: number; variants: number; remaining: number }>;
   barcodeEnsure(a: { productId?: string; variantId?: string }): Promise<{ code: string | null }>;
   cancel(
-    a: { orderId: string; restoreInventory?: boolean; note?: string; unpaidOnly?: boolean },
+    a: {
+      orderId: string;
+      restoreInventory?: boolean;
+      note?: string;
+      unpaidOnly?: boolean;
+      /** Cancel only while the order is in one of these states (checked in the DO's section, Fixes #614); otherwise the
+       * order is untouched, `exceptionNote` is appended to its notes and the result says `skipped: 'status_moved'`. */
+      onlyFrom?: string[];
+      exceptionNote?: string;
+    },
     key?: string
   ): Promise<CancelResult>;
   expireHold(
@@ -1405,6 +1414,8 @@ export interface CancelResult {
   walletReversed: number;
   loyalty: { earnedReversed: number; redeemedRecredited: number };
   backorderLinesCancelled: number;
+  /** Set when an `onlyFrom` cancel found the order already past those states: nothing was changed but its note. */
+  skipped?: 'status_moved';
 }
 
 export interface StoreRepo {

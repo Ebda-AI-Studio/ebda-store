@@ -622,6 +622,37 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       if (cur && (cur.payment_status === 'paid' || cur.payment_status === 'refunded'))
         throw new MoneyError('ORDER_ALREADY_PAID', 'the order was paid; not cancelled', 409);
     }
+    // A cancel that is only valid from given states (Fixes #614: a customer's WhatsApp "refused" must never cancel and
+    // restock an order the merchant shipped a moment earlier). Read and decided in THIS section (the DO runs one op at a
+    // time, no await between the read and the write), so a ship that lands first wins: the order is left as it is and the
+    // refusal is recorded on it as a note for the merchant (a delivery exception), nothing else.
+    if (Array.isArray(a.onlyFrom)) {
+      const allowed = (a.onlyFrom as unknown[]).filter((x): x is string => typeof x === 'string');
+      const cur = db.all(
+        'SELECT status FROM orders WHERE id = ? AND store_id = ? AND deleted_at IS NULL',
+        [orderId, storeId]
+      )[0];
+      if (!cur) throw new MoneyError('ORDER_NOT_FOUND', 'order not found', 404);
+      if (!allowed.includes(cur.status as string)) {
+        const note = typeof a.exceptionNote === 'string' ? a.exceptionNote.slice(0, 500) : '';
+        if (note)
+          db.run(
+            "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ?1 ELSE notes || char(10) || ?1 END, updated_at = ?4 WHERE id = ?2 AND store_id = ?3",
+            [note, orderId, storeId, Date.now()]
+          );
+        return {
+          orderId,
+          kind: 'cancel',
+          replayed: false,
+          skipped: 'status_moved',
+          status: cur.status as string,
+          couponUnclaimed: false,
+          walletReversed: 0,
+          loyalty: { earnedReversed: 0, redeemedRecredited: 0 },
+          backorderLinesCancelled: 0,
+        };
+      }
+    }
     const r = cancelOrder(db, {
       storeId,
       orderId,
