@@ -11,7 +11,7 @@ import { ShopChrome } from '../../components';
 export default function Loading() {
   return (
     <ShopChrome>
-      <div data-loading className="container mx-auto max-w-7xl px-4 py-8 flex-1">
+      <div data-loading className="container mx-auto min-h-[70svh] max-w-7xl px-4 py-8 flex-1">
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-48 bg-muted rounded" />
           <div className="h-10 w-full max-w-2xl mx-auto bg-muted rounded-lg" />

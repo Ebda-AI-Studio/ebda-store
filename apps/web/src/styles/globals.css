@@ -2044,3 +2044,24 @@ html[lang='en'] [data-look] .font-display {
     max-height: var(--look-hero-maxh, 45vh);
   }
 }
+
+/*
+ * UI audit 2026-11-11 (P1): footer and breadcrumb links measured 18-22 px tall at every width (WCAG 2.5.8 floor
+ * is 24 px, the store's own bar is 44 px on touch). Footer links get a real row height; the breadcrumb a touch
+ * height. No colour, font or spacing between columns changes, so merchant themes are untouched.
+ */
+[data-zone='footer'] a:not([data-part='logo']) {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 28px;
+}
+@media (pointer: coarse) {
+  [data-zone='footer'] a:not([data-part='logo']),
+  nav[aria-label] ol a {
+    min-block-size: 44px;
+  }
+  nav[aria-label] ol a {
+    display: inline-flex;
+    align-items: center;
+  }
+}
