@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useT } from '@/i18n/useT';
+import { Button } from '@/components/ui/Button';
 
 export const nudgeStorageKey = (storeId: string) => `ebda.cart-email-nudge.${storeId}`;
 
@@ -53,22 +54,19 @@ export function CartEmailNudge({ storeId, emailEnabled }: Props) {
         <p className="text-sm text-muted-foreground mt-0.5">{t('body')}</p>
       </div>
       <div className="flex gap-2 shrink-0">
-        <button
+        <Button
+          variant="default"
+          size="sm"
           type="button"
           onClick={() =>
             document.getElementById(CART_EMAIL_SETTINGS_ID)?.scrollIntoView({ behavior: 'smooth' })
           }
-          className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
         >
           {t('review')}
-        </button>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="px-4 py-1.5 border border-border rounded-lg text-sm text-foreground hover:bg-muted"
-        >
+        </Button>
+        <Button variant="outline" size="sm" type="button" onClick={dismiss}>
           {t('dismiss')}
-        </button>
+        </Button>
       </div>
     </div>
   );

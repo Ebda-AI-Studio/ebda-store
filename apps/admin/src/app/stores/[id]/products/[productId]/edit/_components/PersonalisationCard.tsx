@@ -16,6 +16,7 @@ import { Toggle } from '@/components/Toggle';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 
+import { Button } from '@/components/ui/Button';
 export const PERSONALISATION_DEFAULT_MAX = 20;
 
 export interface PersonalisationForm {
@@ -116,19 +117,16 @@ export function PersonalisationCard({ value, onChange }: Props) {
               {PRESETS.map(p => {
                 const active = value.labelAr === p.labelAr && value.label === p.label;
                 return (
-                  <button
+                  <Button
                     key={p.key}
                     type="button"
                     aria-pressed={active}
                     onClick={() => set({ label: p.label, labelAr: p.labelAr })}
-                    className={`rounded-full border px-3 py-1 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      active
-                        ? 'border-primary bg-primary/10 text-foreground'
-                        : 'border-border text-muted-foreground hover:text-foreground'
-                    }`}
+                    variant={active ? 'soft' : 'outline'}
+                    size="sm"
                   >
                     {isAr ? p.labelAr : p.label}
-                  </button>
+                  </Button>
                 );
               })}
             </div>

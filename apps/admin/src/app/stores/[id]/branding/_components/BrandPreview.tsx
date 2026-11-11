@@ -28,6 +28,7 @@ export function BrandPreview({ theme }: BrandPreviewProps) {
       >
         <div className="flex items-center gap-4 mb-4">
           <button
+            data-ui="swatch"
             type="button"
             className="px-4 py-2 rounded-lg"
             style={{ backgroundColor: `hsl(${theme.primaryColor})`, color: ink }}
@@ -35,6 +36,7 @@ export function BrandPreview({ theme }: BrandPreviewProps) {
             {t('primaryButton')}
           </button>
           <button
+            data-ui="swatch"
             type="button"
             className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
           >

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
@@ -121,13 +122,15 @@ export default function DevicesPage() {
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   onClick={() => setConfirmRemoveId(d.playerId)}
-                  className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-sm font-medium text-destructive-ink hover:bg-destructive/10 transition-colors cursor-pointer"
+                  className="text-destructive-ink"
                 >
                   {t('remove')}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

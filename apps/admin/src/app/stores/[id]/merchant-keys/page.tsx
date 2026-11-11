@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Modal, useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { apiDelete, apiGet, apiPost, apiPut, getApiUrl } from '../../../../lib/api';
@@ -304,7 +305,7 @@ export default function MerchantKeysPage() {
       title={t('page.title')}
       subtitle={t('page.subtitle')}
       actions={
-        <Button type="button" className="min-h-11" onClick={() => setCreateOpen(true)}>
+        <Button type="button" onClick={() => setCreateOpen(true)}>
           {t('actions.mint')}
         </Button>
       }

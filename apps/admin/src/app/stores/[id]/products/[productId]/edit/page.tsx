@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { SearchTermsField } from '@/components/SearchTermsField';
-import { Badge, Button, Input, Textarea, Select, buttonVariants, cn, useToast } from '@ebda/ui';
+import { Badge, Input, Textarea, Select, cn, useToast } from '@ebda/ui';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { storefrontOrigin } from '@ebda/shared';
 import { StickySaveBar } from '@/components/StickySaveBar';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -766,7 +767,7 @@ export default function EditProductPage() {
                 href={`${storefrontOrigin(storeHost)}/products/${product.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11')}
+                className={buttonVariants({ variant: 'outline' })}
               >
                 {t('viewInStore')}
               </a>
@@ -845,7 +846,7 @@ export default function EditProductPage() {
             <span>{t('createdBanner')}</span>
             <Link
               href={`/stores/${storeId}/products/${product.id}/variants`}
-              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'min-h-11')}
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
             >
               {t('addVariants')}
             </Link>
@@ -1250,23 +1251,27 @@ export default function EditProductPage() {
                   <p className="text-xs text-muted-foreground">{tSeo('hint')}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => generateAiContent('fill-empty')}
                     disabled={seoGenerating}
-                    className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 font-semibold"
                   >
                     <span aria-hidden>✨</span>
                     {seoGenerating ? tSeo('generating') : tSeo('aiFillEmpty')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => generateAiContent('overwrite')}
                     disabled={seoGenerating}
-                    className="inline-flex items-center gap-2 rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary-ink transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 font-semibold"
                   >
                     {tSeo('aiRegenerateAll')}
-                  </button>
+                  </Button>
                 </div>
               </div>
               {seoMessage && <p className="mb-3 text-xs text-muted-foreground">{seoMessage}</p>}

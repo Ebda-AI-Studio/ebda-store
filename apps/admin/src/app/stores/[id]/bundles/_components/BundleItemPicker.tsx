@@ -34,6 +34,7 @@ import { formatPrice } from '@/lib/format';
 import { extractVariantOptions } from '../bundlePricing';
 import { SearchPicker } from '@/components/SearchPicker';
 
+import { Button } from '@/components/ui/Button';
 // Mirrors bundle.routes.ts's MAX_BUNDLE_ITEMS — not importable from the
 // admin app (apps/api is a separate deployable); the server is the real
 // enforcement, this only stops the merchant from typing past a limit that
@@ -218,26 +219,29 @@ export function BundleItemPicker({ storeId, value, onChange }: BundleItemPickerP
                 {variantOptions
                   .filter(v => v.isActive)
                   .map(v => (
-                    <button
+                    <Button
                       key={v.id}
                       type="button"
                       onClick={() => selectVariant(pendingVariantProduct, v)}
-                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:border-primary/40 hover:bg-primary/5"
+                      variant="outline"
+                      size="sm"
                     >
                       {isRtl ? v.titleAr || v.title : v.title}
                       <span className="ms-1.5 text-muted-foreground">
                         {formatPrice(v.price ?? pendingVariantProduct.price)}
                       </span>
-                    </button>
+                    </Button>
                   ))}
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={() => setPendingVariantProduct(null)}
-                className="mt-2 text-xs text-muted-foreground underline"
+                variant="link"
+                size="sm"
+                className="mt-2 text-muted-foreground"
               >
                 {t('cancelVariant')}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -276,14 +280,16 @@ export function BundleItemPicker({ storeId, value, onChange }: BundleItemPickerP
               <span className="w-24 text-end font-semibold text-foreground">
                 {formatPrice(row.unitPrice * row.quantity)}
               </span>
-              <button
+              <Button
                 type="button"
                 onClick={() => removeLine(row)}
                 aria-label={t('removeLabel')}
-                className="rounded p-1 text-destructive-ink hover:bg-destructive/10"
+                className="text-destructive-ink"
+                variant="ghost"
+                size="icon-sm"
               >
                 ×
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useRef } from 'react';
 import { useT } from '@/i18n/useT';
 
@@ -101,21 +102,23 @@ export function OrderAlertsModal({
           {t('body')}
         </p>
         <div className="relative mt-6 flex flex-col items-stretch gap-1">
-          <button
+          <Button
+            size="lg"
             type="button"
             onClick={onEnable}
             disabled={busy}
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#B08D57] px-4 text-[15px] font-semibold text-[#14110c] transition-colors hover:bg-[#bf9d68] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#CBA873] disabled:opacity-60"
+            className="w-full justify-center font-semibold"
           >
             {busy ? t('enabling') : t('cta')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
             type="button"
             onClick={onLater}
-            className="inline-flex h-10 w-full items-center justify-center rounded-xl text-sm text-[#a6b0ac] transition-colors hover:text-[#f1f5f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#CBA873]"
+            className="w-full justify-center text-[#a6b0ac] hover:text-[#f1f5f3]"
           >
             {t('later')}
-          </button>
+          </Button>
         </div>
         <p
           role="status"

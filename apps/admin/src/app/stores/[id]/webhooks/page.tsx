@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Modal, useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { WEBHOOK_EVENT_TYPES, withNumerals, type WebhookEventType } from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../../../lib/api';
@@ -245,7 +246,7 @@ export default function WebhooksPage() {
       subtitle={t('page.subtitle')}
       actions={
         !needsUpgrade ? (
-          <Button type="button" className="min-h-11" onClick={() => openForm(null)}>
+          <Button type="button" onClick={() => openForm(null)}>
             {t('actions.add')}
           </Button>
         ) : null

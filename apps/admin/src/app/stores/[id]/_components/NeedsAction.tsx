@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { useNeedsAction, type NeedCount } from '../_hooks/useNeedsAction';
 
@@ -72,6 +72,7 @@ export function NeedsAction({ storeId }: { storeId: string }) {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {open.map(tile => (
             <Link
+              data-ui="tile"
               key={tile.key}
               href={tile.href}
               className="flex min-h-20 flex-col justify-center rounded-xl border border-primary/30 bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md"

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { buttonVariants, cn } from '@ebda/ui';
+import { buttonVariants } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useT } from '@/i18n/useT';
 
@@ -30,7 +30,7 @@ export function ProductsToolbar({ storeId, listUrl }: ProductsToolbarProps) {
       />
       <Link
         href={`/stores/${storeId}/products/new?returnTo=${encodeURIComponent(listUrl)}`}
-        className={cn(buttonVariants(), 'min-h-11')}
+        className={buttonVariants()}
       >
         {t('addProduct')}
       </Link>

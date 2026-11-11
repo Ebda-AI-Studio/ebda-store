@@ -32,6 +32,7 @@ export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: Sid
           return (
             <li key={item.name}>
               <Link
+                data-ui="nav"
                 href={item.href}
                 onClick={onNavigate}
                 className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${

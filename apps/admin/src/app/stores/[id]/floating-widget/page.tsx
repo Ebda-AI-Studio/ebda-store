@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@ebda/ui';
@@ -343,13 +344,9 @@ export default function FloatingWidgetPage() {
               <h2 className="text-base font-semibold text-foreground">{t('buttonsTitle')}</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('buttonsHint')}</p>
             </div>
-            <button
-              type="button"
-              onClick={addButton}
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
-            >
+            <Button variant="outline" size="sm" type="button" onClick={addButton}>
               {t('addButton')}
-            </button>
+            </Button>
           </header>
           {(config.buttons ?? []).length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('noButtonsHint')}</p>
@@ -359,24 +356,28 @@ export default function FloatingWidgetPage() {
                 <li key={b.id} className="rounded-xl border border-border bg-background p-4">
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col gap-1 pt-1">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         type="button"
                         onClick={() => moveButton(b.id, -1)}
                         disabled={i === 0}
-                        className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+                        className="text-muted-foreground"
                         aria-label={t('moveUp')}
                       >
                         ▲
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         type="button"
                         onClick={() => moveButton(b.id, 1)}
                         disabled={i === arr.length - 1}
-                        className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+                        className="text-muted-foreground"
                         aria-label={t('moveDown')}
                       >
                         ▼
-                      </button>
+                      </Button>
                     </div>
                     <div className="flex-1 space-y-3">
                       <div className="grid gap-3 md:grid-cols-2">
@@ -693,14 +694,16 @@ export default function FloatingWidgetPage() {
                         />
                       </div>
                     </div>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
                       type="button"
                       onClick={() => removeButton(b.id)}
-                      className="rounded p-2 text-destructive-ink hover:bg-destructive/10"
+                      className="text-destructive-ink"
                       aria-label={t('removeButtonAria')}
                     >
                       ✕
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}

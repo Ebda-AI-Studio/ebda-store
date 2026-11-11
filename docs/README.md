@@ -105,6 +105,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [cf/jobs-map.md](cf/jobs-map.md) - Background jobs on Cloudflare (G5)
 - [cf/jobs-on-do.md](cf/jobs-on-do.md) - Jobs on the store Durable Object and the write freeze (INFRA-CF-1 PR E)
 - [cf/neon-zero-integration.md](cf/neon-zero-integration.md) - NEON-ZERO integration branch: every merge conflict between the twelve PRs and its resolution
+- [cf/neon-zero-final-classification.md](cf/neon-zero-final-classification.md) - every file that can still reach the removed Postgres, classified reachable-broken / routed-ok / unreachable (2026-11-10)
 - [cf/neon-zero-remaining.md](cf/neon-zero-remaining.md) - NEON-ZERO route sweep with Postgres dead: routes still failing, by owner PR
 - [cf/jobs-postgres-removed-sweep.md](cf/jobs-postgres-removed-sweep.md) - background jobs vs the removed Postgres: every job call path classified (ported / unreachable / fails) with fixes
 - [cf/neon-zero-routes-b.md](cf/neon-zero-routes-b.md) - NEON-ZERO routes group B (per-store admin): sweep before/after and what is left
@@ -323,6 +324,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-11-10-ssr-client-address.md](plans/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
 - [plans/2026-11-10-services-header-actions.md](plans/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
 - [plans/2026-11-10-storefront-cold-render.md](plans/2026-11-10-storefront-cold-render.md) - PERF-LATENCY: why a cold storefront render took 4-12 s (empty per-build data cache after every deploy), the build-independent fetch cache and the widened warm step (Ruling WEB-COLD-2)
+- [plans/2026-11-10-accounts-standalone-signin.md](plans/2026-11-10-accounts-standalone-signin.md) - ACCOUNTS-PAGE-1: accounts.ebda.app/login as a standalone Ebda AI Studio sign-in page over the same /login and /login/mfa, allowlisted return
 - [plans/2026-11-10-api-hangs.md](plans/2026-11-10-api-hangs.md) - API-HANG-1: every AuthState call bounded at 2.5 s, a public cache fill answers before its write-back
 
 ## privacy - Privacy

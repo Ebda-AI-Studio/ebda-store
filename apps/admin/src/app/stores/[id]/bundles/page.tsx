@@ -66,6 +66,7 @@ import {
   UNTRACKED_AVAILABILITY_CAP,
 } from './bundlePricing';
 
+import { Button } from '@/components/ui/Button';
 interface BundleLineDTO {
   key: string;
   unitPrice: number;
@@ -503,13 +504,9 @@ export default function BundlesPage() {
         <RowActions
           menuLabel={t('rowMenu', { name: bundle.name })}
           primary={
-            <button
-              type="button"
-              onClick={() => void openEdit(bundle)}
-              className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium hover:bg-muted"
-            >
+            <Button type="button" onClick={() => void openEdit(bundle)} variant="outline">
               {t('edit')}
-            </button>
+            </Button>
           }
           items={
             bundle.isActive
@@ -536,13 +533,9 @@ export default function BundlesPage() {
       mode="store_admin"
       storeId={storeId}
       actions={
-        <button
-          type="button"
-          onClick={openCreate}
-          className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
+        <Button type="button" onClick={openCreate} variant="default">
           {t('addNew')}
-        </button>
+        </Button>
       }
     >
       <div className="mx-auto max-w-5xl px-4 py-6">
@@ -561,13 +554,9 @@ export default function BundlesPage() {
           <div className="rounded-md border border-dashed py-12 text-center">
             <p className="text-sm font-medium">{t('emptyTitle')}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t('emptyBody')}</p>
-            <button
-              type="button"
-              onClick={openCreate}
-              className="mt-4 min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
+            <Button type="button" onClick={openCreate} variant="default" className="mt-4">
               {t('addFirst')}
-            </button>
+            </Button>
           </div>
         ) : (
           <DataTable<Bundle>
@@ -589,23 +578,25 @@ export default function BundlesPage() {
             title={editingId ? t('editTitle') : t('createTitle')}
             footer={
               <div className="flex gap-3">
-                <button
+                <Button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="min-h-11 flex-1 rounded-lg border border-border px-4 py-2 text-foreground hover:bg-muted"
+                  variant="outline"
+                  className="flex-1"
                 >
                   {t('cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   form="bundle-form"
                   disabled={
                     saving || !form.name.trim() || !form.slug.trim() || form.items.length === 0
                   }
-                  className="min-h-11 flex-1 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  variant="default"
+                  className="flex-1"
                 >
                   {saving ? t('saving') : t('save')}
-                </button>
+                </Button>
               </div>
             }
           >
@@ -819,13 +810,15 @@ export default function BundlesPage() {
                       suggested: minorToMajor(allocationSuggestion),
                     })}
                   </p>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => applySuggestedPrice(allocationSuggestion)}
-                    className="mt-1.5 rounded-md border border-destructive/40 px-2 py-1 text-xs font-medium hover:bg-destructive/10"
+                    variant="outline"
+                    size="sm"
+                    className="mt-1.5"
                   >
                     {t('useSuggested', { suggested: minorToMajor(allocationSuggestion) })}
-                  </button>
+                  </Button>
                 </div>
               )}
 

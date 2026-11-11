@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { SparkleIcon } from './SparkleIcon';
 import { useEffect, useRef, useState } from 'react';
 import { apiPost } from '../lib/api';
@@ -121,11 +122,13 @@ export function AICategorySuggestions({
       </p>
       <div className="flex flex-wrap gap-1.5">
         {suggestions.map(s => (
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             key={s.id}
             type="button"
             onClick={() => onSelect(s.id)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 px-3 py-1 text-xs font-medium text-primary-ink transition-colors hover:bg-primary/10"
+            className="gap-1.5"
             title={t('confidence', { level: s.confidence })}
           >
             <span>{s.name}</span>
@@ -134,7 +137,7 @@ export function AICategorySuggestions({
                 {t('confidenceHigh')}
               </span>
             )}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

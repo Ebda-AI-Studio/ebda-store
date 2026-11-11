@@ -108,6 +108,7 @@ export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: Produ
               key={product.id}
               type="button"
               onClick={() => handleSelect(product)}
+              data-ui="row"
               className="flex w-full items-center gap-3 px-3 py-2 hover:bg-muted text-start"
             >
               <div className="h-8 w-8 rounded-md bg-muted overflow-hidden flex-shrink-0">

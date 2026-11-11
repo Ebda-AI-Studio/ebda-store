@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState, type ReactNode } from 'react';
 import type { ZoneOverride, StoreTheme, ColorToken } from '@ebda/shared';
 import { ColorField } from './ColorField';
@@ -137,26 +138,30 @@ export function ZoneEditor({
         <div className="flex items-center justify-between gap-2">
           <h4 className="text-sm font-semibold text-foreground capitalize">{zoneLabel}</h4>
           {hasValues && onReset && (
-            <button
+            <Button
+              variant="link"
+              size="sm"
               type="button"
               onClick={onReset}
-              className="text-xs text-destructive-ink hover:underline shrink-0"
+              className="text-destructive-ink shrink-0"
             >
               {t('resetToDefault')}
-            </button>
+            </Button>
           )}
         </div>
       )}
       {/* When label is hidden but reset is available, show reset link inline */}
       {hideLabel && hasValues && onReset && (
         <div className="flex justify-end">
-          <button
+          <Button
+            variant="link"
+            size="sm"
             type="button"
             onClick={onReset}
-            className="text-xs text-destructive-ink hover:underline shrink-0"
+            className="text-destructive-ink shrink-0"
           >
             {t('resetToDefault')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -339,12 +344,14 @@ export function ZoneEditor({
               { value: 'center', key: 'center' },
               { value: 'end', key: 'end' },
             ] as const
-          ).map((opt, i) => {
+          ).map(opt => {
             const active = (values.textAlign ?? '') === opt.value;
             const label = t(`textAlign.${opt.key}.label`);
             const title = t(`textAlign.${opt.key}.title`);
             return (
-              <button
+              <Button
+                variant={active ? 'soft' : 'ghost'}
+                size="sm"
                 key={opt.value || 'auto'}
                 type="button"
                 title={title}
@@ -355,16 +362,9 @@ export function ZoneEditor({
                       opt.value === '' ? undefined : (opt.value as ZoneOverride['textAlign']),
                   })
                 }
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
-                  i > 0 ? 'border-s border-border' : ''
-                } ${
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
               >
                 {label}
-              </button>
+              </Button>
             );
           })}
         </div>

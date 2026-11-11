@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { apiPost } from '../../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+import { Button } from '@/components/ui/Button';
 /**
  * Per-product language balance / revert button pair.
  *
@@ -61,7 +62,7 @@ export function BalanceDescriptionButton({
   return (
     <div className="flex items-center gap-1.5">
       {/* Balance button */}
-      <button
+      <Button
         type="button"
         disabled={busyBalance || busyRevert}
         onClick={async () => {
@@ -83,14 +84,12 @@ export function BalanceDescriptionButton({
           setBalanced(true);
           onBalanced?.(data.name, data.nameAr, data.description, data.descriptionAr);
         }}
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium disabled:opacity-50 transition-colors ${
-          failedBalance
-            ? 'bg-destructive/10 text-destructive-ink'
-            : balanced
-              ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-        }`}
         title={failedBalance ? t('balanceFailed') : t('balanceTitle')}
+        variant="outline"
+        size="sm"
+        className={
+          failedBalance ? 'text-destructive-ink' : balanced ? 'text-success-ink' : undefined
+        }
       >
         {busyBalance ? <SpinIcon /> : <span aria-hidden>⚖️</span>}
         <span>
@@ -102,11 +101,11 @@ export function BalanceDescriptionButton({
                 ? t('balanced')
                 : t('balanceLanguages')}
         </span>
-      </button>
+      </Button>
 
       {/* Revert button — only shown after a balance has been applied */}
       {balanced && (
-        <button
+        <Button
           type="button"
           disabled={busyBalance || busyRevert}
           onClick={async () => {
@@ -127,16 +126,14 @@ export function BalanceDescriptionButton({
             setBalanced(false);
             onBalanced?.(data.name, data.nameAr, data.description, data.descriptionAr);
           }}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium disabled:opacity-50 transition-colors ${
-            failedRevert
-              ? 'bg-destructive/10 text-destructive-ink'
-              : 'bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive-ink'
-          }`}
           title={failedRevert ? t('revertFailed') : t('revertTitle')}
+          variant="outline"
+          size="sm"
+          className={failedRevert ? 'text-destructive-ink' : undefined}
         >
           {busyRevert ? <SpinIcon /> : null}
           <span>{busyRevert ? '…' : failedRevert ? t('retryWarn') : t('revert')}</span>
-        </button>
+        </Button>
       )}
     </div>
   );

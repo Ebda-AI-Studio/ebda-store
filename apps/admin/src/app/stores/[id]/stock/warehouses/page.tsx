@@ -7,7 +7,8 @@ import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 import { textFieldValue, numericFieldValue } from '@/lib/form-text';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
 
@@ -192,11 +193,7 @@ export default function WarehousesPage() {
     <AdminLayout
       title={t('title')}
       subtitle={t('description')}
-      actions={
-        <Button onClick={openNew} className="min-h-[44px]">
-          {t('newButton')}
-        </Button>
-      }
+      actions={<Button onClick={openNew}>{t('newButton')}</Button>}
     >
       {/* Error banner */}
       {err && (
@@ -247,12 +244,14 @@ export default function WarehousesPage() {
                     {t('default')}
                   </span>
                 ) : (
-                  <button
+                  <Button
                     onClick={() => handleSetDefault(w)}
-                    className="text-xs text-muted-foreground underline hover:text-foreground"
+                    variant="link"
+                    size="sm"
+                    className="text-muted-foreground"
                   >
                     {t('setDefault')}
-                  </button>
+                  </Button>
                 ),
             },
             {
@@ -283,12 +282,13 @@ export default function WarehousesPage() {
               mobileActions: true,
               cell: w => (
                 <div className="flex items-center justify-end gap-1">
-                  <button
+                  <Button
                     onClick={() => router.push(`/stores/${storeId}/stock/warehouses/${w.id}`)}
-                    className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary-ink hover:bg-primary/10"
+                    variant="ghost"
+                    size="sm"
                   >
                     {t('viewStock')}
-                  </button>
+                  </Button>
                   <RowActions
                     menuLabel={t('rowMenu', { name: w.name })}
                     items={[
@@ -313,7 +313,7 @@ export default function WarehousesPage() {
           emptyState={
             <div className="rounded-lg border border-dashed border-border py-16 text-center">
               <p className="text-muted-foreground">{t('empty')}</p>
-              <Button onClick={openNew} className="mt-4 min-h-[44px]">
+              <Button onClick={openNew} className="mt-4">
                 {t('newButton')}
               </Button>
             </div>
@@ -454,15 +454,10 @@ export default function WarehousesPage() {
 
             {/* Actions */}
             <div className="mt-6 flex justify-end gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => setModalOpen(false)}
-                disabled={saving}
-                className="min-h-[44px]"
-              >
+              <Button variant="ghost" onClick={() => setModalOpen(false)} disabled={saving}>
                 {tc('cancel')}
               </Button>
-              <Button onClick={handleSave} disabled={saving} className="min-h-[44px]">
+              <Button onClick={handleSave} disabled={saving}>
                 {saving ? tc('saving') : tc('save')}
               </Button>
             </div>

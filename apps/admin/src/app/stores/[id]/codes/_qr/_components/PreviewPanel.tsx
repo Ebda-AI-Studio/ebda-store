@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { sceneToSvg, type Scene, type SelfCheck } from '@ebda/shared/qr';
@@ -87,8 +88,7 @@ export function PreviewPanel({ scene, payload, check, logo, nameForFile }: Props
     }
   }
 
-  const btn =
-    'h-10 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50';
+  const btn = buttonVariants({ variant: 'outline' });
 
   return (
     <div className="space-y-4">

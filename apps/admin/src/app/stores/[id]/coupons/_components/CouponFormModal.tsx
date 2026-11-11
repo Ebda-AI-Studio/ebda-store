@@ -5,6 +5,7 @@ import { useT } from '@/i18n/useT';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { ScopePicker } from '../../_components/ScopePicker';
 import type { CouponFormData, CouponType } from './types';
+import { Button } from '@/components/ui/Button';
 
 interface CustomerGroupOption {
   id: string;
@@ -66,20 +67,12 @@ export function CouponFormModal({
       title={isEditing ? tModal('editTitle') : tModal('createTitle')}
       footer={
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 px-4 py-2 min-h-11 border border-border text-foreground rounded-lg hover:bg-muted"
-          >
+          <Button variant="outline" size="md" className="flex-1" type="button" onClick={onClose}>
             {tActions('cancel')}
-          </button>
-          <button
-            type="submit"
-            form={FORM_ID}
-            className="flex-1 px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
+          </Button>
+          <Button variant="default" size="md" className="flex-1" type="submit" form={FORM_ID}>
             {isEditing ? tActions('update') : tActions('create')}
-          </button>
+          </Button>
         </div>
       }
     >

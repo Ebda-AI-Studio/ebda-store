@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useFeatures } from '../hooks/useFeatures';
 import { useAuth } from '../lib/auth';
 import { isPlanGateError, PLAN_GATE_FALLBACK } from '../lib/route-feature-gates';

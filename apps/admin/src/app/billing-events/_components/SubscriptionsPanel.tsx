@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button } from '@ebda/ui';
+import { Badge } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatMoney } from '@ebda/shared';
 import { DataTable, type DataTableColumn } from '../../../components/mobile/DataTable';
 import { apiGet } from '../../../lib/api';
@@ -184,17 +185,16 @@ export function SubscriptionsPanel({
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">{t('viewFilter')}</span>
         {VIEWS.map(v => (
-          <button
+          <Button
+            variant={view === v ? 'soft' : 'ghost'}
+            size="sm"
             key={v || 'all'}
             type="button"
             aria-pressed={view === v}
             onClick={() => setView(v)}
-            className={`rounded-full px-3 py-1 text-sm ${
-              view === v ? 'bg-foreground text-background' : 'bg-muted text-foreground'
-            }`}
           >
             {t(`views.${v || 'all'}`)}
-          </button>
+          </Button>
         ))}
       </div>
       {loading ? (

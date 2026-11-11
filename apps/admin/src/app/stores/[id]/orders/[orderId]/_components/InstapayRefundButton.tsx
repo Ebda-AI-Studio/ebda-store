@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Button, Input, Modal, useToast } from '@ebda/ui';
+import { Input, Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import {
   INSTAPAY_RECEIPT_MIME_TYPES,
   minorToDecimalString,
@@ -100,15 +101,16 @@ export function InstapayRefundButton({
 
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled}
         data-testid="instapay-refund-button"
-        className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-4 py-2.5 text-sm font-semibold text-destructive-ink hover:bg-destructive/10 disabled:opacity-60 transition-colors cursor-pointer"
+        variant="outline"
+        className="flex-1 min-w-[8rem] justify-center gap-2 font-semibold text-destructive-ink"
       >
         {t('button')}
-      </button>
+      </Button>
       <Modal
         isOpen={open}
         onClose={() => !saving && setOpen(false)}

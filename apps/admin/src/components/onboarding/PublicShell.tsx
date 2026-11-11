@@ -7,6 +7,7 @@ import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { DocumentTitle } from '../DocumentTitle';
+import { usePinnedLightTheme } from '@/lib/use-pinned-light-theme';
 
 /** Shared signed-out and setup surface; logical spacing mirrors under RTL. */
 export function PublicShell({
@@ -23,6 +24,7 @@ export function PublicShell({
   const tb = useT('components.brand');
   const t = useT('onboarding.shell');
   const isAr = useLocale() === 'ar';
+  usePinnedLightTheme();
   return (
     <main id="admin-main-content" className="min-h-dvh bg-background px-4 py-5 sm:px-6">
       <DocumentTitle title={title} />

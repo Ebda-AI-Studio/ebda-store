@@ -21,7 +21,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Select, useToast } from '@ebda/ui';
+import { Badge, Select, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
@@ -532,13 +533,9 @@ export default function StoreBillingPage() {
       {error && (
         <div className="rounded-xl border bg-card p-6 text-center">
           <p className="text-sm text-destructive-ink">{t('loadError')}</p>
-          <button
-            type="button"
-            onClick={load}
-            className="mt-3 text-sm text-primary hover:underline"
-          >
+          <Button variant="link" size="sm" className="mt-3" type="button" onClick={load}>
             {tCommon('retry')}
-          </button>
+          </Button>
         </div>
       )}
       {!error && !data && <p className="text-sm text-muted-foreground">{t('loading')}</p>}
@@ -1029,15 +1026,16 @@ export default function StoreBillingPage() {
             </p>
             <div className="mb-3 inline-flex rounded-full bg-muted p-1 text-sm" role="group">
               {(['monthly', 'yearly'] as const).map(k => (
-                <button
+                <Button
+                  variant={interval === k ? 'soft' : 'ghost'}
+                  size="sm"
                   key={k}
                   type="button"
                   aria-pressed={interval === k}
                   onClick={() => setInterval(k)}
-                  className={`rounded-full px-3 py-1 ${interval === k ? 'bg-foreground text-background' : ''}`}
                 >
                   {t(k === 'monthly' ? 'intervalMonthly' : 'intervalYearly')}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
@@ -1252,13 +1250,14 @@ export default function StoreBillingPage() {
                     mobileActions: true,
                     cell: c =>
                       c.status === 'succeeded' && c.type !== 'refund' ? (
-                        <button
+                        <Button
+                          variant="link"
+                          size="sm"
                           type="button"
                           onClick={() => setReceiptFor(receiptFor === c.id ? null : c.id)}
-                          className="inline-flex min-h-11 items-center text-xs font-medium text-primary-ink underline"
                         >
                           {t('viewReceipt')}
-                        </button>
+                        </Button>
                       ) : (
                         <span className="text-muted-foreground">{c.failureReason ?? '—'}</span>
                       ),

@@ -24,6 +24,7 @@ import {
 } from './_components/types';
 
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { Button, buttonVariants } from '@/components/ui/Button';
 
 export default function LoyaltySettingsPage() {
   const { gate } = useRequireFeature('loyalty');
@@ -209,18 +210,15 @@ export default function LoyaltySettingsPage() {
       actions={
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{tPage('programStatus')}</span>
-          <button
+          <Button
+            variant={loyaltyEnabled ? 'soft' : 'secondary'}
+            size="md"
             type="button"
             onClick={handleToggleEnabled}
             disabled={saving}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              loyaltyEnabled
-                ? 'bg-success/10 text-success-ink dark:bg-success/30 dark:text-success-ink hover:bg-success/20'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
           >
             {loyaltyEnabled ? tPage('enabled') : tPage('disabled')}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -233,33 +231,27 @@ export default function LoyaltySettingsPage() {
           {loyaltyEnabled && stats && <LoyaltyStatsCards stats={stats} />}
 
           <div className="flex gap-2 mb-6">
-            <button
+            <Button
+              variant={activeTab === 'settings' ? 'soft' : 'ghost'}
+              size="md"
               type="button"
               onClick={() => setActiveTab('settings')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'settings'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-muted/80'
-              }`}
             >
               {tPage('tabs.settings')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={activeTab === 'members' ? 'soft' : 'ghost'}
+              size="md"
               type="button"
               onClick={() => setActiveTab('members')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'members'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-muted/80'
-              }`}
               disabled={!loyaltyEnabled}
             >
               {tPage('tabs.members')}
-            </button>
+            </Button>
             {/* Transactions sub-page link */}
             <Link
               href={`/stores/${storeId}/loyalty/transactions`}
-              className="ms-auto px-4 py-2 rounded-lg font-medium text-sm bg-muted text-foreground hover:bg-muted/80 transition-colors inline-flex items-center gap-1.5"
+              className={buttonVariants({ variant: 'secondary', className: 'ms-auto gap-1.5' })}
             >
               <svg
                 className="h-4 w-4"

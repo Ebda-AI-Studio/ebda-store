@@ -7,6 +7,7 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { formatPrice } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 /** Converts piastres (integer) to an EGP display string (2 decimals). */
 const formatMajor = formatPrice;
@@ -180,22 +181,24 @@ export function AbandonmentsTable({
             {meta.page} / {meta.totalPages} ({meta.total})
           </p>
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
               onClick={() => onPageChange(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             >
               &larr;
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
               onClick={() => onPageChange(Math.min(meta.totalPages, page + 1))}
               disabled={page === meta.totalPages}
-              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             >
               &rarr;
-            </button>
+            </Button>
           </div>
         </div>
       )}

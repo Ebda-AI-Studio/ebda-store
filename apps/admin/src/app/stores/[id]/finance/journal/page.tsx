@@ -8,7 +8,7 @@ import { DateRangePicker } from '../../../../../components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGetPage, type PageMeta } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { PageControls } from '../../../../../components/PageControls';
 import { minorToMajor } from '@/lib/format';
 import { useRouter } from 'next/navigation';
@@ -197,10 +197,7 @@ export default function JournalListPage() {
       actions={
         // Only super_admin can post manual journal entries.
         isSuperAdmin ? (
-          <Button
-            className="min-h-11"
-            onClick={() => router.push(`/stores/${storeId}/finance/journal/new`)}
-          >
+          <Button onClick={() => router.push(`/stores/${storeId}/finance/journal/new`)}>
             {tNew('addNew')}
           </Button>
         ) : undefined

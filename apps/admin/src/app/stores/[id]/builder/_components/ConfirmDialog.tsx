@@ -5,6 +5,7 @@
  * translated by us, and blocks the iframe). A native `<dialog>` so focus is
  * trapped, Escape cancels, and focus returns to what opened it.
  */
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { useRestoreFocus } from '../_lib/use-restore-focus';
 
@@ -46,23 +47,23 @@ export function ConfirmDialog({
           {body}
         </p>
         <div className="flex justify-end gap-2 pt-2">
-          <button
+          <Button
+            variant="ghost"
             type="button"
             onClick={onCancel}
             autoFocus
             data-testid="confirm-cancel"
-            className="rounded-lg px-3 py-1.5 text-sm hover:bg-muted"
           >
             {t('cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={tone === 'danger' ? 'destructive' : 'default'}
             type="button"
             onClick={onConfirm}
             data-testid="confirm-ok"
-            className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${tone === 'danger' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

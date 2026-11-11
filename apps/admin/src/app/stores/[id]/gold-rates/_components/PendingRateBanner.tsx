@@ -6,6 +6,7 @@ import { apiPost } from '../../../../../lib/api';
 import { formatPrice } from '../../../../../lib/format';
 import type { PendingRate } from './types';
 
+import { Button } from '@/components/ui/Button';
 /** A feed rate that jumped past the store's gate waits here until the merchant confirms or rejects it. */
 export function PendingRateBanner({
   storeId,
@@ -53,22 +54,22 @@ export function PendingRateBanner({
             </span>
             {canEdit && (
               <span className="flex gap-2">
-                <button
+                <Button
                   type="button"
                   disabled={busy === p.id}
                   onClick={() => void decide(p.id, 'reject')}
-                  className="min-h-11 rounded-md border px-4"
+                  variant="outline"
                 >
                   {t('reject')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   disabled={busy === p.id}
                   onClick={() => void decide(p.id, 'confirm')}
-                  className="min-h-11 rounded-md bg-primary px-4 font-medium text-primary-foreground"
+                  variant="default"
                 >
                   {t('confirm')}
-                </button>
+                </Button>
               </span>
             )}
           </li>

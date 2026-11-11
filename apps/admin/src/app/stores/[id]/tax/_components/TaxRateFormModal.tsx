@@ -4,6 +4,7 @@ import { useT } from '@/i18n/useT';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { COMMON_TAX_TYPES, type RateFormData, type TaxRate, type TaxTemplate } from './types';
 
+import { Button } from '@/components/ui/Button';
 interface TaxRateFormModalProps {
   editingRate: TaxRate | null;
   formData: RateFormData;
@@ -37,24 +38,21 @@ export function TaxRateFormModal({
       title={editingRate ? t('editTitle') : t('newTitle')}
       footer={
         <div className="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 min-h-11 text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-          >
+          <Button type="button" onClick={onClose} variant="outline">
             {t('cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             form={FORM_ID}
             disabled={saving}
-            className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            variant="default"
+            className="gap-2"
           >
             {saving && (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
             )}
             {editingRate ? t('update') : t('create')}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -66,14 +64,15 @@ export function TaxRateFormModal({
             </label>
             <div className="flex flex-wrap gap-2">
               {COMMON_TAX_TYPES.map(template => (
-                <button
+                <Button
                   key={template.name}
                   type="button"
                   onClick={() => onApplyTemplate(template)}
-                  className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-sm hover:bg-muted/80 transition-colors"
+                  variant="secondary"
+                  size="sm"
                 >
                   {template.name} ({template.rate}%)
-                </button>
+                </Button>
               ))}
             </div>
           </div>

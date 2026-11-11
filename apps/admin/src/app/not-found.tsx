@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BRAND_MARKETING_URL } from '@ebda/shared';
@@ -45,10 +46,7 @@ export default function NotFound() {
         <ul className="flex flex-wrap gap-2">
           {links.map(l => (
             <li key={l.href}>
-              <Link
-                href={l.href}
-                className="inline-flex min-h-11 items-center rounded-full border border-input px-4 text-sm text-foreground hover:border-primary hover:text-primary"
-              >
+              <Link href={l.href} className={buttonVariants({ variant: 'outline' })}>
                 {l.label}
               </Link>
             </li>

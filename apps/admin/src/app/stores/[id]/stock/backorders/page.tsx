@@ -9,6 +9,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BackorderLine {
@@ -88,13 +89,9 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
             {t('cancelModal.owedNotice', { amount: formatPrice(owed) })}
           </p>
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm"
-            >
+            <Button type="button" onClick={onClose} variant="default" size="sm">
               {t('cancelModal.ok')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -121,20 +118,24 @@ function CancelModal({ backorderId, storeId, onClose, onSuccess, t }: CancelModa
           </div>
           {error && <p className="text-red-600 text-xs">{error}</p>}
           <div className="flex justify-end gap-2">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded border border-border text-sm text-muted-foreground hover:bg-muted/30"
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground"
             >
               {t('cancelModal.discard')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting || !reason.trim()}
-              className="px-3 py-1.5 rounded bg-destructive text-destructive-foreground text-sm disabled:opacity-50"
+              variant="destructive"
+              size="sm"
+              className="text-destructive-foreground"
             >
               {submitting ? '…' : t('cancelModal.confirm')}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -248,13 +249,15 @@ export default function BackordersPage() {
       mobileActions: true,
       className: 'w-20',
       cell: line => (
-        <button
+        <Button
           type="button"
           onClick={() => setCancelTarget(line.id)}
-          className="px-2 py-1 rounded border border-destructive/40 text-destructive-ink text-xs hover:bg-destructive/10 max-sm:min-h-11 max-sm:px-4"
+          variant="outline"
+          size="sm"
+          className="text-destructive-ink"
         >
           {t('cancel')}
-        </button>
+        </Button>
       ),
     },
   ];

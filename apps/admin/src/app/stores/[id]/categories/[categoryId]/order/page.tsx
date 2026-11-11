@@ -21,7 +21,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../../../lib/api';
@@ -97,7 +98,12 @@ function SortableProductRow({ product, idx, isRtl, isSaving, t }: SortableProduc
       <span
         {...attributes}
         {...listeners}
-        className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        className={buttonVariants({
+          variant: 'ghost',
+          size: 'icon-sm',
+          className:
+            'cursor-grab touch-none text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing',
+        })}
         aria-label={t('dragHandle')}
         title={t('dragHandle')}
       >

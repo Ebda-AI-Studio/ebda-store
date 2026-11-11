@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useT } from '@/i18n/useT';
 import { RowActions } from '@/components/RowActions';
 
+import { Button, buttonVariants } from '@/components/ui/Button';
 interface Category {
   id: string;
   name: string;
@@ -121,7 +122,12 @@ function SortableCategoryRow({
             <span
               {...attributes}
               {...listeners}
-              className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              className={buttonVariants({
+                variant: 'ghost',
+                size: 'icon-sm',
+                className:
+                  'cursor-grab touch-none text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing',
+              })}
               aria-label={t('dragHandle')}
               title={t('dragHandle')}
             >
@@ -182,13 +188,9 @@ function SortableCategoryRow({
           <RowActions
             menuLabel={t('rowMenu', { name: displayName })}
             primary={
-              <button
-                type="button"
-                onClick={() => onEdit(cat)}
-                className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-              >
+              <Button type="button" onClick={() => onEdit(cat)} variant="outline">
                 {t('edit')}
-              </button>
+              </Button>
             }
             items={[
               ...((cat._count?.products ?? 0) > 1
@@ -285,13 +287,9 @@ export function CategoryTable({
         </div>
         <p className="font-semibold text-foreground">{t('empty')}</p>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
-        <button
-          type="button"
-          onClick={onAddFirst}
-          className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-        >
+        <Button type="button" onClick={onAddFirst} variant="default" className="mt-4 font-semibold">
           {t('addFirst')}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -330,13 +328,9 @@ export function CategoryTable({
             <RowActions
               menuLabel={t('rowMenu', { name })}
               primary={
-                <button
-                  type="button"
-                  onClick={() => onEdit(cat)}
-                  className="inline-flex min-h-11 items-center rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-muted"
-                >
+                <Button type="button" onClick={() => onEdit(cat)} variant="outline">
                   {t('edit')}
-                </button>
+                </Button>
               }
               items={[
                 ...((cat._count?.products ?? 0) > 1

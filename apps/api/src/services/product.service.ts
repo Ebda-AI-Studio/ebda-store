@@ -126,6 +126,8 @@ export { enrichStockFlags };
 
 interface CreateProductData {
   name: string;
+  /** `name` is the untranslated copy of `nameAr` (Ruling NAME-PAIR-1): never stamped as typed, so the autofill fills it. */
+  namePlaceholder?: boolean;
   /**
    * Free-text columns the merchant can empty from the edit form. `null`
    * clears, `undefined` leaves the stored value alone — the same convention
@@ -654,7 +656,11 @@ export class ProductService {
       | Array<(typeof withTotalInventory)[number] & { soldQuantity: number }> = withTotalInventory;
     if (withSalesQuantity && withTotalInventory.length > 0) {
       const productIds = withTotalInventory.map(p => p.id);
-      const grouped = await prisma.orderItem.groupBy({
+      // From the store's own backend: the bare `prisma` groupBy was POSTGRES_REMOVED on the Inventory page of every DO
+      // store (prod 2026-11-10, Ruling NZ-FINAL-1); prisma-lite answers the same groupBy + `order` relation filter.
+      const grouped = await (
+        await storeDb(storeId)
+      ).orderItem.groupBy({
         by: ['productId'],
         where: {
           productId: { in: productIds },
@@ -842,6 +848,7 @@ export class ProductService {
       {},
       data as unknown as Record<string, unknown>
     );
+    if (data.namePlaceholder) delete aiFieldSources.name;
 
     // BARCODE-1: a typed barcode must be valid and unused anywhere in the store.
     const typedBarcode = data.barcode?.trim() ? parseBarcodeOrThrow(data.barcode) : undefined;
@@ -1059,6 +1066,7 @@ export class ProductService {
       product as Record<string, unknown>,
       data as Record<string, unknown>
     );
+    if (data.namePlaceholder) delete nextSources.name;
     // Write only what THIS save changed in the provenance map (review N1): the map read above
     // can be stale — an AI guarded write may have committed since — and writing it back whole
     // would drop that fresh 'ai' stamp. The delta is merged in SQL below, in the same

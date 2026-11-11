@@ -11,6 +11,7 @@ import type { Period, ResolvedDateRange } from '../../analytics/_components/type
 import { resolveDateRange } from '../../analytics/_components/types';
 import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@ebda/shared';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CashAccountRow {
@@ -473,13 +474,14 @@ export default function FinanceDashboardPage() {
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-semibold">{t('recentAnomalies')}</h2>
-                <button
+                <Button
                   type="button"
                   onClick={() => router.push(`/stores/${storeId}/finance/anomalies`)}
-                  className="text-xs text-primary hover:underline"
+                  variant="link"
+                  size="sm"
                 >
                   {t('viewAll')}
-                </button>
+                </Button>
               </div>
               <div className="rounded-xl border border-border overflow-hidden">
                 {recentAnomalies.length === 0 ? (
@@ -530,15 +532,16 @@ export default function FinanceDashboardPage() {
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-semibold">{t('pendingOcrDrafts')}</h2>
-                <button
+                <Button
                   type="button"
                   onClick={() =>
                     router.push(`/stores/${storeId}/finance/expenses?status=draft&hasOcr=true`)
                   }
-                  className="text-xs text-primary hover:underline"
+                  variant="link"
+                  size="sm"
                 >
                   {t('viewAll')}
-                </button>
+                </Button>
               </div>
               <div className="rounded-xl border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">

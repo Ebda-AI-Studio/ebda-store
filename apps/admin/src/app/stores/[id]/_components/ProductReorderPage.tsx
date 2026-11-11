@@ -20,7 +20,8 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
@@ -278,13 +279,14 @@ export function ProductReorderPage({
 
                 {/* Move controls */}
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
                     type="button"
                     onClick={() => moveProduct(product.id, 'up')}
                     disabled={idx === 0 || isSaving}
                     aria-label={t.moveUp}
                     title={t.moveUp}
-                    className="grid h-7 w-7 place-items-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors disabled:opacity-30"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -294,14 +296,15 @@ export function ProductReorderPage({
                         d="M5 15l7-7 7 7"
                       />
                     </svg>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
                     type="button"
                     onClick={() => moveProduct(product.id, 'down')}
                     disabled={idx === products.length - 1 || isSaving}
                     aria-label={t.moveDown}
                     title={t.moveDown}
-                    className="grid h-7 w-7 place-items-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors disabled:opacity-30"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -311,7 +314,7 @@ export function ProductReorderPage({
                         d="M19 9l-7 7-7-7"
                       />
                     </svg>
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}

@@ -6,6 +6,7 @@
  * merchant's own content, with a plain list of what changes. Nothing is written until Apply, and Apply is
  * refused by the server when the page moved since the preview.
  */
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { getLook, getSectionDefinition, type LookChangeReport, type LookId } from '@ebda/shared';
@@ -93,24 +94,26 @@ export function LookSwitchPane({
               {preview.willPublish ? t('publishNote') : t('draftNote')}
             </p>
             <div className="flex gap-2 pt-1">
-              <button
+              <Button
+                size="sm"
                 type="button"
                 onClick={onApply}
                 disabled={busy !== null}
-                className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className="font-semibold"
                 data-testid="look-apply"
               >
                 {busy === 'apply' ? t('applying') : t('apply')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={onCancelPreview}
                 disabled={busy !== null}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
                 data-testid="look-keep-editing"
               >
                 {t('keepEditing')}
-              </button>
+              </Button>
             </div>
           </section>
         ) : (
@@ -133,15 +136,16 @@ export function LookSwitchPane({
                 </label>
               ))}
             </fieldset>
-            <button
+            <Button
+              size="sm"
               type="button"
               onClick={() => picked && onPreview(picked, design)}
               disabled={!picked || picked === currentLook || busy !== null}
-              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="font-semibold"
               data-testid="look-preview"
             >
               {busy === 'preview' ? t('previewing') : t('preview')}
-            </button>
+            </Button>
           </>
         )}
       </div>

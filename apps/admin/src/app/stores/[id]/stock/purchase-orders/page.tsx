@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { PageState } from '@/components/PageState';
 import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
@@ -88,10 +88,7 @@ export default function PurchaseOrdersPage() {
       title={t('title')}
       subtitle={t('description')}
       actions={
-        <Button
-          className="min-h-11"
-          onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders/new`)}
-        >
+        <Button onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders/new`)}>
           {t('newButton')}
         </Button>
       }

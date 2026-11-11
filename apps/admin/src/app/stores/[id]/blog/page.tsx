@@ -10,6 +10,7 @@ import { RowActions } from '../../../../components/RowActions';
 import { useConfirm } from '../../../../hooks/useConfirm';
 import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
+import { Button, buttonVariants } from '@/components/ui/Button';
 
 interface BlogPost {
   id: string;
@@ -131,10 +132,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <Link
-          href={`/stores/${storeId}/blog/new`}
-          className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
+        <Link href={`/stores/${storeId}/blog/new`} className={buttonVariants()}>
           {t('newPost')}
         </Link>
       }
@@ -150,14 +148,15 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
               <p className="font-semibold text-warning-ink">{t('disabledTitle')}</p>
               <p className="mt-1 text-muted-foreground">{t('disabledBody')}</p>
             </div>
-            <button
+            <Button
+              variant="default"
+              size="md"
               type="button"
               onClick={enableBlog}
               disabled={togglingBlog}
-              className="min-h-11 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               {t('enableBlog')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -222,7 +221,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
               <p className="mt-1 text-sm text-muted-foreground">{t('emptyDescription')}</p>
               <Link
                 href={`/stores/${storeId}/blog/new`}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                className={buttonVariants({ className: 'mt-4 gap-2' })}
               >
                 {t('emptyCta')}
               </Link>
@@ -303,7 +302,11 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                     <div className="flex items-center gap-2 sm:shrink-0">
                       <Link
                         href={`/stores/${storeId}/blog/${post.id}`}
-                        className="inline-flex flex-1 items-center justify-center min-h-11 rounded-lg border border-input px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted sm:flex-none"
+                        className={buttonVariants({
+                          variant: 'outline',
+                          size: 'sm',
+                          className: 'flex-1 justify-center',
+                        })}
                       >
                         {t('postEdit')}
                       </Link>

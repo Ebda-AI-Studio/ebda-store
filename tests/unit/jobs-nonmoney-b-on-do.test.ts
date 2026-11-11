@@ -81,6 +81,16 @@ vi.mock('@api/lib/repo-factory', () => ({
   storeWriter: async () => h.writer,
   runInJobRepoScope: <T>(fn: () => T) => fn(),
 }));
+// The comms store-active guard reads the D1 directory (tests/unit/comms-jobs-skip-inactive-store.test.ts); here the
+// store is an active DO store.
+vi.mock('@api/lib/definer', async orig => ({
+  ...(await orig<typeof import('@api/lib/definer')>()),
+  lookupStore: async ({ id }: { id: string }) => ({ id, status: 'active' }),
+}));
+vi.mock('@api/lib/store-backend', async orig => ({
+  ...(await orig<typeof import('@api/lib/store-backend')>()),
+  backendFor: async () => 'do',
+}));
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: {
     send: vi.fn(async () => undefined),

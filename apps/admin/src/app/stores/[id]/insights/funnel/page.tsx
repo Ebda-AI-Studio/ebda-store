@@ -13,6 +13,7 @@ import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 import { withNumerals } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,18 +188,15 @@ export default function InsightsFunnelPage() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">{t('windowLabel')}:</span>
           {(['7', '30', '90'] as Window[]).map(w => (
-            <button
+            <Button
+              variant={window === w ? 'soft' : 'ghost'}
+              size="sm"
               key={w}
               type="button"
               onClick={() => setWindow(w)}
-              className={`px-3 py-1 rounded-lg text-sm border transition-colors ${
-                window === w
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'border-border text-muted-foreground hover:bg-muted'
-              }`}
             >
               {t(`window${w}d` as 'window7d' | 'window30d' | 'window90d')}
-            </button>
+            </Button>
           ))}
         </div>
 

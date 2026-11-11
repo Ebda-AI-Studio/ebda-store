@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Modal, useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { apiDelete, apiGet, apiPost } from '../../../../lib/api';

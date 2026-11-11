@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useT } from '@/i18n/useT';
 
@@ -91,22 +92,12 @@ export function LookSwitchDialog({ lookName, saving, onCancel, onConfirm }: Look
           ))}
         </fieldset>
         <div className="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={saving}
-            className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-muted disabled:opacity-50"
-          >
+          <Button variant="outline" type="button" onClick={onCancel} disabled={saving}>
             {t('cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirm(design)}
-            disabled={saving}
-            className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
+          </Button>
+          <Button type="button" onClick={() => onConfirm(design)} disabled={saving}>
             {saving ? t('saving') : t('confirm')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
