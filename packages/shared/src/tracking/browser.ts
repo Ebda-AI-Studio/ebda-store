@@ -135,7 +135,16 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
    * on a URL carrying a typed term, an email, a phone or a one-time token (`/verify-email?token=`,
    * Ruling PIXEL-CONSENT-1). The server-side Conversions API event for the same step still goes.
    */
-  const urlBlockedForPixel = () => urlCarriesSensitiveQuery(win.location.search);
+  const urlBlockedForPixel = () => {
+    if (urlCarriesSensitiveQuery(win.location.search)) return true;
+    // fbevents also reads the referrer (`rl`): a sensitive query there blocks it the same way.
+    try {
+      const ref = doc.referrer;
+      return !!ref && urlCarriesSensitiveQuery(new URL(ref).search);
+    } catch {
+      return false;
+    }
+  };
 
   function loadMeta(): void {
     if (metaLoaded || !config.metaPixelId || urlBlockedForPixel()) return;
@@ -156,6 +165,10 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
       s.src = META_SRC;
       doc.head.appendChild(s);
     }
+    // Our tracker is the ONLY PageView sender: fbevents would otherwise auto-fire on history.pushState,
+    // bypassing the URL gate above and double counting every route change. Set before init.
+    w.fbq.disablePushState = true;
+    w.fbq.allowDuplicatePageViews = false;
     // No automatic button-click / microdata events (they would scrape page content), and no
     // advanced matching: init takes the id only, never an email or phone.
     w.fbq('set', 'autoConfig', false, config.metaPixelId);

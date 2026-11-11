@@ -378,3 +378,51 @@ describe('marketing Meta Pixel: consent, withdrawal, one init, Lead (no PII)', (
     expect(scripts().filter(s => s.includes('connect.facebook.net'))).toHaveLength(1);
   });
 });
+
+describe('Meta pixel is the tracker only: no auto PageView, no sensitive URL or referrer', () => {
+  it('sets disablePushState / allowDuplicatePageViews BEFORE init', () => {
+    setConsent(false, true);
+    const order: string[] = [];
+    const w = window as unknown as { fbq?: any };
+    const t = createTracker(CFG, window);
+    // preinstall a recording fbq so we see flag-vs-init order
+    const fn: any = (...a: unknown[]) => order.push(`call:${a[0]}`);
+    let dps: unknown;
+    Object.defineProperty(fn, 'disablePushState', {
+      set(v) {
+        dps = v;
+        order.push('disablePushState');
+      },
+      get: () => dps,
+    });
+    w.fbq = fn;
+    t.start();
+    expect(order.indexOf('disablePushState')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('disablePushState')).toBeLessThan(order.indexOf('call:init'));
+    expect(w.fbq.disablePushState).toBe(true);
+    expect(w.fbq.allowDuplicatePageViews).toBe(false);
+  });
+
+  it('no event (PageView or Lead) when the URL or the referrer carries email/phone/q', () => {
+    setConsent(false, true);
+    const t = createTracker(CFG, window);
+    t.start();
+    const q = () =>
+      (window as unknown as { fbq: { queue: unknown[][] } }).fbq.queue.filter(a => a[0] === 'track')
+        .length;
+    window.history.replaceState(null, '', '/?email=a@b.com');
+    t.pageView();
+    t.track('contact_submitted');
+    expect(q()).toBe(0);
+    window.history.replaceState(null, '', '/');
+    Object.defineProperty(document, 'referrer', {
+      value: 'https://x.test/?phone=0100',
+      configurable: true,
+    });
+    t.pageView();
+    expect(q()).toBe(0);
+    Object.defineProperty(document, 'referrer', { value: '', configurable: true });
+    t.pageView();
+    expect(q()).toBe(1);
+  });
+});
