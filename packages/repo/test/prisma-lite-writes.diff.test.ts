@@ -242,6 +242,14 @@ run('prisma-lite writes == Prisma writes', () => {
       _sum: { price: true },
       orderBy: { status: 'asc' },
     });
+    // `_count: true` is a NUMBER in Prisma (aggregate and per group), not `{ _all }`
+    await same('Product', 'aggregate', { where: { storeId }, _count: true });
+    await same('Product', 'groupBy', {
+      by: ['status'],
+      where: { storeId },
+      _count: true,
+      orderBy: { status: 'asc' },
+    });
   });
 
   it('$transaction: interactive commit, interactive rollback on throw, array form', async () => {
