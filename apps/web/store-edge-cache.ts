@@ -248,14 +248,28 @@ async function readEpoch(r2: R2Like, key: string, now: number): Promise<number> 
 
 /** True when no purge newer than `meta.at` exists for this entry. Any read error or junk value = false. */
 export async function isEntryCurrent(r2: R2Like, meta: Meta, now = Date.now()): Promise<boolean> {
+  return (await entryEpochState(r2, meta, now)) === 'current';
+}
+
+/**
+ * Like {@link isEntryCurrent} but tells a purge (`purged`) apart from an unreadable epoch store (`unknown`), so the
+ * store resolver can keep serving a seconds-old memory copy through an R2 outage (Ruling RESOLVE-BULLETPROOF-1).
+ */
+export async function entryEpochState(
+  r2: R2Like,
+  meta: Meta,
+  now = Date.now()
+): Promise<'current' | 'purged' | 'unknown'> {
+  let stamps: number[];
   try {
     const keys = ['all', `host/${meta.host}`, `id/${meta.id}`];
-    const stamps = await Promise.all(keys.map(k => readEpoch(r2, k, now)));
-    // 1 s of margin for clock skew between the Worker that rendered and the one that purged.
-    return stamps.every(s => Number.isFinite(s) && s < meta.at - 1000);
+    stamps = await Promise.all(keys.map(k => readEpoch(r2, k, now)));
   } catch {
-    return false;
+    return 'unknown';
   }
+  if (!stamps.every(Number.isFinite)) return 'unknown';
+  // 1 s of margin for clock skew between the Worker that rendered and the one that purged.
+  return stamps.every(s => s < meta.at - 1000) ? 'current' : 'purged';
 }
 
 /** Test seam. */
@@ -365,7 +379,12 @@ export async function serveStoreEdge(
   return fill(key, request, ctx, origin, deps, urlLocale);
 }
 
-const verdicts = new Map<string, { v: StoreVerdict; until: number }>();
+const verdicts = new Map<string, { v: StoreVerdict; until: number; at: number }>();
+/**
+ * Ruling RESOLVE-BULLETPROOF-1: on a 429/5xx/network error the last verdict is kept, but only while the last DEFINITIVE
+ * answer is younger than this; after that the verdict fails closed, so an outage cannot extend it forever.
+ */
+export const VERDICT_STALE_MAX_MS = 10 * 60_000;
 
 /** The API resolver's verdict for a store host: active store + its id. Fails closed; remembered 60 s per isolate. */
 export async function storeVerdict(
@@ -381,6 +400,15 @@ export async function storeVerdict(
     const res = await fetcher(`${apiUrl}/public/store/resolve`, {
       headers: { 'x-store-domain': host },
     });
+    // Ruling RESOLVE-BULLETPROOF-1: a 429/5xx is "could not ask", not "not a store": keep the last verdict.
+    if (known && !res.ok && res.status !== 404 && now - known.at < VERDICT_STALE_MAX_MS) {
+      verdicts.set(host, { v: known.v, until: now + 60_000, at: known.at });
+      return known.v;
+    }
+    if (!res.ok && res.status !== 404) {
+      verdicts.set(host, { v, until: now + 60_000, at: known?.at ?? 0 });
+      return v;
+    }
     if (res.ok) {
       const store = (
         (await res.json()) as {
@@ -402,9 +430,14 @@ export async function storeVerdict(
         };
     }
   } catch {
-    v = { ok: false };
+    if (known && now - known.at < VERDICT_STALE_MAX_MS) {
+      verdicts.set(host, { v: known.v, until: now + 60_000, at: known.at });
+      return known.v;
+    }
+    verdicts.set(host, { v: { ok: false }, until: now + 60_000, at: known?.at ?? 0 });
+    return { ok: false };
   }
-  verdicts.set(host, { v, until: now + 60_000 });
+  verdicts.set(host, { v, until: now + 60_000, at: now });
   return v;
 }
 

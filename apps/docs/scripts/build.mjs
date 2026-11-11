@@ -27,6 +27,8 @@ const ORIGIN = `https://${BRAND.domains.docs}`;
 const url = slug => (slug === 'index' ? '/' : `/${slug}/`);
 
 const SECTIONS = ['Start', 'Concepts', 'Reference'];
+/** Arabic section titles, in the same order as SECTIONS (the ar frontmatter uses these names). */
+const SECTIONS_AR = ['ابدأ', 'المفاهيم', 'المرجع'];
 /** Further products (BRAND-ARCH-1, LAUNCH-SUITE-1): content/<folder>/{en,ar}/<slug>.mdx -> /<folder>/<slug>/ (en) and /ar/<folder>/<slug>/ (ar). */
 const WA = { folder: 'whatsapp', section: 'Ebda Chat', sectionAr: 'ابدأ شات' };
 /** The products this site documents (BRAND-ARCH-1). A product is added when it ships; never a placeholder. */
@@ -69,7 +71,18 @@ if (waEn.map(p => p.slug).join() !== waAr.map(p => p.slug).join())
   throw new Error(
     `WhatsApp docs differ between en and ar:\n en: ${waEn.map(p => p.slug)}\n ar: ${waAr.map(p => p.slug)}`
   );
-const arIndex = loadContent(path.join(root, 'content', 'ar'))[0];
+const arAll = loadContent(path.join(root, 'content', 'ar'));
+const arIndex = arAll.find(p => p.slug === 'index');
+if (!arIndex) throw new Error('content/ar/index.mdx is missing');
+/** Arabic twins of the store API pages: content/ar/<slug>.mdx -> /ar/<slug>/. */
+const arPages = arAll.filter(p => p.slug !== 'index');
+const storeSlugs = pages
+  .filter(p => p.slug !== 'index')
+  .map(p => p.slug)
+  .sort();
+const arSlugs = arPages.map(p => p.slug).sort();
+if (storeSlugs.join() !== arSlugs.join())
+  throw new Error(`Store API docs differ between en and ar:\n en: ${storeSlugs}\n ar: ${arSlugs}`);
 const spec = JSON.parse(readFileSync(path.join(root, '.generated', 'openapi.json'), 'utf8'));
 const coverage = JSON.parse(readFileSync(path.join(root, '.generated', 'coverage.json'), 'utf8'));
 copyFileSync(path.join(root, '.generated', 'openapi.json'), path.join(out, 'openapi.json'));
@@ -117,6 +130,10 @@ const footer = renderFooter({ lang: 'en' });
 const searchDocs = [];
 const urls = ['/', '/ar/', '/search/'];
 
+/** Every English page has an Arabic twin except the generated (English-only) API reference. */
+const hasArTwin = slug => slug !== 'index' && slug !== REF.slug;
+const arUrlOf = slug => (slug === 'index' ? '/ar/' : `/ar${url(slug)}`);
+
 function enPage({ slug, title, description, section, main, headings, bodyHtml }) {
   const html = renderPage({
     lang: 'en',
@@ -126,7 +143,7 @@ function enPage({ slug, title, description, section, main, headings, bodyHtml })
         : `${title} | ${BRAND.company.shortNameEn} Docs`,
     description,
     canonical: ORIGIN + url(slug),
-    alternates: slug.startsWith(`${WA.folder}/`)
+    alternates: hasArTwin(slug)
       ? [
           { hreflang: 'en', href: ORIGIN + url(slug) },
           { hreflang: 'ar', href: ORIGIN + '/ar' + url(slug) },
@@ -139,7 +156,7 @@ function enPage({ slug, title, description, section, main, headings, bodyHtml })
     homeHref: '/',
     active: 'docs',
     langSwitch: {
-      href: slug.startsWith(`${WA.folder}/`) ? `/ar${url(slug)}` : '/ar/',
+      href: hasArTwin(slug) ? arUrlOf(slug) : '/ar/',
       label: 'العربية',
       lang: 'ar',
     },
@@ -206,9 +223,16 @@ for (const p of waEn) {
   });
 }
 const arFooter = renderFooter({ lang: 'ar' });
-const arWaSidebar = current =>
+const arSidebar = current =>
   renderSidebar(
     [
+      ...SECTIONS_AR.map(section => ({
+        title: `${BRAND.product.nameAr} · ${section}`,
+        items: arPages
+          .filter(p => p.data.section === section)
+          .sort((a, b) => (a.data.order ?? 99) - (b.data.order ?? 99))
+          .map(p => ({ href: arUrlOf(p.slug), label: p.data.title, current: p.slug === current })),
+      })).filter(g => g.items.length),
       {
         title: WA.sectionAr,
         items: waAr
@@ -243,7 +267,7 @@ for (const p of waAr) {
       active: 'docs',
       langSwitch: { href: url(p.slug), label: 'English', lang: 'en' },
       search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في الوثائق (بالإنجليزية)' },
-      sidebar: arWaSidebar(p.slug),
+      sidebar: arSidebar(p.slug),
       main: `<article class="prose">${renderToc(headings, 'في هذه الصفحة')}<h1>${esc(p.data.title)}</h1>${html}</article>`,
       footer: arFooter,
       skipLabel: 'تخطَّ إلى المحتوى',
@@ -254,6 +278,44 @@ for (const p of waAr) {
     url: arUrl,
     title: p.data.title,
     section: WA.sectionAr,
+    lang: 'ar',
+    headings: headings.map(h => h.text),
+    html,
+  });
+}
+
+// Arabic twins of the store API pages (/ar/<slug>/), hreflang-paired with the English page.
+for (const p of arPages) {
+  const { html, headings } = await renderMdx(p.body, { tableLabel: p.data.title });
+  const arUrl = arUrlOf(p.slug);
+  writePage(
+    out,
+    arUrl,
+    renderPage({
+      lang: 'ar',
+      title: `${p.data.title} | وثائق ${BRAND.company.shortNameAr}`,
+      description: p.data.description,
+      canonical: ORIGIN + arUrl,
+      alternates: [
+        { hreflang: 'en', href: ORIGIN + url(p.slug) },
+        { hreflang: 'ar', href: ORIGIN + arUrl },
+      ],
+      siteLabel: 'وثائق المطوّرين',
+      homeHref: '/ar/',
+      active: 'docs',
+      langSwitch: { href: url(p.slug), label: 'English', lang: 'en' },
+      search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في الوثائق (بالإنجليزية)' },
+      sidebar: arSidebar(p.slug),
+      main: `<article class="prose">${renderToc(headings, 'في هذه الصفحة')}<h1>${esc(p.data.title)}</h1>${html}</article>`,
+      footer: arFooter,
+      skipLabel: 'تخطَّ إلى المحتوى',
+    })
+  );
+  urls.push(arUrl);
+  searchDocs.push({
+    url: arUrl,
+    title: p.data.title,
+    section: p.data.section,
     lang: 'ar',
     headings: headings.map(h => h.text),
     html,
@@ -279,11 +341,12 @@ for (const p of waAr) {
 // Arabic landing page.
 {
   const { html } = await renderMdx(arIndex.body, { tableLabel: arIndex.data.title });
-  const cards = `<ul class="cards" dir="ltr" lang="en">${pages
-    .filter(x => x.slug !== 'index')
+  const cards = `<ul class="cards">${arPages
+    .slice()
+    .sort((a, b) => (a.data.order ?? 99) - (b.data.order ?? 99))
     .map(
       x =>
-        `<li><a href="${url(x.slug)}">${esc(x.data.title)}</a><p class="muted">${esc(x.data.description)}</p></li>`
+        `<li><a href="${arUrlOf(x.slug)}">${esc(x.data.title)}</a><p class="muted">${esc(x.data.description)}</p></li>`
     )
     .join('')}</ul><h2 id="p-whatsapp">${esc(WA.sectionAr)}</h2><ul class="cards">${waAr
     .map(
@@ -355,7 +418,7 @@ await writeSearchAssets(out, searchDocs);
 
 writeSeoFiles(out, ORIGIN, urls);
 // 404 pages: Workers Static Assets serves the NEAREST 404.html (/ar/* gets the Arabic one). Apple-style: one calm
-// sentence, live search, a compact map. The docs are English-only, so the Arabic page searches the English index.
+// sentence, live search, a compact map. The search index is English, so the Arabic page searches the English index.
 const NF = {
   en: {
     line: "The page you're looking for can't be found.",

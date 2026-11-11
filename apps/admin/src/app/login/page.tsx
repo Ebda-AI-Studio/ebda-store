@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { useAuth, postLoginDestination, goAfterSignIn, type MfaChallenge } from '../../lib/auth';
 import { isPasskeyCancel, passkeyAutofillSupported, passkeysSupported } from '../../lib/passkeys';
 import { useT } from '@/i18n/useT';
-import { NileNight } from './_components/NileNight';
+import { NileSidePanel } from './_components/NileSidePanel';
 import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
+import { usePinnedLightTheme } from '@/lib/use-pinned-light-theme';
 import { SignInBrand } from '@/components/SignInBrand';
 import { signInProduct, type SignInProduct } from '../../lib/sign-in-return';
 import { DocumentTitle } from '@/components/DocumentTitle';
@@ -18,6 +19,7 @@ import { consumeSessionEnded } from '../../lib/session-ended';
 const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 
 export default function LoginPage() {
+  usePinnedLightTheme();
   const t = useT('auth.login');
   // Which product sent the person here (?product=chat from Ebda Chat); anything else is the Store (Ruling SIGNIN-RETURN-1).
   // `null` until the query is read: the first render is neutral, so a Chat visitor never sees the Store's name first.
@@ -178,14 +180,10 @@ export default function LoginPage() {
       <main
         id="admin-main-content"
         tabIndex={-1}
-        className="flex min-h-screen flex-col outline-none lg:flex-row"
+        className="flex min-h-screen flex-col outline-none md:flex-row"
       >
-        {/* Mobile: short Nile band above the form (decorative) */}
-        <div className="relative h-24 shrink-0 overflow-hidden bg-[#0A0B0C] lg:hidden">
-          <NileNight />
-        </div>
-        <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
-          <div className="mx-auto w-full max-w-sm lg:w-96">
+        <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 md:flex-none md:px-10 lg:px-20 xl:px-24">
+          <div className="mx-auto w-full max-w-sm md:w-96">
             <div className="mb-6 flex justify-end">
               <AdminLanguageSwitcher />
             </div>
@@ -272,19 +270,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Right side - Branding */}
-        <div className="relative hidden w-0 flex-1 lg:block">
-          <div className="absolute inset-0 bg-[#0A0B0C]">
-            <NileNight />
-            <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
-            <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
-              <p className="text-4xl font-bold">{tp('brandTitle')}</p>
-              <p className="mt-4 text-lg text-white/85 text-center max-w-md">
-                {tp('brandSubtitle')}
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Side panel (tablet and up) - Branding */}
+        <NileSidePanel title={tp('brandTitle')} subtitle={tp('brandSubtitle')} />
       </main>
     );
   }
@@ -294,15 +281,10 @@ export default function LoginPage() {
     <main
       id="admin-main-content"
       tabIndex={-1}
-      className="flex min-h-screen flex-col outline-none lg:flex-row"
+      className="flex min-h-screen flex-col outline-none md:flex-row"
     >
-      {/* Mobile band, then login form */}
-      {/* Mobile: short Nile band above the form (decorative) */}
-      <div className="relative h-24 shrink-0 overflow-hidden bg-[#0A0B0C] lg:hidden">
-        <NileNight />
-      </div>
-      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
-        <div className="mx-auto w-full max-w-sm lg:w-96">
+      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 md:flex-none md:px-10 lg:px-20 xl:px-24">
+        <div className="mx-auto w-full max-w-sm md:w-96">
           <div className="mb-6 flex justify-end">
             <AdminLanguageSwitcher />
           </div>
@@ -447,17 +429,8 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right side - Branding */}
-      <div className="relative hidden w-0 flex-1 lg:block">
-        <div className="absolute inset-0 bg-[#0A0B0C]">
-          <NileNight />
-          <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
-          <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
-            <p className="text-4xl font-bold">{tp('brandTitle')}</p>
-            <p className="mt-4 text-lg text-white/85 text-center max-w-md">{tp('brandSubtitle')}</p>
-          </div>
-        </div>
-      </div>
+      {/* Side panel (tablet and up) - Branding */}
+      <NileSidePanel title={tp('brandTitle')} subtitle={tp('brandSubtitle')} />
     </main>
   );
 }

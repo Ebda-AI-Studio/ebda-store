@@ -1,5 +1,5 @@
 import type { JobDef } from '../../jobs/types';
-import { withStoreDb } from '../../jobs/store-db';
+import { storeActiveForJob, withStoreDb } from '../../jobs/store-db';
 
 import { config } from '../../../config';
 import logger from '../../logger';
@@ -246,6 +246,13 @@ const campaignSendFn = inngest.createFunction(
     // Unconditional: a past time resumes at once, and a clock check here would make a replay skip the
     // sleep the first run took (the job's concurrency lease is released/re-taken around it).
     await step.sleepUntil('wait-for-schedule', nonce);
+
+    // A store suspended or closed while the campaign waited sends nothing; a skip, not a failed run.
+    if (
+      !(await step.run('check-store-active', () => storeActiveForJob(storeId, 'campaign-send')))
+    ) {
+      return { skipped: 'store-not-active' };
+    }
 
     // 3. Claim scheduled → sending, atomically and only for this request.
     //    A cancel during the wait leaves it `cancelled` and nothing is sent.
