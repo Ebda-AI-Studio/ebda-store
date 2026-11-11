@@ -388,9 +388,17 @@ describe('WhatsAppBridge on a real StoreDO', () => {
 });
 
 const C = '0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c';
+// The bridge recomputes the buyer key from the phone (Ruling WA-BRIDGE-BIND-1, WA-2): each phone carries its pinned vector key
+// (tests/vectors/ebda-wa/buyer-key.json), so these orders are consistent buyers, not mismatches.
+const KEY_OF: Record<string, string> = {
+  '+201001234567': 'e8771d4105457e95d06a8589827d6c09043f73bb1750f2ef525bccbc22d67edd',
+  '+201112345678': '6ceb45953633dabff779c18ba4035a9fe58480c8383c822f93684a541a5c7cf5',
+  '+201212345678': 'e60124811e966cf6a4b953e5ef6fcc922593cf49f579bdbec82f97cae902c538',
+  '+201512345678': '579c854eab21f3746ff0d980995474cb23a3c0b22651f3993f8e4281b4a46863',
+};
 const cod = (key: string, id = 'shop-c-p1', qty = 1, phone = buyer.phoneE164) => ({
   items: [{ variantId: id, quantity: qty }],
-  buyer: { ...buyer, phoneE164: phone },
+  buyer: { ...buyer, phoneE164: phone, buyerKey: KEY_OF[phone] ?? buyer.buyerKey },
   address: { area: 'Maadi', street: '9 Road 233' },
   paymentMethod: 'cod' as const,
   idempotencyKey: key,
