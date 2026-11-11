@@ -22,7 +22,7 @@ import { MoneyError, type SyncSql } from './sync-sql';
  */
 export const MANUAL_RETURN_METHODS = ['cash', 'bank_transfer', 'manual'] as const;
 
-export interface RefundableBalance {
+interface RefundableBalance {
   paid: number;
   refunded: number;
   refundable: number;
@@ -136,7 +136,7 @@ function exceeds(b: RefundableBalance, amount: number): MoneyError {
 // ---------------------------------------------------------------- trimmed give-backs (#659 review B2)
 
 /** A money fact the Worker must alert on after the operation commits (drained by `runMoneyOp`). */
-export interface MoneyAlert {
+interface MoneyAlert {
   kind: string;
   orderId: string;
   body: string;
@@ -151,7 +151,7 @@ export function takeMoneyAlerts(): MoneyAlert[] {
   return pendingAlerts.splice(0);
 }
 
-export const WALLET_TRIM_REASON = 'wallet_giveback_trimmed';
+const WALLET_TRIM_REASON = 'wallet_giveback_trimmed';
 
 /**
  * The ceiling trimmed a wallet give-back the plan said the customer is owed (`planned`) to what the order had left

@@ -30,7 +30,7 @@ import { computeOrderAmounts, frozenTaxInvoiceFields, resolveActiveTaxRate } fro
  * without a reason); amounts are never taken from the caller.
  */
 /** The order took no stock at placement (a manual order): `{ items: [{ orderItemId, quantity }] }` (#633). */
-export const STOCK_NOT_TAKEN_EVENT = 'stock_not_taken';
+const STOCK_NOT_TAKEN_EVENT = 'stock_not_taken';
 
 export interface AdminOrderInput {
   storeId: string;

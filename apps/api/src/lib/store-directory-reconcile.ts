@@ -127,7 +127,7 @@ const readDoRecord: DoRecord = async id => {
  * (the retry converges), but nothing detected a copy nobody retried. Push D1's value to the DO and report it.
  */
 type MirrorRepair = (id: string, fields: Record<string, unknown>) => Promise<void>;
-export function mirrorDrift(
+function mirrorDrift(
   row: Pick<D1Row, 'name' | 'name_ar' | 'template' | 'look'>,
   rec: NonNullable<Awaited<ReturnType<DoRecord>>>
 ): Record<string, string | null> {
