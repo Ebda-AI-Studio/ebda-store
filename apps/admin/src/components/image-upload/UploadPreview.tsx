@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useT } from '@/i18n/useT';
+import { Button } from '@/components/ui/Button';
 
 interface UploadPreviewProps {
   value: string;
@@ -29,8 +30,10 @@ export function UploadPreview({ value, alt, onRemove, className = '' }: UploadPr
         />
       </div>
       {onRemove && (
-        <button
+        <Button
           type="button"
+          variant="destructive"
+          size="icon-sm"
           onClick={onRemove}
           // Same defect class as MultiImageGrid: a hover-gated CONTROL is
           // unreachable on touch, where there is no hover state — so removing
@@ -40,7 +43,7 @@ export function UploadPreview({ value, alt, onRemove, className = '' }: UploadPr
           // too (issue #1356 found the old `md:` gate broke exactly that
           // device). `touch-target` replaces `p-1` (~24px) so the tap area
           // clears the 44px floor the rest of the admin uses.
-          className="absolute top-1 end-1 touch-target bg-destructive text-white rounded-full hover-reveal transition-opacity"
+          className="absolute top-1 end-1 hover-reveal"
           aria-label={t('remove')}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -51,7 +54,7 @@ export function UploadPreview({ value, alt, onRemove, className = '' }: UploadPr
               d="M6 18L18 6M6 6l12 12"
             />
           </svg>
-        </button>
+        </Button>
       )}
     </div>
   );

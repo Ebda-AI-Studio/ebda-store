@@ -15,6 +15,7 @@ import { useT } from '../../../../i18n/useT';
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
 import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { SparkleIcon } from '@/components/SparkleIcon';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -856,7 +857,7 @@ function BulkActionCard({
         onClick={() => onAction(replaceExisting)}
         disabled={loading || disabled}
       >
-        {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
+        {loading ? <SpinIcon /> : <SparkleIcon />}
         <span>{loading ? startingLabel : buttonLabel}</span>
       </Button>
 
@@ -904,7 +905,7 @@ function MasterSweepButton({
       onClick={onClick}
       disabled={loading || disabled}
     >
-      {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
+      {loading ? <SpinIcon /> : <SparkleIcon />}
       {loading ? startingLabel : label}
     </Button>
   );
