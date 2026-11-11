@@ -5,7 +5,7 @@ import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../../../../../lib/api';
 import { DEFAULT_THEME, type StoreBranding, type StoreTheme } from '../_components/types';
 import { themePatch } from './theme-patch';
-import { brandingPatch } from './branding-patch';
+import { brandingPatch, CONTACT_KEYS, keyPatch, settingsContactPatch } from './branding-patch';
 
 interface StoreResponse {
   id: string;
@@ -72,7 +72,6 @@ export function useBranding(storeId: string, messages: ToastMessages) {
   const [baseline, setBaseline] = useState<string | null>(null);
   // `settings.contact` as stored. The bundle replaces that one top-level key, so the keys we do not edit in it
   // (anything besides addressUrl/addressLink) are carried through from here, not from a fresh GET of ALL settings.
-  const [storedContact, setStoredContact] = useState<Record<string, unknown>>({});
 
   const fetchBranding = useCallback(async () => {
     try {
@@ -108,7 +107,6 @@ export function useBranding(storeId: string, messages: ToastMessages) {
 
         const shownTheme: StoreTheme = { ...DEFAULT_THEME, ...(store.theme || {}) };
         setLoadedTheme(shownTheme);
-        setStoredContact(settingsContact);
         const loaded: StoreBranding = {
           id: store.id,
           template: store.template,
@@ -163,31 +161,27 @@ export function useBranding(storeId: string, messages: ToastMessages) {
 
     setIsSaving(true);
     try {
-      // Empty/whitespace URL collapses to a missing key so a stray space never produces an `<a href=" ">`.
-      const trimmedAddressUrl = branding.addressUrl?.trim();
-      const nextContact: Record<string, unknown> = { ...storedContact };
-      if (trimmedAddressUrl) nextContact.addressUrl = trimmedAddressUrl;
-      else delete nextContact.addressUrl;
-      // Persist the boolean explicitly so legacy `'maps' | 'none'` values get rewritten cleanly.
-      nextContact.addressLink = branding.addressLink !== false;
-
-      // Only the theme keys the merchant changed on this page; none at all when the theme was not touched.
+      const loaded = (baseline ? JSON.parse(baseline) : {}) as StoreBranding;
       const changedTheme = themePatch(loadedTheme ?? branding.theme, branding.theme);
       const themeChanged = Object.keys(changedTheme).length > 0;
+      // Only what the merchant changed on this page travels (see branding-patch.ts): a save never writes back a stale copy of
+      // a value another page set meanwhile.
+      const contact = keyPatch(
+        loaded as unknown as Record<string, unknown>,
+        branding as unknown as Record<string, unknown>,
+        CONTACT_KEYS
+      );
+      const social = keyPatch(loaded.socialLinks ?? {}, branding.socialLinks ?? {});
+      const settingsContact = settingsContactPatch(loaded, branding);
 
       const { error } = await apiPut(`/api/v1/stores/${storeId}/branding-bundle`, {
-        branding: brandingPatch(baseline ? (JSON.parse(baseline) as StoreBranding) : {}, branding),
+        branding: brandingPatch(loaded, branding),
         ...(themeChanged && { theme: changedTheme }),
-        contact: {
-          email: branding.email,
-          phone: branding.phone,
-          phoneAr: branding.phoneAr,
-          whatsapp: branding.whatsapp,
-          address: branding.address,
-          addressAr: branding.addressAr,
-        },
-        social: branding.socialLinks,
-        settings: { contact: nextContact },
+        ...(Object.keys(contact).length > 0 && { contact }),
+        ...(Object.keys(social).length > 0 && { social }),
+        ...(Object.keys(settingsContact).length > 0 && {
+          settings: { contact: settingsContact },
+        }),
       });
 
       if (error) {
@@ -203,7 +197,6 @@ export function useBranding(storeId: string, messages: ToastMessages) {
       }
 
       setLoadedTheme(branding.theme);
-      setStoredContact(nextContact);
       setBaseline(JSON.stringify(branding));
       toast.success(messages.saveSuccessTitle, messages.saveSuccessBody);
     } catch (error) {
@@ -212,7 +205,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
     } finally {
       setIsSaving(false);
     }
-  }, [branding, baseline, loadedTheme, storedContact, storeId, toast, messages]);
+  }, [branding, baseline, loadedTheme, storeId, toast, messages]);
 
   const resetBranding = useCallback(() => {
     if (baseline) setBranding(JSON.parse(baseline) as StoreBranding);

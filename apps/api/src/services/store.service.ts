@@ -10,6 +10,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
+import { mergeNestedPatch } from '../lib/merge-nested-patch';
 import { hubOnD1 } from '../lib/platform-hub';
 import {
   copyStoreSettings,
@@ -1835,6 +1836,31 @@ export class StoreService {
     }
   ) {
     const before = await this.getById(storeId);
+    // `settings.contact` is a nested object under ONE top-level key, which the settings merge replaces whole. The Branding page
+    // owns only addressUrl / addressLink inside it, so merge the patch per key into the live object (null deletes a key):
+    // other keys, written meanwhile or by another surface, survive.
+    if (
+      parts.settings &&
+      typeof parts.settings === 'object' &&
+      !Array.isArray(parts.settings) &&
+      (parts.settings as Record<string, unknown>).contact &&
+      typeof (parts.settings as Record<string, unknown>).contact === 'object'
+    ) {
+      const storedContact =
+        ((before.settings as Record<string, unknown> | null)?.contact as
+          | Record<string, unknown>
+          | undefined) ?? {};
+      parts = {
+        ...parts,
+        settings: {
+          ...(parts.settings as Record<string, unknown>),
+          contact: mergeNestedPatch(
+            storedContact,
+            (parts.settings as Record<string, unknown>).contact as Record<string, unknown>
+          ),
+        } as Prisma.InputJsonValue,
+      };
+    }
     const onDo = await storeWritesToDo(storeId);
     if (onDo) {
       const fields: Record<string, unknown> = {};
