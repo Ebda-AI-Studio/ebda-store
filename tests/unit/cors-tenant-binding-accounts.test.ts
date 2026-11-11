@@ -28,6 +28,9 @@ vi.mock('../../apps/api/src/utils/store-helpers', () => ({
 vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('../../apps/api/src/lib/accounts-token', () => ({
   isAccountsToken: (t: string) => t.startsWith('es256.'),
+  // Live identity checks SUCCEED, so a missing origin guard cannot hide behind a failed lookup
+  // (optionalAuthenticate always runs the live check and degrades to guest on any failure).
+  sessionRevoked: async () => false,
   verifyAccountsToken: async () => ({
     sub: 'owner-b',
     email: 'owner@store-b.test',
@@ -41,6 +44,10 @@ vi.mock('../../apps/api/src/lib/accounts-token', () => ({
 vi.mock('../../apps/api/src/lib/auth-sensitivity', () => ({ needsLiveIdentity: () => false }));
 
 const { authenticate, optionalAuthenticate } = await import('../../apps/api/src/middleware/auth');
+const { configureIdentityClient } = await import('../../apps/api/src/lib/identity-client');
+configureIdentityClient({
+  getAccountState: async () => ({ status: 'active', role: 'store_admin' }),
+} as never);
 
 const reqWith = (headers: Record<string, string>): Request =>
   ({
@@ -80,6 +87,14 @@ describe('identity-service token vs request origin (#622)', () => {
     const req = reqWith({ origin });
     expect(await run(req)).toMatchObject({ statusCode: 401, code: 'TOKEN_INVALID' });
     expect(req.user).toBeUndefined();
+  });
+
+  it('optionalAuthenticate identifies it from a platform origin (positive control: the live lookup succeeds)', async () => {
+    const req = reqWith({ origin: 'https://store.ebda.app' });
+    const next = vi.fn();
+    await optionalAuthenticate(req, {} as Response, next as unknown as NextFunction);
+    expect(next).toHaveBeenCalledWith();
+    expect(req.user?.userId).toBe('owner-b');
   });
 
   it('optionalAuthenticate treats it as a guest from a store origin', async () => {
