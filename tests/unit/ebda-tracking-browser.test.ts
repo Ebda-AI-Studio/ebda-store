@@ -4,7 +4,11 @@
  * a yes), the unset-env no-op, event_id passing for Meta dedup, the banner and the signup payload.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createTracker, posthogAssetsHost } from '@ebda/shared/tracking-browser';
+import {
+  createTracker,
+  pixelQuerySensitive,
+  posthogAssetsHost,
+} from '@ebda/shared/tracking-browser';
 import { EBDA_CONSENT_COOKIE, serializeConsent } from '@ebda/shared';
 
 const CFG = {
@@ -424,5 +428,61 @@ describe('Meta pixel is the tracker only: no auto PageView, no sensitive URL or 
     Object.defineProperty(document, 'referrer', { value: '', configurable: true });
     t.pageView();
     expect(q()).toBe(1);
+  });
+});
+
+describe('pixel URL gate scrubs by key AND by value', () => {
+  const blocked = [
+    '?e-mail=x',
+    '?email=x',
+    '?e_mail=x',
+    '?phone=x',
+    '?mobile=x',
+    '?tel=x',
+    '?whatsapp=x',
+    '?contact[email]=x',
+    '?contact%5Bemail%5D=x',
+    '?q=shoes',
+    '?search=a',
+    '?name=Ali',
+    '?address=1',
+    '?ref=a@b.com',
+    '?ref=a%40b.com',
+    '?x=01012345678',
+    '?x=010-1234-5678',
+    '?x=%2B20%201012%20345%20678',
+    '?x=0101234',
+  ];
+  const clean = [
+    '',
+    '?',
+    '?utm_source=meta&utm_medium=paid',
+    '?fbclid=IwAR0abc12',
+    '?ref=home',
+    '?x=123456',
+    '?fbclid=1234567890123',
+  ];
+  for (const q of blocked) it(`blocks ${q}`, () => expect(pixelQuerySensitive(q)).toBe(true));
+  for (const q of clean)
+    it(`allows ${q || '(empty)'}`, () => expect(pixelQuerySensitive(q)).toBe(false));
+
+  it('blocks PageView and Lead for a value-only leak in the URL or the referrer', () => {
+    setConsent(false, true);
+    const t = createTracker(CFG, window);
+    t.start();
+    const n = () =>
+      (window as unknown as { fbq: { queue: unknown[][] } }).fbq.queue.filter(a => a[0] === 'track')
+        .length;
+    window.history.replaceState(null, '', '/?ref=a@b.com');
+    t.pageView();
+    t.track('contact_submitted');
+    window.history.replaceState(null, '', '/');
+    Object.defineProperty(document, 'referrer', {
+      value: 'https://x.test/?x=01012345678',
+      configurable: true,
+    });
+    t.pageView();
+    expect(n()).toBe(0);
+    Object.defineProperty(document, 'referrer', { value: '', configurable: true });
   });
 });

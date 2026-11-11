@@ -97,6 +97,40 @@ export function posthogAssetsHost(apiHost: string): string {
   return apiHost.replace('.i.posthog.com', '-assets.i.posthog.com');
 }
 
+const PIXEL_SENSITIVE_KEY = /e[-_]?mail|phone|mobile|tel|whats(app)?|name|address|q|search/i;
+/** Ad click ids are long opaque tokens that may contain a digit run; they are not personal data. */
+const CLICK_ID_KEY = /^(fbclid|gclid|ttclid|msclkid|wbraid|gbraid)$/i;
+
+function safeDecode(v: string): string {
+  try {
+    return decodeURIComponent(v.replace(/\+/g, ' '));
+  } catch {
+    return v;
+  }
+}
+
+/**
+ * Meta reads the page URL and referrer itself, so the pixel stays silent on a URL whose query holds
+ * personal data. Decided by KEY (e-mail, phone, mobile, tel, whatsapp, name, address, q, search, also
+ * nested like contact[email]) and by VALUE (an `@`, or a run of 7+ digits ignoring separators).
+ * Exported for tests. Blocking (not rewriting the URL) is deliberate: history.replaceState would
+ * change what the visitor sees and the app's own routing state.
+ */
+export function pixelQuerySensitive(search: string | null | undefined): boolean {
+  if (!search) return false;
+  if (urlCarriesSensitiveQuery(search)) return true;
+  for (const pair of search.replace(/^\?/, '').split('&')) {
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    const key = safeDecode(eq < 0 ? pair : pair.slice(0, eq));
+    const value = eq < 0 ? '' : safeDecode(pair.slice(eq + 1));
+    if (PIXEL_SENSITIVE_KEY.test(key)) return true;
+    if (value.includes('@')) return true;
+    if (!CLICK_ID_KEY.test(key) && /\d{7,}/.test(value.replace(/[\s\-.()+_/]/g, ''))) return true;
+  }
+  return false;
+}
+
 const COPY = CONSENT_UI;
 
 export function createTracker(config: TrackerConfig, win: Window): Tracker {
@@ -136,11 +170,11 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
    * Ruling PIXEL-CONSENT-1). The server-side Conversions API event for the same step still goes.
    */
   const urlBlockedForPixel = () => {
-    if (urlCarriesSensitiveQuery(win.location.search)) return true;
-    // fbevents also reads the referrer (`rl`): a sensitive query there blocks it the same way.
+    if (pixelQuerySensitive(win.location.search)) return true;
+    // fbevents also reads the referrer (`rl`): same rule.
     try {
       const ref = doc.referrer;
-      return !!ref && urlCarriesSensitiveQuery(new URL(ref).search);
+      return !!ref && pixelQuerySensitive(new URL(ref).search);
     } catch {
       return false;
     }

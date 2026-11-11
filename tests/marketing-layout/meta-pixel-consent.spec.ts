@@ -36,6 +36,35 @@ async function arm(page: Page) {
   );
   return seen;
 }
+
+/**
+ * A TRUE client-side navigation: the Next app router pushes the route (history.pushState), no document is
+ * requested, and a window marker set before survives. Fails the test if the navigation was a full load.
+ */
+async function clientNav(page: Page, path: string) {
+  await page.evaluate(() => {
+    (window as unknown as { __alive: boolean }).__alive = true;
+  });
+  let documents = 0;
+  const onReq = (r: Request) => {
+    if (r.resourceType() === 'document') documents++;
+  };
+  page.on('request', onReq);
+  const ok = await page.evaluate(p => {
+    const w = window as unknown as { next?: { router?: { push(u: string): void } } };
+    if (!w.next?.router) return false;
+    w.next.router.push(p);
+    return true;
+  }, path);
+  expect(ok, 'window.next.router is available').toBe(true);
+  await page.waitForURL(u => u.pathname === path.split('?')[0], { timeout: 10_000 });
+  await page.waitForTimeout(2500);
+  page.off('request', onReq);
+  expect(documents, 'client-side: no document request').toBe(0);
+  expect(await page.evaluate(() => (window as unknown as { __alive?: boolean }).__alive)).toBe(
+    true
+  );
+}
 const answer = (page: Page, re: RegExp) =>
   page.locator('#ebda-consent button', { hasText: re }).first().click();
 const pageViews = (seen: string[]) => seen.filter(u => u.includes('ev=PageView'));
@@ -61,27 +90,33 @@ test('after Accept: fbevents loads, one PageView per client-side route, never tw
   await expect.poll(() => pageViews(seen).length).toBe(1);
   const before = pageViews(seen).length;
   // client-side navigation (Next Link -> history.pushState): the stub would auto-fire a 2nd one if allowed
-  await page.locator('a[href^="/about"], a[href^="/en/about"]').first().click();
-  await page.waitForURL(/about/);
-  await page.waitForTimeout(2500);
+  await clientNav(page, '/about/');
   expect(pageViews(seen).length - before, 'exactly one PageView for the route change').toBe(1);
 });
 
-test('sensitive query after consent: no Meta request carries email or @', async ({ page }) => {
+test('sensitive query after consent: no Meta request carries email, a number or @', async ({
+  page,
+}) => {
   const seen = await arm(page);
   await page.goto('/', { waitUntil: 'networkidle' });
   await answer(page, /^(قبول|Accept)/);
   await expect.poll(() => seen.some(u => u.endsWith('fbevents.js'))).toBe(true);
+  await expect.poll(() => pageViews(seen).length).toBe(1); // initial PageView settled
+  await page.waitForLoadState('networkidle');
   const n = seen.length;
-  await page.goto('/contact/?email=a@b.com&phone=01001234567&q=shoes', {
-    waitUntil: 'networkidle',
-  });
-  await page.waitForTimeout(2500);
-  for (const u of seen) {
-    const d = decodeURIComponent(u);
-    expect(d, u).not.toMatch(/email|@|phone|01001234567|shoes/i);
+  // value-only leaks and key leaks, client-side from a clean page
+  for (const q of ['?email=a@b.com&phone=01001234567&q=shoes', '?ref=a@b.com', '?x=01012345678']) {
+    await clientNav(page, '/contact/' + q);
+    await clientNav(page, '/about/');
+    await page.goto('/contact/' + q, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+    await page.goto('/', { waitUntil: 'networkidle' });
   }
-  expect(seen.length, 'nothing new sent on the sensitive URL').toBe(n);
+  for (const u of seen) {
+    expect(decodeURIComponent(u), u).not.toMatch(/email|@|phone|01001234567|01012345678|shoes/i);
+  }
+  // the only new requests are PageViews of clean routes, never one for a sensitive URL
+  expect(seen.slice(n).filter(u => /[?&]dl=[^&]*(%3F|\?)/.test(u))).toEqual([]);
 });
 
 test('withdraw through the on-page cookie settings, then navigate client-side: zero Meta requests', async ({
@@ -100,8 +135,6 @@ test('withdraw through the on-page cookie settings, then navigate client-side: z
   await answer(page, /^(رفض|Reject)/);
   await page.waitForTimeout(500);
   const n = seen.length;
-  await page.locator('a[href^="/about"], a[href^="/en/about"]').first().click(); // client-side
-  await page.waitForURL(/about/);
-  await page.waitForTimeout(2500);
+  await clientNav(page, '/about/');
   expect(seen.length, 'no Meta request after withdrawal').toBe(n);
 });
