@@ -17,6 +17,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [CHANGELOG-2026-11-04-admin-fix-pass-t4.md](CHANGELOG-2026-11-04-admin-fix-pass-t4.md) - Admin fix pass, T4 store setup pages (2026-11-04)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t6.md](CHANGELOG-2026-11-04-admin-fix-pass-t6.md) - Admin fix pass, T6 stock / finance / insights / platform / onboarding (2026-11-04)
 - [CHANGELOG-2026-11-09-admin-audit-closure-ux.md](CHANGELOG-2026-11-09-admin-audit-closure-ux.md) - Admin audit closure, UX rows (2026-11-09)
+- [admin-routes-triage-2026-11-11.md](admin-routes-triage-2026-11-11.md) - Triage of the 89 routes with no admin caller (F-9-prune)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md) - Admin audit closure, API and storefront rows (2026-11-09)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md) - Atomic StoreDO settings patch (2026-11-09)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t5.md](CHANGELOG-2026-11-04-admin-fix-pass-t5.md) - Admin fix pass, T5 UI catalog + sales (2026-11-04)
