@@ -118,5 +118,5 @@ service (`forgotIdentityPassword`), never reaching `withUser`. Same response sha
 - PR G3a (money): M1, M2, M4, M7 (+ M3 guard test). Workerd: third case of `merchant-orders-do.test.ts`.
 - PR G3b (accounts + books): M5, M6, A1, A2. Workerd: `account-books-do.test.ts` (same fixture shape: a DO store with
   orders and customers; journal postings produced by running the `order/created` jobs inline via `/__dev/run-event`).
-- Each red-run on the old code is recorded in its PR body; Rulings `NZ-MONEY-1` (M1/M2/M4/M7) and `NZ-ACCT-1`
+- Each red-run on the old code is recorded in its PR body; Rulings `NZ-MONEY-6` (M1/M2/M4/M7) and `NZ-ACCT-1`
   (M5/M6/A1/A2) are written when each PR lands.

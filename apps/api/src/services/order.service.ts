@@ -3668,7 +3668,9 @@ export class OrderService {
     // armed: the sweep re-sends restoreInventory:true, which would invent
     // stock that was never reserved. Partial events never claim the ORDER; they
     // arm their own Return instead (below).
-    if (restoreInventory && !options.partial) {
+    // A DO store armed both claims in the SAME section as its refund (do/refund.ts reverseWholeOrder, do/returns.ts), so
+    // only a Postgres store arms them here (Ruling NZ-MONEY-6: a POSTGRES_REMOVED 500 on every DO refund to `refunded`).
+    if (!doMoney && restoreInventory && !options.partial) {
       await prisma.order.updateMany({
         where: { id: orderId, storeId },
         data: { refundReversalRequestedAt: new Date(), refundReversedAt: null },
@@ -3681,7 +3683,7 @@ export class OrderService {
     // the item-level event for a return requested but never applied — the
     // post-commit enqueue failure Ruling AP-2 had accepted as a residual. A
     // partial keyed on anything else (no Return row) matches nothing here.
-    if (restoreInventory && options.partial?.refundKey) {
+    if (!doMoney && restoreInventory && options.partial?.refundKey) {
       await prisma.return.updateMany({
         where: { id: options.partial.refundKey, storeId, orderId },
         data: { reversalRequestedAt: new Date(), reversalAppliedAt: null },
