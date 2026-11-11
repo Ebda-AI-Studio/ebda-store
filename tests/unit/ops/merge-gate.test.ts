@@ -45,6 +45,7 @@ const run = (
   writeFileSync(
     view,
     JSON.stringify({
+      ...(over.state ? { state: over.state } : {}),
       headRefOid: over.head ?? SHA,
       mergeable: over.mergeable ?? 'MERGEABLE',
       statusCheckRollup: checks.map(c => ({
@@ -226,6 +227,18 @@ describe('merge-gate.sh', () => {
       { wait: WAIT_TO_REFUSE_S }
     );
     expect(r.status).toBe(2);
+    expect(r.merged).toBeNull();
+  });
+  it('PR already MERGED by someone else -> exit 0 "already merged", never polls to the deadline, never merges again', () => {
+    const r = run([], { state: 'MERGED' });
+    expect(r.status).toBe(0);
+    expect(r.out).toContain('already merged');
+    expect(r.merged).toBeNull();
+  });
+  it('PR CLOSED without merging -> refuses at once (non-zero), no merge', () => {
+    const r = run(green, { state: 'CLOSED' });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain('closed without merging');
     expect(r.merged).toBeNull();
   });
   it('head moved since review -> refuses at once', () => {
