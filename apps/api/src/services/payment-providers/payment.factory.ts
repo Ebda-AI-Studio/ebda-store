@@ -3011,6 +3011,7 @@ export class PaymentService {
         paymentId: payment.id,
         amount: request.amount ?? undefined,
         refundKey: request.refundKey,
+        attemptKey: request.attemptKey,
         reason: request.reason,
         itemLevel: request.itemLevel,
       });
