@@ -8,6 +8,7 @@ import { CAPABILITIES, MORE, THEMES, THEME_COPY, featuresFaq } from '../src/lib/
 import { COMING_LABEL, REGISTRY } from '../src/lib/capability-registry';
 import { COMPARE, COMPARE_AS_OF, compareRows } from '../src/lib/compare';
 import { COMPARE_SLUGS } from '../src/lib/site';
+import { socialLinks } from '@ebda/shared/brand';
 
 const SOON = COMING_LABEL.en.toLowerCase(); // "coming soon"
 const coming = (id: keyof typeof REGISTRY) => REGISTRY[id].status === 'coming';
@@ -91,4 +92,7 @@ for (const slug of COMPARE_SLUGS) {
   }
   L.push('');
 }
+L.push('## Social');
+for (const s of socialLinks('en')) L.push(`- ${s.label}: ${s.href}`);
+L.push('');
 writeFileSync('public/llms-full.txt', L.join('\n'));

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import {
   BRAND,
+  SOCIAL_SAME_AS,
   WHATSAPP_PACKAGES,
   officePostalAddress,
   servicesJsonLd,
@@ -305,6 +306,7 @@ export function jsonLd(
         ...orgServices(locale),
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
+        sameAs: SOCIAL_SAME_AS,
         email: BRAND.supportEmail,
       },
       {
@@ -398,6 +400,7 @@ export function studioJsonLd(locale: Locale) {
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         founder: FOUNDER,
+        sameAs: SOCIAL_SAME_AS,
         email: BRAND.supportEmail,
       },
       {

@@ -44,6 +44,17 @@ export const EBDA = {
     /** The shared Ebda AI Studio sign-in (ID-1). */
     accounts: 'accounts.ebda.app',
   },
+  /** Official Ebda AI Studio accounts, in display order (SOCIAL-1). Every site renders, and publishes as JSON-LD sameAs, exactly this list. */
+  social: {
+    handle: 'ebdaaistudio',
+    accounts: [
+      { id: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/ebdaaistudio/' },
+      { id: 'facebook', label: 'Facebook', url: 'https://www.facebook.com/profile.php?id=61596368614285' },
+      { id: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/@ebdaaistudio' },
+      { id: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/company/ebda-ai-studio/' },
+      { id: 'whatsapp', label: 'WhatsApp', url: 'https://wa.me/201514191411' },
+    ],
+  },
 } as const;
 
 /** Brand name for a locale (`ar*` → Arabic wordmark, everything else Latin). */

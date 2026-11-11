@@ -259,7 +259,7 @@ describe('support sites: identical footer, language-correct links, no dead inter
   const footerOf = (html: string) =>
     /<footer class="site-footer band-dark sf">[\s\S]*?<\/footer>/
       .exec(html)![0]
-      .replace(/<(img|svg)[^>]*?(\/>|>)(?:[\s\S]*?<\/svg>)?/, '<mark/>');
+      .replace(/<img[^>]*>|<svg[^>]*>[\s\S]*?<\/svg>/, '<mark/>');
   for (const lang of ['ar', 'en'] as const) {
     it(`${lang}: help, docs and status render the identical footer`, () => {
       const docs = read('apps/docs/out', lang === 'ar' ? 'ar/index.html' : 'index.html');

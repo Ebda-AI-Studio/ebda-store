@@ -281,3 +281,10 @@ ExpandCart says it takes no commission on sales, and it offers multiple currenci
 - Point of sale (POS): Ebda Store — There is no in-store point of sale. ExpandCart — Its navigation lists a point-of-sale option under Sell.
 - Multiple currencies: Ebda Store — The store sells in Egyptian pounds only. ExpandCart — Multi-currency is listed on the Standard plan.
 - Size of platform and community: Ebda Store — A newer platform, so fewer integrations and a smaller community. ExpandCart — Check ExpandCart's site for its merchant base and partners.
+
+## Social
+- Instagram: https://www.instagram.com/ebdaaistudio/
+- Facebook: https://www.facebook.com/profile.php?id=61596368614285
+- TikTok: https://www.tiktok.com/@ebdaaistudio
+- LinkedIn: https://www.linkedin.com/company/ebda-ai-studio/
+- WhatsApp: https://wa.me/201514191411

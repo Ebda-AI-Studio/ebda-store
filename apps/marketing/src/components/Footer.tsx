@@ -1,6 +1,6 @@
 import { PageLink } from './PageLink';
 import { siteFooter, type NavLink } from '@ebda/shared/brand';
-import { SiteLink } from './SiteLink';
+import { SiteLink, NEW_TAB_NOTE } from './SiteLink';
 import { CookieSettingsButton } from './CookieSettingsButton';
 import { COPYRIGHT_YEAR } from '../lib/copyright-year';
 import type { Locale, PageSlug } from '../lib/site';
@@ -47,6 +47,28 @@ export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
                 </div>
               ))}
             </dl>
+            <ul className="sf-social">
+              {f.brand.social.map(s => (
+                <li key={s.id}>
+                  <a
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${s.name} (${NEW_TAB_NOTE[locale]})`}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width={20}
+                      height={20}
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path fill="currentColor" d={s.path} />
+                    </svg>
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
           {f.columns.map(col => (
             <nav key={col.id} className="sf-col" aria-labelledby={`sf-${col.id}`}>

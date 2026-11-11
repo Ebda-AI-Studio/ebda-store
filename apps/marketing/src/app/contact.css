@@ -148,3 +148,17 @@
 #sent:target ~ .cf-form {
   display: none;
 }
+
+.cf-social {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+.cf-social a {
+  display: inline-block;
+  padding: 9px 0;
+  min-height: 44px;
+}

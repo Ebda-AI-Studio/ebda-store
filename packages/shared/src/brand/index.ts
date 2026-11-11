@@ -9,6 +9,9 @@
  * elsewhere; `tests/unit/no-force-branding.test.ts` guards against inherited third-party brand strings.
  */
 
+import { socialLinks, type SocialLink } from './social';
+export { socialLinks, SOCIAL_SAME_AS, type SocialLink } from './social';
+
 export const BRAND = {
   name: 'Ebda AI Studio',
   nameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
@@ -842,6 +845,8 @@ export function siteFooter(lang: NavLang): {
     name: string;
     mission: string;
     contacts: { id: string; label: string; value: string; href: string }[];
+    /** Official social accounts (SOCIAL-1), foundation order; the page mirrors the row for RTL. */
+    social: SocialLink[];
   };
   columns: SiteFooterColumn[];
   copyright: (year: number) => string;
@@ -876,6 +881,7 @@ export function siteFooter(lang: NavLang): {
           href: whatsappUrl(),
         },
       ],
+      social: socialLinks(lang),
     },
     columns: [
       {
@@ -1038,6 +1044,14 @@ export function siteNavHtml(
   );
 }
 
+/** One icon link: inline monochrome mark, accessible name, new tab, 44px target (SITE_FOOTER_CSS `.sf-social`). */
+export const socialLinkHtml = (s: SocialLink, newTabNote: string) =>
+  `<li><a href="${esc(s.href)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(`${s.name} (${newTabNote})`)}"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="${s.path}"/></svg></a></li>`;
+const SOCIAL_NOTE: Record<NavLang, string> = {
+  ar: 'بيفتح في تبويب جديد',
+  en: 'opens in a new tab',
+};
+
 const colHtml = (c: SiteFooterColumn) =>
   `<nav class="sf-col" aria-labelledby="sf-${c.id}"><h2 id="sf-${c.id}">${esc(c.title)}</h2><ul>${c.links
     .map(l => `<li><a href="${esc(l.href)}">${esc(l.label)}</a></li>`)
@@ -1054,7 +1068,7 @@ export function siteFooterHtml(lang: NavLang, markHtml: string, year: number): s
     .join('');
   return (
     `<footer class="site-footer band-dark sf"><div class="wrap">` +
-    `<div class="sf-grid"><div class="sf-brand"><p class="sf-name">${markHtml}<span>${esc(f.brand.name)}</span></p><p class="sf-mission">${esc(f.brand.mission)}</p><dl class="sf-contact">${contacts}</dl></div>` +
+    `<div class="sf-grid"><div class="sf-brand"><p class="sf-name">${markHtml}<span>${esc(f.brand.name)}</span></p><p class="sf-mission">${esc(f.brand.mission)}</p><dl class="sf-contact">${contacts}</dl><ul class="sf-social">${f.brand.social.map(x => socialLinkHtml(x, SOCIAL_NOTE[lang])).join('')}</ul></div>` +
     f.columns.map(colHtml).join('') +
     `</div><div class="sf-bottom"><p class="muted small">${esc(f.copyright(year))}</p></div></div></footer>`
   );
@@ -1333,6 +1347,9 @@ export const SITE_FOOTER_CSS = `
 .sf-contact{margin:0;display:grid;gap:10px}
 .sf-contact dt{color:#a9b1af;font-size:.8125rem}
 .sf-contact dd{margin:0}
+.sf-social{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:4px}
+.sf-social a{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;color:${BRAND.colors.lift}}
+.sf-social a:hover,.sf-social a:focus-visible{color:#f3f5f4;background:#181b1c;text-decoration:none}
 .sf-col h2{font-size:.8125rem;font-weight:600;letter-spacing:.04em;color:${BRAND.colors.lift};margin:0 0 10px}
 html[lang=ar] .sf-col h2{letter-spacing:0}
 .sf-col ul{list-style:none;margin:0;padding:0;display:grid}

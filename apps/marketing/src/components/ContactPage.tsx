@@ -1,5 +1,5 @@
 import { PageLink } from './PageLink';
-import { BRAND, whatsappDisplay, whatsappUrl } from '@ebda/shared/brand';
+import { BRAND, socialLinks, whatsappDisplay, whatsappUrl } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { pageJsonLd } from '../lib/seo';
 import { HOME, SECURITY_EMAIL, type Locale } from '../lib/site';
@@ -54,6 +54,19 @@ export function ContactPage({ locale }: { locale: Locale }) {
                     <bdi dir="ltr">{whatsappDisplay()}</bdi>
                   </SiteLink>
                 </p>
+              </section>
+              <section aria-labelledby="contact-find-h">
+                <h2 id="contact-find-h">{p.findH}</h2>
+                <p>{p.findP}</p>
+                <ul className="cf-social">
+                  {socialLinks(locale).map(s => (
+                    <li key={s.id}>
+                      <SiteLink href={s.href} locale={locale} aria-label={s.name}>
+                        {s.label}
+                      </SiteLink>
+                    </li>
+                  ))}
+                </ul>
               </section>
               <section aria-labelledby="contact-help-h">
                 <h2 id="contact-help-h">{p.helpH}</h2>
