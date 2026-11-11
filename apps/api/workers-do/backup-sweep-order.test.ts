@@ -100,7 +100,7 @@ describe('backup sweep order, bounds and retry (P2-5)', () => {
     const first = await runBackupSweep(fakeEnv(r2, {}, log), deps);
     expect(first.stores.armed).toBe(2);
     expect(first.stores.deferred).toBe(3);
-    expect(first.ok).toBe(false);
+    expect(first.ok).toBe(true); // normal deferral above the cap is not an alert (see backup-sweep-scale.test.ts)
     expect(JSON.parse(r2.m.get(SWEEP_CURSOR_KEY)!).next).toBe('s3');
     log.length = 0;
     const second = await runBackupSweep(fakeEnv(r2, {}, log), deps);
@@ -128,7 +128,7 @@ describe('backup sweep order, bounds and retry (P2-5)', () => {
     expect(rep.stores.deferred).toBeGreaterThan(0);
   });
 
-  it('retries backupNow ONCE for a store with history but no yesterday manifest, and does not page when it works', async () => {
+  it('retries backupNow ONCE for a store with history but no yesterday manifest, and recovers the store', async () => {
     const log: string[] = [];
     const r2 = memR2(log);
     r2.m.set('store-do-backups/old/2026-10-30/manifest.json', '{}');
@@ -141,8 +141,8 @@ describe('backup sweep order, bounds and retry (P2-5)', () => {
     expect(log.filter(l => l === 'backup:old')).toHaveLength(1);
     expect(rep.stores.recovered).toEqual(['old']);
     expect(rep.stores.missingYesterday).toEqual([]);
-    expect(rep.ok).toBe(true);
-    expect(alerts).toHaveLength(0);
+    expect(rep.ok).toBe(false); // the alarm failure still pages (see backup-sweep-scale.test.ts)
+    expect(alerts).toHaveLength(1);
   });
 
   it('a retry that fails is attempted once, stays missing and pages', async () => {

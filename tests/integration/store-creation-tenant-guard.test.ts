@@ -30,6 +30,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import crypto from 'crypto';
+import { safeRun } from '../helpers/safe-run';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
@@ -59,14 +60,15 @@ const asApp = <T>(fn: () => Promise<T>) =>
     beforeDisconnect: () => awaitDeferredWork(5000),
   });
 
-const run = crypto.randomUUID().slice(0, 8);
+// safeRun, not hex: a hex suffix can normalise into a protected brand (400 SLUG_PROTECTED), see tests/helpers/safe-run.ts
+const run = safeRun();
 const emails: string[] = [];
 const mkEmail = (tag: string) => {
   const e = `scg-${tag}-${run}-${crypto.randomUUID().slice(0, 4)}@test.local`;
   emails.push(e);
   return e;
 };
-const mkSlug = (tag: string) => `scg-${tag}-${run}-${crypto.randomUUID().slice(0, 4)}`;
+const mkSlug = (tag: string) => `scg-${tag}-${run}-${safeRun().slice(0, 4)}`;
 
 function buildApp(): Express {
   const app = express();

@@ -420,6 +420,7 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
     const r = await reconcileStoreDirectory({
       pgAll: async () => [],
       pgLive: async () => [],
+      doRecord: async () => ({ slug: 'alpha', status: 'active' }),
       alert: t => void alerts.push(t),
     });
     expect(r.alertOnly.map(a => a.id)).toEqual([A]);
@@ -496,6 +497,7 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
       ],
       pgLive: async () => [{ id: A }],
       pgDomains: async () => (reads++, { domain: 'stale.example.com', pendingDomain: null }),
+      doRecord: async () => ({ slug: 'alpha', status: 'active' }),
       alert: () => undefined,
     });
     expect(reads).toBe(0);
@@ -526,5 +528,125 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
       (sqlite.prepare('SELECT deleted_at FROM stores WHERE id=?').get(A) as { deleted_at: unknown })
         .deleted_at
     ).not.toBeNull();
+  });
+});
+
+describe('D1 stores vs DO store_profile mirror (template / look / name / nameAr, Ruling NZ-D8)', () => {
+  beforeEach(async () => {
+    commit({});
+    await syncStoreDirectoryFromPg(A);
+    sqlite.prepare("UPDATE stores SET storage_backend='do', status='suspended' WHERE id=?").run(A);
+  });
+  const pgOne = {
+    id: A,
+    slug: 'alpha',
+    status: 'active',
+    plan: 'starter',
+    hasDomain: false,
+    hasPendingDomain: false,
+  };
+  const down = async () => {
+    throw new Error('connect ECONNREFUSED');
+  };
+  const inSync = {
+    slug: 'alpha',
+    status: 'suspended',
+    name: 'Alpha',
+    nameAr: null,
+    template: 'qamar',
+    look: null,
+  };
+
+  it('a DO whose template or look differs from D1 is re-pushed from D1 (D1 is authoritative) and alerted, in the Postgres tick', async () => {
+    const pushed: Array<[string, Record<string, unknown>]> = [];
+    const alerts: string[] = [];
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [{ ...pgOne, status: 'suspended' }],
+      pgLive: async () => [{ id: A }],
+      doRecord: async () => ({ ...inSync, template: 'souq', look: 'souq.atelier' }),
+      repairMirror: async (id, f) => void pushed.push([id, f]),
+      alert: t => void alerts.push(t),
+    });
+    expect(pushed).toEqual([[A, { template: 'qamar', look: null }]]);
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(r.corrected[0].why).toMatch(/template, look/);
+    expect(alerts).toHaveLength(1);
+  });
+
+  it('an Arabic name that exists in D1 but not in the DO is re-pushed; an in-sync store is silent', async () => {
+    sqlite.prepare("UPDATE stores SET name_ar='ألفا' WHERE id=?").run(A);
+    const pushed: Array<Record<string, unknown>> = [];
+    let r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ ...inSync }),
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: () => undefined,
+    });
+    expect(pushed).toEqual([{ nameAr: 'ألفا' }]);
+    expect(r.corrected[0].why).toMatch(/nameAr/);
+    pushed.length = 0;
+    r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ ...inSync, nameAr: 'ألفا' }),
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: () => undefined,
+    });
+    expect(pushed).toEqual([]);
+    expect(r.corrected).toEqual([]);
+  });
+
+  it('a merchant edit made mid-tick is never overwritten with the older D1 value, and raises no alert', async () => {
+    const pushed: Array<Record<string, unknown>> = [];
+    const alerts: string[] = [];
+    let reads = 0;
+    // First DO read (initial compare): DO is behind D1 'qamar'. Before the repair the merchant switches D1 to 'souq' and
+    // the DO copy converges to it (the live write path), so the re-read finds nothing to repair.
+    const r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => {
+        reads++;
+        if (reads === 1) return { ...inSync, template: 'jasmine' };
+        sqlite.prepare("UPDATE stores SET template='souq' WHERE id=?").run(A);
+        return { ...inSync, template: 'souq' };
+      },
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: t => void alerts.push(t),
+    });
+    expect(pushed).toEqual([]);
+    expect(r.corrected).toEqual([]);
+    expect(alerts).toEqual([]);
+  });
+
+  it('an edit that lands in D1 mid-tick repairs with the FRESH D1 value, not the stale one', async () => {
+    const pushed: Array<Record<string, unknown>> = [];
+    let reads = 0;
+    await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => {
+        reads++;
+        if (reads === 2) sqlite.prepare("UPDATE stores SET template='souq' WHERE id=?").run(A);
+        return { ...inSync, template: 'jasmine' };
+      },
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: () => undefined,
+    });
+    expect(pushed).toEqual([{ template: 'souq' }]);
+  });
+
+  it('a repair that fails is alert-only, never thrown', async () => {
+    const r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ ...inSync, template: 'souq' }),
+      repairMirror: async () => {
+        throw new Error('applySettings refused');
+      },
+      alert: () => undefined,
+    });
+    expect(r.alertOnly[0].why).toMatch(/could not be repaired/);
   });
 });

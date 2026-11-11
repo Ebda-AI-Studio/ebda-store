@@ -794,16 +794,18 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
           ),
         },
       ]
-    : await acrossStores(async storeId =>
-        shape(
-          storeId,
-          await prisma.manualPaymentClaim.findMany({
-            where: { storeId, status },
-            include,
-            orderBy: { createdAt: 'asc' },
-            take: 200,
-          })
-        )
+    : await acrossStores(
+        async storeId =>
+          shape(
+            storeId,
+            await prisma.manualPaymentClaim.findMany({
+              where: { storeId, status },
+              include,
+              orderBy: { createdAt: 'asc' },
+              take: 200,
+            })
+          ),
+        { abortOnError: true }
       );
   return parts
     .flatMap(p => p.value)

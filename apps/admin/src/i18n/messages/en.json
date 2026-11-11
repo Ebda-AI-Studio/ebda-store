@@ -4362,6 +4362,8 @@
         "PAYMENT_NOT_REFUNDABLE": "This payment has no payment-provider transaction (for example cash on delivery), so it cannot be refunded at the gateway. Choose store credit or bank transfer.",
         "ALREADY_REFUNDED": "This payment has already been refunded in full.",
         "REFUND_EXCEEDS_REMAINING": "The refund is more than what is left un-refunded on this payment. Refresh the page — part of it was refunded elsewhere.",
+        "REFUND_EXCEEDS_ORDER": "This would refund more than the customer paid for the order. Earlier refunds (card, InstaPay, store credit or a cash return) already cover part of it, so nothing was changed.",
+        "ORDER_ALREADY_REFUNDED": "This order is already refunded in full, so this return cannot refund the customer again.",
         "INVALID_REFUND_AMOUNT": "This return has no refund amount. Set the refund amount before completing it.",
         "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support.",
         "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\".",
@@ -6430,8 +6432,10 @@
         "expired": "Payment expired",
         "cancelled": "Payment cancelled",
         "completed": "Payment completed",
-        "failed": "Payment failed"
-      }
+        "failed": "Payment failed",
+        "refund_reconcile_review": "Refund needs review"
+      },
+      "walletTrimmed": "A wallet give-back of {planned} was cut to {credited}, because this order's refunds already reach what the customer paid. Settle the remaining {short} with the customer yourself."
     },
     "colorField": {
       "tokens": {
@@ -10579,7 +10583,8 @@
         "cancel": "Cancel",
         "done": "Refund recorded.",
         "duplicate": "This refund reference was already recorded. Nothing changed.",
-        "failed": "We could not record this refund."
+        "failed": "We could not record this refund.",
+        "exceedsOrder": "This would refund more than the customer paid for the order. Earlier refunds (card, InstaPay, store credit or a cash return) already cover part of it, so nothing was recorded."
       }
     }
   },

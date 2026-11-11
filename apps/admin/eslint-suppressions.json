@@ -1,0 +1,177 @@
+{
+  "src/app/audit-logs/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/email-queue/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/error.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/sms-queue/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/_hooks/useDashboardData.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/abandoned-carts/_hooks/useAbandonedCarts.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/analytics/_hooks/useAnalytics.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/announcement/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/answer-engine/_hooks/useAnswerEngineSummary.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/answer-engine/_hooks/useGscDashboard.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/branding/_hooks/useBranding.ts": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/app/stores/[id]/bulk/_hooks/useBulkOperations.ts": {
+    "no-console": {
+      "count": 3
+    }
+  },
+  "src/app/stores/[id]/content/faqs/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/coupons/_hooks/useCoupons.ts": {
+    "no-console": {
+      "count": 5
+    }
+  },
+  "src/app/stores/[id]/delivery/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/error.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/language/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/loyalty/page.tsx": {
+    "no-console": {
+      "count": 3
+    }
+  },
+  "src/app/stores/[id]/marketing-pixels/_hooks/useMarketingPixels.ts": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/notifications/_components/BroadcastComposerCard.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/notifications/page.tsx": {
+    "no-console": {
+      "count": 3
+    }
+  },
+  "src/app/stores/[id]/products/[productId]/variants/_components/SimpleVariantsForm.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/products/[productId]/variants/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/products/page.tsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/app/stores/[id]/returns/_hooks/useReturns.ts": {
+    "no-console": {
+      "count": 6
+    }
+  },
+  "src/app/stores/[id]/reviews/page.tsx": {
+    "no-console": {
+      "count": 7
+    }
+  },
+  "src/app/stores/[id]/seo/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/stores/[id]/tax/page.tsx": {
+    "no-console": {
+      "count": 4
+    }
+  },
+  "src/app/stores/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/users/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/app/webhook-events/page.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/components/ImageUpload.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/contexts/NotificationContext.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/lib/auth.tsx": {
+    "no-console": {
+      "count": 1
+    }
+  }
+}
