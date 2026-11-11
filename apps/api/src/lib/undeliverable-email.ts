@@ -6,7 +6,7 @@
  * Every outbound email path filters its recipients through `deliverableOnly` so a placeholder is
  * dropped (and logged) instead of sent.
  */
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import logger from './logger';
 
 const emailSchema = z.string().trim().email();
