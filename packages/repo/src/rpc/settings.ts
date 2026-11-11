@@ -135,6 +135,47 @@ export function patchStoreSettings(
   return sql.transactionSync ? sql.transactionSync(run) : run();
 }
 
+const blankVal = (v: unknown): boolean =>
+  v === null ||
+  v === undefined ||
+  (typeof v === 'string' && v.trim() === '') ||
+  (typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0);
+const sameStored = (a: unknown, b: unknown): boolean =>
+  (blankVal(a) && blankVal(b)) || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * Compare-and-set of Store fields (issue #620, Ruling NEVER-OVERWRITE-1): inside ONE synchronous DO transaction, read the
+ * record as it is NOW and write each `set` field only if it still equals `expect[field]` (null, '', whitespace and `{}` all
+ * count as blank, the same equivalence as the API's `isBlankVal`). A field whose current value differs (the merchant edited it
+ * since the job read) is reported in `stale` and left alone; a D1-only field is not served here and is reported in `directoryOnly`.
+ */
+export function casStoreFields(
+  sql: SqlRunner,
+  meta: Meta,
+  storeId: string,
+  input: { expect: Record<string, unknown>; set: Record<string, unknown> }
+): { written: string[]; stale: string[]; directoryOnly: string[] } {
+  const names = Object.keys(input.set);
+  const run = () => {
+    const rec = readStoreRecord(sql, meta, storeId, names);
+    if (!rec)
+      throw Object.assign(new Error('store_profile row is missing (import it first)'), {
+        code: 'STORE_PROFILE_MISSING',
+      });
+    const write: Record<string, unknown> = {};
+    const stale: string[] = [];
+    for (const n of names) {
+      if (rec.missing.includes(n)) continue;
+      if (sameStored(rec.record[n], input.expect[n])) write[n] = input.set[n];
+      else stale.push(n);
+    }
+    if (Object.keys(write).length)
+      applyStoreSettings(sql, meta, storeId, write, { inTransaction: true });
+    return { written: Object.keys(write), stale, directoryOnly: rec.missing };
+  };
+  return sql.transactionSync ? sql.transactionSync(run) : run();
+}
+
 /**
  * First-time bootstrap of a store created on its Durable Object (NEON-ZERO-1 N-18, Ruling NZ-D11): the `store_profile` row (its NOT
  * NULL identity columns), then every other field through `applyStoreSettings` (`store_config` is an upsert), then the default VAT

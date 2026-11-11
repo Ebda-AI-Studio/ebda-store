@@ -293,6 +293,12 @@ declare module '@ebda-src/repo' {
     storeId: string,
     input: { fields?: Record<string, unknown>; json?: Record<string, JsonKeyPatch> }
   ): { profile: string[]; config: string[]; directoryOnly: string[] };
+  export function casStoreFields(
+    sql: SqlRunner,
+    meta: Meta,
+    storeId: string,
+    input: { expect: Record<string, unknown>; set: Record<string, unknown> }
+  ): { written: string[]; stale: string[]; directoryOnly: string[] };
   export function bootstrapStoreRows(
     sql: SqlRunner,
     meta: Meta,

@@ -41,8 +41,8 @@ import {
   currentStoreId,
   prisma,
   withStore,
+  Prisma,
   type AppPrismaClient,
-  type Prisma,
 } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
@@ -2089,6 +2089,71 @@ export async function storePatchOnDo(
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(fields))) === 0)
     throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   return readStoreRowOnDo(storeId, args);
+}
+
+/**
+ * Compare-and-set of Store fields for the AI jobs (issue #620, Ruling NEVER-OVERWRITE-1): each field in `set` is written only if it
+ * still holds `expect[field]` (blank equivalence). A DO store does it in ONE DO transaction (`casStoreFields`) and then mirrors ONLY the
+ * written fields that live in D1; a Postgres store does one conditional `updateMany` per field. Returns the fields written.
+ */
+export async function storeCompareAndSet(
+  storeId: string,
+  expect: Record<string, unknown>,
+  set: Record<string, unknown>
+): Promise<string[]> {
+  if (Object.keys(set).length === 0) return [];
+  if (await storeWritesToDo(storeId)) {
+    const stub = storeDo(storeId) as unknown as {
+      casStoreFields(
+        storeId: string,
+        inputJson: string
+      ): Promise<
+        | { ok: true; data: { written: string[]; stale: string[] } }
+        | { ok: false; code: string; status: number }
+      >;
+    };
+    const { encodeRpc } = await import('@ebda-src/repo');
+    const r = await stub.casStoreFields(storeId, encodeRpc({ expect, set }));
+    if (!r.ok)
+      throw new AppError(502, 'STORE_CAS_REFUSED', `store compare-and-set refused: ${r.code}`);
+    const { written } = r.data;
+    const mirror = Object.fromEntries(written.map(f => [f, set[f]]));
+    if (written.length > 0) {
+      await mirrorEntitlementToPg(storeId, mirror);
+      await d1StoreWrite({ id: storeId }, d1StorePatch(mirror));
+    }
+    return written;
+  }
+  const written: string[] = [];
+  for (const [field, value] of Object.entries(set)) {
+    const was = expect[field];
+    const blank =
+      was === null ||
+      was === undefined ||
+      (typeof was === 'string' && was.trim() === '') ||
+      (typeof was === 'object' && Object.keys(was as object).length === 0);
+    const jsonValue = typeof value === 'object' && value !== null;
+    const cond = blank
+      ? jsonValue
+        ? {
+            OR: [
+              { [field]: { equals: Prisma.DbNull } },
+              { [field]: { equals: Prisma.JsonNull } },
+              { [field]: { equals: {} } },
+            ],
+          }
+        : { OR: [{ [field]: null }, { [field]: '' }] }
+      : { [field]: jsonValue ? { equals: was } : was };
+    const res = await prisma.store.updateMany({
+      where: { id: storeId, ...cond } as never,
+      data: { [field]: value } as never,
+    });
+    if (res.count > 0) {
+      written.push(field);
+      await copyStoreSettings(storeId, { [field]: value });
+    }
+  }
+  return written;
 }
 
 async function readStoreRowOnDo(

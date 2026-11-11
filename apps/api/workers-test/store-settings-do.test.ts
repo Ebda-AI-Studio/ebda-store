@@ -14,6 +14,15 @@ const e = env as unknown as {
   PLATFORM_DB: { prepare(sql: string): { bind(...v: unknown[]): { run(): Promise<unknown> } } };
   TEST_PLATFORM_MIGRATIONS: unknown[];
   E2E_DB: string;
+  STORE_DO: {
+    idFromName(n: string): unknown;
+    get(id: unknown): {
+      casStoreFields(
+        storeId: string,
+        inputJson: string
+      ): Promise<{ ok: boolean; data?: { written: string[]; stale: string[] } }>;
+    };
+  };
 };
 const BASE = 'https://api.ebda.app/api/v1';
 let ip = 0;
@@ -134,5 +143,30 @@ describe.skipIf(e.E2E_DB === '1')('store settings on a DO store (no Postgres)', 
     // the test env has no domain provider: a clean 503 DOMAIN_FEATURE_UNAVAILABLE is the answer, never a 500
     expect([200, 503], await r.clone().text()).toContain(r.status);
     expect((await call(`/stores/${id}/domain`, tok)).status).toBe(200);
+  });
+
+  // Issue #620 / NEVER-OVERWRITE-1: an AI job read metaTitle as blank, the merchant saved their own title while the AI call ran,
+  // then the job wrote through the StoreDO compare-and-set: the merchant's title must win.
+  it('a merchant edit made mid-run wins over the AI job write (StoreDO casStoreFields)', async () => {
+    const encodeRpc = JSON.stringify; // plain strings/null: no tagged values to encode
+    const doStub = e.STORE_DO.get(e.STORE_DO.idFromName(id));
+    const merchant = await call(`/stores/${id}/seo`, tok, {
+      method: 'PUT',
+      body: JSON.stringify({ metaTitle: 'merchant title' }),
+    });
+    expect(merchant.status, await merchant.clone().text()).toBe(200);
+    const stale = await doStub.casStoreFields(
+      id,
+      encodeRpc({ expect: { metaTitle: null }, set: { metaTitle: 'AI title' } })
+    );
+    expect(stale.data).toMatchObject({ written: [], stale: ['metaTitle'] });
+    const after = await call(`/stores/${id}/seo`, tok);
+    expect(await after.text()).toContain('merchant title');
+    // and a field the merchant never touched is still fillable
+    const ok = await doStub.casStoreFields(
+      id,
+      encodeRpc({ expect: { metaDescription: null }, set: { metaDescription: 'AI description' } })
+    );
+    expect(ok.data).toMatchObject({ written: ['metaDescription'] });
   });
 });

@@ -1,6 +1,6 @@
 import { isArabicText, isLatinText, isNamePlaceholder } from '../lib/product-name-pair';
 import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@ebda/shared';
-import { storeDb, storeRepo, storeUpdate, storeWriter } from '../lib/repo-factory';
+import { storeDb, storeCompareAndSet, storeRepo, storeWriter } from '../lib/repo-factory';
 import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
@@ -554,9 +554,6 @@ const isBlankVal = (v: unknown): boolean =>
   v === undefined ||
   (typeof v === 'string' && v.trim() === '') ||
   (typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length === 0);
-const sameVal = (a: unknown, b: unknown): boolean =>
-  (isBlankVal(a) && isBlankVal(b)) || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-
 type EntityOpts = { overwrite?: boolean };
 
 /** Candidates the AI may offer: non-blank, and (without overwrite) only for a field that was blank when read. */
@@ -603,9 +600,9 @@ export async function writeBulkRowFields(
 }
 
 /**
- * Guarded fill-only write of AI output onto the Store row. A Durable-Object store serves no compare-and-set on its own
- * columns, so this re-reads the row immediately before writing (milliseconds, not the AI wait) and writes a field only if it
- * still equals what the job read and (without overwrite) is blank. Returns the fields written.
+ * Guarded fill-only write of AI output onto the Store row (issue #620, Ruling NEVER-OVERWRITE-1): `storeCompareAndSet` writes a
+ * field only while it still holds what the job read (blank, or the read value under the merchant's `force`), atomically: one
+ * StoreDO transaction for a DO store, one conditional `updateMany` per field on Postgres. Returns the fields written.
  */
 export async function writeBulkStoreFields(
   storeId: string,
@@ -615,19 +612,11 @@ export async function writeBulkStoreFields(
 ): Promise<string[]> {
   const picked = entityCandidates(baseline, candidates, opts);
   if (picked.length === 0) return [];
-  const fresh = (await (
-    await storeDb(storeId)
-  ).store.findUnique({ where: { id: storeId } })) as Record<string, unknown> | null;
-  if (!fresh) return [];
-  const data: Record<string, unknown> = {};
-  for (const [field, value] of picked) {
-    if (!sameVal(fresh[field], baseline[field])) continue;
-    if (!opts.overwrite && !isBlankVal(fresh[field])) continue;
-    data[field] = value;
-  }
-  const written = Object.keys(data);
-  if (written.length > 0) await storeUpdate(prisma, { where: { id: storeId }, data });
-  return written;
+  return storeCompareAndSet(
+    storeId,
+    Object.fromEntries(picked.map(([f]) => [f, baseline[f] ?? null])),
+    Object.fromEntries(picked)
+  );
 }
 
 /** Phase 3 — WRITE (short transaction, guarded per field). Idempotent: a retry re-checks. */
