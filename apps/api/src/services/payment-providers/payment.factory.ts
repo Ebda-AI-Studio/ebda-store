@@ -2777,6 +2777,9 @@ export class PaymentService {
         kind: 'payment',
         status,
         amount: captured ? (providerStatus.paidAmount ?? payment.amount) : null,
+        // #625: the gateway's answer stated no amount, so `amount` is ours: the payment is marked unverified until a signed
+        // webhook states it (a short one then raises the P1 amount_mismatch)
+        amountUnverified: captured && typeof providerStatus.paidAmount !== 'number',
         currency: captured
           ? (providerStatus.paidCurrency ?? providerStatus.currency ?? payment.currency ?? null)
           : null,
