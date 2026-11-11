@@ -307,6 +307,8 @@ export type MoneyOpName =
   | 'analyticsCashflow'
   | 'taxReportLines'
   | 'analyticsImportReset';
+/** The states a refused cancel records as a delivery exception (the order left the store; COD-REFUSE-1). */
+const EXCEPTION_NOTE_STATES = ['processing', 'shipped', 'delivered'];
 function boundedInt(v: unknown, name: string, min: number, max: number): number {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
     throw new MoneyError('BAD_ARGS', name, 400);
@@ -634,10 +636,13 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       )[0];
       if (!cur) throw new MoneyError('ORDER_NOT_FOUND', 'order not found', 404);
       if (!allowed.includes(cur.status as string)) {
+        // The note is a delivery exception: only an order that LEFT the store (processing / shipped / delivered) gets
+        // it. An order the merchant cancelled or refunded in between gets nothing (a "stock not returned" note there
+        // would be false and invite a manual double restock). Written once: a repeated refusal adds no second copy.
         const note = typeof a.exceptionNote === 'string' ? a.exceptionNote.slice(0, 500) : '';
-        if (note)
+        if (note && EXCEPTION_NOTE_STATES.includes(cur.status as string))
           db.run(
-            "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ?1 ELSE notes || char(10) || ?1 END, updated_at = ?4 WHERE id = ?2 AND store_id = ?3",
+            "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ?1 ELSE notes || char(10) || ?1 END, updated_at = ?4 WHERE id = ?2 AND store_id = ?3 AND instr(COALESCE(notes, ''), ?1) = 0",
             [note, orderId, storeId, Date.now()]
           );
         return {
