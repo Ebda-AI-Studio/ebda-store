@@ -268,9 +268,10 @@ export function loadBackup(sql: SqlLike, files: Record<string, string>, tables: 
 }
 
 /** Every table a restore writes: the backup's tables plus the encrypted customer-credential tables. Single source for the cleanup. */
-export const restoreWrittenTables = (backupTables: string[], hasCustomerAuth: boolean): string[] => [
-  ...new Set([...backupTables, ...(hasCustomerAuth ? CAUTH_BACKUP_TABLES : [])]),
-];
+export const restoreWrittenTables = (
+  backupTables: string[],
+  hasCustomerAuth: boolean
+): string[] => [...new Set([...backupTables, ...(hasCustomerAuth ? CAUTH_BACKUP_TABLES : [])])];
 
 export const backupKey = (storeId: string, day: string, file: string) =>
   `store-do-backups/${storeId}/${day}/${file}`;
