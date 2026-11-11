@@ -255,6 +255,13 @@
       "models": {
         "storeWhatsAppConsent": 4
       }
+    },
+    "apps/api/src/services/analytics.service.ts": {
+      "kind": "pg-branch",
+      "reason": "stockSnapshot: a DO store returns early through storeMoney and counts its rules via storeDb; the prisma count is the Postgres store's own reorder rules (M-107)",
+      "models": {
+        "reorderRule": 1
+      }
     }
   }
 }

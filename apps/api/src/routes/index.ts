@@ -88,6 +88,7 @@ import insightsRoutes from './insights.routes';
 import searchInsightsRoutes from './search-insights.routes';
 import adminSearchRoutes from './admin-search.routes';
 import suppliersRoutes from './suppliers.routes';
+import reorderRulesRoutes from './reorder-rules.routes';
 import purchaseOrdersRoutes from './purchase-orders.routes';
 import packingSlipRoutes from './packing-slip.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
@@ -503,6 +504,9 @@ router.use('/stores', tenantContext, financeRoutes);
 // reason as financeRoutes — services already self-manage tenant context
 // per-query.
 router.use('/stores', tenantContext, smartLayerRoutes);
+
+// Reorder rules CRUD (M-107): merchant thresholds the reorder scan reads. Store-scoped, no money effect.
+router.use('/stores', tenantContext, reorderRulesRoutes);
 
 // Insights routes (cohort + funnel + rfm + dashboard — Batch 4).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):

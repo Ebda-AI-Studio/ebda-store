@@ -136,6 +136,7 @@ export type WritableModel =
   | 'shippingAreaRate'
   | 'reorderSuggestion'
   | 'supplier'
+  | 'reorderRule'
   | 'catalogImportJob'
   | 'catalogImportFile'
   | 'catalogImportItem'
