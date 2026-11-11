@@ -21,13 +21,17 @@ import { computeOrderAmounts, frozenTaxInvoiceFields, resolveActiveTaxRate } fro
  * What it shares with `placeOrder` (the same functions, not copies): the cart price resolver (tiers, group, wholesale,
  * MOQ), the gold-rate gate, the shipping rates, the tax maths and the frozen seller identity, the entity index and the
  * gapless fiscal sale document. What it does NOT do, exactly like Postgres: reserve stock (the merchant confirms
- * availability, the mark-paid path decrements), take a cart, apply promotions / bundles / loyalty / wallet / COD fee, enforce
+ * availability; NO later step decrements it either, so the order records a `stock_not_taken` marker and a cancel / refund
+ * restocks nothing it never took, #633), take a cart, apply promotions / bundles / loyalty / wallet / COD fee, enforce
  * the stock-hold cap or the minimum-order value, or refuse an area with no rate (an admin may order for any area).
  *
  * Trust boundary as `placeOrder`: `buyer`, `wholesaleEntitled`, `actorRole`/`actorId` and the override permissions are resolved
  * by the API Worker from the verified session (it has already refused an override from a role that may not make it, and one
  * without a reason); amounts are never taken from the caller.
  */
+/** The order took no stock at placement (a manual order): `{ items: [{ orderItemId, quantity }] }` (#633). */
+export const STOCK_NOT_TAKEN_EVENT = 'stock_not_taken';
+
 export interface AdminOrderInput {
   storeId: string;
   lines: Array<{ productId: string; variantId?: string; quantity: number }>;
@@ -352,13 +356,16 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
         now,
       ]
     );
+    const notTaken: Array<{ orderItemId: string; quantity: number }> = [];
     for (const [i, l] of priced.lines.entries()) {
       const src = lines[i];
       const s = l.snapshot;
+      const itemId = crypto.randomUUID();
+      notTaken.push({ orderItemId: itemId, quantity: l.qty });
       db.run(
         'INSERT INTO order_items (id, order_id, product_id, variant_id, product_name, variant_name, variant_name_ar, sku, quantity, price, cost_price, total, list_price, price_source, price_tier_min_qty, price_group_applied, tier_ladder, gold_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
-          crypto.randomUUID(),
+          itemId,
           orderId,
           l.productId,
           l.variantId,
@@ -393,6 +400,8 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
           now,
         ]
       );
+    // #633: this order took NO stock; the cancel / refund restock reads this and puts back only what was taken
+    event(STOCK_NOT_TAKEN_EVENT, { items: notTaken });
     if (override && couponCode)
       event(COUPON_OVERRIDE_EVENT, {
         couponCode,
