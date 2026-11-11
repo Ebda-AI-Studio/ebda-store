@@ -866,7 +866,14 @@ export function createApp() {
       );
     return c.json({
       status: 'ok',
-      ...(noExp.length ? { warning: 'retired_jwk_without_exp', retiredKeysWithoutExp: noExp } : {}),
+      ...(noExp.length
+        ? {
+            warning: 'retired_jwk_without_exp',
+            warningDetail:
+              'a retired JWKS key has no exp, or an exp more than 30 days ahead: it is not published',
+            retiredKeysWithoutExp: noExp,
+          }
+        : {}),
       service: 'accounts',
       commit: c.env.BUILD_COMMIT_SHA || null,
       deploymentId: c.env.CF_VERSION_METADATA?.id ?? null,
