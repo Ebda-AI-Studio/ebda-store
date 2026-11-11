@@ -4,14 +4,17 @@ name: AI review
 # THE GATE RUNS FROM THE BASE BRANCH. The workflow file comes from the base (pull_request_target), the scripts and prompt are
 # checked out from the base branch tip, and the PR's commits are fetched as DATA (git diff) only: never checked out, never
 # executed. A PR that edits the gate cannot change how it is judged, and the edit is itself a non-safe path, so it is reviewed.
-# Classification is fail-closed (ci/ai-review/risky-paths.mjs): only an all-docs/markdown/tests diff skips review.
+# Classification is fail-closed (ci/ai-review/risky-paths.mjs): only docs, markdown and NEWLY ADDED test files skip review; a modified or
+# deleted existing test is reviewed, because several safety guards are test files.
+# FORK PRs are never reviewed with secrets and never skipped: the `fork-gate` job fails until a maintainer reviews the PR and adds the label
+# `ai-review-passed` (the `labeled` event re-runs it green). A manual label on a same-repo PR (e.g. an oversized diff) is honoured the same way.
 # A diff over 400 KB fails with a clear message: it needs human/controller review, then the label `ai-review-passed` by hand.
 # Risky + any infra problem (no secret, CLI crash, bad JSON) = FAIL, never pass. Secret: CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`).
 # Copy of ebda-foundation/.github/workflows/ai-review.yml with `on:` = pull_request_target (foundation Ruling AIR-3: switch to `uses:` once the
 # foundation's Actions access is `organization`). Everything under `jobs:` must stay identical to the foundation file.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 permissions:
   contents: read
@@ -27,7 +30,7 @@ jobs:
     name: AI review classify
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 5
-    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft && github.event.action != 'labeled'
     outputs:
       risky: ${{ steps.paths.outputs.risky }}
     steps:
@@ -50,17 +53,17 @@ jobs:
           [ "$(git rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
           # a new head invalidates any earlier pass: the label must always describe the CURRENT head
           gh pr edit "$PR" --remove-label ai-review-passed 2>/dev/null || true
-          git diff --name-only --no-renames "origin/$BASE_REF...refs/pr/head" > changed.txt
+          git diff --name-status --no-renames "origin/$BASE_REF...refs/pr/head" > changed.txt
           node .github/ai-review/risky-paths.mjs < changed.txt > risky.txt
           if [ -s risky.txt ]; then
             echo "risky=true" >> "$GITHUB_OUTPUT"
-            gh label create risky-path --color B60205 --description "not a docs/markdown/tests-only diff: needs ai-review-passed" 2>/dev/null || true
+            gh label create risky-path --color B60205 --description "needs ai-review-passed (anything but docs, markdown or newly added tests)" 2>/dev/null || true
             gh pr edit "$PR" --add-label risky-path
             echo "paths that need review:"; cat risky.txt
           else
             echo "risky=false" >> "$GITHUB_OUTPUT"
             gh pr edit "$PR" --remove-label risky-path 2>/dev/null || true
-            echo "all-safe diff (docs, markdown, tests only): review not required"
+            echo "all-safe diff (docs, markdown, newly added tests only): review not required"
           fi
 
   review:
@@ -68,7 +71,7 @@ jobs:
     needs: classify
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 20
-    if: github.event.pull_request.head.repo.full_name == github.repository && needs.classify.outputs.risky == 'true'
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'labeled' && needs.classify.outputs.risky == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -127,3 +130,49 @@ jobs:
         run: |
           gh label create ai-review-passed --color 0E8A16 --description "independent AI review found no criticals on this head" 2>/dev/null || true
           gh pr edit "$PR" --add-label ai-review-passed
+
+  # A same-repo PR a maintainer labelled by hand (reviewed a diff the bot could not, e.g. over 400 KB). Same check name as `review`, so the
+  # newest run on this head (green) supersedes the red one. Passes only while the label is really on the PR.
+  manual-pass:
+    name: AI review
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    if: github.event.action == 'labeled' && github.event.label.name == 'ai-review-passed' && github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx ai-review-passed || { echo "::error::the ai-review-passed label is no longer on the PR"; exit 1; }
+          echo "ai-review-passed applied by hand by $ACTOR; the bot review is superseded by that human review"
+
+  # Fork PRs: no secret is ever used and nothing is skipped. Red until a maintainer reviews the PR and labels it ai-review-passed.
+  fork-gate:
+    # fork-guard-exempt: this job IS the fork handler; it runs only gh label/view commands from the base workflow and never touches PR content
+    name: AI review
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          set -euo pipefail
+          if [ "$ACTION" != labeled ]; then
+            # a new head invalidates an earlier manual pass
+            gh pr edit "$PR" --remove-label ai-review-passed 2>/dev/null || true
+            gh label create risky-path --color B60205 --description "needs ai-review-passed" 2>/dev/null || true
+            gh pr edit "$PR" --add-label risky-path
+          fi
+          if gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx ai-review-passed; then
+            echo "fork PR: ai-review-passed was applied by a maintainer"
+          else
+            echo "::error::Fork PR: it is never reviewed with secrets and never skipped. A maintainer must review it, then add the label ai-review-passed (that re-runs this check)."
+            exit 1
+          fi
