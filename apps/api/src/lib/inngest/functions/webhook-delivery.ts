@@ -9,6 +9,7 @@ import {
   WEBHOOK_MAX_ATTEMPTS,
 } from '@ebda/shared';
 import { config } from '../../../config';
+import { storeHasNoDataHere } from '../../store-pg-gone';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { EmailService } from '../../../services/email.service';
@@ -234,9 +235,12 @@ export const webhookDeliveryPurge: JobDef = inngest.createFunction(
           return { count: r.count, failed: 0 };
         }
       }
-      const storeIds = only
+      const allIds = only
         ? [only]
         : (await storeDirectory(undefined, { includeDeleted: true })).map(s => s.id);
+      // a Postgres-flagged store on a Worker with no Postgres (qa-merchant-test) has no deliveries to purge here
+      const storeIds: string[] = [];
+      for (const id of allIds) if (!(await storeHasNoDataHere(id))) storeIds.push(id);
       let failed = 0;
       const results = await acrossStores(
         async storeId =>

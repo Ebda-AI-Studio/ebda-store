@@ -10,7 +10,7 @@ import { isGatewayRefundMethod } from '../../lib/refund-methods';
 import { createProductSchemaChecked, updateProductSchema } from '../../routes/product.routes';
 import { createCouponSchema, updateCouponSchema } from '../../routes/coupon.routes';
 import { adjustInventorySchema, setInventorySchema } from '../../routes/inventory.routes';
-import { hasPermission } from '../../middleware/rbac';
+import { hasPermission, type Role } from '../../middleware/rbac';
 import type { InventoryChangeType } from '@ebda/database';
 import { registerMerchantWriteTool, type WriteToolSpec } from '../merchant-write';
 
@@ -396,7 +396,7 @@ const WRITE_TOOLS: WriteToolSpec<ZodRawShape>[] = [
       // branch fix/security-batch-2026-10-14). Both need orders:refund; staff lack it.
       if (
         (isGatewayRefundMethod(a.refundMethod) || a.refundMethod === 'store_credit') &&
-        !hasPermission(auth.role as any, 'orders:refund')
+        !hasPermission(auth.role as Role, 'orders:refund')
       ) {
         throw new Error(
           'FORBIDDEN: refunding to the original payment method or as store credit needs the orders:refund permission; the key’s owner lacks it.'

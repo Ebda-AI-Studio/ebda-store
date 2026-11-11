@@ -27,6 +27,10 @@ regexes = [
   '''eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9\.eyJ1c2VyX2lkIjo0Mzk5NTYs''',
   '''ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SjFjMlZ5WDJsa0lqb3pNREk0TlRJ''',
   '''ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SjFjMlZ5WDJsa0lqbzBNems1TlRZ''',
+  # WhatsApp bridge contract vectors (tests/vectors/ebda-wa/bridge-v1.json): the PUBLIC pinned buyer-key test vectors from
+  # tests/vectors/ebda-wa/buyer-key.json (HMAC of test numbers under a published test secret), not credentials.
+  '''e8771d4105457e95d06a8589827d6c09043f73bb1750f2ef525bccbc22d67edd''',
+  '''6ceb45953633dabff779c18ba4035a9fe58480c8383c822f93684a541a5c7cf5''',
   # Fake provider-key fixtures (provider-connect / fawry contract tests) — CI-only.
   '''wrong-key-123456''',
   '''pak_live_0123456789abcdef''',

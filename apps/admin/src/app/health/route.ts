@@ -10,6 +10,8 @@ import { NextResponse } from 'next/server';
  */
 export const dynamic = 'force-dynamic';
 
+/** M-070: the commit this worker was deployed from (`wrangler deploy --var BUILD_COMMIT_SHA`), so Rule F can compare it to main. */
 export function GET() {
-  return NextResponse.json({ status: 'ok', service: 'admin' }, { status: 200 });
+  const commit = process.env.BUILD_COMMIT_SHA?.trim() || null;
+  return NextResponse.json({ status: 'ok', service: 'admin', commit }, { status: 200 });
 }

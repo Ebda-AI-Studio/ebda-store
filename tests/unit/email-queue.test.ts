@@ -56,6 +56,51 @@ describe('Email Queue Service', () => {
     emailQueue.stopProcessing();
   });
 
+  describe('recipient validation + bad-recipient class', () => {
+    it('never enqueues an email whose recipient is empty/invalid', async () => {
+      for (const to of ['', '   ', 'no-at-sign', 'a@', '@b.com', [] as string[], ['', 'x@']]) {
+        const id = await emailQueue.enqueue('store-1', { to, subject: 's', html: '<p>x</p>' });
+        expect(id).toBe('skipped-invalid-recipient');
+      }
+      expect(mockRedisClient.lpush).not.toHaveBeenCalled();
+    });
+
+    it('keeps only the valid addresses of a mixed list', async () => {
+      await emailQueue.enqueue('store-1', { to: ['', 'ok@example.com'], subject: 's', html: 'h' });
+      const pushed = JSON.parse(mockRedisClient.lpush.mock.calls[0][1]);
+      expect(pushed.options.to).toEqual(['ok@example.com']);
+    });
+
+    it('a bad-recipient failure is recorded on the entry and never pages', async () => {
+      const email = {
+        id: 'e1',
+        storeId: 's',
+        options: { to: 'x@y.z', subject: 's', html: 'h' },
+        attempts: 1,
+        maxAttempts: 3,
+        createdAt: new Date().toISOString(),
+      } as QueuedEmail;
+      await emailQueue.recordBadRecipient(email, 'bad recipient: E_VALIDATION_ERROR');
+      expect(sendAlertMock).not.toHaveBeenCalled();
+      const [key, json] = mockRedisClient.lpush.mock.calls[0];
+      expect(key).toBe('email:failed');
+      expect(JSON.parse(json).failureClass).toBe('bad_recipient');
+    });
+
+    it('a provider-side permanent failure still pages P1', async () => {
+      const email = {
+        id: 'e2',
+        storeId: 's',
+        options: { to: 'x@y.z', subject: 's', html: 'h' },
+        attempts: 3,
+        maxAttempts: 3,
+        createdAt: new Date().toISOString(),
+      } as QueuedEmail;
+      await emailQueue.parkDeadLetter(email, 'permanent send error E_SENDER_NOT_VERIFIED');
+      expect(sendAlertMock).toHaveBeenCalledWith(expect.objectContaining({ level: 'p1' }));
+    });
+  });
+
   describe('enqueue', () => {
     it('should enqueue email to Redis when available', async () => {
       const emailOptions = {
