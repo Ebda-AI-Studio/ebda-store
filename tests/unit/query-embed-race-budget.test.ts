@@ -22,8 +22,13 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({ sendAlert: vi.fn(
 
 const { setEmbeddingProviderForTests, EMBED_MODEL, EMBED_DIMS } =
   await import('../../apps/api/src/lib/search/embedding-provider');
-const { semanticProductIds, clearQueryVectorCacheForTests, QUERY_EMBED_BUDGET_MS } =
-  await import('../../apps/api/src/services/product-search.service');
+const {
+  semanticProductIds,
+  clearQueryVectorCacheForTests,
+  QUERY_EMBED_BUDGET_MS,
+  QUERY_EMBED_COLD_BUDGET_MS,
+  setLastQueryEmbedOkAtForTests,
+} = await import('../../apps/api/src/services/product-search.service');
 const { clearQueryBudgetSpentForTests } =
   await import('../../apps/api/src/lib/search/embed-budget');
 
@@ -37,11 +42,27 @@ describe('query embed race covers the budget step (M3)', () => {
     clearQueryVectorCacheForTests();
     clearQueryBudgetSpentForTests();
     embed.mockClear();
+    setLastQueryEmbedOkAtForTests(Date.now()); // warm unless a test says otherwise
   });
   afterEach(() => {
     setEmbeddingProviderForTests(undefined);
     delete process.env.SEARCH_SEMANTIC_ENABLED;
     incrDelayMs = 0;
+  });
+
+  it('COLD isolate: a ~900 ms budget step still wins the race (first search after idle is not degraded)', async () => {
+    setLastQueryEmbedOkAtForTests(0);
+    incrDelayMs = 450; // two sequential incr steps: ~900 ms total
+    expect(QUERY_EMBED_COLD_BUDGET_MS).toBeGreaterThan(900 + 150);
+    await semanticProductIds(STORE, 'kotshy abyad', { searcher: 'ip:1.2.3.4' });
+    expect(embed).toHaveBeenCalledTimes(1);
+  });
+
+  it('WARM isolate: the same ~900 ms step loses the 400 ms race (budget unchanged when warm)', async () => {
+    incrDelayMs = 450; // two sequential incr steps: ~900 ms total
+    await semanticProductIds(STORE, 'kotshy abyad', { searcher: 'ip:1.2.3.4' });
+    await new Promise(r => setTimeout(r, 1000));
+    expect(embed).not.toHaveBeenCalled();
   });
 
   it('a budget step slower than the race ends the leg on time, and the provider is never called', async () => {

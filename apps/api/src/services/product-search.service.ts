@@ -257,6 +257,19 @@ export const HYBRID_LEG = 50;
  * storefront GET (Ruling SEARCH-T12-1): losing the race aborts the call and the list is keyword-only.
  */
 export const QUERY_EMBED_BUDGET_MS = 400;
+/**
+ * The budget for the FIRST query embed of an isolate that has not completed one in the last
+ * QUERY_EMBED_WARM_WINDOW_MS (Ruling SEARCH-WARM-1): the budget accounting (AuthState DO round trips) and the
+ * Workers AI model are cold then, and a 400 ms race lost every time degraded the first search to keyword-only.
+ * Warm isolates keep QUERY_EMBED_BUDGET_MS. Applies to the in-isolate state only: a new isolate counts as idle.
+ */
+export const QUERY_EMBED_COLD_BUDGET_MS = 1200;
+export const QUERY_EMBED_WARM_WINDOW_MS = 4 * 60 * 1000;
+let lastEmbedOkAt = 0;
+/** Test seam: forget (0) or set when this isolate last completed a query embed. */
+export function setLastQueryEmbedOkAtForTests(t: number): void {
+  lastEmbedOkAt = t;
+}
 /** Queries shorter than this (letters/digits, spaces ignored) are keyword-only. */
 export const QUERY_EMBED_MIN_CHARS = 3;
 /** Most characters of a query that are embedded (the same 100 the route caps the term at). */
@@ -344,13 +357,14 @@ async function queryVector(
   // never overspend).
   const ctl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const t0 = Date.now();
+  const cold = t0 - lastEmbedOkAt > QUERY_EMBED_WARM_WINDOW_MS;
+  const budgetMs = cold ? QUERY_EMBED_COLD_BUDGET_MS : QUERY_EMBED_BUDGET_MS;
   const lost = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       ctl.abort();
-      reject(
-        new EmbeddingError('timeout', `query embed lost the ${QUERY_EMBED_BUDGET_MS} ms race`)
-      );
-    }, QUERY_EMBED_BUDGET_MS);
+      reject(new EmbeddingError('timeout', `query embed lost the ${budgetMs} ms race`));
+    }, budgetMs);
   });
   const work = (async (): Promise<number[] | null> => {
     // The ONE charge point (SEARCH-T12-6): once per real provider call, right before it, never on
@@ -367,6 +381,9 @@ async function queryVector(
     if (!Array.isArray(v) || v.length !== EMBED_DIMS)
       throw new EmbeddingError('shape', `embedding: expected ${EMBED_DIMS} dims`);
     qCache.set(key, { v: Float32Array.from(v), exp: Date.now() + QUERY_VECTOR_TTL_MS });
+    lastEmbedOkAt = Date.now();
+    // Measured in production so the budgets can be re-tuned from logs (Ruling SEARCH-WARM-1).
+    logger.info({ cold, budgetMs, tookMs: lastEmbedOkAt - t0 }, '[search] query embed ok');
     return v;
   } finally {
     clearTimeout(timer);
