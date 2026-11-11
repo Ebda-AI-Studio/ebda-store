@@ -16,9 +16,11 @@ partial store credit, `reverseOrderPayment` (wallet give-back capped), and the n
 records only what is left). Decisions inside it: (1) provider facts (completeRefund, settle
 webhooks) are never refused, they are recorded and flagged `review`; (2) a gateway return's
 wallet share, credited after the provider already paid, is capped at what is left rather than
-refused; (3) partial-refund events written before this change carry no `external` flag and are
-counted as merchant-booked, which over-counts a pre-#624 provider partial (conservative,
-pre-launch: test stores only). Evidence: `packages/repo/test/do-refund-ceiling.test.ts`, 9
-cases, all red on origin/main. Cost if wrong: a legitimate refund on an order with pre-#624
-partial provider refunds is refused with REFUND_EXCEEDS_ORDER and the merchant has to settle it
-by hand.
+refused; (3) a partial-refund booking is recognised as provider money (already in
+`payments.refunded_amount`) from the data: its refundKey is a provider refund id in that
+order's `payments.metadata.refundEventIds` (or it carries `external: true`), so events written
+before this change are classified exactly, with no backfill. Evidence:
+`packages/repo/test/do-refund-ceiling.test.ts`, 10 cases (9 red on origin/main, plus a
+legacy-event case that goes red when the refund-id match is removed). Cost if wrong: a provider
+booking whose refund id never reached `refundEventIds` is counted twice and a later legitimate
+refund is refused with REFUND_EXCEEDS_ORDER, which the merchant settles by hand.
