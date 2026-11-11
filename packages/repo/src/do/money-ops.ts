@@ -31,6 +31,7 @@ import {
   markRefundIndeterminate,
   matchRefundToClaim,
   recordInstapayRefund,
+  recordManualRefund,
   releaseRefund,
   type ConfirmedTransaction,
   type PaymentWebhookInput,
@@ -203,6 +204,7 @@ export type MoneyOpName =
   | 'refundRelease'
   | 'refundMatchClaim'
   | 'instapayRefundRecord'
+  | 'manualRefundRecord'
   | 'refundIndeterminate'
   | 'refundBook'
   | 'journalSale'
@@ -342,6 +344,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'refundRelease',
   'refundMatchClaim',
   'instapayRefundRecord',
+  'manualRefundRecord',
   'refundIndeterminate',
   'refundBook',
   'journalSale',
@@ -728,6 +731,15 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
         a.record && typeof a.record === 'object' && !Array.isArray(a.record)
           ? (a.record as Record<string, unknown>)
           : {},
+      actorUserId: typeof a.actorUserId === 'string' ? a.actorUserId : null,
+    }),
+  /** The merchant's "I refunded it outside a provider" record on `refunded` (MONEYB-5), bounded by the order balance (#624). */
+  manualRefundRecord: (db, storeId, a) =>
+    recordManualRefund(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      method: typeof a.method === 'string' ? a.method.slice(0, 40) : 'other',
+      reference: typeof a.reference === 'string' ? a.reference.slice(0, 120) : null,
       actorUserId: typeof a.actorUserId === 'string' ? a.actorUserId : null,
     }),
   refundRelease: (db, storeId, a) =>

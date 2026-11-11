@@ -31,6 +31,7 @@ import {
   selectOpenExecutedClaims,
 } from '../../../shared/src/refunds/refund-settlement';
 import { cancelOrder, refundOrder } from './refund';
+import { assertRefundable, refundableBalance } from './refundable';
 import { approveSubmittedReceipts, ensureReceiptSchema } from './instapay-receipts';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -459,7 +460,17 @@ export function beginRefund(
         'Refund amount exceeds the un-refunded balance of this payment.',
         400
       );
-    const amount = a.amount ?? remaining;
+    // #624: the order's ONE refundable balance (store credit, InstaPay, cash returns, other payments) caps this leg too
+    const orderLeft = refundableBalance(db, a.storeId, p.order_id).refundable;
+    const cap = Math.min(remaining, orderLeft);
+    if (cap <= 0 || (a.amount !== undefined && a.amount > cap))
+      throw err(
+        'REFUND_EXCEEDS_REMAINING',
+        'Refund amount exceeds what is left to refund on this order: earlier refunds (store credit, InstaPay or a cash return) already cover part of it.',
+        400,
+        { remaining: Math.max(0, cap) }
+      );
+    const amount = a.amount ?? cap;
     const isFull = amount >= remaining;
     const flipsOrder = isFull && !a.itemLevel;
     const o = loadOrder(db, a.storeId, p.order_id);
@@ -1785,6 +1796,8 @@ export function recordInstapayRefund(
     if (remaining <= 0) throw err('ALREADY_REFUNDED', 'This payment is fully refunded', 409);
     if (a.amountMinor > remaining)
       throw err('INVALID_REFUND_AMOUNT', `Refund must be between 1 and ${remaining} piastres`, 400);
+    // #624: one refundable balance across every channel (a store credit already given counts)
+    assertRefundable(db, a.storeId, a.orderId, a.amountMinor);
     const full = a.amountMinor === remaining;
     const status = full ? 'refunded' : 'partially_refunded';
     db.run(
@@ -1830,5 +1843,83 @@ export function recordInstapayRefund(
       refundedAmount: p.refunded_amount + a.amountMinor,
       orderStatus: order.status,
     };
+  });
+}
+
+/**
+ * A refund the merchant made OUTSIDE a payment provider (cash handed back, an InstaPay or bank transfer), recorded when
+ * they mark the order refunded (ruling MONEYB-5). Port of OrderService.recordManualRefund, which wrote through Prisma
+ * and so could not run on a Durable Object store at all. #624: what is recorded is bounded by the order's ONE refundable
+ * balance, so money already given back as store credit, a wallet give-back or another refund is not recorded twice:
+ * each captured payment is marked refunded for what is left on it, up to what is left on the order. A replay finds no
+ * captured payment left and writes nothing.
+ */
+export function recordManualRefund(
+  db: SyncSql,
+  a: {
+    storeId: string;
+    orderId: string;
+    method: string;
+    reference: string | null;
+    actorUserId: string | null;
+    now?: number;
+  }
+): { recorded: number; payments: number } {
+  need(a.orderId, 'orderId');
+  const now = a.now ?? Date.now();
+  return db.transactionSync(() => {
+    loadOrder(db, a.storeId, a.orderId);
+    const rows = db.all(
+      `SELECT p.id FROM payments p JOIN orders o ON o.id = p.order_id
+        WHERE o.store_id = ? AND p.order_id = ? AND p.status IN ('completed', 'partially_refunded')
+        ORDER BY p.created_at, p.id`,
+      [a.storeId, a.orderId]
+    );
+    let left = Math.max(0, refundableBalance(db, a.storeId, a.orderId).refundable);
+    let recorded = 0;
+    for (const r of rows) {
+      const p = loadPayment(db, a.storeId, r.id as string);
+      const amount = Math.min(Math.max(0, p.amount - p.refunded_amount), left);
+      left -= amount;
+      recorded += amount;
+      const meta = parse(p.metadata);
+      db.run(
+        "UPDATE payments SET status = 'refunded', refunded_amount = refunded_amount + ?, metadata = ?, updated_at = ? WHERE id = ?",
+        [
+          amount,
+          JSON.stringify({
+            ...meta,
+            refundMethod: a.method,
+            refundReference: a.reference,
+            refundRecordedBy: a.actorUserId,
+            refundRecordedAt: new Date(now).toISOString(),
+            refundSource: 'manual_record',
+            ...(amount < p.amount - p.refunded_amount
+              ? { refundCoveredElsewhere: p.amount - p.refunded_amount - amount }
+              : {}),
+          }),
+          now,
+          p.id,
+        ]
+      );
+      addPaymentEvent(db, {
+        storeId: a.storeId,
+        paymentId: p.id,
+        orderId: a.orderId,
+        eventType: 'status_change',
+        from: p.status,
+        to: 'refunded',
+        provider: p.provider,
+        details: { reason: 'manual_refund_recorded', method: a.method, amountMinor: amount },
+        userId: a.actorUserId,
+        now,
+      });
+    }
+    if (rows.length > 0)
+      db.run(
+        "UPDATE orders SET payment_status = 'refunded', updated_at = ? WHERE id = ? AND store_id = ?",
+        [now, a.orderId, a.storeId]
+      );
+    return { recorded, payments: rows.length };
   });
 }

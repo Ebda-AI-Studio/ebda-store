@@ -714,6 +714,12 @@ export interface MoneyClient {
     actorUserId: string;
     orderId?: string;
   }): Promise<{ result: 'matched' | 'already_matched' }>;
+  manualRefundRecord(a: {
+    orderId: string;
+    method: string;
+    reference: string | null;
+    actorUserId: string | null;
+  }): Promise<{ recorded: number; payments: number }>;
   instapayRefundRecord(a: {
     orderId: string;
     referenceKey: string;
@@ -1550,6 +1556,7 @@ export function makeMoneyClient(
     refundRelease: (a, key) => call('refundRelease', a, key),
     refundMatchClaim: a => call('refundMatchClaim', a),
     instapayRefundRecord: a => call('instapayRefundRecord', a),
+    manualRefundRecord: a => call('manualRefundRecord', a),
     refundIndeterminate: (a, key) => call('refundIndeterminate', a, key),
     refundBook: (a, key) => call('refundBook', a, key),
     journalSale: (a, key) => call('journalSale', a, key),

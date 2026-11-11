@@ -1,6 +1,7 @@
 import { settleFiscalOnReversal } from './fiscal';
 import { postWalletMovementJournal } from './ledger';
 import { reverseEarnedPointsFromOrder, reverseRedeemedPointsFromOrder } from './loyalty';
+import { refundableBalance } from './refundable';
 import { recordMovement, restock } from './stock';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -198,7 +199,12 @@ export function reverseOrderPayment(
        WHERE store_id = ? AND order_id = ? AND idempotency_key LIKE 'return-credit:%' AND amount > 0`,
       [a.storeId, a.orderId]
     )[0].s as number;
-    const remaining = -(spend.amount as number) - returned - credited;
+    // #624: never give back more than the order's one refundable balance leaves (a card / InstaPay / cash refund of the
+    // same order may already have covered part of the wallet share)
+    const remaining = Math.min(
+      -(spend.amount as number) - returned - credited,
+      refundableBalance(db, a.storeId, a.orderId).refundable
+    );
     if (remaining <= 0) return null;
     const r = applyWalletEntry(db, {
       storeId: a.storeId,
@@ -689,32 +695,30 @@ export function refundOrder(
       review = 'order_not_confirmed';
     }
 
-    // Bound EVERYTHING credited back for this order, across all partial events and channels, by what was actually paid:
-    // provider/cash amounts recorded on events + store credit already written to the wallet ledger + this call.
-    // (`o.total` is the ceiling for a paid order; an unpaid one has only its wallet share captured.) Same transaction
-    // as the writes below, so two partials racing at the boundary cannot both win.
+    // Two ceilings, same transaction as the writes below (two partials racing at the boundary cannot both win):
+    //  - amount-only bookings (provider/cash amounts recorded on events) stay bounded by what the order captured;
+    //  - store credit is bounded by the order's ONE refundable balance across every channel (#624: card, InstaPay,
+    //    store credit, wallet give-backs, cash returns), so it can never be paid on top of a card refund of the same money.
     const priorAmount = db.all(
       `SELECT COALESCE(SUM(json_extract(metadata, '$.amount')), 0) AS s FROM order_events
        WHERE store_id = ? AND order_id = ? AND to_status IN (?, ?)`,
       [a.storeId, a.orderId, PARTIAL_RESTORE_MARKER, PARTIAL_REFUND_MARKER]
     )[0].s as number;
-    const priorCredit = db.all(
-      `SELECT COALESCE(SUM(amount), 0) AS s FROM wallet_transactions
-       WHERE store_id = ? AND order_id = ? AND idempotency_key LIKE 'return-credit:%' AND amount > 0`,
-      [a.storeId, a.orderId]
-    )[0].s as number;
     const captured =
       o.payment_status === 'paid' || o.payment_status === 'disputed'
         ? o.total
         : (o.wallet_amount ?? 0);
-    if (priorAmount + priorCredit + (amount ?? 0) + (walletCredit ?? 0) > captured) {
+    const bal = refundableBalance(db, a.storeId, a.orderId);
+    // an EXTERNAL amount is already mirrored on payments.refunded_amount (counted in `bal`); a merchant-booked one is not
+    const adds = (a.external ? 0 : (amount ?? 0)) + (walletCredit ?? 0);
+    if (priorAmount + (amount ?? 0) > captured || adds > bal.refundable || bal.refundable < 0) {
       if (a.external) review = review ?? 'refund_exceeds_order';
       else
         throw new MoneyError(
           'REFUND_EXCEEDS_ORDER',
           'refunds and store credit would exceed what the customer paid',
           409,
-          { captured, prior: priorAmount + priorCredit }
+          { captured, prior: priorAmount, refundable: Math.max(0, bal.refundable) }
         );
     }
 
@@ -769,6 +773,8 @@ export function refundOrder(
         items: restored,
         ...(amount !== undefined ? { amount } : {}),
         ...(walletCredit !== undefined ? { walletCredit } : {}),
+        // mirrored on payments.refunded_amount: refundableBalance must not count this amount a second time
+        ...(a.external ? { external: true } : {}),
         ...(review ? { review } : {}),
       },
       now
