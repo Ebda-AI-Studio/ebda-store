@@ -3426,6 +3426,14 @@ html[lang='en'] .studio-home h1 {
   max-width: 34ch;
   font-size: 1.125rem;
 }
+.sh-win-saving {
+  margin: 0;
+  max-width: 40ch;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
 .sh-win .actions {
   margin-top: 8px;
 }
