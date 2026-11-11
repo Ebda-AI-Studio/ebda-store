@@ -925,6 +925,11 @@ jobs:
         run: |
           echo "shards=$SHARDS"
           [ "$SHARDS" = "success" ] || { echo "::error::a unit shard did not pass ($SHARDS)"; exit 1; }
+      - name: Private TMPDIR per runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
