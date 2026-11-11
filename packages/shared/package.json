@@ -28,6 +28,10 @@
       "import": "./dist/constants/index.js",
       "default": "./src/constants/index.ts"
     },
+    "./design": {
+      "types": "./src/design.ts",
+      "default": "./src/design.ts"
+    },
     "./brand": {
       "types": "./src/brand/index.ts",
       "default": "./src/brand/index.ts"

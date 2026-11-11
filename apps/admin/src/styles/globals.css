@@ -1,3 +1,7 @@
+/* Ebda design language v1: the vendored foundation variables (--ebda-*: gold, night, type, radius, control, motion). Never edit
+   the vendored file; the admin roles below are derived from it (proved by tests/unit/admin-design-tokens-sync.test.ts). */
+@import '../../../../packages/shared/src/foundation/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -67,7 +71,7 @@
     --ring: 36.4 36.03% 51.57%;
 
     /* Radius - Softer, more modern */
-    --radius: 0.875rem;
+    --radius: var(--ebda-radius-surface);
 
     /* Sidebar - Subtle warmth */
     --sidebar: 30 20% 99%;
@@ -84,10 +88,10 @@
     --shadow-primary: 0 4px 14px 0 hsl(36.4 36.03% 51.57% / 0.25);
 
     /* Motion tokens (mirrors components/ui/tokens.ts MOTION): fast = colour/press, base = menus/tabs, slow = sheets. */
-    --dur-fast: 150ms;
-    --dur-base: 200ms;
-    --dur-slow: 300ms;
-    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --dur-fast: var(--ebda-dur-fast);
+    --dur-base: var(--ebda-dur-base);
+    --dur-slow: var(--ebda-dur-slow);
+    --ease-out: var(--ebda-ease);
   }
 
   @media (min-width: 768px) {

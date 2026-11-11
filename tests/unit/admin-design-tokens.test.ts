@@ -18,23 +18,13 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { GUARD_RULES, countRule, navIssues, type GuardRule } from '@ebda/shared/design';
 
 const SRC = join(__dirname, '../../apps/admin/src');
 const BASELINE = join(__dirname, 'admin-design-tokens.baseline.json');
 const TOKENS = 'components/ui/tokens.ts';
 
-const PALETTE =
-  'gray|slate|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
-export const RULES: Record<string, RegExp> = {
-  G1: new RegExp(
-    `(?<![\\w-])(?:[a-z-]+:)*(?:text|bg|border|ring|from|to|via|fill|stroke|divide|outline|decoration|accent|caret|placeholder)-(?:${PALETTE})-\\d{2,3}(?:/\\d+)?(?![\\w-])`,
-    'g'
-  ),
-  G2: /(?<![\w-])(?:[a-z-]+:)*text-\[\d+(?:\.\d+)?(?:px|rem)\](?![\w-])/g,
-  G3: /#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b/g,
-  G4: /(?<=[\s'"`:])(?:[a-z-]+:)*rounded(?=[\s'"`])/g,
-  G5: /(?<![\w-])(?:[a-z-]+:)*tracking-(?:tighter|tight|wide|wider|widest)(?![\w-])/g,
-};
+const RULES = GUARD_RULES;
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap(n => {
@@ -42,44 +32,6 @@ function walk(dir: string): string[] {
     if (statSync(p).isDirectory()) return n === 'node_modules' || n === '__tests__' ? [] : walk(p);
     return /\.tsx?$/.test(n) && !/\.(test|spec)\./.test(n) ? [p] : [];
   });
-}
-
-/** The source with line comments and block comments blanked (so prose never trips a rule). */
-export function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:'"`])\/\/[^\n]*/g, (m, a) => a + ' '.repeat(m.length - a.length));
-}
-
-export function countRule(rule: string, src: string): number {
-  return (stripComments(src).match(RULES[rule]) ?? []).length;
-}
-
-/** The JSX opening tag starting at `i` (brace-balanced, so `=>` inside handlers does not end it). */
-function openingTag(src: string, i: number): string {
-  let depth = 0;
-  for (let j = i; j < src.length; j++) {
-    const c = src[j];
-    if (c === '{') depth++;
-    else if (c === '}') depth--;
-    else if (c === '>' && depth === 0 && src[j - 1] !== '=') return src.slice(i, j + 1);
-  }
-  return src.slice(i);
-}
-
-/** Everything the className attribute can resolve to (static string or the whole expression). */
-function classAttr(tag: string): string {
-  const s = tag.match(/\bclassName="([^"]*)"/);
-  if (s) return s[1];
-  const at = tag.search(/\bclassName=\{/);
-  if (at < 0) return '';
-  let depth = 0;
-  const start = tag.indexOf('{', at);
-  for (let j = start; j < tag.length; j++) {
-    if (tag[j] === '{') depth++;
-    else if (tag[j] === '}' && --depth === 0) return tag.slice(start + 1, j);
-  }
-  return tag.slice(start + 1);
 }
 
 type Counts = Record<string, Record<string, number>>; // rule -> file -> n
@@ -92,19 +44,11 @@ function scan(): { counts: Counts; nav: string[] } {
     if (file === TOKENS) continue;
     const src = readFileSync(p, 'utf8');
     for (const r of Object.keys(RULES)) {
-      const n = countRule(r, src);
+      const n = countRule(r as GuardRule, src);
       if (n) counts[r][file] = n;
     }
-    if (p.endsWith('.tsx')) {
-      const re = /<[A-Za-z.]+(?=[\s>])/g;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(src))) {
-        const tag = openingTag(src, m.index);
-        if (!/\bdata-ui=["']nav["']/.test(tag)) continue;
-        if (!/\b(?:navItemClasses|bottomNavClasses)\(/.test(classAttr(tag)))
-          nav.push(`${file}:${src.slice(0, m.index).split('\n').length}`);
-      }
-    }
+    if (p.endsWith('.tsx'))
+      nav.push(...navIssues(file, src, ['navItemClasses', 'bottomNavClasses']));
   }
   return { counts, nav };
 }
@@ -125,6 +69,14 @@ describe('admin design tokens', () => {
     expect(countRule('G5', 'className="tracking-normal"')).toBe(0);
     expect(countRule('G1', '// text-red-500 in a comment\nconst a = 1;')).toBe(0);
     expect(countRule('G1', '/* bg-blue-500 */ const a = 1;')).toBe(0);
+  });
+
+  it('negative control: a hand-styled nav item is caught (G6)', () => {
+    const bad = '<Link data-ui="nav" className="rounded px-3 bg-primary" href="/x">x</Link>';
+    const good =
+      '<Link data-ui="nav" className={navItemClasses({ kind: \'tab\', active })} href="/x">x</Link>';
+    expect(navIssues('a.tsx', bad, ['navItemClasses'])).toEqual(['a.tsx:1']);
+    expect(navIssues('a.tsx', good, ['navItemClasses'])).toEqual([]);
   });
 
   it('nav items take their classes from the tokens (G6)', () => {

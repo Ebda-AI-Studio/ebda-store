@@ -1,23 +1,27 @@
 {
   "tag": "v0.1.0",
-  "commit": "6e307bd69aff0d60b1ee8c048ab93f264694e7fe",
+  "commit": "2661c7301001fbcf5975d86ad3fd173b95db0f3f",
   "dir": "packages/shared/src/foundation",
   "parity": "tests/unit/foundation-parity.test.ts",
   "files": {
     "packages/shared/src/foundation/brand.ts": "c63b01e1ec0367048e9a84f5b7a0d29239ffdeec978ed220226a37cc73031a39",
     "packages/shared/src/foundation/buyer.ts": "2d5434657f733827423796f5a3782ca1d6794d0e9e802332cf0f9a6778e455e8",
-    "packages/shared/src/foundation/package.json": "998888a74872410662d37e452ee7f51daf959c23718a5cbd6bdf4924f1ffc6ca",
+    "packages/shared/src/foundation/guards.ts": "46b7a67097ff6f7eb49246a01738a4845096e1eb01c828cbd73b48b02db801c6",
+    "packages/shared/src/foundation/package.json": "879e24868f0064437f6e1fe4d9bd40a09c4f41ab3d8725249e437bbdb38b091c",
     "packages/shared/src/foundation/phone.ts": "30d8982b7094b392d00795685fd7cb5d4f0b482d6ff564c7aec40d6eb67f5f97",
-    "packages/shared/src/foundation/slugs.ts": "6740ea2faf4e2ef052b7b36f2f3e5ff17d0c6f294982588f51c40c9c72d66a74",
+    "packages/shared/src/foundation/slugs.ts": "173ffba46dd5891b8ba19b4387274e5fb235914d3254cb8fa8b8e98087350c9c",
     "packages/shared/src/foundation/text.ts": "4c7f5a933b0054129b1bb5a23127ab4a635dab6ee2fbac66c5c2312ff16c29fb",
-    "packages/shared/src/foundation/tokens.css": "f5e7519d2f8bd180e4e0187149e0caaa8e25ec70e9386e9dab302a44d02e323b",
-    "packages/shared/src/foundation/tokens.ts": "e29a62b04da14801af32297b77ff70f030237f707e7b5c6d35242f4a93825c89",
+    "packages/shared/src/foundation/tokens.css": "4f16a84ce2b1694ebc4abffab70a5abc4d1a9d19d9172c3b6f9fb3f31e7bda16",
+    "packages/shared/src/foundation/tokens.ts": "4b456a8a2ecc94cb54abceed8ec504ab75e58123d3d13c31696277d2d866f774",
     "packages/shared/src/foundation/vectors/arabic.json": "f96f8a9ff29c75cb1a06d7432298c5308d043224a2d8d801bb2103759b398fd4",
     "packages/shared/src/foundation/vectors/buyer-key-probe.json": "a38b2f9b58b3eb5cdbd0df21eecea0098109583a040bcbe8a90ca76826605cad",
     "packages/shared/src/foundation/vectors/buyer-key.json": "00c47c95622dc2516d3c86d492e609fc0f8659b5645416fd076634e245c62ca1",
     "packages/shared/src/foundation/vectors/phone.json": "f1d99cadf8396fe60d04e4361edb2e46f595bfcaf7a0e0b0a72e2c10fd57009b",
-    "packages/shared/src/foundation/vectors/slugs.json": "9c34ae2167996387b7af93adf2ebc0ad714a2d4928537e5ba3a37ba6dab1a41e",
+    "packages/shared/src/foundation/vectors/slugs.json": "2564035e04d9517530deb8a8665e876888f1cf51b04aa5375507abb2d53e0e08",
     "tests/unit/foundation-parity.test.ts": "308c44b69b0e3337e7a51e2b425d48b351842b7d65ab5ca1652d84cdb36829e1"
   },
-  "managed": []
+  "managed": [],
+  "held": {
+    "packages/shared/src/foundation/brand.ts": "brand.ts is held at the previously locked copy (6e307bd): foundation #40 changed the legal names and dropped company.foundedOn, which the Store marketing pages and JSON-LD read. Adopting it is a separate brand PR; ui-w2 takes tokens and guards only."
+  }
 }
