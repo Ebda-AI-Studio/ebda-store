@@ -114,16 +114,26 @@ export async function hit(
   const useAcct = !!budget.brake && budget.perAccount !== undefined;
   // ONE batch = one transaction: admission is decided BEFORE the guarded work runs, so N parallel guesses are admitted
   // at most `cap` times in total and the rest are refused without being evaluated.
+  //
+  // The row time carries a per-request fraction so the account statement can recognise THIS request's own address rows: an
+  // account slot is claimed only when this request's pair and address counters both admitted it (Issue 664). Otherwise a
+  // locked-out address firing parallel requests would fill the account cap and lock the owner out.
+  const rowAt = at + Math.random() * 0.99;
+  const acctGuarded = `INSERT INTO login_attempts (key, at) SELECT ?1, ?2 WHERE (?5 = 1 OR EXISTS (SELECT 1 FROM login_attempts WHERE key = ?6 AND at = ?2)) AND (?7 = 1 OR EXISTS (SELECT 1 FROM login_attempts WHERE key = ?8 AND at = ?2)) AND (SELECT count(*) FROM login_attempts WHERE key = ?1 AND at > ?3) < ?4 RETURNING rowid AS id`;
   const res = await db.batch([
     db
       .prepare(skipKey ? `SELECT NULL AS id WHERE 0` : guarded)
-      .bind(...(skipKey ? [] : [sKey, at, since, budget.perKey])),
+      .bind(...(skipKey ? [] : [sKey, rowAt, since, budget.perKey])),
     db
       .prepare(skipIp ? `SELECT NULL AS id WHERE 0` : guarded)
-      .bind(...(skipIp ? [] : [iKey, at, since, budget.perIp])),
+      .bind(...(skipIp ? [] : [iKey, rowAt, since, budget.perIp])),
     db
-      .prepare(useAcct ? guarded : `SELECT NULL AS id WHERE 0`)
-      .bind(...(useAcct ? [aKey, at, since, budget.perAccount] : [])),
+      .prepare(useAcct ? acctGuarded : `SELECT NULL AS id WHERE 0`)
+      .bind(
+        ...(useAcct
+          ? [aKey, rowAt, since, budget.perAccount, skipKey ? 1 : 0, sKey, skipIp ? 1 : 0, iKey]
+          : [])
+      ),
     // opportunistic cleanup keeps the table small
     db.prepare(`DELETE FROM login_attempts WHERE at < ?1`).bind(at - 2 * MAX_WINDOW_MS),
   ]);
