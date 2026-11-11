@@ -15,6 +15,11 @@ vi.mock('../src/lib/inngest/client', async orig => {
       get: (t, k) =>
         k === 'send'
           ? async (e: { name: string }) => {
+              const g = globalThis as { __failSend?: boolean };
+              if (g.__failSend) {
+                g.__failSend = false;
+                throw new Error('queue down');
+              }
               sent.push(e);
             }
           : t[k as string],
@@ -40,9 +45,10 @@ vi.mock('../src/services/redis.service', () => ({
 }));
 
 import { createPostgresRemovedClient, runWithRequestDb } from '@ebda/database';
+import { PaymentService } from '../src/services/payment-providers/payment.factory';
 import { createBridge } from '../src/lib/wa/bridge/service';
 import { redeemWaCheckout } from '../src/lib/wa/bridge/redeem';
-import { createDoPort } from '../src/lib/wa/bridge/do-port';
+import { createDoPort, refusalOf } from '../src/lib/wa/bridge/do-port';
 
 const e = env as unknown as {
   PLATFORM_DB: D1Database;
@@ -377,5 +383,149 @@ describe('WhatsAppBridge on a real StoreDO', () => {
       redeemed: false,
       reason: 'invalid',
     });
+  });
+});
+
+const C = '0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c';
+const cod = (key: string, id = 'shop-c-p1', qty = 1, phone = buyer.phoneE164) => ({
+  items: [{ variantId: id, quantity: qty }],
+  buyer: { ...buyer, phoneE164: phone },
+  address: { area: 'Maadi', street: '9 Road 233' },
+  paymentMethod: 'cod' as const,
+  idempotencyKey: key,
+});
+
+describe('WA-RPC-8: replay completes the order (#616) and refusals are typed (#617)', () => {
+  it('fixture: store C with an active and an archived product', async () => {
+    await seedStore(C, 'shop-c', 20);
+    await sql(
+      C,
+      "INSERT INTO products (id, store_id, name, slug, price, inventory, status) VALUES ('shop-c-gone', ?, 'Old', 'old', 5000, 5, 'archived')",
+      C
+    );
+  });
+
+  it('#616: the payment step fails after the order committed; the retry with the same key completes payment row, buyer key and order/created', async () => {
+    const b = bridge();
+    const spy = vi
+      .spyOn(PaymentService, 'recordCodPayment')
+      .mockRejectedValueOnce(new Error('transient'));
+    const before = sent.filter(x => x.name === 'order/created').length;
+    await expect(b.createOrderFromChat(C, cod('example-idem-r616a'))).rejects.toThrow('transient');
+    expect(await num(C, 'SELECT count(*) AS n FROM orders')).toBe(1); // the order committed
+    expect(await num(C, 'SELECT count(*) AS n FROM payments')).toBe(0);
+    expect(sent.filter(x => x.name === 'order/created').length).toBe(before); // nothing announced yet
+    const r = await b.createOrderFromChat(C, cod('example-idem-r616a'));
+    spy.mockRestore();
+    expect(r).toMatchObject({ ok: true });
+    expect(await num(C, 'SELECT count(*) AS n FROM orders')).toBe(1);
+    expect(
+      await num(
+        C,
+        "SELECT count(*) AS n FROM payments WHERE provider = 'cod' AND status = 'cod_pending'"
+      )
+    ).toBe(1);
+    expect(
+      (await sql<{ buyer_key: string }>(C, 'SELECT buyer_key FROM orders'))[0]!.buyer_key
+    ).toBe(BK);
+    expect(sent.filter(x => x.name === 'order/created').length).toBe(before + 1);
+    // the buyer can now see it
+    expect(await b.listCustomerOrders(C, BK, 5)).toMatchObject({
+      ok: true,
+      value: { items: [{ orderNumber: expect.any(String) }] },
+    });
+    // a further replay changes nothing (one order, one payment row, stamp is fill-only)
+    await b.createOrderFromChat(C, cod('example-idem-r616a'));
+    expect(await num(C, 'SELECT count(*) AS n FROM orders')).toBe(1);
+    expect(await num(C, 'SELECT count(*) AS n FROM payments')).toBe(1);
+  });
+
+  it('#616: a failed order/created send is not swallowed: it throws, and the retry sends it', async () => {
+    const b = bridge();
+    (globalThis as { __failSend?: boolean }).__failSend = true;
+    const before = sent.filter(x => x.name === 'order/created').length;
+    await expect(
+      b.createOrderFromChat(C, cod('example-idem-r616b', 'shop-c-p1', 1, '+201112345678'))
+    ).rejects.toThrow('queue down');
+    expect(
+      await b.createOrderFromChat(C, cod('example-idem-r616b', 'shop-c-p1', 1, '+201112345678'))
+    ).toMatchObject({ ok: true });
+    expect(sent.filter(x => x.name === 'order/created').length).toBe(before + 1);
+  });
+
+  it('#617: an archived product is a permanent out_of_stock with its id and code, not a throw', async () => {
+    const r = await bridge().createOrderFromChat(C, cod('example-idem-r617a', 'shop-c-gone'));
+    expect(r).toMatchObject({
+      ok: false,
+      reason: 'out_of_stock',
+      outOfStock: ['shop-c-gone'],
+      code: 'PRODUCT_UNAVAILABLE',
+    });
+  });
+
+  it('#617: the same key with different lines is a typed invalid (IDEMPOTENCY_CONFLICT), not retried forever', async () => {
+    const b = bridge();
+    await b.createOrderFromChat(C, cod('example-idem-r617b', 'shop-c-p1', 1, '+201212345678'));
+    const r = await b.createOrderFromChat(
+      C,
+      cod('example-idem-r617b', 'shop-c-p1', 2, '+201212345678')
+    );
+    expect(r).toMatchObject({ ok: false, reason: 'invalid', code: 'IDEMPOTENCY_CONFLICT' });
+  });
+
+  it('#617: a phone with too many open COD orders is a typed invalid (TOO_MANY_OPEN_ORDERS)', async () => {
+    const b = bridge();
+    const phone = '+201512345678';
+    const answers = [] as unknown[];
+    for (let i = 0; i < 6; i++)
+      answers.push(
+        await b.createOrderFromChat(C, cod(`example-idem-r617c${i}`, 'shop-c-p1', 1, phone))
+      );
+    expect(
+      answers.some(
+        a =>
+          (a as { code?: string }).code === 'TOO_MANY_OPEN_ORDERS' &&
+          (a as { reason: string }).reason === 'invalid'
+      )
+    ).toBe(true);
+  });
+
+  it('#617: refusalOf classifies every engine code; transient and unknown errors are NOT refusals', () => {
+    for (const code of [
+      'OUT_OF_STOCK',
+      'PRODUCT_UNAVAILABLE',
+      'VARIANT_UNAVAILABLE',
+      'VARIANT_INACTIVE',
+    ])
+      expect(refusalOf({ code, message: 'm' }, ['v1']), code).toMatchObject({
+        reason: 'out_of_stock',
+        outOfStock: ['v1'],
+        code,
+      });
+    for (const code of [
+      'MIN_ORDER_NOT_MET',
+      'TOO_MANY_OPEN_ORDERS',
+      'IDEMPOTENCY_CONFLICT',
+      'VARIANT_REQUIRED',
+      'COUPON_INVALID',
+      'INSUFFICIENT_WALLET',
+      'GOLD_PRICE_DRIFT',
+      'GOLD_PREPAID_REQUIRED',
+      'TOTAL_TOO_LARGE',
+    ])
+      expect(refusalOf({ code, message: 'm' }, ['v1']), code).toMatchObject({
+        reason: 'invalid',
+        code,
+      });
+    expect(refusalOf({ code: 'SOMETHING_NEW', statusCode: 409, message: 'm' }, [])).toMatchObject({
+      reason: 'invalid',
+      code: 'SOMETHING_NEW',
+    });
+    expect(refusalOf({ code: 'DB_BUSY', statusCode: 503, message: 'm' }, [])).toBeNull();
+    // #662: a pricing invariant breach (status 500) is a bug, not a refusal; any listed code carrying a 5xx is not a refusal
+    expect(refusalOf({ code: 'NEGATIVE_TOTAL', status: 500, message: 'm' }, [])).toBeNull();
+    expect(refusalOf({ code: 'BAD_ARGS', status: 500, message: 'm' }, [])).toBeNull();
+    expect(refusalOf({ code: 'OUT_OF_STOCK', status: 500, message: 'm' }, ['v1'])).toBeNull();
+    expect(refusalOf(new Error('boom'), [])).toBeNull();
   });
 });

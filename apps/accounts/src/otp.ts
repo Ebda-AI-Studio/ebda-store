@@ -94,28 +94,38 @@ export async function verifyOtp(
 ): Promise<OtpResult> {
   const fail: OtpResult = { ok: false, pending: null };
   if (!/^\d{6}$/.test(code ?? '')) return fail;
-  const row = await db
+  const live = await db
     .prepare(
-      `SELECT id, token, attempts, pending FROM verification_tokens
+      `SELECT id FROM verification_tokens
        WHERE user_id = ?1 AND type = ?2 AND used_at IS NULL AND sent = 1 AND expires_at > ?3 ORDER BY created_at DESC LIMIT 1`
     )
     .bind(user.id, type, iso())
-    .first<{ id: string; token: string; attempts: number; pending: string | null }>();
+    .first<{ id: string }>();
+  if (!live) return fail;
+  // The attempt is CLAIMED atomically BEFORE the code is compared (Issue 618): one guarded UPDATE ... RETURNING, so K parallel
+  // guesses against one code get at most MAX_ATTEMPTS comparisons in total; the rest find no claim and are refused unevaluated.
+  const row = await db
+    .prepare(
+      `UPDATE verification_tokens SET attempts = attempts + 1
+       WHERE id = ?1 AND used_at IS NULL AND attempts < ?2 RETURNING token, attempts, pending`
+    )
+    .bind(live.id, MAX_ATTEMPTS)
+    .first<{ token: string; attempts: number; pending: string | null }>();
   if (!row) return fail;
   const pending = row.pending ? (JSON.parse(row.pending) as PendingSignup) : null;
   const codeMatches = safeEqual(row.token, await hashCode(user.id, type, code));
   if (!codeMatches || (accept && !(await accept(pending)))) {
-    await db
-      .prepare(
-        `UPDATE verification_tokens SET attempts = attempts + 1, used_at = CASE WHEN attempts + 1 >= ?2 THEN ?3 ELSE used_at END WHERE id = ?1`
-      )
-      .bind(row.id, MAX_ATTEMPTS, iso())
-      .run();
+    // the last claimed attempt burns the code
+    if (row.attempts >= MAX_ATTEMPTS)
+      await db
+        .prepare(`UPDATE verification_tokens SET used_at = ?2 WHERE id = ?1 AND used_at IS NULL`)
+        .bind(live.id, iso())
+        .run();
     return fail;
   }
   const res = await db
     .prepare(`UPDATE verification_tokens SET used_at = ?2 WHERE id = ?1 AND used_at IS NULL`)
-    .bind(row.id, iso())
+    .bind(live.id, iso())
     .run();
   if ((res.meta.changes ?? 0) !== 1) return fail;
   return { ok: true, pending };
