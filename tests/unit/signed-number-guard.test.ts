@@ -36,7 +36,7 @@ const NUMBERISH =
   /amount|total|price|count|delta|points|money|format|fmt|fee|balance|qty|quantity|refund|discount|cost|sum|minor|piastre|fils|percent|pct|major/i;
 /** A word that labels a number ("EGP-", "total-"): a sign after it is a sign, not a hyphen. */
 const LABEL_WORD =
-  /^(egp|usd|sar|kwd|aed|eur|gbp|total|subtotal|refund|refunded|discount|amount|price|balance|net|fee|tax|credit|debit|points|ج\.م|جنيه|ر\.س)$/i;
+  /^(egp|total|subtotal|refund|refunded|discount|amount|price|balance|net|fee|tax|credit|debit|points|ج\.م|جنيه)$/i;
 
 /** JSX text with the sign entities decoded (`&minus;`, `&#8722;`, `&#x2212;`, `&plus;`, `&#43;`). */
 export function decodeSignEntities(text: string): string {
