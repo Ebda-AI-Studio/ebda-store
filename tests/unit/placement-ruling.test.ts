@@ -6,18 +6,25 @@ import { join } from 'node:path';
 const root = join(__dirname, '../..');
 const read = (p: string) => readFileSync(join(root, p), 'utf8');
 
-/** The "on" row of the ruling's table: whitespace-tolerant, because prettier pads every table cell to the column width. */
+/**
+ * Every "on" row of the ruling's table (whitespace-tolerant: prettier pads every cell). Measured only when ALL of them carry numbers
+ * in both columns and together they cover the hit and the miss path; one NOT MEASURED cell anywhere makes it unmeasured.
+ */
 export function onArm(md: string): 'missing' | 'unmeasured' | 'measured' {
-  const row = md.split('\n').find(l => /^\|\s*on\s*\|/.test(l));
-  if (!row) return 'missing';
-  const cells = row
-    .split('|')
-    .slice(1, -1)
-    .map(c => c.trim());
-  if (cells.slice(2).some(c => /NOT MEASURED/i.test(c))) return 'unmeasured';
-  return cells.slice(2).length >= 2 && cells.slice(2).every(c => /^\d+(\.\d+)?\s*ms$/.test(c))
-    ? 'measured'
-    : 'unmeasured';
+  const rows = md
+    .split('\n')
+    .filter(l => /^\|\s*on\s*\|/.test(l))
+    .map(l =>
+      l
+        .split('|')
+        .slice(1, -1)
+        .map(c => c.trim())
+    );
+  if (rows.length === 0) return 'missing';
+  const numeric = (c: string) => /^\d+(\.\d+)?\s*ms$/.test(c);
+  if (!rows.every(r => r.length >= 4 && numeric(r[2]!) && numeric(r[3]!))) return 'unmeasured';
+  const paths = rows.map(r => r[1]!.toLowerCase()).join(' ');
+  return /hit/.test(paths) && /miss/.test(paths) ? 'measured' : 'unmeasured';
 }
 
 const prettified = async (md: string) =>
@@ -49,16 +56,30 @@ describe('Smart Placement is only on with a measured ruling (PERF-PLACEMENT-1)',
     expect(onArm(await prettified(ruling))).toBe('unmeasured');
   });
 
-  it('a real "on" flip is recognised after prettier re-pads the cells (and a half flip is not)', async () => {
-    const flipped = ruling.replace(/\| on\s*\|[^\n]*\n/, '| on | hit / miss | 140 ms | 210 ms |\n');
-    expect(flipped).not.toBe(ruling);
-    expect(onArm(await prettified(flipped))).toBe('measured');
-    const half = ruling.replace(
-      /\| on\s*\|[^\n]*\n/,
-      '| on | hit / miss | 140 ms | NOT MEASURED |\n'
+  const ON_ROW = /\| on\s*\|[^\n]*\n/;
+  it('a real "on" flip (one row, or one row per path) is recognised after prettier re-pads the cells', async () => {
+    const one = ruling.replace(ON_ROW, '| on | hit / miss | 140 ms | 210 ms |\n');
+    expect(one).not.toBe(ruling);
+    expect(onArm(await prettified(one))).toBe('measured');
+    const two = ruling.replace(
+      ON_ROW,
+      '| on | hit | 120 ms | 190 ms |\n| on | miss | 160 ms | 240 ms |\n'
     );
-    expect(onArm(await prettified(half))).toBe('unmeasured');
-    const gone = ruling.replace(/\| on\s*\|[^\n]*\n/, '');
-    expect(onArm(gone)).toBe('missing');
+    expect(onArm(await prettified(two))).toBe('measured');
+  });
+
+  it('a half-measured flip is NOT measured, after prettier', async () => {
+    const cases = [
+      '| on | hit / miss | 140 ms | NOT MEASURED |\n',
+      '| on | hit | 120 ms | 190 ms |\n| on | miss | NOT MEASURED | NOT MEASURED |\n',
+      '| on | hit | NOT MEASURED | NOT MEASURED |\n| on | miss | 160 ms | 240 ms |\n',
+      '| on | hit | 120 ms | 190 ms |\n', // miss path never measured
+    ];
+    for (const row of cases)
+      expect(onArm(await prettified(ruling.replace(ON_ROW, row)))).toBe('unmeasured');
+  });
+
+  it('a ruling with no "on" row at all is missing', () => {
+    expect(onArm(ruling.replace(ON_ROW, ''))).toBe('missing');
   });
 });
