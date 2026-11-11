@@ -61,13 +61,13 @@ on:
         type: boolean
         default: false
 
-# Cancel superseded PR runs (a newer push supersedes the older sha), and a superseded main push run: every
-# main push shares ONE group, so the newest main commit's full lane replaces an older one still running (it
-# tests a superset of the older tree). A nightly or manual run gets a group of its own and is never cancelled.
-# Deploys live in other workflows (cf-*-deploy.yml) and are untouched by this group.
+# Cancel superseded PR runs (a newer push supersedes the older sha). A main push gets a group PER MERGE SHA and is
+# never cancelled (Ruling CI-MAIN-SHA-1): with one shared group + cancel-in-progress, a burst of merges cancelled every
+# main full lane in turn (measured 2026-11-11: 4 consecutive main runs `cancelled`, none completed), so main was never
+# proven green. A nightly or manual run gets a group of its own. Deploys live in other workflows (cf-*-deploy.yml).
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && 'main-push' || github.run_id) }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # wrangler >= 4.110 needs Node >= 22, and cf-deploy runs wrangler on 22.
@@ -314,10 +314,17 @@ jobs:
   # workflow pins) runs whenever any code changed; app/package suites run when
   # their workspace (or a dependency) changed. No coverage here: the coverage
   # threshold is enforced by the main lane on the full suite.
+  # Sharded (PREPUSH-4 / CI-SHARD-1): the affected unit suite was ONE 21-minute job, everything else in the PR lane
+  # <= 3 min. `vitest --shard=i/N` splits by file; fail-fast is off so every shard reports. The roll-up job
+  # `Unit Tests (affected)` below keeps the check name stable.
   unit:
-    name: Unit Tests (affected)
+    name: ${{ matrix.shard == 7 && 'Unit workerd extras' || format('Unit shard {0}/6', matrix.shard) }}
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7] # 7 = the workerd extras (no vitest shard), so they run in parallel with 1-6
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 35, not 20: on a congested Umbra runner the SETUP (npm ci, builds, chromium) took 16.5 of the 20 minutes and
     # the job was CANCELLED while its 3.7 minutes of tests were still running (#253, #256: cancelled, not failed).
@@ -356,30 +363,49 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run unit tests (affected paths)
+        if: matrix.shard != 7
         env:
           UNIT_PATHS: ${{ needs.changes.outputs.unit }}
           NODE_OPTIONS: --max-old-space-size=4096
-        run: npx vitest run $UNIT_PATHS --reporter=verbose --retry=0
+        run: npx vitest run $UNIT_PATHS --shard=${{ matrix.shard }}/6 --reporter=verbose --retry=0
 
       # The editor control matrix and the classic-builder parity ratchet (plan 2026-10-22-visual-editor,
       # Task 5): the committed docs/ebda/templates/editor-matrix.* must be current and every not-wired row
       # accepted in scripts/editor-audit/baseline.json. Cheap (a few seconds), so it always runs.
       - name: Editor matrix check
+        if: matrix.shard == 7
         run: npm run editor:matrix:check
 
       # apps/status runs on workerd via @cloudflare/vitest-pool-workers, outside
       # the root vitest config.
       - name: Run status worker tests
-        if: needs.changes.outputs.status_tests == 'true'
+        if: matrix.shard == 7 && needs.changes.outputs.status_tests == 'true'
         run: npm run test:status
 
       # apps/accounts (the shared identity service) runs on workerd with a local D1.
       - name: Run accounts worker tests
-        if: needs.changes.outputs.accounts_tests == 'true'
+        if: matrix.shard == 7 && needs.changes.outputs.accounts_tests == 'true'
         run: npm run test:accounts
       # prisma-lite on a real Durable Object (workerd): the transaction runner contract. ~5 s.
       - name: Run prisma-lite Durable Object tests
+        if: matrix.shard == 7
         run: npm run test:repo-workers
+
+  unit-gate:
+    name: Unit Tests (affected)
+    needs: [changes, unit]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 2
+    steps:
+      - name: Require every unit shard to have passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          UNIT: ${{ needs.unit.result }}
+        run: |
+          echo "changes=$CHANGES unit=$UNIT"
+          [ "$CHANGES" = "success" ] || { echo "::error::could not compute the affected paths ($CHANGES)"; exit 1; }
+          case "$UNIT" in success|skipped) ;; *) echo "::error::a unit shard did not pass ($UNIT)"; exit 1 ;; esac
 
   # Visual builder editor E2E (Phase 2): the admin builder in a real Chromium,
   # Arabic (RTL) and English at 390 / 820 / 1280, against the in-memory API
@@ -570,7 +596,9 @@ jobs:
       # One Next/OpenNext production build at a time: each is ~2 GB resident and ~13 MB/s of I/O, and two at once on the 5 GiB
       # guest repeated the 2026-10-26 swap storm. app-build is HEAVY-lane by design: its job id is not in the guest's
       # light-jobs.conf, so it takes one of the 2 heavy slots (tests/unit/ci-lean-structure.test.ts pins both).
-      max-parallel: 1
+      # On hosted runners (EBDA_RUNS_ON unset) every build has its own VM, so they run in parallel (CI-SHARD-1);
+      # the one-at-a-time limit applies only to the shared Umbra guest.
+      max-parallel: ${{ (vars.EBDA_RUNS_ON == '' && !contains(github.event.pull_request.labels.*.name, 'ci-umbra')) && 6 || 1 }}
       matrix:
         app: ${{ fromJSON(needs.changes.outputs.build_apps) }}
     steps:
@@ -676,7 +704,9 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           if [ "$EVENT" = "pull_request" ]; then
-            npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/store-settings-do.test.ts workers-test/merchant-signup.test.ts workers-test/merchant-journey.test.ts workers-test/merchant-catalogue.test.ts workers-test/money-path.test.ts workers-test/merchant-orders-do.test.ts workers-test/account-books-do.test.ts workers-test/merchant-mcp-do.test.ts workers-test/demo-home.test.ts workers-test/latency-budget.test.ts workers-test/failure-only-limiters.test.ts workers-test/pg-unreachable.test.ts workers-test/answer-engine-do.test.ts
+            # PR lane: discovered, not listed (scripts/ci/workers-test-lane.mjs = every workers-test file minus
+            # workers-test/full-lane-only.txt), so adding a test never edits this line.
+            npm run cf:test -w apps/api -- $(node scripts/ci/workers-test-lane.mjs)
           else
             # full lane: every workers-test file, route-sweep.test.ts included
             npm run cf:test -w apps/api
@@ -780,14 +810,20 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
-  test-unit:
-    name: Unit Tests
+  # CI-SHARD-1: the full unit suite is sharded 6 ways (hosted 2 vCPU ran it 17-28 min as one job). Each shard writes a
+  # vitest blob report with coverage; `test-unit` below merges them and enforces the coverage threshold once.
+  test-unit-shard:
+    name: ${{ matrix.shard == 7 && 'Unit workerd extras' || format('Unit shard {0}/6', matrix.shard) }}
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7] # 7 = the workerd extras (no vitest shard), so they run in parallel with 1-6
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 50, not 20: on hosted ubuntu-24.04 (2 vCPU) the coverage step alone took 16m47s in run 42820243819 and the
     # job was cancelled at 20:00 inside the accounts worker tests, with every assertion so far green; green runs then
     # took 20m05s (42827770627) and 28m39s (42829048643) for the same suite, so the cap keeps ~20 min of headroom.
-    timeout-minutes: 50
-    needs: [build]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -822,6 +858,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run unit tests with coverage
+        if: matrix.shard != 7
         # Globs BEYOND tests/unit are load-bearing, not tidiness. vitest.config.ts
         # has a broad `include`, so a colocated `__tests__` file passes locally and
         # is silently never executed by CI unless its directory is named here.
@@ -855,19 +892,67 @@ jobs:
         # --retry=0 (#1248): explicit, not just inherited from vitest.config.ts's
         # default, so a future config change can't silently re-mask
         # order-dependent state pollution on this required merge gate.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/ui/src packages/cf-schema packages/cf-migrate packages/repo apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2 --retry=0
+        run: npx vitest run tests/unit packages/shared/src packages/database/src packages/ui/src packages/cf-schema packages/cf-migrate packages/repo apps/web apps/admin/src apps/orders --shard=${{ matrix.shard }}/6 --coverage --reporter=blob --reporter=verbose --maxWorkers=2 --retry=0
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
       # apps/status and apps/accounts run on workerd, outside the root vitest config.
       - name: Run status worker tests
+        if: matrix.shard == 7
         run: npm run test:status
 
       - name: Run accounts worker tests
+        if: matrix.shard == 7
         run: npm run test:accounts
       - name: Run prisma-lite Durable Object tests
+        if: matrix.shard == 7
         run: npm run test:repo-workers
 
+      - name: Upload shard blob report
+        if: always() && matrix.shard != 7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-blob-${{ matrix.shard }}
+          path: .vitest-reports/
+          include-hidden-files: true
+          retention-days: 1
+
+  test-unit:
+    name: Unit Tests
+    needs: [test-unit-shard]
+    if: always() && github.event_name != 'pull_request'
+    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Require every shard to have passed
+        env:
+          SHARDS: ${{ needs.test-unit-shard.result }}
+        run: |
+          echo "shards=$SHARDS"
+          [ "$SHARDS" = "success" ] || { echo "::error::a unit shard did not pass ($SHARDS)"; exit 1; }
+      - name: Private TMPDIR per runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+          echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: ${{ (!contains(github.event.pull_request.labels.*.name, 'ci-umbra') && vars.EBDA_RUNS_ON == '') && 'npm' || '' }}
+      - name: Install dependencies
+        uses: ./.github/actions/npm-ci
+      - name: Download shard reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: unit-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+      - name: Merge reports and enforce the coverage threshold
+        run: npx vitest run --merge-reports --coverage --reporter=default
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -1192,7 +1277,10 @@ jobs:
           fi
           echo "integration targets: $targets"
           PLANNER_EXCLUDES="$(bash scripts/ci/planner-lane.sh excludes)"
-          npx vitest run $targets $PLANNER_EXCLUDES --reporter=verbose --retry=1
+          # --passWithNoTests: a narrowed PR run can select ONLY planner-lane files (payment-outage-isolation), which
+          # PLANNER_EXCLUDES removes from this parallel pass; they run in the serial pass below, so an empty parallel
+          # pass is correct, not a failure (it died with "No test files found" on #565).
+          npx vitest run $targets $PLANNER_EXCLUDES --passWithNoTests --reporter=verbose --retry=1
           # serial planner pass: the whole lane on a full run, only the selected planner files on a narrowed PR run
           lane="$(bash scripts/ci/planner-lane.sh list)"
           if [ "$targets" != "tests/integration apps/api/src" ]; then
@@ -1436,6 +1524,7 @@ jobs:
         build,
         security,
         test-unit,
+        test-unit-shard,
         orphan-tests,
         test-integration,
         test-e2e,

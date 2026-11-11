@@ -79,6 +79,7 @@ export type PageSlug =
   | 'about'
   | 'contact'
   | 'credits'
+  | 'support'
   | 'features'
   | 'store'
   | 'whatsapp'
@@ -104,6 +105,7 @@ export const SITE_PAGES = [
   'about',
   'contact',
   'credits',
+  'support',
   ...LEGAL_SLUGS,
   ...LEGAL_EXTRA_SLUGS,
 ] as const satisfies readonly PageSlug[];

@@ -96,7 +96,7 @@ function isOpenCodOrder(o: NonNullable<Awaited<ReturnType<typeof lockedOrder>>>)
   );
 }
 
-async function applyCodOutcome(
+export async function applyCodOutcome(
   e: Extract<OutboundStoreEvent, { type: 'whatsapp.cod_outcome' }>
 ): Promise<StoreEventResult> {
   const { storeId } = e;

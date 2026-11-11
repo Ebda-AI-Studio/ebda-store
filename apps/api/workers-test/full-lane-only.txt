@@ -1,0 +1,18 @@
+# Workerd tests that run ONLY in the full lane (main/nightly), not on a PR: one file name per line.
+# Every OTHER apps/api/workers-test/**/*.test.ts runs on a PR automatically, so adding a test edits nothing here.
+# Only add a line to declare a file slow or heavy. tests/unit/workers-test-lane.test.ts pins that each entry exists.
+workers-test/auth-state.test.ts
+workers-test/entry.test.ts
+workers-test/exceljs-workers.test.ts
+workers-test/feature-gated-do.test.ts
+workers-test/impersonation.test.ts
+workers-test/manual-subscription-refund.test.ts
+workers-test/platform-d1.test.ts
+workers-test/public-do-calls.test.ts
+workers-test/queues-cron-realtime.test.ts
+workers-test/route-sweep.test.ts
+workers-test/s3-xml.test.ts
+workers-test/search-limiter-key.test.ts
+workers-test/store-do-spike.test.ts
+workers-test/store-schedule.test.ts
+workers-test/wholesale-do.test.ts

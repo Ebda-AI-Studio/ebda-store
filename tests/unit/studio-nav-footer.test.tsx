@@ -312,6 +312,7 @@ describe('page kinds (NAV-PRODUCT-OF-PAGE-1)', () => {
       'about',
       'contact',
       'credits',
+      'support',
       'legal',
       'privacy',
       'terms',

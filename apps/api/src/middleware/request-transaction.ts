@@ -97,7 +97,7 @@ import { AppError } from './error-handler';
  *
  * Several in-transaction paths fire best-effort cleanup without awaiting it,
  * through the ambient `prisma` proxy:
- *   - routes: `category.routes.ts` (x2), `typography.routes.ts`,
+ *   - routes: `category.routes.ts` (x2),
  *     `store-layout.routes.ts` (`void cleanupRemovedJsonUrls`)
  *   - services reachable from an in-tx route: `variant.service.ts` (x4),
  *     `pages.service.ts` (x2), `blog.service.ts` (x2), `product.service.ts`

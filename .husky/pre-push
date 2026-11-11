@@ -50,7 +50,8 @@ fi
 # hold of the host lock: ONE worktree's gate at a time on this Mac. It queues and never skips (2026-10-25: load 30
 # because tsc/prettier/lint from several worktrees ran in parallel outside the lock). Same file as the manual rule
 # `lockf -k ~/.claude/locks/heavy-test.lock <cmd>`. The advisory AI/blast-radius steps below run AFTER the lock is released.
-bash scripts/ci/host-lock.sh bash scripts/ci/pre-push-gate.sh
+# PREPUSH-4: the gate itself is light and runs unlocked; only its vitest steps take the host lock (inside the gate).
+bash scripts/ci/pre-push-gate.sh
 
 # Local blast-radius + AI review REMOVED (Ahmad 2026-11-05, Ruling PREPUSH-AI-OFF-1): both run in CI on every PR
 # (blast-radius.yml, ai-review.yml); the local copies only duplicated them and queued every push 30-60 min.

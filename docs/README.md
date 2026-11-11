@@ -27,6 +27,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [HANDOFF-2026-06-01.md](HANDOFF-2026-06-01.md) - Ebda AI Studio — Session Handoff (2026-05-29 → 2026-06-01)
 - [INCIDENT.md](INCIDENT.md) - Incident Response — Ebda Store
 - [load-testing.md](load-testing.md) - Load testing (k6 on GitHub-hosted runners)
+- [NOTIFICATION-CHANNELS.md](NOTIFICATION-CHANNELS.md) - Order notification channels and alert classes
 - [RETENTION.md](RETENTION.md) - Data retention policy
 - [ROLLBACK.md](ROLLBACK.md) - Production rollback — Ebda
 - [RULINGS.md](RULINGS.md) - Rulings ledger (moved)
@@ -196,6 +197,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 ## launch - Launch readiness
 
 - [launch/marketing-assets-needed.md](launch/marketing-assets-needed.md) - Assets the marketing site still needs from Ahmad (marketing-levelup P2)
+- [launch/support-page.md](launch/support-page.md) - The /support page (24/7, assistant first, a person for money and security), the home cost line and the 360px check (audit M-033, M-031, M-039)
 - [launch/marketing-launch-checklist.md](launch/marketing-launch-checklist.md) - Marketing site: launch-day checklist (P12)
 
 ## legal - Legal
@@ -327,6 +329,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-11-10-resolve-bulletproof.md](plans/2026-11-10-resolve-bulletproof.md) - Store resolution bulletproofing: epoch-checked caches, stale-if-error, 503 + Retry-After (Ruling RESOLVE-BULLETPROOF-1)
 - [plans/2026-11-10-storefront-cold-render.md](plans/2026-11-10-storefront-cold-render.md) - PERF-LATENCY: why a cold storefront render took 4-12 s (empty per-build data cache after every deploy), the build-independent fetch cache and the widened warm step (Ruling WEB-COLD-2)
 - [plans/2026-11-10-accounts-standalone-signin.md](plans/2026-11-10-accounts-standalone-signin.md) - ACCOUNTS-PAGE-1: accounts.ebda.app/login as a standalone Ebda AI Studio sign-in page over the same /login and /login/mfa, allowlisted return
+- [plans/2026-11-10-api-hangs.md](plans/2026-11-10-api-hangs.md) - API-HANG-1: every AuthState call bounded at 2.5 s, a public cache fill answers before its write-back
 
 ## privacy - Privacy
 
