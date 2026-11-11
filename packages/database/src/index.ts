@@ -1004,7 +1004,7 @@ export interface AcrossStoresOptions {
   startOffset?: number;
 }
 
-export type AcrossStoresResult<T> = Array<{ storeId: string; value: T }> & {
+type AcrossStoresResult<T> = Array<{ storeId: string; value: T }> & {
   /** Stores whose `fn` threw (isolated mode). Empty when every store succeeded. */
   failures: Array<{ storeId: string; err: unknown }>;
 };

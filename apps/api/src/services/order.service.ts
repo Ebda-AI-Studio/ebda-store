@@ -67,6 +67,7 @@ import {
   COUPON_OVERRIDE_EVENT,
   COUPON_OVERRIDE_ROLES,
 } from '../lib/coupon-override';
+import { STOCK_NOT_TAKEN_EVENT } from '../lib/stock-not-taken';
 import { resolveCustomerContext, resolveBestPromotion } from './promotion-resolver';
 import { socketService } from './socket.service';
 import { featureService } from './feature.service';
@@ -4640,6 +4641,20 @@ export class OrderService {
           },
         });
       }
+      // #633 (Ruling STOCK-SYMMETRY-1): this order took NO stock; the cancel / refund restock reads this marker and
+      // puts back only what was taken. Same event as the DO's placeAdminOrder (repo-factory-orders-contract parity).
+      await tx.orderEvent.create({
+        data: {
+          storeId,
+          orderId: created.id,
+          fromStatus: null,
+          toStatus: STOCK_NOT_TAKEN_EVENT,
+          actorId: adminUserId,
+          metadata: {
+            items: created.items.map(it => ({ orderItemId: it.id, quantity: it.quantity })),
+          },
+        },
+      });
       // The durable record of a MOQ override, in the order transaction (the audit row below is best-effort).
       if (moqOverride && belowMoqProducts.length > 0) {
         await tx.orderEvent.create({
