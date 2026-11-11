@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
@@ -113,11 +114,13 @@ export function NotificationBell() {
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Bell Button */}
-      <button
+      <Button
+        variant="ghost"
+        size="icon"
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="touch-target relative rounded-lg hover:bg-muted dark:hover:bg-foreground transition-colors"
+        className="relative"
         aria-label={t('ariaLabel')}
       >
         <svg
@@ -147,7 +150,7 @@ export function NotificationBell() {
             isConnected ? 'bg-success' : 'bg-muted-foreground'
           }`}
         />
-      </button>
+      </Button>
 
       {/* Dropdown — rendered in a body portal with fixed positioning so the
           header's backdrop-blur stacking/clip context can't trap it. */}
@@ -165,22 +168,20 @@ export function NotificationBell() {
               <h3 className="font-semibold text-foreground">{t('title')}</h3>
               <div className="flex gap-2">
                 {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={markAllAsRead}
-                    className="text-xs text-primary hover:text-primary/80 font-medium"
-                  >
+                  <Button variant="link" size="sm" type="button" onClick={markAllAsRead}>
                     {t('markAllRead')}
-                  </button>
+                  </Button>
                 )}
                 {notifications.length > 0 && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     type="button"
                     onClick={clearNotifications}
-                    className="text-xs text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
+                    className="text-muted-foreground dark:text-muted-foreground"
                   >
                     {t('clear')}
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

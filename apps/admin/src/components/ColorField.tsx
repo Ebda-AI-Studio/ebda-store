@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState, useCallback, useRef } from 'react';
 import { ColorContrastPreview } from './ColorContrastPreview';
 import { COLOR_TOKENS, resolveColor } from '@ebda/shared';
@@ -216,16 +217,18 @@ export function ColorField({
           </>
         ) : null}
         {value ? (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={() => {
               onChange('');
               setRawHex('');
             }}
-            className="min-h-[44px] px-2 text-xs text-muted-foreground underline"
+            className="text-muted-foreground"
           >
             {t('clear')}
-          </button>
+          </Button>
         ) : null}
       </div>
       {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}

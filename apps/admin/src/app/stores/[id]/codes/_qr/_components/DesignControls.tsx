@@ -48,6 +48,7 @@ function ColorRow({
       <div className="flex items-center gap-1.5" role="group" aria-label={label}>
         {swatches.map(c => (
           <button
+            data-ui="swatch"
             key={c}
             type="button"
             aria-label={t('swatch', { color: c })}

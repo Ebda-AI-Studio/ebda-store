@@ -1,6 +1,7 @@
 'use client';
 
-import { Button, Modal } from '@ebda/ui';
+import { Modal } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 
 interface SuspendStoreModalProps {

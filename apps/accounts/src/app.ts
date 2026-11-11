@@ -61,6 +61,14 @@ import {
   HSTS_VALUE,
   STUDIO_PAGE_HEADERS,
 } from '../../../packages/shared/src/studio-pages/index';
+import {
+  renderSignInPage,
+  signInProduct,
+  signInReturn,
+  SIGN_IN_CSS,
+  SIGN_IN_JS,
+  SIGN_IN_PAGE_HEADERS,
+} from './sign-in-page';
 
 export const COOKIE = '__Host-ebda_rt';
 type Env = Cloudflare.Env;
@@ -783,17 +791,46 @@ export function createApp() {
   };
 
   // ---- human entry points ----
-  // This host is API-only (no UI by design, Ruling ID-1): the sign-in form is the Store app's /login, which posts to this
-  // service. A person who types the bare host, /login or /sign-in lands there instead of a 404 (Ruling ACCOUNTS-ENTRY-1).
-  // Cost if wrong: when a dedicated accounts UI ships, point these three at it.
-  // Ebda Chat arrives as /login?product=chat&return=<https url>: both survive the hop (Ruling SIGNIN-RETURN-1). Only
-  // those two keys travel, `product` only from the known set and `return` only as a bounded https URL; the Store
-  // sign-in page re-validates `return` against its host allowlist, which is the actual open-redirect boundary.
-  for (const path of ['/', '/login', '/sign-in']) {
-    app.get(path, c =>
-      c.redirect(signInEntryUrl(c.req.query('product'), c.req.query('return')), 302)
+  // The Store app's /login posts to this service too (Ruling ID-1). `/sign-in` sends a person there instead of a 404
+  // (Ruling ACCOUNTS-ENTRY-1).
+  // On that hop only `product` (known set) and `return` (bounded https URL) travel; the Store page re-validates `return`
+  // against its host allowlist (Ruling SIGNIN-RETURN-1). Ebda Chat arrives at /login?product=chat&return=<https url>.
+  // `/login` is now this host's own Ebda AI Studio sign-in page and `/` lands on it
+  // (Ruling ACCOUNTS-PAGE-1): it calls the same POST /login and /login/mfa as the Store page; the Store page is unchanged.
+  app.get('/sign-in', c =>
+    c.redirect(signInEntryUrl(c.req.query('product'), c.req.query('return')), 302)
+  );
+  app.get('/', c => {
+    const q = new URLSearchParams();
+    for (const k of ['product', 'return', 'return_to', 'lang']) {
+      const v = c.req.query(k);
+      if (v !== undefined && v.length <= 2048) q.set(k, v);
+    }
+    const s = q.toString();
+    return c.redirect(s ? `/login?${s}` : '/login', 302);
+  });
+  app.get('/login', c => {
+    const lang = pickStudioLang(c.req.header('accept-language'), c.req.query('lang'));
+    const product = signInProduct(c.req.query('product'));
+    // `return` is Ebda Chat's parameter; `return_to` is accepted as an alias. Validated here, by the Store's allowlist.
+    const returnTo = signInReturn(c.req.query('return') ?? c.req.query('return_to'));
+    return new Response(
+      c.req.method === 'HEAD' ? null : renderSignInPage({ lang, product, returnTo }),
+      { status: 200, headers: SIGN_IN_PAGE_HEADERS }
     );
-  }
+  });
+  app.get('/sign-in.js', c =>
+    c.body(SIGN_IN_JS, 200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    })
+  );
+  app.get('/sign-in.css', c =>
+    c.body(SIGN_IN_CSS, 200, {
+      'Content-Type': 'text/css; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    })
+  );
 
   // ---- discovery ----
   app.get('/health', c =>

@@ -18,6 +18,7 @@ import { apiDelete, apiFetch, apiGet, apiPost, apiPut, localizedApiMessage } fro
 import { openProtectedDocument } from '@/lib/open-document';
 import { useConfirm } from '@/hooks/useConfirm';
 
+import { Button } from '@/components/ui/Button';
 export interface TaxDocument {
   id: string;
   kind: TaxDocumentKindValue;
@@ -315,14 +316,15 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
         </p>
       )}
       {editable ? (
-        <button
+        <Button
           type="button"
           onClick={saveDetails}
           disabled={busy !== null}
-          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
+          variant="outline"
+          size="sm"
         >
           {busy === 'save' ? t('form.saving') : t('form.save')}
-        </button>
+        </Button>
       ) : (
         <p className="text-xs text-muted-foreground">
           {status === 'verified' ? t('verifiedNote') : t('form.locked')}
@@ -407,14 +409,15 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
                 onChange={e => chooseFile(e.target.files?.[0] ?? null)}
               />
             </label>
-            <button
+            <Button
               type="button"
               onClick={upload}
               disabled={busy !== null}
-              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
+              variant="outline"
+              size="sm"
             >
               {busy === 'upload' ? t('documents.uploading') : t('documents.upload')}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -431,14 +434,15 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
             />
             <span>{t('submit.attest')}</span>
           </label>
-          <button
+          <Button
             type="button"
             onClick={submit}
             disabled={!attest || busy !== null}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            variant="default"
+            size="sm"
           >
             {busy === 'submit' ? t('submit.submitting') : t('submit.button')}
-          </button>
+          </Button>
           <p className="text-xs text-muted-foreground">{t('submit.disclaimer')}</p>
         </div>
       )}

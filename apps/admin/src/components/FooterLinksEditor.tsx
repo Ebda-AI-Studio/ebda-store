@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useState, useEffect, type ReactNode } from 'react';
 import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../lib/api';
@@ -303,10 +304,12 @@ function LinkRow({
             className="sm:col-span-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-muted-foreground focus:border-primary focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           onClick={onRemove}
-          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"
+          className="mt-1 shrink-0 justify-center text-muted-foreground hover:text-destructive"
           title={removeTitle}
           aria-label={removeTitle}
         >
@@ -318,7 +321,7 @@ function LinkRow({
               d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
             />
           </svg>
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -331,16 +334,17 @@ function LinkRow({
  */
 function AddLinkButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
+    <Button
+      variant="outline"
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+      className="w-full justify-center gap-2 text-muted-foreground"
     >
       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
       </svg>
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -787,17 +791,17 @@ export function FooterLinksEditor({
       {!saveRef && (
         <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-xl border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
           <p className="text-xs text-muted-foreground hidden sm:block">{t('saveHintEmpty')}</p>
-          <button
+          <Button
             type="button"
             onClick={() => handleSave()}
             disabled={isSaving}
-            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+            className="gap-2 font-semibold"
           >
             {isSaving && (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             )}
             {isSaving ? t('saving') : t('saveChanges')}
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { apiPost } from '@/lib/api';
 import { formatPrice, majorToMinor } from '@/lib/format';
+import { Button } from '@/components/ui/Button';
 
 interface WalletAdjustModalProps {
   open: boolean;
@@ -103,24 +104,15 @@ export function WalletAdjustModal({
       title={t('title')}
       footer={
         <div className="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 min-h-11 text-foreground border border-border rounded-lg hover:bg-muted"
-          >
+          <Button variant="outline" size="md" type="button" onClick={onClose}>
             {t('cancel')}
-          </button>
-          <button
-            type="submit"
-            form={FORM_ID}
-            disabled={saving}
-            className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
-          >
+          </Button>
+          <Button variant="default" size="md" type="submit" form={FORM_ID} disabled={saving}>
             {saving && (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
             )}
             {t('submit')}
-          </button>
+          </Button>
         </div>
       }
     >

@@ -19,6 +19,7 @@ import { dateTimeLocalValue } from '@/lib/form-text';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 import { fromMinor } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 interface CustomerGroupOption {
   id: string;
   name: string;
@@ -159,16 +160,12 @@ export default function CouponsPage() {
       title={tPage('title')}
       subtitle={tPage('subtitle')}
       actions={
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="px-4 py-2 min-h-11 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium flex items-center gap-2"
-        >
+        <Button variant="default" size="md" type="button" onClick={openCreateModal}>
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           {tActions('create')}
-        </button>
+        </Button>
       }
     >
       <PageState

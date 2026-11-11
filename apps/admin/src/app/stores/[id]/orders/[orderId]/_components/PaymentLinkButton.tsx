@@ -5,6 +5,7 @@ import { useToast } from '@ebda/ui';
 import { apiPost } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+import { Button } from '@/components/ui/Button';
 interface PaymentLinkButtonProps {
   storeId: string;
   orderId: string;
@@ -130,13 +131,14 @@ export function PaymentLinkButton({
             <span className="text-xs font-mono text-info-ink truncate flex-1" dir="ltr">
               {existingPaymentUrl}
             </span>
-            <button
+            <Button
               type="button"
               onClick={copyExistingLink}
               disabled={disabled}
-              className="text-info-ink hover:bg-info/10 rounded-md p-1.5 flex-shrink-0 cursor-pointer"
               aria-label={t('copyAria')}
               title={t('copyAria')}
+              variant="ghost"
+              size="icon-sm"
             >
               {copiedExisting ? (
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -157,7 +159,7 @@ export function PaymentLinkButton({
                   />
                 </svg>
               )}
-            </button>
+            </Button>
             <a
               href={existingPaymentUrl}
               target="_blank"
@@ -176,21 +178,24 @@ export function PaymentLinkButton({
               </svg>
             </a>
           </div>
-          <button
+          <Button
             type="button"
             onClick={() => setOpen(true)}
             disabled={disabled || isIssuing}
-            className="text-xs text-muted-foreground hover:text-foreground underline self-start"
+            variant="link"
+            size="sm"
+            className="text-muted-foreground self-start"
           >
             {t('issueNewLink')}
-          </button>
+          </Button>
         </div>
       ) : (
-        <button
+        <Button
           type="button"
           onClick={() => setOpen(true)}
           disabled={disabled || isIssuing}
-          className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-4 py-2.5 text-sm font-semibold text-info-ink hover:bg-info/10 disabled:opacity-60 transition-colors cursor-pointer"
+          variant="outline"
+          className="flex-1 min-w-[8rem] justify-center gap-2 font-semibold"
         >
           <svg
             className="h-4 w-4"
@@ -207,7 +212,7 @@ export function PaymentLinkButton({
             />
           </svg>
           {t('buttonLabel')}
-        </button>
+        </Button>
       )}
 
       {open && (
@@ -231,11 +236,13 @@ export function PaymentLinkButton({
                   {t('modalSubtitle', { orderNumber })}
                 </p>
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={close}
                 aria-label={tCommon('close')}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
               >
                 <svg
                   className="h-5 w-5"
@@ -251,17 +258,18 @@ export function PaymentLinkButton({
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
-              </button>
+              </Button>
             </div>
 
             {!result ? (
               <>
                 <div className="space-y-3">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => issue()}
                     disabled={isIssuing}
-                    className="w-full rounded-xl border-2 border-primary bg-primary/5 p-4 text-start hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
+                    variant="outline"
+                    className="w-full text-start"
                   >
                     <div className="flex items-start gap-3">
                       <svg
@@ -287,7 +295,7 @@ export function PaymentLinkButton({
                         </p>
                       </div>
                     </div>
-                  </button>
+                  </Button>
                 </div>
 
                 {isIssuing && (
@@ -313,11 +321,7 @@ export function PaymentLinkButton({
                       onFocus={e => e.currentTarget.select()}
                       dir="ltr"
                     />
-                    <button
-                      type="button"
-                      onClick={copyLink}
-                      className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
-                    >
+                    <Button type="button" onClick={copyLink} variant="default" className="gap-1">
                       <svg
                         className="h-4 w-4"
                         fill="none"
@@ -333,19 +337,20 @@ export function PaymentLinkButton({
                         />
                       </svg>
                       {t('copyButton')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 <p className="text-xs text-muted-foreground">{t('paidAutoUpdateNote')}</p>
 
-                <button
+                <Button
                   type="button"
                   onClick={close}
-                  className="w-full rounded-xl bg-muted px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
+                  variant="ghost"
+                  className="w-full font-semibold"
                 >
                   {t('doneButton')}
-                </button>
+                </Button>
               </div>
             )}
           </div>

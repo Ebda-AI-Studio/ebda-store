@@ -6,6 +6,7 @@ import { apiGet } from '../../../../../lib/api';
 import { formatDateTime, formatPrice } from '../../../../../lib/format';
 import type { HistoryItem } from './types';
 
+import { Button } from '@/components/ui/Button';
 export function RateHistory({ storeId, reloadKey }: { storeId: string; reloadKey: number }) {
   const t = useT('goldRates.history');
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -61,13 +62,9 @@ export function RateHistory({ storeId, reloadKey }: { storeId: string; reloadKey
         ))}
       </ul>
       {cursor && (
-        <button
-          type="button"
-          onClick={() => void load(cursor)}
-          className="mt-3 min-h-11 rounded-md border px-4 text-sm"
-        >
+        <Button type="button" onClick={() => void load(cursor)} variant="outline" className="mt-3">
           {t('more')}
-        </button>
+        </Button>
       )}
     </section>
   );

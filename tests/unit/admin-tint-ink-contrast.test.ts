@@ -470,8 +470,10 @@ for (const app of APPS.filter(a => a.css)) {
   const token = tokensFrom(join(app.root, app.css!));
   const used = importedFromUi(app.root);
   const rendered = sourceFiles(UI.root).filter(f => uiExports(f).some(n => used.has(n)));
+  // Admin's own Button replaced the @ebda/ui one (Ruling ADM-BTN-1); its variants face the same gate.
+  if (app.name === 'admin') rendered.push(join(app.root, 'src/components/ui/Button.tsx'));
   describe(`${app.name}: the packages/ui components it renders (issue 2380)`, () => {
-    // Control: admin imports Button and Label, so the scan cannot be vacuous
+    // Control: admin renders its own Button and imports Label, so the scan cannot be vacuous
     // there. Orders imports nothing from @ebda/ui today (0 files is correct).
     it('finds the components it imports (control)', () => {
       if (app.name === 'admin') {

@@ -11,6 +11,7 @@
  * until Publish promotes the draft. `theme` is the effective theme: live + draft.
  * Theme colours are stored as HSL triplets; the colour field speaks hex.
  */
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
@@ -249,15 +250,16 @@ export function ThemeSettingsPanel({
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
               {t('edited')}
             </span>
-            <button
+            <Button
+              variant="link"
+              size="sm"
               type="button"
               disabled={resetting !== null}
               aria-label={t('resetOne', { field: labelOf(s) })}
               onClick={() => void resetOne(String(s.id))}
-              className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-medium text-primary-ink underline disabled:opacity-40"
             >
               {t('reset')}
-            </button>
+            </Button>
           </div>
         )}
       </>
@@ -520,32 +522,37 @@ export function ThemeSettingsPanel({
               <>
                 <span>{t('resetAllConfirm')}</span>
                 <span className="flex gap-1">
-                  <button
+                  <Button
+                    variant="link"
+                    size="sm"
                     type="button"
                     data-testid="reset-all-yes"
                     onClick={() => void resetAll()}
-                    className="min-h-11 rounded-lg px-3 font-semibold text-primary-ink underline"
+                    className="font-semibold"
                   >
                     {t('resetAllYes')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     type="button"
                     onClick={() => setConfirmAll(false)}
-                    className="min-h-11 rounded-lg px-3 text-muted-foreground"
+                    className="text-muted-foreground"
                   >
                     {t('cancel')}
-                  </button>
+                  </Button>
                 </span>
               </>
             ) : (
-              <button
+              <Button
+                variant="link"
+                size="sm"
                 type="button"
                 data-testid="reset-all"
                 onClick={() => setConfirmAll(true)}
-                className="min-h-11 rounded-lg px-1 font-medium text-primary-ink underline"
               >
                 {t('resetAll')}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -565,6 +572,7 @@ export function ThemeSettingsPanel({
                   const on = presetIsActive(p, current);
                   return (
                     <button
+                      data-ui="tile"
                       key={p.id}
                       type="button"
                       aria-pressed={on}
@@ -593,14 +601,15 @@ export function ThemeSettingsPanel({
               </div>
               {onApplyPalette && (
                 <div className="space-y-1">
-                  <button
+                  <Button
+                    variant="outline"
                     type="button"
                     data-testid="smart-palette"
                     onClick={() => setPaletteOpen(true)}
-                    className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm font-semibold hover:bg-muted"
+                    className="w-full font-semibold"
                   >
                     {t('smartPalette')}
-                  </button>
+                  </Button>
                   <p className="text-xs text-muted-foreground">{t('smartPaletteHint')}</p>
                 </div>
               )}
@@ -630,14 +639,14 @@ export function ThemeSettingsPanel({
                 ? t('error')
                 : t('draftNote')}
         </span>
-        <button
+        <Button
           type="button"
           disabled={Object.keys(patch).length === 0 || state === 'saving'}
           onClick={() => void save()}
-          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+          className="font-semibold"
         >
           {state === 'saving' ? t('saving') : t('save')}
-        </button>
+        </Button>
       </div>
       {onApplyPalette && (
         <SmartPaletteModal

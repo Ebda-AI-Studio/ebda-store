@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { SearchPicker } from '@/components/SearchPicker';
 import { useLocale } from 'next-intl';
 import {
@@ -443,35 +444,29 @@ export default function NewOrderPage() {
             {t('customerSection.heading')}
           </h2>
           <div className="mb-4 flex gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => {
                 setCustomerMode('existing');
                 setSelectedCustomerId(null);
               }}
-              className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                customerMode === 'existing'
-                  ? 'border-primary bg-primary/5 text-primary-ink'
-                  : 'border-border text-muted-foreground hover:bg-muted'
-              }`}
+              variant={customerMode === 'existing' ? 'soft' : 'ghost'}
+              className="flex-1"
             >
               {t('customerSection.existingTab')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => {
                 setCustomerMode('guest');
                 setSelectedCustomerId(null);
                 setCustomerSearch('');
               }}
-              className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                customerMode === 'guest'
-                  ? 'border-primary bg-primary/5 text-primary-ink'
-                  : 'border-border text-muted-foreground hover:bg-muted'
-              }`}
+              variant={customerMode === 'guest' ? 'soft' : 'ghost'}
+              className="flex-1"
             >
               {t('customerSection.guestTab')}
-            </button>
+            </Button>
           </div>
           {customerMode === 'existing' && (
             <div className="relative mb-4">
@@ -699,11 +694,12 @@ export default function NewOrderPage() {
                   {(pendingVariantProduct.variants ?? [])
                     .filter(v => v.isActive)
                     .map(v => (
-                      <button
+                      <Button
                         key={v.id}
                         type="button"
                         onClick={() => addVariant(pendingVariantProduct, v)}
-                        className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/5 hover:border-primary/40 transition-colors"
+                        variant="outline"
+                        size="sm"
                       >
                         {isRtl ? v.titleAr || v.title : v.title || v.titleAr || v.title}
                         <span className="ms-1.5 text-muted-foreground">
@@ -714,16 +710,18 @@ export default function NewOrderPage() {
                             {t('productsSection.outOfStock')}
                           </span>
                         )}
-                      </button>
+                      </Button>
                     ))}
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={() => setPendingVariantProduct(null)}
-                  className="mt-2 text-xs text-muted-foreground underline"
+                  variant="link"
+                  size="sm"
+                  className="mt-2 text-muted-foreground"
                 >
                   {tCommon('cancel')}
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -752,14 +750,16 @@ export default function NewOrderPage() {
                   <span className="w-24 text-end font-semibold text-foreground">
                     {formatPrice(it.unitPrice * it.quantity)}
                   </span>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => removeItem(it.productId, it.variantId)}
                     aria-label={t('productsSection.removeItemAria')}
-                    className="rounded p-1 text-destructive-ink hover:bg-destructive/10"
+                    className="text-destructive-ink"
+                    variant="ghost"
+                    size="icon-sm"
                   >
                     ✕
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

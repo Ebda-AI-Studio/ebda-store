@@ -4,6 +4,10 @@
  * proxy, so it needs the store's tenant scope, exactly as before the port.
  */
 import { customerRows } from '../customer-directory';
+import { lookupStore } from '../definer';
+import { backendFor } from '../store-backend';
+import { AppError } from '../../middleware/error-handler';
+import logger from '../logger';
 import {
   acrossStores,
   prisma,
@@ -312,4 +316,29 @@ export async function storeRwClient(storeId: string): Promise<{ db: StoreTx; onD
     }
   );
   return { db: merged as unknown as StoreTx, onDo: true };
+}
+
+/**
+ * May an event-triggered job (comms: review request, scheduled campaign, lifecycle emails) still act for this store?
+ * False when the store is not `active` (inactive / suspended), soft-deleted, unknown, or its storage is gone (a `pg`
+ * directory row on Workers answers 410 STORE_STORAGE_REMOVED). The caller SKIPS on false instead of throwing: a retry can
+ * never make a closed store open, and each failed attempt was a production error (review-request, 2026-11-10, several a
+ * minute). An unreadable directory (503) still throws, so a transient outage retries rather than dropping the message.
+ * Logged once per call at debug level (the job runs it inside one memoised step).
+ */
+export async function storeActiveForJob(storeId: string, job: string): Promise<boolean> {
+  const skip = (reason: string) => {
+    logger.debug({ storeId, job, reason }, '[jobs] store not active; skipping');
+    return false;
+  };
+  if (!(await lookupStore({ id: storeId }, ['active']))) return skip('not_active');
+  try {
+    await backendFor(storeId);
+  } catch (err) {
+    if (err instanceof AppError && (err.statusCode === 410 || err.statusCode === 404)) {
+      return skip(err.code);
+    }
+    throw err;
+  }
+  return true;
 }

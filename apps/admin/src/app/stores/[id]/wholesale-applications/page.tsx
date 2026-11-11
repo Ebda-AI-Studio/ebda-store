@@ -19,6 +19,7 @@ import {
   ApplicationDecisionModal,
   type DecisionKind,
 } from './_components/ApplicationDecisionModal';
+import { Button } from '@/components/ui/Button';
 
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
 
@@ -233,30 +234,34 @@ export default function WholesaleApplicationsPage() {
                     <div className="flex flex-wrap gap-2">
                       {row.status === 'pending' ? (
                         <>
-                          <button
+                          <Button
+                            variant="default"
+                            size="sm"
                             type="button"
                             onClick={() => setDeciding({ row, kind: 'approve' })}
-                            className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground md:min-h-9"
                           >
                             {t('approve')}
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             type="button"
                             onClick={() => setDeciding({ row, kind: 'reject' })}
-                            className="min-h-11 rounded-md border px-4 text-sm md:min-h-9"
                           >
                             {t('reject')}
-                          </button>
+                          </Button>
                         </>
                       ) : null}
                       {row.status === 'approved' ? (
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive-ink"
                           type="button"
                           onClick={() => setDeciding({ row, kind: 'revoke' })}
-                          className="min-h-11 rounded-md border px-4 text-sm text-destructive-ink md:min-h-9"
                         >
                           {t('revoke')}
-                        </button>
+                        </Button>
                       ) : null}
                     </div>
                   </div>
@@ -268,14 +273,15 @@ export default function WholesaleApplicationsPage() {
 
         {cursor ? (
           <div className="mt-4 text-center">
-            <button
+            <Button
+              variant="outline"
+              size="md"
               type="button"
               disabled={loading}
               onClick={() => void load(cursor)}
-              className="min-h-11 rounded-md border px-4 text-sm md:min-h-9"
             >
               {t('loadMore')}
-            </button>
+            </Button>
           </div>
         ) : null}
 

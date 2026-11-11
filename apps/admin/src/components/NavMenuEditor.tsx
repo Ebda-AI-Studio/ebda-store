@@ -12,7 +12,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, useToast } from '@ebda/ui';
+import { Input, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { apiPut } from '../lib/api';
 import { useCurrentStore } from '../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
@@ -192,11 +193,13 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
                 {t('itemNumber', { number: index + 1 })}
               </span>
               <div className="flex items-center gap-1">
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   type="button"
                   onClick={() => move(index, -1)}
                   disabled={index === 0}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
+                  className="text-muted-foreground"
                   aria-label={t('moveUp')}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -207,12 +210,14 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
                       d="M5 15l7-7 7 7"
                     />
                   </svg>
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   type="button"
                   onClick={() => move(index, 1)}
                   disabled={index === items.length - 1}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
+                  className="text-muted-foreground"
                   aria-label={t('moveDown')}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -223,11 +228,13 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
                       d="M19 9l-7 7-7-7"
                     />
                   </svg>
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   type="button"
                   onClick={() => removeItem(index)}
-                  className="rounded p-1 text-destructive-ink hover:bg-destructive/10"
+                  className="text-destructive-ink"
                   aria-label={t('removeItem')}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -238,7 +245,7 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
                       d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                     />
                   </svg>
-                </button>
+                </Button>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -266,29 +273,25 @@ export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEd
       </div>
 
       <div className={`flex flex-wrap items-center gap-3 ${isEmbedded ? 'mt-3' : 'mt-6'}`}>
-        <Button onClick={addItem} variant="outline" size={isEmbedded ? 'sm' : 'default'}>
+        <Button onClick={addItem} variant="outline" size={isEmbedded ? 'sm' : 'md'}>
           {t('addItem')}
         </Button>
         <Button
           onClick={addLocationsLink}
           variant="outline"
-          size={isEmbedded ? 'sm' : 'default'}
+          size={isEmbedded ? 'sm' : 'md'}
           disabled={items.some(it => it.href === '/locations')}
         >
           {t('addLocationsLink')}
         </Button>
-        <Button onClick={resetToDefault} variant="ghost" size={isEmbedded ? 'sm' : 'default'}>
+        <Button onClick={resetToDefault} variant="ghost" size={isEmbedded ? 'sm' : 'md'}>
           {t('resetDefault')}
         </Button>
         <div className="flex-1" />
         {/* Hidden when the visual editor owns saving (saveRef provided) — the
             main Save button persists the nav menu via the registered saver. */}
         {!saveRef && (
-          <Button
-            onClick={() => handleSave()}
-            isLoading={isSaving}
-            size={isEmbedded ? 'sm' : 'default'}
-          >
+          <Button onClick={() => handleSave()} isLoading={isSaving} size={isEmbedded ? 'sm' : 'md'}>
             {t('saveNav')}
           </Button>
         )}

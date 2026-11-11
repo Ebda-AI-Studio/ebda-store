@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Modal, useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { apiPost } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
@@ -94,12 +95,13 @@ export function RefundButton({
 
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled || busy}
         title={t('buttonTooltip')}
-        className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-4 py-2.5 text-sm font-semibold text-destructive-ink hover:bg-destructive/10 disabled:opacity-60 transition-colors cursor-pointer"
+        variant="outline"
+        className="flex-1 min-w-[8rem] justify-center gap-2 font-semibold text-destructive-ink"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
@@ -110,7 +112,7 @@ export function RefundButton({
           />
         </svg>
         {t('button')}
-      </button>
+      </Button>
 
       <Modal isOpen={open} onClose={closeIfIdle} title={t('modalTitle', { orderNumber })} size="sm">
         <p className="text-sm text-muted-foreground">

@@ -31,12 +31,15 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { prisma, runInTenantContext } from '@ebda/database';
+import { prisma } from '@ebda/database';
+import { readInStoreContext, runInStoreTenantContext } from '../lib/store-scoped-read';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { auditLog } from '../middleware/security';
+import { getAccountsBrief } from '../lib/identity-client';
+import { onAccessD1 } from '../services/platform/access-d1';
 import { StoreService } from '../services/store.service';
 import { getAuthUser } from '../utils/store-helpers';
 import {
@@ -46,6 +49,19 @@ import {
   MERCHANT_SCOPES,
   type MerchantScope,
 } from '../mcp/merchant-auth';
+
+interface KeyRow {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  lastUsedAt: Date | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  createdAt: Date;
+  userId?: string;
+  user?: { id: string; email: string; firstName: string; lastName: string } | null;
+}
 
 const router = Router({ mergeParams: true });
 
@@ -97,7 +113,10 @@ router.get(
       // store GUC. Opening the scope here explicitly is what makes the table's
       // RLS policy actually bind, rather than relying on its
       // `current_store_id() IS NULL` escape clause.
-      const keys = await runInTenantContext(storeId, () =>
+      // After the `access` cutover the owning accounts live in the identity service, so the `user` relation cannot be joined
+      // (prisma-lite: it lives in another database): read the keys, then the owners' display facts in ONE identity call.
+      const accountsInIdentity = await onAccessD1();
+      const rawKeys = (await readInStoreContext(storeId, () =>
         prisma.merchantApiKey.findMany({
           where: { storeId },
           select: {
@@ -109,18 +128,33 @@ router.get(
             expiresAt: true,
             revokedAt: true,
             createdAt: true,
-            user: { select: { id: true, email: true, firstName: true, lastName: true } },
+            ...(accountsInIdentity
+              ? { userId: true }
+              : { user: { select: { id: true, email: true, firstName: true, lastName: true } } }),
           },
           orderBy: { createdAt: 'desc' },
         })
-      );
+      )) as unknown as KeyRow[];
+      const briefs = accountsInIdentity
+        ? new Map(
+            (await getAccountsBrief(rawKeys.map(k => k.userId as string))).map(a => [a.id, a])
+          )
+        : null;
+      const keys = rawKeys.map(({ userId, ...k }) => {
+        if (!briefs) return k;
+        const a = briefs.get(userId as string);
+        return {
+          ...k,
+          user: a
+            ? { id: a.id, email: a.email, firstName: a.firstName, lastName: a.lastName }
+            : null,
+        };
+      });
 
       // The SLUG, not just the id: the MCP endpoint is addressed by slug, and
       // the admin's one-time reveal has to render a copy-pasteable client
       // config. Deriving it in the browser is what produced a wrong host.
-      const store = await runInTenantContext(storeId, () =>
-        prisma.store.findUnique({ where: { id: storeId }, select: { slug: true } })
-      );
+      const store = await readInStoreContext(storeId, () => StoreService.getById(storeId));
 
       res.json({
         success: true,
@@ -153,7 +187,7 @@ router.post(
       const body = mintSchema.parse(req.body);
       const actor = getAuthUser(req);
 
-      const activeCount = await runInTenantContext(storeId, () =>
+      const activeCount = await readInStoreContext(storeId, () =>
         prisma.merchantApiKey.count({ where: { storeId, revokedAt: null } })
       );
       if (activeCount >= MAX_ACTIVE_KEYS) {
@@ -170,7 +204,7 @@ router.post(
       const scopes: MerchantScope[] = body.scopes ?? [MERCHANT_SCOPES.read];
       const { plaintext, hash, prefix } = generateMerchantKey();
 
-      const created = await runInTenantContext(storeId, () =>
+      const created = await runInStoreTenantContext(storeId, () =>
         prisma.merchantApiKey.create({
           data: {
             storeId,
@@ -280,7 +314,7 @@ router.delete(
       // Scoped by storeId as well as id: `requireStoreAccess` proves the caller
       // may act on THIS store, and without the storeId term a caller with
       // access to store A could revoke store B's key by guessing its uuid.
-      const result = await runInTenantContext(storeId, () =>
+      const result = await runInStoreTenantContext(storeId, () =>
         prisma.merchantApiKey.updateMany({
           where: { id: keyId, storeId, revokedAt: null },
           data: { revokedAt: new Date() },

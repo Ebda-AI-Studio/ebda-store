@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { engineLabel, type AnswerEngineSummaryPrompt } from './types';
@@ -61,7 +62,7 @@ export function PromptResultsList({ storeId, prompts }: PromptResultsListProps) 
               {!prompt.cited && (
                 <Link
                   href={`/stores/${storeId}/ai-tools`}
-                  className="shrink-0 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10 transition-colors whitespace-nowrap"
+                  className={buttonVariants({ variant: 'soft', size: 'sm', className: 'shrink-0' })}
                 >
                   {t('recCta')}
                 </Link>

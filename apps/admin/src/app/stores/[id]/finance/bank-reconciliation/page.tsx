@@ -11,7 +11,8 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { ErrorState } from '@/components/ErrorState';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
-import { buttonVariants, cn, useToast } from '@ebda/ui';
+import { useToast } from '@ebda/ui';
+import { buttonVariants } from '@/components/ui/Button';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
@@ -176,7 +177,7 @@ export default function BankReconciliationPage() {
         <div className="flex items-center justify-end gap-1">
           <Link
             href={`/stores/${storeId}/finance/bank-reconciliation/${stmt.id}`}
-            className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-primary-ink hover:bg-primary/10"
+            className={buttonVariants({ variant: 'outline', size: 'sm' })}
           >
             {t('view')}
           </Link>
@@ -203,7 +204,7 @@ export default function BankReconciliationPage() {
       actions={
         <Link
           href={`/stores/${storeId}/finance/bank-reconciliation/import`}
-          className={cn(buttonVariants(), 'min-h-11')}
+          className={buttonVariants()}
         >
           {t('importButton')}
         </Link>
@@ -238,7 +239,7 @@ export default function BankReconciliationPage() {
                   <p className="text-sm text-muted-foreground">{t('noStatements')}</p>
                   <Link
                     href={`/stores/${storeId}/finance/bank-reconciliation/import`}
-                    className={cn(buttonVariants(), 'mt-4 min-h-11')}
+                    className={buttonVariants({ className: 'mt-4' })}
                   >
                     {t('importButton')}
                   </Link>

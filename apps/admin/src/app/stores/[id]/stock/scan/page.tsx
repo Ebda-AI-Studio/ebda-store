@@ -26,6 +26,7 @@ import { VariantText } from '@ebda/ui';
 import { apiGet, apiPost } from '@/lib/api';
 import { orderLineVariantTitle, searchQueryHeaders, withNumerals } from '@ebda/shared';
 
+import { Button } from '@/components/ui/Button';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -219,13 +220,15 @@ function CameraScanner({ onDetected, onStop, onError }: CameraScannerProps) {
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-52 h-32 border-2 border-white/70 rounded-lg" />
       </div>
-      <button
+      <Button
         type="button"
         onClick={onStop}
-        className="absolute top-2 end-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/50 text-white text-xs px-3"
+        variant="ghost"
+        size="sm"
+        className="absolute top-2 end-2 min-w-[44px] justify-center"
       >
         ✕
-      </button>
+      </Button>
     </div>
   );
 }
@@ -279,15 +282,16 @@ function BarcodeInput({
           inputMode="text"
         />
         {cameraSupported && (
-          <button
+          <Button
             type="button"
             onClick={onOpenCamera}
             disabled={disabled}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground hover:bg-muted/80 text-lg disabled:opacity-50"
             title={t('scanWithCamera')}
+            variant="outline"
+            className="min-w-[44px] justify-center text-muted-foreground"
           >
             📷
-          </button>
+          </Button>
         )}
       </div>
       {!cameraSupported && (
@@ -422,14 +426,15 @@ function ReceiveMode({ storeId }: { storeId: string }) {
               className="w-24 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
-          <button
+          <Button
             type="button"
             onClick={handleReceive}
             disabled={submitting}
-            className="min-h-[44px] w-full rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
+            variant="default"
+            className="w-full"
           >
             {submitting ? '…' : t('submitReceive')}
-          </button>
+          </Button>
           {submitErr && <p className="text-xs text-destructive-ink">{submitErr}</p>}
         </div>
       )}
@@ -555,14 +560,9 @@ function PickMode({ storeId }: { storeId: string }) {
               className="flex-1 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               autoComplete="off"
             />
-            <button
-              type="button"
-              onClick={loadOrder}
-              disabled={orderLoading}
-              className="min-h-[44px] px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
-            >
+            <Button type="button" onClick={loadOrder} disabled={orderLoading} variant="default">
               {orderLoading ? '…' : t('loadOrder')}
-            </button>
+            </Button>
           </div>
           {orderErr && <p className="text-sm text-destructive-ink">{orderErr}</p>}
         </div>
@@ -582,17 +582,19 @@ function PickMode({ storeId }: { storeId: string }) {
                   {t('picking.orderComplete')}
                 </span>
               )}
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   setOrder(null);
                   setOrderInput('');
                   setPickResult(null);
                 }}
-                className="text-xs text-muted-foreground underline"
+                variant="link"
+                size="sm"
+                className="text-muted-foreground"
               >
                 {t('pickChangeOrder')}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -868,18 +870,19 @@ function CountMode({ storeId }: { storeId: string }) {
           <div className="space-y-2">
             <p className="text-sm font-medium">{t('counting.openSession')}</p>
             {sessions.map(s => (
-              <button
+              <Button
                 key={s.id}
                 type="button"
                 onClick={() => loadSession(s.id)}
-                className="w-full text-start rounded-xl border border-border bg-card p-4 hover:bg-muted/30 min-h-[44px]"
+                variant="outline"
+                className="w-full text-start"
               >
                 <p className="text-sm font-medium">{s.note || t('countSession')}</p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(s.createdAt).toLocaleString(undefined, withNumerals())} · {s.lineCount}{' '}
                   {t('linesSuffix')}
                 </p>
-              </button>
+              </Button>
             ))}
             <div className="border-t border-border/40 pt-4" />
           </div>
@@ -896,14 +899,15 @@ function CountMode({ storeId }: { storeId: string }) {
             placeholder={t('counting.sessionNote')}
             className="w-full min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
-          <button
+          <Button
             type="button"
             onClick={startSession}
             disabled={sessionLoading}
-            className="min-h-[44px] w-full rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
+            variant="default"
+            className="w-full"
           >
             {sessionLoading ? '…' : t('counting.startSession')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -922,16 +926,18 @@ function CountMode({ storeId }: { storeId: string }) {
             {t('counting.linesCount', { count: String(activeSession.lines.length) })}
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={() => {
             setActiveSession(null);
             setReconcileResult(null);
           }}
-          className="text-xs text-muted-foreground underline min-h-[44px] px-2"
+          variant="link"
+          size="sm"
+          className="text-muted-foreground"
         >
           {tc('close')}
-        </button>
+        </Button>
       </div>
 
       {/* Scan input (only when open) */}
@@ -988,14 +994,15 @@ function CountMode({ storeId }: { storeId: string }) {
                   className="w-24 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={submitLine}
                 disabled={submittingLine}
-                className="min-h-[44px] w-full rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                variant="default"
+                className="w-full"
               >
                 {submittingLine ? '…' : t('counting.submitLine')}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -1060,23 +1067,20 @@ function CountMode({ storeId }: { storeId: string }) {
       {!sessionDone && (
         <div className="flex gap-3">
           {activeSession.status === 'open' && (
-            <button
-              type="button"
-              onClick={closeSession}
-              className="flex-1 min-h-[44px] rounded-lg border border-border bg-background text-sm font-medium hover:bg-muted/30"
-            >
+            <Button type="button" onClick={closeSession} variant="outline" className="flex-1">
               {t('counting.closeSession')}
-            </button>
+            </Button>
           )}
           {activeSession.status === 'closed' && (
-            <button
+            <Button
               type="button"
               onClick={reconcile}
               disabled={reconciling}
-              className="flex-1 min-h-[44px] rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
+              variant="default"
+              className="flex-1"
             >
               {reconciling ? '…' : t('counting.reconcile')}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -1153,19 +1157,15 @@ export default function BarcodeScanPage() {
           {/* Mode selector */}
           <div className="flex rounded-xl border border-border bg-muted/20 p-1 gap-1">
             {modes.map(m => (
-              <button
+              <Button
                 key={m.key}
                 type="button"
                 onClick={() => setMode(m.key)}
-                className={[
-                  'flex-1 min-h-[44px] rounded-lg text-sm font-medium transition-colors',
-                  mode === m.key
-                    ? 'bg-background shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                ].join(' ')}
+                variant={mode === m.key ? 'soft' : 'ghost'}
+                className="flex-1"
               >
                 {m.label}
-              </button>
+              </Button>
             ))}
           </div>
 

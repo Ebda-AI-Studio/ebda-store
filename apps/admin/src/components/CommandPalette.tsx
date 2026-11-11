@@ -319,6 +319,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
                   </p>
                 )}
                 <button
+                  data-ui="row"
                   type="button"
                   onClick={() => go(item.href)}
                   onMouseEnter={() => setActive(idx)}

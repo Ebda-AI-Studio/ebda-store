@@ -11,6 +11,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { VariantText, useToast } from '@ebda/ui';
 import { withNumerals } from '@ebda/shared';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ReorderProduct {
@@ -164,22 +165,26 @@ function SuggestionCard({
 
       {/* Actions */}
       <div className="flex gap-2 pt-1">
-        <button
+        <Button
           type="button"
           onClick={handleAccept}
           disabled={accepting || dismissing}
-          className="flex-1 px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 hover:bg-primary/90 transition-colors"
+          variant="default"
+          size="sm"
+          className="flex-1"
         >
           {accepting ? tc('saving') : t('card.draftPo')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleDismiss}
           disabled={accepting || dismissing}
-          className="px-3 py-1.5 rounded border border-border text-sm text-muted-foreground disabled:opacity-60 hover:bg-muted/40 transition-colors"
+          variant="outline"
+          size="sm"
+          className="text-muted-foreground"
         >
           {dismissing ? tc('saving') : t('card.dismiss')}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -277,14 +282,15 @@ export default function ReorderPage() {
             )}
           </div>
           {isSuperAdmin && (
-            <button
+            <Button
               type="button"
               onClick={handleRescan}
               disabled={rescanning}
-              className="px-3 py-1.5 rounded border border-border text-sm text-foreground disabled:opacity-60 hover:bg-muted/40 transition-colors"
+              variant="outline"
+              size="sm"
             >
               {rescanning ? tc('loading') : t('rescanNow')}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -320,27 +326,29 @@ export default function ReorderPage() {
         {/* Pagination */}
         {meta && meta.totalPages > 1 && (
           <div className="flex items-center gap-2 text-sm">
-            <button
+            <Button
               type="button"
               disabled={meta.page === 1}
               onClick={() => load(meta.page - 1)}
-              className="px-3 py-1 rounded border border-border disabled:opacity-40"
               aria-label={t('pagePrev')}
+              variant="outline"
+              size="icon-sm"
             >
               <ArrowStart />
-            </button>
+            </Button>
             <span className="text-muted-foreground">
               {meta.page} / {meta.totalPages}
             </span>
-            <button
+            <Button
               type="button"
               disabled={meta.page >= meta.totalPages}
               onClick={() => load(meta.page + 1)}
-              className="px-3 py-1 rounded border border-border disabled:opacity-40"
               aria-label={t('pageNext')}
+              variant="outline"
+              size="icon-sm"
             >
               <ArrowEnd />
-            </button>
+            </Button>
           </div>
         )}
       </div>

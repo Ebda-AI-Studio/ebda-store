@@ -5,6 +5,7 @@ import { minorToMajor } from '@/lib/format';
 import type { AffiliateConfig } from './types';
 
 import { roundToMinor } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 interface AffiliateCommissionFormProps {
   config: AffiliateConfig;
   saving: boolean;
@@ -98,6 +99,8 @@ export function AffiliateCommissionForm({
               </p>
             </div>
             <button
+              role="switch"
+              aria-checked={config.autoApprove}
               type="button"
               onClick={() => onConfigChange({ ...config, autoApprove: !config.autoApprove })}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -122,6 +125,8 @@ export function AffiliateCommissionForm({
               </p>
             </div>
             <button
+              role="switch"
+              aria-checked={config.publicSignupEnabled}
               type="button"
               onClick={() =>
                 onConfigChange({ ...config, publicSignupEnabled: !config.publicSignupEnabled })
@@ -144,17 +149,12 @@ export function AffiliateCommissionForm({
       </div>
 
       <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving}
-          className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-        >
+        <Button variant="default" size="md" type="button" onClick={onSave} disabled={saving}>
           {saving && (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground" />
           )}
           {t('save')}
-        </button>
+        </Button>
       </div>
     </div>
   );

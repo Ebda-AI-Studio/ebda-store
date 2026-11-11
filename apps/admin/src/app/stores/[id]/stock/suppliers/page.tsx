@@ -7,7 +7,7 @@ import { SearchInput } from '@/components/SearchInput';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPatch } from '@/lib/api';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { PageState } from '@/components/PageState';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -96,10 +96,7 @@ export default function SuppliersPage() {
       title={t('title')}
       subtitle={t('description')}
       actions={
-        <Button
-          className="min-h-11"
-          onClick={() => router.push(`/stores/${storeId}/stock/suppliers/new`)}
-        >
+        <Button onClick={() => router.push(`/stores/${storeId}/stock/suppliers/new`)}>
           {t('newButton')}
         </Button>
       }

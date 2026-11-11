@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -284,14 +285,14 @@ export default function ContentEditorPage() {
           >
             {t('backToList')}
           </Link>
-          <button
+          <Button
             type="button"
             onClick={handleSave}
             disabled={isSaving || isLoading}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors cursor-pointer"
+            className="gap-2 font-semibold"
           >
             {isSaving ? t('saving') : t('save')}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -522,13 +523,9 @@ function BlockColumn({
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={addBlock}
-              className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer"
-            >
+            <Button size="sm" type="button" onClick={addBlock} className="gap-1 font-semibold">
               + {t('addBlock')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -579,35 +576,39 @@ function BlockEditor({
           {t(`blockType.${block.type}`)}
         </span>
         <div className="flex items-center gap-1">
-          <button
+          <Button
+            variant="outline"
+            size="icon-sm"
             type="button"
             onClick={onMoveUp}
             disabled={index === 0}
             title={t('moveUp')}
             aria-label={t('moveUp')}
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             ↑
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-sm"
             type="button"
             onClick={onMoveDown}
             disabled={index === total - 1}
             title={t('moveDown')}
             aria-label={t('moveDown')}
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             ↓
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             type="button"
             onClick={onRemove}
             title={t('removeBlock')}
             aria-label={t('removeBlock')}
-            className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/20 cursor-pointer"
+            className="text-destructive-ink"
           >
             ✕
-          </button>
+          </Button>
         </div>
       </div>
       <BlockFields block={block} onChange={onChange} storeId={storeId} t={t} dir={dir} />
@@ -756,24 +757,22 @@ function ItemListEditor({
             dir={dir}
             className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             type="button"
             onClick={() => removeAt(idx)}
             title={t('removeItem')}
             aria-label={t('removeItem')}
-            className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive-ink hover:bg-destructive/20 cursor-pointer"
+            className="text-destructive-ink"
           >
             ✕
-          </button>
+          </Button>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={addItem}
-        className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent cursor-pointer"
-      >
+      <Button variant="outline" size="sm" type="button" onClick={addItem} className="gap-1">
         + {t('addItem')}
-      </button>
+      </Button>
     </div>
   );
 }

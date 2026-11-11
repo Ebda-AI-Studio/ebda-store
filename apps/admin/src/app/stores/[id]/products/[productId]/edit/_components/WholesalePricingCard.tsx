@@ -20,6 +20,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from '../../../../../../../lib/api
 import { useFeatures } from '../../../../../../../hooks/useFeatures';
 import { checkTierDraft, type DraftProblem } from './tier-draft';
 
+import { Button } from '@/components/ui/Button';
 interface TierRow extends TierInput {
   id: string;
   stale: boolean;
@@ -232,14 +233,15 @@ export function WholesalePricingCard(props: Props) {
                 <td className="py-2 tabular-nums">{r.minQty}+</td>
                 <td className="py-2 tabular-nums">{minorToDecimalString(r.priceMinor)}</td>
                 <td className="py-2 text-end">
-                  <button
+                  <Button
                     type="button"
                     disabled={busy}
                     onClick={() => void removeTier(r.id)}
-                    className="min-h-11 px-2 text-destructive-ink hover:underline md:min-h-9"
+                    variant="link"
+                    className="text-destructive-ink"
                   >
                     {t('remove')}
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -323,14 +325,14 @@ export function WholesalePricingCard(props: Props) {
             ) : null}
           </div>
           <div className="sm:col-span-2">
-            <button
+            <Button
               type="button"
               onClick={() => void addTier()}
               disabled={busy || !check.tier || !!check.problem}
-              className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50 md:min-h-9"
+              variant="default"
             >
               {t('add')}
-            </button>
+            </Button>
           </div>
         </fieldset>
       ) : null}
@@ -364,14 +366,9 @@ export function WholesalePricingCard(props: Props) {
           <span className="mt-1 block text-xs text-muted-foreground">{t('audienceHint')}</span>
         </label>
         <div className="sm:col-span-2">
-          <button
-            type="button"
-            onClick={() => void saveRules()}
-            disabled={busy}
-            className="min-h-11 rounded-md border px-4 text-sm md:min-h-9"
-          >
+          <Button type="button" onClick={() => void saveRules()} disabled={busy} variant="outline">
             {t('saveRules')}
-          </button>
+          </Button>
         </div>
       </fieldset>
     </div>

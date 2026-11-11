@@ -5,6 +5,7 @@ import { minorToMajor } from '@/lib/format';
 import type { AbandonedCartConfig } from './types';
 
 import { roundToMinor } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 interface ToggleProps {
   checked: boolean;
   onChange: (val: boolean) => void;
@@ -234,17 +235,12 @@ export function RecoveryCampaignForm({
       </div>
 
       <div className="mt-5 flex justify-end">
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving}
-          className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
-        >
+        <Button variant="default" size="md" type="button" onClick={onSave} disabled={saving}>
           {saving && (
             <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
           )}
           {t('save')}
-        </button>
+        </Button>
       </div>
     </div>
   );

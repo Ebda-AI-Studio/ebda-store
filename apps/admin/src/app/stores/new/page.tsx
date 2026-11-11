@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiPost } from '../../../lib/api';
 import { isValidEmail, validateStoreSlug } from '@ebda/shared';
@@ -194,13 +194,13 @@ export default function CreateStorePage() {
                 {t('cancel')}
               </Link>
             ) : (
-              <Button type="button" variant="outline" className="min-h-11" onClick={prevStep}>
+              <Button type="button" variant="outline" onClick={prevStep}>
                 {t('back')}
               </Button>
             )}
 
             {currentStep === 'review' ? (
-              <Button className="min-h-11" onClick={handleSubmit} disabled={isSubmitting}>
+              <Button onClick={handleSubmit} disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <svg className="me-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -225,9 +225,7 @@ export default function CreateStorePage() {
                 )}
               </Button>
             ) : (
-              <Button className="min-h-11" onClick={nextStep}>
-                {t('continueBtn')}
-              </Button>
+              <Button onClick={nextStep}>{t('continueBtn')}</Button>
             )}
           </div>
         </div>

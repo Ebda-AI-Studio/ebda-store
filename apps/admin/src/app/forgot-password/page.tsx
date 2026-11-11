@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Button, Input } from '@ebda/ui';
+import { Input } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { PASSWORD_RESET_TTL_MINUTES, isValidEmail } from '@ebda/shared';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { AccountsError, accountsFetch } from '../../lib/accounts';

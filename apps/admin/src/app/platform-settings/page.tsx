@@ -10,7 +10,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Input, useToast } from '@ebda/ui';
+import { Input, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import {
   DEFAULT_PLATFORM_VAT,
   PLATFORM_VAT_MODES,

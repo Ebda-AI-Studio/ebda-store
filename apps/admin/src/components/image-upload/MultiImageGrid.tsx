@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
 import Image from 'next/image';
 import { useT } from '@/i18n/useT';
 
@@ -54,10 +55,11 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
           */}
           <div className="absolute inset-0 hover-reveal-scrim hover-reveal transition-colors flex flex-wrap items-center justify-center gap-1">
             {i > 0 && (
-              <button
+              <Button
+                variant="outline"
+                size="icon-sm"
                 type="button"
                 onClick={() => onMove(i, i - 1)}
-                className="touch-target bg-white rounded-full shadow"
                 title={t('moveLeft')}
                 aria-label={t('moveLeft')}
               >
@@ -69,13 +71,14 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
                     d="M15 19l-7-7 7-7"
                   />
                 </svg>
-              </button>
+              </Button>
             )}
             {i < values.length - 1 && (
-              <button
+              <Button
+                variant="outline"
+                size="icon-sm"
                 type="button"
                 onClick={() => onMove(i, i + 1)}
-                className="touch-target bg-white rounded-full shadow"
                 title={t('moveRight')}
                 aria-label={t('moveRight')}
               >
@@ -87,12 +90,13 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
                     d="M9 5l7 7-7 7"
                   />
                 </svg>
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="destructive"
+              size="icon-sm"
               type="button"
               onClick={() => onRemove(i)}
-              className="touch-target bg-destructive text-white rounded-full shadow"
               title={t('remove')}
               aria-label={t('remove')}
             >
@@ -104,7 +108,7 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-            </button>
+            </Button>
           </div>
         </div>
       ))}

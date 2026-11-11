@@ -3,7 +3,8 @@
 import { GoldRateBanner } from './_components/GoldRateBanner';
 import { useCallback, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { buttonVariants, cn } from '@ebda/ui';
+import { cn } from '@ebda/ui';
+import { buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { AdminLayout } from '../../../components/AdminLayout';

@@ -10,6 +10,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { usePaymentAbandonments } from './_hooks/usePaymentAbandonments';
 import { AbandonmentStatsGrid } from './_components/AbandonmentStatsGrid';
 import { AbandonmentsTable } from './_components/AbandonmentsTable';
+import { Button } from '@/components/ui/Button';
 
 export default function PaymentAbandonmentsPage() {
   // Feature gate — shows an upsell card for store_admins without the Enterprise feature.
@@ -81,25 +82,27 @@ export default function PaymentAbandonmentsPage() {
                 className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
-            <button
+            <Button
+              variant="default"
+              size="md"
               type="button"
               onClick={() => applyDateFilter(localFrom, localTo)}
-              className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90"
             >
               {t('dateApply')}
-            </button>
+            </Button>
             {(dateFrom || dateTo) && (
-              <button
+              <Button
+                variant="outline"
+                size="md"
                 type="button"
                 onClick={() => {
                   setLocalFrom('');
                   setLocalTo('');
                   applyDateFilter('', '');
                 }}
-                className="px-4 py-1.5 text-sm border border-border rounded-lg hover:bg-muted text-muted-foreground"
               >
                 &times;
-              </button>
+              </Button>
             )}
           </div>
 

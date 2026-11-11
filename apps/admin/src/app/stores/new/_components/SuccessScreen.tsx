@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Badge, Button } from '@ebda/ui';
+import { Badge } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
 import { apiGet } from '../../../../lib/api';

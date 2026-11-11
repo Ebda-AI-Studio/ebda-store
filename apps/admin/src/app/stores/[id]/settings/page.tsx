@@ -3,7 +3,8 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
-import { Button, Modal, useToast } from '@ebda/ui';
+import { Modal, useToast } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useAuth } from '../../../../lib/auth';
@@ -562,6 +563,7 @@ export default function StoreSettingsPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {groupCards.map(card => (
                   <Link
+                    data-ui="tile"
                     key={card.href}
                     href={card.href}
                     className="group flex min-h-20 items-start gap-4 rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md"

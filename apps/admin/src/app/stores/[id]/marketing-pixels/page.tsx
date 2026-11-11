@@ -10,6 +10,7 @@ import { PixelsList } from './_components/PixelsList';
 import { TrackedEventsCard } from './_components/TrackedEventsCard';
 import { useMarketingPixels } from './_hooks/useMarketingPixels';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { Button } from '@/components/ui/Button';
 
 export default function MarketingPixelsPage() {
   const { gate } = useRequireFeature('marketing_pixels');
@@ -50,14 +51,9 @@ export default function MarketingPixelsPage() {
       title={tPage('title')}
       subtitle={tPage('subtitle')}
       actions={
-        <button
-          type="button"
-          onClick={save}
-          disabled={isSaving}
-          className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-        >
+        <Button variant="default" size="md" type="button" onClick={save} disabled={isSaving}>
           {isSaving ? t('save.saving') : t('save.button')}
-        </button>
+        </Button>
       }
     >
       <div className="space-y-6">

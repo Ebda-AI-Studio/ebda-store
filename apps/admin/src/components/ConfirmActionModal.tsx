@@ -1,6 +1,7 @@
 'use client';
 
-import { Button, Modal } from '@ebda/ui';
+import { Modal } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 
 interface ConfirmActionModalProps {
   open: boolean;

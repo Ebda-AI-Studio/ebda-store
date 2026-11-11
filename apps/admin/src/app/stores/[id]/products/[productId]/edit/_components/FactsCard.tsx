@@ -9,7 +9,8 @@
  */
 
 import { useRef, useState } from 'react';
-import { Button, Input } from '@ebda/ui';
+import { Input } from '@ebda/ui';
+import { Button, buttonVariants } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { PRODUCT_FACTS_MAX, PRODUCT_FACTS_ON_CARD_MAX, type ProductFact } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
@@ -104,8 +105,7 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
     f.key.trim().length > 0 !== f.keyAr.trim().length > 0 ||
     f.value.trim().length > 0 !== f.valueAr.trim().length > 0;
 
-  const iconBtn =
-    'inline-flex h-8 w-8 items-center justify-center rounded-md border border-input text-sm text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
+  const iconBtn = buttonVariants({ variant: 'outline', size: 'icon-sm' });
   const cell = 'h-9 sm:h-9 text-sm';
 
   return (
@@ -118,14 +118,9 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
       {facts.length < PRODUCT_FACTS_MAX && (
         <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={t('presets')}>
           {PRESETS.map(p => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => add(p)}
-              className="rounded-full border border-input px-3 py-1 text-xs text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-            >
+            <Button key={p.key} type="button" onClick={() => add(p)} variant="outline" size="sm">
               + {locale === 'ar' ? p.keyAr : p.key}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -182,14 +177,15 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
                 {t('onCard')}
               </label>
               <div className="flex items-center gap-1.5">
-                <button
+                <Button
                   type="button"
                   onClick={() => translateRow(i)}
                   disabled={busy !== null || !canTranslate(f)}
-                  className="h-8 rounded-md border border-input px-2.5 text-xs text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  variant="outline"
+                  size="sm"
                 >
                   {busy === i ? t('translating') : t('translate')}
-                </button>
+                </Button>
                 <button
                   type="button"
                   className={iconBtn}

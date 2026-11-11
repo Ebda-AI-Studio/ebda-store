@@ -17,6 +17,7 @@
  * Route guard: super_admin only (RequireSuperAdmin + the API's requireRole).
  */
 
+import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../components/AdminLayout';
@@ -109,13 +110,9 @@ function UsageHistoryInner() {
     return (
       <div className="rounded-xl border bg-card p-6 text-center">
         <p className="text-sm text-destructive-ink">{t('loadError')}</p>
-        <button
-          type="button"
-          onClick={fetchData}
-          className="mt-3 text-sm text-primary hover:underline"
-        >
+        <Button variant="link" size="sm" type="button" onClick={fetchData} className="mt-3">
           {tCommon('retry')}
-        </button>
+        </Button>
       </div>
     );
   }

@@ -18,6 +18,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { pctToBps } from './pct';
 import { wholesalePlanName } from '@/lib/plan-labels';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { Button } from '@/components/ui/Button';
 
 interface CustomerGroup {
   id: string;
@@ -232,13 +233,9 @@ export default function CustomerGroupsPage() {
       mode="store_admin"
       storeId={storeId}
       actions={
-        <button
-          type="button"
-          onClick={openCreate}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-        >
+        <Button variant="default" size="md" type="button" onClick={openCreate}>
           {t('addNew')}
-        </button>
+        </Button>
       }
     >
       <div className="mx-auto max-w-4xl px-4 py-6">
@@ -354,21 +351,23 @@ export default function CustomerGroupsPage() {
               </label>
 
               <div className="flex justify-end gap-2">
-                <button
+                <Button
+                  variant="outline"
+                  size="md"
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="rounded-md border px-3 py-2 text-sm"
                 >
                   {t('cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="default"
+                  size="md"
                   type="button"
                   onClick={() => void save()}
                   disabled={saving || !form.name.trim()}
-                  className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
                 >
                   {saving ? t('saving') : t('save')}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

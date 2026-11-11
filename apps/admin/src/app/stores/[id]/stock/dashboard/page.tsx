@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@ebda/ui';
 import { formatPrice } from '@/lib/format';
 
+import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FinanceDashboard {
@@ -206,14 +207,15 @@ export default function StockDashboardPage() {
     <AdminLayout title={t('title')}>
       {isSuperAdmin && (
         <div className="mb-4 flex justify-end max-w-5xl">
-          <button
+          <Button
             type="button"
             onClick={handleLowStockScan}
             disabled={lowStockScanning}
-            className="px-3 py-1.5 rounded border border-border text-sm text-foreground disabled:opacity-60 hover:bg-muted/40 transition-colors"
+            variant="outline"
+            size="sm"
           >
             {lowStockScanning ? tc('loading') : t('lowStockScanNow')}
-          </button>
+          </Button>
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl">

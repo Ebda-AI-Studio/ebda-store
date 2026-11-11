@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { apiGet } from '../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -174,19 +175,14 @@ export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
       {/* Section header */}
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-foreground">{t('header')}</h2>
-        <button
-          type="button"
-          onClick={fetchAll}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
-        >
+        <Button variant="outline" size="sm" type="button" onClick={fetchAll} disabled={loading}>
           {loading ? (
             <SpinIcon className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <RefreshIcon className="h-3.5 w-3.5" />
           )}
           <span>{loading ? t('refreshing') : t('refresh')}</span>
-        </button>
+        </Button>
       </div>
       {lastFetched && (
         <p className="mb-3 text-xs text-muted-foreground">
@@ -382,26 +378,30 @@ function SeoPanel({ data, storeId }: { data: SeoResult; storeId: string }) {
                   <div className="mt-1 flex items-center gap-1.5">
                     <span className="text-xs text-muted-foreground">{t('titleLabel')}</span>
                     <span className="text-xs">{p.metaTitle}</span>
-                    <button
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="ms-auto shrink-0"
                       type="button"
                       onClick={() => copy(p.metaTitle!, `title-${p.id}`)}
-                      className="ms-auto shrink-0 text-xs text-primary hover:underline"
                     >
                       {copied === `title-${p.id}` ? t('copied') : t('copy')}
-                    </button>
+                    </Button>
                   </div>
                 )}
                 {p.metaDescription && (
                   <div className="mt-0.5 flex items-center gap-1.5">
                     <span className="text-xs text-muted-foreground">{t('descLabel')}</span>
                     <span className="text-xs">{p.metaDescription}</span>
-                    <button
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="ms-auto shrink-0"
                       type="button"
                       onClick={() => copy(p.metaDescription!, `desc-${p.id}`)}
-                      className="ms-auto shrink-0 text-xs text-primary hover:underline"
                     >
                       {copied === `desc-${p.id}` ? t('copied') : t('copy')}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </li>
@@ -777,6 +777,7 @@ function CollapsiblePanel({
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       {/* Header — toggle */}
       <button
+        data-ui="row"
         type="button"
         onClick={() => setOpen(v => !v)}
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-start hover:bg-muted/40 transition-colors"

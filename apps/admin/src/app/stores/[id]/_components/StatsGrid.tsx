@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { formatPrice } from '../../../../lib/format';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../lib/api';
-import { Button } from '@ebda/ui';
+import { Button } from '@/components/ui/Button';
 
 interface LiveStats {
   productCount: number;
