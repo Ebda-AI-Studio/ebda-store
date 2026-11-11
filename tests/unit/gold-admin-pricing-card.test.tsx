@@ -177,8 +177,9 @@ describe('factsKaratMismatch', () => {
     expect(factsKaratMismatch([], 21)).toBeNull();
   });
 
-  it('store gold pricing OFF: a gold product shows the toggle OFF and disabled, with the explanation, and no spec form', async () => {
+  it('store gold pricing OFF: a gold product can still be switched OFF (no dead end)', async () => {
     setup({ data: { ...RATES().data, settings: { enabled: false, roundingStep: 100 } } });
+    apiPut.mockResolvedValue({ data: {} });
     render(
       <GoldPricingCard
         storeId="s"
@@ -188,9 +189,24 @@ describe('factsKaratMismatch', () => {
       />
     );
     await screen.findByTestId('gold-store-off');
-    const box = screen.getByRole('checkbox') as HTMLInputElement;
-    expect(box.checked).toBe(false);
-    expect(box.disabled).toBe(true);
     expect(screen.getByTestId('gold-store-off').textContent).toBe('featureOffSaved');
+    const box = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(box.disabled).toBe(false);
+    fireEvent.click(box);
+    await waitFor(() => expect(apiPut).toHaveBeenCalled());
+  });
+  it('store gold pricing OFF: a fixed-price product cannot be switched ON', async () => {
+    setup({ data: { ...RATES().data, settings: { enabled: false, roundingStep: 100 } } });
+    render(
+      <GoldPricingCard
+        storeId="s"
+        facts={[]}
+        onSaved={() => {}}
+        product={{ id: 'p', price: 1, pricingMode: 'fixed' }}
+      />
+    );
+    await screen.findByTestId('gold-store-off');
+    expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByTestId('gold-store-off').textContent).toBe('featureOff');
   });
 });

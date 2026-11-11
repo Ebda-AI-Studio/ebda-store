@@ -118,7 +118,7 @@ export function GoldPricingCard({
     return { weightMg, makingValue, marginBps };
   }, [grams, making, margin]);
 
-  // The store switch owns gold pricing: while it is off the product toggle reflects OFF and cannot be used.
+  // The store switch gates turning gold pricing ON; a product can always be switched OFF.
   const storeOff = state !== null && !state.settings.enabled;
   const rate = state?.rates.find(r => r.karat === karat);
   const freshRate = rate?.ratePerGram && !rate.stale ? rate.ratePerGram : null;
@@ -203,8 +203,8 @@ export function GoldPricingCard({
       <label className="mt-4 flex min-h-11 items-center gap-3 text-sm">
         <input
           type="checkbox"
-          checked={gold && !storeOff}
-          disabled={saving || storeOff}
+          checked={gold}
+          disabled={saving || (storeOff && !gold)}
           onChange={e => (e.target.checked ? setGold(true) : void save(false))}
           className="h-5 w-5"
         />
