@@ -5,6 +5,7 @@ import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../../../../../lib/api';
 import { DEFAULT_THEME, type StoreBranding, type StoreTheme } from '../_components/types';
 import { themePatch } from './theme-patch';
+import { brandingPatch } from './branding-patch';
 
 interface StoreResponse {
   id: string;
@@ -175,15 +176,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
       const themeChanged = Object.keys(changedTheme).length > 0;
 
       const { error } = await apiPut(`/api/v1/stores/${storeId}/branding-bundle`, {
-        branding: {
-          name: branding.name,
-          nameAr: branding.nameAr,
-          logo: branding.logo,
-          logoAr: branding.logoAr,
-          favicon: branding.favicon,
-          description: branding.description,
-          descriptionAr: branding.descriptionAr,
-        },
+        branding: brandingPatch(baseline ? (JSON.parse(baseline) as StoreBranding) : {}, branding),
         ...(themeChanged && { theme: changedTheme }),
         contact: {
           email: branding.email,
@@ -219,7 +212,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
     } finally {
       setIsSaving(false);
     }
-  }, [branding, loadedTheme, storedContact, storeId, toast, messages]);
+  }, [branding, baseline, loadedTheme, storedContact, storeId, toast, messages]);
 
   const resetBranding = useCallback(() => {
     if (baseline) setBranding(JSON.parse(baseline) as StoreBranding);
