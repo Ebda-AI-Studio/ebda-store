@@ -15,6 +15,7 @@ import { sendAlert } from '../services/alerts.service';
 
 export const ALERTED_PREFIX = 'entity_index_alerted.';
 const DAY_MS = 86_400_000;
+const D1_PARAM_LIMIT = 100;
 
 interface D1Like {
   prepare(sql: string): {
@@ -53,21 +54,23 @@ export async function alertEntityIndexHealth(
     }
   }
 
-  // A deleted/closed store (deleted_at set, or no directory row) can never be fixed: forget its health + dedupe rows instead
-  // of re-alerting daily forever. One query for all ids; a read failure throws -> the tick skips and the next one retries.
+  // A store POSITIVELY marked deleted (`deleted_at` set) can never be fixed: forget its health + dedupe rows instead of re-alerting
+  // daily forever. A store merely MISSING from the D1 directory is NOT cleared: its dead rows still alert (that is a real problem).
+  // Chunked to <= 100 bound params (D1 fails at 101). A read failure throws -> the tick skips and the next one retries.
   const ids = [...health.keys()];
-  const live = new Set<string>();
-  if (ids.length) {
-    const { results: liveRows = [] } = await d1
+  const deletedIds = new Set<string>();
+  for (let i = 0; i < ids.length; i += D1_PARAM_LIMIT) {
+    const chunk = ids.slice(i, i + D1_PARAM_LIMIT);
+    const { results: delRows = [] } = await d1
       .prepare(
-        `SELECT id FROM stores WHERE deleted_at IS NULL AND id IN (${ids.map((_, i) => `?${i + 1}`).join(',')})`
+        `SELECT id FROM stores WHERE deleted_at IS NOT NULL AND id IN (${chunk.map((_, j) => `?${j + 1}`).join(',')})`
       )
-      .bind(...ids)
+      .bind(...chunk)
       .all<{ id: string }>();
-    for (const r of liveRows) live.add(r.id);
+    for (const r of delRows) deletedIds.add(r.id);
   }
   for (const storeId of ids)
-    if (!live.has(storeId)) {
+    if (deletedIds.has(storeId)) {
       await d1
         .prepare('DELETE FROM system_settings WHERE key = ?1')
         .bind(`${INDEX_HEALTH_PREFIX}${storeId}`)
