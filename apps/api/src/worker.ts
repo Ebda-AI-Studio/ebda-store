@@ -63,6 +63,7 @@ import {
   sendNoticeMail,
   type StoreClaim,
 } from './lib/identity-directory';
+import { waBridge } from './lib/wa/bridge';
 import { listStoreMembers, memberRole } from './lib/store-members';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
@@ -486,6 +487,47 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
   /** The owner and active staff of a store, for seat assignment. Only the store's owner may ask. */
   async listStoreMembers(storeId: string, asUserId: string) {
     return withWorkerContext(this.env, this.ctx as Ctx, () => listStoreMembers(storeId, asUserId));
+  }
+  // Commerce RPC (contract section 5, Rulings WA-RPC-1..4). Each call runs in the Store's request context, gated on a resolved,
+  // linked store, and answers with `{ ok, value | reason }` (expected failures are data; an unexpected error throws and the caller retries).
+  private bridge<T>(fn: (b: ReturnType<typeof waBridge>) => Promise<T>) {
+    return withWorkerContext(this.env, this.ctx as Ctx, () => fn(waBridge()));
+  }
+  getStoreProfile(storeId: string) {
+    return this.bridge(b => b.getStoreProfile(storeId));
+  }
+  listCatalog(storeId: string, cursor: string | null, limit: number) {
+    return this.bridge(b => b.listCatalog(storeId, cursor, limit));
+  }
+  getProducts(storeId: string, ids: string[]) {
+    return this.bridge(b => b.getProducts(storeId, ids));
+  }
+  createCheckoutLink(storeId: string, req: unknown) {
+    return this.bridge(b => b.createCheckoutLink(storeId, req));
+  }
+  createOrderFromChat(storeId: string, req: unknown) {
+    return this.bridge(b => b.createOrderFromChat(storeId, req));
+  }
+  getPaymentLink(storeId: string, orderId: string) {
+    return this.bridge(b => b.getPaymentLink(storeId, orderId));
+  }
+  recordCodOutcome(storeId: string, req: unknown) {
+    return this.bridge(b => b.recordCodOutcome(storeId, req));
+  }
+  attachPaymentProof(storeId: string, orderId: string, mediaUrl: string) {
+    return this.bridge(b => b.attachPaymentProof(storeId, orderId, mediaUrl));
+  }
+  getCustomerAddresses(storeId: string, buyerKey: string) {
+    return this.bridge(b => b.getCustomerAddresses(storeId, buyerKey));
+  }
+  saveCustomerAddress(storeId: string, buyerKey: string, address: unknown) {
+    return this.bridge(b => b.saveCustomerAddress(storeId, buyerKey, address));
+  }
+  getOrderStatus(storeId: string, orderNumber: string, buyerKey: string) {
+    return this.bridge(b => b.getOrderStatus(storeId, orderNumber, buyerKey));
+  }
+  listCustomerOrders(storeId: string, buyerKey: string, limit: number) {
+    return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit));
   }
   /** Revocation (v1.4): the live role of a user on a store, or null once removed. WhatsApp calls it on each staff request. */
   async memberRole(storeId: string, userId: string) {

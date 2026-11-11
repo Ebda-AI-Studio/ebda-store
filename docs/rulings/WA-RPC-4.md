@@ -1,0 +1,3 @@
+# WA-RPC-4
+
+Ruling WA-RPC-4 - Customer matching is by buyer key, never by phone lookup. Orders from chat are announced with `order/created`, whose CI planner stamps the buyer key on the order (same normaliser and suite secret as Ebda Chat); status, history and address reads match `orders.buyer_key`. `getOrderStatus` needs order number AND buyer key, so a number alone never reveals another buyer's order. `saveCustomerAddress` for a buyer with no prior order has no customer row to attach to and answers `not_found`; the first address travels inline with `createOrderFromChat`. Cost if wrong: a first-time buyer's second chat cannot reuse a saved address until they have one order.

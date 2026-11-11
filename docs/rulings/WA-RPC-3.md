@@ -1,0 +1,3 @@
+# WA-RPC-3
+
+Ruling WA-RPC-3 - `createCheckoutLink` signs a 30-minute HMAC token (HKDF label `ebda:wa-checkout-mac:v1`) carrying store id, variant ids, quantities and buyer key only, never a price, at `<storefront>/cart/from-wa?t=`; the summary prices come from the Store's own catalog rows and exclude shipping/fees/tax. The contract called this `/cart/from-wa` 'existing', but no such route exists on main (grep 0 hits), so this PR ships sign + verify (`checkout-token.ts`) and the storefront redeem route is a named follow-up (WA-RPC-F1): until it lands the link 404s on the storefront, and ebda-whatsapp should prefer `createOrderFromChat`. Cost if wrong: customers who tap a checkout link before WA-RPC-F1 ships see a 404.
