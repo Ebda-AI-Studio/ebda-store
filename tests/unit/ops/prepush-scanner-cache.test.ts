@@ -6,11 +6,20 @@ import { join } from 'node:path';
 
 // scripts/ci/prepush-scanner-cache.sh (PREPUSH-5): pass cache keyed by HEAD tree + scanner list, clean tree ONLY.
 const SCRIPT = join(__dirname, '../../../scripts/ci/prepush-scanner-cache.sh');
+// The pre-push hook exports GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE; inherited, they would make these temp-repo git
+// calls commit into the REAL checkout (observed 2026-11-11). Every spawn here scrubs them.
+const cleanEnv = (extra: Record<string, string> = {}) => {
+  const e: Record<string, string | undefined> = { ...process.env, ...extra };
+  for (const k of Object.keys(e))
+    if (k.startsWith('GIT_') && k !== 'GIT_CONFIG_NOSYSTEM') delete e[k];
+  return e as NodeJS.ProcessEnv;
+};
+
 function repo() {
   const cwd = mkdtempSync(join(tmpdir(), 'psc-'));
   const cache = mkdtempSync(join(tmpdir(), 'psc-cache-'));
   const git = (...a: string[]) =>
-    spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd });
+    spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd, env: cleanEnv() });
   git('init', '-q');
   writeFileSync(join(cwd, '.gitignore'), 'dist/\n');
   writeFileSync(join(cwd, 'a.txt'), '1');
@@ -20,11 +29,7 @@ function repo() {
     spawnSync('bash', [SCRIPT, mode, ...files], {
       cwd,
       encoding: 'utf8',
-      env: {
-        ...process.env,
-        PREPUSH_CACHE_DIR: cache,
-        ...(key ? { PREPUSH_CACHE_KEY: key } : {}),
-      },
+      env: cleanEnv({ PREPUSH_CACHE_DIR: cache, ...(key ? { PREPUSH_CACHE_KEY: key } : {}) }),
     });
   const run = (mode: string, ...files: string[]) => sp(mode, files).status;
   const out = (mode: string, ...files: string[]) => sp(mode, files).stdout.trim();
