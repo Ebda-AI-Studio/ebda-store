@@ -28,7 +28,7 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   launchd user agents `actions.runner.Ebda-AI-Studio.ebda-mac-{1,2}` (`./svc.sh status|stop|start` in each dir). Their
   `.path` is a clean Homebrew PATH; `.env` sets `PLAYWRIGHT_BROWSERS_PATH` (one local browser cache, never the Actions
   cache) and `EBDA_NM_STORE=~/.ebda-ci/node-modules` (the npm-ci-reuse store, shared by both runners). Two instances, not
-  more: the ForceAI-KW runner on the same Mac counts toward a host total of 3.
+  more: other orgs' runners on the same Mac count toward a host total of 3.
 - **Databases**: macOS runners cannot start service containers, so `services:` images are `''` when `EBDA_RUNS_ON`
   names `ebda-mac` (the runner then skips the service). `scripts/ci/ci-services.sh up` gives the job its URLs
   (`CI_PG_URL`, `CI_PG_APP_URL`, `CI_REDIS_URL`): on Linux from the service ports; on the Mac a database of its own on the
