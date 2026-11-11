@@ -73,7 +73,8 @@ const VALUE_TOKEN_AR: Array<[RegExp, string]> = [
  *  unambiguously clothing sizes (a weight/volume is never "XL"), so when an
  *  option's values look like these we translate the axis as المقاس (clothing
  *  fit) rather than الحجم (volume) or الوزن (weight). */
-const GARMENT_SIZE_RE = /^(xs|s|m|l|xl|xxl|xxxl|[2-5]xl)$/i;
+// QA-C5: also «مقاس 6» / "Size 6" (a ring or shoe size written out): the axis is المقاس, never a guess.
+const GARMENT_SIZE_RE = /^(xs|s|m|l|xl|xxl|xxxl|[2-5]xl|(?:مقاس|size)\s*\S+)$/i;
 
 /** A value carries a WEIGHT unit (185 Gram, 1 KG, 500g, ٧٠٠ جرام). The Latin
  *  branch uses `\b`; the Arabic branch omits it (`\b` is unreliable on Arabic
