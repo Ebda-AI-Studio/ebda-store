@@ -1,5 +1,5 @@
 import { S, S_UNLINKED, S_UNKNOWN, BK, BK_OTHER, BUYER } from './fake-port';
-const idem = (n: number) => `idem-key-${String(n).padStart(4, '0')}`;
+const idem = (n: number) => `example-idem-${String(n).padStart(4, '0')}`;
 const AT = '2026-11-11T10:00:00.000Z';
 /** Ordered: the world is stateful (an order placed in case 9 is read in case 14). Args only; expectations live in the fixture. */
 export const CASES: Array<{ name: string; method: string; args: unknown[] }> = [
