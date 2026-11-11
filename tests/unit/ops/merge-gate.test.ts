@@ -16,6 +16,10 @@ const REQ = [
   'Repo guards',
   'Scan for leaked secrets',
 ];
+// Wall-clock budget for cases that must MERGE: generous, so host load (gate startup + node derive) can never
+// expire it mid-streak. Cases that must refuse by TIMEOUT pass wait: WAIT_TO_REFUSE_S.
+const WAIT_FOR_MERGE_S = '120';
+const WAIT_TO_REFUSE_S = '1';
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12';
 
 type Check = {
@@ -27,7 +31,14 @@ type Check = {
 };
 const run = (
   checks: Check[],
-  over: { head?: string; mergeable?: string; want?: string; polls?: string; derive?: boolean } = {}
+  over: {
+    head?: string;
+    mergeable?: string;
+    want?: string;
+    polls?: string;
+    derive?: boolean;
+    wait?: string;
+  } = {}
 ) => {
   const dir = mkdtempSync(join(tmpdir(), 'mg-'));
   const view = join(dir, 'view.json');
@@ -63,7 +74,7 @@ const run = (
         MERGE_GATE_VIEW_CMD: `cat ${view}`,
         // derive: the gate derives the list from the real workflows itself, as it does in production
         ...(over.derive ? {} : { MERGE_GATE_REQUIRED_JSON: JSON.stringify(REQ) }),
-        MERGE_GATE_MAX_WAIT_S: '1',
+        MERGE_GATE_MAX_WAIT_S: over.wait ?? WAIT_FOR_MERGE_S,
       },
       encoding: 'utf8',
     }
@@ -78,7 +89,7 @@ const run = (
         MERGE_GATE_VIEW_CMD: `cat ${view}`,
         // derive: the gate derives the list from the real workflows itself, as it does in production
         ...(over.derive ? {} : { MERGE_GATE_REQUIRED_JSON: JSON.stringify(REQ) }),
-        MERGE_GATE_MAX_WAIT_S: '1',
+        MERGE_GATE_MAX_WAIT_S: over.wait ?? WAIT_FOR_MERGE_S,
         MERGE_GATE_MERGE_CMD: `echo "$sha" > ${merged}`,
       },
       encoding: 'utf8',
@@ -95,16 +106,16 @@ const green = REQ.map(name => ({ name }));
 
 describe('merge-gate.sh', () => {
   it('no checks at all -> refuses (never merges "nothing reported yet")', () => {
-    const r = run([]);
+    const r = run([], { wait: WAIT_TO_REFUSE_S });
     expect(r.status).toBe(2);
     expect(r.merged).toBeNull();
     expect(r.out).toContain('no checks have reported yet');
   });
   it('a queued / in-progress check -> refuses', () => {
-    const r = run([
-      ...green,
-      { name: 'Unit Tests (affected)', status: 'QUEUED', conclusion: null },
-    ]);
+    const r = run(
+      [...green, { name: 'Unit Tests (affected)', status: 'QUEUED', conclusion: null }],
+      { wait: WAIT_TO_REFUSE_S }
+    );
     expect(r.status).toBe(2);
     expect(r.merged).toBeNull();
     expect(r.out).toContain('Unit Tests (affected)');
@@ -121,7 +132,10 @@ describe('merge-gate.sh', () => {
     expect(r.merged).toBeNull();
   });
   it('a required check that is SKIPPED (no explicit SUCCESS) -> refuses', () => {
-    const r = run(green.map(c => (c.name === 'Repo guards' ? { ...c, conclusion: 'SKIPPED' } : c)));
+    const r = run(
+      green.map(c => (c.name === 'Repo guards' ? { ...c, conclusion: 'SKIPPED' } : c)),
+      { wait: WAIT_TO_REFUSE_S }
+    );
     expect(r.status).toBe(2);
     expect(r.merged).toBeNull();
     expect(r.out).toContain('without an explicit SUCCESS: Repo guards');
@@ -193,21 +207,24 @@ describe('merge-gate.sh', () => {
     expect(r.out).toContain('failing check(s): Repo guards');
   });
   it('a newer in-progress rerun after an old failure -> waits, never merges', () => {
-    const r = run([
-      ...green.filter(c => c.name !== 'Repo guards'),
-      {
-        name: 'Repo guards',
-        conclusion: 'FAILURE',
-        startedAt: '2026-10-29T10:00:00Z',
-        completedAt: '2026-10-29T10:01:00Z',
-      },
-      {
-        name: 'Repo guards',
-        status: 'IN_PROGRESS',
-        conclusion: null,
-        startedAt: '2026-10-29T10:30:00Z',
-      },
-    ]);
+    const r = run(
+      [
+        ...green.filter(c => c.name !== 'Repo guards'),
+        {
+          name: 'Repo guards',
+          conclusion: 'FAILURE',
+          startedAt: '2026-10-29T10:00:00Z',
+          completedAt: '2026-10-29T10:01:00Z',
+        },
+        {
+          name: 'Repo guards',
+          status: 'IN_PROGRESS',
+          conclusion: null,
+          startedAt: '2026-10-29T10:30:00Z',
+        },
+      ],
+      { wait: WAIT_TO_REFUSE_S }
+    );
     expect(r.status).toBe(2);
     expect(r.merged).toBeNull();
   });
@@ -218,8 +235,8 @@ describe('merge-gate.sh', () => {
     expect(r.merged).toBeNull();
   });
   it('mergeable UNKNOWN or CONFLICTING -> does not merge', () => {
-    expect(run(green, { mergeable: 'UNKNOWN' }).merged).toBeNull();
-    expect(run(green, { mergeable: 'CONFLICTING' }).merged).toBeNull();
+    expect(run(green, { mergeable: 'UNKNOWN', wait: WAIT_TO_REFUSE_S }).merged).toBeNull();
+    expect(run(green, { mergeable: 'CONFLICTING', wait: WAIT_TO_REFUSE_S }).merged).toBeNull();
   });
   it('optional skipped checks are fine: all required SUCCESS + skipped others -> merges at the pinned sha', () => {
     const r = run([
