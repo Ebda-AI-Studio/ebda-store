@@ -211,6 +211,16 @@ describe('gold-rate feed cron', () => {
       diffBps,
     });
 
+  it('feeds DISAGREE: a demo store (no owner to decide) takes the primary rate, only a real store goes pending', async () => {
+    h.stores = [
+      { storeId: 'demo', premiumBps: 0, demo: true },
+      { storeId: 'real', premiumBps: 0 },
+    ];
+    await handleGoldRateFeedFetch({ step }, disagreeing());
+    expect(h.applied.find(x => x.storeId === 'demo')!.actor).toMatchObject({ forcePending: false });
+    expect(h.applied.find(x => x.storeId === 'real')!.actor).toMatchObject({ forcePending: true });
+  });
+
   it('feeds DISAGREE (GOLD-DISAGREE-MERCHANT-1): every store gets a PENDING rate carrying both values, ONE owner email each, an INFO (not a P1) for the operator', async () => {
     h.stores = [
       { storeId: 'a', premiumBps: 0 },

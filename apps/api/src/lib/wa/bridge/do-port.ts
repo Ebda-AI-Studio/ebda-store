@@ -149,6 +149,60 @@ async function originFor(storeId: string): Promise<string> {
 }
 export const storefrontUrlFor = originFor;
 
+/** Engine refusals that mean "this product / variant cannot be bought now": shown to the buyer as unavailable, with the variant ids. */
+const UNAVAILABLE_CODES = new Set([
+  'OUT_OF_STOCK',
+  'PRODUCT_UNAVAILABLE',
+  'VARIANT_UNAVAILABLE',
+  'VARIANT_INACTIVE',
+]);
+/** Other permanent business refusals of the checkout engine (never worth retrying): shown to the buyer as a typed `invalid`. */
+const BUSINESS_CODES = new Set([
+  'MIN_ORDER_NOT_MET',
+  'TOO_MANY_OPEN_ORDERS',
+  'IDEMPOTENCY_CONFLICT',
+  'VARIANT_REQUIRED',
+  'EMPTY_CART',
+  'BAD_LINES',
+  'BAD_QUANTITY',
+  'BAD_ADDRESS',
+  'BAD_AMOUNT',
+  'BAD_ARGS',
+  'BAD_ID',
+  'COUPON_EXHAUSTED',
+  'COUPON_EXPIRED',
+  'COUPON_INVALID',
+  'COUPON_USER_LIMIT',
+  'INSUFFICIENT_WALLET',
+  'TOTAL_TOO_LARGE',
+  'GOLD_PRICE_DRIFT',
+  'GOLD_PREPAID_REQUIRED',
+  'NO_STORE',
+]);
+/**
+ * A permanent business refusal becomes a typed PortError (no retry, Chat shows the buyer, Ruling WA-RPC-8, #617); anything else
+ * (a 5xx, a timeout, an unknown error) is null and propagates so the caller retries. A 4xx engine error with a string code that is not
+ * listed is still permanent (the engine refuses deterministically below 500) and reported `invalid` with its code.
+ */
+export function refusalOf(e: unknown, variantIds: string[]): PortError | null {
+  const err = e as { code?: unknown; status?: unknown; statusCode?: unknown; message?: unknown };
+  const code = typeof err?.code === 'string' ? err.code : null;
+  if (!code) return null;
+  const status =
+    typeof err.statusCode === 'number'
+      ? err.statusCode
+      : typeof err.status === 'number'
+        ? err.status
+        : null;
+  const message = typeof err.message === 'string' ? err.message : code;
+  // A 5xx is an engine BUG or outage, never a business rule (Ruling WA-RPC-9, #662): it propagates so it is logged and retried, whatever its code.
+  if (status !== null && status >= 500) return null;
+  if (UNAVAILABLE_CODES.has(code)) return new PortError('out_of_stock', message, variantIds, code);
+  if (BUSINESS_CODES.has(code) || (status !== null && status >= 400 && status < 500))
+    return new PortError('invalid', message, undefined, code);
+  return null;
+}
+
 export function createDoPort(): BridgePort {
   const profile = async (storeId: string): Promise<StoreProfile | null> => {
     if (!(await lookupStore({ id: storeId }, ['active', 'inactive']))) return null;
@@ -316,17 +370,22 @@ export function createDoPort(): BridgePort {
       try {
         placed = await money.createOrder(args);
       } catch (e) {
-        const msg = e as { code?: string; message?: string };
-        if (/STOCK|INVENTORY|OUT_OF/i.test(msg.code ?? ''))
-          throw new PortError(
-            'out_of_stock',
-            msg.message,
+        throw (
+          refusalOf(
+            e,
             a.items.map(i => i.variantId)
-          );
-        if (/BAD_|INVALID|NOT_FOUND|MOQ|CART/i.test(msg.code ?? ''))
-          throw new PortError('invalid', msg.message);
-        throw e;
+          ) ?? e
+        );
       }
+      // Every step below is idempotent, so a REPLAY (the caller retrying after a transient failure of an earlier step) runs them again and
+      // completes whatever is missing (Ruling WA-RPC-8, #616): the buyer key stamp is fill-only-NULL, the payment rows are reused, and the
+      // `order/created` fanout claims `order_created_notified_at` atomically. Stamp FIRST so the buyer can see the order even if a later
+      // step throws; a failed send THROWS (the caller retries the same key) instead of being logged and lost.
+      await money.ciOrderStamp({
+        orderId: placed.orderId,
+        areaKey: null,
+        buyerKey: a.buyer.buyerKey,
+      });
       // The engine writes the ORDER; the payment row is a second step exactly as at checkout (payment.routes.ts / InstapayService), both
       // replay-safe (an open COD row is reused, an awaiting InstaPay order returns the same instructions).
       const currency = await currencyOf(storeId);
@@ -354,31 +413,16 @@ export function createDoPort(): BridgePort {
           userId: null,
         });
       }
-      if (!placed.replayed) {
-        // Stamp the buyer key NOW: status / history reads match on it. The CI planner adds the area key afterwards (fill-only-NULL stamp).
-        await money.ciOrderStamp({
+      // `order/created` announces the order to Ebda Chat (COD confirmation request) and to CI; same shape OrderService sends.
+      await inngest.send({
+        name: 'order/created',
+        data: {
           orderId: placed.orderId,
-          areaKey: null,
-          buyerKey: a.buyer.buyerKey,
-        });
-        // `order/created` announces the order to Ebda Chat (COD confirmation request) and to CI; same shape OrderService sends.
-        await inngest
-          .send({
-            name: 'order/created',
-            data: {
-              orderId: placed.orderId,
-              storeId,
-              paymentMethod: placed.paymentStatus === 'paid' ? 'wallet' : a.paymentMethod,
-              locale: a.buyer.locale,
-            },
-          })
-          .catch((err: unknown) =>
-            logger.error(
-              { err, orderId: placed.orderId },
-              'wa-bridge: failed to enqueue order/created'
-            )
-          );
-      }
+          storeId,
+          paymentMethod: placed.paymentStatus === 'paid' ? 'wallet' : a.paymentMethod,
+          locale: a.buyer.locale,
+        },
+      });
       // remember an address typed in chat so the next chat can offer it (best effort: the order is already placed)
       if (a.address && !placed.replayed)
         await Promise.resolve(

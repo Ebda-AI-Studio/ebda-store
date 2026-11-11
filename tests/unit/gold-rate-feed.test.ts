@@ -182,7 +182,8 @@ describe('cross-check: the threshold is 200 bps and is pinned both sides', () =>
     // scale the fallback's egp so its 24k differs from the primary's 713 800 by `factor`
     const base = fx('fallback-usd-jsdelivr.json');
     const egp = (713_800 * factor * base.usd.xau * 31.1034768) / 100;
-    return { ...base, usd: { ...base.usd, egp } };
+    // dated the same UTC day as NOW: a CURRENT file, so the 200 bps gate applies
+    return { ...base, date: '2026-10-22', usd: { ...base.usd, egp } };
   };
   it('1.9 % apart: applies (ok, the primary)', async () => {
     const r = await run({ ...ALL_OK, [FALLBACK_URLS[0]]: withFallbackScaledBy(1.019) });
@@ -192,6 +193,20 @@ describe('cross-check: the threshold is 200 bps and is pinned both sides', () =>
     const r = await run({ ...ALL_OK, [FALLBACK_URLS[0]]: withFallbackScaledBy(1.021) });
     expect(r.kind).toBe('disagree');
     if (r.kind === 'disagree') expect(r.diffBps).toBeGreaterThan(CROSS_CHECK_BPS);
+  });
+  it('a fallback file from the day BEFORE is lag, not disagreement: 281 bps apart still applies the primary (GOLD-FALLBACK-LAG-1)', async () => {
+    const lagged = { ...withFallbackScaledBy(1.0281), date: '2026-10-21' };
+    const r = await run({ ...ALL_OK, [FALLBACK_URLS[0]]: lagged });
+    expect(r.kind).toBe('ok');
+  });
+  it('a lagging fallback does not hide a real fault: 7 % apart still disagrees', async () => {
+    const lagged = { ...withFallbackScaledBy(1.07), date: '2026-10-21' };
+    expect((await run({ ...ALL_OK, [FALLBACK_URLS[0]]: lagged })).kind).toBe('disagree');
+  });
+  it('a CURRENT fallback file keeps the 200 bps gate at 281 bps', async () => {
+    expect((await run({ ...ALL_OK, [FALLBACK_URLS[0]]: withFallbackScaledBy(1.0281) })).kind).toBe(
+      'disagree'
+    );
   });
   it('one source up, one down: applies with no cross-check and records the single source', async () => {
     expect(ok(await run({ [GOLD_SPOT_URL]: XAU, [USD_RATES_URL]: USD })).source).toBe('primary');
