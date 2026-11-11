@@ -194,6 +194,8 @@ export interface CfBindings {
   CI_EVENTS_QUEUE?: QueueProducerLike;
   CI_BUCKET?: R2BucketCasLike;
   CI_OUTCOMES?: AnalyticsEngineLike;
+  /** Per-route request counters, dataset `ebda_request_budget` (lib/request-budget.ts, NEON-ZERO 9.2). */
+  REQUEST_BUDGET?: AnalyticsEngineLike;
   EMAIL_QUEUE?: QueueProducerLike;
   SMS_QUEUE?: QueueProducerLike;
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */

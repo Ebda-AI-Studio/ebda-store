@@ -300,6 +300,7 @@ Names only. "Set" says where it lives: wrangler var (committed in the Worker's `
 - `CACHEGEN_DO_NAME`, `CACHEGEN_LOCATION_HINT` — optional; AuthState Durable Object name / location hint (`cf/auth-state-client.ts`). Set: wrangler var.
 - `DEV_STATS` — optional, local/test only (`.dev.vars` or workerd test config, never `wrangler.jsonc`); enables the dev-only `POST /__dev/create-store` route (`src/worker.ts`; the pool stats / probe routes went with the isolate pool in N-17), keeps the per-binding call counts in `Server-Timing` on the credential routes, and adds the `x-dev-io-ops` header (the remote calls of the request in order, `lib/io-tally.ts`; the latency budget test prints it when a budget fails).
 - `HOP_TIMING_TOKEN` — optional; authorises hop-timing diagnostics (`lib/hop-timing.ts`). Set: Worker secret.
+- `CF_ANALYTICS_ACCOUNT_ID` + `CF_ANALYTICS_TOKEN` — optional; the hourly request-budget alert (`lib/request-budget-alert.ts`) reads the `ebda_request_budget` Analytics Engine dataset with them (token = Account Analytics:Read). Unset: the alert is skipped. Set: Worker secrets.
 - `LOAD_TEST_BYPASS_TOKEN` — optional; lets the k6 load test skip the global rate limit (`middleware/global-rate-limit-skip.ts`). Set: Worker secret, only while load testing.
 - `PUBLIC_TENANT_RATE_LIMIT_PER_MIN` — optional per-tenant public limiter (`middleware/security.ts`). Set: wrangler var.
 - `LOG_LEVEL`, `SENTRY_DEBUG` — optional logging / Sentry debug switches (`config/index.ts`). Set: wrangler var.
