@@ -13,6 +13,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import postcss from 'postcss';
+import ts from 'typescript';
 import {
   DEFAULT_THEME,
   TEMPLATES,
@@ -32,31 +34,38 @@ const walk = (dir: string): string[] =>
     return /\.(tsx|ts|css)$/.test(n) && !/\.test\./.test(n) ? [p] : [];
   });
 
-/** Every className expression's text, and every @apply line. */
-export function elements(src: string): Array<{ text: string; at: number }> {
+/**
+ * Every className expression's text, and every @apply. Parsed, not scanned: a TSX file through the
+ * TypeScript parser (every JSX `className` attribute: a brace or quote inside a string cannot cut an
+ * expression short, and a comment that mentions `className=` is not one), a CSS file through postcss
+ * (every `@apply` at-rule; comments are not nodes).
+ */
+export function elements(src: string, kind: 'tsx' | 'css'): Array<{ text: string; at: number }> {
   const out: Array<{ text: string; at: number }> = [];
-  const re = /className=|@apply\s/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) {
-    const start = m.index + m[0].length;
-    if (m[0].startsWith('@apply')) {
-      const end = src.indexOf(';', start);
-      out.push({ text: src.slice(start, end), at: m.index });
-      continue;
-    }
-    const open = src[start];
-    if (open === '"' || open === "'") {
-      out.push({ text: src.slice(start + 1, src.indexOf(open, start + 1)), at: m.index });
-    } else if (open === '{') {
-      let depth = 0;
-      let i = start;
-      for (; i < src.length; i++) {
-        if (src[i] === '{') depth++;
-        else if (src[i] === '}' && --depth === 0) break;
-      }
-      out.push({ text: src.slice(start, i + 1), at: m.index });
-    }
+  if (kind === 'css') {
+    postcss.parse(src).walkAtRules('apply', rule => {
+      out.push({ text: rule.params, at: rule.source?.start?.offset ?? 0 });
+    });
+    return out;
   }
+  const sf = ts.createSourceFile('x.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const visit = (n: ts.Node): void => {
+    if (
+      ts.isJsxAttribute(n) &&
+      ts.isIdentifier(n.name) &&
+      n.name.text === 'className' &&
+      n.initializer
+    ) {
+      const init = n.initializer;
+      out.push({
+        // a plain attribute ("…") is its class list; a {…} expression keeps its source text
+        text: ts.isStringLiteral(init) ? init.text : init.getText(sf),
+        at: init.getStart(sf),
+      });
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
   return out;
 }
 
@@ -168,6 +177,7 @@ const ALLOW: Record<string, string> = {
 };
 
 const files = SCAN.flatMap(walk);
+const kindOf = (f: string): 'tsx' | 'css' => (f.endsWith('.css') ? 'css' : 'tsx');
 const lineOf = (src: string, at: number) => src.slice(0, at).split('\n').length;
 
 describe('K-02: bg-primary is paired with text-primary-foreground', () => {
@@ -180,7 +190,7 @@ describe('K-02: bg-primary is paired with text-primary-foreground', () => {
       .filter(f => !ALLOW[relative(ROOT, f)])
       .flatMap(f => {
         const src = readFileSync(f, 'utf8');
-        return elements(src).flatMap(e =>
+        return elements(src, kindOf(f)).flatMap(e =>
           pairs(e.text).map(p => `${relative(ROOT, f)}:${lineOf(src, e.at)} (${p})`)
         );
       });
@@ -195,7 +205,7 @@ describe('K-02: bg-primary is paired with text-primary-foreground', () => {
       .filter(f => !SKIN.test(f))
       .flatMap(f => {
         const src = readFileSync(f, 'utf8');
-        return elements(src)
+        return elements(src, kindOf(f))
           .filter(e => /(?:^|[\s'"`:])shadow-primary\/\d+/.test(e.text))
           .map(e => `${relative(ROOT, f)}:${lineOf(src, e.at)}`);
       });
@@ -203,7 +213,8 @@ describe('K-02: bg-primary is paired with text-primary-foreground', () => {
   });
 
   it('the matcher catches the old shapes and spares the on-token (self-test)', () => {
-    const t = (s: string) => elements(s).flatMap(e => pairs(e.text));
+    const t = (s: string) =>
+      elements(s, s.includes('@apply') ? 'css' : 'tsx').flatMap(e => pairs(e.text));
     expect(t(`<a className="bg-primary text-white" />`)).toEqual(['base']);
     expect(t(`<a className={cn('h-10 bg-primary px-4', 'text-white')} />`)).toEqual(['base']);
     expect(t("<a className={`x ${on ? 'bg-primary text-white' : 'bg-muted'}`} />")).toEqual([
@@ -225,6 +236,8 @@ describe('K-02: bg-primary is paired with text-primary-foreground', () => {
       []
     );
     expect(t(`<a className="bg-primary/10 text-primary" />`)).toEqual([]);
+    // A brace inside a string cannot cut the expression short (a char scanner lost the tail here).
+    expect(t("<a className={`${'}'} bg-primary text-white`} />")).toEqual(['base']);
     // Ternary arms are separate states; a base class joins every arm.
     expect(
       t(
@@ -307,14 +320,23 @@ describe('K-02: the primary fill and its ink read at AA', () => {
   });
 
   it('the globals.css fallbacks (:root and .dark) ≥ 4.5', () => {
-    const css = readFileSync(join(ROOT, 'apps/web/src/styles/globals.css'), 'utf8');
-    for (const sel of [':root {', '.dark {']) {
-      const block = css.slice(css.indexOf(sel), css.indexOf('}', css.indexOf(sel)));
-      const v = (n: string) => block.match(new RegExp(`--${n}:\\s*([^;]+);`))![1].trim();
-      expect(
-        contrastRatio(hsl(v('primary')), hsl(v('primary-foreground'))),
-        sel
-      ).toBeGreaterThanOrEqual(4.5);
+    // postcss rules, not a text window: every rule whose selector is exactly `:root` / `.dark`
+    // that declares the pair is measured (a first match of the selector text could be another rule).
+    const root = postcss.parse(readFileSync(join(ROOT, 'apps/web/src/styles/globals.css'), 'utf8'));
+    for (const sel of [':root', '.dark']) {
+      let measured = 0;
+      root.walkRules(sel, rule => {
+        const decl = (n: string) => {
+          let v: string | undefined;
+          rule.walkDecls(`--${n}`, d => void (v = d.value.trim()));
+          return v;
+        };
+        const [fill, ink] = [decl('primary'), decl('primary-foreground')];
+        if (!fill || !ink) return;
+        measured++;
+        expect(contrastRatio(hsl(fill), hsl(ink)), sel).toBeGreaterThanOrEqual(4.5);
+      });
+      expect(measured, `${sel} declares the primary pair`).toBeGreaterThan(0);
     }
   });
 });

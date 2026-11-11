@@ -668,13 +668,15 @@ jobs:
       # + PERF-LATENCY (Ruling PERF-LAT-1): remote calls and serial round trips per hot path stay under their ceilings.
       # + LAUNCH-RL-MISS (Rulings LAUNCH-RL-MISS-1/2): successful storefront calls never spend the store-miss budget (sequential and
       # parallel, one IP), 21 misses are still refused, successful sign-ins leave the IP-wide failure budget untouched.
+      # + MERCHANT-JOURNEY (Rulings NZ-JOURNEY-1/2, UPLOAD-DO-1): a new DO-store merchant signs in, onboards, creates a product
+      # and uploads its photo + 3D model with no step reaching the removed Postgres.
       - name: Embedding provider + tenant isolation + money path + latency budgets on workerd (fake AI binding, no Postgres)
         timeout-minutes: 20
         env:
           EVENT: ${{ github.event_name }}
         run: |
           if [ "$EVENT" = "pull_request" ]; then
-            npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/store-settings-do.test.ts workers-test/merchant-signup.test.ts workers-test/money-path.test.ts workers-test/demo-home.test.ts workers-test/latency-budget.test.ts workers-test/failure-only-limiters.test.ts workers-test/pg-unreachable.test.ts workers-test/answer-engine-do.test.ts
+            npm run cf:test -w apps/api -- workers-test/embedding-provider.test.ts workers-test/jobs.test.ts workers-test/buyer-key.test.ts workers-test/tenant-isolation.test.ts workers-test/admin-cross-store.test.ts workers-test/store-settings-do.test.ts workers-test/merchant-signup.test.ts workers-test/merchant-journey.test.ts workers-test/money-path.test.ts workers-test/demo-home.test.ts workers-test/latency-budget.test.ts workers-test/failure-only-limiters.test.ts workers-test/pg-unreachable.test.ts workers-test/answer-engine-do.test.ts
           else
             # full lane: every workers-test file, route-sweep.test.ts included
             npm run cf:test -w apps/api

@@ -68,6 +68,7 @@ import {
   MoneyError,
   runReads,
   runWrites,
+  revivePrismaNulls,
   type DoMutation,
   type DoQuery,
   type DoQueryResult,
@@ -264,7 +265,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
    */
   async query(storeId: string, queries: DoQuery[]): Promise<DoQueryResult> {
     try {
-      return await runReads(await this.lite(storeId), queries);
+      return await runReads(await this.lite(storeId), revivePrismaNulls(queries));
     } catch (e) {
       if (e instanceof StoreMismatch)
         return { ok: false, code: 'STORE_MISMATCH', message: e.message };
@@ -313,7 +314,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         message: 'store is closed',
       });
       if (closed) return closed;
-      return await runWrites(await this.lite(storeId), doSqlRunner(this.ctx.storage), m);
+      // Prisma null sentinels arrive tagged (they cannot be structured-cloned, Ruling PRISMA-NULL-RPC-1)
+      return await runWrites(
+        await this.lite(storeId),
+        doSqlRunner(this.ctx.storage),
+        revivePrismaNulls(m)
+      );
     } catch (e) {
       if (e instanceof StoreMismatch)
         return { ok: false, code: 'STORE_MISMATCH', message: e.message };

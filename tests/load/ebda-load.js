@@ -1,5 +1,6 @@
 // Reusable k6 script driven by the `load-test` workflow (.github/workflows/load-test.yml). Ruling SCALE-READY-1 #7.
-// Env: BASE_URL (api root incl. /api/v1), SCENARIO (smoke|storefront-mix|flash-sale), DURATION, RPS,
+// Env: BASE_URL (api root incl. /api/v1), SCENARIO (smoke|storefront-mix|flash-sale|pages), DURATION, RPS,
+//      URLS (pages: comma list of full storefront page URLs; each iteration GETs one, like a shopper page load),
 //      PATHS (comma list, smoke), STORE_IDS (comma list, store scenarios), PRODUCT_SLUG (flash-sale),
 //      P95_MS (default 500), ERROR_RATE (default 0).
 // SAFETY: flash-sale stops after add-to-cart. It NEVER places an order or touches payment.
@@ -20,15 +21,19 @@ const PATHS = (__ENV.PATHS || '/public/health')
   .map(s => s.trim())
   .filter(Boolean);
 const SLUG = __ENV.PRODUCT_SLUG || '';
+const URLS = (__ENV.URLS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
 
-if (!BASE) throw new Error('BASE_URL required');
-if (SCENARIO !== 'smoke' && STORES.length === 0)
+if (!BASE && SCENARIO !== 'pages') throw new Error('BASE_URL required');
+if (SCENARIO === 'pages' && URLS.length === 0) throw new Error('URLS required for pages');
+if (SCENARIO !== 'smoke' && SCENARIO !== 'pages' && STORES.length === 0)
   throw new Error('STORE_IDS required for ' + SCENARIO);
 if (SCENARIO === 'flash-sale' && (STORES.length !== 1 || !SLUG))
   throw new Error('flash-sale needs exactly one STORE_IDS entry and PRODUCT_SLUG');
 
-const rate =
-  SCENARIO === 'flash-sale' ? RPS : SCENARIO === 'smoke' ? RPS : Math.max(10, Math.floor(RPS / 2));
+const rate = SCENARIO === 'storefront-mix' ? Math.max(10, Math.floor(RPS / 2)) : RPS;
 export const options = {
   scenarios: {
     load: {
@@ -51,6 +56,13 @@ const hdr = id => ({ headers: { 'x-store-id': id, 'Content-Type': 'application/j
 const ok = r => r.status >= 200 && r.status < 300;
 
 export default function () {
+  if (SCENARIO === 'pages') {
+    // A real page load: the HTML document only (assets come from the CDN cache and are not the origin's load).
+    check(http.get(pick(URLS), { headers: { 'Accept-Language': 'ar' }, tags: { kind: 'page' } }), {
+      '2xx': ok,
+    });
+    return;
+  }
   if (SCENARIO === 'smoke') {
     check(http.get(BASE + pick(PATHS)), { '2xx': ok });
     return;

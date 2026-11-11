@@ -48,7 +48,7 @@ import { AppError } from '../middleware/error-handler';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
 import { platformDb, requirePlatformDb } from './platform-db';
-import { d1StorePatch } from './store-columns';
+import { d1StorePatch, STORE_D1_ONLY_FIELDS } from './store-columns';
 import { reportAndRetryStoreUpdate, reportStoreUpdateFailure } from './store-update-retry';
 import { getAccountState } from './identity-client';
 
@@ -1656,11 +1656,15 @@ export function doStoreDelegate(
       );
     }
     const rec = decodeRpc(r.data.json) as Record<string, any>;
-    if (r.data.missing.length) {
+    // A whole-record read (no `select`: `include: { owner }`, bare findUnique) makes the DO skip the D1-only columns silently
+    // (`readStoreRecord` only reports `missing` for NAMED fields). Ask D1 for them too, or GET /stores/:id loses
+    // `pendingDomain` / `domainStatus` and the admin domain page shows a pending claim as "no custom domain".
+    const missing = selected ? r.data.missing : [...STORE_D1_ONLY_FIELDS];
+    if (missing.length) {
       const platform = await requirePlatformDb();
       const d1 = await platform.store.findUnique({
         where: { id: storeId },
-        select: Object.fromEntries(r.data.missing.map(f => [f, true])),
+        select: Object.fromEntries(missing.map(f => [f, true])),
       });
       if (!d1) return null; // directory row gone: the store does not exist
       Object.assign(rec, d1);

@@ -2274,6 +2274,11 @@
       "on": "مُفعّل",
       "off": "معطّل"
     },
+    "hideFromSearchChip": {
+      "label": "الظهور في جوجل:",
+      "visible": "ظاهر",
+      "hidden": "مخفي"
+    },
     "settingsSearch": {
       "placeholder": "ابحث في الإعدادات...",
       "noResults": "مفيش إعدادات"
@@ -5438,6 +5443,11 @@
       "twitterHandle": "معرّف Twitter / X",
       "twitterPlaceholder": "yourstorehandle",
       "googleSiteVerification": "التحقق من Google Search Console (للنطاق المخصص فقط)",
+      "hideFromSearchTitle": "إخفاء متجري من محركات البحث",
+      "hideFromSearchLabel": "ما تخلّيش متجري يظهر في جوجل ولا أي محرك بحث",
+      "hideFromSearchHint": "فعّل الخيار ده وإنت لسه بتجهّز متجرك. اللي معاه الرابط يقدر يتصفح ويضيف للسلة ويكمّل الطلب عادي، لكن محركات البحث بتتطلب منها ما تعرضش أي صفحة، وخريطة الموقع بتفضى. اقفله لما تبقى جاهز للإطلاق. محركات البحث ممكن تاخد كام يوم عشان تشيل الصفحات أو ترجّعها بعد ما تغيّر الإعداد.",
+      "hideFromSearchOn": "مخفي: محركات البحث متطلوب منها ما تعرضش متجرك.",
+      "hideFromSearchOff": "ظاهر: محركات البحث ممكن تعرض متجرك.",
       "googleSiteVerificationPlaceholder": "الصق وسم meta كاملاً أو رمز التحقق فقط",
       "googleSiteVerificationHint": "متجرك موثّق بالفعل على ebda.app — لا تحتاج إلى هذا الحقل إلا بعد ربط نطاق مخصص (مثل yourstore.com).\n1. افتح Google Search Console وأضف نطاقك المخصص كخاصية URL-prefix.\n2. اختر طريقة التحقق \"HTML tag\".\n3. الصق وسم meta كاملاً (أو رمز content فقط) هنا واحفظ.\n4. اضغط Verify في Search Console — المتجر سيكون قد بدأ بإصدار الوسم تلقائياً.",
       "successMessage": "اتحفظت إعدادات البحث",
@@ -5570,7 +5580,7 @@
       "title": "نطاق مخصّص",
       "subtitle": "ربط نطاق مخصّص بمتجرك",
       "heading": "نطاق مخصّص",
-      "storeDomainSuffix": "النطاق",
+      "storeDomainTitle": "نطاق {name}",
       "storeNotFound": "المتجر غير موجود.",
       "addDomain": "إضافة نطاق",
       "changeDomain": "تغيير النطاق",

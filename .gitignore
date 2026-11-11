@@ -39,6 +39,7 @@ Thumbs.db
 coverage/
 .nyc_output/
 playwright-report/
+prelaunch-results/
 test-results/
 playwright/.cache/
 

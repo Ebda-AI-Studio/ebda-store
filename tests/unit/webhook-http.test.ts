@@ -3,6 +3,8 @@
  * re-checked at SEND time (not only at registration).
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import ts from 'typescript';
+import { all, callsIn, parseFile, prop, strVal } from './helpers/ast-statements';
 import { setHostResolver, type HostResolver } from '@api/lib/safe-fetch';
 import {
   signWebhook,
@@ -233,35 +235,31 @@ describe('every send goes through the guarded transport', () => {
   });
 });
 
+// Structural (AST): the options object of createFunction whose `id` is 'webhook-deliver'. Behaviour is not practical: the
+// options are Inngest registration metadata that only the Inngest runtime interprets.
+function deliverConfig(): ts.ObjectLiteralExpression {
+  const sf = parseFile('apps/api/src/lib/inngest/functions/webhook-delivery.ts');
+  const cfg = all(sf, ts.isObjectLiteralExpression).find(o => {
+    const id = prop(o, 'id');
+    return !!id && ts.isPropertyAssignment(id) && strVal(id.initializer) === 'webhook-deliver';
+  });
+  expect(cfg, 'webhook-deliver config').toBeTruthy();
+  return cfg!;
+}
+
 describe('M1 delivery function is idempotent on its request event', () => {
-  it('webhook-deliver declares idempotency by deliveryId', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const src = readFileSync(
-      resolve(__dirname, '../../apps/api/src/lib/inngest/functions/webhook-delivery.ts'),
-      'utf8'
-    );
-    const deliver = src.slice(
-      src.indexOf("id: 'webhook-deliver'"),
-      src.indexOf("id: 'webhook-delivery-purge-daily'")
-    );
-    expect(deliver).toMatch(/idempotency:\s*'event\.data\.deliveryId'/);
+  it('webhook-deliver declares idempotency by deliveryId', () => {
+    const p = prop(deliverConfig(), 'idempotency');
+    expect(p && ts.isPropertyAssignment(p) && strVal(p.initializer)).toBe('event.data.deliveryId');
   });
 });
 
 describe('M7 the delivery function has a failure backstop', () => {
-  it('webhook-deliver wires onFailure to markDeliveryFailed', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const src = readFileSync(
-      resolve(__dirname, '../../apps/api/src/lib/inngest/functions/webhook-delivery.ts'),
-      'utf8'
-    );
-    const deliver = src.slice(
-      src.indexOf("id: 'webhook-deliver'"),
-      src.indexOf("id: 'webhook-delivery-purge-daily'")
-    );
-    expect(deliver).toMatch(/onFailure/);
-    expect(deliver).toMatch(/markDeliveryFailed\(/);
+  it('webhook-deliver wires onFailure to markDeliveryFailed', () => {
+    const p = prop(deliverConfig(), 'onFailure');
+    expect(p && ts.isPropertyAssignment(p), 'onFailure is declared').toBe(true);
+    expect(
+      callsIn((p as ts.PropertyAssignment).initializer, 'markDeliveryFailed').length
+    ).toBeGreaterThan(0);
   });
 });

@@ -46,6 +46,7 @@ export const PUBLIC_SETTINGS_KEYS = [
   'minimumOrderFils',
   'acceptedPaymentMethods',
   'receiptBarcodeShape',
+  'hideFromSearchEngines',
 ] as const;
 
 /**

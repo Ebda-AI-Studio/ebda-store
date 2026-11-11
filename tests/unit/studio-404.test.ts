@@ -11,25 +11,46 @@ function hit(host: string, path = '/', headers: Record<string, string> = {}) {
 }
 
 describe('studio pages on hosts nobody serves', () => {
+  // Coming-soon PRODUCTS: one template (SUBDOMAIN-SOON-2): name, line, label, notify-me CTA, back to ebda.app; no search box
   it.each([
     ['crm.ebda.app', 'Ebda CRM is coming soon.'],
     ['erp.ebda.app', 'Ebda ERP is coming soon.'],
-    ['wa.ebda.app', 'Ebda Chat is coming soon.'],
-    ['whatsapp.ebda.app', 'Ebda Chat is coming soon.'],
-    ['hub.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
-    ['id.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
-  ])('%s: 200 coming soon, noindex, search box, live links', async (host, line) => {
+    ['invite.ebda.app', 'Ebda Invite is coming soon.'],
+    ['ads.ebda.app', 'Ebda Ads is coming soon.'],
+    ['quote.ebda.app', 'Ebda Quote Studio is coming soon.'],
+  ])('%s: 200 coming soon, noindex, notify-me CTA, live links', async (host, line) => {
     const res = hit(host, '/', { 'accept-language': 'en-US,en;q=0.9' });
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     expect(res.headers.get('x-robots-tag')).toContain('noindex');
     const html = await res.text();
-    expect(html).toContain(line);
+    expect(html).toContain(`<title>${line}`);
     expect(html).toContain('<meta name="robots" content="noindex, nofollow">');
+    expect(html).toContain('href="https://ebda.app/en/contact/?topic=products#form"');
+    expect(html).not.toContain('type="search"');
+    for (const href of [
+      'https://ebda.app/',
+      'https://wa.ebda.app/',
+      'https://status.ebda.app/',
+      'https://docs.ebda.app/',
+    ]) {
+      expect(html).toContain(`href="${href}"`);
+    }
+  });
+
+  // Reserved addresses keep the sentence and the search box
+  it.each([
+    ['hub.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
+    ['id.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
+  ])('%s: 200 reserved page, noindex, search box, live links', async (host, line) => {
+    const res = hit(host, '/', { 'accept-language': 'en-US,en;q=0.9' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-robots-tag')).toContain('noindex');
+    const html = await res.text();
+    expect(html).toContain(line);
     expect(html).toMatch(
       /<form class="search" role="search" action="https:\/\/help\.ebda\.app\/en\/search\/"/
     );
-    expect(html).toContain('type="search"');
     for (const href of [
       'https://ebda.app/',
       'https://status.ebda.app/',
@@ -37,6 +58,18 @@ describe('studio pages on hosts nobody serves', () => {
     ]) {
       expect(html).toContain(`href="${href}"`);
     }
+  });
+
+  // Ebda Chat is live (WHATSAPP-HOST-REDIRECT-1): its other names redirect, wa itself is never "coming soon"
+  it.each(['whatsapp.ebda.app', 'chat.ebda.app'])('%s: 301 to wa.ebda.app', host => {
+    const res = hit(host, '/x?y=1');
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('https://wa.ebda.app/x?y=1');
+  });
+  it('wa.ebda.app reaching this Worker is a 404, never "Ebda Chat is coming soon"', async () => {
+    const res = hit('wa.ebda.app', '/', { 'accept-language': 'en' });
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain('Ebda Chat is coming soon');
   });
 
   it.each(['app.ebda.app', 'admin.ebda.app', 'billing.ebda.app', 'ab.ebda.app'])(
@@ -61,8 +94,14 @@ describe('studio pages on hosts nobody serves', () => {
     expect(forced).toContain('dir="rtl"');
   });
 
+  it('coming-soon product pages carry no script and no orange', async () => {
+    const html = await hit('crm.ebda.app').text();
+    expect(html.toLowerCase()).not.toMatch(/orange|#ff6e01|#f60|#ff8c00/);
+    expect(html).not.toContain('<script');
+  });
+
   it('is calm: no orange anywhere, one script (the help typeahead), locked-down CSP', async () => {
-    const res = hit('crm.ebda.app');
+    const res = hit('hub.ebda.app');
     const html = await res.text();
     expect(html.toLowerCase()).not.toMatch(/orange|#ff6e01|#f60|#ff8c00/);
     expect(html.match(/<script/g)).toHaveLength(1);

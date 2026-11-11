@@ -33,13 +33,7 @@ describe('OneSignal loads only after the explicit opt-in click', () => {
   });
 
   it('page load only resumes an ALREADY-granted subscription: silent, no prompt, no subscribe', () => {
-    const body = readFileSync(join(src, OPT_IN_MODULE), 'utf8');
-    const resume = body.slice(
-      body.indexOf('export async function resumeGrantedAlerts'),
-      body.indexOf('export async function enableOrderAlerts')
-    );
-    expect(resume).toMatch(/Notification\.permission !== 'granted'\) return/);
-    expect(resume).not.toMatch(/requestPermission|optIn|addTag/);
+    // resumeGrantedAlerts' behaviour (silent, no prompt/subscribe/tag) is run for real in admin-resume-granted-alerts.test.ts.
     const listener = readFileSync(join(src, 'components/PushClickListener.tsx'), 'utf8');
     expect(listener).toMatch(/resumeGrantedAlerts\(\)/);
     expect(listener).not.toMatch(/enableOrderAlerts/);

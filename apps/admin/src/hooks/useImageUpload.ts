@@ -56,7 +56,8 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
 
 /**
  * The API's error text for a failed upload in the admin's language (a byte-sniff refusal
- * carries `details.messageEn` / `details.messageAr`), else its message, else `fallback`.
+ * carries `details.messageEn` / `details.messageAr`), else the fixed sentence for its code or
+ * `status` (never a raw English server string in the Arabic UI, never a 5xx's text), else `fallback`.
  */
 export function uploadErrorText(
   data:
@@ -65,10 +66,11 @@ export function uploadErrorText(
       }
     | null
     | undefined,
-  fallback: string
+  fallback: string,
+  status?: number
 ): string {
   const err = data?.error;
-  return localizedApiMessage(err?.code, err?.message || fallback, err?.details);
+  return localizedApiMessage(err?.code, err?.message || fallback, err?.details, status);
 }
 
 /**
@@ -273,7 +275,11 @@ function runXhr<T>({ t, url, formData, onProgress, parse }: RunXhrOptions<T>): P
           const data: UploadResponse = JSON.parse(xhr.responseText);
           reject(
             new UploadRefusal(
-              uploadErrorText(data, t('errors.uploadFailedWithCode', { code: xhr.status })),
+              uploadErrorText(
+                data,
+                t('errors.uploadFailedWithCode', { code: xhr.status }),
+                xhr.status
+              ),
               data
             )
           );

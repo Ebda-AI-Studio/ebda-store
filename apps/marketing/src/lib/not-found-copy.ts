@@ -12,7 +12,8 @@ import {
 /**
  * The 404's words and links, both languages (Egyptian Arabic in full sentences). One static 404.html serves
  * every path, so the page carries both and a tiny inline script shows the one matching the URL (/en/...).
- * The map is grouped by PRODUCT (Ebda Store live; WhatsApp / CRM / ERP coming soon), then help and contact.
+ * The map is grouped by PRODUCT (Ebda Store and Ebda Chat live; CRM / ERP coming soon), then help and contact.
+ * Ebda Chat is LIVE at wa.ebda.app (Ruling WHATSAPP-HOST-REDIRECT-1): never list it as coming soon.
  */
 export interface NotFoundLink {
   href: string;
@@ -70,9 +71,15 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
         ],
       },
       {
+        title: 'ابدأ شات',
+        links: [
+          { href: pagePath('ar', 'whatsapp'), label: 'إزاي بيشتغل' },
+          { href: `https://${BRAND.domains.whatsappApp}/`, label: 'ادخل على ابدأ شات' },
+        ],
+      },
+      {
         title: 'قريباً',
         links: [
-          { href: '', label: 'ابدأ شات', soon: true },
           { href: '', label: 'ابدأ CRM', soon: true },
           { href: '', label: 'ابدأ ERP', soon: true },
         ],
@@ -116,9 +123,15 @@ export const NOT_FOUND: Record<Locale, NotFoundCopy> = {
         ],
       },
       {
+        title: 'Ebda Chat',
+        links: [
+          { href: pagePath('en', 'whatsapp'), label: 'How it works' },
+          { href: `https://${BRAND.domains.whatsappApp}/`, label: 'Open Ebda Chat' },
+        ],
+      },
+      {
         title: 'Coming soon',
         links: [
-          { href: '', label: 'Ebda Chat', soon: true },
           { href: '', label: 'Ebda CRM', soon: true },
           { href: '', label: 'Ebda ERP', soon: true },
         ],
