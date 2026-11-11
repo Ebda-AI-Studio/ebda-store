@@ -16,6 +16,7 @@ import { authenticate, authorize, rejectImpersonated } from '../middleware/auth'
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { isStaffRoleConflict, STAFF_ROLE_CONFLICT_MESSAGE } from '../lib/staff-role-conflict';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
@@ -57,15 +58,9 @@ async function addStaffMemberD1(storeId: string, userId: string): Promise<{ id: 
   await assertWithinLimit(storeId, 'maxStaff'); // throws the 402 when the seats are full
   throw new AppError(409, 'STAFF_SEAT_CONFLICT', 'Could not add the staff member, try again.');
 }
-
-/** A customer or platform-admin account can never be staff; the identity's REAL role decides, not a literal. */
 function assertInvitableRole(role: string): void {
-  if (role === 'customer' || role === 'super_admin') {
-    throw new AppError(
-      409,
-      'ROLE_CONFLICT',
-      'This email belongs to a customer or platform admin account and cannot be used for store staff.'
-    );
+  if (isStaffRoleConflict(role)) {
+    throw new AppError(409, 'ROLE_CONFLICT', STAFF_ROLE_CONFLICT_MESSAGE);
   }
 }
 
@@ -327,11 +322,7 @@ router.post(
 
       // User exists — must already be a staff or store_admin role
       if (staffUser.role === UserRole.customer || staffUser.role === UserRole.super_admin) {
-        throw new AppError(
-          409,
-          'ROLE_CONFLICT',
-          'This email belongs to a customer or platform admin account and cannot be used for store staff.'
-        );
+        throw new AppError(409, 'ROLE_CONFLICT', STAFF_ROLE_CONFLICT_MESSAGE);
       }
 
       // Prevent double-add

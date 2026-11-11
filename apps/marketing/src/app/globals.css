@@ -152,7 +152,7 @@ ol {
   flex: none;
 }
 .wm-name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1.1rem;
   white-space: nowrap;
 }
@@ -610,7 +610,7 @@ html[lang='en'] .wm-name {
 }
 .hero h1 {
   font-size: clamp(2.5rem, 7vw, 4.6rem);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.12;
   letter-spacing: -0.03em;
   max-width: 16ch;
@@ -712,7 +712,7 @@ html[lang='ar'] .hero h1 {
 }
 .section h2 {
   font-size: clamp(2rem, 5.2vw, 3.4rem);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.025em;
   max-width: 24ch;
@@ -859,7 +859,7 @@ html[lang='ar'] .hero-sub {
 }
 .story h2 {
   font-size: clamp(1.9rem, 5.2vw, 3.4rem);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.025em;
   max-width: 14ch;
@@ -890,7 +890,7 @@ html[lang='ar'] .story h2 {
   color: var(--accent-text);
   font-family: var(--font-sans);
   font-size: 1.5em;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1;
 }
 /* each line is "active" between --s and --e; the old line is gone (e+0.01) before the next arrives (s+0.01), so two never overlap */
@@ -1109,7 +1109,7 @@ html[lang='ar'] .story h2 {
   outline-offset: -3px;
 }
 .looks-tab-name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1.05rem;
   line-height: 1.3;
 }
@@ -1177,7 +1177,7 @@ html[lang='ar'] .story h2 {
 }
 .look-live a {
   color: var(--fg);
-  font-weight: 700;
+  font-weight: 600;
   text-underline-offset: 3px;
 }
 .look-screen .scr:focus-visible {
@@ -1202,7 +1202,7 @@ html[lang='ar'] .story h2 {
   background: var(--fg);
   color: var(--canvas);
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 .looks-item figcaption p {
   margin: 0 0 6px;
@@ -1290,7 +1290,7 @@ html[lang='ar'] .story h2 {
   }
   .looks-switch-btn {
     font: inherit;
-    font-weight: 700;
+    font-weight: 600;
     min-width: 48px;
     min-height: 44px;
     border: 0;
@@ -1373,7 +1373,7 @@ html[lang='ar'] .story h2 {
 }
 .fx-label {
   margin: 0;
-  font-weight: 700;
+  font-weight: 600;
   color: #575c5d;
   font-size: 0.8125rem;
 }
@@ -1396,7 +1396,7 @@ html[lang='ar'] .story h2 {
 .fx-rows li:first-child {
   border-color: #141414;
   background: #fff;
-  font-weight: 700;
+  font-weight: 600;
 }
 .fx-grip {
   width: 8px;
@@ -1449,7 +1449,7 @@ html[lang='ar'] .story h2 {
   margin: 0;
 }
 .fx-chat p:first-child {
-  font-weight: 700;
+  font-weight: 600;
 }
 .fx-chat .fx-send {
   margin-top: 8px;
@@ -1532,7 +1532,7 @@ html[lang='ar'] .story h2 {
 }
 .rails dt {
   color: var(--accent-text);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1.15rem;
 }
 .rails dd {
@@ -1771,7 +1771,7 @@ html[lang='ar'] .price {
   content: '+';
   color: var(--accent-text);
   font-family: var(--font-sans);
-  font-weight: 300;
+  font-weight: 400;
   font-size: 1.5rem;
   line-height: 1;
 }
@@ -1834,7 +1834,7 @@ html[lang='ar'] .price {
 }
 .legal-head h1 {
   font-size: clamp(2.2rem, 6vw, 3.6rem);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.025em;
   margin-bottom: 16px;
@@ -1871,7 +1871,7 @@ html[lang='ar'] .legal-head h1 {
   }
 }
 .legal-toc-h {
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 10px;
 }
 .legal-toc ol {
@@ -1903,7 +1903,7 @@ html[lang='ar'] .legal-head h1 {
 .legal-doc h2 {
   position: relative;
   font-size: 1.4rem;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 12px;
 }
 .legal-doc p {
@@ -2000,7 +2000,7 @@ html[lang='ar'] .legal-doc p {
   min-height: 56px;
   padding: 0 20px;
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   list-style: none;
 }
@@ -2066,7 +2066,7 @@ html[lang='ar'] .legal-doc p {
 }
 .compare .yes {
   color: var(--accent-text);
-  font-weight: 700;
+  font-weight: 600;
 }
 .compare .no {
   color: var(--muted);
@@ -2094,7 +2094,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
 }
 .nf-main h1 {
   font-size: clamp(1.9rem, 5vw, 3rem);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
   text-wrap: balance;
   margin: 0 0 12px;
@@ -2251,7 +2251,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
 .ta-list mark {
   background: transparent;
   color: var(--accent-text);
-  font-weight: 700;
+  font-weight: 600;
 }
 .ta-sec {
   color: var(--muted);
@@ -2386,7 +2386,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
 .m3d-logo {
   font-family: var(--fd), var(--fb), serif;
   font-size: 1.2rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 .m3d-media {
   position: relative;
@@ -2435,7 +2435,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
   text-wrap: wrap;
 }
 .m3d-price {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1.05rem;
 }
 .m3d-desc {
@@ -2449,7 +2449,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
 }
 .m3d-opt-label {
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--mut);
 }
 .m3d-sw {
@@ -2478,7 +2478,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
 }
 .m3d-swatch[aria-pressed='true']::after {
   content: '\2713' / '';
-  font-weight: 700;
+  font-weight: 600;
 }
 .m3d-swatch[aria-pressed='true'] .m3d-dot {
   box-shadow:
@@ -2503,7 +2503,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
   background: var(--ac);
   color: var(--bg);
   text-align: center;
-  font-weight: 700;
+  font-weight: 600;
 }
 /* Tailwind utility classes the viewer's markup uses (packages/ui/src/model3d/ProductModelViewer.tsx),
    scoped to the phone: marketing has no Tailwind. tests/unit/marketing-model3d.test.ts fails when the
@@ -2744,7 +2744,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
   color: var(--accent-text);
 }
 .cap-plan span {
-  font-weight: 700;
+  font-weight: 600;
 }
 .cap-more {
   margin: 0;
@@ -2879,7 +2879,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
   }
   .cmp td::before {
     content: attr(data-label) ': ';
-    font-weight: 700;
+    font-weight: 600;
     color: var(--fg);
   }
   .cmp-verdict {
@@ -2896,7 +2896,7 @@ html[data-nf='en'] .nf-body[data-l='en'] {
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--fg);
   background: var(--raise);
   vertical-align: middle;
@@ -3340,7 +3340,7 @@ body:has(.studio-home) {
 .studio-home h1 {
   margin: 0 0 clamp(16px, 2.4vw, 28px);
   font-size: clamp(2.5rem, 7vw, 5rem);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.12;
   max-width: 14ch;
   color: var(--fg);
@@ -3415,7 +3415,7 @@ html[lang='en'] .studio-home h1 {
   gap: 12px;
   margin: 0;
   font-size: clamp(1.7rem, 3.2vw, 2.5rem);
-  font-weight: 700;
+  font-weight: 600;
 }
 .sh-win h2 svg {
   flex: none;
@@ -3508,7 +3508,7 @@ html[lang='ar'] .sh-statement {
 .sh-steps h3 {
   margin: 0 0 8px;
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 .sh-trio p,
 .sh-steps p {
@@ -3551,7 +3551,7 @@ html[lang='ar'] .sh-statement {
 .sh-rows h3 {
   margin: 0;
   font-size: clamp(2rem, 4.4vw, 3.4rem);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
 }
 .sh-rows > li > p {
