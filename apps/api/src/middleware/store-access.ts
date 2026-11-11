@@ -22,7 +22,7 @@ export const STORE_SUSPENDED_MESSAGES = {
   /** Suspended by the platform (no billing reason): nothing but reads. */
   platform: {
     en: 'This store is suspended, so you can view your data but not change anything. Contact support to bring it back.',
-    ar: 'المتجر ده موقوف حاليًا، فتقدر تشوف بياناتك بس ومش هتقدر تعدّل أي حاجة. كلّم الدعم عشان نرجّعه تاني.',
+    ar: 'المتجر ده موقوف دلوقتي، فتقدر تشوف بياناتك بس ومش هتقدر تعدّل أي حاجة. كلّم الدعم عشان نرجّعه تاني.',
   },
   /** Suspended for a billing reason: reads plus billing, so the owner can pay. */
   billing: {

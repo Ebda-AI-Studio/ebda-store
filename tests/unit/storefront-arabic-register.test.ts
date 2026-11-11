@@ -270,6 +270,7 @@ export function indirectMessageAr(file: string): number[] {
 const MESSAGE_SOURCE_FILES = [
   'apps/api/src/lib/upload-sniff.ts',
   'apps/api/src/lib/variant-required.ts',
+  'apps/api/src/middleware/store-access.ts',
   'apps/api/src/routes/pwa.routes.ts',
   'apps/api/src/routes/product-model.routes.ts',
   'apps/api/src/services/billing/go-live-gate.ts',

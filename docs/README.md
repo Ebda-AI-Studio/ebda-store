@@ -20,6 +20,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [admin-routes-triage-2026-11-11.md](admin-routes-triage-2026-11-11.md) - Triage of the 89 routes with no admin caller (F-9-prune)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-api-web.md) - Admin audit closure, API and storefront rows (2026-11-09)
 - [CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md](CHANGELOG-2026-11-09-admin-audit-closure-p2-store-do.md) - Atomic StoreDO settings patch (2026-11-09)
+- [CHANGELOG-2026-11-12-suspended-store-readonly.md](CHANGELOG-2026-11-12-suspended-store-readonly.md) - A suspended store is read-only in the admin API (TEN-1, TEN-6) (2026-11-12)
 - [CHANGELOG-2026-11-04-admin-fix-pass-t5.md](CHANGELOG-2026-11-04-admin-fix-pass-t5.md) - Admin fix pass, T5 UI catalog + sales (2026-11-04)
 - [DB-BACKUP-RESTORE.md](DB-BACKUP-RESTORE.md) - Database backup, restore & disaster recovery
 - [DB-INDEX-MIGRATIONS.md](DB-INDEX-MIGRATIONS.md) - DB index migrations — lock procedure
