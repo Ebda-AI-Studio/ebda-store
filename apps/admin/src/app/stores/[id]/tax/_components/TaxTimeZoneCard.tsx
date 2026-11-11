@@ -7,24 +7,11 @@ import { apiPut } from '@/lib/api';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 
 /**
- * IANA zones offered in the picker: Egypt first (the default), then the
- * Gulf and Levant neighbours Egyptian stores ship to, plus UTC. A store whose saved zone is not listed still shows it
+ * IANA zones offered in the picker. Ebda is an Egypt product (A3): Africa/Cairo is the
+ * default and first, plus UTC. A store whose saved zone is not listed still shows it
  * (see `options`), so opening this card never silently rewrites a valid zone.
  */
-const TIME_ZONES = [
-  'Africa/Cairo',
-  'Asia/Riyadh',
-  'Asia/Dubai',
-  'Asia/Qatar',
-  'Asia/Bahrain',
-  'Asia/Muscat',
-  'Asia/Baghdad',
-  'Asia/Amman',
-  'Asia/Beirut',
-  'Europe/Istanbul',
-  'Europe/London',
-  'UTC',
-] as const;
+export const TIME_ZONES = ['Africa/Cairo', 'UTC'] as const;
 
 /**
  * The store's ONE time zone (Ruling FRT-2): finance reports, P&L, trial balance,

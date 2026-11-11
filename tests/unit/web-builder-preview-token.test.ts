@@ -98,12 +98,13 @@ describe('store-resolver — token is presented, never cached', () => {
     expect(init.next).toBeUndefined();
   });
 
-  it('inactive store, no token: unchanged public fetch (tagged cache) and a miss is notFound()', async () => {
+  it('inactive store, no token: unchanged public fetch (no token, uncached by Next) and a miss is notFound()', async () => {
     fetchMock.mockResolvedValue(miss);
     await expect(resolver.getStoreOrNotFound()).rejects.toBe(NOT_FOUND);
     const [, init] = fetchMock.mock.calls[0];
     expect(init.headers['x-builder-preview-token']).toBeUndefined();
-    expect(init.next.tags).toEqual(['store-domain:draftshop.ebda.app']);
+    // Ruling RESOLVE-BULLETPROOF-1: resolve caching lives in store-resolve-cache.ts, not the Next data cache.
+    expect(init.cache).toBe('no-store');
   });
 
   it('API rejects the token (other store / expired / forged) -> notFound()', async () => {

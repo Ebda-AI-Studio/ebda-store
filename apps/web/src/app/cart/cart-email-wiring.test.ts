@@ -31,8 +31,9 @@ describe('checkout email opt-in box', () => {
     expect(checkout).toMatch(/if \(!cartEmailOptIn && !cartEmailRecorded\.current\) return;/);
   });
 
-  it('the resolver passes the flag through all three store payload builders', () => {
-    expect(resolver.match(/cartEmailOptIn: storeData\.cartEmailOptIn === true/g)).toHaveLength(3);
+  it('the resolver passes the flag through both store payload builders', () => {
+    // storeFromBody (domain + slug lookups share it since Ruling RESOLVE-BULLETPROOF-1) and getStoreById.
+    expect(resolver.match(/cartEmailOptIn: storeData\.cartEmailOptIn === true/g)).toHaveLength(2);
   });
 });
 

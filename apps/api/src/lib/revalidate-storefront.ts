@@ -1,6 +1,6 @@
 import { storeHost } from '@ebda/shared';
 import logger from './logger';
-import { cfBindings } from '../cf/bindings';
+import { cfBindings, cfWaitUntil } from '../cf/bindings';
 
 /**
  * Fire-and-forget storefront cache purge. After a store mutation (theme,
@@ -40,7 +40,36 @@ import { cfBindings } from '../cf/bindings';
 export const SERVICE_BINDING_BASE = 'https://ebda-web.service-binding';
 
 export function revalidateStorefront(opts: RevalidateOptions): void {
-  void revalidateStorefrontNow(opts);
+  // Kept alive past the response (`ctx.waitUntil`, 30 s grace) so the retries below can run on Workers.
+  cfWaitUntil(revalidateStorefrontWithRetry(opts));
+}
+
+/**
+ * Retry schedule for a purge that did not land (network error, timeout, 429, 5xx other than 503). Bounded so the
+ * whole attempt fits the Worker's 30 s waitUntil grace: 3 tries x 4 s timeout + 1 s + 4 s of backoff = 17 s worst case.
+ * Ruling RESOLVE-BULLETPROOF-1: a dropped purge is what lets a suspended store keep resolving from the storefront's
+ * caches (60 s fresh, up to 24 h during an outage), because the per-store epoch is written only when this lands.
+ * A configuration fault (401 / 503 = secret missing or mismatched) is not retried: it cannot heal in seconds.
+ */
+export const PURGE_RETRY_DELAYS_MS = [1_000, 4_000];
+
+export async function revalidateStorefrontWithRetry(
+  opts: RevalidateOptions,
+  sleep: (ms: number) => Promise<void> = ms => new Promise(r => setTimeout(r, ms))
+): Promise<RevalidateOutcome> {
+  let outcome = await revalidateStorefrontNow(opts);
+  for (const delay of PURGE_RETRY_DELAYS_MS) {
+    if (outcome !== 'failed') return outcome;
+    await sleep(delay);
+    outcome = await revalidateStorefrontNow(opts);
+  }
+  if (outcome === 'failed') {
+    logger.error(
+      { tags: opts.tags, slug: opts.slug, domain: opts.domain },
+      '[revalidate] storefront purge LOST after retries: storefront copies stay until their TTL'
+    );
+  }
+  return outcome;
 }
 
 export interface RevalidateOptions {
@@ -102,6 +131,14 @@ export async function revalidateStorefrontNow(opts: RevalidateOptions): Promise<
       // are configuration faults that silently disable every invalidation, so
       // they are errors (Sentry-visible), not warnings.
       const dead = r.status === 503 || r.status === 401;
+      // 429 / other 5xx: the purge did not land but may on a retry (revalidateStorefrontWithRetry).
+      if (!dead && (r.status === 429 || r.status >= 500)) {
+        logger.warn(
+          { status: r.status, tags, storefront: base },
+          '[revalidate] storefront purge failed, retryable'
+        );
+        return 'failed';
+      }
       const log = dead ? logger.error.bind(logger) : logger.warn.bind(logger);
       log(
         { status: r.status, tags, storefront: base },
