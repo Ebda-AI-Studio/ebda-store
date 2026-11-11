@@ -1,7 +1,7 @@
 /**
  * Entity-index health alert (issue 458, Ruling NZ-MONEY-5). A StoreDO records its dead-lettered / abandoned entity-index rows as
  * one D1 `system_settings` row per store (cf/store-do/index-health.ts; a DO cannot call sendAlert). This hourly cron reads those
- * rows - ONE query, only stores with a problem have a row - and sends one P1 per row per day.
+ * rows - ONE query, only stores with a problem have a row - and sends ONE aggregated P1 per run (rows due: never alerted or last alert a day old).
  *
  * Dedupe: `entity_index_alerted.<storeId>` holds `{ [outboxId]: lastAlertedAtMs }`; a row is alerted when never alerted or the last
  * alert is a day old, and an entry for a row that is no longer dead is dropped. An alert that is not 'sent' (throttled/failed) is
@@ -52,34 +52,67 @@ export async function alertEntityIndexHealth(
       logger.warn({ key: r.key }, '[entity-index-health] unreadable settings row skipped');
     }
   }
+
+  // A deleted/closed store (deleted_at set, or no directory row) can never be fixed: forget its health + dedupe rows instead
+  // of re-alerting daily forever. One query for all ids; a read failure throws -> the tick skips and the next one retries.
+  const ids = [...health.keys()];
+  const live = new Set<string>();
+  if (ids.length) {
+    const { results: liveRows = [] } = await d1
+      .prepare(
+        `SELECT id FROM stores WHERE deleted_at IS NULL AND id IN (${ids.map((_, i) => `?${i + 1}`).join(',')})`
+      )
+      .bind(...ids)
+      .all<{ id: string }>();
+    for (const r of liveRows) live.add(r.id);
+  }
+  for (const storeId of ids)
+    if (!live.has(storeId)) {
+      await d1
+        .prepare('DELETE FROM system_settings WHERE key = ?1')
+        .bind(`${INDEX_HEALTH_PREFIX}${storeId}`)
+        .run();
+      health.delete(storeId); // the dedupe row is dropped by the "health row is gone" loop below
+    }
   out.stores = health.size;
 
+  // ONE aggregated P1 per run: N dead rows across M stores must never be N pages.
+  const due: { storeId: string; outboxId: string }[] = [];
+  const keep = new Map<string, Record<string, number>>();
+  let abandoned = 0;
+  const sample: string[] = [];
   for (const [storeId, h] of health) {
     const seen = alerted.get(storeId) ?? {};
     const next: Record<string, number> = {};
+    keep.set(storeId, next);
     for (const row of h.rows) {
       const last = seen[String(row.outboxId)];
       if (last !== undefined && now - last < DAY_MS) {
         next[String(row.outboxId)] = last;
         continue;
       }
-      const outcome = await send({
-        level: 'p1',
-        source: 'api.entity_index_dead_letter',
-        // unique per row: sendAlert throttles on (level, title) for 5 minutes, so two rows must not share a title
-        title: `Entity index row ${row.abandoned ? 'ABANDONED' : 'dead-lettered'}: ${row.kind} ${row.id} (store ${storeId})`,
-        body:
-          `Store ${storeId}: ${row.kind} ${row.id} is not routable in D1 after ${row.attempts} attempts` +
-          (row.abandoned
-            ? ' and the background retry has stopped (14 days). Payments for it are refused until it is written: write it by hand or fix the row.'
-            : ' (still retried hourly). Payments for it are refused until it is written.') +
-          ` ${h.dead} dead-lettered row(s) in this store, ${h.abandoned} abandoned.`,
-      });
-      if (outcome === 'sent') {
-        next[String(row.outboxId)] = now;
-        out.alerted++;
-      } else if (last !== undefined) next[String(row.outboxId)] = last;
+      due.push({ storeId, outboxId: String(row.outboxId) });
+      if (row.abandoned) abandoned++;
+      if (sample.length < 5) sample.push(`${storeId}:${row.kind}:${row.id}`);
+      if (last !== undefined) next[String(row.outboxId)] = last;
     }
+  }
+  if (due.length) {
+    const storeCount = new Set(due.map(d => d.storeId)).size;
+    const outcome = await send({
+      level: 'p1',
+      source: 'api.entity_index_dead_letter',
+      title: `Entity index: ${due.length} row(s) not routable in ${storeCount} store(s)`,
+      body:
+        `${due.length} entity-index row(s) in ${storeCount} store(s) are not routable in D1 (${abandoned} abandoned, retry stopped after 14 days; ` +
+        `the rest are dead-lettered and still retried hourly). Payments for them are refused until they are written. ` +
+        `Sample (store:kind:id): ${sample.join(', ')}.`,
+    });
+    if (outcome === 'sent') for (const d of due) keep.get(d.storeId)![d.outboxId] = now;
+    out.alerted = outcome === 'sent' ? due.length : 0;
+  }
+  for (const [storeId, next] of keep) {
+    const seen = alerted.get(storeId) ?? {};
     if (JSON.stringify(next) !== JSON.stringify(seen))
       await d1
         .prepare(
