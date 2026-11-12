@@ -1286,7 +1286,10 @@ async function refundOnce(
   // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
   // `orders:refund` (on any store) passed with no membership check at all.
   if (user.role !== 'super_admin') {
-    const access = await checkStoreAccess(paymentRow.order.storeId, user);
+    const access = await checkStoreAccess(paymentRow.order.storeId, user, { write: true });
+    if (!access.ok && access.code === 'STORE_SUSPENDED') {
+      throw new AppError(403, 'STORE_SUSPENDED', access.message); // a refund is a write (TEN-1)
+    }
     if (!access.ok) {
       throw new AppError(404, 'NOT_FOUND', 'Payment not found');
     }

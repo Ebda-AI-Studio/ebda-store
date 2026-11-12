@@ -168,7 +168,9 @@ export async function resolveFolderAndStore(
 
   // Verify the caller owns this storeId before we trust it as the R2
   // key prefix. super_admin always passes; store_admin must own it.
-  const access = await checkStoreAccess(storeId, req.user!);
+  const access = await checkStoreAccess(storeId, req.user!, {
+    write: !['GET', 'HEAD', 'OPTIONS'].includes(req.method),
+  });
   if (!access.ok) {
     return {
       ok: false,
@@ -599,7 +601,7 @@ router.delete(
         return;
       }
 
-      const access = await checkStoreAccess(storeId, req.user!);
+      const access = await checkStoreAccess(storeId, req.user!, { write: true });
       if (!access.ok) {
         res
           .status(access.status)
@@ -725,7 +727,7 @@ router.post(
         });
         return;
       }
-      const access = await checkStoreAccess(storeId, req.user!);
+      const access = await checkStoreAccess(storeId, req.user!, { write: true });
       if (!access.ok) {
         res
           .status(access.status)

@@ -9130,7 +9130,8 @@
       "uploadRight": "Upload the right receipt"
     },
     "notice": {
-      "unpaidTitle": "Your store is paused for shoppers until payment is recorded",
+      "suspendedTitle": "Your store is suspended: you can view everything but not change anything. Contact support to bring it back.",
+      "unpaidTitle": "Your store is suspended over billing: you can view your data but not change anything until payment is recorded",
       "unpaidBody": "Pay by InstaPay with your reference, then send us the transaction reference below. Your store comes back as soon as we confirm it.",
       "overLimitTitle": "Read-only: your plan covers fewer stores",
       "overLimitBody": "Your plan includes fewer stores than you have. Upgrade to {plan} to edit all of them again.",

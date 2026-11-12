@@ -2,11 +2,16 @@ import { planLabel as soldPlanLabel } from '@/lib/plan-labels';
 import { cardLabel, fmtDate, type UiLocale } from './format';
 import type { BillingInfo } from './types';
 
-export type BillingNoticeKind = 'unpaid' | 'overStoreLimit' | 'overdue' | 'dueSoon';
+export type BillingNoticeKind = 'suspended' | 'unpaid' | 'overStoreLimit' | 'overdue' | 'dueSoon';
 
 /** Which billing notice (if any) the merchant must see, most severe first. */
-export function billingNotice(b: BillingInfo | null | undefined): BillingNoticeKind | null {
+export function billingNotice(
+  b: BillingInfo | null | undefined,
+  /** `data.storeStatus` of the billing response: a suspended store with no billing reason is a platform suspension (TEN-1). */
+  storeStatus?: string | null
+): BillingNoticeKind | null {
   if (!b) return null;
+  if (storeStatus === 'suspended' && !b.suspension) return 'suspended';
   if (b.suspension?.reason === 'unpaid') return 'unpaid';
   if (b.suspension?.reason === 'over_store_limit') return 'overStoreLimit';
   if (b.overdue) return 'overdue';
@@ -24,6 +29,8 @@ export function noticeText(
   locale: UiLocale
 ): { title: string; body: string | null } {
   switch (kind) {
+    case 'suspended':
+      return { title: t('suspendedTitle'), body: null };
     case 'unpaid':
       return { title: t('unpaidTitle'), body: t('unpaidBody') };
     case 'overStoreLimit':
