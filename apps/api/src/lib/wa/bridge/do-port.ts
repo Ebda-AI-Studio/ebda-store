@@ -29,6 +29,7 @@ import {
   type StoreProfile,
 } from './service';
 import type { Currency } from '../../../services/payment-providers/types';
+import { proofRef } from './proof-ref';
 
 type Db = any; // the repo's Prisma-shaped read/write client; rows are narrowed below by explicit selects
 const LINK_TTL_MS = 24 * 3600 * 1000;
@@ -545,9 +546,19 @@ export function createDoPort(): BridgePort {
         resourceType: 'order',
         resourceId: orderId,
         storeId,
-        details: { mediaUrl, source: 'whatsapp' },
+        details: { mediaRef: proofRef(mediaUrl), source: 'whatsapp' },
       });
       return true;
+    },
+
+    async orderBuyerKey(storeId, orderId) {
+      const o = await (
+        await db(storeId)
+      ).order.findFirst({
+        where: { id: orderId, storeId, deletedAt: null },
+        select: { buyerKey: true },
+      });
+      return o ? (o.buyerKey ?? null) : undefined;
     },
 
     async addresses(storeId, buyerKey) {

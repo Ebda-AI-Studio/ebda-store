@@ -128,32 +128,10 @@ export const BRAND = {
     { id: 'events', ar: 'الفعاليات', en: 'Events', nameAr: 'ابدأ إيفنتس', nameEn: 'Ebda Events' },
   ],
   /**
-   * The software products still COMING SOON (names confirmed by Ahmad 2026-11-09; the Arabic is the transliteration pattern of
-   * ابدأ ستور / ابدأ شات, except Quote Studio: «ستوديو للتسعير», because «كوت» reads as "coat" in Egyptian Arabic). They are NOT live products
+   * The software products still COMING SOON (only CRM and ERP, by Ahmad's public-copy rule 2026-11-11: nothing else is announced as coming). They are NOT live products
    * (siteNavProducts lists only live ones); the marketing site shows them as "coming soon" only when the service lines are published.
    */
   comingProducts: [
-    {
-      id: 'quote-studio',
-      nameAr: 'ابدأ ستوديو للتسعير',
-      nameEn: 'Ebda Quote Studio',
-      shortAr: 'عروض أسعار تفاعلية لمكاتب التصميم',
-      shortEn: 'Live quotes for design offices',
-    },
-    {
-      id: 'invite',
-      nameAr: 'ابدأ إنفايت',
-      nameEn: 'Ebda Invite',
-      shortAr: 'دعوات وحضور الفعاليات',
-      shortEn: 'Invitations and event attendance',
-    },
-    {
-      id: 'ads',
-      nameAr: 'ابدأ آدز',
-      nameEn: 'Ebda Ads',
-      shortAr: 'إعلاناتك ومبيعاتك في مكان واحد',
-      shortEn: 'Your ads and sales in one place',
-    },
     // CRM + ERP (Ahmad 2026-11-10, Ruling COMING-SOON-CRM-ERP-1): the names of the live crm.ebda.app / erp.ebda.app coming-soon pages
     {
       id: 'crm',

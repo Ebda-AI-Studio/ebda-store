@@ -89,11 +89,9 @@ describe('ON publishes everything together', () => {
     const { StudioHomePage: Home } = await import('../../apps/marketing/src/components/StudioHome');
     const home = html(<Home locale="en" />);
     expect(home).toContain('on-the-ground');
-    for (const id of ['quote-studio', 'invite', 'ads', 'crm', 'erp'])
-      expect(home).toContain(`data-coming-soon="${id}"`);
+    for (const id of ['crm', 'erp']) expect(home).toContain(`data-coming-soon="${id}"`);
     // the cards link to their own live coming-soon pages (SUBDOMAIN-SOON-2)
-    for (const h of ['crm', 'erp', 'invite', 'ads', 'quote'])
-      expect(home).toContain(`href="https://${h}.ebda.app/"`);
+    for (const h of ['crm', 'erp']) expect(home).toContain(`href="https://${h}.ebda.app/"`);
     expect(home).toMatch(/\/en\/contact\/?\?topic=products#form/);
     const seo = await import('../../apps/marketing/src/lib/seo');
     expect(JSON.stringify(seo.studioJsonLd('en'))).toContain('/en/services/marketing/');
@@ -110,15 +108,10 @@ describe('names and the header dropdowns', () => {
       ['Ebda Events', 'ابدأ إيفنتس'],
     ]);
     expect(BRAND.comingProducts.map(p => [p.nameEn, p.nameAr])).toEqual([
-      ['Ebda Quote Studio', 'ابدأ ستوديو للتسعير'],
-      ['Ebda Invite', 'ابدأ إنفايت'],
-      ['Ebda Ads', 'ابدأ آدز'],
       // the names of the live crm.ebda.app / erp.ebda.app coming-soon pages (studio-pages), kept identical
       ['Ebda CRM', 'ابدأ CRM'],
       ['Ebda ERP', 'ابدأ ERP'],
     ]);
-    // «كوت» reads as "coat" in Egyptian Arabic (Ahmad 2026-11-09)
-    expect(JSON.stringify(BRAND.comingProducts)).not.toContain('كوت');
     // no leading alef: the studio's old spelling is banned repo-wide (AR-STUDIO-NAME-1), so the name must never need an exemption
     expect(JSON.stringify(BRAND.comingProducts)).not.toContain('استوديو');
   });
@@ -144,7 +137,7 @@ describe('names and the header dropdowns', () => {
         t.indexOf('>' + (l === 'ar' ? 'المصادر' : 'Resources') + '<')
       );
       expect(t).toMatch(/services\/?#core/);
-      expect((t.match(/np-soon/g) ?? []).length).toBeGreaterThanOrEqual(5);
+      expect((t.match(/np-soon/g) ?? []).length).toBeGreaterThanOrEqual(2);
       for (const p of BRAND.comingProducts) expect(t).toContain(l === 'ar' ? p.nameAr : p.nameEn);
       expect(t).toContain(l === 'ar' ? 'قريبًا' : 'Coming soon');
     }
@@ -197,7 +190,7 @@ describe('post-build step', () => {
     applyServiceLinesPostbuild(out, 'on');
     const t = readFileSync(path.join(out, 'llms.txt'), 'utf8');
     expect(t.match(/## Services/g)).toHaveLength(1);
-    expect(t).toContain('Ebda Invite');
+    expect(t).not.toContain('Ebda Invite');
     expect(t).toContain('Ebda CRM (ابدأ CRM)');
     expect(t).toContain('https://erp.ebda.app/');
   });
@@ -243,8 +236,8 @@ describe.each(LOCALES)('pages (%s)', locale => {
           expect(existsSync(path.join(APP, `public/services/${n}-${w}.webp`)), `${n}-${w}`).toBe(
             true
           );
-      // a service company, not a software pitch: the software note is a footnote, and no prices appear
-      expect(t).toContain(`data-powered="${id}"`);
+      // a service company, not a software pitch: no software note, and no prices appear
+      expect(t).not.toContain('data-powered');
       expect(t).not.toMatch(/\bEGP\s?\d|\d\s?(جنيه|EGP)/);
     }
   );
@@ -260,19 +253,10 @@ describe('coming-soon cards (software only, names distinct from the services)', 
     expect(comingSoonItems('en')).toEqual([]);
     vi.stubEnv('EBDA_SERVICE_LINES', 'on');
     const names = comingSoonItems('en').map(i => i.name);
-    expect(names).toEqual(['Ebda Quote Studio', 'Ebda Invite', 'Ebda Ads', 'Ebda CRM', 'Ebda ERP']);
-    expect(comingSoonItems('ar').map(i => i.name)).toEqual([
-      'ابدأ ستوديو للتسعير',
-      'ابدأ إنفايت',
-      'ابدأ آدز',
-      'ابدأ CRM',
-      'ابدأ ERP',
-    ]);
+    expect(names).toEqual(['Ebda CRM', 'Ebda ERP']);
+    expect(comingSoonItems('ar').map(i => i.name)).toEqual(['ابدأ CRM', 'ابدأ ERP']);
     // every coming-soon product links to its own live coming-soon subdomain page (SUBDOMAIN-SOON-2)
     expect(comingSoonItems('en').map(i => [i.id, i.href])).toEqual([
-      ['quote-studio', 'https://quote.ebda.app/'],
-      ['invite', 'https://invite.ebda.app/'],
-      ['ads', 'https://ads.ebda.app/'],
       ['crm', 'https://crm.ebda.app/'],
       ['erp', 'https://erp.ebda.app/'],
     ]);

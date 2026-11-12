@@ -4,7 +4,7 @@ import { COPY } from '../lib/content';
 import { serviceLineJsonLd } from '../lib/seo';
 import { SERVICE_LINE_CONTENT, type LineId } from '../lib/service-lines-content';
 import { serviceLinesPublished } from '../lib/service-lines';
-import { LINE_POWERED, LINE_UI } from '../lib/services-page';
+import { LINE_UI } from '../lib/services-page';
 import { pagePath, type Locale } from '../lib/site';
 import '@/app/services.css';
 import { Footer } from './Footer';
@@ -202,13 +202,6 @@ export function ServiceLinePage({ locale, id }: { locale: Locale; id: LineId }) 
             </div>
           </div>
         </section>
-
-        <p className="wrap sv-powered muted small" data-powered={id}>
-          {LINE_POWERED[locale][id].text}{' '}
-          <PageLink href={`${pagePath(locale, '')}${locale === 'ar' ? '' : '/'}#products`}>
-            {LINE_POWERED[locale][id].link}
-          </PageLink>
-        </p>
 
         <section className={`ab-sec ${MOTIFS[3]} faq`} aria-labelledby="sv-faq-h" id="faq">
           <div className="wrap sv-faq">
