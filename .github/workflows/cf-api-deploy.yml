@@ -90,8 +90,8 @@ jobs:
         # alert token, so a deploy could ship an API that cannot alert).
         working-directory: apps/api
         run: |
-          npx wrangler secret list --config .wrangler.deploy.jsonc > /tmp/ebda-secret-names.json
-          node -e 'const names = new Set(require("/tmp/ebda-secret-names.json").map(x => x.name)); const req = require(process.env.GITHUB_WORKSPACE + "/scripts/ci/api-required-secrets.json").required; const missing = req.filter(n => !names.has(n)); if (missing.length) throw new Error(`Missing Worker secret(s): ${missing.join(", ")}`); for (const name of ["SEARCH_SEMANTIC_ENABLED"]) { if (names.has(name)) throw new Error(`${name} must be a wrangler.jsonc var, not a Worker secret (Ruling SEARCH-T10-1)`); }'
+          npx wrangler secret list --config .wrangler.deploy.jsonc > "$RUNNER_TEMP/ebda-secret-names.json"
+          node -e 'const names = new Set(require(process.env.RUNNER_TEMP + "/ebda-secret-names.json").map(x => x.name)); const req = require(process.env.GITHUB_WORKSPACE + "/scripts/ci/api-required-secrets.json").required; const missing = req.filter(n => !names.has(n)); if (missing.length) throw new Error(`Missing Worker secret(s): ${missing.join(", ")}`); for (const name of ["SEARCH_SEMANTIC_ENABLED"]) { if (names.has(name)) throw new Error(`${name} must be a wrangler.jsonc var, not a Worker secret (Ruling SEARCH-T10-1)`); }'
       - name: Pre-deploy smoke - boot THIS Worker on workerd (refuse to deploy a Worker that cannot boot)
         # Ruling DEPLOY-SAFETY-1. The Worker built from the deploy config and booted in local workerd with a local D1
         # directory (no Postgres exists any more, N-17); /health and the store-directory reads must answer without a 5xx.

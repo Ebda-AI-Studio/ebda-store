@@ -17,16 +17,20 @@ import { createBridge } from '../../../apps/api/src/lib/wa/bridge/service';
 import {
   signCheckoutToken,
   verifyCheckoutToken,
+  storeBuyerId,
 } from '../../../apps/api/src/lib/wa/bridge/checkout-token';
 import { makeFakePort, S, BK, BUYER } from './fake-port';
 import { CASES } from './cases';
 
+// The secret behind the pinned vector key BK (tests/vectors/ebda-wa/buyer-key.json); the bridge recomputes it (WA-2).
+const SECRET = 'ebda-suite-buyer-key-test-v1';
 const FIXTURE = path.resolve(__dirname, '../../vectors/ebda-wa/bridge-v1.json');
 const SUMS = path.resolve(__dirname, '../../vectors/ebda-wa/SHA256SUMS');
 const bridge = () =>
   createBridge({
     port: makeFakePort().port,
     storefrontUrl: async () => 'https://dar-mona.ebda.app',
+    buyerKeySecret: () => SECRET,
     now: () => 1_762_800_000_000,
   });
 const call = (b: ReturnType<typeof bridge>, m: string, a: unknown[]) =>
@@ -97,7 +101,7 @@ describe('WhatsAppBridge behaviour', () => {
     const p = verifyCheckoutToken(token, 1_762_800_000_000 + 60_000)!;
     expect(p).toMatchObject({
       storeId: S,
-      buyerKey: BK,
+      bk: storeBuyerId(S, BK),
       items: [{ variantId: 'v1', quantity: 2 }],
     });
     expect(JSON.stringify(p)).not.toMatch(/price|total/i);
@@ -106,7 +110,7 @@ describe('WhatsAppBridge behaviour', () => {
   });
   it('a token minted for another store payload does not verify', () => {
     const t = signCheckoutToken(
-      { storeId: S, items: [{ variantId: 'v1', quantity: 1 }], buyerKey: BK },
+      { storeId: S, items: [{ variantId: 'v1', quantity: 1 }], bk: 'x' },
       1
     );
     const [body, sig] = t.split('.');
@@ -120,7 +124,11 @@ describe('WhatsAppBridge behaviour', () => {
     port.issuePaymentLink = async () => {
       throw new Error('gateway down');
     };
-    const b = createBridge({ port, storefrontUrl: async () => 'https://x' });
+    const b = createBridge({
+      port,
+      storefrontUrl: async () => 'https://x',
+      buyerKeySecret: () => SECRET,
+    });
     const r = (await b.createOrderFromChat(S, {
       items: [{ variantId: 'v1', quantity: 1 }],
       buyer: BUYER,
@@ -137,21 +145,34 @@ describe('WhatsAppBridge behaviour', () => {
       throw new Error('do unavailable');
     };
     const log = vi.fn();
-    const b = createBridge({ port, storefrontUrl: async () => 'https://x', log });
+    const b = createBridge({
+      port,
+      storefrontUrl: async () => 'https://x',
+      buyerKeySecret: () => SECRET,
+      log,
+    });
     await expect(b.listCatalog(S, null, 10)).rejects.toThrow('do unavailable');
     expect(log).toHaveBeenCalled();
   });
   it('the store gate runs before any read of a tenant table', async () => {
     const { port } = makeFakePort();
     const spy = vi.spyOn(port, 'catalogPage');
-    const b = createBridge({ port, storefrontUrl: async () => 'https://x' });
+    const b = createBridge({
+      port,
+      storefrontUrl: async () => 'https://x',
+      buyerKeySecret: () => SECRET,
+    });
     await b.listCatalog('33333333-3333-4333-8333-333333333333', null, 10);
     await b.listCatalog('22222222-2222-4222-8222-222222222222', null, 10);
     expect(spy).not.toHaveBeenCalled();
   });
   it('a COD refusal after a confirmation cancels once; a later confirmation does not resurrect it', async () => {
     const { port, orders } = makeFakePort();
-    const b = createBridge({ port, storefrontUrl: async () => 'https://x' });
+    const b = createBridge({
+      port,
+      storefrontUrl: async () => 'https://x',
+      buyerKeySecret: () => SECRET,
+    });
     const placed = (await b.createOrderFromChat(S, {
       items: [{ variantId: 'v1', quantity: 1 }],
       buyer: BUYER,

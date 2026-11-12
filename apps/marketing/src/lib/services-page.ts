@@ -76,38 +76,6 @@ export const LINE_UI = {
   },
 } as const;
 
-/**
- * The small "powered by our software" note on a line page (never the headline: these are services delivered by people). Marketing
- * names its related software product (Marketing: Ebda Ads, Design: Ebda Quote Studio, Events: Ebda Invite; all coming soon), linking to the Products area on the home.
- */
-export const LINE_POWERED = {
-  ar: {
-    marketing: { text: 'بنستخدم برنامجنا في الشغل، وبرنامج الإعلانات جاي قريب:', link: 'ابدأ آدز' },
-    design: {
-      text: 'بنستخدم برنامجنا في الشغل، وبرنامج عرض التصميم على العميل جاي قريب:',
-      link: 'ابدأ ستوديو للتسعير',
-    },
-    events: {
-      text: 'بنستخدم برنامجنا في الشغل، وبرنامج الدعوات والحضور جاي قريب:',
-      link: 'ابدأ إنفايت',
-    },
-  },
-  en: {
-    marketing: {
-      text: 'We work with our own software, and our ads software is coming soon:',
-      link: 'Ebda Ads',
-    },
-    design: {
-      text: 'We work with our own software, and a tool to show designs to clients is coming soon:',
-      link: 'Ebda Quote Studio',
-    },
-    events: {
-      text: 'We work with our own software, and invitations and attendance software is coming soon:',
-      link: 'Ebda Invite',
-    },
-  },
-} as const;
-
 /** The short band on the studio home (published only): the on-the-ground services, linking to Services. */
 export const HOME_SERVICES = {
   ar: {

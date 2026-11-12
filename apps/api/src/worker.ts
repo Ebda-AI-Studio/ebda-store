@@ -523,26 +523,26 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
   createOrderFromChat(storeId: string, req: unknown) {
     return this.bridge(b => b.createOrderFromChat(storeId, req));
   }
-  getPaymentLink(storeId: string, orderId: string) {
-    return this.bridge(b => b.getPaymentLink(storeId, orderId));
+  getPaymentLink(storeId: string, orderId: string, buyerKey?: string) {
+    return this.bridge(b => b.getPaymentLink(storeId, orderId, buyerKey));
   }
   recordCodOutcome(storeId: string, req: unknown) {
     return this.bridge(b => b.recordCodOutcome(storeId, req));
   }
-  attachPaymentProof(storeId: string, orderId: string, mediaUrl: string) {
-    return this.bridge(b => b.attachPaymentProof(storeId, orderId, mediaUrl));
+  attachPaymentProof(storeId: string, orderId: string, mediaUrl: string, buyerKey?: string) {
+    return this.bridge(b => b.attachPaymentProof(storeId, orderId, mediaUrl, buyerKey));
   }
-  getCustomerAddresses(storeId: string, buyerKey: string) {
-    return this.bridge(b => b.getCustomerAddresses(storeId, buyerKey));
+  getCustomerAddresses(storeId: string, buyerKey: string, phoneE164?: string) {
+    return this.bridge(b => b.getCustomerAddresses(storeId, buyerKey, phoneE164));
   }
-  saveCustomerAddress(storeId: string, buyerKey: string, address: unknown) {
-    return this.bridge(b => b.saveCustomerAddress(storeId, buyerKey, address));
+  saveCustomerAddress(storeId: string, buyerKey: string, address: unknown, phoneE164?: string) {
+    return this.bridge(b => b.saveCustomerAddress(storeId, buyerKey, address, phoneE164));
   }
-  getOrderStatus(storeId: string, orderNumber: string, buyerKey: string) {
-    return this.bridge(b => b.getOrderStatus(storeId, orderNumber, buyerKey));
+  getOrderStatus(storeId: string, orderNumber: string, buyerKey: string, phoneE164?: string) {
+    return this.bridge(b => b.getOrderStatus(storeId, orderNumber, buyerKey, phoneE164));
   }
-  listCustomerOrders(storeId: string, buyerKey: string, limit: number) {
-    return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit));
+  listCustomerOrders(storeId: string, buyerKey: string, limit: number, phoneE164?: string) {
+    return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit, phoneE164));
   }
   /** Revocation (v1.4): the live role of a user on a store, or null once removed. WhatsApp calls it on each staff request. */
   async memberRole(storeId: string, userId: string) {
