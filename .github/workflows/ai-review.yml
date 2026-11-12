@@ -32,7 +32,7 @@ concurrency:
 jobs:
   classify:
     name: AI review classify
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'labeled' && (github.event.action != 'edited' || github.event.changes.base.ref.from != null)
     outputs:
@@ -92,13 +92,17 @@ jobs:
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. This PR cannot merge unreviewed. Ahmad: run 'claude setup-token', then 'gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <owner>/<repo>' (or once at org level)."
             exit 1
           fi
-      - name: Install the Claude CLI (pinned; install scripts stay off, only the package's own installer runs)
+      - name: Install the Claude CLI (pinned)
+        # Into this job's RUNNER_TEMP, never --global: a global install writes into the shared Mac host's Homebrew prefix.
         run: |
-          set -euo pipefail
-          npm install --global --ignore-scripts @anthropic-ai/claude-code@2.1.310
-          # --ignore-scripts skipped the postinstall that fetches the native binary ("claude native binary not installed"): run exactly that one script
-          node "$(npm root --global)/@anthropic-ai/claude-code/install.cjs"
-          claude --version
+          npm install --prefix "$RUNNER_TEMP/claude-cli" --no-save --ignore-scripts @anthropic-ai/claude-code@2.1.310
+          # --ignore-scripts skips the package's postinstall, which copies the per-platform native binary over the bin/claude.exe
+          # stub ("claude native binary not installed"); link the binary npm installed for this platform ourselves.
+          bin="$(ls "$RUNNER_TEMP"/claude-cli/node_modules/@anthropic-ai/claude-code-*/claude 2>/dev/null | head -1)"
+          [ -n "$bin" ] && [ -x "$bin" ] || { echo "::error::no native claude binary was installed for $(uname -s)-$(uname -m)"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/claude-cli/bin" && ln -sf "$bin" "$RUNNER_TEMP/claude-cli/bin/claude"
+          echo "$RUNNER_TEMP/claude-cli/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/claude-cli/bin/claude" --version
       - name: Build the diff (fail closed when it is too large)
         env:
           PR: ${{ github.event.pull_request.number }}
@@ -118,11 +122,12 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
+          CLAUDE_OUTPUT: ${{ runner.temp }}/claude-out.json
         run: |
           set -euo pipefail
           # diff on stdin as data, rules as the prompt; no tools: the reviewer reads, it cannot act
           model=(); [ -n "${AI_REVIEW_MODEL:-}" ] && model=(--model "$AI_REVIEW_MODEL")
-          claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > /tmp/claude-out.json
+          claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > "$CLAUDE_OUTPUT"
       - name: Post findings and gate
         id: gate
         env:
@@ -130,6 +135,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           FAIL_CLOSED: 'true'
+          CLAUDE_OUTPUT: ${{ runner.temp }}/claude-out.json
         run: node .github/ai-review/review.mjs
       - name: Label ai-review-passed
         if: steps.gate.outputs.passed == 'true'
@@ -191,7 +197,7 @@ jobs:
   # newest run on this head (green) supersedes the red one. Passes only while the label is really on the PR.
   manual-pass:
     name: AI review
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     if: github.event.action == 'labeled' && github.event.label.name == 'ai-review-passed' && github.event.pull_request.head.repo.full_name == github.repository
     steps:
@@ -209,7 +215,7 @@ jobs:
   fork-gate:
     # fork-guard-exempt: this job IS the fork handler; it runs only gh label/view commands from the base workflow and never touches PR content
     name: AI review
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     if: github.event.pull_request.head.repo.full_name != github.repository
     steps:

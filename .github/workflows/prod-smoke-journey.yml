@@ -33,10 +33,14 @@ jobs:
       - name: Install Playwright only (no workspace install)
         run: |
           v=$(node -p "require('./package.json').devDependencies['@playwright/test']")
-          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund "@playwright/test@${v}"
-          npx playwright install --with-deps chromium
+          # RUNNER_TEMP, not /tmp: two runners share the Mac host (Ruling CI-MAC-RUNNER-1).
+          PW="$RUNNER_TEMP/pw"
+          mkdir -p "$PW" && cd "$PW" && npm init -y >/dev/null && npm i --no-audit --no-fund "@playwright/test@${v}"
+          # macOS uses the runner's local browser cache (no apt); Linux pulls the system deps.
+          if [ "$(uname -s)" = Darwin ]; then npx playwright install chromium; else npx playwright install --with-deps chromium; fi
           # Resolve @playwright/test from the repo root without installing the whole workspace.
-          ln -s /tmp/pw/node_modules "$GITHUB_WORKSPACE/node_modules"
+          ln -s "$PW/node_modules" "$GITHUB_WORKSPACE/node_modules"
+          echo "PW_DIR=$PW" >> "$GITHUB_ENV"
       - name: Run journeys
         env:
           STORES: ${{ inputs.stores || 'ameliaaurum storedemo' }}
@@ -47,7 +51,7 @@ jobs:
           for s in $STORES; do
             case "$s" in *[!a-z0-9-]*) echo "::error::bad slug $s"; exit 1;; esac
             PRELAUNCH_STORE_SLUG="$s" PRELAUNCH_JSON="prelaunch-results/$s.json" \
-              /tmp/pw/node_modules/.bin/playwright test -c playwright.prelaunch.config.ts shopper-journey
+              "$PW_DIR"/node_modules/.bin/playwright test -c playwright.prelaunch.config.ts shopper-journey
             PRELAUNCH_STORE_SLUG="$s" node scripts/qa/prelaunch-summary.mjs "prelaunch-results/$s.json" "prelaunch-results/$s.result.json" || rc=1
           done
           node -e "const fs=require('fs');const r=fs.readdirSync('prelaunch-results').filter(f=>f.endsWith('.result.json')).map(f=>JSON.parse(fs.readFileSync('prelaunch-results/'+f)));fs.writeFileSync('prod-smoke-result.json',JSON.stringify({ok:r.length>0&&r.every(x=>x.ok),runs:r},null,2))"
