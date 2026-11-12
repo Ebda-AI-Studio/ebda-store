@@ -99,7 +99,7 @@ jobs:
     name: Detect affected workspaces
     if: github.event_name == 'pull_request'
     # ubuntu-latest became 26.04 (2026-11); Playwright 1.60 unsupported — Ruling CI-HOSTED-2
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     outputs:
       code: ${{ steps.affected.outputs.code }}
@@ -144,7 +144,7 @@ jobs:
     name: Repo guards
     # Ruling CI-HOSTED-1: deliberately NO `if` here (the always-on PR check; tests/unit/ci-lean-structure and
     # merge-gate derive the required list from it). Residual: ~1.5 hosted min per scheduled run.
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -400,7 +400,7 @@ jobs:
     name: Unit Tests (affected)
     needs: [changes, unit]
     if: always() && !cancelled() && github.event_name == 'pull_request'
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     steps:
       - name: Require every unit shard to have passed
@@ -656,7 +656,7 @@ jobs:
     name: App builds (affected)
     needs: [changes, app-build]
     if: always() && !cancelled() && github.event_name == 'pull_request'
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 2
     steps:
       - name: Require every affected app build to have passed
@@ -1515,10 +1515,44 @@ jobs:
           node .github/scripts/audit-gate.mjs
 
       - name: Check for secrets
+        # The action runs trufflehog in a docker container; the Mac runner has no docker, so it runs on Linux only.
+        if: runner.os == 'Linux'
         uses: trufflesecurity/trufflehog@ea68ca03c865c5f324e86e849ced20ed3cf9dbbb # v3.99.8
         with:
           path: ./
           extra_args: --only-verified
+
+      - name: Check for secrets (Mac runner, native trufflehog with the action's scan range)
+        # Same release as the action above (v3.99.8), checksum-pinned, installed into RUNNER_TEMP. Same range as the action:
+        # a push scans before..after (a first push / zero `before` scans the branch), schedule / dispatch the whole branch.
+        if: runner.os == 'macOS'
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          V=3.99.8
+          T="trufflehog_${V}_darwin_arm64.tar.gz"
+          SHA=85724f221bc390f6e0bdf65df245468c8426350de85aa9290ea5491c6d4ec35a
+          # The 29 MB tarball is kept in the runners' tool cache and re-verified on every run (download only on a miss).
+          C="$HOME/.ebda-ci/tools"; mkdir -p "$C"
+          echo "$SHA  $C/$T" | shasum -a 256 -c - >/dev/null 2>&1 || {
+            curl -fsSL -o "$C/$T.part" "https://github.com/trufflesecurity/trufflehog/releases/download/v${V}/${T}" && mv "$C/$T.part" "$C/$T"; }
+          echo "$SHA  $C/$T" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/th" && tar -xz -C "$RUNNER_TEMP/th" -f "$C/$T" trufflehog
+          # The checkout is depth 1, so `before` is not in the clone and --since-commit alone scans the WHOLE tree. A push
+          # therefore deepens to `before` and scans exactly before..after, and fails rather than fall back to a whole-tree
+          # scan. Ruling CI-MAC-TRUFFLE-1: from the Mac, the `postgres://...@db.example.com` fixtures in
+          # tests/unit/skins-preflight.test.ts (lines 62-63) report as VERIFIED (main run 43112327669; earlier hosted main runs passed the same
+          # whole-tree scan), so .github/trufflehog-mac-exclude-paths.txt skips exactly that file here (pinned by a test). Postgres URLs
+          # trufflehog cannot verify are caught by gitleaks' ebda-postgres-url-password rule (.gitleaks.toml).
+          since=()
+          if [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            git fetch --no-tags --deepen=20 origin "$AFTER" && git merge-base --is-ancestor "$BEFORE" "$AFTER" || { echo "::error::before ($BEFORE) is not an ancestor within 20 commits; refusing a whole-tree scan"; exit 1; }
+            since=(--since-commit "$BEFORE")
+          fi
+          "$RUNNER_TEMP/th/trufflehog" git "file://$PWD" "${since[@]}" --exclude-paths .github/trufflehog-mac-exclude-paths.txt --branch "$AFTER" --fail --no-update --github-actions --only-verified
 
   # Mutation tests: weekly (Sunday) or manual only (far too slow for a push or
   # a nightly).

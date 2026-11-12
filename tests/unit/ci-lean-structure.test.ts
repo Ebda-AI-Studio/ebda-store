@@ -649,6 +649,28 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
       );
     }
   });
+  it('secret scan: the docker-based trufflehog action is Linux-only; the Mac runs the same release natively, checksum-pinned', () => {
+    const steps = parsed.jobs.security.steps as Array<{ uses?: string; if?: string; run?: string }>;
+    expect(steps.find(st => (st.uses ?? '').startsWith('trufflesecurity/trufflehog@'))?.if).toBe(
+      "runner.os == 'Linux'"
+    );
+    const mac = steps.find(st => /trufflehog_\$\{V\}_darwin_arm64/.test(st.run ?? ''));
+    expect(mac?.if).toBe("runner.os == 'macOS'");
+    expect(mac?.run).toMatch(/shasum -a 256 -c -/);
+    expect(mac?.run).toMatch(/--only-verified/);
+    // depth-1 checkout: a push must deepen to `before` and scan only before..after (never a silent whole-tree scan); the
+    // Mac skips exactly the listed fixture files (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list).
+    expect(mac?.run).toMatch(
+      /git fetch --no-tags --deepen=\d+ origin "\$AFTER" && git merge-base --is-ancestor "\$BEFORE" "\$AFTER"/
+    );
+    expect(mac?.run).toContain('--exclude-paths .github/trufflehog-mac-exclude-paths.txt');
+  });
+  it('ai-review links the native claude binary (--ignore-scripts leaves only a stub)', () => {
+    const wf = readFileSync(path.join(ROOT, '.github/workflows/ai-review.yml'), 'utf8');
+    expect(wf).toMatch(/--ignore-scripts @anthropic-ai\/claude-code@/);
+    expect(wf).toMatch(/claude-code-\*\/claude/);
+    expect(wf).toContain('"$RUNNER_TEMP/claude-cli/bin/claude" --version');
+  });
   it('the Mac path never ALTERs the shared ebda_app role (Ruling CI-MAC-ROLE-1)', () => {
     const steps = parsed.jobs['test-integration'].steps;
     expect(steps.find(st => /ALTER ROLE ebda_app/.test(st.run ?? ''))?.if).toBe(

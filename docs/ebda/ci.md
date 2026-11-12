@@ -31,6 +31,17 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   `~/Library/Caches/ms-playwright`: `playwright install` reads every install registered there, and one under `~/Desktop`
   made the launchd runner block on a macOS privacy prompt for 15+ min, 2026-11-11) and `EBDA_NM_STORE=~/.ebda-ci/node-modules` (the npm-ci-reuse store, shared by both runners). Two instances, not
   more: other orgs' runners on the same Mac count toward a host total of 3.
+- **Ruling HOST-RUNNERS-2 (2026-11-11, supersedes the "3 runners per host" cap for Ebda)** - after the switch, 46 runs queued
+  on two runners and 10-second label checks waited behind 30-minute suites. Two LIGHT runners were added:
+  `~/actions-runner-ebda-light-{1,2}` (`ebda-mac-light-1/2`, label `ebda-mac-light` ONLY, no default labels, so a job
+  asking for `["self-hosted","ebda-mac"]` never lands there). `EBDA_LIGHT_RUNS_ON='["ebda-mac-light"]'` routes the cheap jobs
+  there: deploy-change label, PR quality (body + slop), blast-radius, gitleaks, AI review classify / manual-pass / fork-gate,
+  and CI `changes`, `guards`, `unit-gate`, `app-builds`. Their fallback chain is light var, then `EBDA_RUNS_ON`, then hosted
+  `ubuntu-24.04`. None of them takes the heavy lock or a per-job database (pinned by
+  `tests/unit/workflow-hosted-runners-only.test.ts`), so heavy work stays at one suite at a time on the two `ebda-mac`
+  runners. Host at the time: 10 cores, 16 GB (63% free), 35 GB disk free; the light runners are APFS clones (~0 extra disk
+  for binaries). Host total: 4 Ebda runners plus 2 of another org. Cost if wrong: light jobs that turn out heavy would compete with
+  the heavy lane for CPU and RAM; the pinned light list is the place to move such a job back.
 - **Databases**: macOS runners cannot start service containers, so `services:` images are `''` when `EBDA_RUNS_ON`
   names `ebda-mac` (the runner then skips the service). `scripts/ci/ci-services.sh up` gives the job its URLs
   (`CI_PG_URL`, `CI_PG_APP_URL`, `CI_REDIS_URL`): on Linux from the service ports; on the Mac a database of its own on the
@@ -47,6 +58,15 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   localhost, so the password is not what authenticates. The integration suite's own `tests/helpers/app-role-login.ts` still
   sets the same `ci-only-app-pw` the local dev scripts use (no other repo on this host uses `ebda_app`; GCC uses `horse_app`).
   Cost if wrong: a different `ebda_app` password set by another tool on this host would be overwritten during an Ebda run.
+- **No docker on the Mac**: the trufflehog action runs in a container, so `Security Audit` runs it on Linux only and, on the Mac,
+  the same release (v3.99.8) natively from `~/.ebda-ci/tools` (checksum re-verified each run, downloaded only on a miss). The AI
+  review installs the claude CLI with `--ignore-scripts`, so it links the per-platform native binary itself. The checkout is depth 1, so a push
+  deepens to `before` and scans exactly before..after (it fails rather than fall back to a whole-tree scan). Ruling
+  CI-MAC-TRUFFLE-1: from the Mac, the `postgres://...@db.example.com` fixtures in `tests/unit/skins-preflight.test.ts`
+  report as VERIFIED (main run 43112327669), so `.github/trufflehog-mac-exclude-paths.txt` skips exactly that file there.
+  Postgres URLs trufflehog cannot verify are caught by gitleaks' `ebda-postgres-url-password` rule in `.gitleaks.toml`.
+  The built-in gitleaks rules do not flag a Neon-shaped URL. The rule ignores loopback hosts, reserved example/test domains
+  and placeholders. Both are pinned by `tests/unit/gitleaks-postgres-url-rule.test.ts`.
 - **Runner security** - the Mac also runs the main-only deploy workflows, so it holds the Cloudflare deploy token while
   same-repo PR jobs run on the same machine. Deploy secrets live only in the `production` environment, which accepts
   deployments from `main` only (branch policy set 2026-11-11), so a PR-triggered job cannot read them even if a PR edits
