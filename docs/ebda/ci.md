@@ -31,6 +31,17 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   `~/Library/Caches/ms-playwright`: `playwright install` reads every install registered there, and one under `~/Desktop`
   made the launchd runner block on a macOS privacy prompt for 15+ min, 2026-11-11) and `EBDA_NM_STORE=~/.ebda-ci/node-modules` (the npm-ci-reuse store, shared by both runners). Two instances, not
   more: other orgs' runners on the same Mac count toward a host total of 3.
+- **Ruling HOST-RUNNERS-2 (2026-11-11, supersedes the "3 runners per host" cap for Ebda)** - after the switch, 46 runs queued
+  on two runners and 10-second label checks waited behind 30-minute suites. Two LIGHT runners were added:
+  `~/actions-runner-ebda-light-{1,2}` (`ebda-mac-light-1/2`, label `ebda-mac-light` ONLY, no default labels, so a job
+  asking for `["self-hosted","ebda-mac"]` never lands there). `EBDA_LIGHT_RUNS_ON='["ebda-mac-light"]'` routes the cheap jobs
+  there: deploy-change label, PR quality (body + slop), blast-radius, gitleaks, AI review classify / manual-pass / fork-gate,
+  and CI `changes`, `guards`, `unit-gate`, `app-builds`. Their fallback chain is light var, then `EBDA_RUNS_ON`, then hosted
+  `ubuntu-24.04`. None of them takes the heavy lock or a per-job database (pinned by
+  `tests/unit/workflow-hosted-runners-only.test.ts`), so heavy work stays at one suite at a time on the two `ebda-mac`
+  runners. Host at the time: 10 cores, 16 GB (63% free), 35 GB disk free; the light runners are APFS clones (~0 extra disk
+  for binaries). Host total: 4 Ebda runners plus 2 of another org. Cost if wrong: light jobs that turn out heavy would compete with
+  the heavy lane for CPU and RAM; the pinned light list is the place to move such a job back.
 - **Databases**: macOS runners cannot start service containers, so `services:` images are `''` when `EBDA_RUNS_ON`
   names `ebda-mac` (the runner then skips the service). `scripts/ci/ci-services.sh up` gives the job its URLs
   (`CI_PG_URL`, `CI_PG_APP_URL`, `CI_REDIS_URL`): on Linux from the service ports; on the Mac a database of its own on the
