@@ -150,9 +150,8 @@ const joinDoc = (...parts: Array<string | null | undefined>) => parts.map(p => p
 export const buildProductDoc = (p: ProductDocFields): string =>
   normalizeArabicSearch(joinDoc(p.name, p.nameAr, p.searchTerms, p.description, p.descriptionAr));
 /** Stem twins of the two documents (Ruling SEARCH-STEM-1): additional columns, the folded docs above stay as they are. */
-export const buildProductStemDoc = (p: ProductDocFields): string =>
-  stemSearchDoc(buildProductDoc(p));
-export const buildProductStemNameDoc = (p: ProductDocFields): string =>
+const buildProductStemDoc = (p: ProductDocFields): string => stemSearchDoc(buildProductDoc(p));
+const buildProductStemNameDoc = (p: ProductDocFields): string =>
   stemSearchDoc(buildProductNameDoc(p));
 /** `ebda_product_name_doc` */
 export const buildProductNameDoc = (p: ProductDocFields): string =>

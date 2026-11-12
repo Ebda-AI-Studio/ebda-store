@@ -10,7 +10,7 @@ import {
   verifyProductIndex,
   type ProductSearchOpts,
 } from '../src/do/search';
-import { normalizeArabicSearch, stemArabicWord, stemSearchDoc } from '../../shared/src/search';
+import { normalizeArabicSearch, stemSearchDoc, stemSearchToken } from '../../shared/src/search';
 import {
   catalogueRows,
   evalQueries,
@@ -32,7 +32,7 @@ function store(rows: ReadonlyArray<Pick<EvalRow, 'id' | 'nameAr' | 'name'>>) {
 }
 const run = (db: ReturnType<typeof store>['db'], q: string, o: Partial<ProductSearchOpts> = {}) =>
   searchProductIdSet(db, 's1', q, { scope: 'storefront', limit: 10_000, ...o }).ids;
-const stem = (w: string) => stemArabicWord(normalizeArabicSearch(w));
+const stem = (w: string) => stemSearchToken(normalizeArabicSearch(w));
 
 describe('stemArabicWord', () => {
   it.each([

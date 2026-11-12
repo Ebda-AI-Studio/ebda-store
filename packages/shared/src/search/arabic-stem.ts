@@ -22,7 +22,7 @@ const SUFFIXES = ['تين', 'ات', 'ون', 'ين', 'ان', 'ها', 'ه'] as con
 const MIN = 3;
 
 /** Stem ONE folded word. Non-Arabic words (Latin, digits, mixed) come back unchanged. */
-export function stemArabicWord(word: string): string {
+function stemArabicWord(word: string): string {
   if (!ARABIC_WORD.test(word)) return word;
   let w = word;
   for (const p of PREFIXES) {
