@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from './bounded-map';
-import { revalidateStorefront } from './revalidate-storefront';
+import { revalidateStorefront, revalidateStorefrontWithRetry } from './revalidate-storefront';
+import logger from './logger';
 import { retryTransientRead } from './db-retry';
 import { isWorkers } from './runtime';
 import { dropEdgeGensMemo } from './edge-gens-memo';
@@ -414,6 +415,27 @@ export const ORDER_PURGE_COALESCE_MS = 10_000;
 /** Open coalescing windows by store: `pending` = an order arrived mid-window; `openedAt` = when it opened. */
 const orderPurgeWindows = new BoundedMap<string, { pending: boolean; openedAt: number }>(10_000);
 
+/** Awaited purge for the durable trailing job (`storefront-order-purge`, #663): returns the outcome, retries included. */
+export function purgeStorefrontProductsNow(storeId: string) {
+  return revalidateStorefrontWithRetry({
+    tags: [`products:${storeId}`, `categories:${storeId}`, `bundles:${storeId}`],
+  });
+}
+
+/**
+ * #663: ask for the durable trailing purge. A debounced queue job (lib/inngest/functions/storefront-order-purge.ts)
+ * purges 10 s after the LAST order of a burst, independent of any request's `waitUntil`. A failed enqueue is logged,
+ * never thrown: Redis is already cleared and the leading purge already ran.
+ */
+async function requestTrailingOrderPurge(storeId: string): Promise<void> {
+  try {
+    const { inngest } = await import('./inngest/client.js');
+    await inngest.send({ name: 'storefront/order-purge-requested', data: { storeId } });
+  } catch (err) {
+    logger.error({ err, storeId }, '[order-purge] could not enqueue the durable trailing purge');
+  }
+}
+
 function purgeStorefrontProducts(storeId: string): void {
   revalidateStorefront({
     tags: [`products:${storeId}`, `categories:${storeId}`, `bundles:${storeId}`],
@@ -424,7 +446,8 @@ function purgeStorefrontProducts(storeId: string): void {
  * Open a window and schedule its trailing purge. The wait is a promise handed to `ctx.waitUntil`
  * (`cfWaitUntil`), NOT a bare `setTimeout`: Workers do not promise a timer survives the response, so a
  * dropped timer left the window open for the isolate's life and the NEVER-stale inventory purge never
- * fired. As a second line, `invalidateStoreProductCachesAfterOrder` treats a window older than
+ * fired. This window is now only a best-effort mid-burst coalescer: the guaranteed purge of the last order is the
+ * debounced durable job (#663). As a second line, `invalidateStoreProductCachesAfterOrder` treats a window older than
  * 2x the coalesce time as dead and purges itself, so even a dropped waitUntil costs at most one extra window.
  */
 function openOrderPurgeWindow(storeId: string): void {
@@ -464,6 +487,8 @@ function openOrderPurgeWindow(storeId: string): void {
  */
 export async function invalidateStoreProductCachesAfterOrder(storeId: string): Promise<void> {
   await clearProductsRedis(storeId);
+  // Durable guarantee for the last order of a burst (#663); the window below only coalesces mid-burst purges.
+  await requestTrailingOrderPurge(storeId);
   const open = orderPurgeWindows.get(storeId);
   if (open && Date.now() - open.openedAt < ORDER_PURGE_COALESCE_MS * 2) {
     open.pending = true;
