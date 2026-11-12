@@ -376,6 +376,11 @@ type LegalNoticeSendRequestedEvent = EventPayload & {
 // Search program Task 11: ask the product embedding indexer to look at one store (debounced per
 // store). Sent by every product-text writer outside ProductService.create/update, the backstop cron
 // and the indexer's own continuation.
+type StorefrontOrderPurgeRequestedEvent = EventPayload & {
+  name: 'storefront/order-purge-requested';
+  data: { storeId: string };
+};
+
 type SearchStoreReindexRequestedEvent = EventPayload & {
   name: 'search/store.reindex-requested';
   data: { storeId: string; reason: string };
@@ -445,6 +450,7 @@ export type AppEvent =
   | EtaReceiptScheduledEvent
   | LegalNoticeSendRequestedEvent
   | SearchStoreReindexRequestedEvent
+  | StorefrontOrderPurgeRequestedEvent
   | WebhookDeliveryRequestedEvent
   | WebhookInventoryLowEvent
   | StoreSelfServeProvisionedEvent;

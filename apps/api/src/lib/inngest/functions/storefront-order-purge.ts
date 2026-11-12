@@ -22,9 +22,7 @@ export const storefrontOrderPurge: JobDef = inngest.createFunction(
     name: 'Storefront: trailing product-cache purge after orders',
     retries: 1,
     debounce: { key: 'event.data.storeId', period: '10s', timeout: '1m' },
-    // not in the typed AppEvent registry (same cast as product.upserted)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    triggers: [{ event: ORDER_PURGE_EVENT as any }], // pq-allow(no-any): not in the typed AppEvent registry
+    triggers: [{ event: ORDER_PURGE_EVENT }],
   },
   async ({ event, step }) => {
     const storeId = String(event.data?.storeId ?? '');
