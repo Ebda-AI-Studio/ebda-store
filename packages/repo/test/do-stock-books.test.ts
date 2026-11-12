@@ -560,4 +560,20 @@ describe('COD statement marks the order paid (S3-O7)', () => {
     expect(out.settled).toEqual([{ orderId: 'o1', paymentId: 'p1' }]);
     expect(r.pay('o1')).toBe('paid');
   });
+
+  it('a re-upload against an already paid order is recorded but writes no order event', () => {
+    const r = rigCod();
+    r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T1', 'A', 5000)] });
+    expect(r.pay('o1')).toBe('paid');
+    const before = r.events('o1').length;
+    const again = r.op('importCodRemittances', {
+      carrier: 'bosta',
+      rows: [{ ...row('T1', 'B', 5000), remittedAt: new Date('2026-10-09T00:00:00Z') }],
+    });
+    expect(again).toMatchObject({ inserted: 1, settled: [], flagged: [] });
+    expect(r.events('o1')).toHaveLength(before);
+    expect(r.q("SELECT source FROM cod_remittances WHERE line_ref = 'B'")[0].source).toBe(
+      'csv:suspected_duplicate'
+    );
+  });
 });

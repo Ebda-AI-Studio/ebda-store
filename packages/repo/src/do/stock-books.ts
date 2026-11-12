@@ -1177,6 +1177,13 @@ function settleCodFromStatement(
     carrier: line.carrier,
     trackingNumber: line.trackingNumber,
   };
+  // only an order still waiting for its cash is touched: a paid, cancelled or refunded one gets no event
+  if (o.status === 'cancelled' || o.status === 'refunded' || o.payment_status !== 'unpaid') return;
+  const pay = db.all(
+    "SELECT id, amount FROM payments WHERE order_id = ? AND provider = 'cod' AND status = 'cod_pending' ORDER BY created_at, id LIMIT 1",
+    [o.id]
+  )[0];
+  if (!pay) return;
   if (suspectedDuplicate) {
     addOrderEvent(
       db,
@@ -1190,12 +1197,7 @@ function settleCodFromStatement(
     flagged.push({ orderId: o.id as string, reason: 'suspected_duplicate' });
     return;
   }
-  if (o.status !== 'delivered' || o.payment_status !== 'unpaid') return;
-  const pay = db.all(
-    "SELECT id, amount FROM payments WHERE order_id = ? AND provider = 'cod' AND status = 'cod_pending' ORDER BY created_at, id LIMIT 1",
-    [o.id]
-  )[0];
-  if (!pay) return;
+  if (o.status !== 'delivered') return;
   const due = pay.amount as number;
   const collected = db.all(
     "SELECT COALESCE(SUM(gross_amount), 0) AS s FROM cod_remittances WHERE store_id = ? AND shipment_id = ? AND source NOT LIKE '%' || ?",
