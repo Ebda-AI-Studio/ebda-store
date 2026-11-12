@@ -1206,6 +1206,7 @@ const REVOKE_PREFIX = 'refund-revoke:';
  * else (redeems, expiries, negative adjusts) the oldest lots first (FIFO). What cannot be taken from a lot is DEBT, and a
  * later lot pays the debt before anything else, so points earned while in debt are not expired a second time.
  */
+// pq-allow(unused-export): exported for unit tests
 export function lotRemaining(
   db: SyncSql,
   storeId: string,

@@ -3,6 +3,7 @@ import { purgeStorefrontProductsNow } from '../../public-cache';
 import { inngest } from '../client';
 
 /** Event sent by `invalidateStoreProductCachesAfterOrder` on EVERY order (#663). */
+// pq-allow(unused-export): imported by tests and kept public for senders
 export const ORDER_PURGE_EVENT = 'storefront/order-purge-requested';
 
 /**
@@ -23,6 +24,7 @@ export const storefrontOrderPurge: JobDef = inngest.createFunction(
     debounce: { key: 'event.data.storeId', period: '10s', timeout: '1m' },
     // not in the typed AppEvent registry (same cast as product.upserted)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // pq-allow(no-any): inngest trigger event typing needs the string literal widened
     triggers: [{ event: ORDER_PURGE_EVENT as any }],
   },
   async ({ event, step }) => {

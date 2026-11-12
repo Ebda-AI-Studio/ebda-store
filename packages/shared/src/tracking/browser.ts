@@ -132,6 +132,7 @@ function asciiDigits(v: string): string {
  * Exported for tests. Blocking (not rewriting the URL) is deliberate: history.replaceState would
  * change what the visitor sees and the app's own routing state.
  */
+// pq-allow(unused-export): exported for unit tests
 export function pixelQuerySensitive(search: string | null | undefined): boolean {
   if (!search) return false;
   if (urlCarriesSensitiveQuery(search)) return true;

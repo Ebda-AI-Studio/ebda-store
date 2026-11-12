@@ -1082,7 +1082,6 @@
     "unused-export|apps/api/src/lib/revalidate-storefront.ts|RevalidateOutcome",
     "unused-export|apps/api/src/lib/revalidate-storefront.ts|SERVICE_BINDING_BASE",
     "unused-export|apps/api/src/lib/revalidate-storefront.ts|revalidateStorefrontNow",
-    "unused-export|apps/api/src/lib/revalidate-storefront.ts|revalidateStorefrontWithRetry",
     "unused-export|apps/api/src/lib/safe-decrypt-json.ts|safeDecryptJson",
     "unused-export|apps/api/src/lib/safe-fetch.ts|HostResolver",
     "unused-export|apps/api/src/lib/safe-fetch.ts|resolveViaDoh",

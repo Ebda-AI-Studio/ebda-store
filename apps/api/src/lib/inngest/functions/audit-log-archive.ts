@@ -33,6 +33,7 @@ type R2BindingLike = {
  * which serves public uploads. `StorageService.privateBucket()` refuses a private bucket equal to the public one.
  * Null when no private destination is configured: the job skips loudly rather than fall back to the public bucket.
  */
+// pq-allow(unused-export): exported for unit tests
 export async function archivePut(): Promise<((key: string, body: string) => Promise<void>) | null> {
   const bound = cfBindings()?.STORE_BACKUPS as R2BindingLike | undefined;
   if (bound) {

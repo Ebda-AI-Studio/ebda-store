@@ -14,10 +14,12 @@ const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];
  * mount (case-insensitive, like Express routing).
  */
 const BILLING_ROUTE_RE = /^(?:\/api\/v\d+)?\/stores\/[^/]+\/billing(?:\/|$)/i;
+// pq-allow(unused-export): exported for unit tests
 export function isStoreBillingRoute(path: string): boolean {
   return BILLING_ROUTE_RE.test(path);
 }
 
+// pq-allow(unused-export): exported for unit tests
 export const STORE_SUSPENDED_MESSAGES = {
   /** Suspended by the platform (no billing reason): nothing but reads. */
   platform: {
@@ -38,6 +40,7 @@ export const STORE_SUSPENDED_MESSAGES = {
  * (`billingSuspendedReason` set: unpaid, over_store_limit) the billing routes stay open so the owner can pay.
  * `over_store_limit` keeps its own 402 upsell, decided before this. Returns the error to throw, or null.
  */
+// pq-allow(unused-export): exported for unit tests
 export function suspendedWriteBlock(
   store: { status: string; billingSuspendedReason?: string | null },
   role: string,
