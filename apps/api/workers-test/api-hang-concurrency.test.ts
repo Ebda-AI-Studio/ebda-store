@@ -38,8 +38,9 @@ const HANG_MS = 2_000;
 // measured 2026-11-10 on local workerd with 150 ms per AuthState call: 348 ms with the write-back in waitUntil, 654-661 ms with it
 // on the response path (the code before API-HANG-1)
 const DELAY_ROUNDTRIPS_MAX = 3;
-// the relative bound (Ruling API-HANG-3): 3 serial round trips (450 ms) + 90 ms of jitter; the pre-API-HANG-1 code is ~5 (+600 ms)
-const PROD_LIKE_EXTRA_MS = 540;
+// the relative bound (Ruling API-HANG-3): a cold read is 2 serial round trips (+302 ms measured on the CI runner, ~300 locally);
+// the pre-API-HANG-1 code adds 2 more (+595 ms measured). 450 ms leaves ~150 ms of margin on each side
+const PROD_LIKE_EXTRA_MS = 450;
 
 export function pct(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1)] ?? 0;

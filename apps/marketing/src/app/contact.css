@@ -65,9 +65,9 @@
   column-gap: 10px;
 }
 .cf-consent input {
-  width: 22px;
-  height: 22px;
-  margin-top: 4px;
+  width: 24px; /* the 24px tap floor; the label beside it is the larger target */
+  height: 24px;
+  margin-top: 2px;
   accent-color: var(--gold);
 }
 .cf-consent label {
