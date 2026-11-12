@@ -24,7 +24,7 @@ import { ServiceLinePage } from '../../apps/marketing/src/components/ServiceLine
 import { ServicesIndexPage } from '../../apps/marketing/src/components/ServicesIndexPage';
 import { StudioHomePage } from '../../apps/marketing/src/components/StudioHome';
 import { Header } from '../../apps/marketing/src/components/Header';
-import { comingSoonItems } from '../../apps/marketing/src/lib/coming-soon';
+import { comingSoonItems, comingSoonLabels } from '../../apps/marketing/src/lib/coming-soon';
 import {
   applyServiceLinesPostbuild,
   servicesLlmsBlock,
@@ -90,8 +90,12 @@ describe('ON publishes everything together', () => {
     const home = html(<Home locale="en" />);
     expect(home).toContain('on-the-ground');
     for (const id of ['crm', 'erp']) expect(home).toContain(`data-coming-soon="${id}"`);
-    // the cards link to their own live coming-soon pages (SUBDOMAIN-SOON-2)
-    for (const h of ['crm', 'erp']) expect(home).toContain(`href="https://${h}.ebda.app/"`);
+    // COMING-SOON-NO-VISIT-1: a coming-soon card never links its <label>.ebda.app page or says "Visit"
+    for (const h of ['crm', 'erp']) expect(home).not.toContain(`${h}.ebda.app`);
+    expect(home).not.toMatch(/>\s*Visit\b/);
+    const homeAr = html(<Home locale="ar" />);
+    expect(homeAr).toContain('data-coming-soon="crm"');
+    expect(homeAr).not.toMatch(/(?:crm|erp)\.ebda\.app|>\s*زور\s/);
     expect(home).toMatch(/\/en\/contact\/?\?topic=products#form/);
     const seo = await import('../../apps/marketing/src/lib/seo');
     expect(JSON.stringify(seo.studioJsonLd('en'))).toContain('/en/services/marketing/');
@@ -192,7 +196,7 @@ describe('post-build step', () => {
     expect(t.match(/## Services/g)).toHaveLength(1);
     expect(t).not.toContain('Ebda Invite');
     expect(t).toContain('Ebda CRM (ابدأ CRM)');
-    expect(t).toContain('https://erp.ebda.app/');
+    expect(t).not.toMatch(/(?:crm|erp)\.ebda\.app/);
   });
 });
 
@@ -255,11 +259,9 @@ describe('coming-soon cards (software only, names distinct from the services)', 
     const names = comingSoonItems('en').map(i => i.name);
     expect(names).toEqual(['Ebda CRM', 'Ebda ERP']);
     expect(comingSoonItems('ar').map(i => i.name)).toEqual(['ابدأ CRM', 'ابدأ ERP']);
-    // every coming-soon product links to its own live coming-soon subdomain page (SUBDOMAIN-SOON-2)
-    expect(comingSoonItems('en').map(i => [i.id, i.href])).toEqual([
-      ['crm', 'https://crm.ebda.app/'],
-      ['erp', 'https://erp.ebda.app/'],
-    ]);
+    // COMING-SOON-NO-VISIT-1: no coming-soon product carries a link to its subdomain page, and no "visit" label exists
+    for (const i of comingSoonItems('en')) expect(i).not.toHaveProperty('href');
+    for (const l of LOCALES) expect(comingSoonLabels(l)).not.toHaveProperty('visit');
     // ar/en copy parity: same fact count per card
     const ar = comingSoonItems('ar');
     comingSoonItems('en').forEach((i, n) => expect(ar[n].facts).toHaveLength(i.facts.length));

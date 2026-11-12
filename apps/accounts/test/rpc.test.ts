@@ -314,6 +314,7 @@ describe('Accounts RPC for the Store', () => {
     const { u } = await withEveryKindOfData();
     const out = await rpc().exportUser(u.id);
     expect(Object.keys(out).sort()).toEqual([
+      'admin_audit',
       'passkey_credentials',
       'refresh_tokens',
       'sessions',
