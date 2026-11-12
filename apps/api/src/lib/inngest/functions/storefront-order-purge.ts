@@ -24,8 +24,7 @@ export const storefrontOrderPurge: JobDef = inngest.createFunction(
     debounce: { key: 'event.data.storeId', period: '10s', timeout: '1m' },
     // not in the typed AppEvent registry (same cast as product.upserted)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    // pq-allow(no-any): inngest trigger event typing needs the string literal widened
-    triggers: [{ event: ORDER_PURGE_EVENT as any }],
+    triggers: [{ event: ORDER_PURGE_EVENT as any }], // pq-allow(no-any): not in the typed AppEvent registry
   },
   async ({ event, step }) => {
     const storeId = String(event.data?.storeId ?? '');
