@@ -2,7 +2,7 @@
 
 **Purpose:** the definitive, statically-computed gap list for flipping production
 `DATABASE_URL` from the `neondb_owner` BYPASSRLS role to the non-bypass the earlier app role
-login role, per `docs/plans/2026-07-02-rls-cutover.md` Phase 3. Under the earlier app role,
+login role, per `docs/plans/done/2026-07-02-rls-cutover.md` Phase 3. Under the earlier app role,
 Postgres RLS starts enforcing. The flip is safe ONLY if every query either
 (a) runs inside tenant context (`runInTenantContext` sets `app.current_store_id` →
 RLS filters), (b) is an intentional `withRlsBypass` (cross-tenant by design), or

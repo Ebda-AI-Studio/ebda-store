@@ -14,7 +14,7 @@ import { BlogPostClient, type BlogDetail } from './BlogPostClient';
  * so the SAME rendering logic serves both `app/blog/[slug]/page.tsx`
  * (legacy, header-based) and
  * `app/tenant-store/[tenant]/[locale]/blog/[slug]/page.tsx` (new, params-based,
- * dark-launched). See docs/plans/2026-07-12-tenant-cacheable-routing.md
+ * dark-launched). See docs/plans/done/2026-07-12-tenant-cacheable-routing.md
  * §3.6/§9 — this is the one Track-A route the plan explicitly calls out as
  * needing the resolver swap (the blog index itself is a pure client shell).
  */

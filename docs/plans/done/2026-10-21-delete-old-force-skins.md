@@ -15,7 +15,7 @@
 
 **Tech Stack:** Prisma + Neon (Postgres 17, strict RLS, tenant guard), Zod in `@ebda/shared`, Next.js 16 (apps/web, apps/admin, apps/marketing), Express on Cloudflare Workers (apps/api), Vitest, `tsx`/Node scripts.
 
-**Spec / read with it:** `docs/ebda/templates/{looks,qamar,dahab}.md` (+ `souq.md`), `docs/plans/2026-10-15-phase-b1-qamar.md` (Rulings B1-1 "Qamar owns chrome only; cards, PDP, cart and checkout stay shared/minimal" and B1-17), `docs/plans/2026-10-14-looks-phase-s.md` (LOOKS-5, LOOKS-8..10), `docs/ROLLBACK.md` ("enum value added" section), `docs/architecture/store-theme-flags.md`, `CLAUDE.md` § Platform-level fixes.
+**Spec / read with it:** `docs/ebda/templates/{looks,qamar,dahab}.md` (+ `souq.md`), `docs/plans/done/2026-10-15-phase-b1-qamar.md` (Rulings B1-1 "Qamar owns chrome only; cards, PDP, cart and checkout stay shared/minimal" and B1-17), `docs/plans/done/2026-10-14-looks-phase-s.md` (LOOKS-5, LOOKS-8..10), `docs/ROLLBACK.md` ("enum value added" section), `docs/architecture/store-theme-flags.md`, `CLAUDE.md` § Platform-level fixes.
 
 ## What the code says today (measured on `origin/main` at `ab6417fce`, 2026-10-21)
 

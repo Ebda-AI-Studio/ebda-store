@@ -29,7 +29,7 @@ import {
 } from '../../../services/campaign.service';
 
 /**
- * Email campaign sender (D2). Plan: docs/plans/2026-09-25-email-campaigns.md.
+ * Email campaign sender (D2). Plan: docs/plans/done/2026-09-25-email-campaigns.md.
  *
  * Triggered ONLY by `campaign/send-requested`, which only
  * `POST /stores/:storeId/campaigns/:id/send` emits — a merchant pressing send

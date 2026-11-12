@@ -1,6 +1,6 @@
 # Template directions — round 1 (2026-10-14)
 
-Three genuinely different directions per template (colour strategy, layout topology, type voice). **Decision (Ahmad, 2026-10-14, Ruling TPL-1 in `docs/plans/2026-10-14-templates-and-editor-program.md`): all three ship as selectable looks inside each template**; the merchant picks a look, then edits it fully in the editor. Each look gets its own brief in `docs/ebda/templates/<id>.md`. Shared bar for all: calm, premium, clear; Arabic-first RTL; AA contrast; nothing under 12px; no cream/sand body backgrounds; no eyebrow label over every section; no cards+shadow+border stacks; logo prominent; one continuous scroll; first screen shows the categories quickly. Dahab already owns "dark night + gold + arch"; none of these reuse it.
+Three genuinely different directions per template (colour strategy, layout topology, type voice). **Decision (Ahmad, 2026-10-14, Ruling TPL-1 in `docs/plans/done/2026-10-14-templates-and-editor-program.md`): all three ship as selectable looks inside each template**; the merchant picks a look, then edits it fully in the editor. Each look gets its own brief in `docs/ebda/templates/<id>.md`. Shared bar for all: calm, premium, clear; Arabic-first RTL; AA contrast; nothing under 12px; no cream/sand body backgrounds; no eyebrow label over every section; no cards+shadow+border stacks; logo prominent; one continuous scroll; first screen shows the categories quickly. Dahab already owns "dark night + gold + arch"; none of these reuse it.
 
 ## Qamar — fashion & boutiques
 

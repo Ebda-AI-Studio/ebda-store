@@ -1,5 +1,5 @@
 /**
- * The `commerce_outcomes` event contract v1 (docs/plans/2026-10-28-customer-intelligence.md 1.2).
+ * The `commerce_outcomes` event contract v1 (docs/plans/done/2026-10-28-customer-intelligence.md 1.2).
  *
  * One versioned envelope; `data` is a STRICT object per type, so an extra key (a phone, a name, an
  * address line) fails validation instead of riding along. `buyerKey` is the only buyer identifier.

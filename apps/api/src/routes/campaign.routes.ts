@@ -37,7 +37,7 @@ import {
 /**
  * Email campaigns — merchant admin API (D2). Mounted at
  * `/stores/:storeId/campaigns` with `tenantContext` (routes/index.ts).
- * Plan: docs/plans/2026-09-25-email-campaigns.md.
+ * Plan: docs/plans/done/2026-09-25-email-campaigns.md.
  *
  * Every route: authenticate → authorize(store_admin, super_admin) →
  * requireStoreAccess → requireFeature('email_campaigns'). The feature is in the

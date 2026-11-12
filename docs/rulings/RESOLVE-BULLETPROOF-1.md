@@ -1,6 +1,6 @@
 # RESOLVE-BULLETPROOF-1
 
-> Section: 2026-11-10 — launch eve, store-resolution incident (plan `docs/plans/2026-11-10-resolve-bulletproof.md`)
+> Section: 2026-11-10 — launch eve, store-resolution incident (plan `docs/plans/done/2026-11-10-resolve-bulletproof.md`)
 
 **Ruling RESOLVE-BULLETPROOF-1 (2026-11-10) - storefront host -> store resolution is cached in two epoch-invalidated
 layers and survives API failure; an API blip can no longer produce an error page for a store we have seen.**
