@@ -11,8 +11,14 @@
 // the TS folder from a trigger, so the repo layer owns the index: `upsertProductIndex` / `removeProductIndex` after
 // every product write, `reindexStore` for a rebuild, `verifyProductIndex` as the drift check. The StoreDO bootstrap
 // runs `ensureSearchIndex` (DDL here, not in 0001, because a virtual table has shadow tables the schema parity test
-// must not see). Vector (Vectorize) fusion stays a separate stage: this module is the keyword arm.
-import { escapeLike, normalizeArabicSearch, searchTokens } from '../../../shared/src/search';
+// must not see). Arabic light stemming (SEARCH-STEM-1) is an additive `stem_doc` / `stem_name_doc` column pair. Vector (Vectorize) fusion stays a separate stage: this module is the keyword arm.
+import {
+  escapeLike,
+  normalizeArabicSearch,
+  searchTokens,
+  stemSearchDoc,
+  stemSearchToken,
+} from '../../../shared/src/search';
 import { MoneyError, type SyncSql } from './sync-sql';
 import { indexCustomer, indexGuestOrder } from './search-customers';
 import { VECTOR_STATEMENTS } from './search-vectors';
@@ -30,7 +36,7 @@ export const PRODUCT_SEARCH_MAX_LIMIT = 10_000;
 export const SEARCH_STATEMENTS: readonly string[] = [
   ...VECTOR_STATEMENTS,
   `CREATE VIRTUAL TABLE IF NOT EXISTS product_search_fts USING fts5(
-  doc, name_doc, sku, product_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`,
+  doc, name_doc, sku, stem_doc, stem_name_doc, product_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`,
   `CREATE VIRTUAL TABLE IF NOT EXISTS customer_search_fts USING fts5(
   name_doc, digits, email, kind UNINDEXED, ref_id UNINDEXED, store_id UNINDEXED, tokenize = 'trigram')`,
   `CREATE TABLE IF NOT EXISTS search_dirty (kind TEXT NOT NULL, id TEXT NOT NULL, PRIMARY KEY (kind, id)) WITHOUT ROWID`,
@@ -58,9 +64,15 @@ export const SEARCH_STATEMENTS: readonly string[] = [
 
 /** Idempotent. A first run (no index yet) marks every existing product, customer and guest order dirty: the backfill. */
 export function ensureSearchIndex(db: SyncSql): void {
-  const fresh =
+  let fresh =
     db.all("SELECT 1 AS x FROM sqlite_master WHERE name = 'product_search_fts'", []).length === 0;
   db.transactionSync(() => {
+    // Stem columns (Ruling SEARCH-STEM-1): an index built before them is derived state, so drop it and let the dirty
+    // queue below rebuild it lazily and in batches. Re-running after the rebuild finds the column and does nothing.
+    if (!fresh && !hasColumn(db, 'product_search_fts', 'stem_doc')) {
+      db.run('DROP TABLE product_search_fts', []);
+      fresh = true;
+    }
     for (const stmt of SEARCH_STATEMENTS) db.run(stmt, []);
     if (fresh) {
       db.run(
@@ -77,6 +89,10 @@ export function ensureSearchIndex(db: SyncSql): void {
       );
     }
   });
+}
+
+function hasColumn(db: SyncSql, table: string, column: string): boolean {
+  return db.all(`PRAGMA table_info(${table})`, []).some(c => c.name === column);
 }
 
 const FLUSH_BATCH = 2000;
@@ -109,6 +125,12 @@ export interface ProductSearchOpts {
   includeDeleted?: boolean;
   withSku?: boolean;
   order?: 'similarity' | 'featured';
+  /**
+   * Also match by Arabic light stem (كتب finds الكتب, كتابين, مكتبة). Default: on for the storefront, off for admin
+   * (an admin search also selects the rows of bulk edits, which must stay literal). Rows matching only by stem rank
+   * after every row that matches literally.
+   */
+  stem?: boolean;
 }
 export interface ProductSearchIdSet {
   ids: string[];
@@ -127,6 +149,11 @@ const joinDoc = (...parts: Array<string | null | undefined>) => parts.map(p => p
 /** `ebda_product_search_doc` */
 export const buildProductDoc = (p: ProductDocFields): string =>
   normalizeArabicSearch(joinDoc(p.name, p.nameAr, p.searchTerms, p.description, p.descriptionAr));
+/** Stem twins of the two documents (Ruling SEARCH-STEM-1): additional columns, the folded docs above stay as they are. */
+export const buildProductStemDoc = (p: ProductDocFields): string =>
+  stemSearchDoc(buildProductDoc(p));
+export const buildProductStemNameDoc = (p: ProductDocFields): string =>
+  stemSearchDoc(buildProductNameDoc(p));
 /** `ebda_product_name_doc` */
 export const buildProductNameDoc = (p: ProductDocFields): string =>
   normalizeArabicSearch(joinDoc(p.name, p.nameAr, p.searchTerms));
@@ -151,11 +178,13 @@ function writeIndexRow(db: SyncSql, r: Row): void {
   };
   db.run('DELETE FROM product_search_fts WHERE product_id = ?', [r.id]);
   db.run(
-    'INSERT INTO product_search_fts (doc, name_doc, sku, product_id, store_id) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO product_search_fts (doc, name_doc, sku, stem_doc, stem_name_doc, product_id, store_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [
       buildProductDoc(f),
       buildProductNameDoc(f),
       normalizeArabicSearch(f.sku ?? ''),
+      buildProductStemDoc(f),
+      buildProductStemNameDoc(f),
       r.id,
       r.store_id,
     ]
@@ -191,7 +220,10 @@ export function verifyProductIndex(
   const prods = db.all(`SELECT ${PRODUCT_COLS} FROM products WHERE store_id = ?`, [storeId]);
   const idx = new Map(
     db
-      .all('SELECT product_id, doc, name_doc, sku FROM product_search_fts', [])
+      .all(
+        'SELECT product_id, doc, name_doc, sku, stem_doc, stem_name_doc FROM product_search_fts',
+        []
+      )
       .map(r => [r.product_id as string, r])
   );
   const missing: string[] = [];
@@ -213,7 +245,9 @@ export function verifyProductIndex(
     if (
       row.doc !== buildProductDoc(f) ||
       row.name_doc !== buildProductNameDoc(f) ||
-      row.sku !== normalizeArabicSearch(f.sku ?? '')
+      row.sku !== normalizeArabicSearch(f.sku ?? '') ||
+      row.stem_doc !== buildProductStemDoc(f) ||
+      row.stem_name_doc !== buildProductStemNameDoc(f)
     )
       stale.push(r.id as string);
     idx.delete(r.id as string);
@@ -263,6 +297,8 @@ export function searchProductIdSet(
   const storefront = opts.scope === 'storefront';
   const withSku = opts.withSku ?? opts.scope === 'admin';
   const docCol = opts.field === 'name' ? 'name_doc' : 'doc';
+  const stemCol = opts.field === 'name' ? 'stem_name_doc' : 'stem_doc';
+  const useStem = opts.stem ?? storefront;
   // UTF-16 units, exactly like the Postgres caller's `t.length < 3`
   const wordStart = tokens.every(t => t.length < 3);
 
@@ -283,7 +319,11 @@ export function searchProductIdSet(
       }
       where.push(`(${arms.join(' OR ')})`);
     } else if ([...t].length >= 3) {
-      match.push(withSku ? `{${docCol} sku} : ${ftsPhrase(t)}` : `${docCol} : ${ftsPhrase(t)}`);
+      const literal = withSku ? `{${docCol} sku} : ${ftsPhrase(t)}` : `${docCol} : ${ftsPhrase(t)}`;
+      const stem = useStem ? stemSearchToken(t) : '';
+      match.push(
+        [...stem].length >= 3 ? `(${literal} OR ${stemCol} : ${ftsPhrase(stem)})` : literal
+      );
     } else {
       // a short word beside long ones: a plain substring test on the (already narrowed) rows
       const arms = [`f.${docCol} LIKE ? ESCAPE '\\'`];
@@ -304,23 +344,31 @@ export function searchProductIdSet(
   const status = storefront ? "AND p.status = 'active' AND p.audience = 'public'" : '';
   const deleted = opts.includeDeleted && !storefront ? '' : 'AND p.deleted_at IS NULL';
   const rows = db.all(
-    `SELECT p.id AS id, p.name AS name, p.featured AS featured, f.name_doc AS name_doc
+    `SELECT p.id AS id, p.name AS name, p.featured AS featured, f.name_doc AS name_doc, f.${docCol} AS hay, f.sku AS sku
        FROM product_search_fts f JOIN products p ON p.id = f.product_id AND p.store_id = ?
       WHERE ${where.join(' AND ')} ${status} ${deleted}`,
     [storeId, ...sqlParams]
   );
   const q = normalizeArabicSearch(raw);
+  // A row that contains every word literally (or by SKU) ranks before one that matched only through a stem.
+  const literalHit = (r: Row) =>
+    !useStem ||
+    wordStart ||
+    tokens.every(
+      t => String(r.hay ?? '').includes(t) || (withSku && String(r.sku ?? '').includes(t))
+    );
   const ranked = rows
     .map(r => ({
       id: r.id as string,
+      exact: literalHit(r) ? 1 : 0,
       name: (r.name as string | null) ?? '',
       featured: Number(r.featured ?? 0),
       sim: opts.order === 'featured' ? 0 : trigramSimilarity(String(r.name_doc ?? ''), q),
     }))
     .sort((a, b) =>
       opts.order === 'featured'
-        ? b.featured - a.featured || cmp(a.name, b.name) || cmp(a.id, b.id)
-        : b.sim - a.sim || cmp(a.id, b.id)
+        ? b.exact - a.exact || b.featured - a.featured || cmp(a.name, b.name) || cmp(a.id, b.id)
+        : b.exact - a.exact || b.sim - a.sim || cmp(a.id, b.id)
     );
   return { ids: ranked.slice(0, limit).map(r => r.id), truncated: ranked.length > limit };
 }
