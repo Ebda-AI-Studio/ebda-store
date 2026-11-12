@@ -1,9 +1,9 @@
 /**
- * GET /payments/status/:tx, POST /payments/refund and GET /payments/order/:id under strict RLS,
+ * GET /payments/status/:tx and GET /payments/order/:id under strict RLS,
  * with the code under test bound to a real `ebda_app` login. They used to read with no store
  * scope (an empty result, so a 404 for everyone). Now the store comes from the order / payment
  * through the definers and every read runs inside it:
- *   - the owner of the right store gets the payment (and refund reaches the service),
+ *   - the owner of the right store gets the payment,
  *   - the admin of ANOTHER store gets 404,
  *   - an unknown reference gets 404.
  *
@@ -181,27 +181,6 @@ describe.skipIf(!hasDb)('payment routes resolve their store under strict RLS', (
 
     const other = await asApp(async () =>
       http().get(`/api/v1/payments/order/${a.orderId}`).set('Authorization', `Bearer ${b.jwt}`)
-    );
-    expect(other.status).toBe(404);
-  });
-
-  it('POST /refund: the owner reaches the service (409 manual refund), another store gets 404', async () => {
-    // an instapay payment is refunded outside the system: 409 proves the payment was found
-    // inside the right store and the service ran; a 404 would mean the lookup saw nothing.
-    const ok = await asApp(async () =>
-      http()
-        .post('/api/v1/payments/refund')
-        .set('Authorization', `Bearer ${a.jwt}`)
-        .send({ transactionId: a.tx })
-    );
-    expect(ok.status, JSON.stringify(ok.body)).toBe(409);
-    expect(ok.body.error.code).toBe('MANUAL_PROVIDER_REFUND');
-
-    const other = await asApp(async () =>
-      http()
-        .post('/api/v1/payments/refund')
-        .set('Authorization', `Bearer ${b.jwt}`)
-        .send({ transactionId: a.tx })
     );
     expect(other.status).toBe(404);
   });

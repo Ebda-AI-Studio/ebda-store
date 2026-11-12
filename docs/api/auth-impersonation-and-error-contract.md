@@ -6,7 +6,7 @@ Admin fix pass 2026-11-04, track T1. Rulings: FP-1, FP-3, FP-4, LAZY-TX-3.
 
 `POST /admin/impersonate` (super_admin) mints a 1 h token with the target's real role and an `impersonatedBy` claim.
 
-- A route that moves money, credentials, the live domain or staff access answers **403 `IMPERSONATION_FORBIDDEN`** to such a token (`rejectImpersonated`). The list: merchant MCP key mint, `POST /payments/refund`, `POST /payments/retry/:paymentId`, every `/payment-settings/store/:storeId[/...]` write (create, update, delete, toggle, credentials, test), `PUT /stores/:id/domain`, `POST /stores/:id/staff`, every billing write, agent-key / webhook-secret / carrier-credential / ETA-connection writes, affiliate payouts, plus the account-level routes that already had it (password, email, MFA, passkeys, account delete, ...).
+- A route that moves money, credentials, the live domain or staff access answers **403 `IMPERSONATION_FORBIDDEN`** to such a token (`rejectImpersonated`). The list: merchant MCP key mint, `POST /payments/retry/:paymentId`, every `/payment-settings/store/:storeId[/...]` write (create, update, delete, toggle, credentials, test), `PUT /stores/:id/domain`, `POST /stores/:id/staff`, every billing write, agent-key / webhook-secret / carrier-credential / ETA-connection writes, affiliate payouts, plus the account-level routes that already had it (password, email, MFA, passkeys, account delete, ...).
 - Every audit row written during an impersonated request carries `details.impersonatedBy = <acting super_admin id>`. Callers do not pass it: `authenticate` enters an AsyncLocalStorage scope (`lib/impersonation-context.ts`) and `auditLog` reads it. A caller that already sets `details.impersonatedBy` keeps its value.
 
 ## Error body

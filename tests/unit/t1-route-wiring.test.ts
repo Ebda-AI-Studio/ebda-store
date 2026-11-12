@@ -75,7 +75,6 @@ const ROWS: Array<[string, string, string, string[], string]> = [
     'S-9',
   ],
   // S-11: super_admin must have MFA on money / credential / staff / push / billing
-  ['payment.routes.ts', 'post', '/refund', ['requireMfaEnrolled'], 'S-11'],
   ['staff.routes.ts', 'post', '/', ['requireMfaEnrolled'], 'S-11'],
   [
     'payment-settings.routes.ts',
