@@ -4,7 +4,7 @@
  * Server-owned key (packages/shared/src/server-owned-settings.ts): written only by
  * `PUT /stores/:id/recommendations/auto-setting`, so a stale whole-settings PUT cannot flip it.
  */
-export const AUTO_RECOMMENDATIONS_SETTING = 'autoRecommendationsEnabled';
+const AUTO_RECOMMENDATIONS_SETTING = 'autoRecommendationsEnabled';
 
 export function autoRecommendationsEnabled(settings: unknown): boolean {
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return true;

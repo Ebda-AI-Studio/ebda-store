@@ -24,7 +24,7 @@ interface VectorizeNeighbours {
   ): Promise<{ matches: Array<{ id: string; score: number }> }>;
 }
 
-export const SIMILAR_TIMEOUT_MS = 600;
+const SIMILAR_TIMEOUT_MS = 600;
 const SIMILAR_TOPK = 30;
 /** Cosine score floor (distance <= 0.45): below it a "neighbour" is just the least-bad product, not a similar one. */
 const SIMILAR_MIN_SCORE = 0.55;
