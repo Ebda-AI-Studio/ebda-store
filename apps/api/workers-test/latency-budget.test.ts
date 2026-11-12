@@ -101,6 +101,11 @@ const ops: Record<string, string[]> = {};
  * (`rl:auth-ip-fail`): the launch rate limits of #473 (Ruling PERF-LAT-1 addendum), a deliberate security hop, not a regression.
  * PERF-RL-DO (Ruling PERF-RL-DO-1): the public limiters' hits are prefetched in ONE batch on the client's shard, so store resolve
  * 3 -> 1 call (3 -> 2 waves), product list / pdp 4 -> 3 (5 -> 4), cart add 16 -> 15, order create 31 -> 30 (38 -> 37).
+ * Ruling PERF-ORDER-PURGE-1 - order create 30 -> 31 remote calls (waves unchanged): #665's durable trailing purge makes ONE
+ * `do-other:storefront-order-purge|debounce|<store>:touch` call per order. That touch IS the guarantee that the LAST order of a
+ * burst purges the NEVER-stale inventory caches, so it cannot be skipped, folded into the createOrder money op (a different DO
+ * and a different failure policy: the enqueue must never fail an order) or sent off the request path (waitUntil can be dropped).
+ * Cost if wrong: one extra DO hop per order; remove it if the purge moves into the StoreDO alarm.
  * `remote` = D1 + StoreDO + AuthState + other DO + identity calls (KV is edge-local and not counted).
  * The NEON-SCALE-1 targets (public reads 0 D1 / 0 DO; a cart or order write ONE batched DO call) are NOT met yet: the order and
  * cart paths still make 10 StoreDO calls each (see the PR's follow-ups). Lower a ceiling whenever a change lowers the count.
@@ -111,7 +116,7 @@ const BUDGET: Record<string, { remote: number; waves: number }> = {
   pdp: { remote: 3, waves: 4 },
   'cart get': { remote: 2, waves: 2 },
   'cart add (guest)': { remote: 15, waves: 15 },
-  'order create (guest, cod)': { remote: 30, waves: 37 },
+  'order create (guest, cod)': { remote: 31, waves: 37 },
   'customer sign-in': { remote: 13, waves: 9 },
   'customer /auth/me': { remote: 4, waves: 3 },
   'merchant order list': { remote: 6, waves: 4 },
