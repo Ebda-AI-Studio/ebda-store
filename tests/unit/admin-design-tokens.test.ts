@@ -106,7 +106,7 @@ function readBaseBaseline(
     if (env.CI)
       throw new Error(
         `cannot read the base baseline from ${ref}: fetch it in the CI job ` +
-          `(git fetch --no-tags --depth=1 origin <base>:refs/remotes/origin/<base>)`
+          `(git fetch --no-tags origin <base>:refs/remotes/origin/<base>)`
       );
     return null;
   }
