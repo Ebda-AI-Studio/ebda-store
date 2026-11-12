@@ -16,6 +16,34 @@ CI-HOSTED-1 scheduled no-op is retired).
 > fixture/helper or anything under `packages/database` runs the whole tier. Outputs `integration` and `integration_paths`
 > feed the `Integration Tests` job's `if` and its vitest targets. #227 merged four edited integration tests that never ran.
 
+## Ruling CI-SLIM-1 (2026-11-12): 3 unit shards + an opt-in pre-merge full tier
+
+Measured on the Mac (10 cores, 16 GB, load ~10.7, heavy jobs serialised by `heavy-lock.sh`): a code PR push runs 15-20 jobs;
+the per-run sum of job durations on 5 recent PR runs was 2,847-3,976 s wall, of which 682-1,149 s was waiting for the
+heavy lock, leaving **1,709-2,859 s (avg 2,303 s, 38 min) of real heavy-runner work**. The unit shards (6 + workerd extras
+= 7 jobs) were 1,163-1,451 s of that (avg 1,278 s); every job repeats ~60 s of checkout + `npm-ci` + prisma/shared builds.
+
+- **3 shards instead of 6 + 1.** `Unit shard i/3` (i = 1..3) in both the PR lane (`unit`) and the full lane (`test-unit-shard`);
+  the workerd extras (editor matrix, status, accounts, prisma-lite DO) run as the tail of shard 3 (`!cancelled()`, so they
+  still run when the vitest step failed). Setup is paid 3 times, not 7: about 4 x 60 s = **~4 min of heavy work and four
+  lock turns saved per PR push**. Total vitest time is unchanged (same files), so this is an overhead cut, not a speed-up
+  of the tests; shard 3 carries ~1 min more than 1 and 2. The blob reports are still `unit-blob-<n>`, merged by `Unit Tests`.
+- **Pre-merge full tier, opt-in by label `full-ci`** (`.github/workflows/ci-full-pr.yml`). Adding the label (or pushing while
+  it is on the PR) dispatches `ci.yml` (`workflow_dispatch`, the existing full lane) on the PR branch; the checks attach to
+  the head sha, so `ops/merge-gate.sh` sees them and refuses on a failure. Use it for PRs that touch money, auth, data,
+  migrations or anything the AI review marks `risky-path`, once, just before merge. A new full dispatch on the same branch
+  cancels the previous one (`ci.yml` group `ci-full-<ref>`); a dispatch on a PR branch never pages Telegram and never opens
+  `ci-main-red`. Mutation stays Sunday / manual.
+  Why not automatic on `ai-review-passed`: that label is added with `GITHUB_TOKEN`, which raises no event, and one full run is
+  ~7,200 s wall (measured: main runs 42990056432 and 43028985811, 7,297 s and 7,168 s) - with ~3,200 s per PR push the host
+  cannot afford it as a default. Cost if wrong: a risky PR merged without `full-ci` is first proven by the push-to-main full run.
+- **Required checks are unchanged**: `Repo guards`, `Detect affected workspaces`, `Unit Tests (affected)`, `App builds
+(affected)`, `API Worker boots on workerd` (derived by `ops/merge-gate-required.mjs`). The full-tier checks are not
+  required (they exist only when `full-ci` was used); `ci-full-pr.yml:dispatch` is a light job (pinned in
+  `workflow-hosted-runners-only.test.ts`). The only renamed checks are the matrix names `Unit shard i/6` -> `Unit shard i/3` and
+  `Unit workerd extras` (gone); neither is required or listed in the `ebda-main-protection` ruleset.
+- **Concurrency**: PR runs were already one group per PR ref with cancel-in-progress; unchanged.
+
 ## The Mac runner (Ruling CI-MAC-RUNNER-1, 2026-11-11)
 
 The org's 50,000 hosted minutes ran out on 2026-11-11 (ebda-store used 49,451) and paid add-ons are capped at $0, so
