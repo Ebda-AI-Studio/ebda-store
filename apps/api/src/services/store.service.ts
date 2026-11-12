@@ -1910,6 +1910,15 @@ export class StoreService {
   }
 
   /**
+   * Merchant's switch for AUTOMATIC product recommendations (`settings.autoRecommendationsEnabled`, absent = on).
+   * Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
+   */
+  static async setAutoRecommendationsEnabled(storeId: string, enabled: boolean) {
+    await this.setSettingsKey(storeId, 'autoRecommendationsEnabled', enabled);
+    return enabled;
+  }
+
+  /**
    * Merchant's switch "allow COD / installments for gold" (`settings.goldAllowDeferredPayment`, absent =
    * OFF, Ruling SHARIA-GOLD-1). Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
    */
