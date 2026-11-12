@@ -86,6 +86,11 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   localhost, so the password is not what authenticates. The integration suite's own `tests/helpers/app-role-login.ts` still
   sets the same `ci-only-app-pw` the local dev scripts use (no other repo on this host uses `ebda_app`; GCC uses `horse_app`).
   Cost if wrong: a different `ebda_app` password set by another tool on this host would be overwritten during an Ebda run.
+- **Ruling CI-MAC-TZ-1** - `ci-services.sh up` runs `ALTER DATABASE <per-job db> SET timezone TO 'UTC'` on the Mac. The host cluster defaults to the
+  Mac's zone (UTC+3) while the Linux container is UTC, and the pg adapter writes a Date as a UTC wall-clock string that the session
+  zone then reads, so writes outside a tenant transaction (which pins UTC) shifted by the offset: staff-invite-seats fixtures expired in the
+  past and every accept returned 400 (main red since the Mac cutover, #720). Only the per-job database is altered, never the shared cluster.
+  Cost if wrong: a test that relies on a non-UTC session zone would see UTC on the Mac.
 - **No docker on the Mac**: the trufflehog action runs in a container, so `Security Audit` runs it on Linux only and, on the Mac,
   the same release (v3.99.8) natively from `~/.ebda-ci/tools` (checksum re-verified each run, downloaded only on a miss). The AI
   review installs the claude CLI with `--ignore-scripts`, so it links the per-platform native binary itself. The checkout is depth 1, so a push
