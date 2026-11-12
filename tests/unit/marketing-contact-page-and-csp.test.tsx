@@ -4,7 +4,7 @@
  * connect origins were added; no third-party bot widget is used).
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BRAND_API_URL } from '../../packages/shared/src/brand';
@@ -55,5 +55,25 @@ describe('marketing CSP (public/_headers)', () => {
     const src = readFileSync(path.join(MK, 'src/components/ContactForm.tsx'), 'utf8');
     expect(src).not.toMatch(/<script|turnstile|recaptcha|hcaptcha/i);
     expect(src).toContain('CONTACT_HONEYPOT_FIELD');
+  });
+});
+
+describe('marketing Meta Pixel and the CSP', () => {
+  const headers = readFileSync(path.join(MK, 'public/_headers'), 'utf8');
+  const csp = /Content-Security-Policy:\s*(.+)/.exec(headers)![1];
+  it('the CSP sets no script-src/img-src/connect-src, so Meta needs no allow-list entry and none is added', () => {
+    expect(csp).toBe("frame-ancestors 'none'; form-action 'self' " + BRAND_API_URL);
+    expect(csp).not.toMatch(/facebook/);
+  });
+  it('no noscript <img> pixel fallback anywhere in the marketing source (it fires without consent)', () => {
+    const walk = (d: string): string[] =>
+      readdirSync(d, { withFileTypes: true }).flatMap(e =>
+        e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]
+      );
+    for (const f of walk(path.join(MK, 'src')).filter(f => /\.(tsx?|css)$/.test(f))) {
+      const src = readFileSync(f, 'utf8');
+      expect(src, f).not.toMatch(/facebook\.com\/tr\b/);
+      expect(src, f).not.toMatch(/fbevents|connect\.facebook/);
+    }
   });
 });

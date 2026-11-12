@@ -4,7 +4,11 @@
  * a yes), the unset-env no-op, event_id passing for Meta dedup, the banner and the signup payload.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createTracker, posthogAssetsHost } from '@ebda/shared/tracking-browser';
+import {
+  createTracker,
+  pixelQuerySensitive,
+  posthogAssetsHost,
+} from '@ebda/shared/tracking-browser';
 import { EBDA_CONSENT_COOKIE, serializeConsent } from '@ebda/shared';
 
 const CFG = {
@@ -66,8 +70,12 @@ describe('consent gate', () => {
     ]);
     const fbq = (window as unknown as { fbq: { queue: unknown[][] } }).fbq;
     const calls = fbq.queue.map(a => [...a]);
-    expect(calls[0]).toEqual(['init', '123456789']);
-    expect(calls[1]).toEqual(['track', 'PageView', {}, undefined]);
+    expect(calls.slice(0, 2)).toEqual([
+      ['set', 'autoConfig', false, '123456789'],
+      ['consent', 'grant'],
+    ]);
+    expect(calls[2]).toEqual(['init', '123456789']);
+    expect(calls[3]).toEqual(['track', 'PageView', {}, undefined]);
   });
 
   it('marketing-only consent loads Meta but not PostHog', () => {
@@ -316,5 +324,171 @@ describe('posthogAssetsHost', () => {
   it('maps the ingest host to the assets host', () => {
     expect(posthogAssetsHost('https://eu.i.posthog.com')).toBe('https://eu-assets.i.posthog.com');
     expect(posthogAssetsHost('https://us.i.posthog.com')).toBe('https://us-assets.i.posthog.com');
+  });
+});
+
+describe('marketing Meta Pixel: consent, withdrawal, one init, Lead (no PII)', () => {
+  const fbqOf = () =>
+    (window as unknown as { fbq: { queue: unknown[][] } }).fbq.queue.map(a => [...a]);
+  const inits = () => fbqOf().filter(a => a[0] === 'init');
+
+  it('no consent yet: no fbq, no Meta script, nothing fired for page views or Lead', () => {
+    const t = createTracker(CFG, window);
+    t.start();
+    t.pageView();
+    t.track('contact_submitted');
+    expect((window as unknown as { fbq?: unknown }).fbq).toBeUndefined();
+    expect(scripts().some(s => s.includes('facebook'))).toBe(false);
+  });
+
+  it('accepting marketing loads fbevents.js once, inits once, PageView once, advanced matching off', () => {
+    const t = createTracker(CFG, window);
+    t.pageView(); // held while undecided
+    t.setConsent({ analytics: false, marketing: true });
+    t.start();
+    t.start();
+    expect(scripts().filter(s => s.includes('connect.facebook.net'))).toHaveLength(1);
+    expect(inits()).toEqual([['init', '123456789']]); // id only: no email/phone user data
+    expect(fbqOf().filter(a => a[0] === 'track' && a[1] === 'PageView')).toHaveLength(1);
+    expect(fbqOf()).toContainEqual(['set', 'autoConfig', false, '123456789']);
+  });
+
+  it('Lead carries no props; a later SPA route PageView is fired once per call, never re-inits', () => {
+    setConsent(false, true);
+    const t = createTracker(CFG, window);
+    t.start();
+    t.track('contact_submitted');
+    t.pageView();
+    t.pageView();
+    expect(fbqOf()).toContainEqual(['track', 'Lead', {}, undefined]);
+    expect(fbqOf().filter(a => a[1] === 'PageView')).toHaveLength(2);
+    expect(inits()).toHaveLength(1);
+  });
+
+  it('withdrawing marketing consent stops every later event and revokes; it does not reload', () => {
+    setConsent(false, true);
+    const t = createTracker(CFG, window);
+    t.start();
+    t.pageView();
+    const before = fbqOf().length;
+    t.setConsent({ analytics: false, marketing: false });
+    const afterRevoke = fbqOf().length;
+    expect(fbqOf()).toContainEqual(['consent', 'revoke']);
+    t.start();
+    t.pageView();
+    t.track('contact_submitted');
+    expect(fbqOf().length).toBe(afterRevoke);
+    expect(afterRevoke).toBe(before + 1);
+    expect(scripts().filter(s => s.includes('connect.facebook.net'))).toHaveLength(1);
+  });
+});
+
+describe('Meta pixel is the tracker only: no auto PageView, no sensitive URL or referrer', () => {
+  it('sets disablePushState / allowDuplicatePageViews BEFORE init', () => {
+    setConsent(false, true);
+    const order: string[] = [];
+    const w = window as unknown as { fbq?: any };
+    const t = createTracker(CFG, window);
+    // preinstall a recording fbq so we see flag-vs-init order
+    const fn: any = (...a: unknown[]) => order.push(`call:${a[0]}`);
+    let dps: unknown;
+    Object.defineProperty(fn, 'disablePushState', {
+      set(v) {
+        dps = v;
+        order.push('disablePushState');
+      },
+      get: () => dps,
+    });
+    w.fbq = fn;
+    t.start();
+    expect(order.indexOf('disablePushState')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('disablePushState')).toBeLessThan(order.indexOf('call:init'));
+    expect(w.fbq.disablePushState).toBe(true);
+    expect(w.fbq.allowDuplicatePageViews).toBe(false);
+  });
+
+  it('no event (PageView or Lead) when the URL or the referrer carries email/phone/q', () => {
+    setConsent(false, true);
+    const t = createTracker(CFG, window);
+    t.start();
+    const q = () =>
+      (window as unknown as { fbq: { queue: unknown[][] } }).fbq.queue.filter(a => a[0] === 'track')
+        .length;
+    window.history.replaceState(null, '', '/?email=a@b.com');
+    t.pageView();
+    t.track('contact_submitted');
+    expect(q()).toBe(0);
+    window.history.replaceState(null, '', '/');
+    Object.defineProperty(document, 'referrer', {
+      value: 'https://x.test/?phone=0100',
+      configurable: true,
+    });
+    t.pageView();
+    expect(q()).toBe(0);
+    Object.defineProperty(document, 'referrer', { value: '', configurable: true });
+    t.pageView();
+    expect(q()).toBe(1);
+  });
+});
+
+describe('pixel URL gate scrubs by key AND by value', () => {
+  const blocked = [
+    '?e-mail=x',
+    '?email=x',
+    '?e_mail=x',
+    '?phone=x',
+    '?mobile=x',
+    '?tel=x',
+    '?whatsapp=x',
+    '?contact[email]=x',
+    '?contact%5Bemail%5D=x',
+    '?q=shoes',
+    '?search=a',
+    '?name=Ali',
+    '?address=1',
+    '?ref=a@b.com',
+    '?ref=a%40b.com',
+    '?x=01012345678',
+    '?x=010-1234-5678',
+    '?x=%2B20%201012%20345%20678',
+    '?x=0101234',
+    '?ref=\u0660\u0661\u0660\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667',
+    '?ref=\u06F0\u06F1\u06F0\u06F0\u06F1\u06F2\u06F3\u06F4\u06F5\u06F6\u06F7',
+    '?ref=%D9%A0%D9%A1%D9%A0%D9%A0%D9%A1%D9%A2%D9%A3%D9%A4%D9%A5%D9%A6%D9%A7',
+    '?ref=a%2540b.com',
+    '?%2565mail=x',
+    '?x=%252B20%25201012%2520345%2520678',
+  ];
+  const clean = [
+    '',
+    '?',
+    '?utm_source=meta&utm_medium=paid',
+    '?fbclid=IwAR0abc12',
+    '?ref=home',
+    '?x=123456',
+    '?fbclid=1234567890123',
+  ];
+  for (const q of blocked) it(`blocks ${q}`, () => expect(pixelQuerySensitive(q)).toBe(true));
+  for (const q of clean)
+    it(`allows ${q || '(empty)'}`, () => expect(pixelQuerySensitive(q)).toBe(false));
+
+  it('blocks PageView and Lead for a value-only leak in the URL or the referrer', () => {
+    setConsent(false, true);
+    const t = createTracker(CFG, window);
+    t.start();
+    const n = () =>
+      (window as unknown as { fbq: { queue: unknown[][] } }).fbq.queue.filter(a => a[0] === 'track')
+        .length;
+    window.history.replaceState(null, '', '/?ref=a@b.com');
+    t.pageView();
+    t.track('contact_submitted');
+    window.history.replaceState(null, '', '/');
+    Object.defineProperty(document, 'referrer', {
+      value: 'https://x.test/?x=01012345678',
+      configurable: true,
+    });
+    t.pageView();
+    expect(n()).toBe(0);
+    Object.defineProperty(document, 'referrer', { value: '', configurable: true });
   });
 });
