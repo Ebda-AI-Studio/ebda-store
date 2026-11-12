@@ -520,4 +520,44 @@ describe('COD statement marks the order paid (S3-O7)', () => {
     expect(r.pay('o4')).toBe('unpaid');
     expect(r.q("SELECT status FROM payments WHERE id = 'p4'")[0].status).toBe('cod_pending');
   });
+
+  it('the same partial file uploaded again with another date is recorded but never pays the order', () => {
+    const r = rigCod();
+    r.raw.exec(
+      "UPDATE payments SET amount = 200 WHERE id = 'p1'; UPDATE shipments SET cod_amount = 200 WHERE id = 'sh1';"
+    );
+    const day = (d: string) => ({
+      ...row('T1', `D-${d}`, 100),
+      remittedAt: new Date(`${d}T00:00:00Z`),
+    });
+    const first = r.op('importCodRemittances', { carrier: 'bosta', rows: [day('2026-10-01')] });
+    expect(first.flagged).toEqual([{ orderId: 'o1', reason: 'amount_mismatch' }]);
+    const again = r.op('importCodRemittances', { carrier: 'bosta', rows: [day('2026-10-02')] });
+    expect(again).toMatchObject({
+      inserted: 1,
+      settled: [],
+      flagged: [{ orderId: 'o1', reason: 'suspected_duplicate' }],
+    });
+    expect(r.pay('o1')).toBe('unpaid');
+    expect(r.q("SELECT status FROM payments WHERE id = 'p1'")[0].status).toBe('cod_pending');
+    expect(r.q('SELECT line_ref, source FROM cod_remittances ORDER BY line_ref')).toEqual([
+      { line_ref: 'D-2026-10-01', source: 'csv' },
+      { line_ref: 'D-2026-10-02', source: 'csv:suspected_duplicate' },
+    ]);
+    expect(r.events('o1').map(e => e.to_status)).toEqual([
+      'cod_statement_mismatch',
+      'cod_statement_duplicate',
+    ]);
+  });
+
+  it('a genuine second half (different amount) still completes the order after a partial line', () => {
+    const r = rigCod();
+    r.raw.exec(
+      "UPDATE payments SET amount = 200 WHERE id = 'p1'; UPDATE shipments SET cod_amount = 200 WHERE id = 'sh1';"
+    );
+    r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T1', 'A', 100)] });
+    const out = r.op('importCodRemittances', { carrier: 'bosta', rows: [row('T1', 'B', 100, 1)] });
+    expect(out.settled).toEqual([{ orderId: 'o1', paymentId: 'p1' }]);
+    expect(r.pay('o1')).toBe('paid');
+  });
 });

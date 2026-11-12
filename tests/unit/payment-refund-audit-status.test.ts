@@ -1,6 +1,9 @@
 /**
- * GET /payments/status/:tx narrows the store lookup by the optional ?provider= (Ruling ITEST-14).
- * (The POST /payments/refund cases that lived here went with the route, ruling F9-REUSE-1.)
+ * #1360 — POST /payments/refund writes an append-only audit row whose
+ * `toStatus` must agree with the Payment row PaymentService.refund just wrote.
+ * The service decides "full" against the REMAINING balance; the audit used to
+ * compare the slice against the ORIGINAL amount, so the final slice of a
+ * piecewise refund was audited as partially_refunded on a refunded payment.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import express, { type Express } from 'express';
@@ -90,7 +93,154 @@ beforeEach(() => {
   h.resolve.mockResolvedValue('s1');
 });
 
+function paymentRow(refundedAmount: number) {
+  return {
+    id: 'pay_1',
+    orderId: 'order_1',
+    status: refundedAmount > 0 ? 'partially_refunded' : 'completed',
+    provider: 'paymob',
+    amount: 5000,
+    refundedAmount,
+    // the payment's store IS the resolved one (the route refuses any other)
+    order: { id: 'order_1', storeId: 's1' },
+  };
+}
+
+describe('POST /payments/refund — audit toStatus', () => {
+  it('audits the final slice of a piecewise refund as refunded', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(2000));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_2', amount: 3000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'refunded' });
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 3000 });
+
+    expect(res.status).toBe(200);
+    expect(h.recordPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ fromStatus: 'partially_refunded', toStatus: 'refunded' })
+    );
+  });
+
+  it('audits a first partial slice as partially_refunded (control)', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'partially_refunded' });
+
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(h.recordPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ toStatus: 'partially_refunded' })
+    );
+  });
+
+  it('a failing audit write AFTER the money moved still answers 200 and raises a P1 alert (M-128)', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'partially_refunded' });
+    // the intent row (before the money) lands; the outcome row (after it) fails both attempts
+    h.auditLog.mockResolvedValueOnce(undefined).mockRejectedValue(new Error('audit db down'));
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.refund.refundId).toBe('rf_1');
+    expect(h.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'p1', source: 'payment.refund.audit_failed' })
+    );
+  });
+
+  it('a failing REFUND still surfaces as an error, closes the intent with a refund_failed row, writes no outcome', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockRejectedValue(new Error('provider down'));
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    const actions = h.auditLog.mock.calls.map(c => (c[0] as { action: string }).action);
+    expect(actions).toEqual(['payment.refund_requested', 'payment.refund_failed']);
+    expect(h.recordPaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it('M-128: the intent row is written BEFORE the money moves, and no intent row means no money', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.auditLog.mockRejectedValue(new Error('audit db down'));
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error.message).toContain('لم يتم تحويل أي مبلغ');
+    expect(h.refund).not.toHaveBeenCalled();
+  });
+
+  it('M-128: the intent row precedes the refund call', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.paymentFindUnique.mockResolvedValue({ status: 'partially_refunded' });
+    const order: string[] = [];
+    h.auditLog.mockImplementation(async (e: { action: string }) => void order.push(e.action));
+    h.refund.mockImplementation(async () => {
+      order.push('MONEY');
+      return { transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 };
+    });
+
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(order).toEqual(['payment.refund_requested', 'MONEY', 'payment.refunded']);
+  });
+
+  it('M-128: a failing outcome audit row never costs the payment event row (independent writes)', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    h.paymentFindUnique.mockResolvedValue({ status: 'partially_refunded' });
+    h.auditLog.mockResolvedValueOnce(undefined).mockRejectedValue(new Error('audit db down'));
+
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+
+    expect(res.status).toBe(200);
+    expect(h.recordPaymentEvent).toHaveBeenCalled();
+    expect(h.sendAlert).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('payment lookups by provider reference stay inside the named provider (Ruling ITEST-14)', () => {
+  it('refund: the optional provider reaches the store resolver', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000, provider: 'kashier' });
+    expect(h.resolve).toHaveBeenCalledWith({ transactionId: 'txn_1', provider: 'kashier' });
+  });
+
+  it('refund: without a provider the lookup is unchanged', async () => {
+    h.paymentFindFirst.mockResolvedValue(paymentRow(0));
+    h.refund.mockResolvedValue({ transactionId: 'txn_1', refundId: 'rf_1', amount: 2000 });
+    await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000 });
+    expect(h.resolve).toHaveBeenCalledWith({ transactionId: 'txn_1', provider: undefined });
+  });
+
+  it('refund: an unknown provider name is refused before any lookup', async () => {
+    const res = await request(app)
+      .post('/api/v1/payments/refund')
+      .send({ transactionId: 'txn_1', amount: 2000, provider: 'tap' });
+    expect(res.status).toBe(400);
+    expect(h.resolve).not.toHaveBeenCalled();
+  });
+
   it('status: the ?provider= query narrows the store lookup', async () => {
     h.resolve.mockResolvedValue(null); // 404 right after the lookup; only the call matters here
     const res = await request(app).get('/api/v1/payments/status/txn_9?provider=fawry');

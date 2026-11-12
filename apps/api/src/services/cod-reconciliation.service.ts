@@ -8,6 +8,7 @@
  */
 import { prisma } from '@ebda/database';
 import { storeDb, storeStock } from '../lib/repo-factory';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { AppError } from '../middleware/error-handler';
@@ -118,15 +119,20 @@ export class CodReconciliationService {
         })),
       });
       // S3-O7: the same post-payment fan-out as a COD order paid on delivery (journal posting); idempotent per order.
-      for (const o of r.settled)
-        inngest
-          .send({
-            name: 'order/created',
-            data: { orderId: o.orderId, storeId, paymentMethod: 'cod', locale: undefined },
-          })
-          .catch((err: unknown) =>
+      // Deferred to the request's commit (a scope exists on the route) and awaited, so it is neither fired inside an open
+      // transaction nor dropped when the response returns (same as order.service's codCollectedOnDelivery).
+      await Promise.all(
+        r.settled.map(o =>
+          deferAfterTenantCommit('cod.statementSettled', () =>
+            inngest.send({
+              name: 'order/created',
+              data: { orderId: o.orderId, storeId, paymentMethod: 'cod', locale: undefined },
+            })
+          ).catch((err: unknown) =>
             logger.error({ err, orderId: o.orderId }, '[cod-statement] fan-out enqueue failed')
-          );
+          )
+        )
+      );
       return { ...r, rejected: parsed.rejected };
     }
 

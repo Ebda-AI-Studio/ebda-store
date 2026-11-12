@@ -13,10 +13,13 @@ import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate, rejectImpersonated } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { requirePermission } from '../middleware/rbac';
 import { withStore, type Prisma } from '@ebda/database';
 import {
   paymentLimiter,
   auditLog,
+  auditLogStrict,
   uploadLimiter,
   dailyUploadLimiter,
 } from '../middleware/security';
@@ -31,6 +34,8 @@ import {
 import { OrderService } from '../services/order.service';
 import { checkStoreAccess } from '../middleware/store-access';
 import { onAccessD1 } from '../services/platform/access-d1';
+import { recordPaymentEventForStore } from '../services/payment-event.service';
+import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
@@ -57,6 +62,8 @@ import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/pro
 import { PaymentProviderError } from '../services/payment-providers/types';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
 import { customersById, runInStoreCtx } from '../lib/jobs/store-db';
+import { idempotencyKeyOf, withIdempotencyKey } from '../lib/money-idempotency';
+import { refundMayHaveExecuted } from '../services/payment-providers/refund-outcome';
 const router = Router();
 
 // ==========================================
@@ -108,6 +115,15 @@ const createPaymentSchema = z.object({
     .refine(val => val === undefined || platformUrlOrRelative(val), {
       message: 'errorUrl must be a relative path or a URL on the platform domain',
     }),
+});
+
+const refundSchema = z.object({
+  // BE:S-12: bounded, both land in the audit log and the provider call.
+  transactionId: z.string().min(1).max(128),
+  /** Narrows the lookup when two providers hold the same reference string (Ruling ITEST-14). */
+  provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
+  amount: z.number().int().positive().optional(),
+  reason: z.string().max(500).optional(),
 });
 
 // GET /payments/methods is public: its query is parsed, not cast (F-9-prune triage). Shapes only; the service decides which
@@ -1207,6 +1223,198 @@ router.get(
     }
   }
 );
+
+/**
+ * POST /payments/refund
+ * Refund a payment (admin only)
+ */
+router.post(
+  '/refund',
+  authenticate,
+  // BE:S-2 / S-11 (Ruling FP-3): money out is never done from an impersonated session; super_admin needs MFA.
+  requireMfaEnrolled,
+  rejectImpersonated,
+  requirePermission('orders:refund'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = refundSchema.parse(req.body);
+      const user = getAuthUser(req);
+      // Same Idempotency-Key -> the first answer again, never a second refund (review M-8, Ruling NZ-MONEY-3). The key is
+      // scoped to the caller and the transaction, so another payment or another user never collides with it.
+      const idem = idempotencyKeyOf(req.header('idempotency-key'));
+      const out = await withIdempotencyKey(
+        `refund:${user.userId}:${data.transactionId}`,
+        idem,
+        () => refundOnce(data, user, req),
+        refundMayHaveExecuted
+      );
+      res.json({ success: true, data: { refund: out.value } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** The body of POST /payments/refund: the refund the provider made (a not-found is a thrown 404, which frees the key). */
+async function refundOnce(
+  data: z.infer<typeof refundSchema>,
+  user: ReturnType<typeof getAuthUser>,
+  req: Request
+) {
+  // Bootstrap lookup OUTSIDE runInTenantContext: the store is not known yet and a
+  // contextless read shows nothing under strict RLS, so the definer maps the provider
+  // reference to its store and the payment is read inside that store. Ownership follows.
+  const resolvedRefundStore = await resolveStoreFromWebhookRef({
+    transactionId: data.transactionId,
+    provider: data.provider,
+  });
+  // the store's own backend (NEON-ZERO); the payment's store IS the resolved one
+  const paymentRow = resolvedRefundStore
+    ? await readPayment(resolvedRefundStore, db =>
+        db.payment.findFirst({
+          where: { transactionId: data.transactionId },
+          include: { order: { select: { id: true, storeId: true } } },
+        })
+      )
+    : null;
+  if (paymentRow && paymentRow.order.storeId !== resolvedRefundStore) {
+    throw new AppError(404, 'NOT_FOUND', 'Payment not found');
+  }
+  if (!paymentRow) {
+    throw new AppError(404, 'NOT_FOUND', 'Payment not found');
+  }
+  // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
+  // `orders:refund` (on any store) passed with no membership check at all.
+  if (user.role !== 'super_admin') {
+    const access = await checkStoreAccess(paymentRow.order.storeId, user);
+    if (!access.ok) {
+      throw new AppError(404, 'NOT_FOUND', 'Payment not found');
+    }
+  }
+
+  const refundStoreId = paymentRow.order.storeId;
+
+  // Compensating-rollback order (M-128, Ruling M128-1): INTENT row first, on its own transaction, then the money,
+  // then the OUTCOME row. The intent is the durable proof an admin asked for this refund, so a crash or a failed
+  // outcome write after the money moved leaves a trail and never an unexplained refund. No intent row, no money:
+  // the write failing refuses the refund before anything leaves the building.
+  const auditBase = {
+    userId: user.userId,
+    storeId: refundStoreId,
+    resourceType: 'payment',
+    resourceId: data.transactionId,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+  };
+  try {
+    await runInStoreCtx(refundStoreId, () =>
+      auditLogStrict({
+        ...auditBase,
+        action: 'payment.refund_requested',
+        details: { amount: data.amount ?? null, reason: data.reason || null },
+      })
+    );
+  } catch (err) {
+    logger.error(
+      { err, paymentId: paymentRow.id },
+      '[payments] refund refused: intent audit row not written'
+    );
+    throw new AppError(
+      503,
+      'AUDIT_UNAVAILABLE',
+      'تعذّر تسجيل عملية الاسترداد، فلم يتم تحويل أي مبلغ. حاول مرة أخرى بعد قليل.'
+    );
+  }
+
+  // The money step. PaymentService.refund commits its own claim / completion on their own transactions, so by the
+  // time this returns the refund HAS happened at the provider; nothing below may turn that into an error.
+  let refund: Awaited<ReturnType<typeof PaymentService.refund>>;
+  try {
+    refund = await runInStoreCtx(refundStoreId, () =>
+      // The store is named (and the provider when the caller gave one): a Durable Object store's refund is the claim /
+      // completion sections on its DO (`refundOnDo`); without it the service would look the payment up in Postgres.
+      PaymentService.refund(
+        {
+          transactionId: data.transactionId,
+          amount: data.amount,
+          reason: data.reason,
+        },
+        data.provider,
+        refundStoreId
+      )
+    );
+  } catch (err) {
+    // The compensating row: the intent is not left dangling. Best effort; the provider outcome (maybe executed)
+    // is the claim-stuck sweep's job, not this write's.
+    void runInStoreCtx(refundStoreId, () =>
+      auditLogStrict({
+        ...auditBase,
+        action: 'payment.refund_failed',
+        details: { error: err instanceof Error ? err.message.slice(0, 200) : 'unknown' },
+      })
+    ).catch(() => undefined);
+    throw err;
+  }
+
+  // Each trail write is its OWN transaction and its own failure: neither can turn a refund that left the building
+  // into a 5xx, and one failing never takes the other with it. The money fact itself is the payment row plus its
+  // refund_initiated / refund_completed events, written by the service above.
+  const alertLost = (what: string, err: unknown) => {
+    logger.error(
+      { err, paymentId: paymentRow.id, refundId: refund.refundId },
+      `[payments] refund committed but its ${what} failed`
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'store',
+      store: { id: refundStoreId, name: refundStoreId },
+      source: 'payment.refund.audit_failed',
+      title: 'payment.refund.audit_failed',
+      body: `Refund ${refund.refundId} of ${refund.amount} piastres on payment ${paymentRow.id} was made; its ${what} could not be written (the intent row and the payment events are intact).`,
+      context: { paymentId: paymentRow.id, refundId: refund.refundId, amount: refund.amount, what },
+    }).catch(() => undefined);
+  };
+  const outcomeEntry = {
+    ...auditBase,
+    resourceId: refund.transactionId,
+    action: 'payment.refunded',
+    details: { refundId: refund.refundId, amount: refund.amount, reason: data.reason || null },
+  };
+  await runInStoreCtx(refundStoreId, () => auditLogStrict(outcomeEntry))
+    .catch(() => runInStoreCtx(refundStoreId, () => auditLogStrict(outcomeEntry)))
+    .catch(err => alertLost('outcome audit row', err));
+  await runInStoreCtx(refundStoreId, async () => {
+    const after = await (
+      await storeDb(refundStoreId)
+    ).payment.findUnique({
+      where: { id: paymentRow.id },
+      select: { status: true },
+    });
+    // on a Durable Object store the row is appended there (`paymentEventRecord`); Postgres joins this scope
+    await recordPaymentEventForStore({
+      paymentId: paymentRow.id,
+      storeId: refundStoreId,
+      orderId: paymentRow.orderId,
+      eventType: 'refund',
+      fromStatus: paymentRow.status,
+      toStatus:
+        after?.status ??
+        ((paymentRow.refundedAmount ?? 0) + refund.amount >= paymentRow.amount
+          ? 'refunded'
+          : 'partially_refunded'),
+      provider: paymentRow.provider,
+      triggeredByUserId: user.userId,
+      details: {
+        refundId: refund.refundId,
+        amount: refund.amount,
+        reason: data.reason ?? null,
+        initiatedBy: user.role,
+      },
+    });
+  }).catch(err => alertLost('payment event row', err));
+
+  return refund;
+}
 
 /**
  * POST /payments/retry/:paymentId

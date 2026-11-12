@@ -402,7 +402,7 @@ export interface StockClient {
     /** orders the statement marked paid (S3-O7) */
     settled: Array<{ orderId: string; paymentId: string }>;
     /** delivered COD orders whose statement amount did not match: left unpaid, flagged on the order timeline */
-    flagged: Array<{ orderId: string; reason: 'amount_mismatch' }>;
+    flagged: Array<{ orderId: string; reason: 'amount_mismatch' | 'suspected_duplicate' }>;
   }>;
   bulkSetInventory(a: {
     productIds: string[];

@@ -123,6 +123,7 @@ describe('every route whose path names a refund is permission-gated', () => {
     const all = files.flatMap(f => [...read(f).matchAll(routeDecl)].map(m => `${f}:${m[1]}`));
     expect(all).toEqual(
       expect.arrayContaining([
+        'payment.routes.ts:/refund',
         'order.routes.ts:/:orderId/instapay-refund',
         'order.routes.ts:/:orderId/refresh-refund-status',
         'order.routes.ts:/:orderId/refund-via-provider',

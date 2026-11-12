@@ -870,11 +870,25 @@ describe.skipIf(e.E2E_DB === '1')(
       expect(paid?.id).toBe(rows[0]!.id);
     }, 120_000);
 
-    it('the retry entry point resolves and reads the payment on the DO (no Postgres reach)', async () => {
+    it('refund and retry entry points resolve and read the payment on the DO (no Postgres reach)', async () => {
       const o = await placeOrder('paymob');
       const ref = `RF-${o.id.slice(0, 8)}`;
       await gatewayPayment(o.id, 'paymob', ref, o.total);
       await pgReaches(true);
+      const refund = await api('/payments/refund', {
+        method: 'POST',
+        headers: suHeaders(),
+        body: JSON.stringify({ transactionId: ref, provider: 'paymob', amount: 100 }),
+      });
+      const rj = (await refund.json()) as { error?: { code?: string } };
+      expect(rj.error?.code).not.toBe('POSTGRES_REMOVED');
+      expect(rj.error?.code).not.toBe('NOT_FOUND');
+      const unknown = await api('/payments/refund', {
+        method: 'POST',
+        headers: suHeaders(),
+        body: JSON.stringify({ transactionId: 'no-such-ref', provider: 'paymob' }),
+      });
+      expect(unknown.status).toBe(404);
       const retry = await api(`/payments/retry/${crypto.randomUUID()}`, {
         method: 'POST',
         headers: suHeaders(),

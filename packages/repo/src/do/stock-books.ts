@@ -1072,6 +1072,16 @@ export function importCodRemittances(db: SyncSql, storeId: string, a: Args) {
   const settled: CodStatementSettled[] = [];
   const flagged: CodStatementFlagged[] = [];
   for (const r of rows) {
+    // A line whose carrier + tracking + collected + fee equal an already-booked one, whatever its date or reference, is most likely
+    // the same remittance uploaded again (a statement without a date column is stamped with the upload day, which changes the
+    // line id). It is still booked in full (an external money fact is never refused) but marked, kept out of the collected sum
+    // and flagged for review, so cash that was never collected cannot pay an order.
+    const duplicateOf = db.all(
+      `SELECT 1 FROM cod_remittances WHERE store_id = ? AND carrier = ? AND tracking_number = ? AND gross_amount = ? AND fee_amount = ?
+         AND line_ref <> ? AND source NOT LIKE '%' || ? LIMIT 1`,
+      [storeId, carrier, r.trackingNumber, r.gross, r.fee, r.lineRef, SUSPECTED_DUPLICATE]
+    )[0];
+    const lineSource = duplicateOf ? `${source.slice(0, 12)}${SUSPECTED_DUPLICATE}` : source;
     const added = db.run(
       `INSERT INTO cod_remittances (id, store_id, shipment_id, carrier, tracking_number, line_ref, batch_id, gross_amount, fee_amount, net_amount, remitted_at, source, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (store_id, carrier, line_ref) DO NOTHING`,
@@ -1087,7 +1097,7 @@ export function importCodRemittances(db: SyncSql, storeId: string, a: Args) {
         r.fee,
         r.net,
         r.remittedAt,
-        source,
+        lineSource,
         now,
       ]
     ).changes;
@@ -1095,7 +1105,16 @@ export function importCodRemittances(db: SyncSql, storeId: string, a: Args) {
     // Only a line booked NOW can settle: a re-imported line is a duplicate and changes nothing (S3-O7 idempotency).
     const shipmentId = byTracking.get(r.trackingNumber);
     if (added === 1 && shipmentId)
-      settleCodFromStatement(db, storeId, shipmentId, { carrier, ...r }, now, settled, flagged);
+      settleCodFromStatement(
+        db,
+        storeId,
+        shipmentId,
+        { carrier, ...r },
+        now,
+        settled,
+        flagged,
+        !!duplicateOf
+      );
   }
   return {
     inserted,
@@ -1112,8 +1131,10 @@ export interface CodStatementSettled {
 }
 export interface CodStatementFlagged {
   orderId: string;
-  reason: 'amount_mismatch';
+  reason: 'amount_mismatch' | 'suspected_duplicate';
 }
+/** `cod_remittances.source` suffix of a line that repeats an already-booked one (S3-O7); excluded from the collected sum. */
+const SUSPECTED_DUPLICATE = ':suspected_duplicate';
 
 /**
  * S3-O7: a courier statement line is the proof that cash was collected. When the line's shipment is DELIVERED, its order is
@@ -1137,7 +1158,8 @@ function settleCodFromStatement(
   },
   now: number,
   settled: CodStatementSettled[],
-  flagged: CodStatementFlagged[]
+  flagged: CodStatementFlagged[],
+  suspectedDuplicate: boolean
 ): void {
   const sh = db.all(
     'SELECT order_id, status, cod_amount FROM shipments WHERE id = ? AND store_id = ?',
@@ -1148,7 +1170,27 @@ function settleCodFromStatement(
     'SELECT id, status, payment_status, order_number FROM orders WHERE id = ? AND store_id = ? AND deleted_at IS NULL',
     [sh.order_id, storeId]
   )[0];
-  if (!o || o.status !== 'delivered' || o.payment_status !== 'unpaid') return;
+  if (!o) return;
+  const ref = {
+    statementRef: line.lineRef,
+    batchId: line.batchId,
+    carrier: line.carrier,
+    trackingNumber: line.trackingNumber,
+  };
+  if (suspectedDuplicate) {
+    addOrderEvent(
+      db,
+      storeId,
+      o.id as string,
+      o.status as string,
+      'cod_statement_duplicate',
+      { ...ref, statementGross: line.gross },
+      now
+    );
+    flagged.push({ orderId: o.id as string, reason: 'suspected_duplicate' });
+    return;
+  }
+  if (o.status !== 'delivered' || o.payment_status !== 'unpaid') return;
   const pay = db.all(
     "SELECT id, amount FROM payments WHERE order_id = ? AND provider = 'cod' AND status = 'cod_pending' ORDER BY created_at, id LIMIT 1",
     [o.id]
@@ -1156,15 +1198,9 @@ function settleCodFromStatement(
   if (!pay) return;
   const due = pay.amount as number;
   const collected = db.all(
-    'SELECT COALESCE(SUM(gross_amount), 0) AS s FROM cod_remittances WHERE store_id = ? AND shipment_id = ?',
-    [storeId, shipmentId]
+    "SELECT COALESCE(SUM(gross_amount), 0) AS s FROM cod_remittances WHERE store_id = ? AND shipment_id = ? AND source NOT LIKE '%' || ?",
+    [storeId, shipmentId, SUSPECTED_DUPLICATE]
   )[0].s as number;
-  const ref = {
-    statementRef: line.lineRef,
-    batchId: line.batchId,
-    carrier: line.carrier,
-    trackingNumber: line.trackingNumber,
-  };
   if (collected !== due || (sh.cod_amount as number) !== due) {
     addOrderEvent(
       db,

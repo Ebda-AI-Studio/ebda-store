@@ -134,6 +134,7 @@ function guarded(file: string, chain: string): boolean {
 
 const GUARDED: Array<[string, string, string, string]> = [
   ['merchant-key.routes.ts', 'post', '/:id/integrations/merchant-keys', 'mint a durable MCP key'],
+  ['payment.routes.ts', 'post', '/refund', 'refund'],
   ['payment.routes.ts', 'post', '/retry/:paymentId', 'retry a payment'],
   ['payment-settings.routes.ts', 'post', '/store/:storeId', 'create a provider'],
   ['payment-settings.routes.ts', 'put', '/store/:storeId/:provider', 'update / rename a provider'],
