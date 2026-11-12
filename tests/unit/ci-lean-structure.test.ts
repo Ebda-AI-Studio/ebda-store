@@ -658,6 +658,12 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     expect(mac?.if).toBe("runner.os == 'macOS'");
     expect(mac?.run).toMatch(/shasum -a 256 -c -/);
     expect(mac?.run).toMatch(/--only-verified/);
+    // depth-1 checkout: a push must deepen to `before` and scan only before..after (never a silent whole-tree scan); the
+    // Mac skips exactly the listed fixture files (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list).
+    expect(mac?.run).toMatch(
+      /git fetch --no-tags --deepen=\d+ origin "\$AFTER" && git merge-base --is-ancestor "\$BEFORE" "\$AFTER"/
+    );
+    expect(mac?.run).toContain('--exclude-paths .github/trufflehog-mac-exclude-paths.txt');
   });
   it('ai-review links the native claude binary (--ignore-scripts leaves only a stub)', () => {
     const wf = readFileSync(path.join(ROOT, '.github/workflows/ai-review.yml'), 'utf8');
