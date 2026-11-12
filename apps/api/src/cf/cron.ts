@@ -27,6 +27,7 @@ import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
 import { runEntityIndexHealthCron } from '../lib/entity-index-health';
 import { reconcileStoreDirectory } from '../lib/store-directory-reconcile';
+import { checkSuperAdminInvariant } from '../lib/super-admin-invariant';
 import { isSweepCron, writesFrozen } from '../lib/jobs/freeze';
 import type { LegacyCronMessage } from '../lib/jobs/start';
 
@@ -70,6 +71,8 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
   // Loyalty: birthday bonuses + point expiry (was every 24 h).
   '0 3 * * *': [
     { name: 'loyalty-daily', run: () => loyaltyAutomationService.runDailyAutomation() },
+    // Ruling ID-20: P1 when the identity service has no active super_admin, or none that can act (second factor).
+    { name: 'super-admin-invariant', run: () => checkSuperAdminInvariant() },
     // G8: arm StoreDO alarms, check yesterday's backups landed, export D1 to R2 (cf/ops/backup-sweep.ts).
     {
       name: 'backup-sweep',
