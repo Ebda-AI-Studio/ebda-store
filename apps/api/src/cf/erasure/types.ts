@@ -71,6 +71,8 @@ export interface IdentityExport {
   refresh_tokens: unknown[];
   verification_tokens: unknown[];
   passkey_credentials: unknown[];
+  /** Platform-admin lifecycle events naming this account (Ruling ID-20); absent from an identity service older than it. */
+  admin_audit?: unknown[];
 }
 
 /**

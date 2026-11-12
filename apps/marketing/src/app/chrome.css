@@ -12,6 +12,11 @@
     display: none;
   }
 }
+/* A closed Menu is display:none, not just collapsed: its links are not rendered, not in the tab order and not
+   measurable as tap targets (a closed <details> only hid them through the UA's content-visibility). */
+.nav-menu:not([open]) > ul {
+  display: none;
+}
 .nav-menu a.nav-cta {
   justify-content: center;
   background: var(--gold);
@@ -125,6 +130,31 @@
   min-height: 48px;
   overflow-x: auto;
   scrollbar-width: none;
+  /* six links do not fit a 360px phone: this is a proper scroller (snap, contained, never widens the page) and its
+     far edge fades while there is more to reach (the fade is mirrored for RTL). */
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--space-4);
+  overscroll-behavior-x: contain;
+}
+.product-row > * {
+  scroll-snap-align: start;
+}
+@media (max-width: 799px) {
+  .product-row {
+    gap: var(--space-3);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  .product-row:dir(rtl) {
+    -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+  }
+  .product-links {
+    gap: var(--space-4);
+  }
+  .product-chip {
+    padding-inline-end: var(--space-3);
+  }
 }
 .product-row::-webkit-scrollbar {
   display: none;

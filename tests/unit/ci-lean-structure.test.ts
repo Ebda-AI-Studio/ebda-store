@@ -98,10 +98,13 @@ describe('ci.yml triggers', () => {
     expect(ci.concurrency.group).toMatch(/^ci-/);
     // PR runs group per ref, every main push has a group per merge sha, anything else is alone (run_id)
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || github.run_id) }}"
+      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
     );
     // Ruling CI-MAIN-SHA-1: only PR runs are cancelled; a main push (own group per sha) always completes.
-    expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}");
+    // CI-SLIM-1: a pre-merge full-tier dispatch on a PR branch (group per branch) is superseded by the next one too.
+    expect(ci.concurrency['cancel-in-progress']).toBe(
+      "${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}"
+    );
   });
 
   it('uses Node 22 (wrangler >= 4.110) and caches npm (hosted runners only) in every setup-node that installs', () => {
@@ -658,6 +661,12 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     expect(mac?.if).toBe("runner.os == 'macOS'");
     expect(mac?.run).toMatch(/shasum -a 256 -c -/);
     expect(mac?.run).toMatch(/--only-verified/);
+    // depth-1 checkout: a push must deepen to `before` and scan only before..after (never a silent whole-tree scan); the
+    // Mac skips exactly the listed fixture files (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list).
+    expect(mac?.run).toMatch(
+      /git fetch --no-tags --deepen=\d+ origin "\$AFTER" && git merge-base --is-ancestor "\$BEFORE" "\$AFTER"/
+    );
+    expect(mac?.run).toContain('--exclude-paths .github/trufflehog-mac-exclude-paths.txt');
   });
   it('ai-review links the native claude binary (--ignore-scripts leaves only a stub)', () => {
     const wf = readFileSync(path.join(ROOT, '.github/workflows/ai-review.yml'), 'utf8');
