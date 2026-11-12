@@ -35,7 +35,7 @@ export function servicesLlmsBlock(): string {
     lines.push('', '## Coming soon (not live yet)');
     for (const s of soon) {
       const ar = BRAND.comingProducts.find(p => p.id === s.id)!.nameAr;
-      lines.push(`- ${s.name} (${ar}): ${s.blurb}${s.href ? ` Coming-soon page: ${s.href}` : ''}`);
+      lines.push(`- ${s.name} (${ar}): ${s.blurb}`);
     }
   }
   return lines.join('\n') + '\n';

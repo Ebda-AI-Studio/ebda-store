@@ -306,6 +306,12 @@ async function remainingFor(db: D1Database, userId: string, email: string | null
       .first<{ n: number }>();
     n += a?.n ?? 0;
   }
+  // admin_audit keeps the event (Ruling ID-20) but never the erased address.
+  const au = await db
+    .prepare(`SELECT count(*) AS n FROM admin_audit WHERE user_id = ?1 AND email <> 'erased'`)
+    .bind(userId)
+    .first<{ n: number }>();
+  n += au?.n ?? 0;
   return n;
 }
 
@@ -328,6 +334,8 @@ export async function eraseIdentity(
   const statements = [
     db.prepare(`DELETE FROM challenges WHERE user_id = ?1`).bind(userId),
     db.prepare(`DELETE FROM users WHERE id = ?1`).bind(userId),
+    // The platform-admin audit trail survives an erasure, pseudonymised (Ruling ID-20).
+    db.prepare(`UPDATE admin_audit SET email = 'erased' WHERE user_id = ?1`).bind(userId),
   ];
   if (email)
     statements.push(
@@ -371,5 +379,26 @@ export async function exportIdentity(
     passkey_credentials: await all(
       `SELECT id, credential_id, transports, device_type, backed_up, rp_id, name, created_at, last_used_at FROM passkey_credentials WHERE user_id = ?1 ORDER BY created_at`
     ),
+    admin_audit: await all(
+      `SELECT event, email, actor, at, detail FROM admin_audit WHERE user_id = ?1 ORDER BY at`
+    ),
   };
+}
+
+/**
+ * Platform-admin invariant (Ruling ID-20). `active`: super_admins with status active (not erased). `ready`: of those, the ones
+ * that can act today: address verified (the password was set through the mailed code) AND a second factor (TOTP or passkey),
+ * which is what mints `pa: super_admin`. Counts only, no identity data.
+ */
+export async function superAdminSummary(
+  db: D1Database
+): Promise<{ active: number; ready: number }> {
+  const r = await db
+    .prepare(
+      `SELECT count(*) AS active,
+              coalesce(sum(CASE WHEN u.email_verified = 1 AND (u.mfa_enabled = 1 OR EXISTS (SELECT 1 FROM passkey_credentials p WHERE p.user_id = u.id)) THEN 1 ELSE 0 END), 0) AS ready
+         FROM users u WHERE u.role = 'super_admin' AND u.status = 'active' AND u.deleted_at IS NULL`
+    )
+    .first<{ active: number; ready: number }>();
+  return { active: Number(r?.active ?? 0), ready: Number(r?.ready ?? 0) };
 }
