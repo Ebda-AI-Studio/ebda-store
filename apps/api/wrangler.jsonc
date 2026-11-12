@@ -36,6 +36,7 @@
   // NO Smart Placement (tried 2026-10-22, PR #136, reverted): it placed the Worker at EWR
   // (`cf-placement: remote-EWR`) and API KV-hit calls got slower (median 1.2 s -> 2.3 s, n=6).
   // The serial Frankfurt/DO hops are the cost; fix them by removing hops, not by moving the Worker.
+  // 2026-11-11 (Ruling PERF-PLACEMENT-1): still off; the "on" arm of the post-Neon A/B is unmeasured (no preview API), harness: loadtests/scenarios/placement-ab.js.
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
 
   // No Hyperdrive / Postgres binding (NEON-ZERO N-17, Ruling NZ-D23): the Worker's Prisma client throws POSTGRES_REMOVED.
