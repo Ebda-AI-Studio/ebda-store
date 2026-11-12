@@ -458,14 +458,15 @@ export function earnPointsFromPurchase(
 
 /**
  * Take back the points an order earned (refund / cancel). Idempotent through the tagged `adjust` row
- * (`refund-revoke:<earnTxId>`, unique index). Floors the points at the customer's balance (a customer who already
- * spent them cannot go negative); `total_earned` drops by the full earned amount (floored at 0) and the tier is
- * recomputed. `null` when the order earned nothing.
+ * (`refund-revoke:<earnTxId>`, unique index). The FULL earned amount is taken back (#631): points the customer already
+ * spent (e.g. redeemed as a discount on another order) are NOT forgiven, the balance goes negative and that debt is
+ * paid off by the next points earned (a negative balance can never redeem: the redeem gate needs `points >= n`).
+ * `total_earned` drops by the earned amount (floored at 0) and the tier is recomputed. `null` when the order earned nothing.
  */
 export function reverseEarnedPointsFromOrder(
   db: SyncSql,
   a: { storeId: string; orderId: string; now?: number }
-): { pointsReversed: number; newBalance: number; replayed: boolean } | null {
+): { pointsReversed: number; newBalance: number; debt?: number; replayed: boolean } | null {
   requireId(a.storeId, 'storeId');
   requireId(a.orderId, 'orderId');
   const now = a.now ?? Date.now();
@@ -492,7 +493,8 @@ export function reverseEarnedPointsFromOrder(
     const cfg = loadLoyaltyConfig(db, a.storeId);
     if (!cfg) return null;
     const earned = earn.points as number;
-    const toReverse = Math.min(earned, lp.points as number);
+    // #631: never floored at the balance (that let redeem-then-refund keep the discount for free)
+    const toReverse = earned;
     const newTotalEarned = Math.max(0, (lp.total_earned as number) - earned);
     const newTier = calculateTier(newTotalEarned, cfg.settings);
 
@@ -522,6 +524,7 @@ export function reverseEarnedPointsFromOrder(
     return {
       pointsReversed: toReverse,
       newBalance: (lp.points as number) - toReverse,
+      debt: Math.max(0, toReverse - Math.max(0, lp.points as number)),
       replayed: false,
     };
   });
@@ -1194,6 +1197,63 @@ const EARN_TYPES = [
   'earn_manual',
 ];
 
+const REVOKE_PREFIX = 'refund-revoke:';
+
+/**
+ * #631: what is LEFT of each earned lot for one customer, replayed from the ledger in time order (no extra column, so every
+ * existing row is classified the same way). Every positive row is a lot (earns, positive adjusts such as a redeem
+ * re-credit); every negative row consumes: a refund reversal (`refund-revoke:<earnTxId>`) its OWN lot first, everything
+ * else (redeems, expiries, negative adjusts) the oldest lots first (FIFO). What cannot be taken from a lot is DEBT, and a
+ * later lot pays the debt before anything else, so points earned while in debt are not expired a second time.
+ */
+export function lotRemaining(
+  db: SyncSql,
+  storeId: string,
+  customerId: string
+): Map<string, number> {
+  const rows = db.all(
+    `SELECT id, type, points, description FROM loyalty_transactions
+      WHERE store_id = ?1 AND customer_id = ?2 AND points <> 0 ORDER BY created_at, rowid`,
+    [storeId, customerId]
+  );
+  const lots: Array<{ id: string; left: number }> = [];
+  const byId = new Map<string, { id: string; left: number }>();
+  let debt = 0;
+  const takeFifo = (n: number): number => {
+    for (const l of lots) {
+      if (n <= 0) break;
+      const t = Math.min(l.left, n);
+      l.left -= t;
+      n -= t;
+    }
+    return n;
+  };
+  for (const r of rows) {
+    const pts = Number(r.points);
+    if (pts > 0) {
+      const lot = { id: r.id as string, left: pts };
+      const pay = Math.min(debt, lot.left);
+      lot.left -= pay;
+      debt -= pay;
+      lots.push(lot);
+      byId.set(lot.id, lot);
+      continue;
+    }
+    let need = -pts;
+    const desc = typeof r.description === 'string' ? r.description : '';
+    if (r.type === 'adjust' && desc.startsWith(REVOKE_PREFIX)) {
+      const own = byId.get(desc.slice(REVOKE_PREFIX.length));
+      if (own) {
+        const t = Math.min(own.left, need);
+        own.left -= t;
+        need -= t;
+      }
+    }
+    debt += takeFifo(need);
+  }
+  return new Map(lots.map(l => [l.id, l.left]));
+}
+
 /**
  * One page (<= `limit` earn rows, id order, after the `after` cursor) of expired earn transactions. Per member: the expired
  * points are deducted from the balance (never below 0), ONE `expire` row is written, and the earn rows lose their `expires_at`
@@ -1228,7 +1288,11 @@ export function expirePoints(
         [a.storeId, customerId]
       )[0];
       if (!lp) continue;
-      const deduction = Math.min(g.total, Number(lp.points));
+      // #631: only what is LEFT of the expiring lots expires (points already redeemed, reversed or expired, or that paid a
+      // debt, never expire a second time against unrelated points); never more than a positive balance
+      const left = lotRemaining(db, a.storeId, customerId);
+      const remaining = g.ids.reduce((n, id) => n + Math.max(0, left.get(id) ?? 0), 0);
+      const deduction = Math.max(0, Math.min(remaining, Number(lp.points)));
       const marks = g.ids.map(() => '?').join(',');
       if (deduction > 0) {
         db.run(
