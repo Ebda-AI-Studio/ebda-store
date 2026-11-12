@@ -7,8 +7,6 @@ import { AppError } from '../middleware/error-handler';
 import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
-import { assertStorageRoom } from '../services/plan-limit.service';
-import { releaseOnFailure } from '../lib/storage-usage';
 import { enforceMaxDimensions } from '../services/image-resize.service';
 import { sniffImage, IMAGE_EXT, renameByKind, uploadContentError } from '../lib/upload-sniff';
 
@@ -24,6 +22,10 @@ import {
   getExpense,
 } from '../services/accounting/expense.service';
 import { runInStoreCtx } from '../lib/jobs/store-db';
+import {
+  PRIVATE_RECEIPT_PREFIX,
+  privateReceiptKey,
+} from '../services/accounting/expense-ocr.service';
 
 const router = Router();
 
@@ -74,7 +76,13 @@ const createSchema = z
      * When absent, the API treats `amount` as the raw foreign amount.
      */
     originalAmount: z.number().int().nonnegative().optional(),
-    receiptImageUrl: z.string().url().optional(),
+    // Only the server's upload path may set a `private:` reference (it names a file in the private bucket); a
+    // client-sent one could point an expense at any private file of the store (payment proofs, tax documents).
+    receiptImageUrl: z
+      .string()
+      .url()
+      .refine(v => !/^\s*private:/i.test(v), { message: 'receiptImageUrl must be a public URL' })
+      .optional(),
     notes: z.string().max(1000).optional(),
     notesAr: z.string().max(1000).optional(),
   })
@@ -323,21 +331,17 @@ router.post(
       // Named and typed by the bytes actually stored, never the client's filename or mime.
       const storedKind = sniffImage(receiptBuffer) ?? receiptKind;
 
-      releaseOnFailure(res, await assertStorageRoom(req.params.storeId, receiptBuffer.length));
+      // Private bucket: not part of the public-uploads usage the plan ceiling counts, so no assertStorageRoom here.
 
-      // Upload to R2 under stores/<storeId>/receipts/
-      const uploaded = await runInStoreCtx(req.params.storeId, () =>
-        StorageService.upload(
-          receiptBuffer,
-          renameByKind(req.file!.originalname, IMAGE_EXT[storedKind], 'receipt'),
-          {
-            folder: 'misc', // misc is on the ALLOWED_FOLDERS list in storage.service.ts
-            storeId: req.params.storeId,
-            contentType: storedKind,
-            allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
-          }
-        )
-      );
+      // Receipts are merchant financial documents: PRIVATE bucket only, under stores/<storeId>/receipts/, never a
+      // public URL. They are read back through GET /:storeId/expenses/:expenseId/receipt (authorised).
+      const { key } = await StorageService.putPrivate(receiptBuffer, {
+        storeId: req.params.storeId,
+        folder: 'receipts',
+        ext: IMAGE_EXT[storedKind],
+        contentType: storedKind,
+      });
+      const uploaded = { url: `${PRIVATE_RECEIPT_PREFIX}${key}` };
 
       // Fire async OCR job — non-blocking
       try {
@@ -362,6 +366,34 @@ router.post(
         receiptUrl: uploaded.url,
         message: 'Processing — your expense draft will appear shortly.',
       });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /:storeId/expenses/:expenseId/receipt: stream the private receipt image to an authorised store admin.
+router.get(
+  '/:storeId/expenses/:expenseId/receipt',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.expenses'),
+  async (req, res, next) => {
+    try {
+      const exp = await runInStoreCtx(req.params.storeId, () =>
+        getExpense(req.params.storeId, req.params.expenseId)
+      );
+      const key = exp?.receiptImageUrl
+        ? privateReceiptKey(exp.receiptImageUrl, req.params.storeId)
+        : null;
+      if (!key) throw new AppError(404, 'NOT_FOUND', 'Receipt not found');
+      const { body, contentType } = await StorageService.getPrivate(key);
+      res.setHeader('Content-Type', contentType ?? 'application/octet-stream');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', 'inline');
+      res.send(body);
     } catch (err) {
       next(err);
     }

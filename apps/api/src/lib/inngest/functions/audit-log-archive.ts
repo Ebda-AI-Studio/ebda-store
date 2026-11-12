@@ -1,7 +1,8 @@
 import type { JobDef } from '../../jobs/types';
-import { loadS3 } from '../../lazy-modules';
 import { auditRetention } from '../../definer';
 import logger from '../../logger';
+import { cfBindings } from '../../../cf/bindings';
+import { StorageService } from '../../../services/storage.service';
 import { inngest } from '../client';
 import { archivePlatformAuditD1, archiveStoreAuditDo } from '../../../services/audit-retention-cf';
 
@@ -22,33 +23,31 @@ const RETENTION_DAYS = 90;
 const DELETE_BATCH = 5000;
 const EXPORT_PAGE = 5000;
 
-/** An R2 `put` for the archive prefix, or null when STORAGE_* is not configured. */
-async function archivePut(): Promise<((key: string, body: string) => Promise<void>) | null> {
-  const endpoint = process.env.STORAGE_ENDPOINT;
-  const accessKey = process.env.STORAGE_ACCESS_KEY;
-  const secretKey = process.env.STORAGE_SECRET_KEY;
-  const bucket = process.env.STORAGE_BUCKET || 'uploads';
-  if (!endpoint || !accessKey || !secretKey) {
-    logger.warn('audit-log-archive: STORAGE_* not set, skipping the Cloudflare audit archive');
+type R2BindingLike = {
+  put(key: string, value: string | ArrayBuffer | Uint8Array, opts?: unknown): Promise<unknown>;
+};
+
+/**
+ * A `put` for the audit archive. Audit rows carry IPs and user ids, so they go ONLY to the PRIVATE bucket (the
+ * `STORE_BACKUPS` R2 binding = `ebda-private` on Workers; the S3 private bucket elsewhere), never to `STORAGE_BUCKET`,
+ * which serves public uploads. `StorageService.privateBucket()` refuses a private bucket equal to the public one.
+ * Null when no private destination is configured: the job skips loudly rather than fall back to the public bucket.
+ */
+export async function archivePut(): Promise<((key: string, body: string) => Promise<void>) | null> {
+  const bound = cfBindings()?.STORE_BACKUPS as R2BindingLike | undefined;
+  if (bound) {
+    return async (key, body) => {
+      await bound.put(key, body, { httpMetadata: { contentType: 'application/x-ndjson' } });
+    };
+  }
+  try {
+    StorageService.privateBucket();
+  } catch {
+    logger.warn('audit-log-archive: no private bucket configured, skipping the audit archive');
     return null;
   }
-  const { S3Client, PutObjectCommand } = await loadS3();
-  const s3 = new S3Client({
-    endpoint,
-    region: 'auto',
-    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
-    forcePathStyle: true,
-  });
   return async (key, body) => {
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: Buffer.from(body, 'utf-8'),
-        ContentType: 'application/x-ndjson',
-        ContentEncoding: 'utf-8',
-      })
-    );
+    await StorageService.putPrivateObject(key, Buffer.from(body, 'utf-8'), 'application/x-ndjson');
   };
 }
 
@@ -85,23 +84,8 @@ export const auditLogArchive: JobDef = inngest.createFunction(
     }
 
     const exported = await step.run('export-to-r2', async () => {
-      const endpoint = process.env.STORAGE_ENDPOINT;
-      const accessKey = process.env.STORAGE_ACCESS_KEY;
-      const secretKey = process.env.STORAGE_SECRET_KEY;
-      const bucket = process.env.STORAGE_BUCKET || 'uploads';
-
-      if (!endpoint || !accessKey || !secretKey) {
-        logger.warn('audit-log-archive: STORAGE_* not set, skipping R2 export');
-        return { skipped: true, written: 0, key: null };
-      }
-
-      const { S3Client, PutObjectCommand } = await loadS3();
-      const s3 = new S3Client({
-        endpoint,
-        region: 'auto',
-        credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
-        forcePathStyle: true,
-      });
+      const put = await archivePut();
+      if (!put) return { skipped: true, written: 0, key: null };
 
       const chunks: string[] = [];
       let cursor: string | null = null;
@@ -121,18 +105,10 @@ export const auditLogArchive: JobDef = inngest.createFunction(
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
       const key = `audit-archive/${ts}-cutoff-${cutoff.toISOString().slice(0, 10)}.jsonl`;
       const body = Buffer.from(chunks.join(''), 'utf-8');
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: key,
-          Body: body,
-          ContentType: 'application/x-ndjson',
-          ContentEncoding: 'utf-8',
-        })
-      );
+      await put(key, chunks.join(''));
       logger.info(
         { written, key, sizeMb: (body.length / 1024 / 1024).toFixed(1) },
-        'audit-log-archive: exported to r2'
+        'audit-log-archive: exported to the private bucket'
       );
       return { skipped: false, written, key };
     });
