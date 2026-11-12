@@ -148,6 +148,7 @@ describe('light jobs route to the light runners, heavy jobs never do (Ruling HOS
         'ai-review.yml:fork-gate',
         'ai-review.yml:manual-pass',
         'blast-radius.yml:blast-radius',
+        'ci-full-pr.yml:dispatch',
         'ci.yml:app-builds',
         'ci.yml:changes',
         'ci.yml:guards',
