@@ -1,6 +1,6 @@
 /**
  * Checkout email opt-in and the cart-restore link (review item 1).
- * Plan: docs/plans/2026-10-21-cart-email-campaigns.md; rulings CART-CONSENT-1, CART-RESTORE-1.
+ * Plan: docs/plans/done/2026-10-21-cart-email-campaigns.md; rulings CART-CONSENT-1, CART-RESTORE-1.
  *
  * `recordCartEmailConsent` is called when the shopper ticks (or unticks) "Email me about my cart"
  * at checkout. Ticking stores the address on the session cart with a consent timestamp AND upserts

@@ -1,5 +1,5 @@
 /**
- * Transport for merchant OUTGOING webhooks (docs/plans/2026-10-21-merchant-webhooks.md).
+ * Transport for merchant OUTGOING webhooks (docs/plans/done/2026-10-21-merchant-webhooks.md).
  *
  * - Signature: `X-Ebda-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`. The receiver
  *   recomputes over the RAW body and rejects a timestamp outside WEBHOOK_TOLERANCE_SEC (replay).

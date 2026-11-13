@@ -1,7 +1,7 @@
 /**
  * Passkeys (WebAuthn) — the service, against a software authenticator. The REAL
  * @simplewebauthn/server verification runs; only Redis, the database and the store-host definers are
- * in-memory fakes. Rulings PASSKEY-1..6 (docs/plans/2026-10-21-passkeys.md).
+ * in-memory fakes. Rulings PASSKEY-1..6 (docs/plans/done/2026-10-21-passkeys.md).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import bcrypt from 'bcryptjs';

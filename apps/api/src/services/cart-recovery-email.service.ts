@@ -1,6 +1,6 @@
 /**
  * Abandoned-cart recovery EMAIL (cart-email-campaigns, 2026-10-21).
- * Plan: docs/plans/2026-10-21-cart-email-campaigns.md.
+ * Plan: docs/plans/done/2026-10-21-cart-email-campaigns.md.
  *
  * A third recovery channel next to push/SMS, independent of their `status`
  * sequence. ONE reminder per cart, ever:

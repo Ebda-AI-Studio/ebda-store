@@ -1,6 +1,6 @@
 # B2B wholesale pricing API
 
-Plan: `docs/plans/2026-10-21-b2b-wholesale.md`. Rulings: `docs/RULINGS.md` (B2B-\*). Feature key `b2b.wholesale` (Business plan, comped). All money is integer piastres. A write that turns a benefit on needs the entitlement; reads, deletes and turning things off never do (Ruling B2B-1b).
+Plan: `docs/plans/done/2026-10-21-b2b-wholesale.md`. Rulings: `docs/RULINGS.md` (B2B-\*). Feature key `b2b.wholesale` (Business plan, comped). All money is integer piastres. A write that turns a benefit on needs the entitlement; reads, deletes and turning things off never do (Ruling B2B-1b).
 
 ## Storefront (public base `/api/v1/public`)
 

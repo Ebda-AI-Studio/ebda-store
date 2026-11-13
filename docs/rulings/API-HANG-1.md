@@ -1,6 +1,6 @@
 # API-HANG-1
 
-> Section: 2026-11-10 — API hangs on cache misses (branch `fix/api-hangs-do-chain`, plan `docs/plans/2026-11-10-api-hangs.md`). Amended the same day after review (bounded scope).
+> Section: 2026-11-10 — API hangs on cache misses (branch `fix/api-hangs-do-chain`, plan `docs/plans/done/2026-11-10-api-hangs.md`). Amended the same day after review (bounded scope).
 
 **Ruling API-HANG-1 — an AuthState Durable Object call carries a 2.5 s deadline (`AUTH_STATE_TIMEOUT_MS`) ONLY where its caller
 has a defined answer to "no reply in time": the rate-limit store (fail mode per API-HANG-2) and cache-generation READS (the fill

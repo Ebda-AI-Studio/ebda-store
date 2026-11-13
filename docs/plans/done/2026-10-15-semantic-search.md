@@ -369,7 +369,7 @@ Expected: FAIL with `function public.ebda_ar_norm(unknown) does not exist`
 
 ```sql
 -- packages/database/prisma/migrations/20261018000100_search_normalisation/migration.sql
--- Arabic search normalisation (search program P0, plan docs/plans/2026-10-15-semantic-search.md).
+-- Arabic search normalisation (search program P0, plan docs/plans/done/2026-10-15-semantic-search.md).
 --
 -- WHAT: public.ebda_ar_norm(text) folds alef forms (أإآٱ->ا), ى/ی/ئ->ي, ؤ->و, ة->ه, Persian kaf->ك,
 --   strips tashkeel (U+064B-U+065F, U+0670) and tatweel (U+0640), maps Arabic-Indic and

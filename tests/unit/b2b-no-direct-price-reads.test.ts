@@ -1,5 +1,5 @@
 /**
- * Architecture guard (design review section 7 + Task 3 money review M-4, docs/plans/2026-10-21-b2b-wholesale.md): after this
+ * Architecture guard (design review section 7 + Task 3 money review M-4, docs/plans/done/2026-10-21-b2b-wholesale.md): after this
  * change a charged or customer-visible unit price is decided in ONE place, `PriceResolver` (and the pure `resolveUnitPrice`
  * under it). Every other read of a `price` / `unitPrice` in apps/api/src is either feeding the resolver, reading a PERSISTED
  * order value, a retail display, a catalogue read, an admin display, a writer, or a bundle base price, and must say so in the

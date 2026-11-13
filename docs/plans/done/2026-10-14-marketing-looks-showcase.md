@@ -1,6 +1,6 @@
 # Marketing: interactive looks showcase — 2026-10-14
 
-Ahmad, 2026-10-14: the template-directions gallery (https://claude.ai/artifact/Xqg35JTvMtrMddaAufvJkg) is what ebda.app needs: visitors pick a template, see its three looks, scroll and tap inside them. The illustratives on the current site (old Dahab night/gold captures) are replaced. Rulings TPL-1..3 in `docs/plans/2026-10-14-templates-and-editor-program.md`.
+Ahmad, 2026-10-14: the template-directions gallery (https://claude.ai/artifact/Xqg35JTvMtrMddaAufvJkg) is what ebda.app needs: visitors pick a template, see its three looks, scroll and tap inside them. The illustratives on the current site (old Dahab night/gold captures) are replaced. Rulings TPL-1..3 in `docs/plans/done/2026-10-14-templates-and-editor-program.md`.
 
 ## Finish line
 

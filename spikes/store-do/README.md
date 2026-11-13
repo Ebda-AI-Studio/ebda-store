@@ -1,6 +1,6 @@
 # Spike: StoreDO (SQLite Durable Object per store), Ruling INFRA-CF-1 Phase 0
 
-Plan: `docs/plans/2026-10-28-store-on-cloudflare.md` (tasks 0.1 to 0.7). Everything here is spike-only: its own
+Plan: `docs/plans/done/2026-10-28-store-on-cloudflare.md` (tasks 0.1 to 0.7). Everything here is spike-only: its own
 `package.json` and Worker (`ebda-store-do-spike`), never the production `ebda-api` Worker. Demo store used for all
 live measurement: `storedemo-souq` (`09b5dbd1-1774-49b5-b781-e06d0ee7b0fe`), never `qa-walk-store-1010`.
 
