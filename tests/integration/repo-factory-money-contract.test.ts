@@ -209,6 +209,12 @@ async function parity(fx: Fx, scenario: () => Promise<unknown>) {
   return pg as any;
 }
 
+/** The DO backend alone (production). For a rule where the backends diverge ON PURPOSE (a Ruling names it). */
+async function doOnly(fx: Fx, scenario: () => Promise<unknown>) {
+  const out = await settle(() => onDo(scenario));
+  return scrub({ out, state: await onDo(() => state(fx.names)) }, fx.names) as any;
+}
+
 beforeAll(async () => {
   const user = await prisma.user.create({
     data: {
@@ -306,9 +312,12 @@ describe('loyalty (LoyaltyService)', () => {
     expect(t.out.ok.unknown).toBeNull();
   });
 
-  it('reverseEarnedPointsFromOrder floors at the balance a customer still holds (spent points are not clawed negative)', async () => {
+  // Ruling MONEY-LOYALTY-LOTS-1: the DO (the only backend production runs, NZ-D23) takes back the FULL earn and spent
+  // points become a debt; the Postgres LoyaltyService keeps the old floor. The backends diverge on purpose here, so
+  // this case asserts the production rule instead of parity.
+  it('reverseEarnedPointsFromOrder takes back the full earn on the DO; spent points become a debt (MONEY-LOYALTY-LOTS-1)', async () => {
     const fx = await fixtures();
-    const t = await parity(fx, async () => {
+    const t = await doOnly(fx, async () => {
       await LoyaltyService.earnPointsFromPurchase(STORE, fx.cust, fx.o1, 25_000);
       // the customer spends 200 of the 250 points (a redeem elsewhere; set directly on whichever backend is current)
       if ((await storeRepo(STORE)).backend === 'do')
@@ -320,8 +329,9 @@ describe('loyalty (LoyaltyService)', () => {
         });
       return LoyaltyService.reverseEarnedPointsFromOrder(STORE, fx.o1);
     });
-    expect(t.out.ok.pointsReversed).toBe(50);
-    expect(t.state.points[0].points).toBe(0);
+    expect(t.out.ok.pointsReversed).toBe(250);
+    expect(t.out.ok.newBalance).toBe(-200);
+    expect(t.state.points[0].points).toBe(-200);
   });
 
   it('reverseRedeemedPointsFromOrder: re-credits the spent points once, null when nothing was spent', async () => {
