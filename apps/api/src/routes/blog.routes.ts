@@ -22,7 +22,7 @@ import { storeDb } from '../lib/repo-factory';
  * Express does NOT populate req.params.storeId at the mount level.
  * router.param (below) sets RLS tenant context after Express resolves
  * :storeId for the matched route. See F2,
- * docs/plans/2026-07-02-rls-cutover.md.
+ * docs/plans/done/2026-07-02-rls-cutover.md.
  */
 const router = Router({ mergeParams: true });
 

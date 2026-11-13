@@ -1230,7 +1230,7 @@ jobs:
         # ebda_app (order-auto-cancel-unpaid, payment-abandonment-sweep,
         # stock-reorder-scan, analytics-daily-rollup, audit-log-archive, and
         # the rest) remain entirely unexercised here — see
-        # docs/plans/2026-07-02-rls-cutover.md's "Before a second attempt"
+        # docs/plans/done/2026-07-02-rls-cutover.md's "Before a second attempt"
         # section for that gap and how it is currently covered (or not). The
         # test harness keeps the superuser URL for fixtures and cleanup.
         # This password only exists inside this disposable per-job container.

@@ -7,6 +7,7 @@ import { retryTransientRead } from './db-retry';
 import { isWorkers } from './runtime';
 import { dropEdgeGensMemo } from './edge-gens-memo';
 import { cfWaitUntil } from '../cf/bindings';
+import { currentIoTally } from './io-tally';
 
 /**
  * Public-route response cache. Used by the storefront-facing endpoints
@@ -39,6 +40,11 @@ const memoryCache = new BoundedMap<string, { data: unknown; expiresAt: number }>
  * herd is at most (pod count), not (request count).
  */
 const inFlight = new Map<string, Promise<unknown>>();
+/**
+ * DEV_STATS only (Ruling API-HANG-4): the AuthState deadlines a fill's leader hit, so a single-flight follower, which waited on
+ * the same fill, carries them on its own request (`x-dev-io-ops`). Empty and unused in production (the tally has no `ops`).
+ */
+const fillTimeouts = new WeakMap<Promise<unknown>, string[]>();
 
 /**
  * GENERATION COUNTERS (FIX-001). STALENESS CLASS: price/stock are NEVER-stale.
@@ -158,55 +164,74 @@ export async function getCached<T>(
   // key don't each run fetchFn(). A late waiter that arrives after the fetch
   // resolved will re-read the now-warm cache on its next call.
   const existing = inFlight.get(key) as Promise<T> | undefined;
-  if (existing) return existing;
+  if (existing) {
+    const followerOps = currentIoTally()?.ops;
+    if (!followerOps) return existing;
+    try {
+      return await existing;
+    } finally {
+      followerOps.push(...(fillTimeouts.get(existing) ?? []));
+    }
+  }
 
+  const leaderOps = currentIoTally()?.ops;
+  const leaderMark = leaderOps?.length ?? 0;
+  const leaderTimeouts: string[] = [];
   const pending = (async () => {
-    const genNames = generationNamesFor(key);
-    const localBefore = readLocalGens(genNames);
-    const sharedBefore = await readSharedGens(genNames);
-    // A cache fill is a read by construction, so a dropped pooler connection
-    // (Neon idling a socket — EBDA-API-2D/2E/2F) is re-run a bounded number of
-    // times instead of 500ing the storefront. `fetchFn` MUST stay a pure read.
-    const data = await retryTransientRead(fetchFn, {
-      label: `getCached:${key.split(':')[1] ?? key}`,
-    });
+    try {
+      const genNames = generationNamesFor(key);
+      const localBefore = readLocalGens(genNames);
+      const sharedBefore = await readSharedGens(genNames);
+      // A cache fill is a read by construction, so a dropped pooler connection
+      // (Neon idling a socket — EBDA-API-2D/2E/2F) is re-run a bounded number of
+      // times instead of 500ing the storefront. `fetchFn` MUST stay a pure read.
+      const data = await retryTransientRead(fetchFn, {
+        label: `getCached:${key.split(':')[1] ?? key}`,
+      });
 
-    const cacheable = opts.cacheIf ? opts.cacheIf(data) : true;
-    if (cacheable && sharedBefore !== null) {
-      const writeBack = async () => {
-        if ((await readSharedGens(genNames)) !== sharedBefore) return;
-        try {
-          await redis.set(key, JSON.stringify(data), ttlSeconds);
-          // An invalidation that bumped between the check above and this write
-          // has already run (or is running) its delete; take our entry back out.
-          if ((await readSharedGens(genNames)) !== sharedBefore) {
-            await redis.delete(key);
+      const cacheable = opts.cacheIf ? opts.cacheIf(data) : true;
+      if (cacheable && sharedBefore !== null) {
+        const writeBack = async () => {
+          if ((await readSharedGens(genNames)) !== sharedBefore) return;
+          try {
+            await redis.set(key, JSON.stringify(data), ttlSeconds);
+            // An invalidation that bumped between the check above and this write
+            // has already run (or is running) its delete; take our entry back out.
+            if ((await readSharedGens(genNames)) !== sharedBefore) {
+              await redis.delete(key);
+            }
+          } catch {
+            // Redis failed mid-fill: nothing is cached this time (memory is only
+            // written when Redis was already down at the start of the fill).
           }
-        } catch {
-          // Redis failed mid-fill: nothing is cached this time (memory is only
-          // written when Redis was already down at the start of the fill).
-        }
-      };
-      // API-HANG-1: on Workers the write-back (generation check -> KV put -> re-check, two AuthState round trips + a KV
-      // write) runs after the response, in waitUntil, instead of in front of it: same order, same checks, so the
-      // NEVER-stale guarantee is unchanged, and waitUntil outlives a disconnecting client where the request path did not.
-      // Node keeps awaiting it (its tests read the cache right after the fill).
-      if (isWorkers) cfWaitUntil(writeBack());
-      else await writeBack();
+        };
+        // API-HANG-1: on Workers the write-back (generation check -> KV put -> re-check, two AuthState round trips + a KV
+        // write) runs after the response, in waitUntil, instead of in front of it: same order, same checks, so the
+        // NEVER-stale guarantee is unchanged, and waitUntil outlives a disconnecting client where the request path did not.
+        // Node keeps awaiting it (its tests read the cache right after the fill).
+        if (isWorkers) cfWaitUntil(writeBack());
+        else await writeBack();
+      }
+      // Memory only when the shared layer is down (FIX-002), and never with a
+      // value a local invalidation has superseded since the fetch began.
+      if (
+        cacheable &&
+        !isWorkers &&
+        sharedBefore === null &&
+        readLocalGens(genNames) === localBefore
+      ) {
+        memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
+      }
+      return data;
+    } finally {
+      if (leaderOps)
+        leaderTimeouts.push(
+          ...leaderOps.slice(leaderMark).filter(o => o.startsWith('auth-state-timeout:'))
+        );
     }
-    // Memory only when the shared layer is down (FIX-002), and never with a
-    // value a local invalidation has superseded since the fetch began.
-    if (
-      cacheable &&
-      !isWorkers &&
-      sharedBefore === null &&
-      readLocalGens(genNames) === localBefore
-    ) {
-      memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
-    }
-    return data;
   })();
 
+  if (leaderOps) fillTimeouts.set(pending, leaderTimeouts);
   inFlight.set(key, pending);
   try {
     return await pending;

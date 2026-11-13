@@ -108,7 +108,7 @@ is identical regardless of trigger:
    `withRlsBypass` (safe there — it is read-only). Guarded by
    `erasure-addresses-escapes-user-rls` in `docs/security/defence-mutations.json`.
    Inert until the the earlier app role cutover, since prod still connects as
-   `neondb_owner` (BYPASSRLS) — see `docs/plans/2026-07-02-rls-cutover.md`.
+   `neondb_owner` (BYPASSRLS) — see `docs/plans/done/2026-07-02-rls-cutover.md`.
 
 **Sessions die with the erasure.** `eraseAccount` bumps `tokenVersion` in the
 same write that anonymizes the user row and pushes the new version into the tv

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16 App Router (apps/web, apps/admin, apps/marketing), Express on Cloudflare Workers (apps/api), Prisma + Neon (strict RLS + tenant guard), Zod in `@ebda/shared`, Vitest, Playwright + axe-core, R2 (`ebda-media`, `https://media.ebda.app`), FLUX.1 schnell on Workers AI (offline image generation), ffmpeg (hero video).
 
-**Spec:** `docs/plans/2026-10-14-templates-and-editor-program.md` (Phase B, scenario matrix, review loop, Rulings TPL-1..3). Read with it: `docs/ebda/templates/2026-10-14-directions.md` (Qamar A/B/C briefs), `docs/ebda/templates/looks.md`, `docs/ebda/templates/demo-store.md`, `docs/ebda/templates/platform-commerce.md`, `docs/plans/2026-10-14-phase-b0-platform-commerce.md` (§ Taste bar, B0-4 as amended by B0-49), `docs/plans/2026-10-14-marketing-levelup.md` (MKT-3), `docs/ebda/templates/research/qamar.md`.
+**Spec:** `docs/plans/done/2026-10-14-templates-and-editor-program.md` (Phase B, scenario matrix, review loop, Rulings TPL-1..3). Read with it: `docs/ebda/templates/2026-10-14-directions.md` (Qamar A/B/C briefs), `docs/ebda/templates/looks.md`, `docs/ebda/templates/demo-store.md`, `docs/ebda/templates/platform-commerce.md`, `docs/plans/done/2026-10-14-phase-b0-platform-commerce.md` (§ Taste bar, B0-4 as amended by B0-49), `docs/plans/done/2026-10-14-marketing-levelup.md` (MKT-3), `docs/ebda/templates/research/qamar.md`.
 
 ## Coordinator amendments (binding; override task text where they conflict)
 
@@ -2358,7 +2358,7 @@ Starts only when Task 11 Step 5's VERIFIED list includes "storedemo home renders
 - Modify: `apps/marketing/src/components/Home.tsx` (`demo` renderer)
 - Modify: `apps/marketing/src/app/**/llms.txt` source if it lists sections (grep `SECTION_ORDER` and `llms`)
 - Modify: `.github/workflows/cf-web-deploy.yml:81` (`--var SHOW_DEMO_STORE_LINK:…`)
-- Modify: `docs/ENVIRONMENT.md:152`, `docs/DEPLOYMENT.md:174`, `docs/plans/2026-10-14-marketing-levelup.md` (MKT-15 as built), `docs/RULINGS.md` (B1-18 evidence: link went live on <date>)
+- Modify: `docs/ENVIRONMENT.md:152`, `docs/DEPLOYMENT.md:174`, `docs/plans/done/2026-10-14-marketing-levelup.md` (MKT-15 as built), `docs/RULINGS.md` (B1-18 evidence: link went live on <date>)
 - Test: `tests/unit/marketing-site.test.tsx`, `tests/unit/cf-web-deploy-vars.test.ts`
 
 **Interfaces:**
@@ -2450,7 +2450,7 @@ Docs: `ENVIRONMENT.md` — the flag is now a repo variable threaded by `cf-web-d
 npx vitest run tests/unit/marketing-site.test.tsx tests/unit/cf-web-deploy-vars.test.ts tests/unit/marketing-seo.test.ts tests/unit/unknown-store-not-found.test.tsx; echo "exit=$?"
 npm run typecheck; echo "exit=$?"
 node apps/marketing/scripts/check-links.mjs; echo "exit=$?"
-git add apps/marketing/src/lib/site.ts apps/marketing/src/lib/content.ts apps/marketing/src/components/Home.tsx .github/workflows/cf-web-deploy.yml docs/ENVIRONMENT.md docs/DEPLOYMENT.md docs/plans/2026-10-14-marketing-levelup.md docs/RULINGS.md tests/unit/marketing-site.test.tsx tests/unit/cf-web-deploy-vars.test.ts
+git add apps/marketing/src/lib/site.ts apps/marketing/src/lib/content.ts apps/marketing/src/components/Home.tsx .github/workflows/cf-web-deploy.yml docs/ENVIRONMENT.md docs/DEPLOYMENT.md docs/plans/done/2026-10-14-marketing-levelup.md docs/RULINGS.md tests/unit/marketing-site.test.tsx tests/unit/cf-web-deploy-vars.test.ts
 git commit -m "$(cat <<'EOF'
 feat(marketing): mkt-15 demo store section and the 404 demo link flag via repo variable
 

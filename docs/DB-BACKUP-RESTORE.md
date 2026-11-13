@@ -220,7 +220,7 @@ Central script `~/.claude/scripts/backup-all-neon.sh` (launchd `com.ebda.neon-ba
 - **Requires** `pg_dump` ≥ the Neon server major (PG17 → `brew install postgresql@17`;
   pg_dump 14 aborts against a PG17 server and the pipeline gzips the empty stream into a
   valid 20-byte archive — measured 2026-09-17, six such files were found locally, see
-  `docs/plans/2026-09-17-db-backup-assert-dump.md`) and the **DIRECT**
+  `docs/plans/done/2026-09-17-db-backup-assert-dump.md`) and the **DIRECT**
   (non-pooler) URL, which the script pulls from Neon via `neonctl --role-name neondb_owner`
   (full-privilege, includes RLS tables) — independent of any repo `.env`.
 
@@ -322,7 +322,7 @@ for label_url in "prod:$PROD_URL" "restored:$URL"; do
     ) denyall;
   "
 done
-# denyall_tables is the same query as docs/plans/2026-07-02-rls-cutover.md
+# denyall_tables is the same query as docs/plans/done/2026-07-02-rls-cutover.md
 # Phase 0's deny-all detector, wrapped to a scalar count (that doc's version
 # lists the table names — rerun it unwrapped in step 6 if you need names).
 # webhook_events has RLS intentionally never enabled (all access via
@@ -416,7 +416,7 @@ Native extras that are NOT a substitute: StoreDO point-in-time recovery (30 days
 
 | Date       | Path                                                                                                                                                                       | Result                                                                                                                                                                                                       |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-10-24 | StoreDO restore from R2 into a fresh DO (phase 0, live on `storedemo-souq`)                                                                                                | all 7 tables equal rows and checksums (`docs/plans/2026-10-24-cf-phase0-go-no-go.md`)                                                                                                                        |
+| 2026-10-24 | StoreDO restore from R2 into a fresh DO (phase 0, live on `storedemo-souq`)                                                                                                | all 7 tables equal rows and checksums (`docs/plans/done/2026-10-24-cf-phase0-go-no-go.md`)                                                                                                                   |
 | 2026-10-24 | D1 export, then restore into an empty D1, then re-export (local workerd, `apps/api/workers-do/backup-sweep.test.ts` "RESTORE DRILL", runs in CI job `workerd-integration`) | users + passkeys (BLOB column included): rows and sha256 equal; second restore into the non-empty target refused                                                                                             |
 | NOT YET    | Live D1 databases and the Mac pull against real R2                                                                                                                         | `ebda-platform` / `ebda-identity` do not exist in production yet (phases 1 and 2), and the Mac pull needs the read-only R2 token described in `ops/backup-ebda-cloudflare.sh`. Drill both before the cutover |
 

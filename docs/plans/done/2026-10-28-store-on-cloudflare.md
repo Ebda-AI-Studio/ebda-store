@@ -12,7 +12,7 @@
 
 ## Source draft (2026-10-24, kept for the target-architecture table and risks)
 
-Ruling INFRA-CF-1 (Ahmad, 2026-10-24). The launch waits for this. Draft written at 96% weekly usage. After the reset, expand it into bite-sized tasks with the `superpowers:writing-plans` skill and commit it as `ebda-store/docs/plans/2026-10-28-store-on-cloudflare.md`.
+Ruling INFRA-CF-1 (Ahmad, 2026-10-24). The launch waits for this. Draft written at 96% weekly usage. After the reset, expand it into bite-sized tasks with the `superpowers:writing-plans` skill and commit it as `ebda-store/docs/plans/done/2026-10-28-store-on-cloudflare.md`.
 
 ## Finish line
 
@@ -66,7 +66,7 @@ Phases 0–3 ≈ 2–3 weeks of agent work; 4–7 ≈ 1–2 weeks. Launch moves 
 
 ## Detailed plan
 
-> For agentic workers: use `superpowers:subagent-driven-development` (or `superpowers:executing-plans`) task by task. Steps use `- [ ]`. Ruling INFRA-CF-1 (Ahmad, 2026-10-24). Source draft: `2026-10-24-store-on-cloudflare.md`. Commit this file as `ebda-store/docs/plans/2026-10-28-store-on-cloudflare.md`.
+> For agentic workers: use `superpowers:subagent-driven-development` (or `superpowers:executing-plans`) task by task. Steps use `- [ ]`. Ruling INFRA-CF-1 (Ahmad, 2026-10-24). Source draft: `2026-10-24-store-on-cloudflare.md`. Commit this file as `ebda-store/docs/plans/done/2026-10-28-store-on-cloudflare.md`.
 
 **Goal:** Ebda Store runs with zero Neon/Postgres: one SQLite Durable Object per store (`StoreDO`) plus D1 `ebda-platform`, R2 and Analytics Engine.
 **Architecture:** see the draft's target-architecture table. Repo root: `internal-projects/ebda-store` (read-only root; work in a worktree via `new-task-worktree.sh ebda-store feat/<task>`).

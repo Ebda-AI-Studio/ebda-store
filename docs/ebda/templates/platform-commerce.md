@@ -1,6 +1,6 @@
 # Platform commerce features (Phase B0)
 
-Eleven things shipped on `feat/phase-b-qamar` before any Qamar work: swatches, a struck-out Size x Length grid, product facts, lead time with a "delivers by" chip (and a store-wide fallback), per-item personalisation, sticky mobile bars, video upload, hero video, size charts and the receipt-printer success page. Plan: `docs/plans/2026-10-14-phase-b0-platform-commerce.md`. Rulings: `docs/RULINGS.md` (B0-\*, T5-\*, T9-\*). Research rows: `docs/ebda/templates/research/SUMMARY.md` (1-5, 7, 8).
+Eleven things shipped on `feat/phase-b-qamar` before any Qamar work: swatches, a struck-out Size x Length grid, product facts, lead time with a "delivers by" chip (and a store-wide fallback), per-item personalisation, sticky mobile bars, video upload, hero video, size charts and the receipt-printer success page. Plan: `docs/plans/done/2026-10-14-phase-b0-platform-commerce.md`. Rulings: `docs/RULINGS.md` (B0-\*, T5-\*, T9-\*). Research rows: `docs/ebda/templates/research/SUMMARY.md` (1-5, 7, 8).
 
 Rules that apply to all of them:
 

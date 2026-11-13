@@ -13,7 +13,7 @@
  * tenantContext at the mount level was a no-op here. Every route below
  * declares its own '/:storeId/...' path, so tenant context is now set via
  * router.param (below), which runs AFTER Express resolves :storeId for the
- * matched route. See docs/plans/2026-07-02-rls-cutover.md.
+ * matched route. See docs/plans/done/2026-07-02-rls-cutover.md.
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
