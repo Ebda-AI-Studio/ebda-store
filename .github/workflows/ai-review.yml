@@ -125,7 +125,16 @@ jobs:
           set -euo pipefail
           # diff on stdin as data, rules as the prompt; no tools: the reviewer reads, it cannot act
           model=(); [ -n "${AI_REVIEW_MODEL:-}" ] && model=(--model "$AI_REVIEW_MODEL")
-          claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > "$CLAUDE_OUTPUT"
+          # Ruling AI-REVIEW-HANG-1: a call that hangs on the network is cut at 8 min and retried once, so one hang no
+          # longer burns the whole job timeout and a manual rerun (2026-11-13: #740 timed out twice on a 35 KB diff).
+          # Fail closed: two failed attempts fail the step and no label is applied.
+          for attempt in 1 2; do
+            rc=0
+            timeout 480 claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > "$CLAUDE_OUTPUT" || rc=$?
+            [ "$rc" -eq 0 ] && exit 0
+            echo "::warning::review attempt $attempt failed (exit $rc; 124 = cut at 8 min)"
+          done
+          exit 1
       - name: Post findings and gate
         id: gate
         env:

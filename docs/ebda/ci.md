@@ -233,3 +233,20 @@ failure alerts on main and cron runs; without them the notify jobs skip.
   the heavy suites; every merge is gated on it, so it set the merge rate. Evidence: 2026-11-12 20:30Z, 26 runs queued, both
   `ebda-mac` busy, both `ebda-mac-light` idle. Cost if wrong: a slow review competes with the light lane (bounded by its
   20-minute timeout); move it back by editing `ai-review.yml:review` and the pinned list.
+
+- **Ruling HOST-RUNNERS-4** (2026-11-13) - every job that takes the heavy host lock gets job `timeout-minutes` = its
+  run budget + 60, because GitHub counts the lock wait against the job timeout and `heavy-lock.sh` may wait up to
+  `HEAVY_LOCK_MAX_WAIT_S` (3600 s). Evidence: #747 `Unit shard 3/3` waited 1771 s for the lock, ran 7948 tests green
+  and was cancelled 0.3 s later at the old 35-minute limit. Pinned by `tests/unit/heavy-lock-wait-budget.test.ts`
+  (timeout must exceed the lock max wait + 20 min). Cost if wrong: a genuinely hung heavy job holds the lock up to
+  60 minutes longer before GitHub kills it.
+- **Ruling HOST-RUNNERS-5** (2026-11-13) - all `cf-*-deploy.yml` jobs (plan / deploy / notify-failure) move to the
+  light runners. A deploy takes no heavy lock and no database (same as CI `app-builds`, already light), yet the #745
+  API deploy sat queued ~70 min behind two heavy suites while both light runners were idle. Cost if wrong: a large
+  OpenNext build competes with light checks for the light runners; move back by editing the deploy workflows and the
+  pinned light list in `tests/unit/workflow-hosted-runners-only.test.ts`.
+- **Ruling AI-REVIEW-HANG-1** (2026-11-13) - the `review` step cuts `claude -p` at 8 minutes (`timeout 480`) and
+  retries once; two failures fail the step closed (no label). Evidence: #740's review was cancelled at the 20-minute
+  job timeout twice on a 35 KB diff while #742's 257 KB diff passed (network hangs to the model API that day).
+  Pinned by `tests/unit/ai-review-hang-bound.test.ts`. Cost if wrong: a slow-but-healthy review over 8 min is retried
+  and can fail where it would have finished; raise the bound with this test.
