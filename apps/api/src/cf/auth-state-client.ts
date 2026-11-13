@@ -170,8 +170,11 @@ export function withAuthStateDeadline<T>(
   ms = AUTH_STATE_TIMEOUT_MS
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // DEV_STATS only (`ops` is undefined otherwise): mark the request so workers-test can tell the designed timeout path from a hang
+  const devOps = currentIoTally()?.ops;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
+      devOps?.push(`auth-state-timeout:${label}`);
       logger.warn({ authStateTimeout: true, op: label, ms }, 'AuthState call timed out');
       reject(new AuthStateTimeoutError(label));
     }, ms);

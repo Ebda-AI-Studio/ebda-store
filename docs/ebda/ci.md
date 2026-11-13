@@ -63,7 +63,7 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   on two runners and 10-second label checks waited behind 30-minute suites. Two LIGHT runners were added:
   `~/actions-runner-ebda-light-{1,2}` (`ebda-mac-light-1/2`, label `ebda-mac-light` ONLY, no default labels, so a job
   asking for `["self-hosted","ebda-mac"]` never lands there). `EBDA_LIGHT_RUNS_ON='["ebda-mac-light"]'` routes the cheap jobs
-  there: deploy-change label, PR quality (body + slop), blast-radius, gitleaks, AI review classify / manual-pass / fork-gate,
+  there: deploy-change label, PR quality (body + slop), blast-radius, gitleaks, AI review (classify / review / manual-pass / fork-gate),
   and CI `changes`, `guards`, `unit-gate`, `app-builds`. Their fallback chain is light var, then `EBDA_RUNS_ON`, then hosted
   `ubuntu-24.04`. None of them takes the heavy lock or a per-job database (pinned by
   `tests/unit/workflow-hosted-runners-only.test.ts`), so heavy work stays at one suite at a time on the two `ebda-mac`
@@ -227,3 +227,9 @@ register when:
 Optional secrets: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALERT_CHAT_ID` enable the
 failure alerts on main and cron runs; without them the notify jobs skip.
 `vars.OPENNEXT_CACHE` is read by the Worker dry-run, as in the deploy workflow.
+
+- **Ruling HOST-RUNNERS-3** (2026-11-12) - the AI `review` job moves to the light runners. It is one CLI install plus one
+  tool-less `claude -p --max-turns 1`, with no heavy lock and no database, yet it sat on `ebda-mac` and waited 1-3 h behind
+  the heavy suites; every merge is gated on it, so it set the merge rate. Evidence: 2026-11-12 20:30Z, 26 runs queued, both
+  `ebda-mac` busy, both `ebda-mac-light` idle. Cost if wrong: a slow review competes with the light lane (bounded by its
+  20-minute timeout); move it back by editing `ai-review.yml:review` and the pinned list.
