@@ -7,7 +7,7 @@ import { storeBrandTheme } from '../lib/store-brand-theme';
 
 /**
  * Email campaigns (D2) — the pieces the admin routes, the Inngest send job and
- * the public unsubscribe endpoint share. Plan: docs/plans/2026-09-25-email-campaigns.md.
+ * the public unsubscribe endpoint share. Plan: docs/plans/done/2026-09-25-email-campaigns.md.
  *
  * Nothing in this module sends email. Sending happens only in
  * `lib/inngest/functions/campaign-send.ts`, which only runs after a merchant

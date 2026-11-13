@@ -45,6 +45,6 @@ Order-cap enforcement is the only hard stop, and only after the 7-day grace.
 
 ## Implementation status
 
-Implemented on branch `feat/locked-pricing` (see `docs/plans/2026-10-05-pricing-implementation.md` and rulings R-EBDA-PRICING-1 to 10 in `docs/RULINGS.md`). Plan codes in the DB: `basic`, `growth`, `business`; `founding_free` exists hidden and unassigned.
+Implemented on branch `feat/locked-pricing` (see `docs/plans/done/2026-10-05-pricing-implementation.md` and rulings R-EBDA-PRICING-1 to 10 in `docs/RULINGS.md`). Plan codes in the DB: `basic`, `growth`, `business`; `founding_free` exists hidden and unassigned.
 
 Update 2026-10-26: Amelia is a regular client on Growth (EBDA-FUNNEL-15), not `founding_free`; the move off `comped` is `scripts/ebda-amelia-comp-migration.mjs` (EBDA-FUNNEL-19, dry-run by default, not yet run). Extra stores: the oldest store is the billing parent and children are included, never charged (EBDA-FUNNEL-18).

@@ -9,14 +9,14 @@
 1. turns the overlay into the main editing surface: select anything, show hover name chips, edit text and images in place, use a per-section toolbar, drag on the canvas, and insert with "+" between sections;
 2. ports the page-builder-only controls into the generated panels;
 3. adds a page switcher so the canvas can show home, product, collection, cart and the content pages;
-4. absorbs `docs/plans/2026-10-21-template-editor-pass.md` (EP), which is not executed yet (no `scripts/editor-audit/` on main as of 2026-10-22). Its look-switch preview, `shownFor`, no-op removal, flow order, chrome overrides and ⌘K move into this plan, and EP Rulings 1 to 5 stand;
+4. absorbs `docs/plans/done/2026-10-21-template-editor-pass.md` (EP), which is not executed yet (no `scripts/editor-audit/` on main as of 2026-10-22). Its look-switch preview, `shownFor`, no-op removal, flow order, chrome overrides and ⌘K move into this plan, and EP Rulings 1 to 5 stand;
 5. retires `/page-builder` behind a parity test list.
 
 Every saved document keeps working. The page builder already saves into the same `store_page_revisions` home document (`apps/admin/src/lib/page-builder-save.ts` → `PUT …/builder/pages/home/draft` + `publish`), so no data migration is needed. The one new persisted shape is an optional `definition.typography` draft patch, and when it is absent nothing changes.
 
 **Tech Stack:** Next.js 16 App Router (apps/admin, apps/web), Express on Cloudflare Workers (apps/api), Zod in `@ebda/shared`, dnd-kit (already a dependency), Vitest + Testing Library, Playwright + axe-core (`playwright.builder.config.ts`, `playwright.editor-live.config.ts`).
 
-**Read with it:** `CLAUDE.md` (§ Platform-level fixes, § UI/UX standing rules), `docs/architecture/store-theme-flags.md` (canonical owners, ThemeTab ceiling 7, admin mirrors storefront order), `docs/architecture/admin-search.md`, `docs/plans/2026-10-21-template-editor-pass.md` (absorbed), `docs/plans/2026-10-21-delete-old-force-skins.md` (touches page-builder, see § Dependencies), `docs/ebda/templates/quality-bar.md` (§ independent audits, Ruling B1-70), `AHMAD-TASTE-PROFILE.md`.
+**Read with it:** `CLAUDE.md` (§ Platform-level fixes, § UI/UX standing rules), `docs/architecture/store-theme-flags.md` (canonical owners, ThemeTab ceiling 7, admin mirrors storefront order), `docs/architecture/admin-search.md`, `docs/plans/done/2026-10-21-template-editor-pass.md` (absorbed), `docs/plans/done/2026-10-21-delete-old-force-skins.md` (touches page-builder, see § Dependencies), `docs/ebda/templates/quality-bar.md` (§ independent audits, Ruling B1-70), `AHMAD-TASTE-PROFILE.md`.
 
 ## Finish line
 
@@ -115,7 +115,7 @@ The test reads `scripts/editor-audit/classic-manifest.json`. The manifest is gen
 - **VE-4 (confirmed by Ahmad 2026-10-22): every edit made in the editor is a draft until Publish, typography and palette included.** It extends THEME-DRAFT-1 with `definition.typography`. Cost if wrong: a merchant expecting an instant font change has to press Publish. That is the same model as every other edit.
 - **VE-5 (confirmed by Ahmad 2026-10-22, unchanged): content pages (`/content/[slug]`, `pages.service.ts` blocks) show in the page switcher with the canvas and inline text for their blocks. Their structure editor stays at `/content/[slug]`, linked from the switcher.** They were never in `/page-builder`, so retirement does not depend on them. Cost if wrong: two places edit a content page until a later pass folds the block editor in.
 - **VE-6: retirement is test-gated, not date-gated.** `/page-builder` is deleted only in the same PR in which `visual-editor-parity.test.ts` turns green with zero `classic-only` rows. Cost if wrong: the form page lives longer than wanted.
-- EP-1 to EP-5 (`2026-10-21-template-editor-pass.md`) are adopted unchanged. EP's tasks are executed here (map in § 6), and that plan is closed as superseded in Task 14.
+- EP-1 to EP-5 (`done/2026-10-21-template-editor-pass.md`) are adopted unchanged. EP's tasks are executed here (map in § 6), and that plan is closed as superseded in Task 14.
 
 ## 4. Arabic-first, taste, platform and protocol security rules (bind every task)
 
@@ -301,7 +301,7 @@ EP Task 6, with the deep link `/stores/:id/builder?select=<sectionId|type>&field
   2. **`registry.ts` / `settings-schema.ts`**: Dahab adds variants and this plan adds fields (T6, T10). Canvas metadata lives in the new `editor/canvas-targets.ts` to keep conflicts small, and the T6 fields are one contiguous block.
   3. **Dahab skin-owned text and images** have no markers in this plan. The T5 matrix lists them as `pending-template`. After the Dahab PR merges, a follow-up commit inside T10 adds the markers in shared wrappers or, if the skin owns the node, in the Dahab skin with the Dahab owner's review.
   4. **Header/footer markers** go in `ShopChrome.tsx` (the shared slot), not in any skin header. CLAUDE.md rule 2 (header/footer on every theme + Dahab) is satisfied by construction.
-- **Old-skin deletion plan** (`2026-10-21-delete-old-force-skins.md`, branch `docs/editor-pass-skin-removal`): its PR B edits page-builder code paths keyed on the old skins (`recommendedSizeTextForTemplate`). Whichever lands second drops the conflicting hunk. If T12 has deleted the page, the skin plan's page-builder edits become no-ops.
+- **Old-skin deletion plan** (`done/2026-10-21-delete-old-force-skins.md`, branch `docs/editor-pass-skin-removal`): its PR B edits page-builder code paths keyed on the old skins (`recommendedSizeTextForTemplate`). Whichever lands second drops the conflicting hunk. If T12 has deleted the page, the skin plan's page-builder edits become no-ops.
 - **In-flight editor fixes** (worktrees `fix-editor-mobile-overflow`, `fix-editor-theme-save-draft-only`, `fix-editor-fresh-store-empty-sections`, `fix-inactive-store-editor-preview`): check `git branch -r --no-merged origin/main` at the start of T1 and rebase onto any that have merged. Do not duplicate their fixes.
 - **The final impeccable polish pass** runs on all templates and the editor together after T14 and after the Dahab, Jasmine and Lamma builds merge. It is out of this plan's scope. T14's audits gate only the editor.
 - **Deploy order** (VE-2): web before admin for T1–T4 and T8. An admin running ahead of web just receives no new intents (fails closed).

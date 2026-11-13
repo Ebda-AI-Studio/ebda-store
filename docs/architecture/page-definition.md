@@ -1,6 +1,6 @@
 # PageDefinition — the visual builder's page document
 
-Status: Phase 1 (2026-10-07, branch `feat/builder-phase1`) + Phase 2 editor (branch `feat/builder-phase2`). Roadmap: `docs/plans/2026-10-07-ebda-visual-builder-roadmap.md`; file plan: `docs/plans/2026-10-07-builder-file-plan.md`. Rulings: `docs/RULINGS.md` → "Visual builder Phase 1 (BUILDER-\*)".
+Status: Phase 1 (2026-10-07, branch `feat/builder-phase1`) + Phase 2 editor (branch `feat/builder-phase2`). Roadmap: `docs/plans/done/2026-10-07-ebda-visual-builder-roadmap.md`; file plan: `docs/plans/done/2026-10-07-builder-file-plan.md`. Rulings: `docs/RULINGS.md` → "Visual builder Phase 1 (BUILDER-\*)".
 
 ## Model (Shopify theme-editor shape)
 

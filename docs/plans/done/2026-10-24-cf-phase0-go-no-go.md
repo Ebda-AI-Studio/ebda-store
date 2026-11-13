@@ -1,6 +1,6 @@
 # Phase 0 go/no-go: Ebda Store on Cloudflare only (Ruling INFRA-CF-1)
 
-Date 2026-10-24. Plan: `docs/plans/2026-10-28-store-on-cloudflare.md`. Evidence: `spikes/store-do/` (README, `orm/README.md`, `results/`). Labels: **measured** = a number from a run in this session; **inferred** = reasoned from docs or code; **guess** = assumption.
+Date 2026-10-24. Plan: `docs/plans/done/2026-10-28-store-on-cloudflare.md`. Evidence: `spikes/store-do/` (README, `orm/README.md`, `results/`). Labels: **measured** = a number from a run in this session; **inferred** = reasoned from docs or code; **guess** = assumption.
 
 ## Verdict: GO, with three conditions
 

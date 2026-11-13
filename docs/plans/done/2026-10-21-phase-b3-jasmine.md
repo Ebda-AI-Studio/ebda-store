@@ -8,7 +8,7 @@
 
 **Tech Stack:** unchanged — Next.js 16, Express on Cloudflare Workers, Prisma + Neon (strict RLS + tenant guard), Zod in `@ebda/shared`, Vitest, Playwright + axe-core, R2 `ebda-media` (`https://media.ebda.app`), FLUX.1 schnell on Workers AI (offline image generation), ffmpeg.
 
-**Spec / read with it:** `docs/plans/2026-10-14-templates-and-editor-program.md` (Rulings TPL-1..4, scenario matrix), `docs/ebda/templates/2026-10-14-directions.md` (Jasmine A/B/C), `docs/ebda/templates/research/jasmine.md`, `docs/ebda/templates/looks.md`, `docs/ebda/templates/quality-bar.md` (**§ 9 and § 10 binding**), `docs/ebda/templates/qamar.md`, `docs/ebda/templates/platform-commerce.md` (B0-4 as amended by B0-49), `docs/ebda/templates/demo-store.md`, `docs/plans/2026-10-21-phase-b2-souq.md` (the model for this plan; its Rulings B2-1..B2-18 and ledger `.superpowers/sdd/2026-10-21-phase-b2-souq/`), and **Ahmad's taste profile** `business/ebda/AHMAD-TASTE-PROFILE.md` (binding, see Taste Rules).
+**Spec / read with it:** `docs/plans/done/2026-10-14-templates-and-editor-program.md` (Rulings TPL-1..4, scenario matrix), `docs/ebda/templates/2026-10-14-directions.md` (Jasmine A/B/C), `docs/ebda/templates/research/jasmine.md`, `docs/ebda/templates/looks.md`, `docs/ebda/templates/quality-bar.md` (**§ 9 and § 10 binding**), `docs/ebda/templates/qamar.md`, `docs/ebda/templates/platform-commerce.md` (B0-4 as amended by B0-49), `docs/ebda/templates/demo-store.md`, `docs/plans/done/2026-10-21-phase-b2-souq.md` (the model for this plan; its Rulings B2-1..B2-18 and ledger `.superpowers/sdd/2026-10-21-phase-b2-souq/`), and **Ahmad's taste profile** `business/ebda/AHMAD-TASTE-PROFILE.md` (binding, see Taste Rules).
 
 ---
 

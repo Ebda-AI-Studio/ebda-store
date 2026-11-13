@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Zod, Prisma (Neon, strict RLS + tenant guard), Express-on-Workers API, Next.js 16 storefront/admin, Vitest.
 
-**Spec:** `docs/plans/2026-10-14-templates-and-editor-program.md` (Phase S + Rulings TPL-1..3, MKT-3), `docs/ebda/templates/2026-10-14-directions.md` (the 15 looks), `PRODUCT.md`. Current-system map: §"What exists today" below (gathered 2026-10-14 from source).
+**Spec:** `docs/plans/done/2026-10-14-templates-and-editor-program.md` (Phase S + Rulings TPL-1..3, MKT-3), `docs/ebda/templates/2026-10-14-directions.md` (the 15 looks), `PRODUCT.md`. Current-system map: §"What exists today" below (gathered 2026-10-14 from source).
 
 ## Rulings (decided at plan time)
 

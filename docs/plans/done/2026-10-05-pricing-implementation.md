@@ -2,7 +2,7 @@
 
 **Goal:** Basic/Growth/Business prices and the Growth trial match Ahmad's locked decision.
 **Architecture:** Add a forward catalog migration; keep historical migrations and legacy subscription codes intact. Publish the same monthly and annual prices on the bilingual marketing and help pages. Gate new orders after seven days over the monthly cap.
-**Spec:** docs/plans/2026-10-05-pricing-decisions.md
+**Spec:** docs/plans/done/2026-10-05-pricing-decisions.md
 
 - [x] Add priced paid catalog rows; hide historical Free/Pro from public selection, zero their fees, preserve existing subscription references.
 - [x] Resolve locked catalog fallback values and create a fourteen-day Growth trial atomically during self-serve provisioning.

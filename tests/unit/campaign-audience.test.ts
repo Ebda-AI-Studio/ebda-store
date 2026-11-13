@@ -3,7 +3,7 @@
  *
  * The fake Prisma EVALUATES the `where` it is given, so deleting any predicate
  * from `buildCampaignAudience` returns rows the test forbids. Mutation-proven:
- * see docs/plans/2026-09-25-email-campaigns.md (Verification).
+ * see docs/plans/done/2026-09-25-email-campaigns.md (Verification).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
