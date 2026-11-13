@@ -2,7 +2,7 @@
    paper) and the brand gold is an accent only: the primary button, active states and small
    marks. The colour on the page comes from the merchants' stores in the looks phones. Brand
    colours (--night, --gold, --lift) and font stacks are injected from BRAND on <html>; the rest
-   are neutrals. Contrast of every text pair is recorded in docs/plans/2026-10-14-marketing-levelup.md. */
+   are neutrals. Contrast of every text pair is recorded in docs/plans/done/2026-10-14-marketing-levelup.md. */
 :root {
   --canvas: #fafafa;
   --panel: #ffffff;

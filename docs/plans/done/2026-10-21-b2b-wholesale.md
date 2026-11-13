@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Zod 3, Prisma 6.19 (strict RLS as `ebda_app`, tenant guard), Express on Cloudflare Workers, Inngest, Next.js 16 (web + admin, next-intl), Vitest 4 (supertest + real Postgres for integration).
 
-**Plan file:** `docs/plans/2026-10-21-b2b-wholesale.md` · branch `feat/b2b-wholesale` (off `main` @ 03f7421c2).
+**Plan file:** `docs/plans/done/2026-10-21-b2b-wholesale.md` · branch `feat/b2b-wholesale` (off `main` @ 03f7421c2).
 
 ---
 

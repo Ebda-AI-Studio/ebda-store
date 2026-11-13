@@ -7,7 +7,7 @@
  * replay: finished steps return their recorded result, the failed step runs
  * again.
  *
- * Mutation-proven (docs/plans/2026-09-25-email-campaigns.md, Verification):
+ * Mutation-proven (docs/plans/done/2026-09-25-email-campaigns.md, Verification):
  * deleting the `r.status !== 'queued'` idempotency guard turns
  * "a retried batch never re-sends a delivered recipient" red.
  */

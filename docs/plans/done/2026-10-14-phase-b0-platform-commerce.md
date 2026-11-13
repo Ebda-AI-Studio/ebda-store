@@ -12,7 +12,7 @@
 
 - `docs/ebda/templates/research/SUMMARY.md`: P0 rows 1–5, plus row 7 (video) and row 8 (size chart / two-axis chips), which are the Joomah items.
 - `docs/ebda/templates/research/qamar.md`.
-- `docs/plans/2026-10-14-templates-and-editor-program.md` (Phase B).
+- `docs/plans/done/2026-10-14-templates-and-editor-program.md` (Phase B).
 - Ahmad, 2026-10-14: the receipt-printer animation from Instagram reel `DecOpDXt1Fs` is used for every template (frame notes in Task 10).
 
 ## Rulings made during execution
@@ -1695,7 +1695,7 @@ Grep every new identifier across `apps packages tests docs scripts .github`:
 - Walk the full E2E flow (PDP → cart → checkout → receipt) on a 390px phone in Arabic and in English, on `minimal` and on `dahab`. Run the `impeccable` skill's `critique` on the flow as one experience, not per screen. Fix P0/P1 and rule on any P2.
 - Add pillar 5 to the "Strategic positioning" list in `CLAUDE.md`:
 
-  > 5. **Taste** — when anyone can build a store, the difference is what we leave out and how it feels when it opens. Every UI change passes the taste bar in `docs/plans/2026-10-14-phase-b0-platform-commerce.md` (§ Taste bar): hard leave-out limits, motion only where it means something, Arabic-first screenshots, an impeccable critique before commit.
+  > 5. **Taste** — when anyone can build a store, the difference is what we leave out and how it feels when it opens. Every UI change passes the taste bar in `docs/plans/done/2026-10-14-phase-b0-platform-commerce.md` (§ Taste bar): hard leave-out limits, motion only where it means something, Arabic-first screenshots, an impeccable critique before commit.
 
   Also add `taste-bar` to the anti-patterns line: "features that add chrome without adding meaning".
 
@@ -1706,7 +1706,7 @@ Run: `npm run typecheck && npm run lint && npm run test:unit` → all exit 0 (ca
 - [ ] **Step 5: Commit**
 
 ```bash
-git add CLAUDE.md tests/smoke/commerce-b0.spec.ts docs/ebda/templates/platform-commerce.md docs/ebda/templates/research docs/architecture/store-theme-flags.md docs/RULINGS.md docs/plans/2026-10-14-phase-b0-platform-commerce.md
+git add CLAUDE.md tests/smoke/commerce-b0.spec.ts docs/ebda/templates/platform-commerce.md docs/ebda/templates/research docs/architecture/store-theme-flags.md docs/RULINGS.md docs/plans/done/2026-10-14-phase-b0-platform-commerce.md
 git commit -m "docs(commerce): b0 platform features doc, rulings, research status and e2e"
 ```
 

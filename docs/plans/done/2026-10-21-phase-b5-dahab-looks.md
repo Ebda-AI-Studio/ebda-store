@@ -1,6 +1,6 @@
 # Phase B5 — Dahab redesign: Worn / Workshop / Gift box Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax. **LEAN MODE is binding** (contract below), same shape as the B2 Souq plan (`feat/b2-souq:docs/plans/2026-10-21-phase-b2-souq.md`), with **no Ahmad STOP points** (his 2026-10-21 decision): build → independent audits (≥ 28/40, 0 P0/P1) → fix → merge.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax. **LEAN MODE is binding** (contract below), same shape as the B2 Souq plan (`feat/b2-souq:docs/plans/done/2026-10-21-phase-b2-souq.md`), with **no Ahmad STOP points** (his 2026-10-21 decision): build → independent audits (≥ 28/40, 0 P0/P1) → fix → merge.
 
 **Goal:** Retire the night + gold + arch Dahab skin (Ruling TPL-2) and ship Dahab as three real looks — Worn (`dahab.worn`), Workshop (`dahab.workshop`), Gift box (`dahab.giftbox`) — on the existing `dahab` skin id, keeping every piece of its commerce wiring (ProductDetail, bag drawer, pinned buy bar, swatch chips, B0 facts / lead time / personalisation / size chart) and wiring the 3D slot it never actually received. Existing Dahab stores move to a new look with their content intact (C8 keep-diff) and no published page breaking. A third demo store `storedemo-dahab` shows the three looks; the marketing illustrations are replaced by captures of it (TPL-4). **Added 2026-10-21 (Ahmad): live gold-rate pricing as a merchant option for any store, shown first on Dahab (Tasks 8–14, Rulings B5-12..B5-21; overturns B5-6).**
 
@@ -8,7 +8,7 @@
 
 **Tech stack:** as B1/B2 (Next on Workers, Hono API, Prisma/Postgres RLS, vitest, Playwright, `scripts/taste/*` purchase-path pack, FLUX on Workers AI for offline imagery).
 
-**Spec / read with:** `docs/plans/2026-10-14-templates-and-editor-program.md` (TPL-1..4, Phase S contract), `docs/ebda/templates/2026-10-14-directions.md` (§ Dahab A/B/C), `docs/ebda/templates/research/dahab.md`, `docs/ebda/templates/dahab.md` (historical), `docs/ebda/templates/looks.md`, `quality-bar.md` (§ 9, § 10 binding), `qamar.md`, `platform-commerce.md` (B0 §3 facts, §4 lead time, §5 personalisation, §9 size charts), `demo-store.md`, Ahmad's taste profile `Ebda-AI-Studio/business/ebda/AHMAD-TASTE-PROFILE.md` (binding), the B1 ledger and the B2 plan.
+**Spec / read with:** `docs/plans/done/2026-10-14-templates-and-editor-program.md` (TPL-1..4, Phase S contract), `docs/ebda/templates/2026-10-14-directions.md` (§ Dahab A/B/C), `docs/ebda/templates/research/dahab.md`, `docs/ebda/templates/dahab.md` (historical), `docs/ebda/templates/looks.md`, `quality-bar.md` (§ 9, § 10 binding), `qamar.md`, `platform-commerce.md` (B0 §3 facts, §4 lead time, §5 personalisation, §9 size charts), `demo-store.md`, Ahmad's taste profile `Ebda-AI-Studio/business/ebda/AHMAD-TASTE-PROFILE.md` (binding), the B1 ledger and the B2 plan.
 
 ---
 

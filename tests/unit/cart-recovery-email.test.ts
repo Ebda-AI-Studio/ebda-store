@@ -1,6 +1,6 @@
 /**
  * Abandoned-cart recovery EMAIL (cart-email-campaigns, 2026-10-21).
- * Plan: docs/plans/2026-10-21-cart-email-campaigns.md.
+ * Plan: docs/plans/done/2026-10-21-cart-email-campaigns.md.
  *
  * The service runs against a tiny in-memory Prisma that EVALUATES `where`
  * clauses (reusing the campaign fake's matcher), so removing a predicate from

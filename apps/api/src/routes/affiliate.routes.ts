@@ -23,7 +23,7 @@ import { tenantContext } from '../middleware/tenant-context';
 // does NOT populate req.params.storeId at the mount level — every route below
 // declares its own '/:storeId/...' path. router.param runs AFTER Express
 // resolves :storeId for the matched route, so RLS tenant context is set
-// correctly on either router. See F2, docs/plans/2026-07-02-rls-cutover.md.
+// correctly on either router. See F2, docs/plans/done/2026-07-02-rls-cutover.md.
 const router = Router();
 router.param('storeId', tenantContext);
 

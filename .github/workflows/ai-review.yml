@@ -70,7 +70,8 @@ jobs:
   review:
     name: AI review
     needs: classify
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    # light (Ruling HOST-RUNNERS-3): one CLI install + one tool-less `claude -p`; no heavy lock, no database
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'labeled' && needs.classify.outputs.risky == 'true'
     steps:

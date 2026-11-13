@@ -42,7 +42,7 @@ Rulings: NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1. Scope: `apps/marketing` o
    679px language and Log in are Menu rows (the language row 44px tall). English from 1480px keeps the 1200px link
    spacing.
 5. `globals.css`: NOT changed. Its rules for the old `li.menu-start` still apply to the class on the link; `chrome.css`
-   loads after it and sets `display: flex` under 800px. (Follow-up, `docs/plans/2026-11-10-review-followups.md` item 2:
+   loads after it and sets `display: flex` under 800px. (Follow-up, `docs/plans/done/2026-11-10-review-followups.md` item 2:
    that relied on import order, so globals.css now hides `.menu-start` only from 800px and has no rule for it below;
    the two ranges never overlap.)
 6. Tests: `tests/unit/marketing-header-actions.test.tsx` (markup, labels and links, and that the ladder's CSS rules are

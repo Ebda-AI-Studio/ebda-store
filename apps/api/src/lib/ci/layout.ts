@@ -1,4 +1,4 @@
-/** R2 `ebda-ci` key layout (docs/plans/2026-10-28-customer-intelligence.md 1.6). Dependency-free. */
+/** R2 `ebda-ci` key layout (docs/plans/done/2026-10-28-customer-intelligence.md 1.6). Dependency-free. */
 export const ciBuyerIndexKey = (buyerKey: string) =>
   `index/buyer/${buyerKey.slice(0, 2)}/${buyerKey}.json`;
 export const ciPartitionPrefix = (storeId: string, day: string) =>
