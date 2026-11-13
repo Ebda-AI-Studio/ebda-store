@@ -313,6 +313,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/2026-10-25-templates-match-mockups.md](plans/2026-10-25-templates-match-mockups.md) - Make the real templates look like the Python mock-ups (2026-10-25)
 - [plans/done/2026-10-25-wa-store-contract-store-side.md](plans/done/2026-10-25-wa-store-contract-store-side.md) - Ebda Store side of the WhatsApp contract (producer, consumer, buyer key)
 - [plans/done/2026-10-26-search-as-you-type.md](plans/done/2026-10-26-search-as-you-type.md) - Search as you type, everywhere (2026-10-26)
+- [plans/2026-11-12-arabic-stemming.md](plans/2026-11-12-arabic-stemming.md) - Arabic light stemming for storefront search (2026-11-12)
 - [plans/2026-10-26-storefront-locale-paths.md](plans/2026-10-26-storefront-locale-paths.md) - Storefront English at its own URL (audit M-168, SEO-9)
 - [plans/done/2026-10-28-customer-intelligence.md](plans/done/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
 - [plans/done/2026-10-28-store-on-cloudflare.md](plans/done/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan
