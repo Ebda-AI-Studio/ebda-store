@@ -245,3 +245,8 @@ failure alerts on main and cron runs; without them the notify jobs skip.
   API deploy sat queued ~70 min behind two heavy suites while both light runners were idle. Cost if wrong: a large
   OpenNext build competes with light checks for the light runners; move back by editing the deploy workflows and the
   pinned light list in `tests/unit/workflow-hosted-runners-only.test.ts`.
+- **Ruling AI-REVIEW-HANG-1** (2026-11-13) - the `review` step cuts `claude -p` at 8 minutes (`timeout 480`) and
+  retries once; two failures fail the step closed (no label). Evidence: #740's review was cancelled at the 20-minute
+  job timeout twice on a 35 KB diff while #742's 257 KB diff passed (network hangs to the model API that day).
+  Pinned by `tests/unit/ai-review-hang-bound.test.ts`. Cost if wrong: a slow-but-healthy review over 8 min is retried
+  and can fail where it would have finished; raise the bound with this test.
