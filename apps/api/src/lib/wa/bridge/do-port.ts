@@ -8,6 +8,7 @@ import { storeRepo, storeMoney, storeWriter, type CreateOrderArgs } from '../../
 import { lookupStore } from '../../definer';
 import { readInStoreContext } from '../../store-scoped-read';
 import { rankedSearchWithMode } from '../../../services/product-search.service';
+import { queryBudgetSpent } from '../../search/embed-budget';
 import { codFeeConfigFromRow } from '../../../services/payment-providers/cod.provider';
 import { isWhatsAppLinked } from '../link';
 import { applyCodOutcome } from '../store-events-consumer';
@@ -75,8 +76,42 @@ const methodOf = (
 /** How many ranked ids the chat search expands into rows (the caller's `limit` is at most 20). */
 const SEARCH_CANDIDATES = 60;
 
+/** One active shipping area rate, as the policy fold reads it. */
+type ChatAreaRateRow = {
+  governorate: string;
+  governorateAr: string;
+  deliveryFee: number;
+  freeShippingThreshold: number | null;
+};
+/** One active shipping zone, as the policy answer reads it. */
+type ChatZoneRow = {
+  name: string;
+  nameAr: string | null;
+  areas: unknown;
+  deliveryFee: number;
+  freeShippingThreshold: number | null;
+  estimatedDays: number | null;
+  estimatedDaysMin: number | null;
+  estimatedDaysMax: number | null;
+};
+/** One recent order for the chat customer profile (the `select` below). */
+type ChatRecentOrderRow = {
+  orderNumber: string;
+  status: string;
+  paymentStatus: string;
+  total: number;
+  walletAmount: number;
+  currency: string;
+  createdAt: Date | string;
+  items: Array<{ productName: string; variantName: string | null; quantity: number }>;
+  payments: Array<{ provider: string }>;
+};
+
 /** Per-governorate rates folded from the area rates: cheapest and dearest fee, and the lowest free-shipping threshold. */
-export function governoratesOf(rates: any[]): StorePolicyFacts['shipping']['governorates'] {
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-do-port-chat-context.test.ts
+export function governoratesOf(
+  rates: ChatAreaRateRow[]
+): StorePolicyFacts['shipping']['governorates'] {
   const by = new Map<string, StorePolicyFacts['shipping']['governorates'][number]>();
   for (const r of rates) {
     const cur = by.get(r.governorate);
@@ -358,7 +393,10 @@ export function createDoPort(): BridgePort {
       const { ids, degraded } = await readInStoreContext(storeId, () =>
         rankedSearchWithMode(storeId, query, { searcher: o.searcher })
       );
-      if (ids.length === 0) return { items: [], degraded };
+      // Chat only: once the store's daily query-embed budget is spent the meaning leg is skipped and the storefront calls that
+      // "not degraded" (it is a budget, not a failure). For Chat an empty answer then rests on keyword search alone, so it is
+      // reported degraded and the agent says it will check instead of "we don't have it" (Ruling CHAT-AGENT-6).
+      if (ids.length === 0) return { items: [], degraded: degraded || queryBudgetSpent(storeId) };
       const top = ids.slice(0, SEARCH_CANDIDATES);
       const d = await db(storeId);
       const products: any[] = await d.product.findMany({
@@ -390,12 +428,12 @@ export function createDoPort(): BridgePort {
           returnFeesPaidBy: true,
         },
       });
-      const zones: any[] = await d.shippingZone.findMany({
+      const zones: ChatZoneRow[] = await d.shippingZone.findMany({
         where: { storeId, isActive: true },
         orderBy: { position: 'asc' },
         take: 30,
       });
-      const areaRates: any[] = await d.shippingAreaRate.findMany({
+      const areaRates: ChatAreaRateRow[] = await d.shippingAreaRate.findMany({
         where: { storeId, isActive: true },
         orderBy: { position: 'asc' },
         take: 2000,
@@ -452,7 +490,7 @@ export function createDoPort(): BridgePort {
         known: boolean;
       };
       const d = await db(storeId);
-      const orders: any[] = await d.order.findMany({
+      const orders: ChatRecentOrderRow[] = await d.order.findMany({
         where: { storeId, buyerKey, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: 3,
@@ -479,7 +517,7 @@ export function createDoPort(): BridgePort {
           totalMinor: o.total,
           currency: o.currency,
           at: new Date(o.createdAt).getTime(),
-          items: (o.items as any[]).map(i => ({
+          items: o.items.map(i => ({
             name: i.variantName ? `${i.productName} - ${i.variantName}` : i.productName,
             quantity: i.quantity,
           })),

@@ -46,6 +46,10 @@ vi.mock('../../../apps/api/src/services/product-search.service', () => ({
     degraded: flags.degraded,
   }),
 }));
+const budget = { spent: false };
+vi.mock('../../../apps/api/src/lib/search/embed-budget', () => ({
+  queryBudgetSpent: () => budget.spent,
+}));
 vi.mock('../../../apps/api/src/middleware/security', () => ({ auditLog: vi.fn() }));
 vi.mock('../../../apps/api/src/lib/buyer-identity', () => ({ ANONYMOUS_BUYER: 'anon' }));
 vi.mock('../../../apps/api/src/config', () => ({ config: { webUrl: 'https://web.example' } }));
@@ -125,6 +129,21 @@ describe('searchProducts', () => {
     });
     expect(rows.map(r => r.retailerId)).toEqual(['p1']);
   });
+  it('an empty answer once the store search budget is spent is DEGRADED, never a confident "we don\'t have it" (Ruling CHAT-AGENT-6)', async () => {
+    ranked.mockResolvedValue([]);
+    budget.spent = true;
+    try {
+      expect(
+        await createDoPort().searchProducts('s1', 'gift', { limit: 5, searcher: 'wa-chat:s1' })
+      ).toEqual({ items: [], degraded: true });
+    } finally {
+      budget.spent = false;
+    }
+    expect(
+      await createDoPort().searchProducts('s1', 'gift', { limit: 5, searcher: 'wa-chat:s1' })
+    ).toEqual({ items: [], degraded: false });
+  });
+
   it('applies the price ceiling on the sellable row (a variant can be under budget while its product is not)', async () => {
     ranked.mockResolvedValue(['p1']);
     productFind.mockResolvedValue([prod('p1', 90000)]);

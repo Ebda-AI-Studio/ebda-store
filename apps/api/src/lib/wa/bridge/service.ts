@@ -51,7 +51,7 @@ export interface CatalogRow {
   brand: string | null;
 }
 /** Facts a shopper asks about. Every field is what the merchant DECLARED; absent = null / empty, never a default. */
-export interface ShippingZoneFact {
+interface ShippingZoneFact {
   name: string;
   nameAr: string | null;
   areas: string[];
@@ -60,7 +60,7 @@ export interface ShippingZoneFact {
   etaDaysMin: number | null;
   etaDaysMax: number | null;
 }
-export interface GovernorateRateFact {
+interface GovernorateRateFact {
   governorate: string;
   governorateAr: string;
   /** Cheapest and dearest area fee inside the governorate (equal when it has one rate). */
@@ -76,6 +76,7 @@ export interface StorePolicyFacts {
   hours: string | null;
   location: { address: string | null; addressAr: string | null; mapsUrl: string | null } | null;
 }
+// pq-allow(unused-export): named by the emitted declarations of waBridge (index.ts) and the worker RPC getStorePolicies return type (TS4023/TS4053 without it)
 export interface StorePolicies extends StorePolicyFacts {
   name: string;
   currency: string;
@@ -84,7 +85,7 @@ export interface StorePolicies extends StorePolicyFacts {
   instapay: boolean;
   cod: { available: boolean; fixedFeeMinor: number | null; percentBps: number | null };
 }
-export interface FullAddress extends Address {
+interface FullAddress extends Address {
   governorate: string | null;
   buildingNumber: string | null;
   notes: string | null;
@@ -95,7 +96,7 @@ export interface CustomerProfileFacts {
   defaultAddress: FullAddress | null;
   recentOrders: Array<OrderSummaryLite & { items: Array<{ name: string; quantity: number }> }>;
 }
-export interface OrderSummaryLite {
+interface OrderSummaryLite {
   orderNumber: string;
   status: OrderStatus;
   totalMinor: number;
