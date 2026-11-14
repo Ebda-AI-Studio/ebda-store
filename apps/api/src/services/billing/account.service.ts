@@ -1213,6 +1213,11 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     };
   });
 
+  if (!result.duplicate && input.actorId !== 'system:auto-confirm') {
+    // INSTAPAY-AUTO-1 (review finding 1): a person's confirmation also claims the receipt in the platform-global duplicate index
+    const { claimDedupeForHumanConfirm } = await import('./instapay-auto-confirm.service.js');
+    await claimDedupeForHumanConfirm(input.storeId, result.billingEventId).catch(() => undefined);
+  }
   if (!result.duplicate) {
     // the approved receipts' screenshots are deleted now that the approval has committed (M-003; a miss is retried weekly)
     await InstapayReceiptService.deleteImages(input.storeId, result.approvedReceiptIds ?? []);

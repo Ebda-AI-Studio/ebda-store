@@ -299,9 +299,10 @@ describe('fraud matrix', () => {
     expect(good.extract?.amountMinor).toBe(5000);
     expect((await run({ read: good })).out.state).toBe('auto_confirmed');
     const wrong = parseReceiptExtraction(rawAnswer({ amount: '٥١٫٠٠', reference: '100000000008' }));
-    expect((await run({ read: wrong, reference: '100000000008' })).out).toMatchObject({
-      reasons: ['AMOUNT_MISMATCH'],
-    });
+    // (after the first payment, the cumulative first-payment cap of INSTAPAY-CAP-1 also speaks)
+    expect((await run({ read: wrong, reference: '100000000008' })).out.reasons).toContain(
+      'AMOUNT_MISMATCH'
+    );
     const ambiguous = parseReceiptExtraction(
       rawAnswer({ amount: '1.200', reference: '100000000009' })
     );

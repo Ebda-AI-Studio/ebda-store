@@ -220,12 +220,13 @@ describe('S4 decide and activate', () => {
     expect(events()).toHaveLength(0);
   });
 
-  it('when the ledger row IS recorded but the rest of the activation fails, the dedupe claim stays held (the payment must stay unreusable)', async () => {
+  it('when the ledger row IS recorded but the rest of the activation fails, the row is auto_confirmed (digest + revert) and the dedupe claim stays held', async () => {
     const c = seedClaim(w);
     h.storeUpdate.mockRejectedValue(new Error('store write down'));
     const out = await decideAndActivate({ storeId: A, claimId: c.claimId });
     h.storeUpdate.mockResolvedValue({});
-    expect(out.state).toBe('failed');
+    expect(out.state).toBe('auto_confirmed');
+    expect(out.billingEventId).toBeTruthy();
     expect(events()).toHaveLength(1);
     expect(w.dd.prepare('SELECT COUNT(*) n FROM instapay_dedupe').get()).toEqual({ n: 2 });
     expect(h.alert).toHaveBeenCalled();

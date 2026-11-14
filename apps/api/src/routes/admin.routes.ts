@@ -46,6 +46,7 @@ import {
   suggestManualPeriod,
 } from '../services/billing/account.service';
 import {
+  backfillDedupeFromHistory,
   listAutoConfirmationsForAdmin,
   revertAutoConfirmed,
 } from '../services/billing/instapay-auto-confirm.service';
@@ -688,6 +689,20 @@ router.post(
       const { reason } = z.object({ reason: z.string().trim().min(3).max(300) }).parse(req.body);
       const out = await revertAutoConfirmed({ id, actor: req.user!.userId, reason });
       res.json({ success: true, data: out });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Burn every person-approved receipt in the global InstaPay index (R1 backfill). Idempotent; `dryRun` only counts. */
+router.post(
+  '/billing/auto-confirm/backfill',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { dryRun } = z.object({ dryRun: z.boolean().default(true) }).parse(req.body ?? {});
+      res.json({ success: true, data: await backfillDedupeFromHistory({ dryRun }) });
     } catch (error) {
       next(error);
     }
