@@ -11677,6 +11677,7 @@
     "deleteBody": "Deleting removes the store, its products and its customers' personal data. Orders keep the tax and payment records the law requires, without the customer's identity. You have 14 days to change your mind.",
     "deleteButton": "Delete this store",
     "pendingBody": "This store will be deleted on {date}. Until then you can cancel and nothing is lost.",
+    "stuckBody": "The deletion hit a problem and is paused. Ebda Store has been alerted and will finish it.",
     "runningBody": "The deletion is running now and can no longer be cancelled.",
     "cancelButton": "Cancel the deletion",
     "dialogTitle": "Delete this store",

@@ -152,4 +152,25 @@ describe('OwnerStoreLifecycle', () => {
     expect(await screen.findByText(/can no longer be cancelled/)).toBeTruthy();
     expect(screen.queryByText('Cancel the deletion')).toBeNull();
   });
+
+  it('a stuck deletion shows the paused notice and the last reason, still no cancel button', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        request: {
+          id: 'r1',
+          state: 'executing',
+          executeAfter: '2026-11-28T10:00:00Z',
+          stuckAt: '2026-11-28T11:00:00Z',
+          failures: 3,
+          lastFailure: { message: 'd1 down' },
+        },
+        isOwner: true,
+      },
+      error: null,
+    });
+    render(<OwnerStoreLifecycle storeId="s1" />);
+    expect(await screen.findByText(/paused/)).toBeTruthy();
+    expect(screen.getByText('d1 down')).toBeTruthy();
+    expect(screen.queryByText('Cancel the deletion')).toBeNull();
+  });
 });
