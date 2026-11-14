@@ -8,7 +8,10 @@
   "titleAr": "اقتراحات تلقائية للمنتجات",
   "titleEn": "Automatic similar and bought-together recommendations",
   "screens": [],
-  "api": ["(PR #742)"],
+  "api": [
+    "GET /stores/:storeId/recommendations/auto-setting",
+    "PUT /stores/:storeId/recommendations/auto-setting"
+  ],
   "mcpTool": null,
   "planGate": "upsell_crosssell",
   "roles": ["owner", "staff", "super_admin"],
