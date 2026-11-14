@@ -518,8 +518,8 @@ export class InstapayReceiptService {
     storeId: string,
     receiptId: string
   ): Promise<'done' | 'skipped' | 'unreadable'> {
-    const row = await withStore(storeId, () =>
-      prisma.instapayReceipt.findUnique({ where: { id: receiptId, storeId } })
+    const row = await withStore(storeId, tx =>
+      tx.instapayReceipt.findUnique({ where: { id: receiptId, storeId } })
     );
     if (!row || row.kind !== 'subscription') return 'skipped';
     if (autoReadOf(row.extracted)) return 'skipped';
@@ -534,8 +534,8 @@ export class InstapayReceiptService {
     const base = (
       row.extracted && typeof row.extracted === 'object' ? row.extracted : {}
     ) as object;
-    await withStore(storeId, () =>
-      prisma.instapayReceipt.updateMany({
+    await withStore(storeId, tx =>
+      tx.instapayReceipt.updateMany({
         where: { id: receiptId, storeId },
         data: {
           extracted: {
@@ -553,8 +553,8 @@ export class InstapayReceiptService {
     storeId: string,
     receiptId: string
   ): Promise<'queued' | 'skipped' | 'failed'> {
-    const row = await withStore(storeId, () =>
-      prisma.instapayReceipt.findUnique({ where: { id: receiptId, storeId } })
+    const row = await withStore(storeId, tx =>
+      tx.instapayReceipt.findUnique({ where: { id: receiptId, storeId } })
     );
     if (!row?.claimId || row.kind !== 'subscription' || row.status !== 'submitted')
       return 'skipped';

@@ -69,7 +69,8 @@ export const FAMILIES = {
   // N-10d. MONEY. Refuses unless the `billing` marker exists (a claim is confirmed inside the billing ledger flow). The order
   // receipts of stores that live on their Durable Object are NOT copied (their home is the DO, Ruling INSTAPAY-DO-1): the
   // run counts them and refuses --commit until --accept-skipped-do-receipts <that count> acknowledges the number.
-  payments: ['instapay_receipts', 'manual_payment_claims'],
+  // INSTAPAY-AUTO-1: instapay_auto_confirmations is born on D1 (no Postgres rows in production); listed so the router and the copy agree.
+  payments: ['instapay_receipts', 'manual_payment_claims', 'instapay_auto_confirmations'],
   // N-10d. Non-money platform tables.
   // NZ-C-11 adds the admin push devices (user-keyed, no store, no FK: users live in identity).
   ops: [

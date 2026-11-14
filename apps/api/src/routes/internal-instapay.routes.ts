@@ -10,7 +10,7 @@
  *   200 { result: 'reverted' | 'already_reverted' }  - a replay of a valid tap is a 200 `already_reverted`, never a second revert.
  */
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { verifyBridge } from '@ebda/shared';
 import logger from '../lib/logger';
 import { AppError } from '../middleware/error-handler';

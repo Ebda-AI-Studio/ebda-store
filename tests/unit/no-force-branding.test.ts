@@ -69,6 +69,9 @@ const SIDECARS = [
   // Guard tests that must NAME the forbidden strings to forbid them.
   'tests/unit/no-wbs-refs.test.ts',
   'tests/unit/email-domain-allowlist.test.ts',
+  // Vendored @ebda/foundation smart-layer billing-claims: its currency lexicon NAMES foreign currencies so an unsourced amount claim
+  // in any currency is refused; it never renders one (byte-pinned by foundation.lock.json).
+  'packages/shared/src/foundation/smart-layer/rails/binding-claims.ts',
 ];
 // sha1 prefixes of the migration directories already on origin/main (applied, immutable).
 // Hashed so the snapshot itself carries no migration name. A migration dir NOT in this set is new

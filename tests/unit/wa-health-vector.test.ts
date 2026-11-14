@@ -85,6 +85,8 @@ describe('GET /health payload', () => {
     'deploymentId',
     'buyerKeyVector',
     'postgres',
+    // INSTAPAY-AUTO-1: readiness by NAME only (never a value, never phone-derived)
+    'instapayAuto',
   ]);
 
   it('adds buyerKeyVector for a strong secret, and only the known fields', async () => {

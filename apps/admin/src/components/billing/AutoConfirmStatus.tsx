@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { REVERT_GRACE_MS } from '@ebda/shared';
+import { Button } from '@/components/ui/Button';
 import { useT } from '../../i18n/useT';
 import type { PaymentClaim } from './types';
 
@@ -37,16 +38,19 @@ export function AutoConfirmStatus({
   now?: number;
 }) {
   const t = useT('billing.autoConfirm');
-  const [tick, setTick] = useState(() => now ?? Date.now());
+  // no clock read while rendering (B0-46): the clock arrives in an effect, `now` is the test seam
+  const [tick, setTick] = useState<number | null>(now ?? null);
   const a = claim.autoConfirm;
   useEffect(() => {
     if (now !== undefined || a?.state !== 'reverted') return;
+    setTick(Date.now());
     const id = setInterval(() => setTick(Date.now()), 60_000);
     return () => clearInterval(id);
   }, [a?.state, now]);
   if (!a || claim.status === 'rejected') return null;
   if (a.state === 'reverted') {
-    const left = a.graceUntil ? graceCountdown(a.graceUntil, now ?? tick) : null;
+    const clock = now ?? tick;
+    const left = a.graceUntil && clock !== null ? graceCountdown(a.graceUntil, clock) : null;
     return (
       <div
         role="alert"
@@ -63,27 +67,19 @@ export function AutoConfirmStatus({
           <p className="text-xs tabular-nums" data-testid="auto-revert-countdown">
             {t('countdown', { hours: String(left.hours), minutes: String(left.minutes) })}
           </p>
-        ) : (
+        ) : clock !== null ? (
           <p className="text-xs">{t('graceOver')}</p>
-        )}
+        ) : null}
         <div className="mt-2 flex flex-wrap gap-2">
           {onUpload && (
-            <button
-              type="button"
-              className="rounded-md border px-3 py-1.5 text-sm"
-              onClick={onUpload}
-            >
+            <Button type="button" size="sm" variant="outline" onClick={onUpload}>
               {t('uploadReceipt')}
-            </button>
+            </Button>
           )}
           {onPayByCard && (
-            <button
-              type="button"
-              className="rounded-md border px-3 py-1.5 text-sm"
-              onClick={onPayByCard}
-            >
+            <Button type="button" size="sm" variant="outline" onClick={onPayByCard}>
               {t('payByCard')}
-            </button>
+            </Button>
           )}
         </div>
       </div>

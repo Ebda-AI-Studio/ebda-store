@@ -6,6 +6,12 @@
  * no invalidation exists to forget. Fail CLOSED: a missing, unreadable or unparsable row is `off` / "store disabled" for the decision.
  */
 import { prisma } from '@ebda/database';
+import { platformDb } from '../../lib/platform-db';
+
+/** system_settings is a platform table: the D1 client on a Worker (the production shape), else the process prisma (Node tests). */
+async function settingsDb() {
+  return (await platformDb()) ?? prisma;
+}
 import { AppError } from '../../middleware/error-handler';
 import { auditLog } from '../../middleware/security';
 import logger from '../../lib/logger';
@@ -19,7 +25,9 @@ const MODES: readonly AutoMode[] = ['off', 'shadow', 'live'];
 const storeSwitchKey = (storeId: string) => `${STORE_SWITCH_PREFIX}${storeId}`;
 
 export async function getAutoMode(): Promise<AutoMode> {
-  const row = await prisma.systemSetting.findUnique({
+  const row = await (
+    await settingsDb()
+  ).systemSetting.findUnique({
     where: { key: AUTO_MODE_KEY },
     select: { value: true },
   });
@@ -32,7 +40,9 @@ export async function getAutoMode(): Promise<AutoMode> {
 
 /** Unreadable / unparsable per-store row counts as DISABLED (fail closed); no row = enabled. */
 export async function isStoreAutoEnabled(storeId: string): Promise<boolean> {
-  const row = await prisma.systemSetting.findUnique({
+  const row = await (
+    await settingsDb()
+  ).systemSetting.findUnique({
     where: { key: storeSwitchKey(storeId) },
     select: { value: true },
   });
@@ -59,7 +69,9 @@ export async function setAutoMode(
     reason: reason.trim().slice(0, 300),
     at: new Date().toISOString(),
   };
-  await prisma.systemSetting.upsert({
+  await (
+    await settingsDb()
+  ).systemSetting.upsert({
     where: { key: AUTO_MODE_KEY },
     create: { key: AUTO_MODE_KEY, value, category: 'billing', isPublic: false },
     update: { value },
@@ -88,7 +100,9 @@ export async function setStoreAuto(
     reason: reason.trim().slice(0, 300),
     at: new Date().toISOString(),
   };
-  await prisma.systemSetting.upsert({
+  await (
+    await settingsDb()
+  ).systemSetting.upsert({
     where: { key: storeSwitchKey(storeId) },
     create: { key: storeSwitchKey(storeId), value, category: 'billing', isPublic: false },
     update: { value },
@@ -108,7 +122,9 @@ export async function setStoreAuto(
 export async function listDisabledStores(): Promise<
   Array<{ storeId: string; reason: string | null; at: string | null }>
 > {
-  const rows = await prisma.systemSetting.findMany({
+  const rows: Array<{ key: string; value: unknown }> = await (
+    await settingsDb()
+  ).systemSetting.findMany({
     where: { key: { startsWith: STORE_SWITCH_PREFIX } },
     select: { key: true, value: true },
     take: 500,

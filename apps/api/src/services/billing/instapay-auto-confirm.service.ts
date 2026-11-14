@@ -12,6 +12,11 @@
  */
 import crypto from 'node:crypto';
 import { prisma, withStore } from '@ebda/database';
+
+/** The platform client with no tenant scope: the D1 client on a Worker (the production shape), else the process prisma (Node tests). */
+async function platformScope() {
+  return (await platformDb()) ?? prisma;
+}
 import {
   REASON_ORDER,
   REVERT_GRACE_MS,
@@ -113,14 +118,14 @@ function masked(extract: ReceiptExtract | null, flags: ParsedExtraction['flags']
 
 /** Earlier payments of this store that count as CLEAN (INSTAPAY-CLEAN-1): human-confirmed at once, auto only after a SENT digest, never reverted. */
 async function hasCleanPayment(storeId: string, now: number): Promise<boolean> {
-  const [events, autos] = await withStore(storeId, () =>
+  const [events, autos] = await withStore(storeId, tx =>
     Promise.all([
-      prisma.billingEvent.findMany({
+      tx.billingEvent.findMany({
         where: { storeId, type: 'manual_payment', status: 'succeeded' },
         select: { id: true, createdAt: true },
         take: 200,
       }),
-      prisma.instapayAutoConfirmation.findMany({
+      tx.instapayAutoConfirmation.findMany({
         where: { storeId, billingEventId: { not: null } },
         select: { billingEventId: true, confirmedAt: true, digestSentAt: true, revertedAt: true },
         take: 200,
@@ -158,8 +163,8 @@ const claimReference = (c: { payerReference: string }) =>
 
 async function ownerLabel(storeId: string): Promise<string> {
   try {
-    const s = await withStore(storeId, () =>
-      prisma.store.findUnique({ where: { id: storeId }, select: { name: true } })
+    const s = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { name: true } })
     );
     return (s?.name ?? storeId.slice(0, 8)).slice(0, 80);
   } catch {
@@ -198,18 +203,18 @@ export async function decideAndActivate(args: {
   const { storeId, claimId } = args;
   const now = args.now ?? Date.now();
 
-  const [claim, receipt] = await withStore(storeId, () =>
+  const [claim, receipt] = await withStore(storeId, tx =>
     Promise.all([
-      prisma.manualPaymentClaim.findFirst({ where: { id: claimId, storeId } }),
-      prisma.instapayReceipt.findFirst({ where: { storeId, claimId, kind: 'subscription' } }),
+      tx.manualPaymentClaim.findFirst({ where: { id: claimId, storeId } }),
+      tx.instapayReceipt.findFirst({ where: { storeId, claimId, kind: 'subscription' } }),
     ])
   );
   if (!claim || !receipt || claim.method !== 'instapay') return { state: 'skipped', reasons: [] };
 
   const key = autoConfirmKey('store', receipt.id);
   // 1. Idempotency: the row is born `pending_decision`; a replay loads it and returns it (never re-decides, never re-activates).
-  const existing = await withStore(storeId, () =>
-    prisma.instapayAutoConfirmation.findUnique({ where: { idempotencyKey: key } })
+  const existing = await withStore(storeId, tx =>
+    tx.instapayAutoConfirmation.findUnique({ where: { idempotencyKey: key } })
   );
   if (existing) return asOutcome(existing as RowShape);
   if (claim.status !== 'pending') return { state: 'skipped', reasons: [] };
@@ -218,7 +223,7 @@ export async function decideAndActivate(args: {
   const interval: BillingInterval = isInterval(claim.billingInterval)
     ? claim.billingInterval
     : 'monthly';
-  const plan = await prisma.plan.findUnique({ where: { code: claim.planCode } });
+  const plan = await (await platformScope()).plan.findUnique({ where: { code: claim.planCode } });
   const listPrice = plan
     ? interval === 'yearly'
       ? plan.priceYearlyMinor
@@ -318,8 +323,8 @@ export async function decideAndActivate(args: {
   }
 
   // 5. Persist the row (pending_decision first; the unique key makes a concurrent twin lose).
-  const created = await withStore(storeId, () =>
-    prisma.instapayAutoConfirmation.createMany({
+  const created = await withStore(storeId, tx =>
+    tx.instapayAutoConfirmation.createMany({
       data: [
         {
           id: crypto.randomUUID(),
@@ -339,8 +344,8 @@ export async function decideAndActivate(args: {
       skipDuplicates: true,
     })
   );
-  const row = (await withStore(storeId, () =>
-    prisma.instapayAutoConfirmation.findUnique({ where: { idempotencyKey: key } })
+  const row = (await withStore(storeId, tx =>
+    tx.instapayAutoConfirmation.findUnique({ where: { idempotencyKey: key } })
   )) as RowShape | null;
   if (!row)
     throw new AppError(500, 'AUTO_ROW_MISSING', 'The auto-confirm row could not be read back');
@@ -350,8 +355,8 @@ export async function decideAndActivate(args: {
   const settle = async (to: AutoEvent, extra: Record<string, unknown> = {}) => {
     const next = nextAutoState('pending_decision', to);
     if (next === 'illegal') throw new Error(`illegal auto transition ${to}`);
-    await withStore(storeId, () =>
-      prisma.instapayAutoConfirmation.updateMany({
+    await withStore(storeId, tx =>
+      tx.instapayAutoConfirmation.updateMany({
         where: { id: row.id, storeId, state: 'pending_decision' },
         data: { state: next, ...extra },
       })
@@ -428,8 +433,8 @@ export async function decideAndActivate(args: {
   } catch (err) {
     // Compensation. Free ONLY the dedupe claim this call made (never `ours`), and only when no ledger row exists for the key: a recorded
     // payment keeps its claim (it must stay unreusable), a failed one frees it for the human flow.
-    const recorded = await withStore(storeId, () =>
-      prisma.billingEvent.findFirst({
+    const recorded = await withStore(storeId, tx =>
+      tx.billingEvent.findFirst({
         where: { storeId, idempotencyKey: manualPaymentKey('instapay', reference) },
         select: { id: true },
       })
@@ -509,8 +514,8 @@ async function claimRevert(
       .run();
     return { count: Number(r.meta?.changes ?? 0) };
   }
-  return withStore(storeId, () =>
-    prisma.instapayAutoConfirmation.updateMany({
+  return withStore(storeId, tx =>
+    tx.instapayAutoConfirmation.updateMany({
       where: { id, storeId, state: 'auto_confirmed' },
       data: {
         state: 'reverted',
@@ -541,8 +546,8 @@ export async function revertAutoConfirmed(args: {
   const storeId = await autoConfirmationStoreId(args.id);
   if (!storeId)
     throw new AppError(404, 'AUTO_CONFIRMATION_NOT_FOUND', 'Auto-confirmed payment not found');
-  const row = (await withStore(storeId, () =>
-    prisma.instapayAutoConfirmation.findFirst({ where: { id: args.id, storeId } })
+  const row = (await withStore(storeId, tx =>
+    tx.instapayAutoConfirmation.findFirst({ where: { id: args.id, storeId } })
   )) as RowShape | null;
   if (!row)
     throw new AppError(404, 'AUTO_CONFIRMATION_NOT_FOUND', 'Auto-confirmed payment not found');
@@ -567,8 +572,8 @@ export async function revertAutoConfirmed(args: {
   // Claim the transition FIRST (compare-and-set on state): of two concurrent taps exactly one proceeds to the money step.
   const won = await claimRevert(storeId, row.id, args.actor, reason, now, graceUntil);
   if (won.count === 0) {
-    const again = await withStore(storeId, () =>
-      prisma.instapayAutoConfirmation.findFirst({ where: { id: row.id, storeId } })
+    const again = await withStore(storeId, tx =>
+      tx.instapayAutoConfirmation.findFirst({ where: { id: row.id, storeId } })
     );
     return {
       result: 'already_reverted',
@@ -591,8 +596,8 @@ export async function revertAutoConfirmed(args: {
     // an already-voided ledger row (a human voided it meanwhile) is the same end state: keep it reverted
     if (code !== 'ALREADY_REFUNDED' && code !== 'NOT_REFUNDABLE') {
       // Compensate the state claim: the void did not happen, so the payment is still auto-confirmed and the tap can be retried.
-      await withStore(storeId, () =>
-        prisma.instapayAutoConfirmation.updateMany({
+      await withStore(storeId, tx =>
+        tx.instapayAutoConfirmation.updateMany({
           where: { id: row.id, storeId, state: 'reverted' },
           data: {
             state: 'auto_confirmed',
@@ -608,8 +613,8 @@ export async function revertAutoConfirmed(args: {
   }
 
   // Burn the dedupe entries (reference + image) so this receipt can never auto-confirm again, and switch auto off for this store.
-  const receipt = await withStore(storeId, () =>
-    prisma.instapayReceipt.findFirst({ where: { id: row.receiptId, storeId } })
+  const receipt = await withStore(storeId, tx =>
+    tx.instapayReceipt.findFirst({ where: { id: row.receiptId, storeId } })
   );
   const index = getDuplicateIndex();
   const refKey = receipt
@@ -669,15 +674,15 @@ async function recordNeedsHuman(
   claimId: string,
   reasons: ReasonCode[]
 ): Promise<void> {
-  const [receipt, claim] = await withStore(storeId, () =>
+  const [receipt, claim] = await withStore(storeId, tx =>
     Promise.all([
-      prisma.instapayReceipt.findFirst({ where: { storeId, claimId, kind: 'subscription' } }),
-      prisma.manualPaymentClaim.findFirst({ where: { id: claimId, storeId } }),
+      tx.instapayReceipt.findFirst({ where: { storeId, claimId, kind: 'subscription' } }),
+      tx.manualPaymentClaim.findFirst({ where: { id: claimId, storeId } }),
     ])
   );
   if (!receipt || !claim) return;
-  await withStore(storeId, () =>
-    prisma.instapayAutoConfirmation.createMany({
+  await withStore(storeId, tx =>
+    tx.instapayAutoConfirmation.createMany({
       data: [
         {
           id: crypto.randomUUID(),
@@ -734,7 +739,9 @@ export async function enqueueAutoConfirm(
 export async function sweepStuckAutoConfirmations(now: number = Date.now()): Promise<number> {
   if (!(await platformFamilyOnD1('payments'))) return 0;
   if ((await getAutoMode()) === 'off') return 0;
-  const stale = await prisma.manualPaymentClaim.findMany({
+  const stale: Array<{ id: string; storeId: string }> = await (
+    await platformScope()
+  ).manualPaymentClaim.findMany({
     where: {
       status: 'pending',
       method: 'instapay',
@@ -745,7 +752,9 @@ export async function sweepStuckAutoConfirmations(now: number = Date.now()): Pro
     take: 100,
   });
   if (stale.length === 0) return 0;
-  const decided = await prisma.instapayAutoConfirmation.findMany({
+  const decided: Array<{ claimId: string }> = await (
+    await platformScope()
+  ).instapayAutoConfirmation.findMany({
     where: { claimId: { in: stale.map(c => c.id) } },
     select: { claimId: true },
   });
@@ -765,12 +774,12 @@ export async function sweepStuckAutoConfirmations(now: number = Date.now()): Pro
 export async function releaseDedupeAfterReject(storeId: string, claimId: string): Promise<void> {
   const index = getDuplicateIndex();
   if (!index) return;
-  const row = await withStore(storeId, () =>
-    prisma.instapayAutoConfirmation.findFirst({ where: { storeId, claimId } })
+  const row = await withStore(storeId, tx =>
+    tx.instapayAutoConfirmation.findFirst({ where: { storeId, claimId } })
   );
   if (!row || row.state === 'auto_confirmed' || row.state === 'reverted') return;
-  const receipt = await withStore(storeId, () =>
-    prisma.instapayReceipt.findFirst({ where: { id: row.receiptId, storeId } })
+  const receipt = await withStore(storeId, tx =>
+    tx.instapayReceipt.findFirst({ where: { id: row.receiptId, storeId } })
   );
   const refKey = receipt
     ? normalizeReferenceKey(autoReadOf(receipt.extracted)?.read?.extract?.reference ?? '')
@@ -838,8 +847,8 @@ export async function runAutoDigest(
     }
     // stamp each row inside its own store scope (it names the store); a row reverted meanwhile is simply stamped too (it can never be clean)
     for (const r of rows) {
-      await withStore(r.storeId, () =>
-        prisma.instapayAutoConfirmation.updateMany({
+      await withStore(r.storeId, tx =>
+        tx.instapayAutoConfirmation.updateMany({
           where: { id: r.id, storeId: r.storeId },
           data: { digestSentAt: new Date(now) },
         })
@@ -865,8 +874,8 @@ export async function runAutoDigest(
   });
   const live: typeof waiting = [];
   for (const r of waiting) {
-    const claim = await withStore(r.storeId, () =>
-      prisma.manualPaymentClaim.findFirst({ where: { id: r.claimId, storeId: r.storeId } })
+    const claim = await withStore(r.storeId, tx =>
+      tx.manualPaymentClaim.findFirst({ where: { id: r.claimId, storeId: r.storeId } })
     );
     const quiet = (r.reasons as ReasonCode[]).every(x => QUIET_REASONS.has(x));
     if (claim?.status === 'pending' && !quiet) live.push(r);
@@ -888,8 +897,8 @@ export async function runAutoDigest(
     );
     if (ok) {
       for (const r of live) {
-        await withStore(r.storeId, () =>
-          prisma.instapayAutoConfirmation.updateMany({
+        await withStore(r.storeId, tx =>
+          tx.instapayAutoConfirmation.updateMany({
             where: { id: r.id, storeId: r.storeId },
             data: { digestSentAt: new Date(now) },
           })
