@@ -31,6 +31,9 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   // Ruling CF-JOBS-4: jobs that touch only platform (D1) rows or third parties, never a store-do table
   // third-party erasure (OneSignal, PostHog) + the CI bucket in R2, keyed by ids the event carries; the DO erasure scope is finalized by its last step (Ruling CF-OPUS-1)
   'account-erased-propagation',
+  // owner store deletion (Ruling STORE-LIFECYCLE-1): reads the request from the store settings and calls StoreService.delete, which closes
+  // and removes a DO store itself (the same path as the super_admin route); the job body never reads a store-do table directly
+  'store-deletion-execute',
   'ci-erasure-second-pass',
   // the store's public contact address + its owner (stores / users: platform rows) and the mail provider
   'contact-form-send',

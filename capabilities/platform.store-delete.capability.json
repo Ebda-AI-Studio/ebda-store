@@ -1,0 +1,48 @@
+{
+  "id": "platform.store-delete",
+  "status": "live",
+  "area": "platform",
+  "version": 2,
+  "versionDate": "2026-11-14",
+  "titleAr": "امسح متجري",
+  "titleEn": "Delete my store",
+  "screens": ["/stores/[id]/settings"],
+  "api": [
+    "GET /stores/:storeId/deletion",
+    "POST /stores/:storeId/deletion/preview",
+    "POST /stores/:storeId/deletion",
+    "DELETE /stores/:storeId/deletion",
+    "DELETE /stores/:id"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin (the store owner only)", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "cancellable for 14 days after the request; irreversible once the deletion runs"
+  },
+  "helpArticle": "delete-your-store",
+  "questions": {
+    "ar": ["عايز امسح متجري", "ازاي الغي مسح المتجر؟"],
+    "en": ["Delete my store", "How do I cancel a store deletion?"]
+  },
+  "steps": [
+    "Open Settings, press Delete this store",
+    "Read the checks; if one blocks you, fix it and try again",
+    "Type the store address exactly and press Schedule deletion",
+    "The store is deleted after 14 days unless you press Cancel the deletion"
+  ],
+  "edgeCases": [
+    "Owner only: staff and store admins who are not the owner get 403; another store answers 404",
+    "Refused with a named reason while money is in flight, the store subscription is billed, or it is the billing (main) store and the owner has other stores",
+    "The same checks run again when the 14 days end; a store that became blocked stays scheduled and keeps its reason",
+    "The confirmation token is single use and bound to this store and this owner; a wrong typed address does not spend it",
+    "On a Durable-Object store the money check happens when the deletion runs, not when it is scheduled",
+    "Orders keep the tax and payment records the law requires without the customer's identity",
+    "Platform staff (super_admin) can still delete a support or test store immediately: DELETE /stores/:id has no cooling-off"
+  ],
+  "gaps": [
+    "An assistant must never run this from chat: it deep-links to Settings and explains the consequences"
+  ]
+}

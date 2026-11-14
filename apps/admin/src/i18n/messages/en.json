@@ -11664,5 +11664,33 @@
     "savedTitle": "Shipping saved",
     "savedBody": "The return policy was updated.",
     "saveLabel": "Save shipping"
+  },
+  "storeLifecycle": {
+    "title": "Your data and your store",
+    "exportTitle": "Download all my data",
+    "exportBody": "Get a zip with one file per table (products, categories, orders, customers, coupons, reviews, returns, expenses) and a manifest. You can do this once an hour.",
+    "exportButton": "Download my data",
+    "errExportTooLarge": "Your store is too large for a single download. Export orders, products and customers from their own pages, or contact Ebda Store support for a full export.",
+    "errExportRateLimited": "Your data export already ran in the last hour. Try again later.",
+    "errExportFailed": "The export did not finish. Try again.",
+    "deleteTitle": "Delete this store",
+    "deleteBody": "Deleting removes the store, its products and its customers' personal data. Orders keep the tax and payment records the law requires, without the customer's identity. You have 14 days to change your mind.",
+    "deleteButton": "Delete this store",
+    "pendingBody": "This store will be deleted on {date}. Until then you can cancel and nothing is lost.",
+    "cancelButton": "Cancel the deletion",
+    "dialogTitle": "Delete this store",
+    "checking": "Checking that the store can be deleted…",
+    "refusedTitle": "The store cannot be deleted yet",
+    "reasonMoney": "There is money in flight: paid orders not delivered, transfers waiting for confirmation, open returns, cash on delivery not settled, or a payment in dispute. Settle them first.",
+    "reasonBilling": "The store subscription is still active and billed. Cancel it from the billing page first.",
+    "reasonParent": "This is your main (billing) store and you have other stores. Move billing to another store first.",
+    "consequence": "The store \"{name}\" will be permanently deleted {days} days from now. You can cancel any time before then.",
+    "typeSlugLabel": "Type the store address {slug} exactly to confirm",
+    "submit": "Schedule deletion",
+    "errTokenExpired": "The confirmation expired. Review and confirm again.",
+    "scheduledToast": "Deletion scheduled",
+    "scheduledToastBody": "The store will be deleted on {date}. You can cancel before then.",
+    "cancelledToast": "Deletion cancelled",
+    "cancelledToastBody": "Nothing was deleted."
   }
 }
