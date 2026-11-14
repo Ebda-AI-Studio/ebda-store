@@ -206,10 +206,11 @@ export async function createVariantsForProductTx(
 
   // BARCODE-1: a re-import replaces the variants, so a row with no barcode column must keep the
   // code the variant already had (it may be on a printed label). Matched by sku, else by title.
-  const priorVariants = await tx.productVariant.findMany({
-    where: { productId, barcode: { not: null } },
-    select: { sku: true, title: true, barcode: true },
+  const priorAll = await tx.productVariant.findMany({
+    where: { productId },
+    select: { sku: true, title: true, barcode: true, inventory: true },
   });
+  const priorVariants = priorAll.filter(v => v.barcode !== null);
   const priorBarcodeBySku = new Map(
     priorVariants.filter(v => v.sku).map(v => [v.sku as string, v.barcode as string])
   );
@@ -233,10 +234,7 @@ export async function createVariantsForProductTx(
   // turns the global handler's generic "A referenced record does not exist"
   // into something that names the constraint that fired.
   // INV-AUDIT-3: the replaced variants take their units with them; each is a movement to zero (the DO import writes the same)
-  const replaced = await tx.productVariant.findMany({
-    where: { productId, inventory: { not: 0 } },
-    select: { inventory: true },
-  });
+  const replaced = priorAll.filter(v => v.inventory !== 0);
   if (replaced.length > 0)
     await tx.inventoryHistory.createMany({
       data: replaced.map(r => ({

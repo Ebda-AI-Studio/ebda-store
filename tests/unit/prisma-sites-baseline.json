@@ -89,7 +89,7 @@
   "services/price-resolver.service.ts": 3,
   "services/product-index.service.ts": 12,
   "services/product-search.service.ts": 6,
-  "services/product.service.ts": 6,
+  "services/product.service.ts": 7,
   "services/provider-activation.service.ts": 8,
   "services/provider-verification.service.ts": 11,
   "services/provisioning.service.ts": 3,
@@ -103,7 +103,7 @@
   "services/sms-queue.service.ts": 3,
   "services/store.service.ts": 4,
   "services/usage-aggregates.service.ts": 12,
-  "services/variant.service.ts": 4,
+  "services/variant.service.ts": 6,
   "services/wallet.service.ts": 2,
   "services/warehouse.service.ts": 9,
   "services/wholesale-application.service.ts": 3
