@@ -17,8 +17,10 @@
 //   - Price/inventory are NEVER-stale data: this does not weaken the write path (writeTags still hits every DO
 //     replica and deletes the local entry); it only bounds cross-colo propagation to <= 5s. Do NOT raise the TTL
 //     without enabling cache-tag purge (CF_PURGE_* env, isPurgeCacheEnabled) so every colo is invalidated.
+// pq-allow(unused-export): read by scripts/cf-setup-local.sh when it regenerates open-next.config.ts
 export const REGIONAL_TTL_SEC = 5;
 
+// pq-allow(unused-export): read by scripts/cf-setup-local.sh when it regenerates open-next.config.ts
 export const TAG_CACHE_OPTIONS = {
   baseShardSize: 12,
   regionalCache: true,
