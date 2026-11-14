@@ -548,6 +548,16 @@
     "synAr": "كشف بنك مطابقة"
   },
   {
+    "id": "page:/finance/payouts/new",
+    "kind": "page",
+    "route": "/finance/payouts/new",
+    "access": "owner",
+    "en": "Record a payout",
+    "ar": "تسجيل تحويل مستحقات",
+    "synEn": "payout gateway fee cod remittance transfer",
+    "synAr": "تحويل مستحقات رسوم البوابة تحصيل"
+  },
+  {
     "id": "page:/finance/bank-reconciliation/import",
     "kind": "page",
     "route": "/finance/bank-reconciliation/import",

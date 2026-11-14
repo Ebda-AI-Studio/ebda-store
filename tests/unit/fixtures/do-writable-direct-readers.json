@@ -71,8 +71,8 @@
       "kind": "pg-branch",
       "reason": "NZ-FEAT-1: importBankStatement / runAutoMatch / applyManualMatch / getReconciliationSummary / getReconciliationDifference each return early on a DO store (storeRepo / storeMoney) to a storeDb path; these withStore reads are the Postgres store's own rows.",
       "models": {
-        "bankStatement": 1,
-        "bankTransaction": 9
+        "bankStatement": 2,
+        "bankTransaction": 10
       }
     },
     "apps/api/src/services/accounting/expense.service.ts": {

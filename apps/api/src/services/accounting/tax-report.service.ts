@@ -1,5 +1,5 @@
 import { prisma } from '@ebda/database';
-import { storeMoney } from '../../lib/repo-factory';
+import { storeDb, storeMoney } from '../../lib/repo-factory';
 import { DEFAULT_STORE_TIME_ZONE, zonedIsoDay } from '@ebda/shared';
 
 /**
@@ -256,21 +256,22 @@ export async function generateTaxReport(
   // ─── Input VAT claimed on purchases (account 1300) ───────────────────────────
   const inputTax = money
     ? (await money.taxInputTotal({ fromMs: from.getTime(), toMs: to.getTime() })).inputTax
-    : Number(
-        (
-          await prisma.$queryRawUnsafe<Array<{ t: bigint }>>(
-            `SELECT COALESCE(SUM(l.debit - l.credit), 0)::bigint AS t
-               FROM public.journal_lines l
-               JOIN public.journal_entries e ON e.id = l.entry_id
-               JOIN public.accounts a ON a.id = l.account_id AND a.store_id = $1
-              WHERE e.store_id = $1 AND a.code = '1300' AND e.status IN ('posted', 'reversed')
-                AND e.posted_at >= $2::timestamp AND e.posted_at <= $3::timestamp`,
-            storeId,
-            from.toISOString(),
-            to.toISOString()
-          )
-        )?.[0]?.t ?? 0
-      );
+    : await (async () => {
+        const agg = await (
+          await storeDb(storeId)
+        ).journalLine.aggregate({
+          _sum: { debit: true, credit: true },
+          where: {
+            account: { storeId, code: '1300' },
+            entry: {
+              storeId,
+              status: { in: ['posted', 'reversed'] },
+              postedAt: { gte: from, lte: to },
+            },
+          },
+        });
+        return (agg._sum.debit ?? 0) - (agg._sum.credit ?? 0);
+      })();
 
   // ─── Build summary ───────────────────────────────────────────────────────────
   const totalTaxCollected = txRows.reduce((s, r) => s + r.taxCollected, 0);

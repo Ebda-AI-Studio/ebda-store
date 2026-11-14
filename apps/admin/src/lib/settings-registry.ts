@@ -296,6 +296,12 @@ export const PAGES: PageEntry[] = [
   page('/finance/bank-reconciliation', 'finance.bankRec.title', 'owner', {
     syn: { en: 'bank statement match', ar: 'كشف بنك مطابقة' },
   }),
+  page('/finance/payouts/new', 'finance.payout.title', 'owner', {
+    syn: {
+      en: 'payout gateway fee cod remittance transfer',
+      ar: 'تحويل مستحقات رسوم البوابة تحصيل',
+    },
+  }),
   page('/finance/bank-reconciliation/import', 'finance.bankRec.import.title', 'owner', {
     syn: { en: 'upload bank statement csv', ar: 'رفع كشف بنك' },
   }),

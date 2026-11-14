@@ -17,6 +17,9 @@ vi.mock('@ebda/database', () => ({
 const mockStoreMoney = vi.fn();
 vi.mock('../../apps/api/src/lib/repo-factory', () => ({
   storeMoney: (...a: unknown[]) => mockStoreMoney(...a),
+  storeDb: async () => ({
+    journalLine: { aggregate: async () => ({ _sum: { debit: 1400, credit: 0 } }) },
+  }),
 }));
 
 import { generateTaxReport } from '../../apps/api/src/services/accounting/tax-report.service';
@@ -304,8 +307,7 @@ describe('generateTaxReport — basic aggregation', () => {
 
     await generateTaxReport(STORE_ID, { from: FROM, to: TO });
 
-    // the sales query, then the input-VAT query (ACCT-AUDIT-10)
-    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(2);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledOnce();
     const [sql, sid, f, t] = mockQueryRawUnsafe.mock.calls[0];
     expect(typeof sql).toBe('string');
     expect(sql).toContain("code = '2100'");
@@ -421,6 +423,13 @@ describe('generateTaxReport: input VAT and rate buckets (ACCT-AUDIT-10)', () => 
     expect(r.summary.byRate.map(b => b.taxRate)).toEqual(['14.00']);
     expect(r.rows.map(x => x.taxRate)).toEqual(['14.00', '14.00', '14.00']);
     expect(r.summary.byRate[0].transactionCount).toBe(3);
+  });
+
+  it('a Postgres store reads the input VAT from the journal lines on account 1300', async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([]);
+    const r = await generateTaxReport('s1', W);
+    expect(r.summary.totalInputTax).toBe(1400);
+    expect(r.summary.netTaxPayable).toBe(-1400);
   });
 
   it('a blended basket (half 14%, half exempt) is NOT forced onto a standard rate', async () => {
