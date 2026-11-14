@@ -11,11 +11,12 @@ import { auditLog } from '../../middleware/security';
 import logger from '../../lib/logger';
 
 export type AutoMode = 'off' | 'shadow' | 'live';
+// pq-allow(unused-export): the settings test seeds a garbage row under this key
 export const AUTO_MODE_KEY = 'instapay.auto_confirm.mode';
-export const STORE_SWITCH_PREFIX = 'instapay.auto_confirm.store.';
+const STORE_SWITCH_PREFIX = 'instapay.auto_confirm.store.';
 const MODES: readonly AutoMode[] = ['off', 'shadow', 'live'];
 
-export const storeSwitchKey = (storeId: string) => `${STORE_SWITCH_PREFIX}${storeId}`;
+const storeSwitchKey = (storeId: string) => `${STORE_SWITCH_PREFIX}${storeId}`;
 
 export async function getAutoMode(): Promise<AutoMode> {
   const row = await prisma.systemSetting.findUnique({

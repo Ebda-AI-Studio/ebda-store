@@ -23,6 +23,7 @@ const GLOBAL = 120;
 const WINDOW_MS = 60_000;
 const hits = new Map<string, { start: number; n: number }>();
 /** per-isolate flood guard: a signed tap is rare (one per payment per day); anything beyond this is noise or an attack. */
+// pq-allow(unused-export): the flood guard is reset by its unit test
 export function allowInternalCall(key: string, limit: number, now: number = Date.now()): boolean {
   if (hits.size > 5_000) hits.clear();
   const e = hits.get(key);

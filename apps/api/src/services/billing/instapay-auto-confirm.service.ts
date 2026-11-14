@@ -52,7 +52,7 @@ import {
 import { notifyBrain } from './instapay-notify-brain';
 import { runBillingEffects } from './billing-notify';
 
-export const AUTO_ACTOR = 'system:auto-confirm';
+const AUTO_ACTOR = 'system:auto-confirm';
 /** A pure switch outcome (off / shadow / store off) is the normal manual flow, not "waiting on you". */
 const QUIET_REASONS: ReadonlySet<ReasonCode> = new Set([
   'SHADOW_MODE',
@@ -60,7 +60,7 @@ const QUIET_REASONS: ReadonlySet<ReasonCode> = new Set([
   'KILL_STORE',
 ]);
 
-export type AutoOutcome = {
+type AutoOutcome = {
   state: AutoState | 'skipped';
   reasons: ReasonCode[];
   billingEventId?: string;
@@ -454,14 +454,14 @@ export async function decideAndActivate(args: {
 
 // ───────────────────────────── revert ("not received") ─────────────────────────────
 
-export type RevertResult = { result: 'reverted' | 'already_reverted'; graceUntil: number };
+type RevertResult = { result: 'reverted' | 'already_reverted'; graceUntil: number };
 
 /**
  * The store of an auto-confirmation row, from its id alone (a Telegram tap carries only the id). Read on the platform D1 client, which has no
  * tenant context by design: the id is an unguessable uuid, the route that calls this verifies the bridge signature first, and the answer
  * is only used to open that row's own store scope (every later query names the store).
  */
-export async function autoConfirmationStoreId(id: string): Promise<string | null> {
+async function autoConfirmationStoreId(id: string): Promise<string | null> {
   const db = (await platformDb()) ?? prisma;
   const row = await db.instapayAutoConfirmation.findFirst({
     where: { id },

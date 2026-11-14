@@ -328,7 +328,7 @@ export async function readInstapayReceipt(args: {
 // keys are dropped, instruction-like text nulls the extract and raises `suspiciousText`. Order receipts never come through here (M-003: no
 // shopper personal data is extracted); their reader above is untouched.
 
-export type AutoReadCall = (args: {
+type AutoReadCall = (args: {
   storeId: string;
   imageBase64: string;
   mimeType: string;
@@ -378,6 +378,7 @@ const defaultAutoCall: AutoReadCall = async ({ storeId, imageBase64, mimeType, s
 };
 
 let autoCall: AutoReadCall = defaultAutoCall;
+// pq-allow(unused-export): test seam, like setReceiptModelCallForTests
 export function setAutoReadCallForTests(fn: AutoReadCall | null): void {
   autoCall = fn ?? defaultAutoCall;
 }

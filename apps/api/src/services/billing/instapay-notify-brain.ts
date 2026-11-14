@@ -10,7 +10,7 @@ import { signBridge, type DigestItem } from '@ebda/shared';
 import logger from '../../lib/logger';
 import { MIN_BRIDGE_SECRET } from '../../lib/instapay-bridge-env';
 
-export type WaitingItem = DigestItem & { reasons: string[] };
+type WaitingItem = DigestItem & { reasons: string[] };
 const TIMEOUT_MS = 8000;
 
 export async function notifyBrain(

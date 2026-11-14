@@ -6,6 +6,7 @@ import { useT } from '../../i18n/useT';
 import type { PaymentClaim } from './types';
 
 /** "47h 59m" style countdown to the end of the grace, from the server's `graceUntil`; null once it has passed. */
+// pq-allow(unused-export): pure countdown, unit-tested directly
 export function graceCountdown(
   graceUntilIso: string,
   now: number
@@ -16,6 +17,7 @@ export function graceCountdown(
 }
 
 /** The 48 hours the merchant has, derived from the one constant the server uses (a changed constant changes the copy). */
+// pq-allow(unused-export): the help-article parity test derives the 48 from this constant
 export const GRACE_HOURS = REVERT_GRACE_MS / 3_600_000;
 
 /**
