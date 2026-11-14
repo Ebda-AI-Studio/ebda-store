@@ -15,11 +15,15 @@
  *
  * `mcpWriteEnabled` (BE:S-8, Ruling FP-1) is the merchant's MCP write switch: it is written only by
  * `PUT /stores/:id/integrations/merchant-mcp/write-switch` (audit row; one atomic `jsonb_set` statement on a Postgres store, a write-time read-merge on a Durable Object store, Ruling FP-5), never the generic route.
+ *
+ * `autoRecommendationsEnabled` is the merchant's switch for automatic product recommendations (absent = on): written only by
+ * `PUT /stores/:id/recommendations/auto-setting`, never the generic route, so a stale whole-settings copy cannot flip it back.
  */
 export const SERVER_OWNED_SETTINGS_KEYS = [
   'ebdaWhatsApp',
   'goldAllowDeferredPayment',
   'mcpWriteEnabled',
+  'autoRecommendationsEnabled',
 ] as const;
 
 /**
@@ -30,6 +34,7 @@ export const SERVER_OWNED_SETTINGS_KEYS = [
 export const ECHOED_SERVER_OWNED_KEYS: readonly string[] = [
   'goldAllowDeferredPayment',
   'mcpWriteEnabled',
+  'autoRecommendationsEnabled',
 ];
 
 export function reservedSettingsKeys(settings: unknown): string[] {

@@ -8,6 +8,8 @@ import { readInStoreContext } from '../lib/store-scoped-read';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { visibleProductWhere } from '../lib/visible-product';
 import { enrichStockFlags, gateBackorder } from '../lib/effective-inventory';
+import { similarProductIds } from '../lib/recommendations/similar-products';
+import { autoRecommendationsEnabled } from '../lib/recommendations/auto-setting';
 
 // ==========================================
 // Recommendation Service
@@ -22,6 +24,12 @@ const FBT_LOCK_TTL_SECONDS = 300;
 // Cart cross-sell: slots shown, and how many scored candidates are read to fill them.
 const CART_RECS_SHOWN = 4;
 const CART_RECS_CANDIDATES = 12;
+// PDP: the three slots (upsell + crossSell + alsoLike) together never exceed this many cards.
+const PDP_RECS_CAP = 8;
+// A degraded answer (Vectorize missing / slow) is cached briefly so a failing index is not retried on every page view.
+const DEGRADED_CACHE_TTL_SECONDS = 30;
+// Cart: a merchant's pick outweighs any number of bought-together hits, so curated always sorts first.
+const CART_MANUAL_WEIGHT = 1000;
 
 // Minimal product shape returned in recommendation lists
 const productSelect = {
@@ -88,6 +96,18 @@ const productSelect = {
   options: LISTING_SWATCH_OPTIONS_SELECT,
 };
 
+// A card as the storefront lists consume it: an id plus the enriched product fields.
+type RecCard = {
+  id: string;
+  inStock?: boolean;
+  acceptsBackorder?: boolean;
+  relationId?: string;
+  position?: number;
+  aiScore?: number;
+  aiReason?: string | null;
+  coOccurrenceCount?: number;
+};
+
 // FBT cron handle
 let fbtCronTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -96,6 +116,14 @@ let fbtCronTimer: ReturnType<typeof setInterval> | null = null;
 // ==========================================
 
 class RecommendationService {
+  // The merchant's switch (absent = on). Read on a cache miss / per cart request; the store row is read in its own scope
+  // because the public routes run with no tenant context. The import is lazy: store.service pulls a very large graph.
+  private async autoEnabled(storeId: string): Promise<boolean> {
+    const { StoreService } = await import('./store.service.js');
+    const store = await readInStoreContext(storeId, () => StoreService.getById(storeId));
+    return autoRecommendationsEnabled(store.settings);
+  }
+
   // ----------------------------------------
   // getProductRecommendations
   // ----------------------------------------
@@ -112,9 +140,12 @@ class RecommendationService {
       return cached;
     }
 
-    // 2. Cross-sell: manual relations first, fall back to FBT
-    let crossSell: unknown[] = [];
+    // Automatic recommendations are the merchant's choice (absent = on). Read here, on a cache miss only; turning the
+    // switch off clears the store's cached lists (invalidateAllProductCaches), so a cached list never outlives it.
+    const auto = await this.autoEnabled(storeId);
 
+    // 2. Cross-sell: the merchant's picks FIRST (they always win), then, when automatic recommendations are on, AI picks and
+    // bought-together topping the list up to the cap. Before, any one curated pick hid every automatic one.
     const manualCrossSell = await (
       await storeWriter(storeId)
     ).productRelation.findMany({
@@ -125,7 +156,7 @@ class RecommendationService {
         targetProduct: visibleProductWhere(),
       },
       orderBy: { position: 'asc' },
-      take: 4,
+      take: PDP_RECS_CAP,
       select: {
         id: true,
         targetProduct: { select: productSelect },
@@ -133,16 +164,16 @@ class RecommendationService {
       },
     });
 
-    if (manualCrossSell.length > 0) {
-      crossSell = manualCrossSell.map(r => ({
-        relationId: r.id,
-        position: r.position,
-        ...enrichStockFlags(r.targetProduct),
-      }));
-    } else {
-      // AI recommendations — second priority after manual cross-sells.
-      // When the bulk-ai-recommendations sweep has been run for this store
-      // these rows are populated and ordered by Gemini confidence score.
+    const crossSell: RecCard[] = manualCrossSell.map(r => ({
+      relationId: r.id,
+      position: r.position,
+      ...enrichStockFlags(r.targetProduct),
+    }));
+    const crossSeen = new Set<string>([productId, ...crossSell.map(p => p.id)]);
+    const crossRoom = () => PDP_RECS_CAP - crossSell.length;
+
+    if (auto && crossRoom() > 0) {
+      // AI recommendations: ordered by Gemini confidence once the bulk-ai-recommendations sweep has run for this store.
       //
       // `ai_recommendation` has a STRICT RLS policy and the public
       // `/public/:storeId/products/:productId/recommendations` route runs
@@ -153,7 +184,7 @@ class RecommendationService {
         (await storeDb(storeId)).aiRecommendation.findMany({
           where: { storeId, sourceProductId: productId, targetProduct: visibleProductWhere() },
           orderBy: { score: 'desc' },
-          take: 4,
+          take: PDP_RECS_CAP,
           select: {
             targetProduct: { select: productSelect },
             score: true,
@@ -161,42 +192,43 @@ class RecommendationService {
           },
         })
       );
+      for (const r of aiRecRows) {
+        if (crossRoom() <= 0) break;
+        const p = enrichStockFlags(r.targetProduct);
+        if (crossSeen.has(p.id)) continue;
+        crossSeen.add(p.id);
+        crossSell.push({ aiScore: r.score, aiReason: r.reason, ...p });
+      }
+    }
 
-      if (aiRecRows.length > 0) {
-        crossSell = aiRecRows.map(r => ({
-          aiScore: r.score,
-          aiReason: r.reason,
-          ...enrichStockFlags(r.targetProduct),
-        }));
-      } else {
-        // FBT fallback — used when no AI recs exist for this product yet.
-        const fbtRows = await (
-          await storeDb(storeId)
-        ).frequentlyBoughtTogether.findMany({
-          where: {
-            storeId,
-            OR: [{ productId1: productId }, { productId2: productId }],
-            product1: visibleProductWhere(),
-            product2: visibleProductWhere(),
-          },
-          orderBy: { coOccurrenceCount: 'desc' },
-          take: 4,
-          select: {
-            productId1: true,
-            productId2: true,
-            coOccurrenceCount: true,
-            product1: { select: productSelect },
-            product2: { select: productSelect },
-          },
-        });
-
-        crossSell = fbtRows.map(row => {
-          const isSource = row.productId1 === productId;
-          return {
-            coOccurrenceCount: row.coOccurrenceCount,
-            ...enrichStockFlags(isSource ? row.product2 : row.product1),
-          };
-        });
+    if (auto && crossRoom() > 0) {
+      // Bought together: this store's own order pairs (FrequentlyBoughtTogether: product ids + counts, no customer data).
+      const fbtRows = await (
+        await storeDb(storeId)
+      ).frequentlyBoughtTogether.findMany({
+        where: {
+          storeId,
+          OR: [{ productId1: productId }, { productId2: productId }],
+          product1: visibleProductWhere(),
+          product2: visibleProductWhere(),
+        },
+        orderBy: { coOccurrenceCount: 'desc' },
+        take: PDP_RECS_CAP,
+        select: {
+          productId1: true,
+          productId2: true,
+          coOccurrenceCount: true,
+          product1: { select: productSelect },
+          product2: { select: productSelect },
+        },
+      });
+      for (const row of fbtRows) {
+        if (crossRoom() <= 0) break;
+        const isSource = row.productId1 === productId;
+        const p = enrichStockFlags(isSource ? row.product2 : row.product1);
+        if (crossSeen.has(p.id)) continue;
+        crossSeen.add(p.id);
+        crossSell.push({ coOccurrenceCount: row.coOccurrenceCount, ...p });
       }
     }
 
@@ -224,46 +256,84 @@ class RecommendationService {
       ...enrichStockFlags(r.targetProduct),
     }));
 
-    // 4. Also Like: products from same categories
+    // 4. Also Like (similar items), only while automatic recommendations are on and the 8-card cap has room:
+    //    a. nearest neighbours of this product's own vector (Vectorize, this store's namespace; fail-soft),
+    //    b. products of the same categories.
+    //    Every candidate is re-read from THIS store's database (storeId + visible + active) and must be buyable.
     const alreadyReturnedIds = new Set<string>([
       productId,
-      ...crossSell.map((p: any) => p.id),
-      ...upsell.map((p: any) => p.id),
+      ...crossSell.map(p => p.id),
+      ...upsell.map(p => p.id),
     ]);
+    const alsoLikeRoom = Math.max(0, PDP_RECS_CAP - crossSell.length - upsell.length);
+    const buyable = (p: RecCard) => p.inStock || p.acceptsBackorder;
 
-    const productCategories = await (
-      await storeWriter(storeId)
-    ).productCategory.findMany({
-      where: { productId },
-      select: { categoryId: true },
-    });
-    const categoryIds = productCategories.map(pc => pc.categoryId);
-
-    let alsoLike: unknown[] = [];
-    if (categoryIds.length > 0) {
-      const alsoLikeRows = await (
-        await storeWriter(storeId)
-      ).product.findMany({
-        where: {
-          storeId,
-          status: 'active',
-          deletedAt: null,
-          ...visibleProductWhere(),
-          id: { notIn: Array.from(alreadyReturnedIds) },
-          categories: {
-            some: { categoryId: { in: categoryIds } },
+    const alsoLike: RecCard[] = [];
+    let degraded = false;
+    if (auto && alsoLikeRoom > 0) {
+      const similar = await similarProductIds(storeId, productId, alsoLikeRoom + 4);
+      degraded = similar.degraded;
+      const ids = similar.ids.filter(id => !alreadyReturnedIds.has(id));
+      if (ids.length > 0) {
+        const rows = await (
+          await storeWriter(storeId)
+        ).product.findMany({
+          where: {
+            id: { in: ids },
+            storeId,
+            status: 'active',
+            deletedAt: null,
+            ...visibleProductWhere(),
           },
-        },
-        take: 6,
-        select: productSelect,
-      });
-      alsoLike = alsoLikeRows.map(p => enrichStockFlags(p));
+          select: productSelect,
+        });
+        const byId = new Map(rows.map(r => [r.id, r] as const));
+        for (const id of ids) {
+          const row = byId.get(id);
+          if (!row) continue;
+          const p = enrichStockFlags(row);
+          if (!buyable(p) || alsoLike.length >= alsoLikeRoom) continue;
+          alreadyReturnedIds.add(id);
+          alsoLike.push(p);
+        }
+      }
+
+      if (alsoLike.length < alsoLikeRoom) {
+        const productCategories = await (
+          await storeWriter(storeId)
+        ).productCategory.findMany({
+          where: { productId },
+          select: { categoryId: true },
+        });
+        const categoryIds = productCategories.map(pc => pc.categoryId);
+        if (categoryIds.length > 0) {
+          const alsoLikeRows = await (
+            await storeWriter(storeId)
+          ).product.findMany({
+            where: {
+              storeId,
+              status: 'active',
+              deletedAt: null,
+              ...visibleProductWhere(),
+              id: { notIn: Array.from(alreadyReturnedIds) },
+              categories: {
+                some: { categoryId: { in: categoryIds } },
+              },
+            },
+            take: alsoLikeRoom - alsoLike.length,
+            select: productSelect,
+          });
+          alsoLike.push(...alsoLikeRows.map(p => enrichStockFlags(p)));
+        }
+      }
     }
 
     const result = { crossSell, upsell, alsoLike };
 
-    // 5. Cache result
-    await redis.set(cacheKey, result, CACHE_TTL_SECONDS);
+    // 5. Cache result. CACHE CLASS: BOUNDED-stale. Residual window = CACHE_TTL_SECONDS (5 min): a product that sells out or is
+    // unpublished can still show for at most that long (the cart API re-checks stock and refuses an oversell). A DEGRADED
+    // answer (Vectorize missing / slow: no similar items) is held only DEGRADED_CACHE_TTL_SECONDS.
+    await redis.set(cacheKey, result, degraded ? DEGRADED_CACHE_TTL_SECONDS : CACHE_TTL_SECONDS);
 
     return result;
   }
@@ -283,6 +353,7 @@ class RecommendationService {
     backorderFeatureEnabled = true
   ) {
     if (!productIds.length) return [];
+    const auto = await this.autoEnabled(storeId);
 
     const scoreMap = new Map<string, number>();
     const productIdSet = new Set(productIds);
@@ -302,16 +373,18 @@ class RecommendationService {
         orderBy: { position: 'asc' },
         select: { sourceProductId: true, targetProductId: true },
       }),
-      (await storeDb(storeId)).frequentlyBoughtTogether.findMany({
-        where: {
-          storeId,
-          OR: [{ productId1: { in: productIds } }, { productId2: { in: productIds } }],
-          product1: visibleProductWhere(),
-          product2: visibleProductWhere(),
-        },
-        orderBy: { coOccurrenceCount: 'desc' },
-        select: { productId1: true, productId2: true },
-      }),
+      auto
+        ? (await storeDb(storeId)).frequentlyBoughtTogether.findMany({
+            where: {
+              storeId,
+              OR: [{ productId1: { in: productIds } }, { productId2: { in: productIds } }],
+              product1: visibleProductWhere(),
+              product2: visibleProductWhere(),
+            },
+            orderBy: { coOccurrenceCount: 'desc' },
+            select: { productId1: true, productId2: true },
+          })
+        : Promise.resolve([] as Array<{ productId1: string; productId2: string }>),
     ]);
 
     const manualBySource = new Map<string, string[]>();
@@ -322,28 +395,25 @@ class RecommendationService {
     }
 
     for (const productId of productIds) {
-      // Manual cross-sell first; per-product cap of 8 mirrors the
-      // pre-batched query that used `take: 8`.
+      // Manual cross-sell first (weighted so it always sorts ahead); per-product cap of 8 mirrors the pre-batched query
+      // that used `take: 8`. Bought-together then TOPS UP for every cart item (before: only for an item with no manual
+      // pick, so one curated pick hid the automatic ones). Off = curated only (fbtRows is empty).
       const manual = (manualBySource.get(productId) ?? []).slice(0, 8);
-      if (manual.length > 0) {
-        for (const targetId of manual) {
-          if (!productIdSet.has(targetId)) {
-            scoreMap.set(targetId, (scoreMap.get(targetId) ?? 0) + 1);
-          }
+      for (const targetId of manual) {
+        if (!productIdSet.has(targetId)) {
+          scoreMap.set(targetId, (scoreMap.get(targetId) ?? 0) + CART_MANUAL_WEIGHT);
         }
-      } else {
-        // FBT fallback for products without manual cross-sells
-        let added = 0;
-        for (const row of fbtRows) {
-          if (added >= 8) break;
-          const isLeftMatch = row.productId1 === productId;
-          const isRightMatch = row.productId2 === productId;
-          if (!isLeftMatch && !isRightMatch) continue;
-          const targetId = isLeftMatch ? row.productId2 : row.productId1;
-          if (productIdSet.has(targetId)) continue;
-          scoreMap.set(targetId, (scoreMap.get(targetId) ?? 0) + 1);
-          added++;
-        }
+      }
+      let added = 0;
+      for (const row of fbtRows) {
+        if (added >= 8) break;
+        const isLeftMatch = row.productId1 === productId;
+        const isRightMatch = row.productId2 === productId;
+        if (!isLeftMatch && !isRightMatch) continue;
+        const targetId = isLeftMatch ? row.productId2 : row.productId1;
+        if (productIdSet.has(targetId)) continue;
+        scoreMap.set(targetId, (scoreMap.get(targetId) ?? 0) + 1);
+        added++;
       }
     }
 
@@ -658,6 +728,11 @@ class RecommendationService {
   // recommendation cache without accessing the private method directly.
   async invalidateProductCache(storeId: string, productId: string) {
     await this.invalidateCache(storeId, productId);
+  }
+
+  // The merchant flipped the automatic-recommendations switch: every cached list of the store was built under the old value.
+  async invalidateAllProductCaches(storeId: string) {
+    await this.invalidateStoreCache(storeId);
   }
 
   private async invalidateStoreCache(storeId: string) {
