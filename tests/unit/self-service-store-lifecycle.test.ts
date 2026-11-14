@@ -70,6 +70,7 @@ function makeDeps(over: Partial<DeletionDeps> = {}, store?: Partial<DeletionStor
     audit: vi.fn(async () => undefined),
     emit: vi.fn(async () => undefined),
     notifyOwner: vi.fn(async () => undefined),
+    alertStuck: vi.fn(async () => undefined),
     ...over,
   } satisfies DeletionDeps;
   return {
@@ -553,5 +554,97 @@ describe('review findings (Opus review of #772)', () => {
         h.deps
       )
     ).rejects.toMatchObject({ statusCode: 403 });
+  });
+});
+
+describe('stuck executing (follow-up to #772): repeated non-money failures are visible and alert, never a silent loop', () => {
+  async function scheduledWith(over: Partial<DeletionDeps>) {
+    const h = makeDeps(over);
+    const r = await scheduleStoreDeletion(
+      {
+        storeId: 'store-a',
+        userId: OWNER,
+        confirmToken: await mintToken(h.deps),
+        typedSlug: 'shop-a',
+      },
+      h.deps
+    );
+    h.advance(COOLING_OFF_MS + 1);
+    return { ...h, r };
+  }
+  const run = (h: { deps: DeletionDeps; r: DeletionRequest }) =>
+    executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+
+  it('counts each failure with its reason and rethrows until the limit; the 3rd failure returns STUCK, audits and raises ONE P1', async () => {
+    const del = vi.fn(async () => {
+      throw new Error('r2 timeout');
+    });
+    const h = await scheduledWith({ deleteStore: del });
+    await expect(run(h)).rejects.toThrow('r2 timeout');
+    expect(h.state.store.deletionRequest?.failures).toBe(1);
+    await expect(run(h)).rejects.toThrow('r2 timeout');
+    expect(h.state.store.deletionRequest?.failures).toBe(2);
+    expect((await run(h)).outcome).toBe('stuck');
+    const req = h.state.store.deletionRequest!;
+    expect(req.state).toBe('executing');
+    expect(req.stuckAt).toBeTruthy();
+    expect(req.lastFailure?.message).toContain('r2 timeout');
+    expect(h.deps.alertStuck).toHaveBeenCalledTimes(1);
+    expect(h.deps.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETION_STUCK' })
+    );
+  });
+
+  it('once stuck it does NOT call the delete again (no silent loop) and does not alert again', async () => {
+    const del = vi.fn(async () => {
+      throw new Error('boom');
+    });
+    const h = await scheduledWith({ deleteStore: del });
+    await expect(run(h)).rejects.toThrow();
+    await expect(run(h)).rejects.toThrow();
+    await run(h);
+    const calls = del.mock.calls.length;
+    expect((await run(h)).outcome).toBe('stuck');
+    expect((await run(h)).outcome).toBe('stuck');
+    expect(del.mock.calls.length).toBe(calls);
+    expect(h.deps.alertStuck).toHaveBeenCalledTimes(1);
+  });
+
+  it('super_admin sees the stuck state, count and reason', async () => {
+    const h = await scheduledWith({
+      deleteStore: vi.fn(async () => {
+        throw new Error('d1 down');
+      }),
+    });
+    await expect(run(h)).rejects.toThrow();
+    await expect(run(h)).rejects.toThrow();
+    await run(h);
+    const st = await readDeletionStatus(
+      { storeId: 'store-a', userId: 'root-1', role: 'super_admin' },
+      h.deps
+    );
+    expect(st.request).toMatchObject({ state: 'executing', failures: 3 });
+    expect(st.request?.stuckAt).toBeTruthy();
+    expect(st.request?.lastFailure?.message).toContain('d1 down');
+  });
+
+  it('a money block is not a failure: it does not count toward stuck', async () => {
+    const del = vi.fn(async () => {
+      throw new AppError(409, 'STORE_HAS_MONEY_IN_FLIGHT', 'money', {
+        paidUndelivered: 1,
+      } as never);
+    });
+    const h = await scheduledWith({ deleteStore: del });
+    for (let i = 0; i < 5; i++) expect((await run(h)).outcome).toBe('blocked');
+    expect(h.state.store.deletionRequest?.failures ?? 0).toBe(0);
+    expect(h.deps.alertStuck).not.toHaveBeenCalled();
+  });
+
+  it('a success after earlier failures still executes', async () => {
+    const del = vi.fn().mockRejectedValueOnce(new Error('blip')).mockResolvedValue(undefined);
+    const h = await scheduledWith({ deleteStore: del });
+    await expect(run(h)).rejects.toThrow('blip');
+    expect((await run(h)).outcome).toBe('executed');
+    expect(h.deps.alertStuck).not.toHaveBeenCalled();
   });
 });

@@ -39,6 +39,11 @@ export interface DeletionRequest {
   executedAt?: string;
   /** Why the last execution attempt was refused (the request stays pending and is re-checked). */
   lastBlock?: { code: string; at: string };
+  /** Non-money failures of the delete itself (an outage, a timeout): counted, with the last reason, readable by super admin. */
+  failures?: number;
+  lastFailure?: { message: string; at: string };
+  /** Set after MAX_DELETE_FAILURES: the job stops calling the delete, a P1 was raised, a person has to act. */
+  stuckAt?: string;
 }
 interface DeletionStore {
   id: string;
@@ -80,6 +85,13 @@ export interface DeletionDeps {
     details?: Record<string, unknown>;
   }): Promise<void>;
   emit(name: string, data: Record<string, unknown>): Promise<void>;
+  /** P1 for a deletion that keeps failing for a non-money reason (raised once, when it becomes stuck). */
+  alertStuck(info: {
+    storeId: string;
+    requestId: string;
+    failures: number;
+    message: string;
+  }): Promise<void>;
   notifyOwner(
     kind: 'scheduled' | 'cancelled' | 'executed',
     info: { to: string | null; storeName: string; slug: string; executeAfter?: string }
@@ -308,8 +320,14 @@ export async function readDeletionStatus(
 type ExecuteOutcome =
   | { outcome: 'executed' }
   | { outcome: 'not-due' | 'cancelled' | 'stale' | 'gone' | 'done' | 'voided' }
-  | { outcome: 'blocked'; reasons: GuardReason[] };
+  | { outcome: 'blocked'; reasons: GuardReason[] }
+  | { outcome: 'stuck' };
 
+/**
+ * Non-money failures before the deletion is declared STUCK. Kept BELOW the job's step attempts (retries: 3 = 4 attempts) so the
+ * stuck verdict and the alert happen inside one job run instead of the run dying silently after its last retry.
+ */
+const MAX_DELETE_FAILURES = 3;
 const BLOCKING_DELETE_CODES = new Set(['STORE_HAS_MONEY_IN_FLIGHT', 'STORE_IS_BILLING_PARENT']);
 
 export async function executeStoreDeletion(
@@ -323,6 +341,9 @@ export async function executeStoreDeletion(
   if (req.state === 'cancelled') return { outcome: 'cancelled' };
   if (req.state === 'executed') return { outcome: 'done' };
   if (deps.now() < Date.parse(req.executeAfter)) return { outcome: 'not-due' };
+  // Stuck: no more silent retries. The request stays `executing` and visible (failures, lastFailure, stuckAt); a super admin decides
+  // (DELETE /stores/:id is the platform override that finishes or removes it).
+  if (req.stuckAt) return { outcome: 'stuck' };
   const nowIso = () => new Date(deps.now()).toISOString();
   // The requester must still own the store: a transfer during the 14 days means the new owner never asked for this.
   if (store.ownerId !== req.requestedBy) {
@@ -396,7 +417,31 @@ export async function executeStoreDeletion(
         'executing'
       );
     }
-    throw err; // the job retries; the request stays `executing` and resumes
+    // Any other failure: count it with its reason (visible state); after MAX_DELETE_FAILURES it is STUCK (audit + one P1, no more calls).
+    const failures = (req.failures ?? 0) + 1;
+    const message = (err instanceof Error ? err.message : String(err)).slice(0, 200);
+    const at = nowIso();
+    const stuck = failures >= MAX_DELETE_FAILURES;
+    await deps.transition(
+      store.id,
+      { id: req.id, state: 'executing' },
+      {
+        ...req,
+        state: 'executing',
+        failures,
+        lastFailure: { message, at },
+        ...(stuck ? { stuckAt: at } : {}),
+      }
+    );
+    if (!stuck) throw err; // the job retries; the request stays `executing` and resumes
+    await deps.audit({
+      action: 'STORE_DELETION_STUCK',
+      userId: req.requestedBy,
+      storeId: store.id,
+      details: { requestId: req.id, failures, message },
+    });
+    await deps.alertStuck({ storeId: store.id, requestId: req.id, failures, message });
+    return { outcome: 'stuck' };
   }
   await deps.audit({
     action: 'STORE_DELETED_BY_OWNER',

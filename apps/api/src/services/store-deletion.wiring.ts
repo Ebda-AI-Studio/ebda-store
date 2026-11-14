@@ -7,6 +7,7 @@ import { ownerStores } from '../lib/store-create-do';
 import { StoreService } from './store.service';
 import { BILLED_SUBSCRIPTION_STATUSES } from './account-closure-guard';
 import { EmailService } from './email.service';
+import { sendAlert } from './alerts.service';
 import { sortOwnerStores } from './billing/billing-parent';
 import { moneyInFlight } from './store-closure.service';
 import type { DeletionDeps, DeletionRequest } from './store-deletion.service';
@@ -78,6 +79,15 @@ export function productionDeletionDeps(): DeletionDeps {
     },
     async emit(name, data) {
       await inngest.send({ name, data });
+    },
+    async alertStuck(info) {
+      await sendAlert({
+        level: 'p1',
+        scope: 'store',
+        source: 'job.store-deletion-execute',
+        title: `Owner store deletion stuck after ${info.failures} failures`,
+        body: `Store ${info.storeId}, request ${info.requestId}: ${info.message}. The job stopped retrying; the state is visible to super admin (settings.deletionRequest). DELETE /stores/:id finishes it.`,
+      } as Parameters<typeof sendAlert>[0]);
     },
     async notifyOwner(kind, info) {
       if (!info.to) return;

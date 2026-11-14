@@ -17,6 +17,9 @@ interface DeletionRequest {
   state: 'pending' | 'executing' | 'cancelled' | 'executed';
   executeAfter: string;
   lastBlock?: { code: string };
+  failures?: number;
+  lastFailure?: { message: string };
+  stuckAt?: string;
 }
 interface Preview {
   slug: string;
@@ -203,7 +206,12 @@ export function OwnerStoreLifecycle({ storeId }: { storeId: string }) {
             )}
             {request.state === 'executing' && (
               <p role="status" className="mt-2 text-sm text-muted-foreground">
-                {t('runningBody')}
+                {request.stuckAt ? t('stuckBody') : t('runningBody')}
+              </p>
+            )}
+            {request.stuckAt && request.lastFailure && (
+              <p role="status" dir="ltr" className="mt-1 text-xs text-muted-foreground">
+                {request.lastFailure.message}
               </p>
             )}
           </>
