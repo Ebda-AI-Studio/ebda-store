@@ -28,6 +28,7 @@ interface AccountsTree {
 interface ImportResult {
   statementId: string;
   imported: number;
+  alreadyImported?: number;
   skipped: number;
   parseErrors: string[];
 }
@@ -194,6 +195,11 @@ export default function ImportStatementPage() {
               <p>
                 {t('imported')}: <strong>{result.imported}</strong>
               </p>
+              {(result.alreadyImported ?? 0) > 0 && (
+                <p>
+                  {ti('alreadyImportedLabel')}: <strong>{result.alreadyImported}</strong>
+                </p>
+              )}
               <p>
                 {ti('skippedLabel')}: <strong>{result.skipped}</strong>
               </p>

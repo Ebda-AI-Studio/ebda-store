@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   decimalStringToFils,
   parseStatementCsv,
+  parseStatementOfx,
 } from '@api/services/accounting/bank-statement-parser';
 
 const utf8 = (s: string) => Buffer.from(s, 'utf-8');
@@ -77,5 +78,31 @@ describe('parseStatementCsv: Egyptian export shapes', () => {
 
   it('a file with no header anywhere still reports the missing column', () => {
     expect(parseStatementCsv(utf8('hello\nworld')).errors[0]).toMatch(/date column/);
+  });
+});
+
+describe('row hashes (ACCT-AUDIT-6)', () => {
+  const file =
+    'date,description,amount\n2026-11-01,POS purchase,-50.00\n2026-11-01,POS purchase,-50.00\n2026-11-01,POS purchase,-50.00\n2026-11-02,Other,10.00';
+  it('identical lines in one file are separate transactions with distinct hashes', () => {
+    const r = parseStatementCsv(utf8(file));
+    expect(r.rows).toHaveLength(4);
+    expect(new Set(r.rows.map(x => x.rowHash)).size).toBe(4);
+  });
+  it('a re-upload of the same file hashes every row the same', () => {
+    const a = parseStatementCsv(utf8(file)).rows.map(x => x.rowHash);
+    const b = parseStatementCsv(utf8(file)).rows.map(x => x.rowHash);
+    expect(b).toEqual(a);
+  });
+  it('the first occurrence keeps the hash it had before ordinals, so earlier imports still match', () => {
+    const one = parseStatementCsv(utf8('date,description,amount\n2026-11-01,POS purchase,-50.00'))
+      .rows[0];
+    const three = parseStatementCsv(utf8(file)).rows[0];
+    expect(three.rowHash).toBe(one.rowHash);
+  });
+  it('OFX lines without a FITID repeat the same way', () => {
+    const tx = '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261101<TRNAMT>-50.00<NAME>POS</STMTTRN>';
+    const r = parseStatementOfx(Buffer.from(`<OFX><BANKTRANLIST>${tx}${tx}</BANKTRANLIST></OFX>`));
+    expect(new Set(r.rows.map(x => x.rowHash)).size).toBe(2);
   });
 });

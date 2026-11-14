@@ -355,12 +355,18 @@ function makeTx(overrides: {
     id: overrides.id ?? 'btx-001',
     date: overrides.date ?? new Date('2026-01-15'),
     amountFils: overrides.amountFils ?? 10000,
-    direction: overrides.direction ?? 'debit',
+    // a deposit: money IN is a DEBIT on the bank's asset account (ACCT-AUDIT-7)
+    direction: overrides.direction ?? 'credit',
   };
 }
 
-function makeCandidate(entryId: string, debit = 10000, credit = 0) {
-  return { entryId, debit, credit };
+function makeCandidate(
+  entryId: string,
+  debit = 10000,
+  credit = 0,
+  postedAt = new Date('2026-01-15')
+) {
+  return { entryId, debit, credit, entry: { postedAt } };
 }
 
 // Wire the withRlsBypass mock to execute the callback with a mock tx
@@ -400,10 +406,14 @@ beforeEach(() => {
 });
 
 describe('runAutoMatch — matching rules', () => {
+  beforeEach(() => {
+    mockBankTxFindFirst.mockResolvedValue({ glAccountId: 'gl-bank' });
+  });
+
   it('auto-matches a single exact candidate', async () => {
     mockBankTxUpdateMany.mockResolvedValue({});
     mockBankTxFindMany
-      .mockResolvedValueOnce([makeTx({ id: 'btx-1', amountFils: 10000, direction: 'debit' })])
+      .mockResolvedValueOnce([makeTx({ id: 'btx-1', amountFils: 10000 })])
       .mockResolvedValueOnce([]); // alreadyMatched query
     mockJournalLineFindMany.mockResolvedValueOnce([makeCandidate('entry-1', 10000, 0)]);
     mockBankTxUpdate.mockResolvedValue({});
@@ -462,7 +472,7 @@ describe('runAutoMatch — matching rules', () => {
     mockBankTxUpdateMany.mockResolvedValue({});
     // Bank tx: 10000 piastres; ledger line: 10003 piastres (diff = 3, within tolerance of 5)
     mockBankTxFindMany
-      .mockResolvedValueOnce([makeTx({ id: 'btx-4', amountFils: 10000, direction: 'debit' })])
+      .mockResolvedValueOnce([makeTx({ id: 'btx-4', amountFils: 10000 })])
       .mockResolvedValueOnce([]);
     mockJournalLineFindMany.mockResolvedValueOnce([makeCandidate('entry-C', 10003, 0)]);
     mockBankTxUpdate.mockResolvedValue({});
@@ -502,6 +512,61 @@ describe('runAutoMatch — matching rules', () => {
   });
 });
 
+describe('runAutoMatch — account, direction and ranking (ACCT-AUDIT-7)', () => {
+  beforeEach(() => {
+    mockBankTxFindFirst.mockResolvedValue({ glAccountId: 'gl-bank' });
+    mockBankTxUpdateMany.mockResolvedValue({});
+    mockBankTxUpdate.mockResolvedValue({});
+    mockBankTxCount.mockResolvedValue(1);
+    mockBankStatementUpdate.mockResolvedValue({});
+  });
+  const run = async (tx: ReturnType<typeof makeTx>, lines: ReturnType<typeof makeCandidate>[]) => {
+    mockBankTxFindMany.mockResolvedValueOnce([tx]).mockResolvedValueOnce([]);
+    mockJournalLineFindMany.mockResolvedValueOnce(lines);
+    return runAutoMatch(STMT_ID, STORE_ID);
+  };
+
+  it("only looks at journal lines on the statement's own bank account", async () => {
+    await run(makeTx({}), []);
+    expect(mockJournalLineFindMany.mock.calls[0][0].where.accountId).toBe('gl-bank');
+  });
+
+  it('a deposit (bank credit) looks for a DEBIT on the bank account, a withdrawal for a CREDIT', async () => {
+    await run(makeTx({ direction: 'credit', amountFils: 50000 }), []);
+    expect(mockJournalLineFindMany.mock.calls[0][0].where).toMatchObject({
+      debit: { gte: 49995, lte: 50005 },
+    });
+    expect(mockJournalLineFindMany.mock.calls[0][0].where.credit).toBeUndefined();
+    mockBankTxFindMany.mockReset();
+    mockJournalLineFindMany.mockReset();
+    await run(makeTx({ direction: 'debit', amountFils: 50000 }), []);
+    expect(mockJournalLineFindMany.mock.calls[0][0].where).toMatchObject({
+      credit: { gte: 49995, lte: 50005 },
+    });
+    expect(mockJournalLineFindMany.mock.calls[0][0].where.debit).toBeUndefined();
+  });
+
+  it('a candidate three days away scores lower than the same amount on the same day', async () => {
+    await run(makeTx({}), [makeCandidate('e-far', 10000, 0, new Date('2026-01-18'))]);
+    expect(mockBankTxUpdate.mock.calls[0][0].data.confidence).toBe(70);
+  });
+
+  it('two same-amount candidates: the closer date wins and the other stays free', async () => {
+    const r = await run(makeTx({}), [
+      makeCandidate('e-far', 10000, 0, new Date('2026-01-17')),
+      makeCandidate('e-near', 10000, 0, new Date('2026-01-15')),
+    ]);
+    expect(r.matched).toBe(1);
+    expect(mockBankTxUpdate.mock.calls[0][0].data.matchedJournalEntryId).toBe('e-near');
+  });
+
+  it('two candidates equally close stay ambiguous for a human', async () => {
+    const r = await run(makeTx({}), [makeCandidate('e1'), makeCandidate('e2')]);
+    expect(r.ambiguous).toBe(1);
+    expect(mockBankTxUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe('bank matching row cap (FIX-013)', () => {
   it('importBankStatement rejects an oversized statement with 422 STATEMENT_TOO_LARGE before any DB work', async () => {
     const lines = ['Date,Description,Debit,Credit,Reference'];
@@ -521,6 +586,7 @@ describe('bank matching row cap (FIX-013)', () => {
   });
 
   it('runAutoMatch rejects a statement over the cap (legacy rows) and does not reach the match loop', async () => {
+    mockBankTxFindFirst.mockResolvedValue({ glAccountId: 'gl-bank' });
     mockBankTxUpdateMany.mockResolvedValue({});
     mockBankTxFindMany.mockResolvedValueOnce(
       Array.from({ length: MAX_STATEMENT_ROWS + 1 }, (_, i) => makeTx({ id: `btx-${i}` }))
@@ -532,6 +598,7 @@ describe('bank matching row cap (FIX-013)', () => {
   });
 
   it('runAutoMatch accepts a statement exactly at the cap', async () => {
+    mockBankTxFindFirst.mockResolvedValue({ glAccountId: 'gl-bank' });
     mockBankTxUpdateMany.mockResolvedValue({});
     mockBankTxFindMany
       .mockResolvedValueOnce(

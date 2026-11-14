@@ -6840,6 +6840,7 @@
         "error": "فشل الاستيراد.",
         "fileTypesHint": "CSV أو Excel (.xlsx) أو OFX (بحد أقصى 5 ميغابايت)",
         "skippedLabel": "اتخطّت",
+        "alreadyImportedLabel": "كانت متسجّلة قبل كده",
         "viewReconciliation": "عرض المطابقة",
         "andMore": "…و{count} كمان"
       },

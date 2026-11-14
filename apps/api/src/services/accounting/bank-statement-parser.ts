@@ -9,7 +9,9 @@
  *   (a 3rd decimal, if a statement carries one, is truncated — never rounded up)
  *
  * The row_hash (SHA-256 of canonical fields) is the idempotent dedup key.
- * Re-importing the same statement rows is a no-op in the DB.
+ * Re-importing the same statement rows is a no-op in the DB. Two genuinely identical lines in ONE file (same day, amount,
+ * direction, reference and text) are two transactions: the Nth repeat carries its occurrence ordinal in the hash
+ * (ACCT-AUDIT-6), so they stay distinct while a re-upload of the same file still hashes the same.
  */
 
 import { createHash } from 'crypto';
@@ -89,13 +91,35 @@ export function decimalStringToFils(raw: string): number {
   return isNegative ? -totalMinor : totalMinor;
 }
 
+/** How many identical lines (same canonical fields) this file already produced; counts this one. */
+function nextOccurrence(
+  seen: Map<string, number>,
+  date: Date,
+  amountFils: number,
+  direction: TransactionDirection,
+  externalRef: string | null,
+  description: string
+): number {
+  const key = [
+    date.toISOString().slice(0, 10),
+    amountFils,
+    direction,
+    externalRef ?? '',
+    description,
+  ].join('|');
+  const n = seen.get(key) ?? 0;
+  seen.set(key, n + 1);
+  return n;
+}
+
 /** Compute the deterministic row hash. */
 function computeRowHash(
   date: Date,
   amountFils: number,
   direction: TransactionDirection,
   externalRef: string | null,
-  description: string
+  description: string,
+  occurrence = 0
 ): string {
   const canonical = [
     date.toISOString().slice(0, 10), // date portion only
@@ -103,6 +127,8 @@ function computeRowHash(
     direction,
     externalRef ?? '',
     description,
+    // the first occurrence keeps the pre-ordinal hash, so lines already imported are still recognised
+    ...(occurrence > 0 ? [`#${occurrence}`] : []),
   ].join('|');
   return createHash('sha256').update(canonical).digest('hex');
 }
@@ -250,6 +276,7 @@ export function parseStatementCsv(buffer: Buffer): CsvParseResult {
   }
 
   const rows: ParsedRow[] = [];
+  const seen = new Map<string, number>();
 
   for (let i = headerAt + 1; i < lines.length; i++) {
     const cells = splitCsvLine(lines[i], sep).map(c => c.trim().replace(/^"|"$/g, ''));
@@ -309,7 +336,14 @@ export function parseStatementCsv(buffer: Buffer): CsvParseResult {
       direction = piastres < 0 ? 'debit' : 'credit';
     }
 
-    const rowHash = computeRowHash(date, amountFils, direction, externalRef, descRaw);
+    const rowHash = computeRowHash(
+      date,
+      amountFils,
+      direction,
+      externalRef,
+      descRaw,
+      nextOccurrence(seen, date, amountFils, direction, externalRef, descRaw)
+    );
     rows.push({ date, description: descRaw, amountFils, direction, externalRef, rowHash });
   }
 
@@ -404,6 +438,7 @@ export interface OfxParseResult {
 export function parseStatementOfx(buffer: Buffer): OfxParseResult {
   const text = decodeStatementText(buffer);
   const rows: ParsedRow[] = [];
+  const seen = new Map<string, number>();
   const errors: string[] = [];
   let skipped = 0;
 
@@ -453,7 +488,14 @@ export function parseStatementOfx(buffer: Buffer): OfxParseResult {
     const externalRef = fitid || null;
     const description = name || `OFX transaction ${txIdx}`;
 
-    const rowHash = computeRowHash(date, amountFils, direction, externalRef, description);
+    const rowHash = computeRowHash(
+      date,
+      amountFils,
+      direction,
+      externalRef,
+      description,
+      nextOccurrence(seen, date, amountFils, direction, externalRef, description)
+    );
     rows.push({ date, description, amountFils, direction, externalRef, rowHash });
   }
 

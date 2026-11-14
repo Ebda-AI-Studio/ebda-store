@@ -6840,6 +6840,7 @@
         "error": "Import failed.",
         "fileTypesHint": "CSV, Excel (.xlsx), or OFX (max 5 MB)",
         "skippedLabel": "Skipped",
+        "alreadyImportedLabel": "Already imported before",
         "viewReconciliation": "View Reconciliation",
         "andMore": "…and {count} more"
       },

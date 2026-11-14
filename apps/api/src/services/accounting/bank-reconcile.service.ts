@@ -34,7 +34,7 @@ import { runInStoreCtx } from '../../lib/jobs/store-db';
 import { minorToDecimalString } from '@ebda/shared';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Fil tolerance for amount matching (5 piastres = 0.005 EGP — rounding/truncation). */
+/** Tolerance for amount matching: 5 piastres = EGP 0.05 (rounding/truncation). */
 const AMOUNT_TOLERANCE_FILS = 5;
 
 /** Maximum days difference between bank transaction date and journal posting date. */
@@ -73,7 +73,10 @@ export interface ImportStatementInput {
 
 export interface ImportStatementResult {
   statementId: string;
+  /** Rows newly stored by THIS import. */
   imported: number;
+  /** Rows in the file whose line was already stored by an earlier import (same row hash). */
+  alreadyImported: number;
   skipped: number;
   parseErrors: string[];
 }
@@ -167,18 +170,17 @@ export async function importBankStatement(
     await assertStoreOwnsInTenantScope(storeId, { accountIds: [glAccountId] });
     const db = await storeDb(storeId);
     const w = await storeWriter(storeId);
-    // one row per hash, like the upsert-per-row loop below (a repeated hash in the file is a no-op)
-    const byHash = new Map<string, ParsedRow>();
-    for (const row of rows) if (!byHash.has(row.rowHash)) byHash.set(row.rowHash, row);
+    // Row hashes are unique within a file (identical lines carry an occurrence ordinal, ACCT-AUDIT-6); a line an earlier
+    // import already stored is skipped and COUNTED, never silently dropped.
     const have = new Set(
       (
         await db.bankTransaction.findMany({
-          where: { storeId, rowHash: { in: [...byHash.keys()] } },
+          where: { storeId, rowHash: { in: rows.map(r => r.rowHash) } },
           select: { rowHash: true },
         })
       ).map(r => r.rowHash)
     );
-    const fresh = [...byHash.values()].filter(r => !have.has(r.rowHash));
+    const fresh = rows.filter(r => !have.has(r.rowHash));
     const statementId = crypto.randomUUID();
     const ops: Promise<unknown>[] = [
       w.bankStatement.create({
@@ -215,13 +217,19 @@ export async function importBankStatement(
       throw err;
     }
     await runAutoMatch(statementId, storeId);
-    // the Postgres loop counts every row (an upsert returns the existing one too)
-    return { statementId, imported: rows.length, skipped, parseErrors };
+    return {
+      statementId,
+      imported: fresh.length,
+      alreadyImported: rows.length - fresh.length,
+      skipped,
+      parseErrors,
+    };
   }
 
   // ── Persist (transactional) ──
   let statementId: string;
   let imported = 0;
+  let alreadyImported = 0;
 
   await withStore(storeId, async tx => {
     // glAccountId comes from the request body and is written onto the
@@ -250,7 +258,19 @@ export async function importBankStatement(
 
     // Upsert each row — the unique constraint on (storeId, rowHash) makes this
     // idempotent: re-importing the same statement is a no-op per row.
+    const have = new Set(
+      (
+        await tx.bankTransaction.findMany({
+          where: { storeId, rowHash: { in: rows.map(r => r.rowHash) } },
+          select: { rowHash: true },
+        })
+      ).map(r => r.rowHash)
+    );
     for (const row of rows) {
+      if (have.has(row.rowHash)) {
+        alreadyImported++;
+        continue;
+      }
       const result = await tx.bankTransaction.upsert({
         where: {
           storeId_rowHash: { storeId, rowHash: row.rowHash },
@@ -269,6 +289,7 @@ export async function importBankStatement(
   return {
     statementId: statementId!,
     imported,
+    alreadyImported,
     skipped,
     parseErrors,
   };
@@ -340,7 +361,13 @@ export async function runAutoMatch(
   // iteration before; that baseline is invariant for the duration of this
   // pass — only `claimedEntries`, tracked in memory below, changes).
   // -------------------------------------------------------------------------
-  const { bankTxs, alreadyMatchedIds } = await withStore(storeId, async tx => {
+  const { bankTxs, alreadyMatchedIds, bankAccountId } = await withStore(storeId, async tx => {
+    // the matcher only looks at the statement's own bank account (ACCT-AUDIT-7)
+    const stmt = await tx.bankStatement.findFirst({
+      where: { id: statementId, storeId },
+      select: { glAccountId: true },
+    });
+    if (!stmt) throw new AppError(404, 'statement_not_found', 'statement_not_found');
     // Reset prior auto_matches so re-runs are idempotent
     await tx.bankTransaction.updateMany({
       where: { statementId, storeId, matchStatus: 'auto_matched' },
@@ -373,7 +400,7 @@ export async function runAutoMatch(
     });
     const alreadyMatchedIds = alreadyMatched.map(r => r.matchedJournalEntryId!).filter(Boolean);
 
-    return { bankTxs, alreadyMatchedIds };
+    return { bankTxs, alreadyMatchedIds, bankAccountId: stmt.glAccountId };
   });
 
   // Track which journal entries have been claimed in this pass (across ALL
@@ -404,10 +431,9 @@ export async function runAutoMatch(
         // Find candidate journal entries
         const candidates = await tx.journalLine.findMany({
           where: {
+            accountId: bankAccountId,
             account: { storeId },
-            ...(btx.direction === 'debit'
-              ? { debit: { gte: minFils, lte: maxFils } }
-              : { credit: { gte: minFils, lte: maxFils } }),
+            ...ledgerSideFilter(btx.direction, minFils, maxFils),
             entry: {
               storeId,
               // A refunded sale's original entry is flipped to 'reversed' but
@@ -422,35 +448,30 @@ export async function runAutoMatch(
             entryId: true,
             debit: true,
             credit: true,
+            entry: { select: { postedAt: true } },
           },
-          distinct: ['entryId'],
         });
 
-        if (candidates.length === 0) {
+        const pick = pickMatch(btx, candidates);
+        if (pick.kind === 'none') {
           unmatched++;
           continue;
         }
-
-        if (candidates.length > 1) {
+        if (pick.kind === 'ambiguous') {
           ambiguous++;
           continue;
         }
-
-        // Exactly one candidate — auto match
-        const candidate = candidates[0];
-        const exactAmt = btx.direction === 'debit' ? candidate.debit : candidate.credit;
-        const confidence = computeConfidence(btx.amountFils, exactAmt);
 
         await tx.bankTransaction.update({
           where: { id: btx.id, storeId },
           data: {
             matchStatus: 'auto_matched',
-            matchedJournalEntryId: candidate.entryId,
-            confidence,
+            matchedJournalEntryId: pick.entryId,
+            confidence: pick.confidence,
           },
         });
 
-        claimedEntries.add(candidate.entryId);
+        claimedEntries.add(pick.entryId);
         matched++;
       }
     });
@@ -492,6 +513,13 @@ async function runAutoMatchOnDo(
 ): Promise<{ matched: number; unmatched: number; ambiguous: number }> {
   const db = await storeDb(storeId);
   const w = await storeWriter(storeId);
+  // the matcher only looks at the statement's own bank account (ACCT-AUDIT-7)
+  const stmt = await db.bankStatement.findFirst({
+    where: { id: statementId, storeId },
+    select: { glAccountId: true },
+  });
+  if (!stmt) throw new AppError(404, 'statement_not_found', 'statement_not_found');
+  const bankAccountId = stmt.glAccountId;
   await w.bankTransaction.updateMany({
     where: { statementId, storeId, matchStatus: 'auto_matched' },
     data: { matchStatus: 'unmatched', matchedJournalEntryId: null, confidence: 0 },
@@ -529,10 +557,9 @@ async function runAutoMatchOnDo(
       const excludedIds = [...alreadyMatchedIds, ...Array.from(claimedEntries)];
       const lines = await db.journalLine.findMany({
         where: {
+          accountId: bankAccountId,
           account: { storeId },
-          ...(btx.direction === 'debit'
-            ? { debit: { gte: minFils, lte: maxFils } }
-            : { credit: { gte: minFils, lte: maxFils } }),
+          ...ledgerSideFilter(btx.direction, minFils, maxFils),
           entry: {
             storeId,
             status: { in: ['posted', 'reversed'] },
@@ -540,31 +567,29 @@ async function runAutoMatchOnDo(
             id: excludedIds.length > 0 ? { notIn: excludedIds } : undefined,
           },
         },
-        select: { entryId: true, debit: true, credit: true },
+        select: { entryId: true, debit: true, credit: true, entry: { select: { postedAt: true } } },
       });
-      // `distinct: ['entryId']` is not in the DO read surface: one candidate per entry, here
-      const candidates = [...new Map(lines.map(l => [l.entryId, l])).values()];
-      if (candidates.length === 0) {
+      // `distinct: ['entryId']` is not in the DO read surface: pickMatch keeps one line per entry
+      const pick = pickMatch(btx, lines);
+      if (pick.kind === 'none') {
         unmatched++;
         continue;
       }
-      if (candidates.length > 1) {
+      if (pick.kind === 'ambiguous') {
         ambiguous++;
         continue;
       }
-      const candidate = candidates[0];
-      const exactAmt = btx.direction === 'debit' ? candidate.debit : candidate.credit;
       updates.push(
         w.bankTransaction.update({
           where: { id: btx.id, storeId },
           data: {
             matchStatus: 'auto_matched',
-            matchedJournalEntryId: candidate.entryId,
-            confidence: computeConfidence(btx.amountFils, exactAmt),
+            matchedJournalEntryId: pick.entryId,
+            confidence: pick.confidence,
           },
         }) as Promise<unknown>
       );
-      claimedEntries.add(candidate.entryId);
+      claimedEntries.add(pick.entryId);
       matched++;
     }
     if (updates.length > 0) await w.$transaction(updates as never);
@@ -582,6 +607,61 @@ async function runAutoMatchOnDo(
     },
   });
   return { matched, unmatched, ambiguous };
+}
+
+/** Confidence points lost per whole day between the bank line and the journal entry (ACCT-AUDIT-7). */
+const DATE_PENALTY_PER_DAY = 10;
+
+interface MatchLine {
+  entryId: string;
+  debit: number;
+  credit: number;
+  entry: { postedAt: Date };
+}
+
+type MatchPick =
+  | { kind: 'none' }
+  | { kind: 'ambiguous' }
+  | { kind: 'match'; entryId: string; confidence: number };
+
+/**
+ * Choose the journal entry for one bank line among the lines on the statement's bank account (ACCT-AUDIT-7).
+ * The bank account is an asset: money IN (bank credit) is a DEBIT on it and money OUT (bank debit) a CREDIT, so the
+ * line's own side is the opposite of the bank direction. Candidates are scored on amount closeness minus a penalty per
+ * day apart; the best wins only when it strictly beats the runner-up, otherwise the line stays for a human (ambiguous).
+ */
+export function pickMatch(
+  btx: { date: Date; amountFils: number; direction: string },
+  lines: MatchLine[]
+): MatchPick {
+  const byEntry = new Map<string, MatchLine>();
+  for (const l of lines) if (!byEntry.has(l.entryId)) byEntry.set(l.entryId, l);
+  if (byEntry.size === 0) return { kind: 'none' };
+  const scored = [...byEntry.values()]
+    .map(l => {
+      const ledgerFils = btx.direction === 'credit' ? l.debit : l.credit;
+      const days = Math.floor(
+        Math.abs(l.entry.postedAt.getTime() - btx.date.getTime()) / 86_400_000
+      );
+      return {
+        entryId: l.entryId,
+        confidence: Math.max(
+          0,
+          computeConfidence(btx.amountFils, ledgerFils) - days * DATE_PENALTY_PER_DAY
+        ),
+      };
+    })
+    .sort((a, b) => b.confidence - a.confidence);
+  if (scored.length > 1 && scored[0].confidence === scored[1].confidence)
+    return { kind: 'ambiguous' };
+  return { kind: 'match', ...scored[0] };
+}
+
+/** The side of the bank GL account a bank line of this direction lands on, as a prisma amount filter. */
+function ledgerSideFilter(direction: string, minFils: number, maxFils: number) {
+  return direction === 'credit'
+    ? { debit: { gte: minFils, lte: maxFils } }
+    : { credit: { gte: minFils, lte: maxFils } };
 }
 
 /** Confidence 0–100: 100 = exact piastres match, lower as difference grows. */
