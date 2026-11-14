@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { scan, vendoredExemption } from '../../.github/pr-quality/slop-guard.mjs';
 
 const DIR = 'packages/shared/src/foundation';
@@ -144,6 +145,23 @@ describe('SLOP-VENDORED-1', () => {
     const { root, config } = checkout();
     rmSync(join(root, 'foundation.lock.json'));
     expect(vendoredExemption(root, config).dir).toBeNull();
+  });
+
+  it('an old baseline entry for a waived vendored export is ignored, not reported as fixed-but-listed (no later PR has to rewrite it)', () => {
+    const { root, config } = checkout();
+    writeFileSync(join(root, '.pr-quality.json'), JSON.stringify(config));
+    const ids = [...scan({ root, config }).keys()];
+    writeFileSync(
+      join(root, '.pr-quality-baseline.json'),
+      JSON.stringify({ ids: [...ids, `unused-export|${DIR}/helpers.ts|UNUSED_VENDORED`] })
+    );
+    const guard = join(__dirname, '../../.github/pr-quality/slop-guard.mjs');
+    const ok = spawnSync(process.execPath, [guard, '--root', root], { encoding: 'utf8' });
+    expect(ok.status, ok.stderr).toBe(0);
+    // with the parity test gone the waiver is off: the vendored export counts again and the listed id is honoured
+    rmSync(join(root, PARITY));
+    const off = spawnSync(process.execPath, [guard, '--root', root], { encoding: 'utf8' });
+    expect(off.stderr).toMatch(/OFF/);
   });
 
   it('the real repo: exactly one narrow entry, and the real vendored files match the lock', () => {

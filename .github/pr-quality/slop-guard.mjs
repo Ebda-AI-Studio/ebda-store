@@ -221,7 +221,12 @@ function main() {
   const basePath = arg('--baseline', join(root, config.baseline ?? '.pr-quality-baseline.json'));
   const current = scan({ root, config });
   if (a.includes('--list')) { for (const d of current.values()) console.log(d); console.log(`${current.size} violation(s)`); return; }
-  const baseline = existsSync(basePath) ? readJsonRegular(basePath).ids ?? [] : null;
+  // SLOP-VENDORED-1: ids the active exemption waives are ignored on BOTH sides (an old baseline entry for a waived vendored export is
+  // neither "fixed but still listed" nor needed), so the exemption never forces every later PR to rewrite the baseline.
+  const waivedDir = vendoredExemption(root, config).dir;
+  const waivedId = (id) => !!waivedDir && id.startsWith('unused-export|') && id.split('|')[1].startsWith(`${waivedDir}/`);
+  const rawBaseline = existsSync(basePath) ? readJsonRegular(basePath).ids ?? [] : null;
+  const baseline = rawBaseline === null ? null : rawBaseline.filter((id) => !waivedId(id));
   if (baseline === null && !a.includes('--update')) { console.error(`slop-guard: no baseline at ${basePath}; create it once with --update --init`); process.exit(1); }
   const { added, stale } = compare(current, baseline ?? []);
   if (a.includes('--update')) {
@@ -236,7 +241,7 @@ function main() {
   if (baseRoot) {
     const bp = join(baseRoot, config.baseline ?? '.pr-quality-baseline.json');
     if (existsSync(bp)) {
-      const B = new Set(readJsonRegular(bp).ids ?? []);
+      const B = new Set((readJsonRegular(bp).ids ?? []).filter((id) => !waivedId(id)));
       for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
       for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
     }
