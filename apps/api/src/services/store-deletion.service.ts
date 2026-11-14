@@ -20,12 +20,12 @@ import {
  * Owner = `store.ownerId === userId`. Staff, store admins who are not the owner and every other store get 403 / 404.
  * `DELETE /stores/:id` (super_admin: support / test stores) is untouched and has no cooling-off.
  */
-export const COOLING_OFF_MS = 14 * 86_400_000;
-export const DELETION_TOOL = 'store.delete';
+const COOLING_OFF_MS = 14 * 86_400_000;
+const DELETION_TOOL = 'store.delete';
 /** The confirm token is bound to the signed-in owner session, not to an API key (the MCP key slot is unused here). */
 const KEY_SLOT = 'owner-session';
 
-export type DeletionState = 'pending' | 'cancelled' | 'executed';
+type DeletionState = 'pending' | 'cancelled' | 'executed';
 export interface DeletionRequest {
   id: string;
   requestedBy: string;
@@ -38,14 +38,14 @@ export interface DeletionRequest {
   /** Why the last execution attempt was refused (the request stays pending and is re-checked). */
   lastBlock?: { code: string; at: string };
 }
-export interface DeletionStore {
+interface DeletionStore {
   id: string;
   name: string;
   slug: string;
   ownerId: string | null;
   deletionRequest: DeletionRequest | null;
 }
-export interface GuardReason {
+interface GuardReason {
   code: 'STORE_HAS_MONEY_IN_FLIGHT' | 'STORE_HAS_BILLED_SUBSCRIPTION' | 'STORE_IS_BILLING_PARENT';
   message: string;
   details?: Record<string, number>;
@@ -96,10 +96,7 @@ export async function assertStoreOwner(
   return store;
 }
 
-export async function evaluateGuards(
-  deps: DeletionDeps,
-  store: DeletionStore
-): Promise<GuardReason[]> {
+async function evaluateGuards(deps: DeletionDeps, store: DeletionStore): Promise<GuardReason[]> {
   const reasons: GuardReason[] = [];
   const flight = await deps.moneyInFlight(store.id);
   if (flight && Object.values(flight).reduce((n, v) => n + v, 0) > 0) {
@@ -134,7 +131,7 @@ function tokenSubject(store: DeletionStore, userId: string) {
   };
 }
 
-export type PreviewResult =
+type PreviewResult =
   | {
       ok: true;
       slug: string;
@@ -270,7 +267,7 @@ export async function readDeletionStatus(
   return { request: store.deletionRequest };
 }
 
-export type ExecuteOutcome =
+type ExecuteOutcome =
   | { outcome: 'executed' }
   | { outcome: 'not-due' | 'cancelled' | 'stale' | 'gone' | 'done' }
   | { outcome: 'blocked'; reasons: GuardReason[] };

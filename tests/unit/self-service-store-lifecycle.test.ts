@@ -18,7 +18,6 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 import {
-  COOLING_OFF_MS,
   previewStoreDeletion,
   scheduleStoreDeletion,
   cancelStoreDeletion,
@@ -26,9 +25,10 @@ import {
   readDeletionStatus,
   type DeletionDeps,
   type DeletionRequest,
-  type DeletionStore,
 } from '@api/services/store-deletion.service';
 
+const COOLING_OFF_MS = 14 * 86_400_000;
+type DeletionStore = NonNullable<Awaited<ReturnType<DeletionDeps['loadStore']>>>;
 const NOW = Date.parse('2026-11-14T10:00:00Z');
 const OWNER = 'owner-1';
 
