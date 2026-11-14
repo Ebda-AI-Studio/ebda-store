@@ -141,6 +141,7 @@ async function getSupplierLeadTime(
 const DEMAND_EXCLUDED_ORDER_STATUSES = ['cancelled', 'refunded'];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// pq-allow(unused-export): test seam, imported by tests/unit/reorder-scan-demand.test.ts
 export async function sumOrderQty(
   productId: string,
   variantId: string | null,
