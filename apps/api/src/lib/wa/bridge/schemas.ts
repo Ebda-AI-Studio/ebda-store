@@ -70,6 +70,27 @@ export const args = {
     buyerKey,
     phoneE164: phoneE164.optional(),
   }),
+  /**
+   * Product recommendations for the chat agent. Seeds are RETAILER ids (variant or product id) the shopper was looking at, or
+   * an order number of THIS buyer (proved with buyerKey, + phoneE164 when strict) whose lines become the seeds. The tenant is
+   * `storeId` only; nothing in here can name another store.
+   */
+  getRecommendations: z
+    .object({
+      seedIds: z.array(z.string().min(1).max(64)).max(5),
+      orderNumber: z.string().min(1).max(40).optional(),
+      buyerKey: buyerKey.optional(),
+      phoneE164: phoneE164.optional(),
+      mode: z.enum(['similar', 'complement']),
+      limit: z.number().int().min(1).max(8),
+      maxPriceMinor: z.number().int().min(0).max(100_000_000).optional(),
+    })
+    .refine(
+      v => v.seedIds.length > 0 || (v.orderNumber !== undefined && v.buyerKey !== undefined),
+      {
+        message: 'seedIds or orderNumber+buyerKey',
+      }
+    ),
   listCustomerOrders: z.object({
     buyerKey,
     phoneE164: phoneE164.optional(),

@@ -73,7 +73,7 @@ describe('WhatsAppBridge contract vectors', () => {
 });
 
 describe('WhatsAppBridge behaviour', () => {
-  it('every one of the 12 RPC names the caller uses exists', () => {
+  it('every one of the 13 RPC names the caller uses exists', () => {
     expect(Object.keys(bridge()).sort()).toEqual([
       'attachPaymentProof',
       'createCheckoutLink',
@@ -82,6 +82,7 @@ describe('WhatsAppBridge behaviour', () => {
       'getOrderStatus',
       'getPaymentLink',
       'getProducts',
+      'getRecommendations',
       'getStoreProfile',
       'listCatalog',
       'listCustomerOrders',

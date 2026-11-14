@@ -161,6 +161,15 @@ export function makeFakePort() {
           }
         : null;
     },
+    orderSeedIds: async (_s, num, k) =>
+      [...orders.values()].some(o => o.orderNumber === num && o.buyerKey === k) ? ['v1'] : null,
+    recommend: async (_s, a) =>
+      CATALOG.filter(
+        r =>
+          r.availability === 'in_stock' &&
+          !a.seedIds.includes(r.retailerId) &&
+          (a.maxPriceMinor === undefined || r.priceMinor <= a.maxPriceMinor)
+      ).slice(0, a.limit),
     customerOrders: async (_s, k) =>
       [...orders.values()]
         .filter(o => o.buyerKey === k)

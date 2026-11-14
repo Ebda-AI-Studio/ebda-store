@@ -4,6 +4,7 @@
  * (`money.createOrder`), exactly the path the storefront uses; this file only translates chat shapes into it.
  */
 import { storefrontOrigin } from '@ebda/shared';
+import { visibleProductWhere } from '../../visible-product';
 import { storeRepo, storeMoney, storeWriter, type CreateOrderArgs } from '../../repo-factory';
 import { lookupStore } from '../../definer';
 import { isWhatsAppLinked } from '../link';
@@ -610,6 +611,78 @@ export function createDoPort(): BridgePort {
         paymentMethod: method,
         shipment: sh ? { status: sh.status, trackingUrl: sh.trackingUrl ?? null } : null,
       };
+    },
+
+    async orderSeedIds(storeId, orderNumber, buyerKey) {
+      const d = await db(storeId);
+      const o = await d.order.findFirst({
+        where: { storeId, orderNumber, buyerKey, deletedAt: null },
+        select: { items: { select: { productId: true, variantId: true }, take: 20 } },
+      });
+      if (!o) return null;
+      return [...new Set<string>(o.items.map((i: any) => (i.variantId ?? i.productId) as string))];
+    },
+
+    /**
+     * Reuses the Store's own recommendation engine (curated picks, AI picks, bought-together, vector neighbours, same category;
+     * the merchant's automatic switch is applied inside it) and then RE-READS every candidate from this store: storeId + active +
+     * public audience + in stock. The engine's list is cached (bounded-stale, 5 min), so what is returned (price, stock, link)
+     * is never taken from it, only the ids and their order.
+     */
+    async recommend(storeId, a) {
+      const d = await db(storeId);
+      // Seeds resolve inside THIS store only (a variant id of another store resolves to nothing).
+      const variants: any[] = await d.productVariant.findMany({
+        where: { id: { in: a.seedIds }, product: { storeId, deletedAt: null } },
+        select: { id: true, productId: true },
+      });
+      const vById = new Map(variants.map(v => [v.id as string, v.productId as string]));
+      const direct: any[] = await d.product.findMany({
+        where: { storeId, id: { in: a.seedIds.filter(i => !vById.has(i)) }, deletedAt: null },
+        select: { id: true },
+      });
+      const seeds = [
+        ...new Set<string>([
+          ...a.seedIds.filter(i => vById.has(i)).map(i => vById.get(i)!),
+          ...direct.map(p => p.id as string),
+        ]),
+      ].slice(0, 3);
+      if (seeds.length === 0) return [];
+      const { recommendationService } = await import('../../../services/recommendation.service.js');
+      const order =
+        a.mode === 'similar'
+          ? ['alsoLike', 'crossSell', 'upsell']
+          : ['crossSell', 'upsell', 'alsoLike'];
+      const ranked: string[] = [];
+      for (const seed of seeds) {
+        const r = (await recommendationService.getProductRecommendations(storeId, seed)) as Record<
+          string,
+          Array<{ id: string }>
+        >;
+        for (const k of order) for (const p of r[k] ?? []) ranked.push(p.id);
+      }
+      const ids = [...new Set(ranked)].filter(id => !seeds.includes(id));
+      if (ids.length === 0) return [];
+      const products: any[] = await d.product.findMany({
+        where: {
+          storeId,
+          id: { in: ids },
+          status: 'active',
+          deletedAt: null,
+          ...visibleProductWhere(),
+        },
+        select: PRODUCT_SELECT,
+      });
+      const rows = await rowsForProducts(storeId, d, products);
+      // One buyable row per product (the cheapest in-stock variant), within budget, in the engine's order.
+      const best = new Map<string, CatalogRow>();
+      for (const r of rows) {
+        if (r.availability !== 'in_stock') continue;
+        if (a.maxPriceMinor !== undefined && r.priceMinor > a.maxPriceMinor) continue;
+        const cur = best.get(r.productId);
+        if (!cur || r.priceMinor < cur.priceMinor) best.set(r.productId, r);
+      }
+      return ids.flatMap(id => (best.has(id) ? [best.get(id)!] : [])).slice(0, a.limit);
     },
 
     async customerOrders(storeId, buyerKey, limit) {
