@@ -6,6 +6,9 @@
 import { storefrontOrigin } from '@ebda/shared';
 import { storeRepo, storeMoney, storeWriter, type CreateOrderArgs } from '../../repo-factory';
 import { lookupStore } from '../../definer';
+import { readInStoreContext } from '../../store-scoped-read';
+import { rankedSearch } from '../../../services/product-search.service';
+import { codFeeConfigFromRow } from '../../../services/payment-providers/cod.provider';
 import { isWhatsAppLinked } from '../link';
 import { applyCodOutcome } from '../store-events-consumer';
 import { createHash } from 'crypto';
@@ -24,6 +27,8 @@ import {
   type BridgePort,
   type CatalogRow,
   type ChatPaymentMethod,
+  type CustomerProfileFacts,
+  type StorePolicyFacts,
   type OrderStatus,
   type OrderSummary,
   type StoreProfile,
@@ -66,6 +71,35 @@ const methodOf = (
   if (!p && walletAmount >= total && total > 0) return 'wallet';
   return 'card';
 };
+
+/** How many ranked ids the chat search expands into rows (the caller's `limit` is at most 20). */
+const SEARCH_CANDIDATES = 60;
+
+/** Per-governorate rates folded from the area rates: cheapest and dearest fee, and the lowest free-shipping threshold. */
+export function governoratesOf(rates: any[]): StorePolicyFacts['shipping']['governorates'] {
+  const by = new Map<string, StorePolicyFacts['shipping']['governorates'][number]>();
+  for (const r of rates) {
+    const cur = by.get(r.governorate);
+    if (!cur) {
+      by.set(r.governorate, {
+        governorate: r.governorate,
+        governorateAr: r.governorateAr,
+        feeMinor: r.deliveryFee,
+        feeMaxMinor: r.deliveryFee,
+        freeOverMinor: r.freeShippingThreshold ?? null,
+      });
+      continue;
+    }
+    cur.feeMinor = Math.min(cur.feeMinor, r.deliveryFee);
+    cur.feeMaxMinor = Math.max(cur.feeMaxMinor, r.deliveryFee);
+    if (r.freeShippingThreshold != null)
+      cur.freeOverMinor =
+        cur.freeOverMinor === null
+          ? r.freeShippingThreshold
+          : Math.min(cur.freeOverMinor, r.freeShippingThreshold);
+  }
+  return [...by.values()].slice(0, 30);
+}
 
 const PRODUCT_SELECT = {
   id: true,
@@ -315,6 +349,137 @@ export function createDoPort(): BridgePort {
         select: PRODUCT_SELECT,
       });
       return rowsForProducts(storeId, d, products, new Set(ids));
+    },
+
+    // The storefront's own ranked search (Arabic stemming, AI Franco/dialect search terms, meaning leg: Ruling SEARCH-SEMANTIC-ON-1),
+    // so Chat and the website can never disagree on what "فستان احمر" matches. Active public products only, rank order kept,
+    // the price ceiling applied per sellable row (a variant can be cheaper than its product).
+    async searchProducts(storeId, query, o) {
+      const ids = await readInStoreContext(storeId, () => rankedSearch(storeId, query));
+      if (ids.length === 0) return [];
+      const top = ids.slice(0, SEARCH_CANDIDATES);
+      const d = await db(storeId);
+      const products: any[] = await d.product.findMany({
+        where: { storeId, id: { in: top }, status: 'active', deletedAt: null, audience: 'public' },
+        select: PRODUCT_SELECT,
+      });
+      const byId = new Map(products.map(p => [p.id as string, p]));
+      const ranked = top.map(id => byId.get(id)).filter((p): p is any => p !== undefined);
+      const rows = await rowsForProducts(storeId, d, ranked);
+      return rows
+        .filter(r => o.maxPriceMinor === undefined || r.priceMinor <= o.maxPriceMinor)
+        .slice(0, o.limit);
+    },
+
+    async storePolicies(storeId): Promise<StorePolicyFacts> {
+      const d = await db(storeId);
+      const s = await d.store.findUnique({
+        where: { id: storeId },
+        select: {
+          nameAr: true,
+          businessHours: true,
+          address: true,
+          addressAr: true,
+          googleMapsUrl: true,
+          returnWindowDays: true,
+          returnFeesPaidBy: true,
+        },
+      });
+      const zones: any[] = await d.shippingZone.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { position: 'asc' },
+        take: 30,
+      });
+      const areaRates: any[] = await d.shippingAreaRate.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { position: 'asc' },
+        take: 2000,
+      });
+      const cod = await d.paymentConfig.findFirst({
+        where: { storeId, provider: 'cod', isEnabled: true },
+        select: { fixedFee: true, settings: true },
+      });
+      const codCfg = cod ? codFeeConfigFromRow(cod) : null;
+      const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+      const loc = {
+        address: text(s?.address),
+        addressAr: text(s?.addressAr),
+        mapsUrl: text(s?.googleMapsUrl),
+      };
+      return {
+        nameAr: text(s?.nameAr),
+        shipping: {
+          zones: zones.map(z => ({
+            name: z.name,
+            nameAr: text(z.nameAr),
+            areas: Array.isArray(z.areas) ? (z.areas as unknown[]).map(String).slice(0, 40) : [],
+            feeMinor: z.deliveryFee,
+            freeOverMinor: z.freeShippingThreshold ?? null,
+            etaDaysMin: z.estimatedDaysMin ?? z.estimatedDays ?? null,
+            etaDaysMax: z.estimatedDaysMax ?? z.estimatedDays ?? null,
+          })),
+          governorates: governoratesOf(areaRates),
+        },
+        returns: {
+          windowDays: typeof s?.returnWindowDays === 'number' ? s.returnWindowDays : null,
+          feesPaidBy:
+            s?.returnFeesPaidBy === 'merchant' || s?.returnFeesPaidBy === 'customer'
+              ? s.returnFeesPaidBy
+              : null,
+        },
+        // 0 = "no fee declared", reported as null: the agent must not say "COD fee is 0" for a merchant who never set one
+        cod: {
+          fixedFeeMinor: codCfg && codCfg.fixedFee > 0 ? codCfg.fixedFee : null,
+          percentBps: codCfg && codCfg.percentBps > 0 ? codCfg.percentBps : null,
+        },
+        hours: text(s?.businessHours),
+        location: loc.address || loc.addressAr || loc.mapsUrl ? loc : null,
+      };
+    },
+
+    async customerProfile(storeId, buyerKey): Promise<CustomerProfileFacts | null> {
+      const base = (await (
+        await storeWriter(storeId)
+      ).$proc('waCustomerProfile', { storeId, buyerKey })) as {
+        firstName: string | null;
+        preferredLocale: 'ar' | 'en' | null;
+        defaultAddress: CustomerProfileFacts['defaultAddress'];
+        known: boolean;
+      };
+      const d = await db(storeId);
+      const orders: any[] = await d.order.findMany({
+        where: { storeId, buyerKey, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        select: {
+          orderNumber: true,
+          status: true,
+          paymentStatus: true,
+          total: true,
+          walletAmount: true,
+          currency: true,
+          createdAt: true,
+          items: { select: { productName: true, variantName: true, quantity: true }, take: 10 },
+          payments: { select: { provider: true }, take: 1 },
+        },
+      });
+      if (!base.known && orders.length === 0) return null;
+      return {
+        firstName: base.firstName,
+        preferredLocale: base.preferredLocale,
+        defaultAddress: base.defaultAddress,
+        recentOrders: orders.map(o => ({
+          orderNumber: o.orderNumber,
+          status: orderStatus(o, methodOf(o.payments, o.walletAmount, o.total)),
+          totalMinor: o.total,
+          currency: o.currency,
+          at: new Date(o.createdAt).getTime(),
+          items: (o.items as any[]).map(i => ({
+            name: i.variantName ? `${i.productName} - ${i.variantName}` : i.productName,
+            quantity: i.quantity,
+          })),
+        })),
+      };
     },
 
     async placeOrder(storeId, a) {

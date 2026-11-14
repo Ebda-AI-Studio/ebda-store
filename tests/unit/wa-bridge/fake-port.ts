@@ -133,6 +133,69 @@ export function makeFakePort() {
       return { orderNumber: o.orderNumber };
     },
     attachProof: async (_s, id) => orders.get(id)?.method === 'instapay',
+    searchProducts: async (_s, q, o) => {
+      // stands in for the Store hybrid search: meaning, not only words ("gift" finds the bracelet)
+      const hit = (r: CatalogRow) =>
+        q === 'هدية' ? r.retailerId === 'v2' || r.retailerId === 'v1' : r.title.includes(q);
+      return CATALOG.filter(hit)
+        .filter(r => o.maxPriceMinor === undefined || r.priceMinor <= o.maxPriceMinor)
+        .slice(0, o.limit);
+    },
+    storePolicies: async () => ({
+      nameAr: 'دار منى',
+      shipping: {
+        zones: [
+          {
+            name: 'Cairo',
+            nameAr: 'القاهرة',
+            areas: ['Maadi', 'Nasr City'],
+            feeMinor: 6000,
+            freeOverMinor: 100000,
+            etaDaysMin: 1,
+            etaDaysMax: 2,
+          },
+        ],
+        governorates: [
+          {
+            governorate: 'Giza',
+            governorateAr: 'الجيزة',
+            feeMinor: 6000,
+            feeMaxMinor: 8000,
+            freeOverMinor: null,
+          },
+        ],
+      },
+      returns: { windowDays: 14, feesPaidBy: 'customer' as const },
+      cod: { fixedFeeMinor: 2500, percentBps: null },
+      hours: 'Sat-Thu 10am-10pm',
+      location: { address: '9 Road 233, Maadi', addressAr: null, mapsUrl: null },
+    }),
+    customerProfile: async (_s, k) =>
+      k === BK
+        ? {
+            firstName: 'Mona',
+            preferredLocale: 'ar' as const,
+            defaultAddress: {
+              id: 'a1',
+              label: 'Home',
+              area: 'Maadi',
+              street: '9 Road 233',
+              governorate: 'Cairo',
+              buildingNumber: '4',
+              notes: null,
+            },
+            recentOrders: [
+              {
+                orderNumber: 'EB-900',
+                status: 'delivered' as const,
+                totalMinor: 25000,
+                currency: 'EGP',
+                at: 1_762_000_000_000,
+                items: [{ name: 'Item v1', quantity: 1 }],
+              },
+            ],
+          }
+        : null,
     addresses: async (_s, k) => addresses.get(k) ?? [],
     saveAddress: async (_s, k, a) => {
       if (!addresses.has(k)) addresses.set(k, []);

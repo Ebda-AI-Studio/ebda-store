@@ -63,6 +63,15 @@ export const args = {
     mediaUrl: z.string().url().max(2000).startsWith('https://'),
     buyerKey: buyerKey.optional(),
   }),
+  /** Meaning search (Store hybrid search). `maxPriceMinor` is piasters, never major units. */
+  searchProducts: z.object({
+    query: z.string().trim().min(1).max(200),
+    maxPriceMinor: z.number().int().min(0).max(100_000_000).optional(),
+    limit: z.number().int().min(1).max(20),
+  }),
+  getStorePolicies: z.undefined(),
+  /** The phone IS the proof: the Store rebuilds buyerKey from it. There is no key-only form. */
+  getCustomerProfile: z.object({ phoneE164 }),
   buyerKey: z.object({ buyerKey, phoneE164: phoneE164.optional() }),
   saveCustomerAddress: z.object({ buyerKey, phoneE164: phoneE164.optional(), address: newAddress }),
   getOrderStatus: z.object({
