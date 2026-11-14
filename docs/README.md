@@ -314,6 +314,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-10-25-wa-store-contract-store-side.md](plans/done/2026-10-25-wa-store-contract-store-side.md) - Ebda Store side of the WhatsApp contract (producer, consumer, buyer key)
 - [plans/done/2026-10-26-search-as-you-type.md](plans/done/2026-10-26-search-as-you-type.md) - Search as you type, everywhere (2026-10-26)
 - [plans/2026-11-12-arabic-stemming.md](plans/2026-11-12-arabic-stemming.md) - Arabic light stemming for storefront search (2026-11-12)
+- [plans/2026-11-14-gateway-payout-postings.md](plans/2026-11-14-gateway-payout-postings.md) - Gateway payout, fee and COD remittance postings (clearing 1000/1010/1020 to bank 1030; prerequisite of the AI finance plans)
+- [plans/2026-11-14-ai-transaction-categorising.md](plans/2026-11-14-ai-transaction-categorising.md) - AI categorising of bank transactions: rules, memory, dictionary, then Gemini; merchant confirms every posting
+- [plans/2026-11-14-ai-bank-reconciliation.md](plans/2026-11-14-ai-bank-reconciliation.md) - AI bank reconciliation: ranked candidates, N:1 payout and COD batches, LLM tie-break, review queue
+- [plans/2026-11-14-sales-forecasting.md](plans/2026-11-14-sales-forecasting.md) - Sales forecasting: per-SKU seasonal-naive / SES / Croston with backtests, Egyptian calendar, stock-out dates, revenue forecast card
 - [plans/2026-10-26-storefront-locale-paths.md](plans/2026-10-26-storefront-locale-paths.md) - Storefront English at its own URL (audit M-168, SEO-9)
 - [plans/done/2026-10-28-customer-intelligence.md](plans/done/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
 - [plans/done/2026-10-28-store-on-cloudflare.md](plans/done/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan
