@@ -974,6 +974,16 @@
     "feature": "staff_accounts"
   },
   {
+    "id": "page:/activity",
+    "kind": "page",
+    "route": "/activity",
+    "access": "owner",
+    "en": "Store activity",
+    "ar": "نشاط المتجر",
+    "synEn": "audit log history who changed activity",
+    "synAr": "سجل نشاط مين غيّر تاريخ"
+  },
+  {
     "id": "page:/features",
     "kind": "page",
     "route": "/features",

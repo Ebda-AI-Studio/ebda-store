@@ -4,7 +4,9 @@ description: Strong passwords, resetting a forgotten password, two-step verifica
 section: Settings
 order: 10
 appPath: /account/security
-keywords: security mfa 2fa totp lockout password backup codes forgot reset recover
+keywords: security mfa 2fa totp lockout password backup codes recovery codes regenerate forgot reset recover
+capabilities:
+  - account.mfa-recovery-codes@1
 ---
 
 ## Password and email
@@ -29,6 +31,12 @@ You can protect your account with an authenticator app (a 6-digit code that chan
 1. Start setup from your account page and scan the secret with your authenticator app.
 2. Enter a code from the app to finish.
 3. **Save your backup codes.** They are shown once. Each backup code works one time if you lose your phone.
+
+### Lost your recovery codes, or used most of them?
+
+Open **Account → Security**. Under **Recovery codes** you see how many unused codes are left. To make a new set, enter your password and a current code from your authenticator app, then press **Make new recovery codes**. The new codes appear once: save them straight away. **Every old code stops working** the moment the new set is created. A recovery code cannot be used for this step, because it must not be able to make more of itself.
+
+If you lost both your authenticator app and your recovery codes, you cannot make new ones yourself. Write to ahlan@ebda.app and we reset two-step verification after checking it is really you.
 
 MFA is optional for merchants. Platform staff accounts are required to use it. You can turn it off later, with a valid code.
 

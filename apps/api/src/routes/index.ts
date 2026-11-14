@@ -97,6 +97,7 @@ import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
 import slugRedirectsRoutes from './slug-redirects.routes';
 import staffRoutes from './staff.routes';
+import storeActivityRoutes from './store-activity.routes';
 import staffInviteRoutes from './staff-invite.routes';
 import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
@@ -560,6 +561,9 @@ router.use('/stores', tenantContext, slugRedirectsRoutes);
 
 // Staff management — store owners add / remove staff members
 router.use('/stores/:storeId/staff', tenantContext, staffRoutes);
+
+// Merchant activity log (A24): read-only view of the store's own audit rows
+router.use('/stores/:storeId/activity', tenantContext, storeActivityRoutes);
 
 // Merchant billing — plan, subscription, usage vs limits (SP5)
 router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
