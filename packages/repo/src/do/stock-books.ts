@@ -151,6 +151,8 @@ interface AdjItem {
   productId: string;
   variantId: string | null;
   newQty: number;
+  /** a cycle-count line: the variance (counted - system at scan time) IS the intent, not `newQty - live now` (INV-AUDIT-1) */
+  countDelta?: number;
 }
 
 /** createAdjustment: snapshot previous qty and unit cost per line, number the draft, insert it and its lines. */
@@ -198,7 +200,8 @@ function createAdjustmentIn(
         ])[0];
     const previousQty = (row?.inventory as number | undefined) ?? 0;
     const unitCost = (row?.cost_price as number | null | undefined) ?? 0;
-    return { ...item, previousQty, unitCost, deltaQty: item.newQty - previousQty };
+    const deltaQty = item.countDelta ?? item.newQty - previousQty;
+    return { ...item, newQty: previousQty + deltaQty, previousQty, unitCost, deltaQty };
   });
   const totalValueImpact = snapshots.reduce((s, x) => s + x.deltaQty * x.unitCost, 0);
   const id = crypto.randomUUID();
@@ -262,32 +265,57 @@ function postAdjustmentIn(
     'SELECT product_id, variant_id, previous_qty, new_qty, delta_qty FROM stock_adjustment_items WHERE adjustment_id = ? ORDER BY rowid ASC',
     [id]
   );
+  // INV-AUDIT-1: the draft's `previous_qty`/`new_qty` are a snapshot from when it was created, possibly hours ago. What the
+  // merchant decided is the DELTA; it is applied to the LIVE quantity (read here, inside the single-writer section), so units
+  // sold since the draft stay sold, and the ledger row records the live before/after.
+  const applied: { previous: number; next: number }[] = [];
   for (const item of items) {
+    const delta = item.delta_qty as number;
+    const live = item.variant_id
+      ? db.all(
+          'SELECT v.inventory AS inventory FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND p.store_id = ?',
+          [item.variant_id, storeId]
+        )[0]
+      : db.all('SELECT inventory FROM products WHERE id = ? AND store_id = ?', [
+          item.product_id,
+          storeId,
+        ])[0];
+    if (!live) notFound();
+    const previous = live.inventory as number;
+    const next = previous + delta;
+    if (next < 0)
+      fail(
+        'STALE_SNAPSHOT',
+        `Stock changed since this adjustment was drafted: live ${previous}, change ${delta} would go below zero. المخزون اتغيّر من وقت ما جهّزت التسوية، والتغيير ده هيخلّي الكمية أقل من صفر. اعمل تسوية جديدة على الكمية الحالية.`,
+        409
+      );
     const changed = item.variant_id
       ? db.run(
           'UPDATE product_variants SET inventory = ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM products p WHERE p.id = product_variants.product_id AND p.store_id = ?)',
-          [item.new_qty, now, item.variant_id, storeId]
+          [next, now, item.variant_id, storeId]
         ).changes
       : db.run('UPDATE products SET inventory = ?, updated_at = ? WHERE id = ? AND store_id = ?', [
-          item.new_qty,
+          next,
           now,
           item.product_id,
           storeId,
         ]).changes;
     if (changed !== 1) notFound();
+    applied.push({ previous, next });
   }
-  for (const item of items)
+  items.forEach((item, i) =>
     history(db, {
       storeId,
       productId: item.product_id as string,
       type: INVENTORY_TYPE[adj.type as string],
       quantity: item.delta_qty as number,
-      previousStock: item.previous_qty as number,
-      newStock: item.new_qty as number,
+      previousStock: applied[i].previous,
+      newStock: applied[i].next,
       reason: (adj.reason as string | null) ?? (adj.type as string),
       reference: adj.adjustment_number as string,
       createdBy: postedBy,
-    });
+    })
+  );
   const hasWarehouses =
     (db.all('SELECT count(*) AS n FROM warehouses WHERE store_id = ?', [storeId])[0].n as number) >
     0;
@@ -979,6 +1007,7 @@ export function reconcileCountSession(db: SyncSql, storeId: string, a: Args) {
         productId: l.product_id as string,
         variantId: (l.variant_id as string | null) ?? null,
         newQty: l.counted_qty as number,
+        countDelta: l.variance as number,
       })),
     });
     postAdjustmentIn(db, storeId, adj.id, reconciledBy);

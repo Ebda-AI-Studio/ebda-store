@@ -129,6 +129,53 @@ describe('stock adjustments', () => {
   });
 });
 
+describe('stale snapshots never overwrite live stock (Ruling INV-AUDIT-1)', () => {
+  const sell = (r: ReturnType<typeof rig>, qty: number) =>
+    r.raw.exec(`UPDATE products SET inventory = inventory - ${qty} WHERE id = 'p1'`);
+
+  it('a draft adjustment posts its delta onto live stock, so units sold since the draft stay sold', () => {
+    const r = rig();
+    const d = r.op('createStockAdjustment', {
+      type: 'damage',
+      items: [{ productId: 'p1', newQty: 7 }], // 10 -> 7: two units are damaged... three, delta -3
+    });
+    sell(r, 3); // live 7 while the draft sits open
+    r.op('postStockAdjustment', { id: d.id, postedBy: 'u1' });
+    expect(inv(r, 'p1')).toBe(4);
+    const h = r.q('SELECT previous_stock, new_stock, quantity FROM inventory_history')[0];
+    expect(h).toMatchObject({ previous_stock: 7, new_stock: 4, quantity: -3 }); // the ledger tells the live truth
+  });
+
+  it('refuses with a conflict (draft kept) when the delta would take live stock below zero', () => {
+    const r = rig();
+    const d = r.op('createStockAdjustment', {
+      type: 'damage',
+      items: [{ productId: 'p1', newQty: 2 }],
+    });
+    sell(r, 9); // live 1, delta -8
+    expect(r.code('postStockAdjustment', { id: d.id })).toBe('STALE_SNAPSHOT/409');
+    expect(inv(r, 'p1')).toBe(1);
+    expect(r.q('SELECT status FROM stock_adjustments')[0].status).toBe('draft');
+  });
+
+  it('a cycle count reconciles variance = counted - system at scan time as a delta, sales since the scan survive', () => {
+    const r = rig();
+    const s = r.op('openCountSession', { createdBy: 'u1' });
+    r.op('submitCountLine', { sessionId: s.id, productId: 'p1', countedQty: 9 }); // system 10, variance -1
+    sell(r, 3); // live 7 by the time the merchant reconciles
+    r.op('closeCountSession', { sessionId: s.id });
+    r.op('reconcileCountSession', { sessionId: s.id, reconciledBy: 'u1' });
+    expect(inv(r, 'p1')).toBe(6);
+    expect(
+      r.q('SELECT previous_stock, new_stock, quantity FROM inventory_history')[0]
+    ).toMatchObject({
+      previous_stock: 7,
+      new_stock: 6,
+      quantity: -1,
+    });
+  });
+});
+
 describe('purchase orders', () => {
   const line = (o: Record<string, unknown> = {}) => ({
     productId: 'p1',

@@ -140,6 +140,12 @@ Every stock writer follows this shape: checkout, refund restore, the
 payment-failure rollback, PO receive, stock adjustments, the backorder-line
 cancel's debt heal.
 
+**A snapshot never overwrites live stock** (INV-AUDIT-1). A stock adjustment draft and a cycle-count line
+carry a quantity captured earlier; on the StoreDO, posting applies the DELTA (`delta_qty`; for a count line the
+variance counted - system-at-scan) to the live row inside the single-writer section and writes the ledger row from
+the live before/after. A post that would take live stock below zero is refused with 409 `STALE_SNAPSHOT` and the
+draft stays open.
+
 Consequences worth stating explicitly:
 
 - **`InventoryHistory` has no `variantId`** (it is keyed on `productId`). For a
