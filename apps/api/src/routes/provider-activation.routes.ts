@@ -25,6 +25,7 @@ import {
   confirmSelfActivation,
   deactivateForStore,
   previewSelfActivation,
+  unblockForStore,
   listAllRequests,
   listStoreRequests,
   notifyOpsOfRequest,
@@ -48,7 +49,8 @@ import {
  *    POST /admin/provider-activation/:storeId/:provider/test       re-run Test connection
  *    POST /admin/provider-activation/:storeId/:provider/activate   only after a passing test
  *    POST /admin/provider-activation/:storeId/:provider/reject     body { note }
- *    POST /admin/provider-activation/:storeId/:provider/deactivate body { note } turn it off for one store
+ *    POST /admin/provider-activation/:storeId/:provider/deactivate body { note } turn it off for one store AND block re-enabling
+ *    POST /admin/provider-activation/:storeId/:provider/unblock    lift that block
  *
  * Nothing here returns a credential. The merchant's `activated` is only ever written by `confirmSelfActivation`, after a
  * server-run passing test, a verified single-use confirm token and an Idempotency-Key.
@@ -250,7 +252,7 @@ adminProviderActivationRoutes.post(
 
 // Super-admin OVERRIDES, kept on purpose (task 12): `activate` (only after the store's own passing test: no force past the
 // money gate) and `deactivate` (turn a provider off for one store, with a note the merchant sees).
-for (const action of ['test', 'activate', 'reject', 'deactivate'] as const) {
+for (const action of ['test', 'activate', 'reject', 'deactivate', 'unblock'] as const) {
   adminProviderActivationRoutes.post(
     `/provider-activation/:storeId/:provider/${action}`,
     ...superAdmin,
@@ -265,6 +267,8 @@ for (const action of ['test', 'activate', 'reject', 'deactivate'] as const) {
         } else if (action === 'activate') {
           const request = await activateForStore(storeId, provider, actor);
           res.json({ success: true, data: { request } });
+        } else if (action === 'unblock') {
+          res.json({ success: true, data: await unblockForStore(storeId, provider, actor) });
         } else if (action === 'deactivate') {
           const { note } = parseInput(decisionSchema, req.body);
           res.json({

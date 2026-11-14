@@ -39,7 +39,9 @@
     "A provider with no safe test call turns on with an unverified warning and the Ebda Store team is paged on its first connection (P1)",
     "Another store's provider answers 404; staff without store settings permission are refused",
     "The failure sentence is AI-written from the measured error code only (never keys); the fixed sentence is the fallback",
-    "Turn it off from the same switch; platform staff can also deactivate it for a store with a note"
+    "Turn it off from the same switch; platform staff can also deactivate it for a store with a note",
+    "The old toggle and carrier switch refuse a merchant turning a provider ON with 409 CONFIRMATION_REQUIRED; turning OFF is free",
+    "A provider the platform team turned off for a store answers 409 PROVIDER_BLOCKED until they unblock it"
   ],
   "gaps": []
 }

@@ -473,6 +473,7 @@
   "POST /admin/provider-activation/:storeId/:provider/deactivate",
   "POST /admin/provider-activation/:storeId/:provider/reject",
   "POST /admin/provider-activation/:storeId/:provider/test",
+  "POST /admin/provider-activation/:storeId/:provider/unblock",
   "POST /admin/provider-verification/:provider/confirm",
   "POST /admin/sms-queue/corrupt/discard",
   "POST /admin/sms-queue/failed/retry",

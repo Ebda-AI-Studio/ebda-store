@@ -485,7 +485,7 @@ export async function activateForStore(
 
 /** The activation ledger lives in `provider_verification_events` (append-only for these ops: migration 20261114000100). */
 const ACTIVATION_LEDGER_PREFIX = 'activation.';
-type ActivationLedgerAction = 'activated_self' | 'activated_admin' | 'deactivated';
+type ActivationLedgerAction = 'activated_self' | 'activated_admin' | 'deactivated' | 'unblocked';
 const ACTIVATE_TOOL = 'provider.activate';
 /** The confirm token is bound to the signed-in merchant session, not to an API key (the MCP binds a key id here). */
 const CONFIRM_KEY_ID = 'merchant-session';
@@ -523,6 +523,43 @@ async function appendActivationLedger(e: {
       ref: e.ref,
     },
   });
+}
+
+/** Newest-first activation ledger rows (one read site: the prisma-sites ratchet). */
+function readLedger(where: Prisma.ProviderVerificationEventWhereInput, take: number) {
+  return prisma.providerVerificationEvent.findMany({
+    where,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take,
+    select: { op: true },
+  });
+}
+
+/**
+ * "Blocked by admin": a super-admin deactivate sticks. The flag IS the newest ledger row of this store + provider
+ * (`activation.deactivated` until a later activated_admin / unblocked row), so it needs no schema change and cannot
+ * be edited (the ledger is append-only on Postgres and D1).
+ */
+async function assertNotBlocked(storeId: string, provider: string): Promise<void> {
+  const [last] = await readLedger(
+    {
+      provider,
+      sourceStoreId: storeId,
+      op: {
+        in: ['activated_self', 'activated_admin', 'deactivated', 'unblocked'].map(
+          a => `${ACTIVATION_LEDGER_PREFIX}${a}`
+        ),
+      },
+    },
+    1
+  );
+  if (last?.op === `${ACTIVATION_LEDGER_PREFIX}deactivated`) {
+    throw new AppError(
+      409,
+      'PROVIDER_BLOCKED',
+      `${provider} was turned off for this store by the Ebda Store team. Contact support to have it unblocked.`
+    );
+  }
 }
 
 /** Switch the provider on/off FOR CHECKOUT. Enabling goes through the exact gate of the settings routes. */
@@ -630,6 +667,7 @@ export async function previewSelfActivation(
   if (rowEnabled(conn)) {
     throw new AppError(409, 'ALREADY_ACTIVE', `${provider} is already turned on for this store`);
   }
+  await assertNotBlocked(storeId, provider);
   const test = await runTestForStore(storeId, provider, actor);
   if (!test.ok) {
     await reportConnectionCheck({ storeId, provider, mode: test.mode, code: test.code });
@@ -679,6 +717,8 @@ export async function confirmSelfActivation(
           `${provider} is already turned on for this store`
         );
       }
+      // Before the token is looked at, so a blocked store never burns (or learns anything from) a token.
+      await assertNotBlocked(storeId, provider);
       const last = lastTestOf(conn);
       if (!last || !last.ok || !last.current) {
         throw new AppError(
@@ -712,17 +752,20 @@ export async function confirmSelfActivation(
       if (!first) {
         throw new AppError(409, 'CONFIRMATION_USED', 'This confirmation was already used');
       }
-      const everBefore = await prisma.providerVerificationEvent.count({
-        where: {
-          provider,
-          op: {
-            in: [
-              `${ACTIVATION_LEDGER_PREFIX}activated_self`,
-              `${ACTIVATION_LEDGER_PREFIX}activated_admin`,
-            ],
+      const everBefore = (
+        await readLedger(
+          {
+            provider,
+            op: {
+              in: [
+                `${ACTIVATION_LEDGER_PREFIX}activated_self`,
+                `${ACTIVATION_LEDGER_PREFIX}activated_admin`,
+              ],
+            },
           },
-        },
-      });
+          1
+        )
+      ).length;
       let enabled = false;
       let requestId: string | null = null;
       try {
@@ -755,6 +798,20 @@ export async function confirmSelfActivation(
           ref: requestId,
         });
       } catch (err) {
+        // The request must not stay `activated` without its ledger row: mark it failed (status `rejected` + note,
+        // the table's check constraint has no `failed`), whatever step threw.
+        if (requestId) {
+          const failedId = requestId;
+          await withStore(storeId, () =>
+            decideRequest(failedId, storeId, {
+              status: 'rejected',
+              note: 'activation failed before it was recorded',
+              decidedAt: new Date(),
+            })
+          ).catch(e =>
+            logger.error({ e, storeId, provider }, '[ACTIVATION] could not mark the request failed')
+          );
+        }
         if (enabled) {
           try {
             await setProviderEnabled(storeId, provider, entry.kind, false, actor);
@@ -829,7 +886,7 @@ export async function deactivateForStore(
   if (!wasEnabled && !open) {
     throw new AppError(409, 'NOT_ACTIVE', `${provider} is not turned on for this store`);
   }
-  if (wasEnabled) await setProviderEnabled(storeId, provider, entry.kind, false, actor);
+  // The block (ledger row) first: if switching off then fails, the flag already stops any re-enable.
   await appendActivationLedger({
     storeId,
     provider,
@@ -837,6 +894,7 @@ export async function deactivateForStore(
     mode: conn ? (lastTestOf(conn)?.mode ?? 'sandbox') : 'sandbox',
     ref: null,
   });
+  if (wasEnabled) await setProviderEnabled(storeId, provider, entry.kind, false, actor);
   await auditLog({
     action: 'provider_activation.deactivated',
     storeId,
@@ -884,6 +942,39 @@ export async function rejectForStore(
   });
   await notifyMerchant(storeId, provider, 'rejected', note, actor);
   return toPublic(updated);
+}
+
+/** Super-admin: lift a "blocked by admin" flag (the merchant can then run Test and turn on again). */
+export async function unblockForStore(
+  storeId: string,
+  provider: string,
+  actor: ActivationActor
+): Promise<{ provider: string }> {
+  activatableEntry(provider);
+  try {
+    await assertNotBlocked(storeId, provider);
+    throw new AppError(409, 'NOT_BLOCKED', `${provider} is not blocked for this store`);
+  } catch (err) {
+    if (!(err instanceof AppError) || err.code !== 'PROVIDER_BLOCKED') throw err;
+  }
+  await appendActivationLedger({
+    storeId,
+    provider,
+    action: 'unblocked',
+    mode: 'sandbox',
+    ref: null,
+  });
+  await auditLog({
+    action: 'provider_activation.unblocked',
+    storeId,
+    userId: actor.userId,
+    resourceType: 'provider_activation_request',
+    resourceId: provider,
+    details: { storeId, provider },
+    ip: actor.ip,
+    userAgent: actor.userAgent,
+  });
+  return { provider };
 }
 
 /** Email the store owner the decision (platform sender, bilingual). Best effort, never throws. */

@@ -20,6 +20,7 @@ import { createPrismaClient, Prisma, runWithRequestDb, type AppPrismaClient } fr
 import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
 import paymentSettingsRoutes from '@api/routes/payment-settings.routes';
+import providerActivationRoutes from '@api/routes/provider-activation.routes';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { errorHandler } from '@api/middleware/error-handler';
 import { planService } from '@api/services/plan.service';
@@ -113,6 +114,20 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
         .set('Authorization', `Bearer ${s.jwt}`)
         .send(body as object)
     );
+  // Turning a gateway ON is the confirm flow (the legacy /toggle refuses an unconfirmed ON): the server runs the
+  // check, a pass returns a token, the token + an Idempotency-Key turn it on.
+  const turnOn = async (s: { id: string; jwt: string }) => {
+    const root = `/api/v1/provider-activation/store/${s.id}/kashier/activate`;
+    const pv = await post(s, `${root}/preview`);
+    if (pv.status !== 200 || pv.body.data.outcome !== 'ready') return pv;
+    return asApp(async () =>
+      request(app)
+        .post(`${root}/confirm`)
+        .set('Authorization', `Bearer ${s.jwt}`)
+        .set('Idempotency-Key', `connect-${crypto.randomUUID()}`)
+        .send({ confirmToken: pv.body.data.confirmToken })
+    );
+  };
   const get = (s: { id: string; jwt: string }) =>
     asApp(async () =>
       request(app)
@@ -132,6 +147,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     app = express();
     app.use(express.json());
     app.use('/api/v1/payment-settings', paymentSettingsRoutes);
+    app.use('/api/v1/provider-activation', providerActivationRoutes);
     app.use(errorHandler);
   });
 
@@ -224,7 +240,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     // The stub saw the documented harmless call and nothing that moves money.
     expect(stub.requests.some(r => r.path === '/v2/merchants/validate-credentials')).toBe(true);
 
-    const on = await post(s, `${base(s)}/toggle`, { enabled: true });
+    const on = await turnOn(s);
     expect(on.status).toBe(200);
     expect((await row(s)).isEnabled).toBe(true);
 
@@ -249,7 +265,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
       secretKey: SECRET_KEY,
     });
     expect((await post(s, `${base(s)}/test`)).body.data.test.ok).toBe(true);
-    expect((await post(s, `${base(s)}/toggle`, { enabled: true })).status).toBe(200);
+    expect((await turnOn(s)).status).toBe(200);
 
     const sw = await put(s, base(s), { testMode: false });
     expect(sw.status).toBe(409);
@@ -349,7 +365,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
         expect(save.body.data.check.messageEn).toBeTruthy();
         expect(JSON.stringify(save.body)).not.toContain(SECRET_KEY);
         expect((await row(s)).connectionTest).toMatchObject({ ok: true, mode: 'sandbox' });
-        const on = await post(s, `${base(s)}/toggle`, { enabled: true });
+        const on = await turnOn(s);
         expect(on.status, JSON.stringify(on.body)).toBe(200);
         expect((await row(s)).isEnabled).toBe(true);
       });
@@ -366,7 +382,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
       secretKey: SECRET_KEY,
     });
     expect((await post(s, `${base(s)}/test`)).body.data.test.ok).toBe(true);
-    expect((await post(s, `${base(s)}/toggle`, { enabled: true })).status).toBe(200);
+    expect((await turnOn(s)).status).toBe(200);
 
     const prev = process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;

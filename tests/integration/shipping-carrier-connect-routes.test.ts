@@ -39,6 +39,7 @@ import {
 import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
 import shippingCarrierRoutes from '@api/routes/shipping-carrier.routes';
+import providerActivationRoutes from '@api/routes/provider-activation.routes';
 import webhookRoutes from '@api/routes/webhook.routes';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { errorHandler } from '@api/middleware/error-handler';
@@ -180,6 +181,20 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
     asApp(async () => request(app).put(url).set('Authorization', `Bearer ${who.jwt}`).send(body));
   const post = (who: Who, url: string, body: object = {}) =>
     asApp(async () => request(app).post(url).set('Authorization', `Bearer ${who.jwt}`).send(body));
+  // Turning a carrier ON is the confirm flow (the carrier PUT refuses an unconfirmed ON from a merchant): the server runs
+  // the check, a pass returns a token, the token + an Idempotency-Key turn it on.
+  const turnOn = async (who: Who, s: { id: string }, carrier: string) => {
+    const root = `/api/v1/provider-activation/store/${s.id}/${carrier}/activate`;
+    const pv = await post(who, `${root}/preview`);
+    if (pv.status !== 200 || pv.body.data.outcome !== 'ready') return pv;
+    return asApp(async () =>
+      request(app)
+        .post(`${root}/confirm`)
+        .set('Authorization', `Bearer ${who.jwt}`)
+        .set('Idempotency-Key', `carrier-${crypto.randomUUID()}`)
+        .send({ confirmToken: pv.body.data.confirmToken })
+    );
+  };
   const get = (who: Who, url: string) =>
     asApp(async () => request(app).get(url).set('Authorization', `Bearer ${who.jwt}`));
   const del = (who: Who, url: string) =>
@@ -212,6 +227,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
     app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
     app.use(express.json());
     app.use('/api/v1/stores', shippingCarrierRoutes);
+    app.use('/api/v1/provider-activation', providerActivationRoutes);
     app.use(errorHandler);
   });
 
@@ -386,7 +402,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       });
       const early = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(early.status).toBe(409);
-      expect(early.body.error.code).toBe('CONNECTION_NOT_TESTED');
+      expect(early.body.error.code).toBe('CONFIRMATION_REQUIRED');
       expect((await row(s, c.code)).enabled).toBe(false);
 
       const before = c.testCalls();
@@ -402,9 +418,9 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect(cfg.connectionTestCurrent).toBe(true);
       expect(cfg.connectionTest.fingerprint).toBeUndefined();
 
-      const on = await put(s, cfgUrl(s, c.code), { enabled: true });
+      const on = await turnOn(s, s, c.code);
       expect(on.status, JSON.stringify(on.body)).toBe(200);
-      expect(on.body.data.config.enabled).toBe(true);
+      expect(on.body.data.activated).toBe(true);
       expect((await row(s, c.code)).enabled).toBe(true);
 
       // disabling is always allowed
@@ -435,7 +451,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect(JSON.stringify(test.body)).not.toContain('definitely-not-the-stub-key');
       const on = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(on.status).toBe(409);
-      expect(on.body.error.code).toBe('CONNECTION_NOT_TESTED');
+      expect(on.body.error.code).toBe('CONFIRMATION_REQUIRED');
 
       // no apiKey at all: the adapter is not even called
       const s2 = await mkStore(`${c.code}-inc`);
@@ -454,7 +470,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       const s = await mkStore(`${c.code}-edit`);
       await saveSandbox(s, s);
       expect((await post(s, testUrl(s, c.code))).body.data.test.ok).toBe(true);
-      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, c.code)).status).toBe(200);
 
       const edited = await saveSandbox(s, s, c.edit());
       expect(edited.status, JSON.stringify(edited.body)).toBe(200);
@@ -465,7 +481,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       // the proof covers exactly what is stored now; re-enabling is the merchant's explicit act.
       expect(edited.body.data.check).toMatchObject({ status: 'connected', ok: true });
       expect((await hintsOf(s, s, c.code)).connectionTestCurrent).toBe(true);
-      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, c.code)).status).toBe(200);
 
       // a re-edit to a key the carrier REFUSES fails its check: disabled, and enabling stays 409
       const refused = await saveSandbox(s, s, { apiKey: 'definitely-not-the-stub-key-0123456789' });
@@ -474,12 +490,12 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect((await hintsOf(s, s, c.code)).connectionTestCurrent).toBe(false);
       const again = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(again.status).toBe(409);
-      expect(again.body.error.code).toBe('CONNECTION_NOT_TESTED');
+      expect(again.body.error.code).toBe('CONFIRMATION_REQUIRED');
 
       // restoring the good credentials passes the check again and opens the gate
       const restored = await saveSandbox(s, s, c.fields);
       expect(restored.body.data.check).toMatchObject({ status: 'connected' });
-      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, c.code)).status).toBe(200);
 
       // editing the OTHER mode's key does not touch the active one
       const other = await put(s, cfgUrl(s, c.code), {
@@ -494,7 +510,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       const s = await mkStore(`${c.code}-mode`);
       await saveSandbox(s, s);
       expect((await post(s, testUrl(s, c.code))).body.data.test.ok).toBe(true);
-      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, c.code)).status).toBe(200);
 
       const sw = await put(s, cfgUrl(s, c.code), {
         mode: 'live',
@@ -511,7 +527,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       // the sandbox test does not count for live
       const on = await put(s, cfgUrl(s, c.code), { enabled: true });
       expect(on.status).toBe(409);
-      expect(on.body.error.code).toBe('CONNECTION_NOT_TESTED');
+      expect(on.body.error.code).toBe('CONFIRMATION_REQUIRED');
 
       // switching back needs a new test too: the live test below replaced the sandbox one
       const liveTest = await post(s, testUrl(s, c.code));
@@ -522,7 +538,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect(back.body.data.config).toMatchObject({ enabled: false, mode: 'sandbox' });
       expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(409);
       expect((await post(s, testUrl(s, c.code))).body.data.test.ok).toBe(true);
-      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, c.code)).status).toBe(200);
     });
 
     it('make-default needs an enabled carrier (409 NOT_ENABLED)', async () => {
@@ -540,7 +556,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       expect(await defaults(s)).toEqual([]);
 
       expect((await post(s, testUrl(s, c.code))).body.data.test.ok).toBe(true);
-      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, c.code)).status).toBe(200);
       expect((await post(s, defaultUrl(s, c.code))).status).toBe(200);
       expect(await defaults(s)).toEqual([{ carrier: c.code }]);
 
@@ -566,7 +582,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         ).status
       ).toBe(200);
       expect((await post(s, testUrl(s, c.code))).body.data.test.ok).toBe(true);
-      expect((await put(s, cfgUrl(s, c.code), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, c.code)).status).toBe(200);
     }
     expect((await post(s, defaultUrl(s, 'bosta'))).status).toBe(200);
     expect(await defaults(s)).toEqual([{ carrier: 'bosta' }]);
@@ -612,10 +628,13 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         expect(opTest.body.data.test.ok).toBe(true);
 
         // PROVIDERS-3: it enables like any other once the check passed, for the merchant and the operator
-        for (const who of [op, s]) {
-          const on = await put(who, cfgUrl(s, 'bosta'), { enabled: true });
-          expect(on.status, JSON.stringify(on.body)).toBe(200);
-        }
+        // the operator keeps the override (the legacy PUT); the merchant turns it on through the confirm flow, and the
+        // legacy PUT refuses a merchant's unconfirmed ON
+        const refused = await put(s, cfgUrl(s, 'bosta'), { enabled: true });
+        expect(refused.status).toBe(409);
+        expect(refused.body.error.code).toBe('CONFIRMATION_REQUIRED');
+        const on = await put(op, cfgUrl(s, 'bosta'), { enabled: true });
+        expect(on.status, JSON.stringify(on.body)).toBe(200);
         expect((await row(s, 'bosta')).enabled).toBe(true);
       });
     });
@@ -652,7 +671,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
 
       // sanity: once enabled, this very order books. (Through the service: the 201 over HTTP
       // books but its response never completes under ebda_app, see the report.)
-      expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, 'bosta')).status).toBe(200);
       const ok = await asApp(() =>
         runInTenantContext(s.id, () =>
           shippingCarrierService.createShipmentForOrder(s.id, o.id, 'bosta')
@@ -673,7 +692,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         settings: {},
       });
       expect((await post(a, testUrl(a, 'bosta'))).body.data.test.ok).toBe(true);
-      expect((await put(a, cfgUrl(a, 'bosta'), { enabled: true })).status).toBe(200);
+      expect((await turnOn(a, a, 'bosta')).status).toBe(200);
       const snapshot = await row(a, 'bosta');
 
       const attempts: Array<[string, string, string, object?]> = [
@@ -739,7 +758,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         settings: {},
       });
       expect((await post(s, testUrl(s, 'bosta'))).body.data.test.ok).toBe(true);
-      expect((await put(s, cfgUrl(s, 'bosta'), { enabled: true })).status).toBe(200);
+      expect((await turnOn(s, s, 'bosta')).status).toBe(200);
 
       const secretOf = async () =>
         decryptCarrierBlob((await row(s, 'bosta')).credentials).webhookSecret as string;

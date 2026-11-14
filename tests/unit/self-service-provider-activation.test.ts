@@ -63,9 +63,11 @@ vi.mock('@api/middleware/security', async () => {
 vi.mock('@api/middleware/require-mfa', () => ({
   requireMfaEnrolled: (_q: any, _s: any, n: any) => n(),
 }));
-vi.mock('@api/middleware/store-access', () => ({
+vi.mock('@api/middleware/00000000-0000-4000-8000-000000000001ccess', () => ({
   requireStoreAccess: (req: any, res: any, next: any) =>
-    req.params.storeId === 'store-a' ? next() : res.status(404).json({ success: false }),
+    req.params.storeId === '00000000-0000-4000-8000-000000000001'
+      ? next()
+      : res.status(404).json({ success: false }),
 }));
 vi.mock('@api/middleware/rbac', () => ({
   requirePermission: () => (_q: any, _s: any, n: any) => n(),
@@ -163,7 +165,11 @@ vi.mock('@ebda/database', async () => {
   const { state } = m;
   const prisma = {
     store: {
-      findUnique: async () => ({ id: 'store-a', name: 'Shop A', ownerId: 'u1' }),
+      findUnique: async () => ({
+        id: '00000000-0000-4000-8000-000000000001',
+        name: 'Shop A',
+        ownerId: 'u1',
+      }),
     },
     providerActivationRequest: {
       findFirst: async () =>
@@ -190,9 +196,17 @@ vi.mock('@ebda/database', async () => {
         state.ledger.push(data);
         return data;
       },
-      count: async ({ where }: any) =>
-        state.ledger.filter(l => where.op.in.includes(l.op) && l.provider === where.provider)
-          .length,
+      findMany: async ({ where, take }: any) =>
+        [...state.ledger]
+          .reverse()
+          .filter(
+            l =>
+              l.provider === where.provider &&
+              (where.sourceStoreId === undefined || l.sourceStoreId === where.sourceStoreId) &&
+              where.op.in.includes(l.op)
+          )
+          .slice(0, take)
+          .map(l => ({ op: l.op })),
     },
   };
   return { ...real, prisma, withStore: async (_id: string, fn: any) => fn(prisma) };
@@ -214,7 +228,7 @@ beforeEach(() => {
   s.row = {
     id: 'cfg1',
     provider: 'kashier',
-    storeId: 'store-a',
+    storeId: '00000000-0000-4000-8000-000000000001',
     credentials: 'enc',
     isEnabled: false,
     testMode: true,
@@ -237,7 +251,7 @@ beforeEach(() => {
 });
 
 const FIRST_ATTEMPT = 'attempt-12345678';
-const base = '/provider-activation/store/store-a/kashier/activate';
+const base = '/provider-activation/store/00000000-0000-4000-8000-000000000001/kashier/activate';
 const preview = (role = 'store_admin', user = 'u1') =>
   request(app).post(`${base}/preview`).set('x-role', role).set('x-user', user).send({});
 const confirm = (
@@ -317,7 +331,7 @@ describe('step 2: confirm', () => {
     expect(m.state.ledger).toEqual([
       expect.objectContaining({
         provider: 'kashier',
-        sourceStoreId: 'store-a',
+        sourceStoreId: '00000000-0000-4000-8000-000000000001',
         op: 'activation.activated_self',
       }),
     ]);
@@ -325,7 +339,7 @@ describe('step 2: confirm', () => {
     expect(m.auditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'provider_activation.self_activated',
-        storeId: 'store-a',
+        storeId: '00000000-0000-4000-8000-000000000001',
         userId: 'u1',
       })
     );
@@ -406,6 +420,9 @@ describe('step 2: confirm', () => {
     const res = await confirm(token, 'attempt-eeeeeeee');
     expect(res.status).toBeGreaterThanOrEqual(500);
     expect(m.state.row!.isEnabled).toBe(false);
+    // the request is marked failed (rejected + note), never left `activated` without its ledger row
+    expect(m.state.requests[0]).toMatchObject({ status: 'rejected' });
+    expect(m.state.requests[0].note).toMatch(/failed/);
     expect(m.state.kv.has([...m.state.kv.keys()].find(k => k.startsWith('idem:')) ?? '')).toBe(
       false
     );
@@ -444,6 +461,44 @@ describe('super admin overrides', () => {
       .set('x-role', 'store_admin')
       .send({ note: 'because' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('a super-admin deactivate sticks (blocked by admin)', () => {
+  const deactivate = () =>
+    request(app)
+      .post('/admin/provider-activation/00000000-0000-4000-8000-000000000001/kashier/deactivate')
+      .set('x-role', 'super_admin')
+      .send({ note: 'chargeback abuse' });
+  const unblock = (role = 'super_admin') =>
+    request(app)
+      .post('/admin/provider-activation/00000000-0000-4000-8000-000000000001/kashier/unblock')
+      .set('x-role', role)
+      .send({});
+
+  it('after a deactivate the merchant cannot run the flow again, even with an older token', async () => {
+    const early = (await preview()).body.data.confirmToken; // minted before the block
+    const token = (await preview()).body.data.confirmToken;
+    expect((await confirm(token)).status).toBe(200);
+    expect((await deactivate()).status).toBe(200);
+    const again = await preview();
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe('PROVIDER_BLOCKED');
+    const replay = await confirm(early, 'attempt-ffffffff');
+    expect(replay.status).toBe(409);
+    expect(replay.body.error.code).toBe('PROVIDER_BLOCKED');
+    expect(m.state.row!.isEnabled).toBe(false);
+  });
+
+  it('unblock lifts the flag; only super_admin can, and only when blocked', async () => {
+    expect((await unblock()).status).toBe(409); // not blocked
+    const token = (await preview()).body.data.confirmToken;
+    await confirm(token);
+    await deactivate();
+    expect((await unblock('store_admin')).status).toBe(403);
+    expect((await unblock()).status).toBe(200);
+    expect((await preview()).body.data.outcome).toBe('ready');
+    expect(m.state.ledger.map(l => l.op)).toContain('activation.unblocked');
   });
 });
 

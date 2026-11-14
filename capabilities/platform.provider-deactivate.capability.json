@@ -9,7 +9,8 @@
   "screens": ["/provider-activation"],
   "api": [
     "POST /admin/provider-activation/:storeId/:provider/deactivate",
-    "POST /admin/provider-activation/:storeId/:provider/activate"
+    "POST /admin/provider-activation/:storeId/:provider/activate",
+    "POST /admin/provider-activation/:storeId/:provider/unblock"
   ],
   "mcpTool": null,
   "planGate": null,
@@ -29,7 +30,8 @@
   "edgeCases": [
     "Deactivating switches the gateway or carrier off, closes the activated request and emails the merchant the note",
     "Activate (kept as the override) still needs the store's own passing test: no force past the money gate",
-    "Both leave a row in the append-only activation ledger"
+    "Both leave a row in the append-only activation ledger",
+    "Deactivate also blocks the store from turning that provider on again until a super admin unblocks it"
   ],
   "gaps": []
 }
