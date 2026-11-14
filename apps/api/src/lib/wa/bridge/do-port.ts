@@ -620,7 +620,13 @@ export function createDoPort(): BridgePort {
         select: { items: { select: { productId: true, variantId: true }, take: 20 } },
       });
       if (!o) return null;
-      return [...new Set<string>(o.items.map((i: any) => (i.variantId ?? i.productId) as string))];
+      return [
+        ...new Set<string>(
+          o.items.map(
+            (i: { variantId: string | null; productId: string }) => i.variantId ?? i.productId
+          )
+        ),
+      ];
     },
 
     /**
@@ -637,14 +643,14 @@ export function createDoPort(): BridgePort {
         select: { id: true, productId: true },
       });
       const vById = new Map(variants.map(v => [v.id as string, v.productId as string]));
-      const direct: any[] = await d.product.findMany({
+      const direct: Array<{ id: string }> = await d.product.findMany({
         where: { storeId, id: { in: a.seedIds.filter(i => !vById.has(i)) }, deletedAt: null },
         select: { id: true },
       });
       const seeds = [
         ...new Set<string>([
           ...a.seedIds.filter(i => vById.has(i)).map(i => vById.get(i)!),
-          ...direct.map(p => p.id as string),
+          ...direct.map(p => p.id),
         ]),
       ].slice(0, 3);
       if (seeds.length === 0) return [];
