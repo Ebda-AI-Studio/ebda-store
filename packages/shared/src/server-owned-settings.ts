@@ -13,6 +13,9 @@
  * `goldAllowDeferredPayment` (Ruling SHARIA-GOLD-1) is a merchant choice that needs an explicit confirm and
  * an audit row, so it is written only by `PUT /stores/:id/gold-rates/payment-policy`, never the generic route.
  *
+ * `accountingLock` (ACCT-AUDIT-4) is the closed-month boundary `{ through: 'YYYY-MM-DD', untilMs }`; it is written only by
+ * `PUT /stores/:id/finance/period-lock` (audit row), because a generic settings save must never reopen a closed month.
+ *
  * `mcpWriteEnabled` (BE:S-8, Ruling FP-1) is the merchant's MCP write switch: it is written only by
  * `PUT /stores/:id/integrations/merchant-mcp/write-switch` (audit row; one atomic `jsonb_set` statement on a Postgres store, a write-time read-merge on a Durable Object store, Ruling FP-5), never the generic route.
  */
@@ -20,6 +23,7 @@ export const SERVER_OWNED_SETTINGS_KEYS = [
   'ebdaWhatsApp',
   'goldAllowDeferredPayment',
   'mcpWriteEnabled',
+  'accountingLock',
 ] as const;
 
 /**
@@ -30,6 +34,7 @@ export const SERVER_OWNED_SETTINGS_KEYS = [
 export const ECHOED_SERVER_OWNED_KEYS: readonly string[] = [
   'goldAllowDeferredPayment',
   'mcpWriteEnabled',
+  'accountingLock',
 ];
 
 export function reservedSettingsKeys(settings: unknown): string[] {

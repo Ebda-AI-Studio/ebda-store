@@ -1904,6 +1904,18 @@ export class StoreService {
    * column. This is the merchant half of the gate; the plan/Feature-Matrix half
    * is the `merchant_mcp_write` feature (mcp/merchant-write.ts checks both).
    */
+  /**
+   * The closed-month boundary (`settings.accountingLock`, ACCT-AUDIT-4): entries dated up to and including `through` (a Cairo day)
+   * are final. `null` reopens. Server-owned: only `PUT /stores/:id/finance/period-lock` writes it, through the single-key setter.
+   */
+  static async setAccountingLock(
+    storeId: string,
+    lock: { through: string; untilMs: number } | null
+  ) {
+    await this.setSettingsKey(storeId, 'accountingLock', lock);
+    return lock;
+  }
+
   static async setMcpWriteEnabled(storeId: string, enabled: boolean) {
     await this.setSettingsKey(storeId, 'mcpWriteEnabled', enabled);
     return enabled;

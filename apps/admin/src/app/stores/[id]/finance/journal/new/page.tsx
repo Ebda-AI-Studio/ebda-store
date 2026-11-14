@@ -49,7 +49,7 @@ export default function NewJournalEntryPage() {
   const t = useT('finance.journal');
   const tNew = useT('finance.newEntry');
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === 'super_admin';
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'store_admin';
 
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [memo, setMemo] = useState('');
@@ -131,9 +131,8 @@ export default function NewJournalEntryPage() {
     }
   }
 
-  // Only super_admin can post manual journal entries (API enforces this with
-  // authorize('super_admin')). Show a clear permission notice to store_admin
-  // so they don't waste time filling the form and getting a cryptic 403.
+  // store_admin and super_admin can post manual journal entries (API: authorize('store_admin', 'super_admin'), ACCT-AUDIT-9).
+  // Anyone else gets a clear permission notice instead of a cryptic 403.
   if (!isSuperAdmin) {
     return (
       <AdminLayout title={tNew('title')} subtitle={tNew('description')}>

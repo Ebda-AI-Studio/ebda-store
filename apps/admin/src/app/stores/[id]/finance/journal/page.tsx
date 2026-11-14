@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../../components/DateRangePicker';
 import { useT } from '@/i18n/useT';
-import { apiGetPage, type PageMeta } from '@/lib/api';
+import { apiGet, apiGetPage, apiPut, type PageMeta } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { Button } from '@/components/ui/Button';
 import { PageControls } from '../../../../../components/PageControls';
@@ -43,6 +43,69 @@ const PER_PAGE = 100;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/** The closed-months card (ACCT-AUDIT-4): pick the last day that is final, or reopen. */
+function PeriodLockCard({ storeId }: { storeId: string }) {
+  const t = useT('finance.journal');
+  const [through, setThrough] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiGet<{ through: string | null }>(`/api/v1/stores/${storeId}/finance/period-lock`)
+      .then(({ data }) => {
+        if (data) {
+          setThrough(data.through);
+          setDraft(data.through ?? '');
+        }
+      })
+      .catch(() => undefined);
+  }, [storeId]);
+
+  async function save(next: string | null) {
+    setMsg(null);
+    const { error } = await apiPut(`/api/v1/stores/${storeId}/finance/period-lock`, {
+      through: next,
+    }).catch(() => ({ error: { message: t('lockFailed') } }));
+    if (error) {
+      setMsg(error.message || t('lockFailed'));
+      return;
+    }
+    setThrough(next);
+    setDraft(next ?? '');
+    setMsg(t('lockSaved'));
+  }
+
+  return (
+    <section className="mb-4 max-w-5xl rounded-xl border border-border bg-card p-4 space-y-3">
+      <h2 className="text-sm font-semibold">{t('lockTitle')}</h2>
+      <p className="text-sm text-muted-foreground">{t('lockHelp')}</p>
+      <p className="text-sm" data-testid="period-lock-status">
+        {through ? t('lockCurrent', { date: through }) : t('lockNone')}
+      </p>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="space-y-1">
+          <span className="text-sm font-medium">{t('lockThrough')}</span>
+          <input
+            type="date"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            className="block border border-border rounded-md px-3 py-2 text-base sm:text-sm"
+          />
+        </label>
+        <Button onClick={() => void save(draft || null)} disabled={!draft}>
+          {t('lockSave')}
+        </Button>
+        {through && (
+          <Button variant="secondary" onClick={() => void save(null)}>
+            {t('lockReopen')}
+          </Button>
+        )}
+      </div>
+      {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+    </section>
+  );
+}
+
 export default function JournalListPage() {
   const params = useParams();
   const storeId = params?.id as string;
@@ -51,7 +114,7 @@ export default function JournalListPage() {
   const tc = useT('common');
   const router = useRouter();
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === 'super_admin';
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'store_admin';
 
   const { subscribeToStore, unsubscribeFromStore } = useNotifications();
 
@@ -195,7 +258,7 @@ export default function JournalListPage() {
       title={t('title')}
       subtitle={t('description')}
       actions={
-        // Only super_admin can post manual journal entries.
+        // store_admin and super_admin can post manual journal entries.
         isSuperAdmin ? (
           <Button onClick={() => router.push(`/stores/${storeId}/finance/journal/new`)}>
             {tNew('addNew')}
@@ -203,6 +266,8 @@ export default function JournalListPage() {
         ) : undefined
       }
     >
+      {isSuperAdmin && <PeriodLockCard storeId={storeId} />}
+
       <DateRangePicker
         period={period}
         custom={customRange}

@@ -2,7 +2,7 @@ import { prisma } from '@ebda/database';
 import { postEntry } from '../journal.service';
 import { getSystemAccountIdByCode } from '../account.service';
 import logger from '../../../lib/logger';
-import { storeMoney } from '../../../lib/repo-factory';
+import { storeDb, storeMoney } from '../../../lib/repo-factory';
 
 export interface PoReceiveJournalInput {
   storeId: string;
@@ -68,7 +68,9 @@ export async function postPoReceiveJournal(args: PoReceiveJournalInput): Promise
   const receivedTotal = po.items.reduce((s, i) => s + i.qtyReceived * i.unitCost, 0);
   // ACCT-AUDIT-1: post only the DELTA over what this PO already booked to Inventory (old `poId` entry + per-pass
   // `poId:recv:<cumulative>` entries), keyed by the cumulative value, so a later partial receipt is never dropped.
-  const bookedAgg = await prisma.journalLine.aggregate({
+  const bookedAgg = await (
+    await storeDb(args.storeId)
+  ).journalLine.aggregate({
     _sum: { debit: true },
     where: {
       accountId: inventoryAccountId,

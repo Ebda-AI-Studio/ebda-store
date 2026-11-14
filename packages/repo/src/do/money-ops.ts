@@ -163,7 +163,12 @@ import {
   journalRepostMissingOp,
   journalStockAdjustmentOp,
 } from './books-journals';
-import { bankLedgerSideOp, journalManualOp, stockValueOp } from './finance-ops';
+import {
+  bankLedgerSideOp,
+  journalManualOp,
+  journalReverseManualOp,
+  stockValueOp,
+} from './finance-ops';
 import { backorderCancelOp } from './backorder-cancel';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -246,6 +251,7 @@ export type MoneyOpName =
   | 'journalPoReceive'
   | 'journalRepostMissing'
   | 'journalManual'
+  | 'journalReverseManual'
   | 'backorderCancel'
   | 'bankLedgerSide'
   | 'stockValue'
@@ -389,6 +395,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'journalPoReceive',
   'journalRepostMissing',
   'journalManual',
+  'journalReverseManual',
   'backorderCancel',
   'bankLedgerSide',
   'stockValue',
@@ -1005,6 +1012,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   journalRepostMissing: (db, storeId, a) => journalRepostMissingOp(db, storeId, a),
   /** Finance admin (Ruling NZ-FEAT-1): see `finance-ops.ts`. */
   journalManual: (db, storeId, a) => journalManualOp(db, storeId, a),
+  journalReverseManual: (db, storeId, a) => journalReverseManualOp(db, storeId, a),
   /** cancelBackorder (Ruling NZ-FEAT-1): claim, deferred-cost flag, stock-debt heal and marker in one section. */
   backorderCancel: (db, storeId, a) => backorderCancelOp(db, storeId, a),
   bankLedgerSide: (db, storeId, a) => bankLedgerSideOp(db, storeId, a),

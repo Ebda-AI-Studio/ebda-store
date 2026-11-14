@@ -265,7 +265,8 @@ export async function postManualEntry(
 export async function reverseEntry(
   originalId: string,
   reason?: string,
-  tx?: Prisma.TransactionClient
+  tx?: Prisma.TransactionClient,
+  postedBy?: string
 ): Promise<JournalEntry> {
   const run = async (t: Prisma.TransactionClient) => {
     const original = await t.journalEntry.findUnique({
@@ -290,6 +291,7 @@ export async function reverseEntry(
         memo: reason ?? `Reversal of ${original.entryNumber}`,
         memoAr: reason ?? `إلغاء قيد ${original.entryNumber}`,
         status: 'posted',
+        postedBy,
         lines: {
           create: original.lines.map(l => ({
             accountId: l.accountId,
@@ -344,4 +346,48 @@ export async function reverseEntry(
   });
 
   return reversal;
+}
+
+/**
+ * Reverse a MANUAL entry on behalf of a merchant admin (ACCT-AUDIT-9): a mirror entry dated now, the original marked reversed,
+ * the actor stored on the reversal and the reason in its memo. System entries are reversed only by their own flows (409), and
+ * an entry can be reversed once (409). Corrections are always by reversal; nothing is deleted.
+ */
+export async function reverseManualEntry(
+  storeId: string,
+  entryId: string,
+  reason: string,
+  actorId: string | null
+): Promise<JournalEntry> {
+  const money = await storeMoney(storeId);
+  if (money) {
+    const { reversalId } = await money.journalReverseManual({ entryId, reason, actor: actorId });
+    const reversal = await (
+      await storeDb(storeId)
+    ).journalEntry.findFirst({ where: { id: reversalId, storeId } });
+    if (!reversal)
+      throw new AppError(500, 'JOURNAL_READBACK_FAILED', 'Reversal entry could not be read back');
+    broadcastToStore(storeId, {
+      name: 'ui/journal-posted',
+      data: { entryId: reversal.id, source: 'manual', sourceId: undefined },
+    });
+    return reversal as JournalEntry;
+  }
+  const original = await (
+    await storeDb(storeId)
+  ).journalEntry.findFirst({
+    where: { id: entryId, storeId },
+    select: { id: true, source: true, status: true, entryNumber: true },
+  });
+  if (!original) throw new AppError(404, 'JOURNAL_NOT_FOUND', `JournalEntry ${entryId} not found`);
+  if (original.source !== 'manual')
+    throw new AppError(409, 'JOURNAL_NOT_MANUAL', 'Only a manual entry can be reversed here');
+  if (original.status === 'reversed')
+    throw new AppError(409, 'JOURNAL_ALREADY_REVERSED', 'This entry is already reversed');
+  return reverseEntry(
+    entryId,
+    `Reversal of ${original.entryNumber} - ${reason}`,
+    undefined,
+    actorId ?? undefined
+  );
 }

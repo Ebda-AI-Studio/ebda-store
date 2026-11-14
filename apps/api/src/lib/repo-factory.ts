@@ -1094,6 +1094,12 @@ export interface MoneyClient {
     poId: string;
     clearedBackorders: Array<Record<string, unknown>>;
   }): Promise<{ posted: boolean; skipped?: string; entries: number }>;
+  /** Reverse a manual entry with a reason and the actor (ACCT-AUDIT-9); once only, manual entries only. */
+  journalReverseManual(a: {
+    entryId: string;
+    reason: string;
+    actor: string | null;
+  }): Promise<{ reversalId: string }>;
   /** Re-post journals whose trigger was lost (ACCT-AUDIT-5); idempotent, bounded per run. */
   journalRepostMissing(a: {
     includeExpenses?: boolean;
@@ -1631,6 +1637,7 @@ export function makeMoneyClient(
     journalPoReceive: a => call('journalPoReceive', a),
     journalRepostMissing: a => call('journalRepostMissing', a),
     journalManual: (a, key) => call('journalManual', a, key),
+    journalReverseManual: a => call('journalReverseManual', a),
     backorderCancel: (a, key) => call('backorderCancel', a, key),
     bankLedgerSide: a => call('bankLedgerSide', a),
     stockValue: () => call('stockValue', {}),

@@ -6570,11 +6570,26 @@
       "totalCount": "{total} entries",
       "loadFailed": "Could not load journal entries. Try again.",
       "entryNotFound": "This entry was not found.",
-      "loadEntryFailed": "Could not load the entry. Try again."
+      "loadEntryFailed": "Could not load the entry. Try again.",
+      "reverseButton": "Reverse this entry",
+      "reverseHelp": "A reversal posts the opposite entry today and keeps this one. Nothing is deleted.",
+      "reverseReasonLabel": "Why are you reversing it?",
+      "reverseConfirm": "Confirm reversal",
+      "reverseCancel": "Cancel",
+      "reverseFailed": "Could not reverse the entry. Try again.",
+      "lockTitle": "Close the books",
+      "lockHelp": "Entries dated up to the day you pick become final. Nothing can be posted into a closed month, and automatic entries land on the first open day.",
+      "lockThrough": "Closed through (inclusive)",
+      "lockSave": "Save",
+      "lockReopen": "Reopen all months",
+      "lockCurrent": "Books are closed through {date}.",
+      "lockNone": "No month is closed.",
+      "lockSaved": "Saved.",
+      "lockFailed": "Could not save the closing date. Try again."
     },
     "newEntry": {
       "title": "New Manual Journal Entry",
-      "description": "Post an adjusting entry. Super-admin only. Lines must balance (sum of debits = sum of credits).",
+      "description": "Post an adjusting entry for capital, a loan, an owner draw or a correction. Lines must balance (sum of debits = sum of credits).",
       "memo": "Memo (English)",
       "memoAr": "Memo (Arabic)",
       "memoPlaceholder": "Year-end depreciation, opening adjustment, …",
@@ -6589,7 +6604,7 @@
       "submitting": "Posting…",
       "cancel": "Cancel",
       "superAdminOnly": "Insufficient permissions",
-      "superAdminNotice": "Manual journal entries require super-admin access. Store admins cannot post raw GL entries — corrections are made via order refunds, expense updates, or by contacting your platform administrator.",
+      "superAdminNotice": "Manual journal entries need a store admin or super-admin account.",
       "errors": {
         "unbalanced": "Debits must equal credits"
       }

@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { PageState } from '@/components/PageState';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { useAuth } from '@/lib/auth';
 import { minorToMajor } from '@/lib/format';
 import { withNumerals } from '@ebda/shared';
 
@@ -58,6 +60,29 @@ export default function JournalDetailPage() {
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const canReverse = user?.role === 'super_admin' || user?.role === 'store_admin';
+  const [reversing, setReversing] = useState(false);
+  const [reason, setReason] = useState('');
+  const [reverseError, setReverseError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function reverse() {
+    setBusy(true);
+    setReverseError(null);
+    const { error: apiError } = await apiPost(
+      `/api/v1/stores/${storeId}/finance/journal/${entryId}/reverse`,
+      { reason }
+    ).catch(() => ({ error: { message: t('reverseFailed') } }));
+    setBusy(false);
+    if (apiError) {
+      setReverseError(apiError.message || t('reverseFailed'));
+      return;
+    }
+    setReversing(false);
+    setReason('');
+    setRetryKey(k => k + 1);
+  }
 
   useEffect(() => {
     if (!storeId || !entryId) return;
@@ -129,6 +154,42 @@ export default function JournalDetailPage() {
             </p>
           )}
         </div>
+
+        {canReverse && entry.source === 'manual' && entry.status === 'posted' && (
+          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+            {!reversing ? (
+              <Button variant="secondary" onClick={() => setReversing(true)}>
+                {t('reverseButton')}
+              </Button>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">{t('reverseHelp')}</p>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium">{t('reverseReasonLabel')}</span>
+                  <textarea
+                    value={reason}
+                    onChange={e => setReason(e.target.value)}
+                    maxLength={500}
+                    rows={2}
+                    className="w-full border border-border rounded-md px-3 py-2 text-base sm:text-sm"
+                  />
+                </label>
+                {reverseError && <p className="text-sm text-destructive-ink">{reverseError}</p>}
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => void reverse()}
+                    disabled={busy || reason.trim().length < 3}
+                  >
+                    {t('reverseConfirm')}
+                  </Button>
+                  <Button variant="secondary" onClick={() => setReversing(false)} disabled={busy}>
+                    {t('reverseCancel')}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Lines table — genuine accounting ledger (debit/credit columns are
             the point); kept as an isolated horizontal-scroll container per
