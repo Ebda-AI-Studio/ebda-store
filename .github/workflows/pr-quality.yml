@@ -39,7 +39,8 @@ jobs:
           PR_QUALITY_CONFIG: .pr-quality.json
         run: |
           set -euo pipefail
-          CHANGED_FILES="$(gh pr diff "$PR" --name-only)"
+          # the pulls/files API pages through any size; `gh pr diff` fails with HTTP 406 above 300 files
+          CHANGED_FILES="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')"
           export CHANGED_FILES
           node .github/pr-quality/pr-body-check.mjs
 

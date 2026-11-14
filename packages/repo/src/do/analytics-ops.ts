@@ -3,7 +3,8 @@
 // Each op is scoped by the `store_id` the DO holds, never by the caller, and runs as ONE section (runKeyed wraps it).
 //
 // Counters are the same statements the Postgres services ran (a counter, not an event log) with SQLite spelling.
-// `dayMs` is the UTC-midnight epoch of the calendar day (what a Postgres `date` column holds as a Date).
+// `dayMs` is the day KEY: a UTC-midnight epoch (what a Postgres `date` column holds as a Date). For views and QR scans the API
+// derives it with `regionDayKey` (@ebda/shared, Ruling ANALYTICS-DAY-1) - never a Cairo day-start instant, which this refuses.
 import { MoneyError, type SyncSql } from './sync-sql';
 
 const INT4_CAP = 2147483646;
