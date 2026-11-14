@@ -88,6 +88,8 @@ export async function postPoReceiveJournal(args: PoReceiveJournalInput): Promise
       storeId: args.storeId,
       source: 'purchase_order',
       sourceId: `${args.poId}:recv:${receivedTotal}`,
+      // ACCT-AUDIT-3: keeps the date the goods were received on
+      postedAt: po.receivedAt && po.receivedAt < new Date() ? po.receivedAt : undefined,
       memo: `PO receive — ${po.poNumber}`,
       memoAr: `استلام أمر شراء — ${po.poNumber}`,
       lines: [

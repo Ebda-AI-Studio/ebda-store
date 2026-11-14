@@ -91,6 +91,8 @@ export async function postExpenseJournal(args: ExpenseJournalInput): Promise<voi
     storeId: args.storeId,
     source: 'expense',
     sourceId: expense.id,
+    // ACCT-AUDIT-3: dated by the expense itself, never later than now
+    postedAt: expense.expenseDate < new Date() ? expense.expenseDate : new Date(),
     memo: `Expense — ${expense.expenseNumber}`,
     memoAr: `مصروف — ${expense.expenseNumber}`,
     lines,

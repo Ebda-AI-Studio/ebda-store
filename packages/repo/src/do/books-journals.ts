@@ -19,11 +19,18 @@ const accountingOn = (db: SyncSql, storeId: string): boolean => {
 
 type Out = { posted: boolean; skipped?: string };
 
+/** ACCT-AUDIT-3: a journal is dated by its document (an expense's own date, an adjustment's / receipt's post date), never
+ *  later than now, so a late-posting job cannot move October's cost into November. Absent date -> now (postEntry's default). */
+const docDate = (v: unknown): number | undefined => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, Date.now()) : undefined;
+};
+
 export function journalExpenseOp(db: SyncSql, storeId: string, a: Record<string, unknown>): Out {
   const id = str(a.expenseId, 'expenseId');
   return db.transactionSync((): Out => {
     const e = db.all(
-      'SELECT id, expense_number, status, total, expense_account_id, paid_from_account_id FROM expenses WHERE id = ? AND store_id = ?',
+      'SELECT id, expense_number, status, total, expense_date, expense_account_id, paid_from_account_id FROM expenses WHERE id = ? AND store_id = ?',
       [id, storeId]
     )[0];
     if (!e) return { posted: false, skipped: 'expense_not_found' };
@@ -36,6 +43,7 @@ export function journalExpenseOp(db: SyncSql, storeId: string, a: Record<string,
       storeId,
       source: 'expense',
       sourceId: id,
+      postedAt: docDate(e.expense_date),
       memo: `Expense — ${num}`,
       memoAr: `مصروف — ${num}`,
       lines: [
@@ -79,7 +87,7 @@ export function journalStockAdjustmentOp(
   const id = str(a.adjustmentId, 'adjustmentId');
   return db.transactionSync((): Out => {
     const adj = db.all(
-      'SELECT id, adjustment_number, type, status, total_value_impact FROM stock_adjustments WHERE id = ? AND store_id = ?',
+      'SELECT id, adjustment_number, type, status, total_value_impact, posted_at FROM stock_adjustments WHERE id = ? AND store_id = ?',
       [id, storeId]
     )[0];
     if (!adj) return { posted: false, skipped: 'adjustment_not_found' };
@@ -119,6 +127,7 @@ export function journalStockAdjustmentOp(
       storeId,
       source: 'stock_adjustment',
       sourceId: id,
+      postedAt: docDate(adj.posted_at),
       memo: `Stock adjustment — ${num}`,
       memoAr: `تسوية مخزون — ${num}`,
       lines,
@@ -145,7 +154,7 @@ export function journalPoReceiveOp(
   const cleared = Array.isArray(a.clearedBackorders) ? (a.clearedBackorders as Cleared[]) : [];
   return db.transactionSync(() => {
     const po = db.all(
-      'SELECT id, po_number, ap_account_id FROM purchase_orders WHERE id = ? AND store_id = ?',
+      'SELECT id, po_number, ap_account_id, received_at FROM purchase_orders WHERE id = ? AND store_id = ?',
       [poId, storeId]
     )[0];
     if (!po) return { posted: false, skipped: 'po_not_found', entries: 0 };
@@ -189,6 +198,7 @@ export function journalPoReceiveOp(
         storeId,
         source: 'purchase_order',
         sourceId: `${poId}:recv:${received}`,
+        postedAt: docDate(po.received_at),
         memo: `PO receive — ${poNumber}`,
         memoAr: `استلام أمر شراء — ${poNumber}`,
         lines: [

@@ -325,6 +325,51 @@ describe('expense / stock-adjustment / PO-receive journals (Ruling CF-JOBS-4)', 
     expect(r2.q('SELECT count(*) n FROM journal_entries')[0].n).toBe(0);
   });
 
+  describe('journals are dated by the document, not by the posting job (ACCT-AUDIT-3)', () => {
+    const postedAt = (r: ReturnType<typeof rig>) =>
+      r.q('SELECT posted_at p FROM journal_entries ORDER BY created_at').map(x => Number(x.p));
+    const OCT28 = Date.UTC(2026, 9, 28, 9, 0, 0);
+
+    it('an expense dated 28 Oct that is posted on 3 Nov lands in October', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', 500, 500, ${OCT28}, 'posted')`
+      );
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(postedAt(r)).toEqual([OCT28]);
+    });
+
+    it('a future-dated expense is clamped to now, never posted into the future', () => {
+      const r = books();
+      const future = Date.now() + 40 * 86_400_000;
+      r.raw.exec(
+        `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', 500, 500, ${future}, 'posted')`
+      );
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(postedAt(r)[0]).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('a stock adjustment keeps the date it was posted on', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO stock_adjustments (id, store_id, adjustment_number, type, status, total_value_impact, posted_at) VALUES ('s1', 's1', 'ADJ-1', 'damage', 'posted', -300, ${OCT28})`
+      );
+      r.op('journalStockAdjustment', { adjustmentId: 's1' });
+      expect(postedAt(r)).toEqual([OCT28]);
+    });
+
+    it('a PO receipt keeps the date it was received on', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO suppliers (id, store_id, name) VALUES ('sup', 's1', 'Acme');
+       INSERT INTO purchase_orders (id, store_id, supplier_id, po_number, status, received_at) VALUES ('po1', 's1', 'sup', 'PO-1', 'received', ${OCT28});
+       INSERT INTO purchase_order_items (id, po_id, product_id, qty, qty_received, unit_cost, total) VALUES ('i1', 'po1', 'sku', 1, 1, 100, 100);`
+      );
+      r.op('journalPoReceive', { poId: 'po1' });
+      expect(postedAt(r)).toEqual([OCT28]);
+    });
+  });
+
   describe('partial PO receipts (ACCT-AUDIT-1)', () => {
     const seed = (r: ReturnType<typeof rig>) =>
       r.raw.exec(
