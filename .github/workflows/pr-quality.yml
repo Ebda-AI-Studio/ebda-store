@@ -68,3 +68,35 @@ jobs:
       - name: Remove the checkouts (a shared runner keeps its workspace between jobs; never leave a fork's files on it)
         if: always()
         run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base"
+
+  capability-ratchet:
+    name: Capability baselines
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 10
+    # fork-guard-exempt: forks must be checked too (a skipped check is a pass); the PR is only read as data, symlinks are refused
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Capability baselines may only shrink (judged against the base branch)
+        run: |
+          if [ -f base/.github/pr-quality/capability-ratchet.mjs ]; then
+            node base/.github/pr-quality/capability-ratchet.mjs --base base --pr pr
+          else
+            # the adoption PR: the script reaches the base branch only when this PR merges; every later PR is judged by it
+            echo "::notice::capability-ratchet.mjs is not on the base branch yet (adoption PR): nothing to compare"
+          fi
+
+      - name: Remove the checkouts (a shared runner keeps its workspace between jobs; never leave a fork's files on it)
+        if: always()
+        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base"
