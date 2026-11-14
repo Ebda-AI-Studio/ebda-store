@@ -19,6 +19,7 @@ const m = vi.hoisted(() => ({
   putPrivate: vi.fn(),
   deletePrivate: vi.fn(),
   audit: vi.fn(),
+  loseClaim: false,
 }));
 
 vi.mock('@api/middleware/auth', async () => {
@@ -84,7 +85,9 @@ vi.mock('@ebda/database', () => ({
         m.settings.set(data.key, data.value);
       },
       upsert: async ({ where, create }: any) => void m.settings.set(where.key, create.value),
-      deleteMany: async ({ where }: any) => void m.settings.delete(where.key),
+      deleteMany: async ({ where }: any) => ({
+        count: m.loseClaim ? 0 : m.settings.delete(where.key) ? 1 : 0,
+      }),
     },
   },
   withUser: (_id: string, fn: () => unknown) => fn(),
@@ -103,6 +106,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   m.settings.clear();
+  m.loseClaim = false;
   for (const f of [m.getProfile, m.apply, m.review, m.read, m.putPrivate, m.deletePrivate, m.audit])
     f.mockReset();
   m.getProfile.mockResolvedValue({ status: 'verified' });
@@ -325,6 +329,41 @@ describe('A10 super-admin decision', () => {
     );
     expect(m.settings.has(`tax.change.${STORE}`)).toBe(false);
     expect(m.deletePrivate).not.toHaveBeenCalled(); // the evidence became a profile document
+  });
+
+  it('two concurrent approvals apply once; the second is a no-op (also when it arrives after the first finished)', async () => {
+    await pending();
+    const go = () =>
+      request(app)
+        .post(`/admin/tax-verification/${STORE}/change-decision`)
+        .set('x-role', 'super_admin')
+        .send({ decision: 'approve' });
+    const [a, b] = await Promise.all([go(), go()]);
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(m.apply).toHaveBeenCalledTimes(1);
+  });
+
+  it('a decision that loses the claim to a concurrent one does not apply', async () => {
+    await pending();
+    m.loseClaim = true; // the row was read, but another approval removed it first
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/change-decision`)
+      .set('x-role', 'super_admin')
+      .send({ decision: 'approve' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.noop).toBe(true);
+    expect(m.apply).not.toHaveBeenCalled();
+  });
+
+  it('a failed apply puts the request back so it can be decided again', async () => {
+    await pending();
+    m.apply.mockRejectedValueOnce(new Error('boom'));
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/change-decision`)
+      .set('x-role', 'super_admin')
+      .send({ decision: 'approve' });
+    expect(res.status).toBe(500);
+    expect(m.settings.has(`tax.change.${STORE}`)).toBe(true);
   });
 
   it('reject needs a reason, deletes the evidence and tells the merchant why', async () => {

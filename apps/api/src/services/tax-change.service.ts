@@ -139,8 +139,10 @@ async function readStored(storeId: string): Promise<StoredChange | null> {
 
 const resultKeyOf = (storeId: string) => `tax.change-result.${storeId}`;
 
-async function deleteStored(storeId: string): Promise<void> {
-  await settings().deleteMany({ where: { key: keyOf(storeId) } });
+/** Deletes the pending row and says whether THIS call removed it (the atomic claim a decision takes first). */
+async function deleteStored(storeId: string): Promise<boolean> {
+  const out = await settings().deleteMany({ where: { key: keyOf(storeId) } });
+  return out.count > 0;
 }
 
 async function dropEvidence(change: StoredChange, storeId: string): Promise<void> {
@@ -375,12 +377,24 @@ export async function decideTaxChange(
   storeId: string,
   decision: TaxChangeDecision,
   actor: Actor
-): Promise<{ decision: TaxChangeDecision['decision'] }> {
+): Promise<{ decision: TaxChangeDecision['decision']; noop?: true }> {
   const c = await readStored(storeId);
-  if (!c) throw new AppError(404, 'NOT_FOUND', 'No pending change request');
+  // Idempotent: a request already decided (or never made) is a no-op, never a second apply.
+  if (!c) return { decision: decision.decision, noop: true };
+  // Claim first: of two concurrent decisions only the one that removes the row proceeds; the other is a no-op (no double apply).
+  if (!(await deleteStored(storeId))) return { decision: decision.decision, noop: true };
   if (decision.decision === 'approve') {
-    await applyApprovedTaxChange(storeId, c, actor);
-    await deleteStored(storeId);
+    try {
+      await applyApprovedTaxChange(storeId, c, actor);
+    } catch (err) {
+      // nothing was applied: put the request back so it can be decided again
+      await settings()
+        .create({
+          data: { key: keyOf(storeId), value: c as never, category: 'tax', isPublic: false },
+        })
+        .catch(() => undefined);
+      throw err;
+    }
     await settings().deleteMany({ where: { key: resultKeyOf(storeId) } });
   } else {
     await settings().upsert({
@@ -393,7 +407,6 @@ export async function decideTaxChange(
       },
       update: { value: { reason: decision.reason, at: new Date().toISOString() } },
     });
-    await deleteStored(storeId);
     await dropEvidence(c, storeId);
   }
   await auditLog({
@@ -416,8 +429,9 @@ export async function decideTaxChange(
   return { decision: decision.decision };
 }
 
-/** A revoke or a fresh verification makes a pending change meaningless: drop it and its evidence. */
+/** A revoke, a store deletion or a fresh verification makes a pending change meaningless: drop it, its last answer and its evidence (reusable by store deletion). */
 export async function discardTaxChange(storeId: string): Promise<void> {
+  await settings().deleteMany({ where: { key: resultKeyOf(storeId) } });
   const c = await readStored(storeId);
   if (!c) return;
   await deleteStored(storeId);
