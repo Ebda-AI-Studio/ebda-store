@@ -51,7 +51,7 @@ const T = {
     checked: 'آخر فحص',
     generated: 'آخر تحديث للصفحة',
     explain:
-      'بنفحص كل خدمة كل دقيقة من برّه منصتنا. لو كذا فحص ورا بعض فشلوا بنفتح مشكلة لوحدها، وبنقفلها أول ما الخدمة ترجع.',
+      'بنفحص كل خدمة كل ٥ دقايق من برّه منصتنا. لو كذا فحص ورا بعض فشلوا بنفتح مشكلة لوحدها، وبنقفلها أول ما الخدمة ترجع.',
     bars: 'كل شريط يوم واحد (بتوقيت جرينتش)، من الأقدم للأحدث.',
     days: 'الأيام',
     otherLang: { href: '/en', label: 'English', lang: 'en' },
@@ -89,7 +89,7 @@ const T = {
     checked: 'Last checked',
     generated: 'Page generated',
     explain:
-      'Every service is probed once a minute from outside our platform. An incident opens automatically after several consecutive failed probes and resolves after the service recovers.',
+      'Every service is probed every 5 minutes from outside our platform. An incident opens automatically after several consecutive failed probes and resolves after the service recovers.',
     bars: 'Each bar is one UTC day, oldest to newest.',
     days: 'days',
     otherLang: { href: '/', label: 'العربية', lang: 'ar' },
