@@ -16,6 +16,25 @@ CI-HOSTED-1 scheduled no-op is retired).
 > fixture/helper or anything under `packages/database` runs the whole tier. Outputs `integration` and `integration_paths`
 > feed the `Integration Tests` job's `if` and its vitest targets. #227 merged four edited integration tests that never ran.
 
+## Ruling PR-CI-CHEAP-1 (2026-11-14): PRs pay for what they touch
+
+Measured: ~11 approved PRs queued behind two heavy Mac runners. Changes (all in `ci.yml`):
+
+- **PR unit tests are ONE job** (`Unit shard 1/1 (affected)`, `vitest run <affected paths> --shard=1/1`) instead of 3: the setup
+  (npm ci, builds, Chromium, heavy lock) was paid three times for a few minutes of tests. Main/nightly keep the 3 coverage
+  shards (`test-unit-shard`). The workerd extras run in that one job. Check name `Unit Tests (affected)` unchanged.
+- **Lint and Type Check run on the light runner** (`EBDA_LIGHT_RUNS_ON`, GitHub Linux): no workerd or macOS need.
+- **`API Worker boots on workerd` (merge-gate REQUIRED) is a fast pass when the API Worker is out of scope.** The job still has no
+  `if` (so the derived required list is unchanged); a first step runs `scripts/ci-affected.mjs` plus a path match
+  (`apps/api`, dependents, `packages/repo`, smoke/lane scripts, `ci.yml`, lockfile) and every later step is skipped on `run=false`
+  with a `::notice::`. Push to main, nightly and dispatch always run it whole.
+- Concurrency was already cancel-in-progress for PRs only (main gets a group per SHA, never cancelled).
+- Unchanged: App build / Worker dry-run / workerd integration / Integration Tests are already gated on the affected outputs;
+  the `full-ci` label still dispatches the full lane pre-merge.
+
+Heavy-runner jobs per PR (affected set from `ci-affected.mjs --files`, before -> after): docs-only (#759) 1 -> 0 (+1 seconds-long skip pass);
+api-only (#758) 8 -> 4; web-only (#722) 7 -> 2 (+1 skip pass).
+
 ## Ruling CI-SLIM-1 (2026-11-12): 3 unit shards + an opt-in pre-merge full tier
 
 Measured on the Mac (10 cores, 16 GB, load ~10.7, heavy jobs serialised by `heavy-lock.sh`): a code PR push runs 15-20 jobs;
