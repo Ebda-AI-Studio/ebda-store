@@ -1,0 +1,32 @@
+{
+  "id": "team.audit-log",
+  "status": "live",
+  "area": "team",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "شوف سجل نشاط متجري",
+  "titleEn": "See my store's activity log",
+  "screens": ["/stores/[id]/activity"],
+  "api": ["GET /stores/:storeId/activity"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "read only"
+  },
+  "helpArticle": "store-activity-log",
+  "questions": {
+    "ar": ["مين غيّر حاجة في متجري؟", "عايز اشوف سجل النشاط"],
+    "en": ["Who changed something in my store?", "Where is the audit log?"]
+  },
+  "steps": ["Open Settings, Activity log", "Press Load more for older entries"],
+  "edgeCases": [
+    "Staff get 403",
+    "Another store answers 404",
+    "Contact fields, keys and tokens are masked or dropped; IP shows its network prefix only",
+    "Platform staff can read any store's log (support override)"
+  ],
+  "gaps": []
+}

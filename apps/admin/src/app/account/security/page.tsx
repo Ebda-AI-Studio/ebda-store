@@ -17,6 +17,7 @@ import { withNumerals } from '@ebda/shared';
 import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 import { PasskeysPanel } from '../../../components/account/PasskeysPanel';
 import { PhonePanel } from '../../../components/account/PhonePanel';
+import { RecoveryCodesPanel } from '../../../components/account/RecoveryCodesPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -683,6 +684,7 @@ export default function SecurityPage() {
             onSignInAgain={() => void logout()}
           />
         )}
+        {status?.mfaEnabled && step === 'idle' && <RecoveryCodesPanel />}
         {status && <PhonePanel mfaEnabled={status.mfaEnabled} />}
         <LegalAcceptancesPanel />
       </div>

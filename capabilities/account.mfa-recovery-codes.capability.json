@@ -1,0 +1,39 @@
+{
+  "id": "account.mfa-recovery-codes",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اعمل أكواد استرجاع جديدة للتحقق بخطوتين",
+  "titleEn": "Make new two-step recovery codes",
+  "screens": ["/account/security"],
+  "api": [
+    "GET /mfa/recovery-codes (identity service)",
+    "POST /mfa/recovery-codes/regenerate (identity service)"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "the old set is invalidated at once; the new codes are shown once"
+  },
+  "helpArticle": "account-security",
+  "questions": {
+    "ar": ["ضاعت أكواد الاسترداد بتاعتي", "ازاي اعمل أكواد استرجاع جديدة؟"],
+    "en": ["How do I get new recovery codes?", "I lost my 2FA backup codes"]
+  },
+  "steps": [
+    "Open Account, Security, Recovery codes",
+    "Enter password and a current authenticator code",
+    "Press Make new recovery codes and save the codes shown"
+  ],
+  "edgeCases": [
+    "Needs password AND a live authenticator code; a recovery code is refused as the step-up",
+    "Regenerating retires every old code in one statement",
+    "An account without 2FA enabled gets 409",
+    "Lost authenticator and codes: staff reset via scripts/mfa-reset.ts (last resort, docs/runbooks/mfa-recovery.md)"
+  ],
+  "gaps": []
+}
