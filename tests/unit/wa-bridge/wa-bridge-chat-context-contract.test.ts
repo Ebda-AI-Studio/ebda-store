@@ -1,5 +1,5 @@
 /**
- * Store side of the Chat-agent context contract (Ruling CHAT-AGENT-1). `tests/vectors/ebda-wa/bridge-chat-context-v1.json` is a recorded
+ * Store side of the Chat-agent context contract (Ruling CHAT-AGENT-1). `tests/vectors/ebda-wa/bridge-chat-context-v2.json` is a recorded
  * list of calls and exact answers for `searchProducts`, `getStorePolicies` and `getCustomerProfile`. ebda-whatsapp vendors the SAME file
  * byte for byte (sha pinned in SHA256SUMS on both sides) and replays it through its adapter and schemas. Kept apart from `bridge-v1.json`
  * so the older fixture (and ebda-whatsapp pr 67's re-vendor of it) is untouched.
@@ -18,7 +18,7 @@ import { createBridge } from '../../../apps/api/src/lib/wa/bridge/service';
 import { makeFakePort } from './fake-port';
 import { CHAT_CONTEXT_CASES } from './chat-context-cases';
 
-const FIXTURE = path.resolve(__dirname, '../../vectors/ebda-wa/bridge-chat-context-v1.json');
+const FIXTURE = path.resolve(__dirname, '../../vectors/ebda-wa/bridge-chat-context-v2.json');
 const SUMS = path.resolve(__dirname, '../../vectors/ebda-wa/SHA256SUMS');
 const bridge = () =>
   createBridge({
@@ -37,7 +37,7 @@ describe('chat-context contract vectors', () => {
       const cases = [];
       for (const c of CHAT_CONTEXT_CASES)
         cases.push({ ...c, expect: plain(await call(b, c.method, c.args)) });
-      writeFileSync(FIXTURE, JSON.stringify({ version: 1, cases }, null, 1) + '\n');
+      writeFileSync(FIXTURE, JSON.stringify({ version: 2, cases }, null, 1) + '\n');
     });
     return;
   }
@@ -56,7 +56,7 @@ describe('chat-context contract vectors', () => {
   });
   it('the fixture sha is pinned', () => {
     expect(readFileSync(SUMS, 'utf8')).toContain(
-      `${createHash('sha256').update(readFileSync(FIXTURE)).digest('hex')}  bridge-chat-context-v1.json`
+      `${createHash('sha256').update(readFileSync(FIXTURE)).digest('hex')}  bridge-chat-context-v2.json`
     );
   });
 });

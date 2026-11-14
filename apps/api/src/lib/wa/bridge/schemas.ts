@@ -68,6 +68,11 @@ export const args = {
     query: z.string().trim().min(1).max(200),
     maxPriceMinor: z.number().int().min(0).max(100_000_000).optional(),
     limit: z.number().int().min(1).max(20),
+    /** Opaque per-shopper id for the embed rate limit (Ruling CHAT-AGENT-6); never a phone. */
+    searcher: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/)
+      .optional(),
   }),
   getStorePolicies: z.undefined(),
   /** The phone IS the proof: the Store rebuilds buyerKey from it. There is no key-only form. */

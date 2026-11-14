@@ -6,7 +6,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const ranked = vi.fn(async (_s: string, _q: string) => [] as string[]);
+const ranked = vi.fn(async (_s: string, _q: string, _o?: unknown) => [] as string[]);
+const flags = { degraded: false };
 const productFind = vi.fn(async (_a: any) => [] as any[]);
 const variantFind = vi.fn(async (_a: any) => [] as any[]);
 const state = {
@@ -40,7 +41,10 @@ vi.mock('../../../apps/api/src/lib/store-scoped-read', () => ({
   readInStoreContext: (_s: string, fn: () => unknown) => fn(),
 }));
 vi.mock('../../../apps/api/src/services/product-search.service', () => ({
-  rankedSearch: (s: string, q: string) => ranked(s, q),
+  rankedSearchWithMode: async (s: string, q: string, o: unknown) => ({
+    ids: await ranked(s, q, o),
+    degraded: flags.degraded,
+  }),
 }));
 vi.mock('../../../apps/api/src/middleware/security', () => ({ auditLog: vi.fn() }));
 vi.mock('../../../apps/api/src/lib/buyer-identity', () => ({ ANONYMOUS_BUYER: 'anon' }));
@@ -78,6 +82,7 @@ const prod = (id: string, price: number) => ({
 });
 beforeEach(() => {
   ranked.mockReset();
+  flags.degraded = false;
   productFind.mockReset();
   variantFind.mockReset();
   variantFind.mockResolvedValue([]);
@@ -93,14 +98,17 @@ describe('searchProducts', () => {
   it('keeps the storefront rank order, not the database order', async () => {
     ranked.mockResolvedValue(['p3', 'p1', 'p2']);
     productFind.mockResolvedValue([prod('p1', 100), prod('p2', 200), prod('p3', 300)]);
-    const rows = await createDoPort().searchProducts('s1', 'فستان', { limit: 10 });
+    const { items: rows } = await createDoPort().searchProducts('s1', 'فستان', {
+      limit: 10,
+      searcher: 'wa-chat:s1',
+    });
     expect(rows.map(r => r.retailerId)).toEqual(['p3', 'p1', 'p2']);
-    expect(ranked).toHaveBeenCalledWith('s1', 'فستان');
+    expect(ranked).toHaveBeenCalledWith('s1', 'فستان', { searcher: 'wa-chat:s1' });
   });
   it('reads only active, public, non-deleted products of THIS store', async () => {
     ranked.mockResolvedValue(['p1']);
     productFind.mockResolvedValue([prod('p1', 100)]);
-    await createDoPort().searchProducts('s1', 'x', { limit: 5 });
+    await createDoPort().searchProducts('s1', 'x', { limit: 5, searcher: 'wa-chat:s1' });
     expect(productFind.mock.calls[0]![0].where).toMatchObject({
       storeId: 's1',
       status: 'active',
@@ -111,7 +119,10 @@ describe('searchProducts', () => {
   it('an id the ranker returned but the product read dropped (draft/deleted) is skipped', async () => {
     ranked.mockResolvedValue(['gone', 'p1']);
     productFind.mockResolvedValue([prod('p1', 100)]);
-    const rows = await createDoPort().searchProducts('s1', 'x', { limit: 5 });
+    const { items: rows } = await createDoPort().searchProducts('s1', 'x', {
+      limit: 5,
+      searcher: 'wa-chat:s1',
+    });
     expect(rows.map(r => r.retailerId)).toEqual(['p1']);
   });
   it('applies the price ceiling on the sellable row (a variant can be under budget while its product is not)', async () => {
@@ -121,19 +132,29 @@ describe('searchProducts', () => {
       { id: 'v-cheap', productId: 'p1', title: 'S', price: 40000, isActive: true, inventory: 3 },
       { id: 'v-dear', productId: 'p1', title: 'L', price: 90000, isActive: true, inventory: 3 },
     ]);
-    const rows = await createDoPort().searchProducts('s1', 'x', {
+    const { items: rows } = await createDoPort().searchProducts('s1', 'x', {
       limit: 5,
       maxPriceMinor: 50000,
+      searcher: 'wa-chat:s1',
     });
     expect(rows.map(r => r.retailerId)).toEqual(['v-cheap']);
   });
   it('honours the limit and returns [] without touching products when nothing ranks', async () => {
     ranked.mockResolvedValue([]);
-    expect(await createDoPort().searchProducts('s1', 'x', { limit: 5 })).toEqual([]);
+    expect(
+      await createDoPort().searchProducts('s1', 'x', { limit: 5, searcher: 'wa-chat:s1' })
+    ).toEqual({ items: [], degraded: false });
     expect(productFind).not.toHaveBeenCalled();
+    flags.degraded = true;
+    expect(
+      await createDoPort().searchProducts('s1', 'x', { limit: 5, searcher: 'wa-chat:s1' })
+    ).toEqual({ items: [], degraded: true });
+    flags.degraded = false;
     ranked.mockResolvedValue(['p1', 'p2', 'p3']);
     productFind.mockResolvedValue([prod('p1', 1), prod('p2', 2), prod('p3', 3)]);
-    expect(await createDoPort().searchProducts('s1', 'x', { limit: 2 })).toHaveLength(2);
+    expect(
+      (await createDoPort().searchProducts('s1', 'x', { limit: 2, searcher: 'wa-chat:s1' })).items
+    ).toHaveLength(2);
   });
 });
 

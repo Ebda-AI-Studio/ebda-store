@@ -7,7 +7,7 @@ import { storefrontOrigin } from '@ebda/shared';
 import { storeRepo, storeMoney, storeWriter, type CreateOrderArgs } from '../../repo-factory';
 import { lookupStore } from '../../definer';
 import { readInStoreContext } from '../../store-scoped-read';
-import { rankedSearch } from '../../../services/product-search.service';
+import { rankedSearchWithMode } from '../../../services/product-search.service';
 import { codFeeConfigFromRow } from '../../../services/payment-providers/cod.provider';
 import { isWhatsAppLinked } from '../link';
 import { applyCodOutcome } from '../store-events-consumer';
@@ -355,8 +355,10 @@ export function createDoPort(): BridgePort {
     // so Chat and the website can never disagree on what "فستان احمر" matches. Active public products only, rank order kept,
     // the price ceiling applied per sellable row (a variant can be cheaper than its product).
     async searchProducts(storeId, query, o) {
-      const ids = await readInStoreContext(storeId, () => rankedSearch(storeId, query));
-      if (ids.length === 0) return [];
+      const { ids, degraded } = await readInStoreContext(storeId, () =>
+        rankedSearchWithMode(storeId, query, { searcher: o.searcher })
+      );
+      if (ids.length === 0) return { items: [], degraded };
       const top = ids.slice(0, SEARCH_CANDIDATES);
       const d = await db(storeId);
       const products: any[] = await d.product.findMany({
@@ -366,9 +368,12 @@ export function createDoPort(): BridgePort {
       const byId = new Map(products.map(p => [p.id as string, p]));
       const ranked = top.map(id => byId.get(id)).filter((p): p is any => p !== undefined);
       const rows = await rowsForProducts(storeId, d, ranked);
-      return rows
-        .filter(r => o.maxPriceMinor === undefined || r.priceMinor <= o.maxPriceMinor)
-        .slice(0, o.limit);
+      return {
+        items: rows
+          .filter(r => o.maxPriceMinor === undefined || r.priceMinor <= o.maxPriceMinor)
+          .slice(0, o.limit),
+        degraded,
+      };
     },
 
     async storePolicies(storeId): Promise<StorePolicyFacts> {

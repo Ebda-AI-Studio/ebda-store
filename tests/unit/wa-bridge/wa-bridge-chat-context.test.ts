@@ -37,13 +37,33 @@ describe('searchProducts', () => {
     const { b, port } = mk();
     const spy = vi.spyOn(port, 'searchProducts');
     const r = await b.searchProducts(S, 'هدية', { maxPriceMinor: 30000, limit: 3 });
-    expect(spy).toHaveBeenCalledWith(S, 'هدية', { maxPriceMinor: 30000, limit: 3 });
+    expect(spy).toHaveBeenCalledWith(S, 'هدية', {
+      maxPriceMinor: 30000,
+      limit: 3,
+      searcher: `wa-chat:${S}`,
+    });
     expect(r.ok && r.value.items.map(i => i.retailerId)).toEqual(['v1']);
   });
   it('an empty result is ok + empty (a real negative), not a failure', async () => {
     const { b } = mk();
     const r = await b.searchProducts(S, 'no-such-thing', { limit: 5 });
-    expect(r).toEqual({ ok: true, value: { items: [] } });
+    expect(r).toEqual({ ok: true, value: { items: [], degraded: false } });
+  });
+  it('surfaces degraded when the meaning leg was skipped, so an empty list is not a real negative (Ruling CHAT-AGENT-6)', async () => {
+    const { b } = mk();
+    expect(await b.searchProducts(S, 'dg', { limit: 5 })).toEqual({
+      ok: true,
+      value: { items: [], degraded: true },
+    });
+  });
+  it('gives the port a per-store searcher, or a per-shopper one when Chat passes an opaque id; never the raw input', async () => {
+    const { b, port } = mk();
+    const spy = vi.spyOn(port, 'searchProducts');
+    await b.searchProducts(S, 'هدية', { limit: 5, searcher: 'abc_123' });
+    expect(spy.mock.calls[0]![2].searcher).toBe(`wa-chat:${S}:abc_123`);
+    expect(await b.searchProducts(S, 'x', { limit: 5, searcher: 'a b' })).toMatchObject({
+      reason: 'invalid',
+    });
   });
   it('refuses a blank query, a limit over 20 and a fractional price before any read', async () => {
     const { b, port } = mk();

@@ -517,7 +517,11 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
   getProducts(storeId: string, ids: string[]) {
     return this.bridge(b => b.getProducts(storeId, ids));
   }
-  searchProducts(storeId: string, query: string, opts: { maxPriceMinor?: number; limit: number }) {
+  searchProducts(
+    storeId: string,
+    query: string,
+    opts: { maxPriceMinor?: number; limit: number; searcher?: string }
+  ) {
     return this.bridge(b => b.searchProducts(storeId, query, opts));
   }
   getStorePolicies(storeId: string) {

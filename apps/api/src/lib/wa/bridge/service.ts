@@ -12,6 +12,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { z } from 'zod/v3';
 import { args } from './schemas';
+import { chatSearcherId } from './searcher';
 import { buyerKeyFor } from '@ebda/shared';
 import { signCheckoutToken, storeBuyerId } from './checkout-token';
 
@@ -153,8 +154,8 @@ export interface BridgePort {
   searchProducts(
     storeId: string,
     query: string,
-    o: { maxPriceMinor?: number; limit: number }
-  ): Promise<CatalogRow[]>;
+    o: { maxPriceMinor?: number; limit: number; searcher: string }
+  ): Promise<{ items: CatalogRow[]; degraded: boolean }>;
   storePolicies(storeId: string): Promise<StorePolicyFacts>;
   /** The CRM row + last orders of the buyer key; null = no such buyer in this store. */
   customerProfile(storeId: string, buyerKey: string): Promise<CustomerProfileFacts | null>;
@@ -343,16 +344,17 @@ export function createBridge(deps: BridgeDeps) {
     searchProducts: (
       storeId: string,
       query: string,
-      opts: { maxPriceMinor?: number; limit: number }
+      opts: { maxPriceMinor?: number; limit: number; searcher?: string }
     ) =>
-      run('searchProducts', storeId, args.searchProducts, { query, ...opts }, async (s, a) =>
-        ok({
-          items: await port.searchProducts(s, a.query, {
-            ...(a.maxPriceMinor !== undefined ? { maxPriceMinor: a.maxPriceMinor } : {}),
-            limit: a.limit,
-          }),
-        })
-      ),
+      run('searchProducts', storeId, args.searchProducts, { query, ...opts }, async (s, a) => {
+        // `degraded` = the meaning leg was wanted but skipped (budget/limit/outage): an empty list is then NOT a real negative
+        const r = await port.searchProducts(s, a.query, {
+          ...(a.maxPriceMinor !== undefined ? { maxPriceMinor: a.maxPriceMinor } : {}),
+          limit: a.limit,
+          searcher: chatSearcherId(s, a.searcher),
+        });
+        return ok({ items: r.items, degraded: r.degraded });
+      }),
 
     getStorePolicies: (storeId: string) =>
       run('getStorePolicies', storeId, args.getStorePolicies, undefined, async (s, _a, p) => {
