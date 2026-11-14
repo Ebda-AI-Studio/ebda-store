@@ -30,6 +30,20 @@ export const instapayReceiptExtract: JobDef = inngest.createFunction(
     const outcome = await step.run('read-receipt', () =>
       runInStoreScope(storeId, () => InstapayReceiptService.runExtraction(storeId, receiptId))
     );
-    return { storeId, receiptId, outcome };
+    // INSTAPAY-AUTO-1: the typed auto-confirm read (subscription receipts, mode not off), then a decision when the claim already exists.
+    let auto: string | null = null;
+    if (outcome === 'done') {
+      auto = await step.run('auto-read', () =>
+        runInStoreScope(storeId, () => InstapayReceiptService.runAutoExtraction(storeId, receiptId))
+      );
+      if (auto !== 'skipped') {
+        await step.run('auto-enqueue', () =>
+          runInStoreScope(storeId, () =>
+            InstapayReceiptService.enqueueIfClaimed(storeId, receiptId)
+          )
+        );
+      }
+    }
+    return { storeId, receiptId, outcome, auto };
   }
 );

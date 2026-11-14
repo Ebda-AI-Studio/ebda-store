@@ -61,6 +61,7 @@ export const PORTED_JOBS: ReadonlySet<string> = new Set([
   'order-auto-cancel-unpaid',
   'instapay-expiry',
   'instapay-receipt-extract',
+  'instapay-auto-confirm',
   'accounting-post-order-journal',
   'accounting-post-refund-journal',
   'accounting-daily-close',

@@ -1252,6 +1252,14 @@ export interface ManualRefundInput {
   newPeriodEnd?: Date | null;
   screenshot?: Buffer | null;
   actorId: string;
+  /**
+   * INSTAPAY-AUTO-1 ("not received" revert): when this void takes back the period the store is currently on and that leaves it overdue,
+   * the store goes `past_due` with `nextRetryAt = graceUntil` (the cycle suspends it then if unpaid) instead of the default grace.
+   * Omitted = unchanged behaviour.
+   */
+  graceUntil?: Date | null;
+  /** INSTAPAY-AUTO-1: a void that keeps the claim's payer reference (it stays burned, never reusable). Omitted = the reference is freed. */
+  keepReference?: boolean;
   now?: Date;
 }
 
@@ -1367,9 +1375,10 @@ async function recordManualRefundInner(input: ManualRefundInput) {
           ? {
               currentPeriodEnd: target,
               status: 'past_due',
-              nextRetryAt: new Date(
-                Math.max(now.getTime(), addDays(target, INSTAPAY_GRACE_DAYS).getTime())
-              ),
+              nextRetryAt: input.graceUntil
+                ? input.graceUntil
+                : new Date(Math.max(now.getTime(), addDays(target, INSTAPAY_GRACE_DAYS).getTime())),
+              ...(input.graceUntil ? { dunningAttempts: 0 } : {}),
             }
           : { currentPeriodEnd: target },
       });
@@ -1422,11 +1431,15 @@ async function recordManualRefundInner(input: ManualRefundInput) {
         await tx.manualPaymentClaim.update({
           where: { id: c.id, storeId },
           data: {
-            payerReference: freedReference(c.payerReference, c.id, 'voided'),
+            ...(input.keepReference
+              ? {}
+              : { payerReference: freedReference(c.payerReference, c.id, 'voided') }),
             reviewNote: `voided: ${note}`.slice(0, 500),
           },
         });
-        await InstapayReceiptService.voidByClaim(storeId, c.id, note, input.actorId);
+        await InstapayReceiptService.voidByClaim(storeId, c.id, note, input.actorId, {
+          keepReference: input.keepReference === true,
+        });
       }
     }
     return {
@@ -1453,6 +1466,12 @@ export const rejectClaim = (args: Parameters<typeof rejectClaimInner>[0]) =>
   withClaimReleases(() => rejectClaimInner(args));
 export const recordManualRefund = (input: Parameters<typeof recordManualRefundInner>[0]) =>
   withClaimReleases(() => recordManualRefundInner(input));
-export const submitSubscriptionReceipt = (
+export const submitSubscriptionReceipt = async (
   args: Parameters<typeof submitSubscriptionReceiptInner>[0]
-) => withClaimReleases(() => submitSubscriptionReceiptInner(args));
+) => {
+  const out = await withClaimReleases(() => submitSubscriptionReceiptInner(args));
+  // INSTAPAY-AUTO-1: ask the auto-confirm job to decide, AFTER the claim committed. Never throws (fail-fast inside) and never blocks the merchant.
+  const { enqueueAutoConfirm } = await import('./instapay-auto-confirm.service.js');
+  await enqueueAutoConfirm(args.storeId, out.claim.id).catch(() => undefined);
+  return out;
+};

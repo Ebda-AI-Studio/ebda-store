@@ -18,6 +18,7 @@ import { emitEbdaConversion } from '../ebda-ads-emit';
 import { purchaseEventId, billingPaymentNumber, EBDA_BILLING_BARCODE_SHAPE } from '@ebda/shared';
 import { ensureEmailBarcode } from '../barcode-image.service';
 import type { EmailBarcode } from '../email-templates/_barcode';
+import { notReceivedText } from '../email-templates/subscription-billing';
 
 export type BillingEffect =
   | { kind: 'plan_changed'; storeId: string }
@@ -50,6 +51,8 @@ export type BillingEffect =
     }
   /** The super-admin rejected an InstaPay payment, with the reason. */
   | { kind: 'payment_rejected'; storeId: string; note: string }
+  /** INSTAPAY-AUTO-1: an automatically confirmed payment was marked "not received"; the store has a 48 h grace. */
+  | { kind: 'instapay_not_received'; storeId: string; graceUntil: Date; billingEventId?: string }
   /** A billing suspension was lifted: the store is back. */
   | { kind: 'store_restored'; storeId: string; reason: 'unpaid' | 'over_store_limit' }
   | {
@@ -133,6 +136,35 @@ async function runOne(effect: BillingEffect): Promise<void> {
         : ctx.planCode)
   );
   const planName = planRow ? (lang === 'ar' ? planRow.nameAr : planRow.nameEn) : '';
+
+  if (effect.kind === 'instapay_not_received') {
+    const graceOn = effect.graceUntil.toISOString().slice(0, 16).replace('T', ' ');
+    socketService.notifyStore(effect.storeId, {
+      type: 'billing_instapay_not_received',
+      title: lang === 'ar' ? 'الدفع ما وصلش' : 'Your payment did not arrive',
+      message: notReceivedText(graceOn, lang),
+      data: { storeId: effect.storeId, url, graceUntil: effect.graceUntil.toISOString() },
+      createdAt: new Date(),
+    });
+    if (store.owner?.email) {
+      await EmailService.sendSubscriptionBillingNotice(
+        effect.storeId,
+        {
+          kind: 'instapay_not_received',
+          to: store.owner.email,
+          storeName: store.name,
+          planName,
+          amountMinor: 0,
+          billingUrl: `${config.adminUrl ?? ''}${url}`,
+          graceUntil: graceOn,
+          whatsappUrl: supportContact(store.name).whatsappUrl,
+          supportEmail: supportContact(store.name).email,
+        },
+        lang
+      );
+    }
+    return;
+  }
 
   if (
     effect.kind === 'payment_confirmed' ||
