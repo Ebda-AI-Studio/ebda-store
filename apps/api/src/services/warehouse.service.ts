@@ -28,7 +28,7 @@ async function notifyAfterCommit(
   if (!afterTxCommit(tx, () => notifyCatalogChanged(change))) await notifyCatalogChanged(change);
 }
 import { randomUUID } from 'node:crypto';
-import { prisma, Prisma, withMoneyTx, afterTxCommit } from '@ebda/database';
+import { prisma, Prisma, withMoneyTx, afterTxCommit, ambientScope } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
@@ -571,7 +571,12 @@ export class WarehouseService {
     await retryOnWriteConflict(
       () =>
         withMoneyTx(prisma, async tx => {
-          await WarehouseService.upsertWarehouseStock(tx, {
+          const before = await tx.warehouseStock.findFirst({
+            where: { storeId, warehouseId, productId: input.productId, variantId },
+            select: { quantity: true },
+          });
+          const previousQty = before?.quantity ?? 0;
+          const newQty = await WarehouseService.upsertWarehouseStock(tx, {
             warehouseId,
             productId: input.productId,
             variantId,
@@ -581,6 +586,22 @@ export class WarehouseService {
           });
 
           await WarehouseService.syncAggregateInventory(storeId, input.productId, variantId, tx);
+
+          // INV-AUDIT-3: every stock change is a movement row (same shape as the DO op and adjustStock below)
+          if (newQty !== previousQty)
+            await tx.inventoryHistory.create({
+              data: {
+                productId: input.productId,
+                storeId,
+                type: 'adjustment',
+                quantity: newQty - previousQty,
+                previousStock: previousQty,
+                newStock: newQty,
+                reason: `[Warehouse: ${warehouse.code}] stock set`,
+                reference: warehouseId,
+                createdBy: ambientScope().userId ?? null,
+              },
+            });
         }),
       WAREHOUSE_WRITE_RETRY
     );
@@ -674,6 +695,7 @@ export class WarehouseService {
                 ? `[Warehouse: ${warehouse.code}] ${input.reason}`
                 : `[Warehouse: ${warehouse.code}] delta adjustment`,
               reference: warehouseId,
+              createdBy: ambientScope().userId ?? null,
             },
           });
 

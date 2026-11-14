@@ -1,5 +1,5 @@
 import { assertActiveVariantPrice } from '../lib/sellable-price';
-import { prisma } from '@ebda/database';
+import { prisma, ambientScope } from '@ebda/database';
 import { GoldRateService } from './gold-rate/gold-rate.service';
 import { assertBarcodeAvailable, ensureBarcode, parseBarcodeOrThrow } from './barcode.service';
 import { AppError } from '../middleware/error-handler';
@@ -604,6 +604,23 @@ export class VariantService {
           (await storeWriter(storeId)) as unknown as Pick<typeof prisma, 'productVariant'>
         );
 
+    // INV-AUDIT-3: on a Postgres store the opening stock rode the insert; its movement row is written here (a DO store's op
+    // and its gold-variant section write their own)
+    if (input.inventory && !(await storeStock(storeId)))
+      await prisma.inventoryHistory.create({
+        data: {
+          productId,
+          storeId,
+          type: 'initial',
+          quantity: input.inventory,
+          previousStock: 0,
+          newStock: input.inventory,
+          reason: 'Opening stock',
+          reference: variant.id,
+          createdBy: ambientScope().userId ?? null,
+        },
+      });
+
     if (openingStockOnDo && input.inventory) {
       try {
         const r = await openingStockOnDo.setVariantInventory({
@@ -973,6 +990,21 @@ export class VariantService {
             where: { id: update.variantId },
             data: { inventory: update.inventory },
           });
+          // INV-AUDIT-3: every stock change is a movement row (the DO op writes the same one)
+          if (variant.inventory !== update.inventory)
+            await prisma.inventoryHistory.create({
+              data: {
+                productId,
+                storeId,
+                type: 'adjustment',
+                quantity: update.inventory - variant.inventory,
+                previousStock: variant.inventory,
+                newStock: update.inventory,
+                reason: 'Variant stock update',
+                reference: update.variantId,
+                createdBy: ambientScope().userId ?? null,
+              },
+            });
           return true;
         });
         results.push({ variantId: update.variantId, success: updated });
