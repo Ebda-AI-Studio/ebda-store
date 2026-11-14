@@ -1269,8 +1269,6 @@ export function createApp() {
     await c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`)
       .bind(user.id, JSON.stringify(hashed))
       .run();
-    // pq-allow(no-console): the Worker log is this service's audit trail for a credential change (user id only, never a code)
-    console.log(JSON.stringify({ event: 'mfa_recovery_codes_regenerated', userId: user.id }));
     return c.json({ success: true, data: { backupCodes: plain } });
   });
 
