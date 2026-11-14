@@ -15,7 +15,7 @@ const PROTECTED_LEGAL_PAGE_SLUGS = new Set([
   'returns',
   'refund-policy',
 ]);
-export function isProtectedLegalPageSlug(slug: string): boolean {
+function isProtectedLegalPageSlug(slug: string): boolean {
   return PROTECTED_LEGAL_PAGE_SLUGS.has(slug.trim().toLowerCase());
 }
 

@@ -35,16 +35,12 @@ let app: Express;
 beforeAll(async () => {
   const pages = (await import('@api/routes/pages.routes')).default;
   const smart = await import('@api/routes/smart-layer.routes');
-  const { createScanNowLimiter } = await import('@api/middleware/scan-now-limiter');
   const { errorHandler } = await import('@api/middleware/error-handler');
-  // The scan route uses the real limiter; rebuild one that is not skipped under vitest to test the 429.
-  smart.scanNowLimiters; // import side effect only
   app = express();
   app.use(express.json());
   app.use('/', pages);
   app.use('/stores', smart.default);
   app.use(errorHandler as any);
-  void createScanNowLimiter;
 });
 beforeEach(() => {
   m.remove.mockReset().mockResolvedValue(undefined);

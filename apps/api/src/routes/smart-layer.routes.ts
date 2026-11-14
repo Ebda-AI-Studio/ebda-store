@@ -32,7 +32,7 @@ import { runInStoreCtx } from '../lib/jobs/store-db';
 import { createScanNowLimiter } from '../middleware/scan-now-limiter';
 
 /** Merchant "Scan now" (gap A17): store_admin may run each scan once per hour per store; super_admin is unlimited. */
-export const scanNowLimiters = {
+const scanNowLimiters = {
   reorder: createScanNowLimiter('reorder'),
   'low-stock': createScanNowLimiter('low-stock'),
   deadstock: createScanNowLimiter('deadstock'),
