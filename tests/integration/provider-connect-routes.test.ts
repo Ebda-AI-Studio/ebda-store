@@ -142,6 +142,8 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
   beforeAll(async () => {
     vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] } as never);
     owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
+    // the confirm step needs an Idempotency-Key claim, which lives in Redis
+    await redis.connect().catch(() => undefined);
     stubServer = await serveStub(stub.fetch);
     process.env.KASHIER_BASE_URL = stubServer.url;
     app = express();
@@ -255,6 +257,22 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     // Disabling is always allowed.
     const off = await post(s, `${base(s)}/toggle`, { enabled: false });
     expect(off.status).toBe(200);
+  });
+
+  it('the old toggle refuses a merchant turning a tested gateway ON (409 CONFIRMATION_REQUIRED); OFF stays free', async () => {
+    const s = await mkStore('legacy');
+    await saveSandbox(s, {
+      merchantId: KASHIER_STUB.merchantId,
+      paymentApiKey: API_KEY,
+      secretKey: SECRET_KEY,
+    });
+    expect((await post(s, `${base(s)}/test`)).body.data.test.ok).toBe(true);
+    const on = await post(s, `${base(s)}/toggle`, { enabled: true });
+    expect(on.status).toBe(409);
+    expect(on.body.error.code).toBe('CONFIRMATION_REQUIRED');
+    expect((await row(s)).isEnabled).toBe(false);
+    expect((await turnOn(s)).status).toBe(200);
+    expect((await post(s, `${base(s)}/toggle`, { enabled: false })).status).toBe(200);
   });
 
   it('switching an enabled gateway to the other mode is refused until that mode is tested', async () => {

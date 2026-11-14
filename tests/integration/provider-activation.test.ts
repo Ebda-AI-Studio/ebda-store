@@ -388,8 +388,9 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       expect(on.status, JSON.stringify(on.body)).toBe(200);
       expect(await offered(b)).toContain('kashier');
       expect(await asApp(() => isProviderUsableForStore('kashier', b.id))).toBe(true);
-      // and it cannot be activated without its own request
-      expect((await call('post', op, adminUrl(b, 'kashier', 'activate'))).status).toBe(404);
+      // the self-activation recorded B's row, so the operator activate is an idempotent no-op
+      expect((await call('post', op, adminUrl(b, 'kashier', 'activate'))).status).toBe(200);
+      expect((await rows(b)).map(r => r.status)).toEqual(['activated']);
 
       // the audit trail names every action
       const actions = (
@@ -402,7 +403,9 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       expect(actions).toEqual([
         'provider_activation.activated',
         'provider_activation.requested',
-        'provider_activation.test_run',
+        'provider_activation.self_activated',
+        'provider_activation.test_run', // the operator's re-run
+        'provider_activation.test_run', // the preview of the merchant's own "Test and turn on"
       ]);
 
       // the list shows store, provider, requested-at and the last test, never a credential
@@ -444,10 +447,11 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       const on = await turnOnProvider(s, 'kashier');
       expect(on.status).toBe(200);
       expect(await offered(s)).toContain('kashier');
-      // activating a rejected request is impossible; re-filing makes a new open one
-      expect((await call('post', op, adminUrl(s, 'kashier', 'activate'))).status).toBe(404);
-      expect((await call('post', s, requestUrl(s, 'kashier'))).status).toBe(201);
-      expect((await rows(s)).map(r => r.status)).toEqual(['rejected', 'requested']);
+      // the self-activation after the rejection recorded a NEW activated row: the operator activate is a no-op and
+      // a second request is refused (already activated)
+      expect((await call('post', op, adminUrl(s, 'kashier', 'activate'))).status).toBe(200);
+      expect((await call('post', s, requestUrl(s, 'kashier'))).status).toBe(409);
+      expect((await rows(s)).map(r => r.status)).toEqual(['rejected', 'activated']);
     });
   });
 
@@ -467,15 +471,15 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
         const on = await turnOnProvider(s, 'bosta');
         expect(on.status, JSON.stringify(on.body)).toBe(200); // PROVIDERS-3: no activation gate
       }
-      expect((await call('post', a, requestUrl(a, 'bosta'))).status).toBe(201);
+      // turning on recorded an activated row, so a request is refused (already activated)
+      expect((await call('post', a, requestUrl(a, 'bosta'))).status).toBe(409);
       const t = await call('post', op, adminUrl(a, 'bosta', 'test'));
       expect(t.body.data.test).toMatchObject({ ok: true, current: true });
       expect((await call('post', op, adminUrl(a, 'bosta', 'activate'))).status).toBe(200);
 
-      const onA = await turnOnProvider(a, 'bosta');
-      expect(onA.status, JSON.stringify(onA.body)).toBe(200);
-      const onB = await turnOnProvider(b, 'bosta');
-      expect(onB.status).toBe(200);
+      // both carriers are already on: a second turn-on is refused, not repeated
+      expect((await turnOnProvider(a, 'bosta')).status).toBe(409);
+      expect((await turnOnProvider(b, 'bosta')).status).toBe(409);
       expect(await asApp(() => isProviderUsableForStore('bosta', a.id))).toBe(true);
       expect(await asApp(() => isProviderUsableForStore('bosta', b.id))).toBe(true);
     });
