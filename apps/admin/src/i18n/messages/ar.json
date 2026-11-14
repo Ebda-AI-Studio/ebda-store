@@ -9183,7 +9183,18 @@
     "viewReceipt": "شوف الإيصال",
     "receiptProcessing": "الدفع تم. الإيصال هيطلع هنا حالاً.",
     "cancelObject": "إلغاء اشتراكك في الباقة",
-    "cancelAction": "الغي الاشتراك"
+    "cancelAction": "الغي الاشتراك",
+    "autoConfirm": {
+      "checking": "جاري التأكيد",
+      "confirmed": "اتأكدت تلقائيًا",
+      "waiting": "مستنية مراجعة",
+      "revertedTitle": "الدفع ما وصلش",
+      "revertedBody": "الدفع ما وصلش. ارفع إيصال صح أو ادفع بالكارت قبل {date} عشان الخدمات المدفوعة ما تقفش.",
+      "countdown": "فاضل {hours} ساعة و{minutes} دقيقة",
+      "graceOver": "المهلة خلصت.",
+      "uploadReceipt": "ارفع إيصال",
+      "payByCard": "ادفع بالكارت"
+    }
   },
   "planLimit": {
     "maxProducts": "باقتك تسمح بحد أقصى {limit} منتج. رقّي باقتك لإضافة المزيد.",

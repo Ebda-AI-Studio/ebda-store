@@ -737,9 +737,21 @@ export async function listStoreClaims(storeId: string) {
           where: { storeId, claimId: { in: claims.map(c => c.id) } },
         })
       : [];
+    // INSTAPAY-AUTO-1: what the auto-confirm path did with each claim, in the merchant's words (state + the end of the 48 h grace only)
+    const autos = claims.length
+      ? await tx.instapayAutoConfirmation.findMany({
+          where: { storeId, claimId: { in: claims.map(c => c.id) } },
+          select: { claimId: true, state: true, graceUntil: true },
+        })
+      : [];
     return claims.map(c => {
       const r = receipts.find(x => x.claimId === c.id);
-      return { ...c, receipt: r ? toReceiptView(r) : null };
+      const a = autos.find(x => x.claimId === c.id);
+      return {
+        ...c,
+        receipt: r ? toReceiptView(r) : null,
+        autoConfirm: a ? { state: a.state, graceUntil: a.graceUntil } : null,
+      };
     });
   });
 }

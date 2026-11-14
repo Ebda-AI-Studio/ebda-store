@@ -87,6 +87,12 @@ export interface PaymentClaim {
   createdAt: string;
   reviewedAt: string | null;
   receipt?: InstapayReceiptView | null;
+  /** INSTAPAY-AUTO-1: what the automatic check did with this claim (null = not looked at, e.g. the switch is off). */
+  autoConfirm?: {
+    state: 'pending_decision' | 'auto_confirmed' | 'needs_human' | 'reverted' | 'failed';
+    /** reverted: the end of the 48 h grace (ISO). */
+    graceUntil: string | null;
+  } | null;
 }
 
 /** Minimal plan row needed to show a price card. */
