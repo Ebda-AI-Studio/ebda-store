@@ -76,6 +76,8 @@ const methodOf = (
 /** How many ranked ids the chat search expands into rows (the caller's `limit` is at most 20). */
 const SEARCH_CANDIDATES = 60;
 
+/** A product row as the chat search reads it (PRODUCT_SELECT); passed on to rowsForProducts. */
+type ChatSearchProductRow = { id: string } & Record<string, unknown>;
 /** One active shipping area rate, as the policy fold reads it. */
 type ChatAreaRateRow = {
   governorate: string;
@@ -399,12 +401,14 @@ export function createDoPort(): BridgePort {
       if (ids.length === 0) return { items: [], degraded: degraded || queryBudgetSpent(storeId) };
       const top = ids.slice(0, SEARCH_CANDIDATES);
       const d = await db(storeId);
-      const products: any[] = await d.product.findMany({
+      const products: ChatSearchProductRow[] = await d.product.findMany({
         where: { storeId, id: { in: top }, status: 'active', deletedAt: null, audience: 'public' },
         select: PRODUCT_SELECT,
       });
-      const byId = new Map(products.map(p => [p.id as string, p]));
-      const ranked = top.map(id => byId.get(id)).filter((p): p is any => p !== undefined);
+      const byId = new Map(products.map(p => [p.id, p]));
+      const ranked = top
+        .map(id => byId.get(id))
+        .filter((p): p is ChatSearchProductRow => p !== undefined);
       const rows = await rowsForProducts(storeId, d, ranked);
       return {
         items: rows
