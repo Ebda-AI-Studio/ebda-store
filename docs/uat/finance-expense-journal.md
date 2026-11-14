@@ -6,7 +6,7 @@ fixes: C2 (expense date-422), H2 (paid-from guard), H1 (journal role), PR-#86/#8
 
 # UAT: Finance — Expense Creation & Journal Entry
 
-**Reviewer account:** store_admin (for expenses); super_admin (for journal entries)
+**Reviewer account:** store_admin (expenses, manual journal entries, reversals, period close, payouts)
 **Pre-conditions:**
 
 - Store has Chart of Accounts seeded (Admin → Finance → Accounts → "Seed COA" if empty)
@@ -31,9 +31,9 @@ fixes: C2 (expense date-422), H2 (paid-from guard), H1 (journal role), PR-#86/#8
 
 ---
 
-## Golden path — Journal Manual Entry (super_admin only)
+## Golden path — Journal Manual Entry (store_admin and super_admin)
 
-1. Log in as **super_admin** (not store_admin)
+1. Log in as **store_admin**
 2. Navigate to **Admin → Finance → Journal → New Entry**
 3. Add two balanced lines (total debit = total credit):
    - Line 1: Account = Cash Online, Debit = 100.00
@@ -78,3 +78,17 @@ fixes: C2 (expense date-422), H2 (paid-from guard), H1 (journal role), PR-#86/#8
 - [ ] store_admin cannot post journal entries (either form hidden or API returns 403)
 - [ ] super_admin can post balanced manual journal entries
 - [ ] No 500s in any scenario above
+
+---
+
+## Accounting audit fixes (ACCT-AUDIT-1 to 11, 2026-11-14)
+
+- [ ] **Partial PO receipt** — receive 4 of 10 units at 1.00 EGP, then the other 6 → Finance → Journal shows two PO receive entries (4.00 then 6.00); Inventory and Accounts Payable both read 10.00.
+- [ ] **Receipt OCR VAT** — upload a 114.00 receipt with 14.00 VAT → the draft shows amount 100.00, tax 14.00, total 114.00 (not 128.00).
+- [ ] **Expense VAT** — post that expense → the journal debits the expense 100.00 and **VAT Recoverable (1300)** 14.00, credits cash 114.00. A store whose chart has no 1300 yet (run **Seed COA**) keeps the old single debit.
+- [ ] **Backdated expense** — post an expense dated last month → its journal entry carries last month's date.
+- [ ] **Close the books** — Finance → Journal → "إقفال الدفاتر": pick the last day of last month → a manual entry dated inside it is refused with PERIOD_LOCKED; an automatic entry for an old document lands on the first open day; "افتح كل الشهور" reopens.
+- [ ] **Reverse a manual entry** — open a manual entry → "اعكس القيد ده" → reason required → a mirror entry appears dated today, the original shows "Reversed by"; a second attempt, or a system entry, has no button / is refused.
+- [ ] **Bank CSV** — a semicolon file with `100,50` imports 100.50; a header `التاريخ,الوصف,مدين,دائن`, a windows-1256 file and a file with a bank preamble all import.
+- [ ] **Identical bank lines** — two identical same-day lines import as two rows and "imported" says 2; re-uploading the file imports 0 and reports them as already imported.
+- [ ] **Payout** — Finance → Bank reconciliation → "سجّل تحويل مستحقات": gross 1000.00, fee 25.50 → bank +974.50, bank fees +25.50, cash-in-transit −1000.00.
