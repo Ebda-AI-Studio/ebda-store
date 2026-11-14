@@ -28,7 +28,7 @@ import {
  * Feed assembly + cache.
  *
  * CACHE CLASS (Ruling FEEDS-4): price, stock and availability are NEVER-stale for an advertising feed, so
- *  - the cached part lives under `public:products:<storeId>:feedx:` - the prefix `clearProductsRedis` drops on EVERY product,
+ *  - the cached part lives under `public:products:<storeId>:feedx:` - the prefix the product-cache invalidator drops on EVERY product,
  *    variant, price, stock, category, bundle and order write path (invalidateStoreProductCaches /
  *    invalidateStoreProductCachesAfterOrder), clearing the KV/Redis layer immediately;
  *  - the `inventory.backorder` entitlement is part of the KEY (not the value), so flipping it can never serve the other state;
@@ -37,14 +37,15 @@ import {
  *    stale-while-revalidate, 60 s for a store that sells gold-rate products. Ad platforms fetch on a schedule of an hour or
  *    more, so the edge window is shorter than the shortest fetch interval; checkout re-prices from the database regardless.
  */
+// pq-allow(unused-export): test seam - the pagination test sizes its catalogue from the part size
 export const PART_ITEMS = 5000;
-export const FEED_EDGE_SECONDS = 300;
-export const FEED_EDGE_SECONDS_GOLD = 60;
+const FEED_EDGE_SECONDS = 300;
+const FEED_EDGE_SECONDS_GOLD = 60;
 const CACHE_TTL = 600;
 /** A hard stop for one scan (health / part build): 500 chunks of 100 products. */
 const MAX_CHUNKS = 500;
 
-export const feedPartKey = (
+const feedPartKey = (
   storeId: string,
   p: FeedPlatform,
   lang: FeedLang,
@@ -52,7 +53,7 @@ export const feedPartKey = (
   part: number
 ) => `public:products:${storeId}:feedx:v1:${p}:${lang}:bo${backorderOn ? 1 : 0}:${part}`;
 const metaKey = (storeId: string) => `public:products:${storeId}:feedx:meta:v1`;
-export const healthKey = (storeId: string, lang: FeedLang) =>
+const healthKey = (storeId: string, lang: FeedLang) =>
   `admin:products:${storeId}:feed-health:v1:${lang}`;
 
 interface CachedPart {
@@ -162,7 +163,7 @@ function getMeta(storeId: string, bundlesEnabled: boolean): Promise<MetaCache> {
   );
 }
 
-export interface FeedDocument {
+interface FeedDocument {
   body: string;
   contentType: string;
   nextPart: number | null;

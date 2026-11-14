@@ -96,6 +96,7 @@ export interface PurchaseOrderData {
 }
 
 /** Order lines as catalogue contents, in decimal major units. Empty when the order carries no lines. */
+// pq-allow(unused-export): test seam - the id contract test asserts the CAPI line ids
 export function purchaseContents(
   order: PurchaseOrderData
 ): Array<{ id: string; quantity: number; price: number }> {

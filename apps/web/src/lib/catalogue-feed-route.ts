@@ -14,7 +14,7 @@ import { localePathsOn, localizeUrlsInText, storeKeyForHost } from './locale-pat
  * (60 s for gold-rate stores), no stale-while-revalidate: BOUNDED, shorter than any ad platform's fetch interval
  * (Ruling FEEDS-4).
  */
-export type FeedKind = 'google.xml' | 'meta.xml' | 'tiktok.csv';
+type FeedKind = 'google.xml' | 'meta.xml' | 'tiktok.csv';
 
 async function resolveStore(domain: string) {
   const none = {

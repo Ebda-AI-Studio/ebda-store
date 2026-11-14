@@ -8,7 +8,7 @@ import type { FeedProductRow, FeedStoreInfo } from './build';
  * thousands of products never holds more than one chunk of raw rows at a time (Worker memory/CPU).
  * Only active, non-deleted, PUBLIC-audience products: the same visibility as the storefront listing.
  */
-export const PRODUCT_CHUNK = 100;
+const PRODUCT_CHUNK = 100;
 
 const PRODUCT_SELECT = {
   id: true,
@@ -60,7 +60,7 @@ const PRODUCT_SELECT = {
   },
 } as const;
 
-export interface ProductChunk {
+interface ProductChunk {
   products: FeedProductRow[];
   /** id to resume after; null = the catalogue ended. */
   nextCursor: string | null;

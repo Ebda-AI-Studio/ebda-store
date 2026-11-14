@@ -19,7 +19,7 @@ export interface FeedStoreInfo {
   flatShippingMinor?: number | null;
 }
 
-export interface FeedVariantRow {
+interface FeedVariantRow {
   id: string;
   title: string;
   titleAr?: string | null;
@@ -120,7 +120,7 @@ export interface FeedItem {
   isBundle?: boolean;
 }
 
-export type ExcludeReason =
+type ExcludeReason =
   | 'no_image'
   | 'zero_price'
   | 'variant_inactive'
@@ -161,7 +161,7 @@ const cut = (s: string, n: number): string => {
   return a.length <= n ? s : a.slice(0, n).join('').trimEnd();
 };
 /** Plain text: tags out, entities for the common three decoded, whitespace collapsed (feeds are plain text). */
-export const plainText = (s: string | null | undefined): string =>
+const plainText = (s: string | null | undefined): string =>
   (s ?? '')
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/g, ' ')

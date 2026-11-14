@@ -73,7 +73,7 @@ export function itemXml(it: FeedItem, platform: 'google' | 'meta'): string {
   return `<item>${parts.join('')}</item>`;
 }
 
-export interface XmlHeader {
+interface XmlHeader {
   storeName: string;
   origin: string;
   lang: FeedLang;
@@ -90,7 +90,7 @@ export const XML_TAIL = '</channel></rss>';
 
 // ---- TikTok CSV -----------------------------------------------------------------------------------------------------
 
-export const TIKTOK_COLUMNS = [
+const TIKTOK_COLUMNS = [
   'sku_id',
   'title',
   'description',

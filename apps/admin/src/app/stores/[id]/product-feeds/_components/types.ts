@@ -1,6 +1,6 @@
 /** Mirrors `FeedHealth` from apps/api/src/lib/catalogue-feed/service.ts (`GET /stores/:id/product-feeds/health`). */
 export type FeedLang = 'ar' | 'en';
-export type IssueCode =
+type IssueCode =
   | 'no_image'
   | 'zero_price'
   | 'variant_inactive'
@@ -39,7 +39,7 @@ export interface FeedHealth {
 }
 
 export type PlatformKey = 'google' | 'meta' | 'tiktok';
-export const PLATFORM_FILES: Record<PlatformKey, string> = {
+const PLATFORM_FILES: Record<PlatformKey, string> = {
   google: 'google.xml',
   meta: 'meta.xml',
   tiktok: 'tiktok.csv',

@@ -5,7 +5,7 @@ import { validGtin } from './gtin';
  * product data specification rules that a generator can break. Pure and dependency-free so a test, a script and CI can
  * all run it. It is NOT Google's own validator (that needs a Merchant Center account): see the plan's "Not verified".
  */
-export interface FeedViolation {
+interface FeedViolation {
   itemId: string | null;
   rule: string;
 }
@@ -19,6 +19,7 @@ const decode = (s: string) =>
     .replace(/&amp;/g, '&');
 
 /** Tag-stack well-formedness: every open tag closed in order, no stray `&` or `<` in text. */
+// pq-allow(unused-export): test seam - the validator tests assert well-formedness directly
 export function xmlWellFormed(xml: string): string | null {
   if (!xml.startsWith('<?xml')) return 'missing xml declaration';
   const re = /<(\/?)([A-Za-z_][\w:.-]*)[^>]*?(\/?)>|<[^>]*>|&(?!(?:amp|lt|gt|quot|apos);)/g;
@@ -51,6 +52,7 @@ const ENUMS = {
 const PRICE = /^\d+(\.\d{1,2})? [A-Z]{3}$/;
 const len = (s: string) => Array.from(s).length;
 
+// pq-allow(unused-export): test seam - the local Google-rules validator is exercised by tests/unit/catalogue-feed-build.test.ts
 export function validateGoogleFeed(xml: string): FeedViolation[] {
   const out: FeedViolation[] = [];
   const wf = xmlWellFormed(xml);

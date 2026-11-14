@@ -13,7 +13,7 @@
  * TikTok Pixel, gtag `item_id`), the server-side CAPI Purchase event, and Ebda Chat's store bridge (`retailerId`).
  * A dynamic ad only matches when the feed `id` and the pixel `content_ids` are byte-identical.
  */
-export interface CatalogueItemRef {
+interface CatalogueItemRef {
   productId: string;
   /** The variant, when the thing is one variant of a variant product. */
   variantId?: string | null;
@@ -27,9 +27,4 @@ export function catalogueItemId(ref: CatalogueItemRef): string {
 /** `item_group_id` / `product_group` id of a variant product's items. */
 export function catalogueGroupId(productId: string): string {
   return productId;
-}
-
-/** A purchasable bundle's catalogue id. Bundles are a separate table; uuids never collide with product ids. */
-export function catalogueBundleId(bundleId: string): string {
-  return bundleId;
 }
