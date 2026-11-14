@@ -442,6 +442,16 @@ async function bearerAuth(
   return { user, sid: verified.sid, aud: verifiedAud };
 }
 
+/** Unused recovery codes; a null or malformed column (legacy row, operator reset) reads as none instead of a 500. */
+function remainingRecoveryCodes(raw: string | null): number {
+  try {
+    const list: unknown = JSON.parse(raw ?? '[]');
+    return Array.isArray(list) ? list.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** 10 single-use recovery codes: the plain list is shown once, only bcrypt hashes are stored. */
 async function newRecoveryCodes(): Promise<{ plain: string[]; hashed: string[] }> {
   const plain = Array.from({ length: 10 }, () =>
@@ -1253,7 +1263,7 @@ export function createApp() {
     if (!user.mfa_enabled) throw err(409, 'MFA_NOT_ENABLED');
     return c.json({
       success: true,
-      data: { remaining: (JSON.parse(user.mfa_backup_codes) as string[]).length },
+      data: { remaining: remainingRecoveryCodes(user.mfa_backup_codes) },
     });
   });
 
@@ -1263,8 +1273,8 @@ export function createApp() {
   app.post('/mfa/recovery-codes/regenerate', async c => {
     const { user } = await bearerAuth(c);
     const body = await json(c, z.object({ password: z.string(), code: z.string().max(20) }));
-    await requirePassword(c, user, body.password);
     if (!user.mfa_enabled || !user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
+    await requirePassword(c, user, body.password);
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
     const { plain, hashed } = await newRecoveryCodes();
     // The new set and its audit row land together (no code, no hash in the row; actor 'self').

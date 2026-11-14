@@ -19,7 +19,7 @@ interface ActivityItem {
   ip: string | null;
   details: Record<string, string | number | boolean | null>;
 }
-interface Page {
+interface ActivityPage {
   items: ActivityItem[];
   nextCursor: string | null;
 }
@@ -42,12 +42,16 @@ export default function StoreActivityPage() {
     }
   }, [user, storeId, router]);
 
+  const allowed = user?.role === 'store_admin' || user?.role === 'super_admin';
+
   const load = useCallback(
     async (after: string | null) => {
       setLoading(true);
       setError(false);
       const q = after ? `?cursor=${encodeURIComponent(after)}` : '';
-      const { data, error: err } = await apiGet<Page>(`/api/v1/stores/${storeId}/activity${q}`);
+      const { data, error: err } = await apiGet<ActivityPage>(
+        `/api/v1/stores/${storeId}/activity${q}`
+      );
       if (err || !data) setError(true);
       else {
         setItems(prev => (after ? [...prev, ...data.items] : data.items));
@@ -58,8 +62,9 @@ export default function StoreActivityPage() {
     [storeId]
   );
   useEffect(() => {
-    void load(null);
-  }, [load]);
+    // Staff never fire the request (the API would answer 403); they are redirected above.
+    if (allowed) void load(null);
+  }, [load, allowed]);
 
   const when = (iso: string) =>
     new Date(iso).toLocaleString(intlLocaleForUi(), { dateStyle: 'medium', timeStyle: 'short' });

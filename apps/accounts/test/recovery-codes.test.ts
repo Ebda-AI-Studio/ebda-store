@@ -214,3 +214,28 @@ describe('A23 regenerate leaves an audit row and tells the mailbox owner', () =>
     expect(fakes.notices).toEqual([]);
   });
 });
+
+describe('A23 review follow-ups', () => {
+  it('a malformed or null backup-code column reads as 0 left, not a 500', async () => {
+    const u = await seedUser();
+    const { s } = await withMfa(u);
+    for (const bad of ['not json', 'null', '{"a":1}']) {
+      await env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`)
+        .bind(u.id, bad)
+        .run();
+      const res = await call('/mfa/recovery-codes', { bearer: s.body.access_token });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { data: { remaining: number } }).data.remaining).toBe(0);
+    }
+  });
+
+  it('an account without MFA gets 409 before any password check (no password-guess feedback)', async () => {
+    const u = await seedUser();
+    const s = await login(u);
+    const res = await call('/mfa/recovery-codes/regenerate', {
+      json: { password: 'nope', code: '123456' },
+      bearer: s.body.access_token,
+    });
+    expect(res.status).toBe(409);
+  });
+});

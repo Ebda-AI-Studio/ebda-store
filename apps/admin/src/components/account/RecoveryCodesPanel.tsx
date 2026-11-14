@@ -21,6 +21,16 @@ export function RecoveryCodesPanel() {
   const [error, setError] = useState<string | null>(null);
   const [fresh, setFresh] = useState<string[]>([]);
 
+  // The old set is already dead once new codes exist: warn before the page is left with codes not yet saved.
+  useEffect(() => {
+    if (fresh.length === 0) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [fresh]);
+
   const load = useCallback(async () => {
     try {
       const grant = await accountsToken();

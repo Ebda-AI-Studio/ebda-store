@@ -153,7 +153,6 @@ export async function sendNoticeMail(m: NoticeMail): Promise<void> {
     await sendRecoveryCodesChangedNoticeEmail({ email: m.to, name: m.firstName }, m.language, true);
     return;
   }
-  if (m.kind !== 'factor_added') throw new Error('sendNoticeMail: unknown kind');
   await sendFactorAddedNoticeEmail(
     { email: m.to, name: m.firstName, factor: m.factor },
     m.language,
