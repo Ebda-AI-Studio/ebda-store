@@ -11,7 +11,11 @@
 //     baseline is allowed, and none of the PR's eslint-suppressions.json may total more per rule than DIR's. DIR's .pr-quality.json also wins.
 //     A DIR with no baseline yet (the adoption PR) falls back to the plain check.
 // Config (.pr-quality.json): { "roots": ["apps","packages"], "locales": ["apps/web/messages"], "baseline": ".pr-quality-baseline.json",
-//   "skip": ["generated"], "frameworkExports": ["extra names"] }.   Inline escape on the same or previous line:  pq-allow(rule): reason
+//   "skip": ["generated"], "frameworkExports": ["extra names"], "ruleExemptions": [{ "rule": "unused-export", "path": "<foundation.lock.json dir>",
+//   "reason": "...", "requires": "<foundation.lock.json parity test>" }] }.  Ruling SLOP-VENDORED-1: the ONLY exemption that exists. It waives the
+//   `unused-export` rule (never another rule) for exactly the vendored foundation folder, and only while the lock proves every vendored file
+//   byte-matches the tagged release and its parity test exists. Any wider path, another rule or a failed proof = the exemption is OFF and the
+//   violations count again.   Inline escape on the same or previous line:  pq-allow(rule): reason
 import { readFileSync, readdirSync, lstatSync, existsSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -120,6 +124,13 @@ export function scan({ root, config = {} }) {
     }
   }
 
+  const waived = vendoredExemption(root, config);
+  if (waived.dir) {
+    for (const id of [...viol.keys()]) if (id.startsWith('unused-export|') && id.split('|')[1].startsWith(`${waived.dir}/`)) viol.delete(id);
+  } else if ((config.ruleExemptions ?? []).length) {
+    console.error(`slop-guard: the ruleExemptions entry is OFF (${waived.why}); the findings count`);
+  }
+
   const EMOJI = /\p{Extended_Pictographic}/u;
   for (const d of config.locales ?? []) {
     for (const f of walk(root, [d], config.skip).filter((x) => x.endsWith('.json'))) {
@@ -150,6 +161,45 @@ export function eslintGrowth(root, baseRoot, roots) {
   if (base.files === 0) return [];
   const cur = eslintTotals(root, roots);
   return [...cur.totals].filter(([k, n]) => n > (base.totals.get(k) ?? 0)).map(([k, n]) => `${k} ${base.totals.get(k) ?? 0} -> ${n}`);
+}
+
+const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+function* filesUnder(root, dir) {
+  const abs = join(root, dir);
+  if (!existsSync(abs)) return;
+  for (const e of readdirSync(abs, { withFileTypes: true })) {
+    const rel = `${dir}/${e.name}`;
+    if (e.isSymbolicLink()) continue;
+    if (e.isDirectory()) yield* filesUnder(root, rel);
+    else yield rel;
+  }
+}
+
+/**
+ * Ruling SLOP-VENDORED-1. Returns the folder whose `unused-export` findings are waived, or { dir: null, why } when the exemption is not valid.
+ * Valid only when: exactly one entry { rule: 'unused-export', path === foundation.lock.json "dir", reason, requires === the lock's parity test and it
+ * exists }, AND every file the lock names under `dir` has the locked sha256, AND no file under `dir` is outside the lock.
+ */
+export function vendoredExemption(root, config = {}) {
+  const entries = config.ruleExemptions ?? [];
+  if (entries.length === 0) return { dir: null, why: 'none configured' };
+  const lockPath = join(root, 'foundation.lock.json');
+  if (!existsSync(lockPath)) return { dir: null, why: 'no foundation.lock.json' };
+  let lock;
+  try { lock = readJsonRegular(lockPath); } catch (e) { return { dir: null, why: String(e.message) }; }
+  if (entries.length !== 1) return { dir: null, why: 'exactly one exemption is allowed' };
+  const [x] = entries;
+  if (x.rule !== 'unused-export') return { dir: null, why: `rule ${x.rule}: only unused-export may be exempted` };
+  if (typeof x.reason !== 'string' || x.reason.trim().length < 10) return { dir: null, why: 'a real reason is required' };
+  if (x.path !== lock.dir) return { dir: null, why: `path ${x.path} is not exactly the vendored folder ${lock.dir}` };
+  if (x.requires !== lock.parity || !existsSync(join(root, x.requires))) return { dir: null, why: 'the parity test is missing' };
+  for (const [rel, want] of Object.entries(lock.files ?? {})) {
+    if (!rel.startsWith(`${lock.dir}/`) && rel !== lock.parity) continue;
+    const p = join(root, rel);
+    if (!existsSync(p) || lstatSync(p).isSymbolicLink() || sha256(readFileSync(p)) !== want) return { dir: null, why: `${rel} does not byte-match the lock` };
+  }
+  for (const f of filesUnder(root, lock.dir)) if (!(f in (lock.files ?? {}))) return { dir: null, why: `${f} is not in the lock` };
+  return { dir: lock.dir, why: '' };
 }
 
 export function compare(current, baselineIds) {
