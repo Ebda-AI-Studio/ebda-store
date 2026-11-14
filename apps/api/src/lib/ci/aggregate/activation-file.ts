@@ -11,7 +11,7 @@ type Step = (typeof ONBOARDING_STEPS)[number];
 type HelpKind = (typeof ONBOARDING_HELP_KINDS)[number];
 
 /** The last thing that happened to an order, in the words the view shows (a closed set: never a free-text reason). */
-export const ORDER_FACTS = [
+const ORDER_FACTS = [
   'placed',
   'payment_failed',
   'paid',
@@ -25,7 +25,7 @@ export const ORDER_FACTS = [
   'delivered',
   'returned',
 ] as const;
-export type OrderFact = (typeof ORDER_FACTS)[number];
+type OrderFact = (typeof ORDER_FACTS)[number];
 
 const FACT_OF: Partial<Record<CiEnvelope['type'], OrderFact>> = {
   'order.placed': 'placed',
@@ -43,7 +43,7 @@ const FACT_OF: Partial<Record<CiEnvelope['type'], OrderFact>> = {
 };
 
 /** Orders whose trail is kept per store. The first order is among a store's earliest, so a small cap holds it. */
-export const TRAIL_CAP = 10;
+const TRAIL_CAP = 10;
 
 export interface ActivationFile {
   v: 1;
@@ -57,7 +57,7 @@ export interface ActivationFile {
   trail: Record<string, { fact: OrderFact; at: number }>;
 }
 
-export const emptyActivation = (storeId: string): ActivationFile => ({
+const emptyActivation = (storeId: string): ActivationFile => ({
   v: 1,
   storeId,
   signupAt: null,

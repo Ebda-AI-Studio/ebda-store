@@ -107,7 +107,7 @@ export async function aggregateStoreDay(
 }
 
 /** Folds the days' events into the store's activation file: 1 get + 1 put, and no put when nothing changed. */
-export async function updateActivation(
+async function updateActivation(
   ci: CiBucket,
   storeId: string,
   events: CiEnvelope[]

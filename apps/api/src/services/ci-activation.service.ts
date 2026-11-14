@@ -18,10 +18,10 @@ import {
   type StoreActivationView,
 } from '../lib/ci/aggregate/activation-file';
 
-export const ACTIVATION_PAGE_DEFAULT = 25;
-export const ACTIVATION_PAGE_MAX = 50;
+const ACTIVATION_PAGE_DEFAULT = 25;
+const ACTIVATION_PAGE_MAX = 50;
 /** Stores one funnel request reads (well under a Worker's 1000 subrequests); beyond it the answer says `truncated`. */
-export const FUNNEL_STORE_CAP = 600;
+const FUNNEL_STORE_CAP = 600;
 const READ_CHUNK = 100;
 
 const bucket = (): CiBucket | undefined =>

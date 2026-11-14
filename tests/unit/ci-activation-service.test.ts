@@ -85,7 +85,7 @@ describe('activation service', () => {
       count: 2,
       medianSecondsFromSignup: 1200,
     });
-    dir.v = Array.from({ length: FUNNEL_STORE_CAP + 1 }, (_, i) => ({
+    dir.v = Array.from({ length: 600 + 1 }, (_, i) => ({
       id: id(i + 1),
       slug: 's',
       name: 'n',

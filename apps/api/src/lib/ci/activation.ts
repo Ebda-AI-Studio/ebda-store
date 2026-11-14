@@ -27,17 +27,17 @@ export interface CiActivationOrder {
   adminActorId: string | null;
 }
 
-export type FirstOrderChannel = (typeof FIRST_ORDER_CHANNELS)[number];
-export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
+type FirstOrderChannel = (typeof FIRST_ORDER_CHANNELS)[number];
+type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 const ADVANCED = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
-export const STOCK_NOT_TAKEN_ROW = 'stock_not_taken';
+const STOCK_NOT_TAKEN_ROW = 'stock_not_taken';
 /** Peers read per decision. More than this many earlier real orders means this one is not the first anyway. */
 export const ACTIVATION_PEER_LIMIT = 10;
 /** Help only counts while the store is this young: older stores are established, not onboarding. */
-export const ONBOARDING_WINDOW_DAYS = 30;
+const ONBOARDING_WINDOW_DAYS = 30;
 
-export interface ActivationInputs {
+interface ActivationInputs {
   id: string;
   source: string | null;
   status: string;
@@ -69,7 +69,7 @@ export function activationOf(o: ActivationInputs): CiActivationOrder {
 }
 
 /** Placed from the admin by someone other than the owner: staff, or a super admin acting on the store. */
-export const isStaffOrder = (a: CiActivationOrder, ownerId: string | null): boolean =>
+const isStaffOrder = (a: CiActivationOrder, ownerId: string | null): boolean =>
   a.adminActorId != null && a.adminActorId !== ownerId;
 
 export function channelOf(a: CiActivationOrder): FirstOrderChannel {

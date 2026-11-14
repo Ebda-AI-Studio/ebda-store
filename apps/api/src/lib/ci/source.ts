@@ -82,7 +82,7 @@ export interface CiStoreSetupFacts {
 }
 
 /** Where a store stands in setup right now (for the help signal). Reads only; `live` hides the order reads. */
-export interface CiOnboardingProgress {
+interface CiOnboardingProgress {
   ownerId: string | null;
   isDemo: boolean;
   createdAt: Date | null;

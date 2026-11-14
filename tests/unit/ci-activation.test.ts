@@ -13,7 +13,6 @@ import { activationOf, openStep } from '../../apps/api/src/lib/ci/activation';
 import { buildEnvelope } from '../../apps/api/src/lib/ci/port';
 import { parseEnvelope, type CiEnvelope } from '../../apps/api/src/lib/ci/envelope';
 import {
-  TRAIL_CAP,
   foldActivation,
   funnelOf,
   median,
@@ -484,8 +483,8 @@ describe('activation file', () => {
     expect(viewOf(failed, STORE).lastFact).toEqual({ fact: 'payment_failed', at: T0 + 1_000_000 });
   });
 
-  it('keeps at most TRAIL_CAP order trails', () => {
-    const many = Array.from({ length: TRAIL_CAP + 5 }, (_, i) =>
+  it('keeps at most 10 order trails', () => {
+    const many = Array.from({ length: 10 + 5 }, (_, i) =>
       ev(
         'order.placed',
         T0 + i * 1000,
@@ -501,7 +500,7 @@ describe('activation file', () => {
         `0d8ea0f4-5a47-4c7d-9a49-${String(i).padStart(12, '0')}`
       )
     );
-    expect(Object.keys(foldActivation(null, STORE, many).trail)).toHaveLength(TRAIL_CAP);
+    expect(Object.keys(foldActivation(null, STORE, many).trail)).toHaveLength(10);
   });
 });
 
