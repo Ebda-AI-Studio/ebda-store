@@ -38,6 +38,9 @@ import logger from '../lib/logger';
  * a super-admin (approve / reject), the legal call stays human. A mismatch is a flag, never an approval.
  */
 
+// ONE prisma site: `system_settings` is a D1-routed platform model (services/platform/router.ts), like `ebda.vat`.
+const settings = () => prisma.systemSetting;
+
 const TOOL = 'tax.change-request';
 // The admin session has no MCP key; the token is still bound to tool + store + actor + payload hash.
 const KEY_ID = 'admin-session';
@@ -127,7 +130,7 @@ function precheck(
 const keyOf = (storeId: string) => `${TAX_CHANGE_SETTING_PREFIX}${storeId}`;
 
 async function readStored(storeId: string): Promise<StoredChange | null> {
-  const row = await prisma.systemSetting.findUnique({
+  const row = await settings().findUnique({
     where: { key: keyOf(storeId) },
     select: { value: true },
   });
@@ -137,7 +140,7 @@ async function readStored(storeId: string): Promise<StoredChange | null> {
 const resultKeyOf = (storeId: string) => `tax.change-result.${storeId}`;
 
 async function deleteStored(storeId: string): Promise<void> {
-  await prisma.systemSetting.deleteMany({ where: { key: keyOf(storeId) } });
+  await settings().deleteMany({ where: { key: keyOf(storeId) } });
 }
 
 async function dropEvidence(change: StoredChange, storeId: string): Promise<void> {
@@ -266,7 +269,7 @@ export async function requestTaxChange(
   };
   try {
     // create-only: a second request that raced past assertChangeable loses to the unique key
-    await prisma.systemSetting.create({
+    await settings().create({
       data: { key: keyOf(storeId), value: change as never, category: 'tax', isPublic: false },
     });
   } catch (err) {
@@ -279,7 +282,7 @@ export async function requestTaxChange(
       );
     throw err;
   }
-  await prisma.systemSetting.deleteMany({ where: { key: resultKeyOf(storeId) } }); // a new request clears the last answer
+  await settings().deleteMany({ where: { key: resultKeyOf(storeId) } }); // a new request clears the last answer
   await auditLog({
     action: 'tax_profile.change_requested',
     userId: actor.userId,
@@ -309,7 +312,7 @@ export async function requestTaxChange(
 /** The pending request (if any) and the reason of the last rejection (if the last answer was a rejection). */
 export async function getTaxChangeForMerchant(storeId: string) {
   const c = await readStored(storeId);
-  const last = await prisma.systemSetting.findUnique({
+  const last = await settings().findUnique({
     where: { key: resultKeyOf(storeId) },
     select: { value: true },
   });
@@ -339,7 +342,7 @@ export async function withdrawTaxChange(storeId: string, actor: Actor): Promise<
 /** Super-admin queue: every pending request with its pre-check, oldest first. */
 export async function listTaxChangesForReview(adminId: string) {
   const rows = await withPlatformUser(adminId, () =>
-    prisma.systemSetting.findMany({
+    settings().findMany({
       where: { key: { startsWith: TAX_CHANGE_SETTING_PREFIX } },
       select: { key: true, value: true },
       take: 500,
@@ -378,9 +381,9 @@ export async function decideTaxChange(
   if (decision.decision === 'approve') {
     await applyApprovedTaxChange(storeId, c, actor);
     await deleteStored(storeId);
-    await prisma.systemSetting.deleteMany({ where: { key: resultKeyOf(storeId) } });
+    await settings().deleteMany({ where: { key: resultKeyOf(storeId) } });
   } else {
-    await prisma.systemSetting.upsert({
+    await settings().upsert({
       where: { key: resultKeyOf(storeId) },
       create: {
         key: resultKeyOf(storeId),

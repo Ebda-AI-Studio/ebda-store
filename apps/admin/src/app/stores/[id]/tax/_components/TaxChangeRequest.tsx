@@ -140,7 +140,9 @@ export function TaxChangeRequest({ storeId }: { storeId: string }) {
   return (
     <div data-testid="vat-change-request" className="space-y-3 border-t border-border pt-3">
       <div>
-        <h3 className="text-sm font-medium text-foreground">{t('change.title')}</h3>
+        <h3 data-setting-id="tax.change-request" className="text-sm font-medium text-foreground">
+          {t('change.title')}
+        </h3>
         <p className="text-xs text-muted-foreground">{t('change.hint')}</p>
       </div>
       {state?.lastRejection && !state.request && (
