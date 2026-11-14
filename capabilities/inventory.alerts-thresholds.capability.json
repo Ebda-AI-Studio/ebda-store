@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "low-stock-alerts",
   "questions": {
     "ar": ["نبهني لما المنتج يقل", "حد التنبيه"],
     "en": ["Alert me when stock is low"]

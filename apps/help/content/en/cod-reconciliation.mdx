@@ -1,0 +1,55 @@
+---
+title: Reconcile cash on delivery with your courier
+description: Upload your courier's remittance statement and see which shipments were collected and paid out, and which were not.
+section: Selling
+order: 23
+appPath: /stores
+keywords: cod reconciliation cash on delivery courier bosta shipblu mylerz aramex statement csv remittance
+capabilities:
+  - shipping.cod-reconciliation@1
+---
+
+When a customer pays the courier in cash, the carrier sends you the money later in batches and keeps its fee. The reconciliation page compares what the carrier should have collected for your cash-on-delivery shipments with what its statement says it collected and remitted.
+
+## Who can do this
+
+The store owner only. It needs a plan that includes shipping carriers (available on the paid plans). If your plan does not include it, the page does not open and asks you to upgrade, from [Plans and billing](/en/plans-and-billing/).
+
+## Open the page
+
+From **Shipping and delivery** open the **Cash-on-delivery collection** tab. You need a carrier connected first, see [Shipping providers](/en/shipping-providers/).
+
+## Upload a statement
+
+1. From your carrier's portal, download the settlement statement as a CSV file.
+2. In the **Import a carrier statement** card choose the **Carrier**: Bosta, ShipBlu, Mylerz, Aramex or Manual.
+3. Pick the **CSV file**, or paste the statement text in the **…or paste the statement here** box.
+4. Press **Import**.
+
+You then see the result: how many lines are new, how many were already imported and how many do not match any shipment. Uploading the same statement again changes nothing.
+
+### The file format
+
+The first row must be column names. It needs a **tracking number** column (tracking_number, awb or waybill) and the collected amount (collected, cod_amount or amount), or the net amount (net) together with the fee (fee). Amounts are in EGP. A date column (date) is read if present. A line with a problem is listed as rejected with the reason, and the other lines are still imported. The limit is 5000 lines per upload.
+
+## Read the numbers
+
+The top of the page shows totals: **Owed (COD)**, **Collected**, **Carrier fees**, **Remitted (net)**, **Still to receive**, **Over-remitted**, **Unmatched lines** and **Shipments needing attention**. The rule always holds: owed minus collected equals still to receive minus over-remitted.
+
+The table below lists one shipment per row, with a status:
+
+- **Awaiting remittance:** nothing paid out yet.
+- **Partly remitted:** part of the amount arrived. Several remittances add up.
+- **Settled:** the full amount arrived.
+- **Over-remitted:** more arrived than was owed.
+- **Mismatch:** a line contradicts itself, or money came for a parcel that was never delivered.
+
+You can filter by status or by carrier. **Needs attention** groups partial, over-remitted and mismatch.
+
+## Lines that match nothing
+
+A statement line with a tracking number that is not one of your shipments appears under **Lines matching no shipment**. It matches automatically if that shipment appears later.
+
+<Callout title="Reconciliation only">
+  The page shows the differences; it does not change any order's payment status. An order becomes **Paid** when it is delivered, or you mark it with **Mark paid** on the order page. See [Orders and cash on delivery](/en/orders-and-cod/).
+</Callout>

@@ -22,7 +22,7 @@
     "class": "unclassified",
     "note": "reverse with a reversing entry"
   },
-  "helpArticle": null,
+  "helpArticle": "chart-of-accounts-and-journal",
   "questions": {
     "ar": ["اعمل قيد يومية", "ضيف حساب جديد"],
     "en": ["Add a manual journal entry"]

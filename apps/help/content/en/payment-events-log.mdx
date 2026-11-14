@@ -1,0 +1,49 @@
+---
+title: Payment events log on an order
+description: When a customer says they paid but the order shows unpaid, open the payment log on the order and see what happened step by step.
+section: Selling
+order: 36
+appPath: /stores/:id/orders/:orderId
+keywords: payment log payment events payment status unpaid order webhook refund gateway customer paid
+capabilities:
+  - payment.events@1
+---
+
+Every time an order's payment state changes, Ebda Store records an event: payment created, a reply from the gateway, payment completed, failure, refund. That log answers you when a customer says "I paid".
+
+## Who can see it
+
+The store owner and staff members who can open orders. No particular plan is needed.
+
+## Open the log
+
+1. Under **Sales** open **Orders**, then open the order.
+2. In the **Payment Details** card you see the payment status (**Paid** or **Unpaid**) and the remaining amount, the **Payment method**, the **Transaction ID** and the **Payment link** if there is one.
+3. Press **View payment events**. If the order has more than one payment attempt there is a button for each.
+
+The log shows the latest 200 events, newest first. Each event has its type, date and time, the status from and to if it changed, the gateway, and short details.
+
+## What the events mean
+
+- **Payment created**, **Payment completed**, **Payment failed**, **Payment expired** and **Payment cancelled**.
+- **Webhook received**: a reply from the payment gateway. **Webhook confirmed with the provider** means Ebda Store asked the gateway and confirmed it. **Webhook corrected** means the gateway's record was applied.
+- **Status changed**, **Reconciliation**, **Admin action** and **Retry attempt**.
+- Refund events: **Refund initiated**, **Refund completed** and **Refund failed**. **Refund unconfirmed — check the provider** and **Refund needs review** mean you must check the gateway's dashboard. **Refund settled by merchant** appears if you recorded that you returned the money yourself.
+
+## If the customer says they paid
+
+1. Open the log and look at the latest event. If it shows **Payment completed** and the order still looks unpaid, refresh the page and check the **Payment Details** card again.
+2. If the events stop at **Payment created** with no reply from the gateway, the notification may still be delayed. Wait a little and refresh.
+3. If it shows **Payment failed** or **Payment expired**, the customer needs a new payment link or another payment method. See [Orders and cash on delivery](/en/orders-and-cod/) and [Payment providers](/en/payment-providers/).
+
+<Callout title="Raw data">
+  The **View raw payload** button (the gateway's raw reply) is shown to the platform administrator only, not to the store owner. If support needs the raw reply, send them the order number and transaction ID.
+</Callout>
+
+## Common questions
+
+**A customer says they paid but I did not receive it.** Open **View payment events** on the order and read the latest event, following the steps above.
+
+**What is the payment status?** From the **Payment Details** card: **Paid** or **Unpaid** and the remaining amount.
+
+**Is there a button to retry the payment?** The log is read-only and has no retry button.

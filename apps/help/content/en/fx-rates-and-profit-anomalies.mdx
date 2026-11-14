@@ -1,0 +1,55 @@
+---
+title: FX rates and profit anomalies
+description: Record exchange rates for foreign currencies in your accounts, and follow the alerts that tell you when margin, cost, revenue or refunds move in an unusual way.
+section: Selling
+order: 34
+appPath: /stores/:id/finance/fx-rates
+keywords: fx exchange rate currency dollar euro multi currency profit anomaly margin cost refunds alert accounting
+capabilities:
+  - finance.fx-anomalies@1
+---
+
+These two pages in the **Accounting** section do different jobs: a log of exchange rates for foreign-currency accounting, and profit alerts that point out something odd in your numbers.
+
+## Who can open them
+
+The store owner only. Staff members do not get the Accounting pages.
+
+## Record exchange rates
+
+The page logs the rate of each currency against the Egyptian pound so you can refer back to it. Open it from the search in **Settings** (type "exchange rate") or from the link `/stores/STORE_ID/finance/fx-rates`.
+
+1. Under **Record a New Rate** choose the **Currency** (US dollar, euro, pound sterling, Saudi riyal, UAE dirham and others).
+2. Enter the **Rate (EGP per 1 unit)**. If the dollar is 50.00, that means 1 USD = 50.00 EGP. The preview under the field shows 1 and 100 units in EGP.
+3. Pick the **Rate Date** and press **Save Rate**.
+
+Below the form is **Rate History (last 90 days)**, which you can filter to one currency. The log is a reference: when you record an expense in a foreign currency in [Expenses](/en/finance-expenses/) you enter the exchange rate on the expense itself.
+
+This feature is on the **Business** plan. If your plan does not include it you see a **Feature not active** page with an upgrade button, and the server answers `FEATURE_DISABLED`.
+
+<Callout title="This is accounting, not selling">
+  The rates here are for accounting and for recording expenses in other currencies. There is no setting here to sell your products in a currency other than the Egyptian pound.
+</Callout>
+
+## Profit anomalies
+
+Ebda Store compares the last 7 days with the weekly average of the 3 weeks before, and opens an alert when it finds a deviation in:
+
+- **Margin drop**
+- **Cost spike**
+- **Revenue drop**
+- **Refund spike**
+
+A deviation above 20% is a **Warning**, and above 40% it is **Critical**. There is no alert when the data is too thin. Each alert has a written explanation plus the **Current (7d)** figure, the **Weekly baseline** and the **Delta**.
+
+Open **Accounting**, then **Overview** and you will find the **Open anomalies** card with a **View all** link. The page has the filters **All**, **Unacknowledged** and **Critical only**. After you read an alert press **Acknowledge**, and it is marked **Acknowledged**.
+
+Profit anomalies work on every paid plan.
+
+## Common questions
+
+**How do I sell in USD?** This page only records rates for your accounts; it does not let you sell in another currency in the store.
+
+**What is a profit anomaly?** An alert opened when margin, cost, revenue or refunds in the last week are far from your usual.
+
+**There are no alerts.** Either your numbers are steady, or the data is still thin and the system does not alert on small numbers.

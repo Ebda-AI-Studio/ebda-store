@@ -1,0 +1,57 @@
+---
+title: Warehouses and per-warehouse stock
+description: Record more than one stock location, see each product's quantity in each one, and edit quantities from the warehouse page.
+section: Selling
+order: 45
+appPath: /stores
+keywords: warehouse warehouses multiple locations default priority per-warehouse quantity adjust reconcile
+capabilities:
+  - inventory.warehouses@1
+---
+
+If you keep your goods in more than one place, record each place as a **warehouse**, and Ebda Store shows you each product's quantity in each warehouse. A product's total stock stays in sync with the warehouse quantities.
+
+## Who can do this
+
+Only the store owner.
+
+## Plan
+
+Multiple warehouses are on the **Business** plan (see [Plans and billing](/en/plans-and-billing/)). If your plan does not include the feature, the request is refused with `FEATURE_DISABLED` and names the plan you need. Stores with a single warehouse are not affected.
+
+## Add a warehouse
+
+1. In **Stock**, open **Warehouses** and press **+ New Warehouse**.
+2. Fill in:
+   - **Name (English)** and **Name (Arabic)**.
+   - **Code**: English letters, numbers, `-` and `_` only, up to 20 characters. Name and code are required.
+   - **Priority**: a number from 0 to 9999.
+   - **Latitude**, **Longitude** and **Address** (optional).
+   - **Set as default warehouse** if you want it to be the main one.
+3. Save. You see "Warehouse created".
+
+The table shows the name, code, priority, a **Default** badge, the number of **SKUs** and **Units**, and the location.
+
+## Change the default, edit or deactivate
+
+- **Set as default**: shown next to any warehouse that is not the default.
+- **Edit**: from the menu next to the warehouse.
+- **Deactivate**: from the same menu (not shown for the default warehouse). The warehouse stops being used and its stock data is kept. You cannot deactivate the last active warehouse; create another one first.
+
+## See and edit a warehouse's stock
+
+1. Press **View stock** next to the warehouse. You see the product, SKU, variant and quantity, with search by name or SKU.
+2. To change a quantity directly, click the number (**Click to edit quantity**) and type the new quantity (0 or more).
+3. Or press **Adjust** and type the **Delta**: a positive number to add and a negative number to remove, for example `+10` or `-5`, with an optional **Reason**, then **Apply**. The delta cannot be zero, and you see the **New quantity** before applying.
+
+The **Reconcile to aggregate** button reconciles every warehouse's counts with your authoritative product stock. It runs in the background and the warehouse counts update shortly after.
+
+<Callout title="Priority and location are for routing">
+  Priority, latitude and longitude are saved with the warehouse so orders can be routed to the nearest or highest-priority warehouse. Ebda Store does not currently route your store's checkout orders to a specific warehouse automatically.
+</Callout>
+
+## Common questions
+
+**I have more than one warehouse. What do I do?** Add each one as a warehouse and record each product's quantity in it from **View stock**.
+
+**How do I move stock between warehouses?** There is no transfer button. Adjust the quantity in both: remove from the first with a negative delta and add to the second with a positive one.

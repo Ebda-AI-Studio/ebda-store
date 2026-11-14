@@ -20,7 +20,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "customers",
   "questions": {
     "ar": ["مين احسن عملائي؟", "دور على عميل برقم تليفونه", "العميل ده طلب كام مرة؟"],
     "en": ["Find a customer by phone"]

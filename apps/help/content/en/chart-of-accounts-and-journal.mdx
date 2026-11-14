@@ -1,0 +1,45 @@
+---
+title: Chart of accounts and journal
+description: Know your store's accounts, add a custom account under a system account, and follow the journal entries posted from orders and expenses.
+section: Selling
+order: 32
+appPath: /stores/:id/finance/accounts
+keywords: chart of accounts custom account journal entry ledger accounting debit credit manual entry
+capabilities:
+  - finance.journal-accounts@1
+---
+
+Every money movement in your store is recorded in a double-entry ledger: equal debits and credits. The **Chart of Accounts** is the list of accounts things are recorded against, and the **Journal** is the log of the entries themselves.
+
+## Who can open it
+
+The store owner only. Staff members do not get the Accounting pages.
+
+## Chart of Accounts
+
+Open **Accounting**, then **Chart of Accounts**. Accounts are grouped by type: Assets, Liabilities, Equity, Revenue, Expenses. The core accounts are tagged **System** and cannot be edited or deleted.
+
+- **If the chart is empty:** press **Seed default accounts**, and the page tells you how many accounts were created. Without these accounts no entry can be recorded.
+- **Add a custom account:** press **Add custom account**, choose the **Parent account** (it must be a system account), and enter the **Code** and the **Name (English)**; the Arabic name is optional. Then press **Create account**. The code is 4 to 6 digits. The new account takes the parent's type, and only one level of custom accounts is allowed.
+
+Custom accounts then appear in the pick lists, such as **Expense Category** in [Expenses](/en/finance-expenses/).
+
+## Journal
+
+Open **Accounting**, then **Journal**. Each row is an entry with its number, date, **Source** (order, refund or expense), memo, debit and credit. Pick the period at the top of the page, and press **View** on any entry to see its lines account by account.
+
+If an entry was cancelled by a reversing entry it shows **Reversed by entry** and the reversing entry's number, and the reversing entry shows **Reverses** and the original's number. Entries are posted automatically when an order is paid or refunded, or when an expense is posted, so the journal is empty before the first movement.
+
+## Manual entries
+
+Posting a manual entry is available to the platform administrator only, and the **New Manual Entry** button does not appear for a store owner. If you need a correction, use an order refund or update the expense and leave the entry to the system.
+
+## Plan
+
+Both pages are available from the **Growth** plan. If your plan does not include the feature the server answers `FEATURE_DISABLED` and names the plan you need. See [Plans and billing](/en/plans-and-billing/).
+
+## Common questions
+
+**I want to add a journal entry.** Manual entries are not available to a store owner. What you record yourself is expenses, which create the entry automatically after posting.
+
+**Add a new account.** From **Chart of Accounts** press **Add custom account** under a system parent account.

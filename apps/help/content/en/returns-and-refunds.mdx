@@ -1,0 +1,77 @@
+---
+title: Returns and refunding your customer
+description: Set your return window, review and approve return requests, then refund the customer to the original payment, store credit or a bank transfer.
+section: Selling
+order: 22
+appPath: /stores
+keywords: return refund return policy return window store credit bank transfer complete return
+capabilities:
+  - returns.policy@1
+  - returns.complete-refund@1
+---
+
+When a customer asks to return something, you follow the request on the Returns page: approve or reject it, record that you received the parcel, then refund the money. Before that, you decide how long your store accepts returns.
+
+## Set your return policy
+
+1. From your store, open **Shipping**.
+2. In the **Return policy** card, enter the **Return window (days)**.
+3. Choose **Return shipping paid by**: **Customer** or **Merchant (free returns)**.
+4. Press **Save return policy**.
+
+The window is counted from the delivery date and is enforced on return requests. It is shown on your store's Returns, Terms and FAQ pages, and published to Google and AI shopping assistants.
+
+- Enter a number of days (0 to 3650), for example 14.
+- Enter **0** if your store does not accept returns. The Returns page says so.
+- Leave it blank to declare no window. No limit is enforced then.
+
+The card holds the window and who pays for return shipping, nothing more. There is no field for a long policy text.
+
+<Callout title="Keep it consistent">
+  If you wrote your return terms yourself on your Terms page, make sure the number of days there matches the Return policy card.
+</Callout>
+
+## Review a return request
+
+Open **Returns & Exchanges** from your store. You see counters (Total Returns, Pending, Approved, Completed) and a filter with the same statuses. Open any return to see the customer, the reason and the items. Every return moves in this order:
+
+1. **Pending**: press **Approve**, or **Reject** and write the **Rejection reason**.
+2. **Approved**: when the parcel reaches you, press **Mark Received**.
+3. **Received**: press **Complete & Refund**.
+
+## Refund the money
+
+**Complete & Refund** opens the **Complete Return** window. Choose **how the customer will be refunded**. The page works out the refund amount before you continue and asks you to confirm.
+
+- **Original payment method**: a real refund is sent through the payment provider to the card or wallet used at checkout. This cannot be undone. It is not available when the order has no online payment (for example cash on delivery or InstaPay).
+- **Store credit**: if the **customer wallet** is on for your store, the amount is added to the customer's wallet for their next order. Shipping is refunded only on a full return. See [Customer wallet](/en/customer-wallet/).
+- **Bank transfer**: you send the money to the customer's bank account yourself, and the system records it.
+- **Already refunded - record only**: use it when the customer already has their money. It completes the return without sending anything.
+
+Every refund issues a **credit note**. See [Invoices and credit notes](/en/invoices-and-credit-notes/).
+
+## Who can do this
+
+The store owner, and team members who have the returns permission. The page needs a plan that includes Returns. If yours does not, the system answers `FEATURE_DISABLED` and names the plan to move to. See [Plans and billing](/en/plans-and-billing/).
+
+## Questions and edge cases
+
+**A message says the refund reached the payment provider but the return was not completed.**
+Do not refund again. Check the payment provider dashboard, then complete the return with **Already refunded - record only**.
+
+**The order was paid with InstaPay.**
+InstaPay cannot be refunded through the system. Send the money back from your InstaPay app, then complete the return with **Already refunded - record only**.
+
+**Part of the payment was already refunded.**
+If what is left is less than the return is worth, the original payment is unavailable. Complete it with store credit or a bank transfer and settle the difference with the customer.
+
+**Exchanges.**
+An exchange does not refund money. Choose store credit, or complete it as a return.
+
+**The refund is lower than expected.**
+If the item was sold at a tier price and the customer keeps fewer units than the tier needs, the window shows **Tier price adjustment** and explains the difference. For wholesale items you can override the refund amount and write a reason.
+
+**I pressed twice.**
+If you see "This return is already being completed", refresh the page before trying again.
+
+For the order-side view of returns, cash on delivery and recording a refund on an order, see [Orders and cash on delivery](/en/orders-and-cod/).

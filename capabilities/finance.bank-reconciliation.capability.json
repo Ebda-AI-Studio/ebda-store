@@ -22,7 +22,7 @@
     "class": "unclassified",
     "note": "delete statement no"
   },
-  "helpArticle": null,
+  "helpArticle": "bank-reconciliation",
   "questions": {
     "ar": ["ازاي اطابق كشف البنك؟", "ارفع كشف حساب CSV"],
     "en": ["Reconcile my bank statement"]

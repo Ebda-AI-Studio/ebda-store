@@ -16,7 +16,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "payment-abandonments",
   "questions": {
     "ar": ["مين بدأ الدفع وماكملش؟"],
     "en": ["Who started paying and left?"]

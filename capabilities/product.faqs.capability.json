@@ -20,7 +20,7 @@
     "class": "unclassified",
     "note": "delete = confirm"
   },
-  "helpArticle": null,
+  "helpArticle": "product-faqs",
   "questions": {
     "ar": ["اضيف اسئلة شائعة لمنتج"],
     "en": ["Add FAQs to a product"]

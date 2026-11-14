@@ -1,0 +1,52 @@
+---
+title: Backorders
+description: Let customers order products that are out of stock, track the waiting orders, and cancel the ones you cannot supply.
+section: Selling
+order: 41
+appPath: /stores
+keywords: backorder pre-order out of stock waiting cancel deferred order
+capabilities:
+  - inventory.backorders@1
+---
+
+A backorder lets a customer buy a product that is out of stock, and you supply it when the goods reach you. These orders collect on the **Backorders** page.
+
+## Who can do this
+
+Only the store owner can open the Backorders page and cancel from it. Staff members can turn backorder on or off from the Inventory page.
+
+## Plan
+
+The feature is on the **Growth** plan and above (see [Plans and billing](/en/plans-and-billing/)). If your plan does not include it, the request is refused with `FEATURE_DISABLED` and names the plan you need.
+
+## Turn backorder on
+
+1. In **Stock**, open the **Inventory** tab.
+2. Press **Inventory options** at the top, then **Enable backorder on all products**.
+3. Confirm. You see "Backorder enabled on N products".
+
+This applies to **every active product** at once. Draft and archived products are skipped. The **Allows Backorder** column in Inventory shows which products have it on. To turn it off, the same menu has **Disable backorder on all products**, after which out-of-stock products can no longer be ordered.
+
+## Track waiting orders
+
+Open **Stock**, then **Backorders**. The table shows the order number (it opens the order), the customer, the product, the quantity and the days waiting. When you receive goods against a [purchase order](/en/suppliers-and-purchase-orders/), waiting orders are cleared oldest first (FIFO).
+
+An empty page means there are no open backorders.
+
+## Cancel a backorder
+
+1. Press **Cancel** next to the order.
+2. Write the **cancellation reason**. It is internal, kept on the order's history, and not sent to the customer.
+3. Press **Cancel line & reverse the sale**.
+
+<Callout title="Cancelling does not refund money">
+  Cancelling a backorder cancels the line and reverses its sale in your books, but it **sends no money to the customer**. If the customer already paid, the window shows how much you still owe, and you refund it yourself at your payment provider. A cancel cannot be undone.
+</Callout>
+
+If the order was paid and this line has an amount to give back, the customer receives a notice that the refund was recorded, so make sure you actually refund them.
+
+## Common questions
+
+**A customer ordered an out-of-stock item. What now?** If backorder is on, it joins the Backorders list and clears automatically when stock arrives. If you cannot supply it, cancel it and refund the customer.
+
+**Can I enable backorder for one product only?** On the current screen, backorder is switched for all active products at once.

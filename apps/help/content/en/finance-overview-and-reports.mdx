@@ -1,0 +1,50 @@
+---
+title: Profit, expenses and financial reports
+description: See what came in, what went out and your profit for any period, and run the trial balance, profit and loss, balance sheet and tax report as CSV or Excel.
+section: Selling
+order: 30
+appPath: /stores/:id/finance/dashboard
+keywords: profit expenses financial reports trial balance balance sheet vat tax excel xlsx csv accounting
+capabilities:
+  - finance.overview-reports@1
+---
+
+The **Accounting** section of Ebda Store puts your store's money numbers in one place: what came in, what went out, profit and stock value. It also produces the reports your accountant asks for, as Excel or CSV downloads.
+
+## Who can open it
+
+The store owner only. Staff members do not get the Accounting pages.
+
+## See your profit this month
+
+1. In the sidebar open **Accounting**. The first page is **Overview** (titled Accounting Overview).
+2. Pick the period at the top: Today, Yesterday, Last 7 days, Last 30 days, Last 90 days, This month, Last month, This year, or a **Custom range** with from and to dates.
+3. You will see the cards **Revenue**, **Expenses**, **Net Income** and **Stock Value**, and below them **Cash by Account** and the **Balance Sheet** (assets, liabilities and equity).
+4. There is also a **Sales (from Orders)** card: paid-order revenue and the count for the period. That card is calculated from the orders themselves, while **Revenue** comes from journal entries, so the two numbers can differ.
+5. The **Open anomalies** and **Pending receipt drafts** cards have a **View all** link to their own pages. See [FX rates and profit anomalies](/en/fx-rates-and-profit-anomalies/) and [Expenses](/en/finance-expenses/).
+
+## Reports
+
+Open **Accounting**, then **Reports**. There are four tabs:
+
+- **Trial Balance**: every account with debit, credit and balance. Pick an **As of** date and the page confirms whether debits equal credits.
+- **Profit & Loss**: revenue, expenses and net income. Pick **From** and **To** (the default is the first of the month until today).
+- **Balance Sheet**: assets, liabilities and equity on a given date. The line **Retained & current earnings** is revenue minus expenses up to that date. If the sheet does not balance, the page shows the difference.
+- **Tax Report**: every taxable sale or refund in the period, with order number, customer, taxable base, rate and tax collected, plus a breakdown by rate.
+
+Every tab has **Export CSV** and **Export XLSX**. Days are counted in your store's time zone, which is written above the report.
+
+## Plan needed
+
+- Overview, trial balance, profit and loss and balance sheet: **Growth** plan and above.
+- Tax report: **Business** plan.
+
+If your plan does not include the feature, the server refuses the request with `FEATURE_DISABLED` and names the plan that unlocks it. See [Plans and billing](/en/plans-and-billing/).
+
+## Common questions
+
+**What is my profit this month?** Open **Overview**, choose **This month**, and read the **Net Income** card.
+
+**How do I export the VAT report for the month?** Under **Reports** open **Tax Report**, choose the first to the last day of the month, and press **Export XLSX**.
+
+**The reports are empty.** The numbers are built from journal entries, which are posted from orders, refunds and posted expenses. Until something is recorded the page stays empty. See [Chart of accounts and journal](/en/chart-of-accounts-and-journal/).

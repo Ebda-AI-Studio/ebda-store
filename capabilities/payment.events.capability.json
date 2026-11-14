@@ -21,7 +21,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "payment-events-log",
   "questions": {
     "ar": ["العميل بيقول دفع وماوصلنيش", "ايه حالة الدفع؟"],
     "en": ["Customer says they paid but order shows unpaid"]

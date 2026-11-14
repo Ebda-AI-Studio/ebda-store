@@ -26,7 +26,7 @@
     "class": "unclassified",
     "note": "delete variant = confirm"
   },
-  "helpArticle": null,
+  "helpArticle": "product-variants",
   "questions": {
     "ar": [
       "ازاي اضيف مقاسات والوان؟",

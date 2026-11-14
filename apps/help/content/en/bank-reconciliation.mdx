@@ -1,0 +1,59 @@
+---
+title: Bank statement reconciliation
+description: Import your bank statement as CSV, Excel or OFX, let Ebda Store match the lines to your ledger entries, and finish the matching by hand until the difference is zero.
+section: Selling
+order: 33
+appPath: /stores/:id/finance/bank-reconciliation
+keywords: bank reconciliation statement csv ofx xlsx import auto-match difference accounting
+capabilities:
+  - finance.bank-reconciliation@1
+---
+
+Reconciling means making sure every line on your bank statement has a matching entry in your ledger. Ebda Store does the first pass automatically and you settle the rest.
+
+## Who can do this
+
+The store owner only. Staff members do not get the Accounting pages.
+
+## Import a statement
+
+1. Open **Accounting**, then **Bank Reconciliation**, and press **Import Statement**.
+2. Choose the file: **CSV, Excel (.xlsx) or OFX**, up to 5 MB.
+3. Choose the **GL bank account** from your chart of accounts.
+4. You see a **Preview** with the row count and any **Parse warnings**. Press **Import**.
+5. The page says how many transactions were imported and how many rows were skipped. Press **View Reconciliation**.
+
+A CSV needs a date column, a description column and an amount column (or separate debit and credit columns). Column names are understood in English and Arabic, for example Date, Description, Amount, Debit and Credit. If one is missing, the import answers with the missing column. A single statement holds at most 2000 rows, so split a larger one by period.
+
+## Auto-match and manual matching
+
+Auto-match runs after the import, and you can run it again with **Run Auto-match**. It links a bank line to a ledger entry only when exactly one entry fits:
+
+- the direction agrees (a bank debit with a ledger debit, a bank credit with a ledger credit),
+- the amount is the same (within 5 piastres),
+- the date is within 3 days,
+- and the entry is not already linked to another line.
+
+If more than one entry fits, or none, the line stays **Unmatched** and you decide. For each row:
+
+- **Match**: enter the **Journal Entry ID (UUID)** from the [journal](/en/chart-of-accounts-and-journal/) and press **Link**.
+- **Unmatch**: returns the line to unmatched.
+- **Ignore**: for lines that do not belong in your ledger.
+
+Each line is **Unmatched**, **Auto-matched**, **Manual-matched** or **Ignored**. Above the table a summary shows the count per status and the matched and unmatched amounts, and the **Reconciliation Difference** card compares the bank's net for the period with the ledger account balance. It says **Reconciled** when the difference is zero, or **Mismatch** with the unmatched bank lines and ledger entries.
+
+## Delete a statement
+
+In the statements list press **Delete** on the statement. The statement and every matched transaction are removed, and it cannot be undone.
+
+## Plan
+
+Reconciliation is available on the **Business** plan. If your plan does not include the feature the server answers `FEATURE_DISABLED` and names the plan you need. See [Plans and billing](/en/plans-and-billing/).
+
+## Common questions
+
+**How do I reconcile my bank statement?** Import the statement, run auto-match, and settle the **Unmatched** lines by matching or ignoring them.
+
+**The import failed.** Check the file is CSV, XLSX or OFX, under 5 MB, and has date, description and amount columns.
+
+**A line matches no entry.** The entry may not be recorded yet (for example an expense that is not posted) or the date is more than 3 days away. Post the expense or link the line by hand.

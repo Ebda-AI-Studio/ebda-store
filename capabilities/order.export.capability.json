@@ -16,7 +16,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "export-orders-and-customers",
   "questions": {
     "ar": ["نزلي الطلبات في اكسيل"],
     "en": ["Export my orders"]

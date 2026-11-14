@@ -1,0 +1,61 @@
+---
+title: Webhooks: send order and product events to your server
+description: Connect your store to your own system (ERP, accounting or shipping): Ebda Store sends it a signed message whenever an order or product changes, and you can test and resend.
+section: Settings
+order: 62
+appPath: /stores/:id/webhooks
+keywords: webhook integration erp server event order product signature secret inventory api
+capabilities:
+  - integrations.webhooks@1
+---
+
+A webhook means Ebda Store brings you the news: whenever a new order is recorded or a product is edited, your store sends a message to an address on your server. You use it to send orders to your ERP, accounting or shipping system.
+
+## Who can use it
+
+The store owner only. Staff members do not get this page.
+
+## Plan
+
+Webhooks are on the **Growth** and **Business** plans. If your plan does not include them you see "Webhooks are on the ... plans" and a **See plans** button, and the server answers with a plan limit (402) and names the plan you need. If you drop below a plan that includes webhooks you can still see, switch off and delete the endpoints you have, but you cannot add, test, or resend.
+
+## Add an endpoint
+
+1. In **Settings** open the **Webhooks** card, and press **Add endpoint**.
+2. Enter the **Address (HTTPS)**. It must be a public HTTPS address. Local and private addresses are not accepted. Ports other than the default, bare IP addresses and Ebda Store's own addresses are also refused.
+3. Add a **Note** if you like (optional).
+4. Choose the **Events to send**: **Order placed**, **Order paid**, **Order shipped, delivered or cancelled**, **Order refunded**, **Product added**, **Product changed**, **Product deleted** and **Stock is low**.
+5. **Include customer name, email and phone in order events** is off by default. Turn it on only if your system needs to contact the customer.
+6. Press **Save**. The **signing secret** appears; press **Copy**. It is shown **once only**. If you lose it, make a new one.
+
+Your server checks that a message really came from us using the `X-Ebda-Signature` header. The technical details (message shape and how to verify) are in the **Developer guide** linked on the page.
+
+## On each endpoint
+
+The table shows the address, events, status and **Last success**. The status is **On**, **Off** or **Turned off after repeated failures**. The buttons:
+
+- **Send test event**: sends a test event to your address. Refresh the log after a few seconds to see the result.
+- **New secret**: the old secret stops at once. Update your server with the new one first, or events fail the signature check.
+- **Edit**, **Turn on** or **Turn off**, and **Delete** (which deletes the delivery log too).
+- **Delivery log**: the latest deliveries for that endpoint with the event, the result (**Delivered**, **Failed**, **Waiting** or **Will retry**), the number of tries, the time and the **Reply** from your server. Press **Resend** on any row to send it again.
+
+## Rules and limits
+
+- A maximum of **10 endpoints** per store. If you reach it you see "You reached the maximum number of endpoints".
+- Your server must answer 2xx within 10 seconds. Ebda Store does not follow redirects (3xx) and counts them as failures.
+- If your server is down we retry up to 6 times over about a day.
+- If 10 deliveries in a row fail (after all their retries) the endpoint is switched off automatically and shows **Turned off after repeated failures**. Fix your server, then press **Turn on**.
+- The delivery log keeps the last 50 deliveries per endpoint, for 30 days.
+- The **Order shipped, delivered or cancelled** event is sent for those three statuses only.
+
+## Common questions
+
+**How do I connect my store to another system?** Add an endpoint on your system's HTTPS address, choose the events, and have your system verify the signature with the secret.
+
+**The webhook keeps failing.** Open the **Delivery log** and read the reply that came back from your server. Make sure the address is public HTTPS and your server answers 2xx quickly, then press **Resend**.
+
+**Send new orders to my ERP.** Choose **Order placed**, **Order paid** and **Order shipped, delivered or cancelled** for the endpoint.
+
+<Callout title="The secret">
+  The secret is shown once only. Keep it somewhere safe, and if you lose it make a **New secret** and update your server with it.
+</Callout>

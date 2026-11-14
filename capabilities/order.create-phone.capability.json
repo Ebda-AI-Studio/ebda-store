@@ -16,7 +16,7 @@
     "class": "unclassified",
     "note": "cancel = confirm"
   },
-  "helpArticle": null,
+  "helpArticle": "phone-orders",
   "questions": {
     "ar": ["زبون كلمني تليفون ازاي اعمله اوردر؟", "ابعتله لينك دفع"],
     "en": ["Create a phone order"]

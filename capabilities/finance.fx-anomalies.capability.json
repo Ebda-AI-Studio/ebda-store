@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "fx-rates-and-profit-anomalies",
   "questions": {
     "ar": ["بيع بالدولار ازاي؟", "ايه شذوذ الربحية؟"],
     "en": ["Sell in USD"]

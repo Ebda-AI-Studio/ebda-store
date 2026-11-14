@@ -21,7 +21,7 @@
     "class": "irreversible",
     "note": "no (erase irreversible)"
   },
-  "helpArticle": null,
+  "helpArticle": "customers",
   "questions": {
     "ar": ["العميل عايز يمسح بياناته", "ابلوك عميل", "نزلي بيانات عميل"],
     "en": ["A customer asked me to delete their data"]

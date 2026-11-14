@@ -1,0 +1,61 @@
+---
+title: Record expenses and upload receipts
+description: Add an expense by hand, or upload a photo of the receipt and let AI fill the draft, then approve the expense and post it to your accounts.
+section: Selling
+order: 31
+appPath: /stores/:id/finance/expenses
+keywords: expenses expense receipt vendor supplier ocr ai approve post reject accounting
+capabilities:
+  - finance.expenses@1
+---
+
+The **Expenses** page records everything you spend on the store: rent, shipping, ads, supplier bills. Each expense goes through three steps: draft, approve, post. Once posted, it enters your accounts.
+
+## Who can do this
+
+The store owner only. Staff members do not get the Accounting pages.
+
+## Add an expense by hand
+
+1. In the sidebar open **Accounting**, then **Expenses**, and press **Add expense**.
+2. Enter the **Expense date**.
+3. Pick a **Supplier** if you want one (the field is optional: **no vendor**).
+4. Choose the **Expense Category** from your chart of accounts and the **Paid From Account**. The paid-from account must be a cash or bank account; other assets such as inventory are not offered.
+5. Enter the **Amount (EGP)** and **Tax (EGP)**. The total is calculated for you.
+6. Add notes in English or Arabic if you like, and a **Receipt URL** if you have one.
+7. Press **Save expense**. It is saved as a **Draft**.
+
+If your plan includes multi-currency accounting (Business plan) a **Currency** field appears. Choose another currency and enter the **FX Rate** (1 unit of the currency = how many EGP), and the page works out the total in EGP. The rate is required for any currency other than EGP.
+
+## Upload a receipt photo
+
+At the top of the new-expense page is **Upload receipt (AI auto-fill)**:
+
+1. Press **Choose receipt image**. JPG, PNG or WebP, up to 10 MB.
+2. Press **Upload + process**. The page says **Reading receipt with AI**.
+3. When the draft is ready you land on the expenses list and the draft is there. Check what was read before you approve it.
+
+If reading takes a while the page says "OCR taking longer than expected". Come back to the expenses list in a moment. You can also fill the form by hand below (**Or fill in manually below**). The list has a **Receipt drafts only** filter that shows only drafts that came from photos.
+
+## Approve, reject and post
+
+The list shows number, date, vendor, category, amount, tax, total and status. The statuses:
+
+- **Draft** or **Pending Approval**: press **Approve** on the row.
+- **Approved**: press **Post**. Posting records the expense as a balanced entry in the ledger (it appears in the [journal](/en/chart-of-accounts-and-journal/) within moments).
+- **Posted**: done, and it is not edited from here.
+- **Rejected**: from the row's options menu choose **Reject expense**. It is marked rejected and does not enter the accounts.
+
+An expense must be approved before it can be posted, otherwise the server answers `EXPENSE_INVALID_STATUS`. The **All statuses** filter above the list narrows the list to one status.
+
+## Plan
+
+Expenses are available from the **Growth** plan. If your plan does not include the feature the server answers `FEATURE_DISABLED` and names the plan you need. Multiple currencies need the **Business** plan. See [Plans and billing](/en/plans-and-billing/).
+
+## Common questions
+
+**How do I record an expense from a supplier receipt photo?** Use **Upload receipt** at the top, review the draft and approve it.
+
+**I made a mistake on a posted expense.** A posted expense cannot be edited from this page. Check the details before you press **Post**; before posting you can reject the expense and record it again.
+
+**The photo will not upload.** Make sure it is a JPG, PNG or WebP under 10 MB.

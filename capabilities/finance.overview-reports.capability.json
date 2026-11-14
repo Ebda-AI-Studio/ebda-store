@@ -19,7 +19,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "finance-overview-and-reports",
   "questions": {
     "ar": ["ارباحي الشهر ده كام؟", "اطلع ميزانية", "تقرير الضريبة للشهر", "المصروفات كام؟"],
     "en": ["What's my profit this month?", "Export a VAT report"]

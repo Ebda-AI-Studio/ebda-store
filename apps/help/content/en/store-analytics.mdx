@@ -1,0 +1,52 @@
+---
+title: Analytics: sales, top products and stock
+description: See your sales, profit, top products, latest orders and low-stock products on one page, and compare with the previous period.
+section: Selling
+order: 37
+appPath: /stores/:id/analytics
+keywords: analytics stats sales today revenue profit top products orders low stock average order value cashflow
+capabilities:
+  - analytics.dashboard@1
+---
+
+The **Analytics** page answers questions like: what are today's sales? Which product sells best? How many orders came in this month? Which products are about to run out?
+
+## Who can open it
+
+The store owner and staff members. No particular plan is needed. The one exception is the **Cashflow** card and stock value, which have a condition below.
+
+## How to use it
+
+1. In the sidebar open **Analytics**.
+2. Pick the period at the top: Today, Yesterday, Last 7 days, Last 30 days, Last 90 days, This month, Last month, This year, or a **Custom range**. Every figure updates for that period.
+3. The first cards are **Total Revenue**, **Total Profit**, **Total Orders**, **Total Customers** and **Avg Order Value**, with the percentage change **vs last period** when it is available.
+4. Next is the **Sales Overview** chart. Switch between **Revenue** and **Orders**; the chart is grouped daily, weekly or monthly depending on how long the period is.
+5. Below it is the **Inventory snapshot (right now)**: stock value, open backorders and reorder rules.
+6. Then **Top Products**, **Latest 5 orders (all time)** and **Low stock alerts (current stock)**.
+7. At the end are **Wholesale vs retail** (the share of line revenue that came from wholesale prices) and **Searches with no results (last 7 days)**.
+
+Some cards do not follow the period: **Latest 5 orders** covers all time, and **Low stock alerts** and the **Inventory snapshot** show the current position.
+
+## Profit needs cost prices
+
+**Total Profit** is calculated from the cost price saved on the product. If some items were sold without a cost price, the card shows **Unknown** or tells you the figure **excludes** that many items, and suggests **Add cost prices to see profit**.
+
+## Ledger figures and cashflow
+
+If your store has accounting you also see cards tagged **GL**: Revenue, COGS, Gross profit and Net income **(GL)**. These take refunds into account. The **Cashflow** card shows the **Net daily movement**.
+
+Cashflow and financial stock value are for the store owner on plans that include accounting (from **Growth**). Otherwise you see the card **Cash flow is locked on your plan** with a **See plans** button. See [Profit, expenses and financial reports](/en/finance-overview-and-reports/).
+
+## If an error message appears
+
+If one of the requests the page makes fails you see **Some analytics could not be loaded**, and the figures below may be incomplete. Press **Retry**.
+
+## Common questions
+
+**What are today's sales?** Choose **Today** and read **Total Revenue**.
+
+**Which product sells best?** The **Top Products** card, with "N sold" beside each product.
+
+**This month versus last month?** Choose **This month** and read the change **vs last period** on the cards.
+
+**How many orders today?** Choose **Today** and read **Total Orders**.

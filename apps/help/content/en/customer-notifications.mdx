@@ -1,0 +1,58 @@
+---
+title: Customer notifications: SMS and browser alerts
+description: Choose what the customer is told (order confirmed, payment, shipped, delivered, cancelled, refunded) and on which channel, connect SMS, and follow the log of what was sent.
+section: Selling
+order: 38
+appPath: /stores/:id/notifications
+keywords: notifications sms push browser order confirmed shipped delivered cancelled refunded unifonic notification log
+capabilities:
+  - notify.channels-events@1
+---
+
+The **Notifications** page decides what the customer is told along their order's journey, and on which channel: a text message or a browser notification. If you want to be alerted yourself when a new order arrives, see [New-order alerts](/en/new-order-alerts/).
+
+## Who can open it
+
+The store owner. And the channels must be on for your store:
+
+- **Push notifications:** **Growth** plan and above.
+- **SMS:** **Business** plan.
+
+If your store has neither channel the page sends you back to the store dashboard. If a channel is not in your plan the server answers `FEATURE_DISABLED`. See [Plans and billing](/en/plans-and-billing/).
+
+## Choose events and channels
+
+1. Under **Marketing and offers** open **Notifications**.
+2. In the **Event Configuration** table each event is a row: **Order Confirmed**, **Payment Success**, **Payment Failed**, **Order Shipped**, **Order Delivered**, **Order Cancelled** and **Order Refunded**. The columns are the channels available to you (**SMS** and **Push**).
+3. Tick the boxes you want and press **Save Event Config**. If you change nothing, every channel is on for every event.
+
+## Turn on SMS
+
+Messages go out through your own Unifonic account.
+
+1. Open **Channel setup** and choose the **SMS** card.
+2. Switch **Enabled** on.
+3. Enter the **App key from Unifonic** (from your account there) and the **Sender name the customer sees** (for example MyStore).
+4. Press **Save**, then **Test Connection**. The test checks your details are right without sending a message to any customer.
+
+## Turn on browser notifications
+
+1. On the page switch on **Browser notifications for customers**. It is off by default. When it is on, customers can subscribe and get notifications in their browser.
+2. In the **Push Notifications** card switch **Enabled** on and press **Save**. There are no keys to set: it uses the platform's configuration. The card shows the number of **subscribers**.
+3. **Test Connection** checks that the platform can send and that a device is subscribed. It does not send a notification to any customer.
+
+## Send a notification to every subscriber
+
+When push is on you find **Send a notification to all your customers now**. Write the title and message in Arabic and English, an optional link that opens when the customer taps the notification, and press **Send broadcast**. Below it **Recent broadcasts** shows how many were delivered and clicked. For one-off messages such as offers, the page recommends using **Campaigns**.
+
+## Notification log
+
+At the bottom, **Recent Notifications** lists the time, event, channel, recipient and status (**Queued**, **Sent**, **Delivered**, **Failed**). Filter by channel or status.
+
+## Common questions
+
+**Stop SMS messages.** Open **Channel setup**, switch **Enabled** off on the **SMS** card and press **Save**, or untick **SMS** for the events you do not want.
+
+**The page sends me back to the store dashboard.** It means your store has no notification channel on, that is, the plan has neither push notifications nor SMS.
+
+**What about WhatsApp?** There is no WhatsApp card on this page. WhatsApp is set up from Ebda Chat.

@@ -1,0 +1,57 @@
+---
+title: Customer groups
+description: Split your customers into groups like VIP or wholesale, and give a group its own discounted price.
+section: Selling
+order: 25
+appPath: /stores
+keywords: group customer groups vip wholesale discount group price default segment
+capabilities:
+  - customers.groups@1
+---
+
+Customer groups let you split your customers by hand and use the split for group pricing and promotion targeting. For example, you create a VIP group and give it a percentage discount.
+
+## Create a group
+
+1. From your store, open **Customer groups**.
+2. Press **New group**.
+3. Enter the **Name**, and the **Name (Arabic)** if you want.
+4. Keep **Active** ticked if the group should be live.
+5. Tick **Default group for new customers** if every new customer should join this group. The first group you create is marked default automatically.
+6. Press **Save**.
+
+The list shows each group's name, number of customers and status (**Active** or **Inactive**), with a **Default** badge on the default one. Use **Edit** to change anything.
+
+## Give the group its own price
+
+In the **Pricing** section choose **Group price**:
+
+- **No group discount**: the group is only for segmenting and promotions.
+- **Percent off the price**: enter **Discount (%)** from 0 to 90, with at most two decimals. The discount applies when it beats any quantity price break. Coupons do not apply to these lines.
+
+Also tick **Wholesale group (members must be approved)** if the group is for wholesale accounts. Group prices apply only to approved, signed-in accounts. A guest, or someone who typed a phone number or email at checkout, never gets the group price.
+
+Group and wholesale pricing needs the **Business** plan (wholesale pricing). If your plan does not include it you see "Wholesale pricing needs the … plan" and the system answers `FEATURE_DISABLED`. A group without pricing needs no particular plan. See [Plans and billing](/en/plans-and-billing/).
+
+## Put a customer in a group
+
+1. Open **Customers** and press **View** on the customer.
+2. Under **Customer group** pick the group. Pick **No group** to remove them.
+
+The choice is saved right away. An inactive group shows with an **inactive** tag in the list. The profile also tells you whether the customer will pay a group's prices once signed in.
+
+## Delete a group
+
+Press **Delete** on the group and confirm. The customers in it become ungrouped; they are not deleted.
+
+## Who can do this
+
+The store owner only. Team members do not see customer groups.
+
+## Common questions
+
+**Create a VIP group.**
+Create a new group named VIP, then put customers in it from each customer's profile. For a discount, turn on **Percent off the price** (needs the Business plan).
+
+**A discount for one group.**
+Under **Pricing** choose **Percent off the price** and enter the discount.

@@ -16,7 +16,7 @@
     "class": "irreversible",
     "note": "no"
   },
-  "helpArticle": null,
+  "helpArticle": "returns-and-refunds",
   "questions": {
     "ar": ["رجّع الفلوس للعميل بعد المرتجع", "رصيد في المحفظة بدل الكاش"],
     "en": ["Refund the customer after the return"]

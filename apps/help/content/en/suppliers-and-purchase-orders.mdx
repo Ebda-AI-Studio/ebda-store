@@ -1,0 +1,59 @@
+---
+title: Suppliers and purchase orders
+description: Record your suppliers, create a purchase order, and receive the goods in full or in parts, while stock and accounts update by themselves.
+section: Selling
+order: 44
+appPath: /stores
+keywords: supplier purchase order partial receive receiving goods shipment unit cost draft cancel lead time
+capabilities:
+  - inventory.suppliers-po@1
+---
+
+Suppliers are the people you buy your goods from, and a **purchase order** is the order you record with them. When the goods arrive you record the receipt on the order, so stock goes up and the Inventory and Accounts Payable accounts are updated.
+
+## Who can do this
+
+Only the store owner.
+
+## Plan
+
+Purchase orders are on the **Business** plan (see [Plans and billing](/en/plans-and-billing/)). If your plan does not include the feature, the request is refused with `FEATURE_DISABLED` and names the plan you need. The Suppliers page itself is tied to the basic accounting feature.
+
+## Add a supplier
+
+1. In **Stock**, open **Suppliers** and press **+ New Supplier**.
+2. Fill in **Name** (required), **Name (Arabic)**, **Contact**, **Phone** and **Email**.
+3. Choose **Payment Terms**: cash on delivery, net 15, 30 or 60 days, or **Custom** (then type **Custom terms days**, from 1 to 365).
+4. Type **Net lead time (days)**, from 1 to 365: the days from placing an order until the goods arrive. The system uses it for [reorder suggestions](/en/reorder-and-dead-stock/) when a product has no rule of its own.
+5. Add notes in English and Arabic if you like, and press **Create supplier**.
+
+In the suppliers list, the menu next to each supplier has **Edit** and **Deactivate**. Deactivating takes the supplier out of new lists, and existing purchase orders stay as they are.
+
+## Create a purchase order
+
+1. In **Stock**, open **Purchase Orders** and press **New purchase order**.
+2. **Select supplier**, and set the **Expected receipt date** if you want.
+3. Press **+ Add line item**, choose the **Product** and **Variant** (required when the product has variants), and type the **Qty** and **Unit cost (EGP)**. The subtotal is calculated below the table.
+4. Add optional notes and press **Create draft PO**. The order is saved as a **Draft**, and nothing is sent to the supplier.
+
+You need at least one line with a product, quantity and unit cost. Order statuses are: Draft, Sent, Partial, Received and Cancelled.
+
+## Receive goods
+
+1. Open the order from the purchase orders list.
+2. Under **Receive items**, type in **Receive Qty** for each line the quantity that actually arrived. The columns show **Ordered**, **Received** and **Remaining**, and you cannot receive more than what remains.
+3. Press **Receive**.
+
+If you receive only part, the order becomes **Partial** and you can come back to receive the rest later. When every line is fully received it becomes **Received**. After each receipt stock goes up, and open waiting orders (see [Backorders](/en/backorders/)) are cleared oldest first.
+
+If a product has variants and the line was saved without one, it cannot be received, and you get a message telling you to cancel the order and draft it again for each variant.
+
+## Cancel a purchase order
+
+Cancelling is only available while the order is still a **Draft**, from **Purchase order options** then **Cancel PO**. Quantities already received stay, and you cannot restore the order after cancelling.
+
+## Common questions
+
+**How do I create a purchase order?** In **Purchase Orders** press **New purchase order**.
+
+**I received half the shipment?** Open the order, type only the quantity that arrived in **Receive Qty** and press **Receive**; the order is **Partial** until you receive the rest.

@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "product-tags",
   "questions": {
     "ar": ["ازاي اضيف تاج للمنتج؟"],
     "en": ["Add tags"]

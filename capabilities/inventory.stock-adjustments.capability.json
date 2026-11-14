@@ -20,7 +20,7 @@
     "class": "unclassified",
     "note": "posted adjustments need a reversing adjustment"
   },
-  "helpArticle": null,
+  "helpArticle": "stock-adjustments",
   "questions": {
     "ar": ["عايز اعمل تسوية جرد بملف"],
     "en": ["Adjust stock from a CSV"]

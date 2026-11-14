@@ -1,0 +1,69 @@
+---
+title: Reorder suggestions and dead stock
+description: Let Ebda Store suggest how much to reorder of each product, and find the stock that is not moving and clear it with a coupon.
+section: Selling
+order: 42
+appPath: /stores
+keywords: reorder suggestion rules lead time safety stock dead stock clearance discount coupon purchase order
+capabilities:
+  - inventory.reorder@1
+---
+
+Two pages under **Stock** help you decide: **Reorder** tells you how much to order and why, and **Dead Stock** shows products that are sitting and not selling.
+
+## Who can do this
+
+Only the store owner, and the owner must have two-step verification turned on (see [Account security](/en/account-security/)). Staff members do not have access to the Reorder and Dead Stock pages.
+
+## Reorder suggestions
+
+Open **Stock**, then **Reorder**. Suggestions are based on how fast the product sells, supplier lead time and open backorders. Each card shows:
+
+- **Reorder qty**.
+- **Suggested supplier**.
+- **Urgency**, in days.
+- **Variant** when the product has variants.
+
+You have two buttons:
+
+- **Draft PO**: creates a **draft** [purchase order](/en/suppliers-and-purchase-orders/) with the suggested quantity and supplier. You see "Draft PO created", and nothing is sent to the supplier.
+- **Dismiss**: removes the suggestion.
+
+When there are no suggestions, the page says the next scan runs tomorrow at 06:00 Cairo time. The **Re-scan now** button is not for merchants; only the Ebda team can use it.
+
+### Reorder rules
+
+For a product to appear as a suggestion you tell the system when to order it. On the Reorder page press **Reorder rules**, then **New rule**, and fill in:
+
+1. **Product**, and **Variant** if it has variants (or **Whole product**).
+2. **Reorder when stock is at or below**: a number from 0 to 1,000,000.
+3. **Quantity to order**: from 1 to 1,000,000.
+4. **Lead time (days)** and **Safety stock (days)**: from 0 to 365.
+5. **Preferred supplier** (optional).
+6. **Rule is active** to switch it on.
+
+Then **Save**. Each product (or variant) can have only one rule; adding a second shows that the item already has a rule, so edit the existing one. In the rules list you can **Edit** or **Delete** a rule (deleting does not change stock or purchase orders).
+
+## Dead stock
+
+Open **Stock**, then **Dead Stock**. A product appears when it:
+
+- is in stock and has not sold for **90 days or more** (a product that never sold counts from the day it was added), and
+- is worth **EGP 5,000 or more** at cost price. If a product has no cost price its value shows as "Unknown", so add the cost price on the product page.
+
+Each card shows the last sale, the stock value and the suggested discount, with clearance wording. You can:
+
+- **Run Clearance**: creates a percentage discount coupon with code `CLEAR-` plus the product's SKU, active straight away. Review it and set its scope under Coupons before relying on it, because the system does not limit it to specific products.
+- **Dismiss**: removes the product from the list.
+
+If a coupon with that code already exists, the system tells you to rename it and try again.
+
+## Plan
+
+These pages are not tied to a plan gate in the code, but the suggestions need your stock and sales data and the rules above.
+
+## Common questions
+
+**How much should I reorder of this product?** Open Reorder and read **Reorder qty**. If the product is not there, add a rule for it.
+
+**What is dead stock?** Products in stock that have not sold for 90 days and are worth EGP 5,000 or more at cost.

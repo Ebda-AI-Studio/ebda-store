@@ -1,0 +1,50 @@
+---
+title: Variants (sizes, volumes and colours)
+description: Sell one product in several options, like Small, Medium and Large, each with its own price, stock and photo.
+section: Selling
+order: 20
+appPath: /stores
+keywords: variants sizes colours volumes price per size stock sku swatch
+capabilities:
+  - product.variants@1
+---
+
+Variants let you sell the same product in more than one option: Small, Medium and Large, or a 4 liter and a 6 liter pack. Each variant has its own price, stock and photo, and your customer picks one on the product page.
+
+## Who can do this
+
+The store owner and staff members who can manage products.
+
+## Add variants
+
+1. Open the product from **Products**. On a brand-new product you get an **Add variants** button in the banner on top. On an older product open **More product options** and choose **Manage Variants**.
+2. The **Variants** page opens with your product name. At the top you see the product's base price and the **Total Variant Stock**.
+3. In the **Variants** card write one row per variant. Fill in the **Name** (for example Medium) and the **Name (Arabic)**.
+4. Fill in the **Price (EGP)**. You can also set a **Compare-at (EGP)** price, a **Cost (EGP)** and the **Stock**, and pick an **Image** if the variant has its own photo.
+5. To add another variant press **Add another variant**. The page starts you off with two empty rows.
+6. Press **Save variants**. You see "Variants saved" with the number saved.
+
+The page creates one option axis (like Size or Volume) and builds the variants from your rows. SKUs are generated automatically as "product SKU-variant name".
+
+## Swatches
+
+When the product has a single option axis, each row also has a **Swatch colour** and a **Swatch photo**. Your customer sees them as a colour dot or a small picture next to the choice, which is useful when the options are colours.
+
+## Products with two axes (Size by Colour)
+
+If a product was set up with two axes, such as Size and Colour, the page shows every combination as a row. You can edit the **Price**, **Stock** and **Image** of each combination, but the names are locked and you cannot create new combinations from this page. An **Option swatches** card also appears so you can save a colour or photo for each value.
+
+## Delete a variant
+
+Press **Remove** on the row. A confirmation asks you to delete the variant. If you confirm, it is removed from the product and cannot be restored.
+
+## If saving is blocked
+
+- **Add at least one variant with a name:** at least one row must have a name.
+- **"Name" appears twice:** variant names must be unique.
+- **Set a price:** every variant needs a price, and it must be zero or more.
+- **Some variants failed to save:** refresh to see the current state, then save again.
+
+<Callout title="Stock">
+  The total variant stock counts active variants only. A disabled variant is not counted as stock.
+</Callout>

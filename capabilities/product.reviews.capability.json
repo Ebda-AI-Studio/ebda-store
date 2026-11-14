@@ -25,7 +25,7 @@
     "class": "unclassified",
     "note": "reject/approve yes; delete = confirm"
   },
-  "helpArticle": null,
+  "helpArticle": "product-reviews",
   "questions": {
     "ar": ["ازاي اوافق على تقييم؟", "ارد على تقييم سلبي", "التقييم الوهمي ازاي اشيله؟"],
     "en": ["How do I reply to a bad review?"]

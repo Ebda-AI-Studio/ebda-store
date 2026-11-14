@@ -1,0 +1,52 @@
+---
+title: Phone orders (create an order from the admin)
+description: Record an order for a customer who called or messaged you, then send them a payment link.
+section: Selling
+order: 24
+appPath: /stores
+keywords: phone order manual order create order payment link coupon shipping customer whatsapp
+capabilities:
+  - order.create-phone@1
+---
+
+When a customer calls or messages you on WhatsApp to order, record the order yourself from the dashboard. It is saved unpaid, and you can issue a payment link to send the customer.
+
+## Who can do this
+
+The store owner and staff. Overriding coupon rules (below) is for the store owner only.
+
+## Create the order
+
+1. Open **Orders** and press **New phone order**.
+2. Under **Customer** choose **Existing customer** and search by name, email or phone, or **New / Guest** and type their details. **First name** and **Phone** are required; last name and email are optional.
+3. Under **Shipping address** write the **Address line** and choose the **Governorate**, then the **Area**. Once both are chosen the **Calculated shipping fee** appears (or "Free delivery"). If no rate is set for the area a warning says the order will save with 0 EGP shipping.
+4. If you agreed a different shipping price with the customer, enter it in **Shipping fee override (EGP)**. Leave it blank to use the calculated fee.
+5. Under **Products** search by name or SKU and click the product. If it has variants you are asked to choose one, and out-of-stock ones are marked. Change the quantity, and remove any item you do not want.
+6. Optional: enter a **Coupon code** and **Notes**.
+7. Press **Place order**. The order details page opens with a message showing the number.
+
+The shipping shown before saving is a preview only; tax is calculated when you save.
+
+## Coupons, with or without their rules
+
+A coupon is applied with its rules (customer group, first order, products, dates, usage limits). Only the store owner can turn on **Override coupon rules**, and must enter a **Reason for the override** (at least 3 characters). Your name and the reason are recorded on the order. A staff account cannot do this.
+
+## Send the payment link
+
+The order is created as **unpaid**. On the order details page press **Payment Link**:
+
+1. The **Issue Payment Link** window opens.
+2. Choose **Copy link**. It creates the link with your store's default online payment gateway.
+3. Copy the link and send it to the customer on WhatsApp, email or any channel. The store does not send it for you.
+
+When the customer pays, the order's payment status updates by itself. If the order is already paid the button is disabled. You need an online payment gateway enabled in [Payment providers](/en/payment-providers/).
+
+## If you see a message
+
+- **Add at least one product before placing the order.**
+- **First name and phone are required.**
+- **Pick a size or option for every product that has them.**
+- **A size on this order is disabled:** re-enable it on the product page or pick another size.
+- **Failed to create order:** the message comes with the reason.
+
+Learn more about order statuses in [Orders and cash on delivery](/en/orders-and-cod/).

@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes (unsubscribe)"
   },
-  "helpArticle": null,
+  "helpArticle": "new-order-alerts",
   "questions": {
     "ar": ["ازاي يرن الموبايل لما ييجي اوردر؟", "تطبيق ادارة الطلبات"],
     "en": ["How do I get a sound alert for new orders?"]

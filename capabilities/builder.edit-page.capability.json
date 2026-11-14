@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes (history/undo, draft never live until publish)"
   },
-  "helpArticle": null,
+  "helpArticle": "page-editor",
   "questions": {
     "ar": ["ازاي اغير الصفحة الرئيسية؟", "اضيف قسم جديد", "اخفي قسم", "الموبايل شكله مش حلو"],
     "en": ["How do I edit my home page?", "Add a section"]

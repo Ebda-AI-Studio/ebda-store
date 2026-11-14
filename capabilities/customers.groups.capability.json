@@ -21,7 +21,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "customer-groups",
   "questions": {
     "ar": ["اعمل مجموعة VIP", "خصم لمجموعة معينة"],
     "en": ["Create a VIP group"]

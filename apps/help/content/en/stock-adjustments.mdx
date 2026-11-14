@@ -1,0 +1,61 @@
+---
+title: Stock adjustments and CSV stock counts
+description: Correct stock after a count, damage or theft, by hand or by uploading a CSV, with every change recorded in your accounts.
+section: Selling
+order: 43
+appPath: /stores
+keywords: stock adjustment cycle count damage theft loss write-off csv import draft post
+capabilities:
+  - inventory.stock-adjustments@1
+---
+
+Any manual change to stock (a count, damaged goods, goods you found) is recorded as a **stock adjustment** with a number, a type and a reason. When you approve it, quantities really change and an entry is posted to your accounts.
+
+## Who can do this
+
+Only the store owner.
+
+## Plan
+
+Bulk stock adjustments are on the **Business** plan (see [Plans and billing](/en/plans-and-billing/)). If your plan does not include the feature, the request is refused with `FEATURE_DISABLED` and names the plan you need. The **Quick Adjust** link from Inventory opens this same screen.
+
+## Make a manual adjustment
+
+1. In **Stock**, open **Adjustments** and press **New stock adjustment**.
+2. Pick the **Adjustment type**:
+   - **Cycle Count**: sets stock to the quantity you actually counted.
+   - **Damage**: units damaged and no longer sellable.
+   - **Theft**: stock lost to theft.
+   - **Loss**: stock lost or misplaced for no clear reason.
+   - **Write-off**: deliberately removed (expired or obsolete).
+   - **Found Stock**: missing stock located, so the quantity goes up.
+   - **Return to Supplier**: sent back to the supplier, so the quantity goes down.
+3. Write the **Reason** in English and Arabic (optional), and optionally an **Evidence URL** (a link to a photo or file that proves the reason).
+4. Press **+ Add product**, choose the product and type the **New quantity** (the final quantity after the change, not the difference). You need at least one product.
+5. Choose one:
+   - **Save as draft**: saved in the adjustments list as a draft, and stock does not change.
+   - **Approve adjustment**: asks you to confirm, then stock changes and the entry is posted to your accounts.
+
+## Import adjustments from a CSV
+
+For hundreds of products, use the **CSV Import** tab on the same page:
+
+1. Press **Download template (.csv)** and fill it in.
+2. Each row needs a **SKU** or **Barcode**, plus **New Quantity** (the actual count) or **Delta** (positive or negative). Reason is optional. Arabic column headers are also accepted.
+3. Choose the adjustment type and upload the file (drag it in or click to choose).
+4. Review the preview: you see the first 50 rows, how many rows are valid and how many have errors. Rows with errors are skipped, with the reason for each (**Show row errors**).
+5. Press **Import & Post (N rows)**. The import approves the adjustment straight away, with no draft step. You see the adjustment number and how many rows were imported and skipped.
+
+<Callout title="Approval cannot be undone">
+  Once approved, an adjustment is never edited again and it posts an accounting entry. If you made a mistake, create a new adjustment that reverses it. If you want to review first, save the manual adjustment as a draft before approving.
+</Callout>
+
+## The adjustments list
+
+The table shows the number, type, status (draft or posted), date and value impact in EGP, and it has search. A manual draft appears here, but the current screen has no button to approve a draft after saving it, so use **Approve adjustment** if you want the change applied.
+
+## Common questions
+
+**How do I adjust stock from a CSV?** Use **CSV Import** with the **Cycle Count** type and a **New Quantity** column.
+
+**Only one product's quantity is wrong?** In the **Inventory** tab press **Quick Adjust** next to the product. It opens a new adjustment with that product selected.

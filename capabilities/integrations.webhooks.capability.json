@@ -22,7 +22,7 @@
     "class": "unclassified",
     "note": "delete yes recreate"
   },
-  "helpArticle": null,
+  "helpArticle": "webhooks",
   "questions": {
     "ar": ["ازاي اربط متجري بنظام تاني؟", "webhook بيفشل", "ابعت الاوردرات لنظام الـ ERP"],
     "en": ["Send new orders to my ERP"]

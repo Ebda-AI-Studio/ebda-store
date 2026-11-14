@@ -1,0 +1,46 @@
+---
+title: Customers who left the payment page
+description: See who reached the online payment gateway and did not finish, and contact them to win the sale back.
+section: Selling
+order: 35
+appPath: /stores/:id/payment-abandonments
+keywords: payment abandonment gateway abandoned checkout recover sale customers whatsapp lost sale
+capabilities:
+  - payment.abandonments@1
+---
+
+When a customer chooses online payment, gets a payment-gateway link and then leaves without paying, Ebda Store marks that order, and you find it on the **Payment Abandonments** page. These are customers very close to buying, and a message from you can win the sale back.
+
+## Who can open it
+
+The store owner.
+
+## Plan
+
+The page is available on the **Business** plan. If your plan does not include it you see an upgrade card instead of the page, and the server answers `FEATURE_DISABLED` and names the plan you need. See [Plans and billing](/en/plans-and-billing/).
+
+## How to see them
+
+1. Under **Marketing and offers** open **Payment Abandonments**.
+2. At the top you see four numbers: **Total abandoners (all time)**, **Last 7 days**, **Last 30 days** and **Total abandoned value (all time)**.
+3. The table shows order number, customer, phone, email, gateway, value, items, **Abandoned at** and status. Newest first.
+4. To pick a period choose **From** and **To** and press **Apply**. The × button clears the filter.
+5. Press **View order** on a row to open the order with its details.
+
+Phone and email in the table are partly hidden: the last 4 digits of the phone, and only the domain of the email. The full details are on the order page itself.
+
+## How an order is marked abandoned
+
+A periodic check (about every hour) looks for orders that are still **Pending** and unpaid, have an online payment link, and were created more than 30 minutes ago. The check does not cancel the order or change its payment status. An empty page means there is nobody like that in the period you picked.
+
+## After you know who left
+
+Under the table is a hint: **Contact the customer via WhatsApp or phone to recover the sale.** The page does not send messages itself. You contact the customer yourself, using their number on the order page.
+
+## Common questions
+
+**Who started paying and left?** Open the page and you will find them in the table.
+
+**The customer paid the order later.** Press **View order** and check the current payment status in the [payment events log](/en/payment-events-log/).
+
+**Why is there nothing about cash on delivery?** The page covers online payment gateways only.

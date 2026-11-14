@@ -21,7 +21,7 @@
     "class": "unclassified",
     "note": "post = ledger entry (reverse via journal)"
   },
-  "helpArticle": null,
+  "helpArticle": "finance-expenses",
   "questions": {
     "ar": ["ازاي اسجل مصروف؟", "صور فاتورة المورد", "اعتمد المصروفات"],
     "en": ["Record an expense from a receipt photo"]

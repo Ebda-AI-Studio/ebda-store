@@ -21,7 +21,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "customer-notifications",
   "questions": {
     "ar": ["ازاي يوصلني اشعار لما يجي اوردر؟", "وقف رسايل SMS", "واتساب اشعارات الاوردر"],
     "en": ["Notify me on a new order"]

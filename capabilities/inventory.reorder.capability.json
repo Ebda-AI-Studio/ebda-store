@@ -22,7 +22,7 @@
     "class": "unclassified",
     "note": "dismiss yes"
   },
-  "helpArticle": null,
+  "helpArticle": "reorder-and-dead-stock",
   "questions": {
     "ar": ["اشتري كام من المنتج ده؟", "ايه البضاعة الراكدة؟"],
     "en": ["What should I reorder?"]

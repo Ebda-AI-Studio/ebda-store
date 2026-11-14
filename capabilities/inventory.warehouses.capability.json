@@ -23,7 +23,7 @@
     "class": "unclassified",
     "note": "delete = confirm"
   },
-  "helpArticle": null,
+  "helpArticle": "warehouses",
   "questions": {
     "ar": ["عندي اكتر من مخزن", "انقل مخزون بين المخازن"],
     "en": ["I have two warehouses"]

@@ -1,0 +1,53 @@
+---
+title: Low-stock alerts
+description: Set the quantity at which each product counts as low, and see low products on the stock overview and in your email.
+section: Selling
+order: 40
+appPath: /stores
+keywords: low stock alert threshold running out out of stock quantity email inventory
+capabilities:
+  - inventory.alerts-thresholds@1
+---
+
+Every product has a **Low-Stock Threshold**. When a product's quantity drops to that number or below (and is not zero), Ebda Store treats it as low and shows it on your stock overview and in an email alert, so you can reorder before it runs out.
+
+## Who can do this
+
+The store owner and staff members can set thresholds and see the alerts.
+
+## Plan
+
+Alerts are on the **Growth** plan and above (see [Plans and billing](/en/plans-and-billing/)). If your plan does not include the feature, the request is refused with `FEATURE_DISABLED` and names the plan you need to upgrade to.
+
+## Set the threshold for one product
+
+1. Open the product from **Products** and edit it.
+2. Type the number in the **Low-Stock Threshold** field (the suggested value is 5).
+3. Save the product.
+
+## Set it for many products at once
+
+1. In **Stock**, open the **Inventory** tab.
+2. Tick the products you want (or **Select all**). The count shows, for example "3 selected".
+3. Type the number in the **Low-Stock Threshold** box and press **Set threshold**.
+4. You see "N products updated".
+
+The threshold must be a whole number from 0 to 1,000,000, and you can update up to 500 products at a time.
+
+## Where you see low products
+
+- **Stock**, then **Overview**: the **Low-stock SKUs** card, with **View all**.
+- The **Inventory** tab: the **On Hand** column colours a low product, and the **Low-Stock Threshold** column shows its limit. You can filter by **Low stock** or **Out of stock**.
+- To fix a quantity fast, press **Quick Adjust** next to the product. It opens a new stock adjustment with that product already selected (see [Stock adjustments](/en/stock-adjustments/)).
+
+## The email alert
+
+Every 6 hours Ebda Store scans your store. If products have dropped to their threshold, **one email** goes to the store owner listing them. Each product alerts once, and alerts again only after you restock it above the threshold and it falls again. A product at zero is not in the alert email, but it shows under the **Out of stock** filter.
+
+The button that runs the scan immediately is not available to merchants; only the Ebda team can run it.
+
+## Common questions
+
+**Why did I get no email?** Check that your plan includes alerts, that the product tracks inventory, and that its quantity is above zero and at or below the threshold. The alert is sent once per drop below the threshold.
+
+**Can I use one number for everything?** Yes. Select all products in Inventory and type one number.

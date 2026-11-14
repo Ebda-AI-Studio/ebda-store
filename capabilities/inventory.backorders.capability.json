@@ -16,7 +16,7 @@
     "class": "irreversible",
     "note": "no"
   },
-  "helpArticle": null,
+  "helpArticle": "backorders",
   "questions": {
     "ar": ["العميل طلب منتج خلصان"],
     "en": ["Customer ordered an out-of-stock item"]

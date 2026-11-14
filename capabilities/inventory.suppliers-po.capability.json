@@ -23,7 +23,7 @@
     "class": "unclassified",
     "note": "cancel no"
   },
-  "helpArticle": null,
+  "helpArticle": "suppliers-and-purchase-orders",
   "questions": {
     "ar": ["ازاي اعمل امر شراء؟", "استلمت نص الشحنة"],
     "en": ["Create a purchase order", "Receive a partial delivery"]

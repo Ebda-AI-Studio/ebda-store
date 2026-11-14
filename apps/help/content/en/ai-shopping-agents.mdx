@@ -1,0 +1,50 @@
+---
+title: Let AI shopping agents buy from your store
+description: Your store opens to shopping agents (such as Claude and ChatGPT) that search products, build a cart and place orders. Learn what is open, what needs a key, and how to control it.
+section: Settings
+order: 61
+appPath: /stores/:id/agent-key
+keywords: ai agent shopping mcp claude chatgpt agentic checkout cart order agent key x-agent-key
+capabilities:
+  - integrations.shopper-mcp@1
+---
+
+AI agents now shop on people's behalf: a customer tells their assistant "order a silver ring from this store", and the assistant goes into your store and does the work. Ebda Store gives every store its own MCP server so this can happen.
+
+## What an AI agent can do in your store
+
+- **Read without any key:** store info (name, currency, whether it accepts orders), product search, product details (variants, price, availability), view the cart, and order status. These tools are `get_store_info`, `search_products`, `get_product`, `view_cart` and `get_order_status`.
+- **Write only with a key:** add to cart `add_to_cart` and place the order `place_order`. The agent must send your store's key in the `x-agent-key` header on every write request, otherwise it is refused.
+
+An order the agent places is recorded as a guest order in **Orders**, like any other order. **Cash on delivery** completes on its own (your store must be set up for cash on delivery). **Online payment** returns a payment link that a person must open and pay from.
+
+## Who can control it
+
+The store owner.
+
+## Plan
+
+The feature is on for paid plans. If your store does not have it the server answers "not found" (404) rather than revealing that the service exists, and the key page does not appear in Settings. See [Plans and billing](/en/plans-and-billing/).
+
+## Issue the agent key
+
+1. Open **Settings**, then the **AI agent key** card.
+2. Press **Issue key**. The key is shown **once only**, so press **Copy key** and keep it wherever your agent keeps its secrets, then **I have stored it**. Nobody can read it back, including us.
+3. Give it to your agent. Never put it on a public page, in a chat or in your store content.
+
+The page shows the **Key status**: **Key issued** or **No key issued**, and when it was last changed.
+
+- **Rotate key:** issues a new key and the current one stops working immediately. Any agent still sending the old key is refused until you give it the new one.
+- **Revoke key:** removes it permanently and stops any agent using it. To open it up again you must issue a new key.
+
+Until you issue a key, no agent can add to a cart or place an order, but reading stays open.
+
+If you see the notice **Open writes are ON for this store**, a platform administrator has switched off the key requirement and any agent can write without a key. Ask support to switch it off once your agent is using its key.
+
+## Common questions
+
+**Can AI agents buy from my store?** Yes. They can search and build a cart without a key, and place an order when they hold your key.
+
+**I lost the key.** **Rotate key** and give the new one to your agent.
+
+**The agent is refused.** Make sure it sends the current key in the `x-agent-key` header, and that you did not rotate or revoke the key after handing it over.
