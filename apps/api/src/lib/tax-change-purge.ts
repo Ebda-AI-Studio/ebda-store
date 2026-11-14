@@ -12,6 +12,9 @@ import { StorageService } from '../services/storage.service';
 const CHANGE_PREFIX = 'tax.change.';
 const RESULT_PREFIX = 'tax.change-result.';
 
+// ONE prisma site: `system_settings` is a D1-routed platform model (services/platform/router.ts), like `ebda.vat`.
+const settings = () => prisma.systemSetting;
+
 export async function purgeTaxChangeRecords(
   storeId: string,
   deps: {
@@ -23,7 +26,7 @@ export async function purgeTaxChangeRecords(
   const readRow =
     deps.readRow ??
     (async (key: string) => {
-      const row = await prisma.systemSetting.findUnique({
+      const row = await settings().findUnique({
         where: { key },
         select: { value: true },
       });
@@ -33,7 +36,7 @@ export async function purgeTaxChangeRecords(
   const deleteRows =
     deps.deleteRows ??
     (async (keys: string[]) => {
-      await prisma.systemSetting.deleteMany({ where: { key: { in: keys } } });
+      await settings().deleteMany({ where: { key: { in: keys } } });
     });
   const pending = await readRow(`${CHANGE_PREFIX}${storeId}`);
   let object = false;
