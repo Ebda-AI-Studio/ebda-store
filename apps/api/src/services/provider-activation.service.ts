@@ -127,9 +127,10 @@ function findOpenRequest(storeId: string, provider: string): Promise<RequestRow 
   });
 }
 function createRequest(
-  data: Prisma.ProviderActivationRequestUncheckedCreateInput
+  storeId: string,
+  data: Omit<Prisma.ProviderActivationRequestUncheckedCreateInput, 'storeId'>
 ): Promise<RequestRow> {
-  return prisma.providerActivationRequest.create({ data });
+  return prisma.providerActivationRequest.create({ data: { storeId, ...data } });
 }
 function decideRequest(
   id: string,
@@ -247,8 +248,7 @@ export async function requestActivation(
     }
     return { request: toPublic(open), created: false };
   }
-  const row = await createRequest({
-    storeId,
+  const row = await createRequest(storeId, {
     provider,
     status: 'requested',
     requestedById: actor.userId,
@@ -740,8 +740,7 @@ export async function confirmSelfActivation(
             await decideRequest(open.id, storeId, data);
             return open.id;
           }
-          const row = await createRequest({
-            storeId,
+          const row = await createRequest(storeId, {
             provider,
             requestedById: actor.userId,
             ...data,
