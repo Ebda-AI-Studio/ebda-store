@@ -6,6 +6,7 @@
  */
 import { prisma, withStore } from '@ebda/database';
 import logger from '../../lib/logger';
+import { isStoreGoneError } from '../../lib/jobs/store-gone';
 import { encryption } from '../encryption.service';
 import { acrossBilling } from '../platform/billing-d1';
 import { getBillingProvider } from './index';
@@ -90,6 +91,11 @@ export async function renewDueAddons(now: Date, providerArg?: BillingProvider): 
       });
       if (r.settled === 'succeeded') charged++;
     } catch (err) {
+      // A closed / removed store is skipped, never a failed run (gone-store guard).
+      if (isStoreGoneError(err)) {
+        logger.warn({ storeId: c.storeId }, '[addons] renewal skipped: store is gone');
+        continue;
+      }
       logger.error({ err, storeId: c.storeId, planCode: c.planCode }, '[addons] renewal threw');
     }
   }
