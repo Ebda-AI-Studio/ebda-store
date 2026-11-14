@@ -51,8 +51,8 @@ const day = (d: Date) => d.toISOString().slice(0, 10);
 
 function Inner() {
   const t = useT('activation');
-  const [from, setFrom] = useState(() => day(new Date(Date.now() - 30 * 86_400_000)));
-  const [to, setTo] = useState(() => day(new Date()));
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [funnel, setFunnel] = useState<{ rows: FunnelRow[]; stores: number; truncated: boolean }>();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
@@ -67,7 +67,14 @@ function Inner() {
     return t('duration.days', { n: Math.round(s / 86_400) });
   };
 
+  // The default range is set after mount: a render-time Date would differ between server and client.
+  useEffect(() => {
+    setFrom(day(new Date(Date.now() - 30 * 86_400_000)));
+    setTo(day(new Date()));
+  }, []);
+
   const loadFunnel = useCallback(async () => {
+    if (!from || !to) return;
     const r = await apiGet<{ rows: FunnelRow[]; stores: number; truncated: boolean }>(
       `/api/v1/admin/ci/activation/funnel?from=${from}&to=${to}`
     );
