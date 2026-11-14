@@ -232,3 +232,22 @@ export function journalReverseManualOp(
     return { reversalId: r.reversalId as string };
   });
 }
+
+/**
+ * Input VAT claimed in a period (ACCT-AUDIT-10): the net debit of Input VAT (1300) over the counted entries posted in
+ * `[fromMs, toMs]`. The monthly return is output (Tax Payable, 2100) minus this.
+ */
+export function taxInputTotalOp(db: SyncSql, storeId: string, a: Args): { inputTax: number } {
+  if (typeof a.fromMs !== 'number' || !Number.isFinite(a.fromMs)) bad('fromMs');
+  if (typeof a.toMs !== 'number' || !Number.isFinite(a.toMs)) bad('toMs');
+  const r = db.all(
+    `SELECT COALESCE(SUM(l.debit - l.credit), 0) AS t
+       FROM journal_lines l
+       JOIN journal_entries e ON e.id = l.entry_id
+       JOIN accounts x ON x.id = l.account_id AND x.store_id = e.store_id
+      WHERE e.store_id = ? AND x.code = '1300' AND e.status IN ('posted', 'reversed')
+        AND e.posted_at >= ? AND e.posted_at <= ?`,
+    [storeId, a.fromMs, a.toMs]
+  )[0];
+  return { inputTax: Number(r?.t ?? 0) };
+}

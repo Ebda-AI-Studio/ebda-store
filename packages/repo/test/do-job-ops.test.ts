@@ -429,6 +429,72 @@ describe('expense / stock-adjustment / PO-receive journals (Ruling CF-JOBS-4)', 
     });
   });
 
+  describe('input VAT on expenses (ACCT-AUDIT-10)', () => {
+    const exp = (r: ReturnType<typeof rig>, amount: number, tax: number) =>
+      r.raw.exec(
+        `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, tax_amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', ${amount}, ${tax}, ${amount + tax}, ${Date.now() - 1000}, 'posted')`
+      );
+    const lines = (r: ReturnType<typeof rig>) =>
+      r
+        .q(
+          `SELECT a.code, l.debit, l.credit FROM journal_lines l JOIN accounts a ON a.id = l.account_id ORDER BY a.code`
+        )
+        .map(x => [x.code, Number(x.debit), Number(x.credit)]);
+
+    it('a 114.00 receipt with 14.00 VAT books expense 100.00 + input VAT 14.00 against cash 114.00', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO accounts (id, store_id, code, name_en, type, is_system) VALUES ('a1300', 's1', '1300', 'VAT Recoverable', 'asset', 1)`
+      );
+      exp(r, 10000, 1400);
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(lines(r)).toEqual([
+        ['1000', 0, 11400],
+        ['1300', 1400, 0],
+        ['5200', 10000, 0],
+      ]);
+      expect(tb(r).debit).toBe(tb(r).credit);
+    });
+
+    it('a store whose chart has no 1300 yet keeps the old gross posting (never a failed job)', () => {
+      const r = books();
+      exp(r, 10000, 1400);
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(lines(r)).toEqual([
+        ['1000', 0, 11400],
+        ['5200', 11400, 0],
+      ]);
+    });
+
+    it('an expense with no tax posts two lines as before', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO accounts (id, store_id, code, name_en, type, is_system) VALUES ('a1300', 's1', '1300', 'VAT Recoverable', 'asset', 1)`
+      );
+      exp(r, 500, 0);
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(lines(r)).toEqual([
+        ['1000', 0, 500],
+        ['5200', 500, 0],
+      ]);
+    });
+
+    it('taxInputTotal sums the input VAT of the period; a reversal nets it out', () => {
+      const r = books();
+      r.raw.exec(
+        `INSERT INTO accounts (id, store_id, code, name_en, type, is_system) VALUES ('a1300', 's1', '1300', 'VAT Recoverable', 'asset', 1)`
+      );
+      exp(r, 10000, 1400);
+      r.op('journalExpense', { expenseId: 'e1' });
+      expect(r.op('taxInputTotal', { fromMs: 0, toMs: Date.now() + 1000 })).toEqual({
+        inputTax: 1400,
+      });
+      expect(r.op('taxInputTotal', { fromMs: Date.now() + 5000, toMs: Date.now() + 9000 })).toEqual(
+        { inputTax: 0 }
+      );
+    });
+  });
+
   describe('partial PO receipts (ACCT-AUDIT-1)', () => {
     const seed = (r: ReturnType<typeof rig>) =>
       r.raw.exec(

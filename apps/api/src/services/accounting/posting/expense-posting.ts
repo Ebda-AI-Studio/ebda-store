@@ -1,5 +1,6 @@
 import { prisma } from '@ebda/database';
 import { postEntry } from '../journal.service';
+import { getSystemAccountIdByCode } from '../account.service';
 import logger from '../../../lib/logger';
 import { storeMoney } from '../../../lib/repo-factory';
 
@@ -11,18 +12,25 @@ export interface ExpenseJournalInput {
 /**
  * Post the GL journal for an expense.
  *
- * v1 simplification: tax recovery is deferred until Egypt VAT activates.
- * The full expense total (amount + taxAmount) is debited to the merchant's
- * chosen expense account and credited from the chosen payment account.
- * When VAT becomes applicable, the tax portion should be split into a
- * separate DR to a Tax Recoverable asset account.
- *
- *   DR expenseAccount  (total)
+ *   DR expenseAccount  (total - tax)
+ *   DR Input VAT 1300  (tax)          -- only when the chart has 1300 and the tax is > 0
  *   CR paidFromAccount (total)
+ *
+ * A chart without 1300 (a store not re-seeded yet) keeps the old gross posting:
+ *   DR expenseAccount (total) / CR paidFromAccount (total).
  *
  * Idempotent via postEntry's (source, sourceId) check.
  * Guards: skips if expense not found, accounting disabled, or not posted.
  */
+/** The store's account for `code`, or null when its chart does not have it yet (never throws). */
+async function findAccountIdByCode(storeId: string, code: string): Promise<string | null> {
+  try {
+    return await getSystemAccountIdByCode(storeId, code);
+  } catch {
+    return null;
+  }
+}
+
 export async function postExpenseJournal(args: ExpenseJournalInput): Promise<void> {
   // A store on its Durable Object posts in one section there (Ruling CF-JOBS-4); idempotent per source row.
   const money = await storeMoney(args.storeId);
@@ -68,23 +76,27 @@ export async function postExpenseJournal(args: ExpenseJournalInput): Promise<voi
     return;
   }
 
+  // ACCT-AUDIT-10: the VAT on a purchase is recoverable (Input VAT 1300), not part of the expense. A chart with no 1300 yet
+  // keeps the old gross posting.
+  const tax = Math.min(Math.max(expense.taxAmount ?? 0, 0), total);
+  const inputVat = tax > 0 ? await findAccountIdByCode(args.storeId, '1300') : null;
+  const line = (accountId: string, debit: number, credit: number, lineMemo: string) => ({
+    accountId,
+    debit,
+    credit,
+    lineMemo,
+    refTable: 'expenses',
+    refId: expense.id,
+  });
   const lines = [
-    {
-      accountId: expense.expenseAccountId,
-      debit: total,
-      credit: 0,
-      lineMemo: `Expense — ${expense.expenseNumber}`,
-      refTable: 'expenses',
-      refId: expense.id,
-    },
-    {
-      accountId: expense.paidFromAccountId,
-      debit: 0,
-      credit: total,
-      lineMemo: `Paid — ${expense.expenseNumber}`,
-      refTable: 'expenses',
-      refId: expense.id,
-    },
+    line(
+      expense.expenseAccountId,
+      inputVat ? total - tax : total,
+      0,
+      `Expense — ${expense.expenseNumber}`
+    ),
+    ...(inputVat ? [line(inputVat, tax, 0, `Input VAT — ${expense.expenseNumber}`)] : []),
+    line(expense.paidFromAccountId, 0, total, `Paid — ${expense.expenseNumber}`),
   ];
 
   await postEntry({

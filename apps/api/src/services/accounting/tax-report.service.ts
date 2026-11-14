@@ -7,7 +7,7 @@ import { DEFAULT_STORE_TIME_ZONE, zonedIsoDay } from '@ebda/shared';
  * that moved Tax Payable (2100) in the period: the sale, and any
  * refund/return reversal or partial-return adjustment. Reversal rows carry
  * NEGATIVE amounts, so the summary nets to what the merchant actually owes.
- * All money fields are in PIASTRES (integer — smallest EGP unit = 1/1000 EGP).
+ * All money fields are in PIASTRES (integer — 1 piastre = 1/100 EGP).
  */
 export interface TaxReportRow {
   /**
@@ -72,8 +72,29 @@ export interface TaxReportResult {
     totalTaxableSales: number;
     /** NET tax collected in piastres — sales minus refund/return reversals */
     totalTaxCollected: number;
+    /** Input VAT claimed on purchases / expenses in the period (account 1300), piastres (ACCT-AUDIT-10) */
+    totalInputTax: number;
+    /** What the return owes: output tax collected minus input tax claimed, piastres (negative = refundable) */
+    netTaxPayable: number;
     byRate: TaxRateSummary[];
   };
+}
+
+/** The standard Egyptian VAT rates a derived rate may snap to (percent). */
+const STANDARD_RATES_PCT = [0, 5, 10, 14];
+
+/**
+ * Derive the entry's effective rate and snap it to a standard rate when the piastre rounding of the tax explains the gap
+ * (a 33.33 base at 14% taxes 4.67, which reads back as 14.01), so rounding never spawns its own bucket. A blended basket
+ * (a 14% line with an exempt line) matches no standard rate within one piastre and keeps its blended rate: the order lines
+ * carry no per-line rate, so that split needs a schema change (ACCT-AUDIT-10 residual).
+ */
+function effectiveRatePct(tax: number, base: number): number {
+  if (base === 0) return 0;
+  for (const r of STANDARD_RATES_PCT) {
+    if (Math.abs(tax - Math.round((base * r) / 100)) <= 1) return r;
+  }
+  return Math.round((tax / base) * 10000) / 100;
 }
 
 /**
@@ -218,8 +239,7 @@ export async function generateTaxReport(
     // Derive effective rate from the entry's OWN tax/base pair — a reversal
     // row's negatives cancel, giving the same positive rate as its sale.
     // Avoid divide-by-zero: if the base is 0 but tax moved, show 0.00%.
-    const effectiveRatePct =
-      taxableBase !== 0 ? Math.round((taxCollected / taxableBase) * 10000) / 100 : 0;
+    const ratePct = effectiveRatePct(taxCollected, taxableBase);
 
     return {
       kind: r.is_sale ? 'sale' : 'reversal',
@@ -227,11 +247,30 @@ export async function generateTaxReport(
       orderNumber: r.order_number,
       customerName: r.customer_name ?? null,
       subtotal: taxableBase,
-      taxRate: effectiveRatePct.toFixed(2),
+      taxRate: ratePct.toFixed(2),
       taxCollected,
       total: r.is_sale ? Number(r.order_total) : null,
     };
   });
+
+  // ─── Input VAT claimed on purchases (account 1300) ───────────────────────────
+  const inputTax = money
+    ? (await money.taxInputTotal({ fromMs: from.getTime(), toMs: to.getTime() })).inputTax
+    : Number(
+        (
+          await prisma.$queryRawUnsafe<Array<{ t: bigint }>>(
+            `SELECT COALESCE(SUM(l.debit - l.credit), 0)::bigint AS t
+               FROM public.journal_lines l
+               JOIN public.journal_entries e ON e.id = l.entry_id
+               JOIN public.accounts a ON a.id = l.account_id AND a.store_id = $1
+              WHERE e.store_id = $1 AND a.code = '1300' AND e.status IN ('posted', 'reversed')
+                AND e.posted_at >= $2::timestamp AND e.posted_at <= $3::timestamp`,
+            storeId,
+            from.toISOString(),
+            to.toISOString()
+          )
+        )?.[0]?.t ?? 0
+      );
 
   // ─── Build summary ───────────────────────────────────────────────────────────
   const totalTaxCollected = txRows.reduce((s, r) => s + r.taxCollected, 0);
@@ -268,6 +307,8 @@ export async function generateTaxReport(
       orderCount: new Set(txRows.map(r => r.orderNumber)).size,
       totalTaxableSales,
       totalTaxCollected,
+      totalInputTax: inputTax,
+      netTaxPayable: totalTaxCollected - inputTax,
       byRate,
     },
   };

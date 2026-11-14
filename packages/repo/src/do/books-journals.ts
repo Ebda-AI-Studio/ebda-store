@@ -30,7 +30,7 @@ export function journalExpenseOp(db: SyncSql, storeId: string, a: Record<string,
   const id = str(a.expenseId, 'expenseId');
   return db.transactionSync((): Out => {
     const e = db.all(
-      'SELECT id, expense_number, status, total, expense_date, expense_account_id, paid_from_account_id FROM expenses WHERE id = ? AND store_id = ?',
+      'SELECT id, expense_number, status, total, tax_amount, expense_date, expense_account_id, paid_from_account_id FROM expenses WHERE id = ? AND store_id = ?',
       [id, storeId]
     )[0];
     if (!e) return { posted: false, skipped: 'expense_not_found' };
@@ -39,6 +39,28 @@ export function journalExpenseOp(db: SyncSql, storeId: string, a: Record<string,
     const total = e.total as number;
     if (total === 0) return { posted: false, skipped: 'zero_total' };
     const num = e.expense_number as string;
+    // ACCT-AUDIT-10: the VAT on a purchase is recoverable, so it goes to Input VAT (1300), not into the expense. A chart that
+    // has no 1300 yet (a store not re-seeded) keeps the old gross posting, never a failed job.
+    const tax = Math.min(Math.max(Number(e.tax_amount ?? 0), 0), total);
+    const inputVat =
+      tax > 0
+        ? (db.all("SELECT id FROM accounts WHERE store_id = ? AND code = '1300'", [storeId])[0]
+            ?.id as string | undefined)
+        : undefined;
+    const net = inputVat ? total - tax : total;
+    const line = (
+      accountId: string,
+      debit: number,
+      credit: number,
+      lineMemo: string
+    ): JournalLine => ({
+      accountId,
+      debit,
+      credit,
+      lineMemo,
+      refTable: 'expenses',
+      refId: id,
+    });
     const r = postEntry(db, {
       storeId,
       source: 'expense',
@@ -47,22 +69,9 @@ export function journalExpenseOp(db: SyncSql, storeId: string, a: Record<string,
       memo: `Expense — ${num}`,
       memoAr: `مصروف — ${num}`,
       lines: [
-        {
-          accountId: e.expense_account_id as string,
-          debit: total,
-          credit: 0,
-          lineMemo: `Expense — ${num}`,
-          refTable: 'expenses',
-          refId: id,
-        },
-        {
-          accountId: e.paid_from_account_id as string,
-          debit: 0,
-          credit: total,
-          lineMemo: `Paid — ${num}`,
-          refTable: 'expenses',
-          refId: id,
-        },
+        line(e.expense_account_id as string, net, 0, `Expense — ${num}`),
+        ...(inputVat ? [line(inputVat, tax, 0, `Input VAT — ${num}`)] : []),
+        line(e.paid_from_account_id as string, 0, total, `Paid — ${num}`),
       ],
     });
     return { posted: r.created };

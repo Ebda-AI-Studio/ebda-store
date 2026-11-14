@@ -49,6 +49,7 @@ function makeRow(overrides: {
   };
 }
 
+const noInput = vi.fn().mockResolvedValue({ inputTax: 0 });
 const STORE_ID = 'store-unit-test-001';
 const FROM = new Date('2026-01-01');
 const TO = new Date('2026-01-31');
@@ -303,7 +304,8 @@ describe('generateTaxReport — basic aggregation', () => {
 
     await generateTaxReport(STORE_ID, { from: FROM, to: TO });
 
-    expect(mockQueryRawUnsafe).toHaveBeenCalledOnce();
+    // the sales query, then the input-VAT query (ACCT-AUDIT-10)
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(2);
     const [sql, sid, f, t] = mockQueryRawUnsafe.mock.calls[0];
     expect(typeof sql).toBe('string');
     expect(sql).toContain("code = '2100'");
@@ -330,7 +332,7 @@ describe('generateTaxReport on a Durable Object store (Ruling NZ-ACCT-1)', () =>
 
   it('reads the DO op with the window in ms and never touches Postgres', async () => {
     const taxReportLines = vi.fn().mockResolvedValue([line({})]);
-    mockStoreMoney.mockResolvedValue({ taxReportLines });
+    mockStoreMoney.mockResolvedValue({ taxReportLines, taxInputTotal: noInput });
     const r = await generateTaxReport('s1', { ...WIN, timeZone: 'UTC' });
     expect(taxReportLines).toHaveBeenCalledWith({
       fromMs: WIN.from.getTime(),
@@ -350,10 +352,14 @@ describe('generateTaxReport on a Durable Object store (Ruling NZ-ACCT-1)', () =>
   });
 
   it('an empty window is an empty report, and a reversal row keeps its negative tax with no order total', async () => {
-    mockStoreMoney.mockResolvedValue({ taxReportLines: vi.fn().mockResolvedValue([]) });
+    mockStoreMoney.mockResolvedValue({
+      taxReportLines: vi.fn().mockResolvedValue([]),
+      taxInputTotal: noInput,
+    });
     const empty = await generateTaxReport('s1', { ...WIN, timeZone: 'UTC' });
     expect(empty.rows).toEqual([]);
     mockStoreMoney.mockResolvedValue({
+      taxInputTotal: noInput,
       taxReportLines: vi
         .fn()
         .mockResolvedValue([
@@ -371,9 +377,58 @@ describe('generateTaxReport on a Durable Object store (Ruling NZ-ACCT-1)', () =>
 
   it('a DO refusal propagates (never falls back to Postgres)', async () => {
     mockStoreMoney.mockResolvedValue({
+      taxInputTotal: noInput,
       taxReportLines: vi.fn().mockRejectedValue(new Error('DO down')),
     });
     await expect(generateTaxReport('s1', WIN)).rejects.toThrow('DO down');
     expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
+  });
+});
+
+describe('generateTaxReport: input VAT and rate buckets (ACCT-AUDIT-10)', () => {
+  const W = { from: new Date('2026-01-01'), to: new Date('2026-01-31'), timeZone: 'UTC' };
+  const sale = (taxDelta: number, baseDelta: number, n: string) => ({
+    postedAtMs: Date.UTC(2026, 0, 15),
+    orderNumber: n,
+    customerName: null,
+    taxDelta,
+    baseDelta,
+    orderTotal: baseDelta + taxDelta,
+    isSale: true,
+  });
+
+  it('the summary carries the input VAT claimed and the net payable (output - input)', async () => {
+    const taxInputTotal = vi.fn().mockResolvedValue({ inputTax: 1400 });
+    mockStoreMoney.mockResolvedValue({
+      taxReportLines: vi.fn().mockResolvedValue([sale(2800, 20000, 'A')]),
+      taxInputTotal,
+    });
+    const r = await generateTaxReport('s1', W);
+    expect(taxInputTotal).toHaveBeenCalledWith({ fromMs: W.from.getTime(), toMs: W.to.getTime() });
+    expect(r.summary.totalTaxCollected).toBe(2800);
+    expect(r.summary.totalInputTax).toBe(1400);
+    expect(r.summary.netTaxPayable).toBe(1400);
+  });
+
+  it('piastre rounding does not spawn 14.01 / 13.99 buckets: they snap to 14.00', async () => {
+    mockStoreMoney.mockResolvedValue({
+      taxReportLines: vi
+        .fn()
+        .mockResolvedValue([sale(467, 3333, 'A'), sale(1399, 10000, 'B'), sale(1400, 10000, 'C')]),
+      taxInputTotal: noInput,
+    });
+    const r = await generateTaxReport('s1', W);
+    expect(r.summary.byRate.map(b => b.taxRate)).toEqual(['14.00']);
+    expect(r.rows.map(x => x.taxRate)).toEqual(['14.00', '14.00', '14.00']);
+    expect(r.summary.byRate[0].transactionCount).toBe(3);
+  });
+
+  it('a blended basket (half 14%, half exempt) is NOT forced onto a standard rate', async () => {
+    mockStoreMoney.mockResolvedValue({
+      taxReportLines: vi.fn().mockResolvedValue([sale(700, 10000, 'A')]),
+      taxInputTotal: noInput,
+    });
+    const r = await generateTaxReport('s1', W);
+    expect(r.rows[0].taxRate).toBe('7.00');
   });
 });

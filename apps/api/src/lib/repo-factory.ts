@@ -1100,6 +1100,8 @@ export interface MoneyClient {
     reason: string;
     actor: string | null;
   }): Promise<{ reversalId: string }>;
+  /** Input VAT (account 1300) claimed in a period, for the tax return (ACCT-AUDIT-10). */
+  taxInputTotal(a: { fromMs: number; toMs: number }): Promise<{ inputTax: number }>;
   /** Re-post journals whose trigger was lost (ACCT-AUDIT-5); idempotent, bounded per run. */
   journalRepostMissing(a: {
     includeExpenses?: boolean;
@@ -1638,6 +1640,7 @@ export function makeMoneyClient(
     journalRepostMissing: a => call('journalRepostMissing', a),
     journalManual: (a, key) => call('journalManual', a, key),
     journalReverseManual: a => call('journalReverseManual', a),
+    taxInputTotal: a => call('taxInputTotal', a),
     backorderCancel: (a, key) => call('backorderCancel', a, key),
     bankLedgerSide: a => call('bankLedgerSide', a),
     stockValue: () => call('stockValue', {}),
