@@ -4,6 +4,7 @@ import { storageBackendCounts } from './store-backend';
 import { buyerKeyVector } from './wa/health-vector';
 import { isWorkers } from './runtime';
 import { alertIfStoreCreateMisconfigured } from './store-create-config';
+import { instapayAutoReady } from './instapay-dedupe';
 
 /**
  * The public GET /health body: status, time, which build is running and, when the suite buyer-key secret is
@@ -29,6 +30,8 @@ export async function healthPayload(
     ...buildIdentity(),
     // NEON-ZERO N-17 (Ruling NZ-D23): there is no Postgres to report on; a constant so a caller can tell "removed" from "not said".
     postgres: 'removed',
+    // InstaPay auto-confirm wiring (INSTAPAY-AUTO-1): names only, never a value; the mode defaults to off so a gap never fails the deploy probe.
+    instapayAuto: instapayAutoReady(env),
     ...(vector ? { buyerKeyVector: vector } : {}),
     ...(isWorkers ? { store_create: storeCreate } : {}),
     // Public: reachability only. The per-backend store COUNTS disclose the store count, so they are served only by
