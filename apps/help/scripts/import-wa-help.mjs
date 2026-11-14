@@ -29,6 +29,13 @@ export const STORE_LINKS = {
   'use-the-shared-number': ['chat.ref-help@1'],
 };
 
+/** MDX reads braces as expressions: escape them outside inline code (a template variable is written {{1}}). */
+const escapeBraces = t =>
+  t
+    .split(/(```[\s\S]*?```|`[^`\n]*`)/)
+    .map((part, i) => (i % 2 ? part : part.replace(/([{}])/g, '\\$1')))
+    .join('');
+
 export function convert(raw, lang, order, slug = '') {
   const { fm: srcFm, rest } = splitFrontMatter(raw);
   const extraIds = STORE_LINKS[slug] ?? [];
@@ -52,12 +59,10 @@ export function convert(raw, lang, order, slug = '') {
     para.push(l.trim());
   }
   const base = lang === 'ar' ? '' : '/en';
-  const text = body
-    .join('\n')
-    .replace(
-      /\((\d\d)-([a-z0-9-]+)\.md(#[^)]*)?\)/g,
-      (_, _n, slug, h = '') => `(${base}/whatsapp/${slug}/${h})`
-    );
+  const text = escapeBraces(body.join('\n')).replace(
+    /\((\d\d)-([a-z0-9-]+)\.md(#[^)]*)?\)/g,
+    (_, _n, slug, h = '') => `(${base}/whatsapp/${slug}/${h})`
+  );
   const extra = fm ? `\n${fm.trim()}` : '';
   return `---\ntitle: ${q(title)}\ndescription: ${q(desc(clean(para.join(' '))))}\nsection: ${q(SECTION[lang])}\norder: ${order}${extra}\n---\n\n${text.trimEnd()}\n`;
 }

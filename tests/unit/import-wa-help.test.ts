@@ -32,4 +32,9 @@ describe('import-wa-help convert', () => {
     const a = toHelpArticle('whatsapp/use-the-shared-number', 'en', out);
     expect(a.capabilities.map(c => c.id)).toEqual(['chat.ref-help']);
   });
+
+  it('escapes braces outside code so a {{1}} template variable does not break MDX', () => {
+    const out = convert('# T\n\nUse {{1}} and `{{2}}`.\n', 'en', 1);
+    expect(out).toContain('Use \\{\\{1\\}\\} and `{{2}}`.');
+  });
 });
