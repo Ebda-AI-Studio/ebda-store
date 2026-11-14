@@ -1,0 +1,42 @@
+{
+  "id": "integrations.merchant-mcp",
+  "status": "live",
+  "area": "integrations",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "شغل متجرك من مساعد ذكاء",
+  "titleEn": "Run my store from an AI assistant (Merchant MCP keys + write switch)",
+  "screens": ["/stores/[id]/merchant-keys"],
+  "api": [
+    "GET/POST .../integrations/merchant-keys",
+    "DELETE .../merchant-keys/:keyId",
+    "GET/PUT .../integrations/merchant-mcp/write-switch",
+    "POST/GET/DELETE /mcp/admin/:storeSlug"
+  ],
+  "mcpTool": "all 11 read + 15 write admin_* tools",
+  "planGate": "merchant_mcp; merchant_mcp_write (Growth+Business)",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "keys revocable"
+  },
+  "helpArticle": "merchant-mcp-write-tools",
+  "questions": {
+    "ar": ["ازاي اشغل المتجر من Claude؟", "ايه مفتاح MCP؟", "الغي المفتاح"],
+    "en": ["How do I manage my store from Claude?"]
+  },
+  "steps": ["Merchant keys page: mint key (shown once), toggle writes."],
+  "edgeCases": [
+    "Destructive tools need confirm-token round trip",
+    "Key acts as owning user (staff limits)",
+    "Audit actor=mcp",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [],
+  "assistantNote": "key minting deep-link only"
+}

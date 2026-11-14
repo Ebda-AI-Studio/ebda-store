@@ -1,0 +1,46 @@
+{
+  "id": "product.reviews",
+  "status": "live",
+  "area": "customers",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ادارة التقييمات والرد عليها",
+  "titleEn": "Moderate product reviews, reply, AI draft reply",
+  "screens": ["/stores/[id]/reviews"],
+  "api": [
+    "GET /stores/:storeId/reviews/admin",
+    "PUT .../admin/:id",
+    "POST .../admin/:id/approve",
+    "POST .../admin/:id/reject",
+    "DELETE .../admin/:id",
+    "POST .../admin/:id/draft-response",
+    "PUT .../admin/:id/owner-response",
+    "POST .../admin/products/:productId/summary"
+  ],
+  "mcpTool": "admin_list_reviews",
+  "planGate": "reviews",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "unclassified",
+    "note": "reject/approve yes; delete = confirm"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي اوافق على تقييم؟", "ارد على تقييم سلبي", "التقييم الوهمي ازاي اشيله؟"],
+    "en": ["How do I reply to a bad review?"]
+  },
+  "steps": ["Reviews page: approve/reject, reply; AI drafts reply (merchant sends)."],
+  "edgeCases": [
+    "Reply is public: confirm",
+    "Fake review detection none",
+    "Review only by verified buyers (can-review)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}

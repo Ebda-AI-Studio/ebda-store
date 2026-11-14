@@ -1,0 +1,34 @@
+{
+  "id": "store.navigation-menu",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "قائمة التنقل وروابط الفوتر",
+  "titleEn": "Navigation menu and footer links editor",
+  "screens": ["/stores/[id]/navigation"],
+  "api": ["PUT /stores/:storeId (navigation/footer links)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي اغير القايمة اللي فوق؟", "ضيف رابط في الفوتر"],
+    "en": ["Edit my menu and footer links"]
+  },
+  "steps": ["Navigation page: NavMenuEditor + FooterLinksEditor."],
+  "edgeCases": [
+    "Menu depth",
+    "Links to hidden pages 404",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article; editor also reachable in builder (inferred)"]
+}

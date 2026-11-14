@@ -1,0 +1,44 @@
+{
+  "id": "store.agent-feed",
+  "status": "live",
+  "area": "seo",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "خلاصة المنتجات لوكلاء الذكاء",
+  "titleEn": "AI product feed and llms.txt for shopping agents",
+  "screens": [
+    "/stores/[id]/agent-key",
+    "public /feeds/products.json, /llms.txt, /.well-known/acp.json"
+  ],
+  "api": [
+    "GET/POST/DELETE /stores/:id/integrations/agent-key",
+    "POST /stores/:storeId/ai/bulk/llms-txt"
+  ],
+  "mcpTool": null,
+  "planGate": "agent_feed",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (revoke key)"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي ChatGPT يقدر يشتري من متجري؟", "ايه مفتاح الوكيل؟"],
+    "en": ["How can AI agents shop on my store?"]
+  },
+  "steps": [
+    "Agent key page mints the X-Agent-Key for checkout writes; feed is public when feature on."
+  ],
+  "edgeCases": [
+    "agent_checkout_open_writes is a super-admin rollback lever",
+    "Key shown once",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"],
+  "assistantNote": "key minting: deep-link only (secret shown once)"
+}

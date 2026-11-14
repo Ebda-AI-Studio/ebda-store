@@ -1,0 +1,34 @@
+{
+  "id": "store.hero",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "بانر الصفحة الرئيسية",
+  "titleEn": "Hero banner / slides (legacy hero page)",
+  "screens": ["/stores/[id]/hero"],
+  "api": ["(store layout / builder hero section)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي اغير صورة البانر؟", "ضيف سلايد"],
+    "en": ["Change the hero banner"]
+  },
+  "steps": ["Hero page or editor hero section; background video supported per slide."],
+  "edgeCases": [
+    "Image ratio on phones (hero height on phones)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Overlaps with the editor; verify page redirects to editor", "No help article"]
+}

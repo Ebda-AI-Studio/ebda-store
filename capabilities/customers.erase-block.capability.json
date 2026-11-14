@@ -1,0 +1,39 @@
+{
+  "id": "customers.erase-block",
+  "status": "live",
+  "area": "customers",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "احذف او ابلوك عميل",
+  "titleEn": "Block, delete or erase (PDPL) a customer; export customer data",
+  "screens": ["/stores/[id]/customers/[customerKey]"],
+  "api": [
+    "PUT .../customers/:customerId/status",
+    "DELETE .../customers/:customerId",
+    "POST .../customers/:customerId/erase",
+    "GET .../customers/:customerId/export"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no (erase irreversible)"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["العميل عايز يمسح بياناته", "ابلوك عميل", "نزلي بيانات عميل"],
+    "en": ["A customer asked me to delete their data"]
+  },
+  "steps": ["Customer page."],
+  "edgeCases": [
+    "Orders retained for tax law; erase anonymises",
+    "Legal retention conflict",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}

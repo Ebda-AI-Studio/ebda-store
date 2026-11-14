@@ -1,0 +1,48 @@
+{
+  "id": "store.domain",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "وصل دومين خاص بيك",
+  "titleEn": "Connect a custom domain",
+  "screens": ["/stores/[id]/domain"],
+  "api": ["GET /stores/:storeId/domain", "PUT /stores/:storeId/domain"],
+  "mcpTool": null,
+  "planGate": "plan.customDomain (Basic+; Free no)",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (remove domain) but DNS changes are outside Ebda"
+  },
+  "helpArticle": "custom-domain",
+  "questions": {
+    "ar": [
+      "ازاي اربط الدومين بتاعي؟",
+      "الدومين لسه pending",
+      "حطيت DNS وماشتغلش",
+      "ينفع دومين من GoDaddy؟",
+      "الدومين متحجوز على متجر تاني"
+    ],
+    "en": ["How do I connect my domain?", "My domain is stuck on pending DNS verification"]
+  },
+  "steps": [
+    "Domain page: enter domain (claim), add DNS records at the registrar, wait for Verified; unverified claim auto-released after 72 h."
+  ],
+  "edgeCases": [
+    "Apex vs www (flattened apex handled)",
+    "Claim released after 72 h",
+    "Domain active on another store cannot be claimed",
+    "Plan without customDomain: Free only",
+    "DNS propagation delays; Cloudflare-proxied zones",
+    "Email sender domain (domain.email-sender) separate",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No domain purchase flow inside Ebda"],
+  "assistantNote": "assistant can read status and explain the DNS records; entering the domain is a confirm because it changes where customers land only after verification"
+}

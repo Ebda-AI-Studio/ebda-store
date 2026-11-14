@@ -1,0 +1,51 @@
+{
+  "id": "product.variants",
+  "status": "live",
+  "area": "products",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الخيارات والمقاسات والالوان",
+  "titleEn": "Variants: options, values, SKUs, per-variant stock and price",
+  "screens": ["/stores/[id]/products/[productId]/variants"],
+  "api": [
+    "GET /stores/:storeId/products/:productId/variants",
+    "POST .../options",
+    "PUT .../options/:optionId",
+    "DELETE .../options/:optionId",
+    "POST .../options/:optionId/values",
+    "POST .../variants/generate",
+    "PUT .../variants/:variantId",
+    "DELETE .../variants/:variantId",
+    "POST .../variants/bulk-inventory"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "unclassified",
+    "note": "delete variant = confirm"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [
+      "ازاي اضيف مقاسات والوان؟",
+      "كل مقاس ليه سعر مختلف",
+      "خلص مقاس M بس",
+      "ولد كل التوليفات"
+    ],
+    "en": ["How do I add sizes and colours?", "Different price per size"]
+  },
+  "steps": ["Variants page: add option (Size), values, generate combos, set stock/price."],
+  "edgeCases": [
+    "Combination explosion (options product limit)",
+    "Deleting a variant with open orders",
+    "SKU/barcode duplicates",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article for variants"]
+}

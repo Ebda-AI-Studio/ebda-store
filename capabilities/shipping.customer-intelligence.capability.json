@@ -1,0 +1,41 @@
+{
+  "id": "shipping.customer-intelligence",
+  "status": "live",
+  "area": "shipping",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تلميحات ذكية من طلباتك",
+  "titleEn": "Smart hints: COD risk, courier suggestion, COD amount",
+  "screens": ["/stores/[id]/customer-intelligence"],
+  "api": [
+    "GET .../ci/overview",
+    "PUT .../ci/hints",
+    "PUT .../ci/sharing",
+    "GET .../ci/orders/:orderId/hint",
+    "GET .../ci/courier"
+  ],
+  "mcpTool": null,
+  "planGate": "customer_intelligence",
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (turn off)"
+  },
+  "helpArticle": "smart-hints",
+  "questions": {
+    "ar": ["ايه التلميحات الذكية؟", "عميل ده خطر COD؟"],
+    "en": ["What are smart hints?"]
+  },
+  "steps": ["Turn on in smart hints page."],
+  "edgeCases": [
+    "Cohort sharing opt-in",
+    "In no plan baseline: super-admin enables",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Enablement super-admin only"]
+}

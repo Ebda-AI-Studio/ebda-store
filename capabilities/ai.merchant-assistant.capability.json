@@ -1,0 +1,34 @@
+{
+  "id": "ai.merchant-assistant",
+  "status": "planned",
+  "plan": "self-service spec project 2",
+  "area": "ai",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "مساعد ابدأ: ازاي واعملها ليّا",
+  "titleEn": "Ebda assistant: how do I / do it for me (Store)",
+  "screens": ["/stores/[id]"],
+  "api": ["(planned) engine tools over catalogue entries"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (undo window 24 h)"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي اعمل خصم؟", "اعملي كوبون", "فين صفحة الشحن؟"],
+    "en": ["How do I...?", "Do it for me"]
+  },
+  "steps": ["Not available yet."],
+  "edgeCases": [
+    "Preview + confirm token",
+    "Acts with merchant permissions",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
+  ],
+  "gaps": ["NOT BUILT spec 2026-11-14 project 2"]
+}

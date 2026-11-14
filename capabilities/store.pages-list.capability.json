@@ -1,0 +1,34 @@
+{
+  "id": "store.pages-list",
+  "status": "live",
+  "area": "content",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الصفحات",
+  "titleEn": "Pages list (about, contact, custom pages)",
+  "screens": ["/stores/[id]/pages"],
+  "api": ["GET /stores/:storeId/pages"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["فين صفحة من نحن؟"],
+    "en": ["Where is my About page?"]
+  },
+  "steps": ["Pages list then edit by slug."],
+  "edgeCases": [
+    "MFA required",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [
+    "No create-page endpoint listed (PUT upserts by slug); no help article",
+    "No help article"
+  ]
+}

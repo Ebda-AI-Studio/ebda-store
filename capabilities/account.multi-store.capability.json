@@ -1,0 +1,33 @@
+{
+  "id": "account.multi-store",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "عندي اكتر من متجر",
+  "titleEn": "Own several stores (Business plan: 3) and switch between them",
+  "screens": ["/stores", "/stores/new"],
+  "api": ["GET /stores", "POST /stores"],
+  "mcpTool": null,
+  "planGate": "plan.maxStores",
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ينفع يبقى عندي اكتر من متجر؟", "اتنقل بين متاجري"],
+    "en": ["Can I run two stores?"]
+  },
+  "steps": ["Stores list; new store limited by maxStores (Free/Basic/Growth 1, Business 3)."],
+  "edgeCases": [
+    "Assistant must scope every action to the current storeId and never act cross-store without asking",
+    "Staff of store A cannot see store B",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Cross-store questions need explicit store pick", "No help article"]
+}

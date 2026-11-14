@@ -1,0 +1,41 @@
+{
+  "id": "store.qr-barcode",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اكواد QR والباركود",
+  "titleEn": "QR codes and barcodes for the store and products",
+  "screens": ["/stores/[id]/codes"],
+  "api": [
+    "GET/PUT /stores/:storeId/qr/settings",
+    "GET /stores/:storeId/qr/stats",
+    "GET/PUT /stores/:storeId/barcodes/settings",
+    "POST /stores/:storeId/barcodes/generate",
+    "GET /stores/:storeId/barcodes/items"
+  ],
+  "mcpTool": null,
+  "planGate": "inventory.barcode (qr) ",
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "qr-codes; help/product-labels",
+  "questions": {
+    "ar": ["ازاي اطبع QR للمتجر؟", "اطبع باركود للمنتجات", "QR بيوجه لفين؟"],
+    "en": ["How do I print a QR code for my store?"]
+  },
+  "steps": ["Codes page."],
+  "edgeCases": [
+    "QR scans recorded on DO stores had a P0 bug (#752 open)",
+    "Plan: Enterprise/Business for barcode",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Analytics of QR scans broken on DO stores until #752 merges"]
+}

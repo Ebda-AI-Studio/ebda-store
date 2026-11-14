@@ -1,0 +1,41 @@
+{
+  "id": "store.settings",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اعدادات المتجر العامة",
+  "titleEn": "General store settings (name, contact, currency, social)",
+  "screens": ["/stores/[id]/settings"],
+  "api": [
+    "GET /stores/:storeId",
+    "PUT /stores/:storeId",
+    "PUT /stores/:storeId/contact",
+    "PUT /stores/:storeId/social",
+    "GET /stores/:storeId/stats"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (edit back)"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي اغير رقم التليفون في المتجر؟", "اضيف لينك الانستجرام", "غير اسم المتجر"],
+    "en": ["How do I change my store contact details?", "Add my Instagram link"]
+  },
+  "steps": ["Settings > contact / social."],
+  "edgeCases": [
+    "MFA required",
+    "Saving branding sends only changed fields (#657)",
+    "Arabic and English names both required for bilingual stores",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article for settings"]
+}

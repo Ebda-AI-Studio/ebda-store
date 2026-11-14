@@ -1,0 +1,48 @@
+{
+  "id": "billing.pay-instapay",
+  "status": "live",
+  "area": "billing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ادفع اشتراك ابدأ بإنستاباي",
+  "titleEn": "Pay Ebda Store by InstaPay (upload receipt)",
+  "screens": ["/stores/[id]/billing"],
+  "api": [
+    "POST /stores/:storeId/billing/instapay-plan",
+    "POST /stores/:storeId/billing/payment-claims",
+    "POST /stores/:storeId/billing/receipts",
+    "POST /stores/:storeId/billing/receipts/:receiptId/submit",
+    "GET /stores/:storeId/billing/payment-claims"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "withdraw claim not documented"
+  },
+  "helpArticle": "pay-ebda-with-instapay",
+  "questions": {
+    "ar": [
+      "ازاي ادفع بإنستاباي؟",
+      "حولت بس الباقة ما اتفعلتش",
+      "رفعت الايصال بقالي يومين",
+      "هل الاقتراح عنوان انستاباي صح؟"
+    ],
+    "en": ["How do I pay with InstaPay?", "I paid but my plan is not active"]
+  },
+  "steps": ["Billing > InstaPay > transfer > upload receipt screenshot > submit claim."],
+  "edgeCases": [
+    "Claim waits for a super-admin today",
+    "Duplicate receipt / wrong amount / wrong recipient: rejected with reason",
+    "Receipt older than 48 h",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [
+    "Super-admin confirmation required (audit gap 3 BLOCKER); AI auto-confirm with first-payment cap and daily digest NOT BUILT"
+  ]
+}

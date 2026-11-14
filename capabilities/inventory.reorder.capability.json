@@ -1,0 +1,41 @@
+{
+  "id": "inventory.reorder",
+  "status": "live",
+  "area": "inventory",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اقتراحات اعادة الطلب والبضاعة الراكدة",
+  "titleEn": "Reorder suggestions and rules; dead stock",
+  "screens": ["/stores/[id]/stock/reorder", "/stock/reorder/rules", "/stock/deadstock"],
+  "api": [
+    "GET/POST/PATCH/DELETE /stores/:storeId/stock/reorder-rules",
+    "GET .../stock/reorder-suggestions",
+    "POST .../accept|dismiss",
+    "GET .../stock/deadstock-flags",
+    "POST .../clearance|dismiss"
+  ],
+  "mcpTool": null,
+  "planGate": "inventory.stock_alerts",
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "unclassified",
+    "note": "dismiss yes"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["اشتري كام من المنتج ده؟", "ايه البضاعة الراكدة؟"],
+    "en": ["What should I reorder?"]
+  },
+  "steps": ["Reorder page."],
+  "edgeCases": [
+    "Reorder speed COD-blind fixed in #754 (open)",
+    "Forecast beyond sales speed is planned #753",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}

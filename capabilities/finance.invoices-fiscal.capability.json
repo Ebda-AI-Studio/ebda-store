@@ -1,0 +1,34 @@
+{
+  "id": "finance.invoices-fiscal",
+  "status": "live",
+  "area": "finance",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الفواتير والاشعارات الدائنة",
+  "titleEn": "Invoices, credit notes and fiscal documents",
+  "screens": ["/stores/[id]/invoices"],
+  "api": ["GET /stores/:storeId/invoices", "GET .../invoices/:docId"],
+  "mcpTool": null,
+  "planGate": "accounting.invoicing",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "invoices-and-credit-notes",
+  "questions": {
+    "ar": ["فين فواتيري؟", "عايز اشعار دائن"],
+    "en": ["Where are my invoices?"]
+  },
+  "steps": ["Invoices page."],
+  "edgeCases": [
+    "Immutable documents",
+    "Tax archive is super-admin",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

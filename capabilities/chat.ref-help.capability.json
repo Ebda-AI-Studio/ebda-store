@@ -1,0 +1,43 @@
+{
+  "id": "chat.ref-help",
+  "status": "live",
+  "area": "chat",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "مساعدة ابدأ شات",
+  "titleEn": "Ebda Chat help set: shared number, Meta verify, Meta fees, campaigns and opt-out, COD confirmations, InstaPay orders, service menu, team seats, wallet top-ups, customer data, delete workspace",
+  "screens": ["(Ebda Chat)"],
+  "api": ["(Ebda Chat API)"],
+  "mcpTool": null,
+  "planGate": "whatsapp",
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "whatsapp/use-the-shared-number; help/whatsapp/verify-your-business-on-meta; help/whatsapp/meta-fees-explained; help/whatsapp/campaigns-and-opt-out; help/whatsapp/cod-confirmations; help/whatsapp/instapay-orders-in-whatsapp; help/whatsapp/service-menu-hours-and-location; help/whatsapp/team-members-and-seats; help/whatsapp/wallet-top-ups-and-refunds; help/whatsapp/your-customers-data; help/whatsapp/delete-your-workspace",
+  "questions": {
+    "ar": [
+      "ميتا بتاخد كام على الرسايل؟",
+      "ازاي اشحن رصيد الواتساب؟",
+      "امسح الورك سبيس",
+      "ابعت حملة واتساب",
+      "تاكيد COD عالواتساب"
+    ],
+    "en": [
+      "How much does Meta charge?",
+      "How do I top up my WhatsApp wallet?",
+      "Delete my Chat workspace"
+    ]
+  },
+  "steps": [
+    "Answer from the 13 Ebda Chat help articles; Chat actions belong to the Chat adapter, not this catalogue."
+  ],
+  "edgeCases": [
+    "Meta fees change; link to the article",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Chat actions not enumerated here (separate catalogue needed for ebda-whatsapp)"]
+}

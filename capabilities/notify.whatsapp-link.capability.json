@@ -1,0 +1,38 @@
+{
+  "id": "notify.whatsapp-link",
+  "status": "live",
+  "area": "notifications",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ربط واتساب (ابدأ Chat)",
+  "titleEn": "Link store to Ebda Chat (WhatsApp) and consent revoke",
+  "screens": ["/stores/[id]/notifications"],
+  "api": ["GET /stores/:storeId/whatsapp-link", "POST .../whatsapp-link/consent/revoke"],
+  "mcpTool": null,
+  "planGate": "whatsapp (hidden)",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي اربط المتجر بواتساب؟", "ابدأ شات"],
+    "en": ["Link my store to WhatsApp"]
+  },
+  "steps": ["Ebda Chat connect; see Chat help (connect-your-own-number)."],
+  "edgeCases": [
+    "Meta business verification (Chat help)",
+    "Template approval self-service gap #1/#2 (Chat)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [
+    "Chat templates screen NOT BUILT (audit gap 1, 2 blockers); whatsapp key super-admin-enabled",
+    "No help article"
+  ]
+}

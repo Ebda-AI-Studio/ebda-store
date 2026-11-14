@@ -1,0 +1,46 @@
+{
+  "id": "marketing.campaigns",
+  "status": "live",
+  "area": "marketing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "حملات البريد",
+  "titleEn": "Email campaigns: draft, AI draft, test send, send, cancel",
+  "screens": ["/stores/[id]/campaigns"],
+  "api": [
+    "GET/POST /stores/:storeId/campaigns",
+    "GET/PUT/DELETE .../:campaignId",
+    "POST .../:campaignId/send|cancel|test",
+    "POST .../ai-draft",
+    "GET .../audience",
+    "GET .../:campaignId/recipients"
+  ],
+  "mcpTool": null,
+  "planGate": "email_campaigns",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "cancel before send only; no after"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ابعت عرض لكل المشتركين", "اكتب ايميل لعرض رمضان", "ابعت تجربة لنفسي الاول"],
+    "en": ["Send an Eid offer to my subscribers"]
+  },
+  "steps": ["Campaign: draft > test > send."],
+  "edgeCases": [
+    "Sends to real customers: confirm with count; opt-in only",
+    "Unsubscribe link mandatory",
+    "Provider daily limit/bounces",
+    "Growth plan+",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"],
+  "assistantNote": "messaging: confirm with audience count + test send first"
+}

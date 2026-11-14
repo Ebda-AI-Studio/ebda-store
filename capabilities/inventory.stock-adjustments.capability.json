@@ -1,0 +1,39 @@
+{
+  "id": "inventory.stock-adjustments",
+  "status": "live",
+  "area": "inventory",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تسويات المخزون",
+  "titleEn": "Batch stock adjustments (draft, post, CSV)",
+  "screens": ["/stores/[id]/stock/adjustments"],
+  "api": [
+    "GET/POST /stores/:storeId/stock-adjustments",
+    "POST .../csv-import",
+    "POST .../:id/post"
+  ],
+  "mcpTool": null,
+  "planGate": "inventory.bulk_adjustments",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "posted adjustments need a reversing adjustment"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["عايز اعمل تسوية جرد بملف"],
+    "en": ["Adjust stock from a CSV"]
+  },
+  "steps": ["Adjustments > new > review > post."],
+  "edgeCases": [
+    "Posting writes ledger entries (accounting)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}
