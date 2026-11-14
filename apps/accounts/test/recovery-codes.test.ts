@@ -166,6 +166,8 @@ describe('A23 regenerate emits a structured audit event', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
 
 describe('A23 regenerate leaves an audit row and tells the mailbox owner', () => {
   it('writes one admin_audit row (no code, no hash) and mails a "recovery codes changed" notice', async () => {
