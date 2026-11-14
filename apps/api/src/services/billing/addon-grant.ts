@@ -20,7 +20,15 @@ import {
   ADDON_TERM_DAYS,
   skuOfPlanCode,
 } from './addon-catalog';
-import type { BillingEffect } from './billing-notify';
+
+/**
+ * The two effects a grant can raise. Declared here, NOT imported from billing-notify: feature.service imports this
+ * file, and a type import of billing-notify drags email.service and the Express request augmentation into every
+ * TypeScript project that touches FeatureService (that broke `npm run typecheck` in the projects without it).
+ */
+type GrantEffect =
+  | { kind: 'addon_granted'; storeId: string }
+  | { kind: 'addon_unapplied'; storeId: string; billingEventId: string };
 
 type Tx = Prisma.TransactionClient;
 
@@ -111,7 +119,7 @@ export async function applyAddonGrant(
   tx: Tx,
   row: { id: string; storeId: string; planCode: string | null },
   now: Date,
-  effects: BillingEffect[]
+  effects: { push(e: GrantEffect): unknown }
 ): Promise<void> {
   const sku = skuOfPlanCode(row.planCode);
   if (!sku) {
