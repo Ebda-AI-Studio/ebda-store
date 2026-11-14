@@ -1,0 +1,44 @@
+{
+  "id": "tax.change-request",
+  "status": "live",
+  "area": "tax",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "غيّر الرقم الضريبي أو الاسم القانوني بعد التوثيق",
+  "titleEn": "Change my tax number or legal name after verification",
+  "screens": ["/stores/[id]/tax"],
+  "api": [
+    "GET /stores/:storeId/tax/change-request",
+    "POST /stores/:storeId/tax/change-request",
+    "DELETE /stores/:storeId/tax/change-request",
+    "GET /admin/tax-verification/change-requests",
+    "GET /admin/tax-verification/:storeId/change-request/file",
+    "POST /admin/tax-verification/:storeId/change-decision"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "the merchant can withdraw a pending request; the old verified state stays active until a super admin approves"
+  },
+  "helpArticle": "vat-registration",
+  "questions": {
+    "ar": ["عايز اغيّر الرقم الضريبي بعد التوثيق", "ازاي اعدّل الاسم القانوني في التسجيل الضريبي؟"],
+    "en": ["How do I change my tax registration number after verification?"]
+  },
+  "steps": [
+    "Open Tax & VAT, press Request a change",
+    "Enter the new number and legal name, attach the new tax card or certificate, press Review and send",
+    "Confirm; the request waits for Ebda AI Studio, your current verification stays active"
+  ],
+  "edgeCases": [
+    "Only a verified registration uses this flow; none, rejected and revoked edit and resubmit as before",
+    "One pending request per store; withdraw it to send another",
+    "The AI only reads the number and name off an image; plain code compares them with what was typed; a mismatch, an unreadable image, a PDF or an edited-looking image is flagged for the reviewer and never approved automatically",
+    "Approve, reject and revoke stay with a super admin; revoking drops a pending request",
+    "Edited payload or replayed confirm token is refused"
+  ],
+  "gaps": []
+}

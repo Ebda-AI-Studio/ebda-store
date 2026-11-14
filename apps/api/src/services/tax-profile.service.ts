@@ -113,7 +113,7 @@ function assertEditable(status: TaxProfileStatusValue): void {
       'TAX_PROFILE_LOCKED',
       status === 'pending'
         ? 'Your VAT registration is under review and cannot be changed now. / طلب التسجيل الضريبي قيد المراجعة ولا يمكن تعديله الآن.'
-        : 'A verified VAT registration can only be changed by Ebda AI Studio support. / لا يمكن تعديل التسجيل الضريبي الموثّق إلا عن طريق دعم ابدأ ستوديو للذكاء الاصطناعي.'
+        : 'A verified VAT registration is changed by sending a change request with your new document. / التسجيل الضريبي الموثّق بيتغيّر عن طريق إرسال طلب تغيير مع المستند الجديد.'
     );
   }
 }
@@ -295,6 +295,70 @@ export async function listProfilesForReview(status: string | null): Promise<TaxR
     .map(f => f.row)
     .sort((a, b) => at(a.submittedAt) - at(b.submittedAt))
     .slice(0, QUEUE_LIMIT);
+}
+
+/**
+ * Approve a change request of a VERIFIED profile (self-service A10): the new identity replaces the old on the verified profile and
+ * the evidence file becomes one of its documents. Super-admin only (the route; the trigger / DO guard enforce it below the route).
+ * The status stays `verified`, so VAT never stops charging; the seller identity on later invoices is the new one, so the public caches
+ * are busted like every other write that changes what VAT is collected under.
+ */
+export async function applyApprovedTaxChange(
+  storeId: string,
+  change: {
+    taxRegistrationNumber: string;
+    legalName: string;
+    kind: TaxDocumentKindValue;
+    storageKey: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    requestedBy: string;
+  },
+  actor: Actor
+): Promise<void> {
+  await withUser(
+    actor.userId,
+    async () => {
+      const current = await (
+        await storeDb(storeId)
+      ).storeTaxProfile.findUnique({ where: { storeId }, select: { id: true, status: true } });
+      if (!current || current.status !== 'verified')
+        throw new AppError(409, 'INVALID_TRANSITION', 'The profile is no longer verified');
+      const now = new Date();
+      const moved = await guarded(async () =>
+        (await storeWriter(storeId)).storeTaxProfile.updateMany({
+          where: { storeId, status: 'verified' },
+          data: {
+            taxRegistrationNumber: change.taxRegistrationNumber,
+            legalName: change.legalName,
+            reviewedAt: now,
+            reviewedBy: actor.userId,
+          },
+        })
+      );
+      if (moved.count === 0)
+        throw new AppError(409, 'INVALID_TRANSITION', 'The profile is no longer verified');
+      await guarded(async () =>
+        (await storeWriter(storeId)).storeTaxDocument.create({
+          data: {
+            storeId,
+            profileId: current.id,
+            kind: change.kind,
+            storageKey: change.storageKey,
+            fileName: change.fileName,
+            mimeType: change.mimeType,
+            sizeBytes: change.sizeBytes,
+            sha256: change.sha256,
+            uploadedBy: change.requestedBy,
+          },
+        })
+      );
+      bustPublicTaxCaches(storeId);
+    },
+    storeId
+  );
 }
 
 export class TaxProfileService {
