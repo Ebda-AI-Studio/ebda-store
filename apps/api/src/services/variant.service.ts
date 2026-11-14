@@ -609,6 +609,8 @@ export class VariantService {
         const r = await openingStockOnDo.setVariantInventory({
           productId,
           updates: [{ variantId: variant.id, inventory: input.inventory }],
+          type: 'initial',
+          reason: 'Opening stock',
         });
         if (r.updated !== 1)
           throw new AppError(500, 'STOCK_WRITE_FAILED', 'Variant stock was not set');

@@ -146,6 +146,12 @@ variance counted - system-at-scan) to the live row inside the single-writer sect
 the live before/after. A post that would take live stock below zero is refused with 409 `STALE_SNAPSHOT` and the
 draft stays open.
 
+**Every stock write has a movement row** (INV-AUDIT-3). On the StoreDO each function that changes a stock quantity
+(grid, warehouse set, bulk edit, opening stock, CSV import, gold variants, adjustments, sales, restocks) writes an
+`inventory_history` row with reason and actor in the same section; unchanged values write none. The actor is the caller's
+`userId` or the request scope's user. `packages/repo/test/stock-movement-guard.test.ts` discovers stock writers from the
+source and fails when a new one has no movement row.
+
 Consequences worth stating explicitly:
 
 - **`InventoryHistory` has no `variantId`** (it is keyed on `productId`). For a

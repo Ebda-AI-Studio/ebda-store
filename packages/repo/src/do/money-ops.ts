@@ -899,6 +899,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       storeId,
       productId: id(a.productId, 'productId'),
       variants: (a.variants as ImportVariantRow[]) ?? [],
+      userId: typeof a.userId === 'string' ? a.userId : null,
     }),
   /** Missing in-store barcodes for existing items (Ruling BARCODE-DO-1): one section replaces the advisory lock. */
   barcodeFill: (db, storeId, a) =>

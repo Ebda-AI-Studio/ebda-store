@@ -928,6 +928,8 @@ export class ProductService {
           productIds: [product.id],
           mode: 'set',
           value: data.inventory,
+          type: 'initial',
+          reason: 'Opening stock',
         });
         (product as { inventory?: number }).inventory = data.inventory;
       } catch (err) {

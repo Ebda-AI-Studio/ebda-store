@@ -111,15 +111,55 @@ function aiColumns(db: SyncSql, fields: string[]): Map<string, string> {
   return out;
 }
 
+/** INV-AUDIT-3: an import's stock change is a movement row, like every other stock write (reason + actor). */
+function importMovement(
+  db: SyncSql,
+  m: {
+    storeId: string;
+    productId: string;
+    type: 'initial' | 'adjustment';
+    previous: number;
+    next: number;
+    reason: string;
+    userId: string | null;
+    now: number;
+  }
+): void {
+  if (m.previous === m.next) return;
+  db.run(
+    `INSERT INTO inventory_history (id, product_id, store_id, type, quantity, previous_stock, new_stock, reason, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      crypto.randomUUID(),
+      m.productId,
+      m.storeId,
+      m.type,
+      m.next - m.previous,
+      m.previous,
+      m.next,
+      m.reason,
+      m.userId,
+      m.now,
+    ]
+  );
+}
+
 const dbVal = (col: string, v: unknown): unknown =>
   BOOL_COLS.has(col) ? (v ? 1 : 0) : v === undefined ? null : v;
 
 /** Options, option values, variants and their junction rows for one product, replacing what it has. Returns the variants made. */
 export function replaceProductVariants(
   db: SyncSql,
-  a: { storeId: string; productId: string; variants: ImportVariantRow[]; now: number }
+  a: {
+    storeId: string;
+    productId: string;
+    variants: ImportVariantRow[];
+    now: number;
+    userId?: string | null;
+  }
 ): number {
   const { productId, variants, now } = a;
+  const userId = a.userId ?? null;
   if (variants.length === 0) return 0;
   const prior = db.all('SELECT id, name, name_ar FROM product_options WHERE product_id = ?', [
     productId,
@@ -152,6 +192,21 @@ export function replaceProductVariants(
     return code;
   };
 
+  // the replaced variants take their units with them: record each as a movement to zero
+  for (const old of db.all(
+    'SELECT inventory FROM product_variants WHERE product_id = ? AND inventory <> 0',
+    [productId]
+  ))
+    importMovement(db, {
+      storeId: a.storeId,
+      productId,
+      type: 'adjustment',
+      previous: old.inventory as number,
+      next: 0,
+      reason: 'Variant replaced by bulk import',
+      userId,
+      now,
+    });
   db.run('DELETE FROM product_variants WHERE product_id = ?', [productId]);
   db.run('DELETE FROM product_options WHERE product_id = ?', [productId]);
 
@@ -229,6 +284,16 @@ export function replaceProductVariants(
         now,
       ]
     );
+    importMovement(db, {
+      storeId: a.storeId,
+      productId,
+      type: 'initial',
+      previous: 0,
+      next: v.inventory ?? 0,
+      reason: 'Initial stock from bulk import',
+      userId,
+      now,
+    });
     for (const p of pairs)
       db.run('INSERT INTO product_variant_options (variant_id, value_id) VALUES (?, ?)', [
         id,
@@ -304,6 +369,17 @@ export function importProductsBatch(
             `UPDATE products SET ${cols.map(c => `${c} = ?`).join(', ')}, ai_field_sources = ?, updated_at = ? WHERE id = ? AND store_id = ?`,
             [...vals, JSON.stringify(sources), now, productId, a.storeId]
           );
+          if (cols.includes('inventory'))
+            importMovement(db, {
+              storeId: a.storeId,
+              productId,
+              type: 'adjustment',
+              previous: (cur.inventory as number | null) ?? 0,
+              next: Number(r.fields.inventory ?? 0),
+              reason: 'Stock set by bulk import',
+              userId: a.userId ?? null,
+              now,
+            });
           out.updated++;
           if (r.existingSlug && r.existingSlug !== r.slug)
             out.renames.push({ from: r.existingSlug, to: r.slug });
@@ -315,13 +391,16 @@ export function importProductsBatch(
              VALUES (?, ?, ${cols.map(() => '?').join(', ')}, ?, ?, ?)`,
             [productId, a.storeId, ...vals, JSON.stringify(sources), now, now]
           );
-          const qty = Number(r.fields.inventory ?? 0);
-          if (qty > 0)
-            db.run(
-              `INSERT INTO inventory_history (id, product_id, store_id, type, quantity, previous_stock, new_stock, reason, created_by, created_at)
-               VALUES (?, ?, ?, 'initial', ?, 0, ?, 'Initial stock from bulk import', ?, ?)`,
-              [crypto.randomUUID(), productId, a.storeId, qty, qty, a.userId ?? null, now]
-            );
+          importMovement(db, {
+            storeId: a.storeId,
+            productId,
+            type: 'initial',
+            previous: 0,
+            next: Number(r.fields.inventory ?? 0),
+            reason: 'Initial stock from bulk import',
+            userId: a.userId ?? null,
+            now,
+          });
           out.created++;
         }
         if (r.categoryIds) {
@@ -355,6 +434,7 @@ export function importProductsBatch(
             productId,
             variants: r.variants,
             now,
+            userId: a.userId ?? null,
           });
         out.products.push({ rowIndex: r.rowIndex, productId });
       } catch (e) {
@@ -368,7 +448,13 @@ export function importProductsBatch(
 /** Variants for a parent product that already exists in the store but is not in the file (their own section, like Postgres). */
 export function importVariantsForProduct(
   db: SyncSql,
-  a: { storeId: string; productId: string; variants: ImportVariantRow[]; now?: number }
+  a: {
+    storeId: string;
+    productId: string;
+    variants: ImportVariantRow[];
+    now?: number;
+    userId?: string | null;
+  }
 ): { variantsCreated: number } {
   const now = a.now ?? Date.now();
   return db.transactionSync(() => {
@@ -384,6 +470,7 @@ export function importVariantsForProduct(
           productId: a.productId,
           variants: a.variants,
           now,
+          userId: a.userId ?? null,
         }),
       };
     } catch (e) {

@@ -121,6 +121,50 @@ describe('bulkAdjustProducts', () => {
   });
 });
 
+describe('every stock write has a movement row with reason and actor (Ruling INV-AUDIT-3)', () => {
+  it('setVariantInventory records the variant before/after, the actor and a reason; an unchanged value writes none', () => {
+    const r = rig();
+    r.op('setVariantInventory', {
+      productId: 'pv',
+      updates: [
+        { variantId: 'v1', inventory: 9 },
+        { variantId: 'v2', inventory: 4 }, // unchanged
+      ],
+      userId: 'u1',
+      reason: 'stocktake',
+    });
+    const rows = r.q('SELECT * FROM inventory_history');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      product_id: 'pv',
+      type: 'adjustment',
+      quantity: 6,
+      previous_stock: 3,
+      new_stock: 9,
+      reason: 'stocktake',
+      created_by: 'u1',
+    });
+  });
+
+  it('setWarehouseStock records a row in the adjustWarehouseStock shape (warehouse before/after, reference = warehouse)', () => {
+    const r = rig();
+    r.raw.exec(
+      `INSERT INTO warehouses (id, store_id, name, code, is_default) VALUES ('w1', 's1', 'Main', 'MAIN', 1)`
+    );
+    r.op('setWarehouseStock', { warehouseId: 'w1', productId: 'p1', quantity: 7, userId: 'u2' });
+    const rows = r.q('SELECT * FROM inventory_history');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      product_id: 'p1',
+      type: 'adjustment',
+      new_stock: 7,
+      reference: 'w1',
+      created_by: 'u2',
+    });
+    expect(rows[0].reason).toContain('[Warehouse: MAIN]');
+  });
+});
+
 describe('setVariantInventory', () => {
   it('sets per variant; a variant of another product fails alone; a missing product is 404', () => {
     const r = rig();
@@ -204,7 +248,7 @@ describe('warehouses', () => {
     expect(inv(r, 'p1')).toBe(5);
     expect(
       r.q(
-        'SELECT type, quantity, previous_stock, new_stock, reason, reference FROM inventory_history'
+        "SELECT type, quantity, previous_stock, new_stock, reason, reference FROM inventory_history WHERE type = 'manual_remove'"
       )[0]
     ).toEqual({
       type: 'manual_remove',

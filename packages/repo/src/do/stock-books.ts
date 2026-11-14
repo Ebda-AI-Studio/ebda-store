@@ -1027,7 +1027,8 @@ export function reconcileCountSession(db: SyncSql, storeId: string, a: Args) {
 
 /**
  * ProductService.bulkUpdate `fields.inventory`: simple (variant-less) products only, absolute or relative, floored at 0.
- * Like Postgres it writes no history row and no warehouse shadow (a bulk edit, not a stock movement).
+ * Every change writes a movement row (INV-AUDIT-3: reason + actor; opening stock passes type 'initial'); it writes no warehouse
+ * shadow (the daily reconcile heals that, P2-6). A write that changes nothing writes no row.
  */
 export function bulkSetInventory(db: SyncSql, storeId: string, a: Args) {
   if (!Array.isArray(a.productIds) || a.productIds.length > 500) fail('BAD_ARGS', 'productIds');
@@ -1035,6 +1036,14 @@ export function bulkSetInventory(db: SyncSql, storeId: string, a: Args) {
   const mode = a.mode === 'set' || a.mode === 'adjust' ? a.mode : fail('BAD_ARGS', 'mode');
   if (typeof a.value !== 'number' || !Number.isFinite(a.value)) fail('BAD_ARGS', 'value');
   const value = Math.round(a.value as number);
+  const type =
+    a.type === undefined
+      ? 'adjustment'
+      : a.type === 'initial'
+        ? 'initial'
+        : fail('BAD_ARGS', 'type');
+  const reason = optStr(a.reason, 'reason') ?? 'Bulk inventory update';
+  const createdBy = optStr(a.userId, 'userId', 128);
   const now = Date.now();
   const rows = productIds.length
     ? db.all(
@@ -1052,6 +1061,18 @@ export function bulkSetInventory(db: SyncSql, storeId: string, a: Args) {
       r.id,
       storeId,
     ]);
+    if (next !== (r.inventory as number))
+      history(db, {
+        storeId,
+        productId: r.id as string,
+        type,
+        quantity: next - (r.inventory as number),
+        previousStock: r.inventory as number,
+        newStock: next,
+        reason,
+        reference: null,
+        createdBy,
+      });
   }
   return { updated: rows.length };
 }

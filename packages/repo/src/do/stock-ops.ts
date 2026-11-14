@@ -459,14 +459,35 @@ function setVariantInventory(db: SyncSql, storeId: string, a: Record<string, unk
   if (!Array.isArray(a.updates) || a.updates.length > 500) return fail('BAD_ARGS', 'updates');
   if (!product(db, storeId, productId)) return fail('NOT_FOUND', 'Product not found', 404);
   const results: Array<{ variantId: string; success: boolean }> = [];
+  // INV-AUDIT-3: every stock change is a movement. The ledger row is keyed on the product and carries the VARIANT's before/after
+  // (inventory-model.md); the actor and reason come from the caller (opening stock passes type 'initial').
+  const type = a.type === undefined ? 'adjustment' : hType(a.type);
+  const reason = optStr(a.reason, 'reason') ?? 'Variant stock update';
+  const createdBy = optStr(a.userId, 'userId', 128);
   for (const u of a.updates as Array<Record<string, unknown>>) {
     const variantId = str(u.variantId, 'variantId');
     const inventory = int(u.inventory, 'inventory', 0);
+    const before = db.all(
+      'SELECT inventory FROM product_variants WHERE id = ? AND product_id = ?',
+      [variantId, productId]
+    )[0];
     const r = db.run('UPDATE product_variants SET inventory = ? WHERE id = ? AND product_id = ?', [
       inventory,
       variantId,
       productId,
     ]);
+    if (r.changes === 1 && before && (before.inventory as number) !== inventory)
+      history(db, {
+        storeId,
+        productId,
+        type,
+        quantity: inventory - (before.inventory as number),
+        previousStock: before.inventory as number,
+        newStock: inventory,
+        reason,
+        reference: variantId,
+        createdBy,
+      });
     results.push({ variantId, success: r.changes === 1 });
   }
   return {
@@ -571,8 +592,32 @@ function setWarehouseStock(db: SyncSql, storeId: string, a: Record<string, unkno
   if (quantity < 0) return fail('INVALID_QUANTITY', 'Quantity cannot be negative');
   const t = warehouseTarget(db, storeId, a);
   shadowInSync(db, storeId, t);
+  const before = db.all(
+    t.variantId
+      ? 'SELECT quantity FROM warehouse_stock WHERE store_id = ? AND warehouse_id = ? AND product_id = ? AND variant_id = ?'
+      : 'SELECT quantity FROM warehouse_stock WHERE store_id = ? AND warehouse_id = ? AND product_id = ? AND variant_id IS NULL',
+    t.variantId
+      ? [storeId, t.warehouseId, t.productId, t.variantId]
+      : [storeId, t.warehouseId, t.productId]
+  )[0];
+  const previousQty = (before?.quantity as number | undefined) ?? 0;
   const q = upsertWarehouseStock(db, { storeId, ...t, mode: 'set', value: quantity });
   syncAggregate(db, storeId, t.productId, t.variantId);
+  // INV-AUDIT-3: same row shape as adjustWarehouseStock (warehouse-row before/after, reference = warehouse id)
+  if (q !== previousQty) {
+    const reason = optStr(a.reason, 'reason');
+    history(db, {
+      storeId,
+      productId: t.productId,
+      type: 'adjustment',
+      quantity: q - previousQty,
+      previousStock: previousQty,
+      newStock: q,
+      reason: reason ? `[Warehouse: ${t.code}] ${reason}` : `[Warehouse: ${t.code}] stock set`,
+      reference: t.warehouseId,
+      createdBy: optStr(a.userId, 'userId', 128),
+    });
+  }
   return { quantity: q };
 }
 
@@ -602,7 +647,7 @@ function adjustWarehouseStock(db: SyncSql, storeId: string, a: Record<string, un
     newStock: newQty,
     reason: reason ? `[Warehouse: ${t.code}] ${reason}` : `[Warehouse: ${t.code}] delta adjustment`,
     reference: t.warehouseId,
-    createdBy: null,
+    createdBy: optStr(a.userId, 'userId', 128),
   });
   return { newQuantity: newQty };
 }

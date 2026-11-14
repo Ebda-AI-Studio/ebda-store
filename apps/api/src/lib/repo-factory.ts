@@ -38,6 +38,7 @@ import type { NextFunction, Request, Response } from 'express';
 import {
   afterTenantTxCommit,
   afterTxCommit,
+  ambientScope,
   currentStoreId,
   prisma,
   withStore,
@@ -242,7 +243,14 @@ export interface StockClient {
     key?: string
   ): Promise<{ successful: number; failed: number; errors: string[]; applied: StockLevel[] }>;
   setVariantInventory(
-    a: { productId: string; updates: Array<{ variantId: string; inventory: number }> },
+    a: {
+      productId: string;
+      updates: Array<{ variantId: string; inventory: number }>;
+      /** movement row (INV-AUDIT-3): who and why; opening stock passes type 'initial' */
+      userId?: string;
+      reason?: string;
+      type?: HistoryType;
+    },
     key?: string
   ): Promise<{
     updated: number;
@@ -255,7 +263,14 @@ export interface StockClient {
     key?: string
   ): Promise<{ changed: boolean; historyId: string | null }>;
   setWarehouseStock(
-    a: { warehouseId: string; productId: string; variantId?: string | null; quantity: number },
+    a: {
+      warehouseId: string;
+      productId: string;
+      variantId?: string | null;
+      quantity: number;
+      userId?: string;
+      reason?: string;
+    },
     key?: string
   ): Promise<{ quantity: number }>;
   adjustWarehouseStock(
@@ -265,6 +280,7 @@ export interface StockClient {
       variantId?: string | null;
       delta: number;
       reason?: string;
+      userId?: string;
     },
     key?: string
   ): Promise<{ newQuantity: number }>;
@@ -400,6 +416,10 @@ export interface StockClient {
     productIds: string[];
     mode: 'set' | 'adjust';
     value: number;
+    /** movement row (INV-AUDIT-3) */
+    userId?: string;
+    reason?: string;
+    type?: 'initial';
   }): Promise<{ updated: number }>;
   reconcileWarehouseAll(a: { limit?: number; afterKey?: string | null }): Promise<{
     skusReconciled: number;
@@ -640,6 +660,7 @@ export interface MoneyClient {
   importVariants(a: {
     productId: string;
     variants: unknown[];
+    userId?: string | null;
   }): Promise<{ variantsCreated: number }>;
   /** In-store barcodes (Ruling BARCODE-DO-1). */
   barcodeFill(a: {
@@ -1491,6 +1512,15 @@ interface QueryStub {
   >;
 }
 
+/**
+ * INV-AUDIT-3: the stock ops that write a movement row take the ACTOR from the request's ambient scope when the caller did not
+ * name one (the scope's `userId` is the signed-in admin; a cron or job has none, so its rows carry no actor).
+ */
+const withActor = <T extends { userId?: string | null }>(a: T): T => {
+  const actor = ambientScope().userId;
+  return a.userId === undefined && actor ? { ...a, userId: actor } : a;
+};
+
 /** The typed stock client over a transport `call(op, args, key)`; shared by the Worker and the contract tests. */
 export function makeStockClient(
   call: (op: string, args: unknown, key?: string) => Promise<any>
@@ -1499,10 +1529,10 @@ export function makeStockClient(
     adjustProduct: (a, key) => call('adjustProduct', a, key),
     setProduct: (a, key) => call('setProduct', a, key),
     bulkAdjustProducts: (a, key) => call('bulkAdjustProducts', a, key),
-    setVariantInventory: (a, key) => call('setVariantInventory', a, key),
+    setVariantInventory: (a, key) => call('setVariantInventory', withActor(a), key),
     setVariantActive: (a, key) => call('setVariantActive', a, key),
-    setWarehouseStock: (a, key) => call('setWarehouseStock', a, key),
-    adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', a, key),
+    setWarehouseStock: (a, key) => call('setWarehouseStock', withActor(a), key),
+    adjustWarehouseStock: (a, key) => call('adjustWarehouseStock', withActor(a), key),
     createStockAdjustment: (a, key) => call('createStockAdjustment', a, key),
     postStockAdjustment: (a, key) => call('postStockAdjustment', a, key),
     createPurchaseOrder: (a, key) => call('createPurchaseOrder', a, key),
@@ -1515,7 +1545,7 @@ export function makeStockClient(
     submitCountLine: a => call('submitCountLine', a),
     closeCountSession: a => call('closeCountSession', a),
     reconcileCountSession: (a, key) => call('reconcileCountSession', a, key),
-    bulkSetInventory: a => call('bulkSetInventory', a),
+    bulkSetInventory: a => call('bulkSetInventory', withActor(a)),
     importCodRemittances: a => call('importCodRemittances', a),
     reconcileWarehouseSku: a => call('reconcileWarehouseSku', a),
     reconcileWarehouseAll: a => call('reconcileWarehouseAll', a),
@@ -1555,7 +1585,7 @@ export function makeMoneyClient(
     receiptImageDeleted: a => call('receiptImageDeleted', a),
     receiptSweep: a => call('receiptSweep', a ?? {}),
     importBatch: a => call('importBatch', a),
-    importVariants: a => call('importVariants', a),
+    importVariants: a => call('importVariants', withActor(a)),
     createOrder: (a, key) => call('createOrder', a, key),
     quoteOrder: a => call('quoteOrder', a),
     confirmPayment: (a, key) => call('confirmPayment', a, key),

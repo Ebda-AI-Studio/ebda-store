@@ -71,7 +71,7 @@ describe('CSV import batches on the store DO', () => {
       expect(await num(stub, `SELECT COUNT(*) n FROM ${t}`)).toBe(0);
   });
 
-  it('20 concurrent imports of one new SKU: one product, one history row, its two variants; 19 refused whole', async () => {
+  it('20 concurrent imports of one new SKU: one product, its stock history once (product + its two variants, INV-AUDIT-3), its two variants; 19 refused whole', async () => {
     const store = 'imp-race';
     const stub = await bound(store);
     const r = await Promise.all(
@@ -79,7 +79,7 @@ describe('CSV import batches on the store DO', () => {
     );
     expect(codes(r)).toEqual({ ok: 1, IMPORT_ROW_FAILED: 19 });
     expect(await num(stub, 'SELECT COUNT(*) n FROM products')).toBe(1);
-    expect(await num(stub, 'SELECT COUNT(*) n FROM inventory_history')).toBe(1);
+    expect(await num(stub, 'SELECT COUNT(*) n FROM inventory_history')).toBe(3);
     expect(await num(stub, 'SELECT COUNT(*) n FROM product_variants')).toBe(2);
     expect(await num(stub, 'SELECT has_variants n FROM products')).toBe(1);
   });

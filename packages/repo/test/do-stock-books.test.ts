@@ -388,10 +388,16 @@ describe('scan flows', () => {
 });
 
 describe('bulk inventory', () => {
-  it('sets or adjusts simple products only, floored at 0, and writes no history', () => {
+  it('sets or adjusts simple products only, floored at 0, and writes one movement row per change with actor and reason (INV-AUDIT-3)', () => {
     const r = rig();
     expect(
-      r.op('bulkSetInventory', { productIds: ['p1', 'pv', 'px'], mode: 'adjust', value: -50 })
+      r.op('bulkSetInventory', {
+        productIds: ['p1', 'pv', 'px'],
+        mode: 'adjust',
+        value: -50,
+        userId: 'u1',
+        reason: 'clearance',
+      })
     ).toEqual({
       updated: 1,
     });
@@ -399,7 +405,18 @@ describe('bulk inventory', () => {
     r.op('bulkSetInventory', { productIds: ['p1'], mode: 'set', value: 12.4 });
     expect(inv(r, 'p1')).toBe(12);
     expect(inv(r, 'px')).toBe(5);
-    expect(r.q('SELECT count(*) AS n FROM inventory_history')[0].n).toBe(0);
+    r.op('bulkSetInventory', { productIds: ['p1'], mode: 'set', value: 12 }); // unchanged: no row
+    const rows = r.q('SELECT * FROM inventory_history ORDER BY rowid');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      product_id: 'p1',
+      quantity: -10,
+      previous_stock: 10,
+      new_stock: 0,
+      reason: 'clearance',
+      created_by: 'u1',
+    });
+    expect(rows[1]).toMatchObject({ quantity: 12, previous_stock: 0, new_stock: 12 });
   });
 });
 
