@@ -324,6 +324,74 @@ describe('expense / stock-adjustment / PO-receive journals (Ruling CF-JOBS-4)', 
     );
     expect(r2.q('SELECT count(*) n FROM journal_entries')[0].n).toBe(0);
   });
+
+  describe('partial PO receipts (ACCT-AUDIT-1)', () => {
+    const seed = (r: ReturnType<typeof rig>) =>
+      r.raw.exec(
+        `INSERT INTO suppliers (id, store_id, name) VALUES ('sup', 's1', 'Acme');
+       INSERT INTO purchase_orders (id, store_id, supplier_id, po_number, status) VALUES ('po1', 's1', 'sup', 'PO-1', 'partial');
+       INSERT INTO purchase_order_items (id, po_id, product_id, qty, qty_received, unit_cost, total) VALUES ('i1', 'po1', 'sku', 10, 4, 100, 1000);`
+      );
+    const invDebit = (r: ReturnType<typeof rig>) =>
+      Number(
+        r.q(
+          `SELECT COALESCE(SUM(l.debit),0) t FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '1200' AND l.ref_table = 'purchase_orders'`
+        )[0].t
+      );
+    const apCredit = (r: ReturnType<typeof rig>) =>
+      Number(
+        r.q(
+          `SELECT COALESCE(SUM(l.credit),0) t FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '2000'`
+        )[0].t
+      );
+
+    it('10 units x 100 received 4 then 6 post Inventory 1000 and AP 1000 (the later receipt is not dropped)', () => {
+      const r = books();
+      seed(r);
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({ posted: true, entries: 1 });
+      expect(invDebit(r)).toBe(400);
+      r.raw.exec(`UPDATE purchase_order_items SET qty_received = 10 WHERE id = 'i1'`);
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({ posted: true, entries: 1 });
+      expect(invDebit(r)).toBe(1000);
+      expect(apCredit(r)).toBe(1000);
+      expect(tb(r).debit).toBe(tb(r).credit);
+    });
+
+    it('a replay of each pass posts nothing; three passes net to the received value', () => {
+      const r = books();
+      seed(r);
+      r.op('journalPoReceive', { poId: 'po1' });
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({
+        posted: false,
+        entries: 0,
+      });
+      r.raw.exec(`UPDATE purchase_order_items SET qty_received = 7 WHERE id = 'i1'`);
+      r.op('journalPoReceive', { poId: 'po1' });
+      r.raw.exec(`UPDATE purchase_order_items SET qty_received = 10 WHERE id = 'i1'`);
+      r.op('journalPoReceive', { poId: 'po1' });
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({
+        posted: false,
+        entries: 0,
+      });
+      expect(invDebit(r)).toBe(1000);
+    });
+
+    it('an old single-entry journal (sourceId = poId, cumulative) is counted: only the remainder posts', () => {
+      const r = books();
+      seed(r);
+      r.raw.exec(
+        `INSERT INTO journal_entries (id, store_id, entry_number, posted_at, source, source_id, status, created_at) VALUES ('je0', 's1', 'JE-0', 1, 'purchase_order', 'po1', 'posted', 1);
+       INSERT INTO journal_lines (id, entry_id, account_id, debit, credit, ref_table, ref_id, created_at) VALUES ('l1', 'je0', 'a1200', 400, 0, 'purchase_orders', 'po1', 1), ('l2', 'je0', 'a2000', 0, 400, 'purchase_orders', 'po1', 1);
+       UPDATE purchase_order_items SET qty_received = 10 WHERE id = 'i1';`
+      );
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({ posted: true, entries: 1 });
+      expect(invDebit(r)).toBe(1000);
+      expect(r.op('journalPoReceive', { poId: 'po1' })).toMatchObject({
+        posted: false,
+        entries: 0,
+      });
+    });
+  });
 });
 
 describe('fan-out claims, markers and affiliate writes (Ruling CF-JOBS-4)', () => {

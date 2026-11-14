@@ -172,16 +172,28 @@ export function journalPoReceiveOp(
       refTable: string,
       refId: string
     ): JournalLine => ({ accountId, debit, credit, lineMemo, refTable, refId });
-    if (received > 0) {
+    // ACCT-AUDIT-1: each receive pass posts only the DELTA over what this PO already booked to Inventory (the old single
+    // entry keyed `poId` and the per-pass `poId:recv:<cumulative>` entries are both counted), keyed by the cumulative value so
+    // a replay finds its own entry and a later pass is never dropped.
+    const booked = Number(
+      db.all(
+        `SELECT COALESCE(SUM(l.debit), 0) AS t FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id
+         WHERE e.store_id = ? AND e.source = 'purchase_order' AND e.status = 'posted'
+           AND (e.source_id = ? OR e.source_id LIKE ?) AND l.account_id = ? AND l.ref_table = 'purchase_orders' AND l.ref_id = ?`,
+        [storeId, poId, `${poId}:recv:%`, inventory, poId]
+      )[0].t
+    );
+    const delta = received - booked;
+    if (delta > 0) {
       const r = postEntry(db, {
         storeId,
         source: 'purchase_order',
-        sourceId: poId,
+        sourceId: `${poId}:recv:${received}`,
         memo: `PO receive — ${poNumber}`,
         memoAr: `استلام أمر شراء — ${poNumber}`,
         lines: [
-          jl(inventory, received, 0, `Inventory in (PO ${poNumber})`, 'purchase_orders', poId),
-          jl(ap, 0, received, 'AP — supplier', 'purchase_orders', poId),
+          jl(inventory, delta, 0, `Inventory in (PO ${poNumber})`, 'purchase_orders', poId),
+          jl(ap, 0, delta, 'AP — supplier', 'purchase_orders', poId),
         ],
       });
       if (r.created) entries++;

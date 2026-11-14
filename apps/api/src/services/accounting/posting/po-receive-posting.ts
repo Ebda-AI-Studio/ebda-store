@@ -21,8 +21,8 @@ export interface PoReceiveJournalInput {
  * Post the GL journal for a PO receipt + any cleared backorder COGS entries.
  *
  * Posts up to N+1 entries (one main, optionally N variance-aware deferred-COGS):
- *   1. PO receive (sourceId = poId)
- *      DR Inventory  = sum(item.qtyReceived * item.unitCost) for this receipt window
+ *   1. PO receive (sourceId = `<poId>:recv:<cumulative>`)
+ *      DR Inventory  = sum(item.qtyReceived * item.unitCost) newly received since the last pass
  *      CR Accounts Payable  = same total
  *   2. For each cleared backorder line (sourceId = `bo:<backorderLineId>:cogs`):
  *      DR COGS                actualUnitCost * qty
@@ -31,9 +31,8 @@ export interface PoReceiveJournalInput {
  *
  * Idempotent via postEntry's (source, sourceId) lookup.
  *
- * v1 limitation: sourceId=poId means a single-shot full receive. Multi-partial
- * receives will collide on the same sourceId and be idempotency-skipped.
- * Sub-sourceId per receive-pass is a v2 patch.
+ * Each receive pass posts only the delta since the last pass, keyed
+ * `<poId>:recv:<cumulative received value>` (ACCT-AUDIT-1); a replay posts nothing.
  */
 export async function postPoReceiveJournal(args: PoReceiveJournalInput): Promise<void> {
   // A store on its Durable Object posts in one section there (Ruling CF-JOBS-4); idempotent per source row.
@@ -67,17 +66,34 @@ export async function postPoReceiveJournal(args: PoReceiveJournalInput): Promise
   // Sum all received line values. For v1 single-shot receives this equals the
   // full PO receipt. Idempotency via sourceId=poId prevents double-posting.
   const receivedTotal = po.items.reduce((s, i) => s + i.qtyReceived * i.unitCost, 0);
-  if (receivedTotal > 0) {
+  // ACCT-AUDIT-1: post only the DELTA over what this PO already booked to Inventory (old `poId` entry + per-pass
+  // `poId:recv:<cumulative>` entries), keyed by the cumulative value, so a later partial receipt is never dropped.
+  const bookedAgg = await prisma.journalLine.aggregate({
+    _sum: { debit: true },
+    where: {
+      accountId: inventoryAccountId,
+      refTable: 'purchase_orders',
+      refId: po.id,
+      entry: {
+        storeId: args.storeId,
+        source: 'purchase_order',
+        status: 'posted',
+        OR: [{ sourceId: args.poId }, { sourceId: { startsWith: `${args.poId}:recv:` } }],
+      },
+    },
+  });
+  const delta = receivedTotal - (bookedAgg._sum.debit ?? 0);
+  if (delta > 0) {
     await postEntry({
       storeId: args.storeId,
       source: 'purchase_order',
-      sourceId: args.poId,
+      sourceId: `${args.poId}:recv:${receivedTotal}`,
       memo: `PO receive — ${po.poNumber}`,
       memoAr: `استلام أمر شراء — ${po.poNumber}`,
       lines: [
         {
           accountId: inventoryAccountId,
-          debit: receivedTotal,
+          debit: delta,
           credit: 0,
           lineMemo: `Inventory in (PO ${po.poNumber})`,
           refTable: 'purchase_orders',
@@ -86,7 +102,7 @@ export async function postPoReceiveJournal(args: PoReceiveJournalInput): Promise
         {
           accountId: apAccountId,
           debit: 0,
-          credit: receivedTotal,
+          credit: delta,
           lineMemo: `AP — supplier`,
           refTable: 'purchase_orders',
           refId: po.id,
