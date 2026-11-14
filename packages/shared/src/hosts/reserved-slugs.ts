@@ -36,7 +36,6 @@ export const RESERVED_SLUGS = [
   ...STORE_EXTRA_RESERVED_SLUGS,
 ] as const;
 
-// pq-allow(unused-export): imported by the vendored foundation, which the slop guard skips
 export type ReservedSlug = (typeof RESERVED_SLUGS)[number];
 
 /** True when `slug` (case-insensitive, trimmed) is reserved (exact label or reserved prefix) and can never be a store. */

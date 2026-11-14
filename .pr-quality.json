@@ -2,6 +2,5 @@
   "roots": ["apps", "packages"],
   "locales": ["apps/admin/src/i18n/messages"],
   "baseline": ".pr-quality-baseline.json",
-  "skip": ["foundation"],
   "bodyCheckEnforceFrom": "2026-11-19"
 }
