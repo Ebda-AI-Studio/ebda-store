@@ -788,3 +788,115 @@ export async function releaseDedupeAfterReject(storeId: string, claimId: string)
       logger.error({ err, storeId }, '[instapay-auto] dedupe release after reject failed')
     );
 }
+
+// ───────────────────────────── daily digest + waiting reminders (S8) ─────────────────────────────
+
+type DigestRow = RowShape & { expectedAmountMinor: number };
+const DIGEST_PAGE = 200;
+const STALE_DIGEST_MS = 26 * 3600_000;
+const REMINDER_MAX = 5;
+
+/**
+ * The daily digest: every `auto_confirmed` payment not yet listed goes to Ahmad in ONE brain message (cursor-paginated, 200 per page). A row
+ * is stamped `digestSentAt` ONLY when the brain answered `sent:true` for the page that listed it (INSTAPAY-CLEAN-1: that stamp is what makes the
+ * payment "clean"); a failure leaves the rows for the next run and raises a P1 once the oldest undelivered row is older than 26 h.
+ * An empty set sends nothing. A reverted payment is not `auto_confirmed` any more, so it is never listed.
+ *
+ * The brain allows ONE digest per product per UTC day: a second page the same day is refused (429) and simply waits for tomorrow's run.
+ * Also reminds (max 5, as `waiting` notices) of claims that still wait for a human, so nothing depends on the one immediate notice.
+ */
+export async function runAutoDigest(
+  now: number = Date.now()
+): Promise<{ listed: number; stamped: number; reminded: number }> {
+  const db = (await platformDb()) ?? prisma;
+  let listed = 0;
+  let stamped = 0;
+  let oldestUndelivered: number | null = null;
+  // Stamped rows leave the filter, so each loop reads the FIRST page again (a cursor on a row that just left the filter would skip one).
+  for (let page = 0; page < 25; page++) {
+    const rows: DigestRow[] = await db.instapayAutoConfirmation.findMany({
+      where: { state: 'auto_confirmed', digestSentAt: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: DIGEST_PAGE,
+    });
+    if (rows.length === 0) break;
+    listed += rows.length;
+    const items = await Promise.all(
+      rows.map(async r => ({
+        product: 'store' as const,
+        id: r.id,
+        ownerLabel: await ownerLabel(r.storeId),
+        amountMinor: r.amountMinor ?? r.expectedAmountMinor,
+        kind: 'subscription',
+        confirmedAt: (r.confirmedAt ?? r.createdAt).getTime(),
+      }))
+    );
+    const ok = await notifyBrain('digest', items);
+    if (!ok) {
+      oldestUndelivered = rows[0].createdAt.getTime();
+      break;
+    }
+    // stamp each row inside its own store scope (it names the store); a row reverted meanwhile is simply stamped too (it can never be clean)
+    for (const r of rows) {
+      await withStore(r.storeId, () =>
+        prisma.instapayAutoConfirmation.updateMany({
+          where: { id: r.id, storeId: r.storeId },
+          data: { digestSentAt: new Date(now) },
+        })
+      );
+      stamped++;
+    }
+    if (rows.length < DIGEST_PAGE) break;
+  }
+  if (oldestUndelivered !== null && now - oldestUndelivered > STALE_DIGEST_MS) {
+    void sendAlert({
+      level: 'p1',
+      title: 'InstaPay auto-confirm: the daily digest has not reached Ahmad for over 26 hours',
+      body: `oldest undelivered auto-confirmed payment: ${new Date(oldestUndelivered).toISOString()}. Check the brain bridge (BRAIN_BRIDGE_URL, INSTAPAY_BRIDGE_SECRET) and Telegram.`,
+    }).catch(() => undefined);
+  }
+
+  // claims still waiting for a human (a lost immediate notice must not leave one unseen)
+  let reminded = 0;
+  const waiting: DigestRow[] = await db.instapayAutoConfirmation.findMany({
+    where: { state: 'needs_human', digestSentAt: null },
+    orderBy: { createdAt: 'asc' },
+    take: REMINDER_MAX,
+  });
+  const live: typeof waiting = [];
+  for (const r of waiting) {
+    const claim = await withStore(r.storeId, () =>
+      prisma.manualPaymentClaim.findFirst({ where: { id: r.claimId, storeId: r.storeId } })
+    );
+    const quiet = (r.reasons as ReasonCode[]).every(x => QUIET_REASONS.has(x));
+    if (claim?.status === 'pending' && !quiet) live.push(r);
+  }
+  if (live.length > 0) {
+    const ok = await notifyBrain(
+      'waiting',
+      await Promise.all(
+        live.map(async r => ({
+          product: 'store' as const,
+          id: r.id,
+          ownerLabel: await ownerLabel(r.storeId),
+          amountMinor: r.amountMinor ?? r.expectedAmountMinor,
+          kind: 'subscription',
+          confirmedAt: r.createdAt.getTime(),
+          reasons: r.reasons as string[],
+        }))
+      )
+    );
+    if (ok) {
+      for (const r of live) {
+        await withStore(r.storeId, () =>
+          prisma.instapayAutoConfirmation.updateMany({
+            where: { id: r.id, storeId: r.storeId },
+            data: { digestSentAt: new Date(now) },
+          })
+        );
+        reminded++;
+      }
+    }
+  }
+  return { listed, stamped, reminded };
+}

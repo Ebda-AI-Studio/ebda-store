@@ -25,6 +25,22 @@ vi.mock('../../apps/api/src/services/billing/charge-amount', async importOrigina
   ...(await importOriginal<object>()),
   resolvePlatformVat: async () => ({ enabled: false, rateBps: 0, mode: 'inclusive' }),
 }));
+vi.mock('../../apps/api/src/lib/repo-factory', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  storeUpdate: h.storeUpdate,
+}));
+vi.mock(
+  '../../apps/api/src/services/payment-providers/instapay-receipt.service',
+  async importOriginal => {
+    const real = await importOriginal<{ InstapayReceiptService: object }>();
+    return {
+      ...real,
+      InstapayReceiptService: Object.assign(Object.create(real.InstapayReceiptService), {
+        deleteImages: async () => undefined,
+      }),
+    };
+  }
+);
 vi.mock('@ebda/database', async importOriginal => {
   const real = await importOriginal<typeof import('@ebda/database')>();
   const fake: Record<string, unknown> = {
@@ -115,6 +131,7 @@ describe('S5 stuck sweep', () => {
     const c = seedClaim(w);
     const a = await decideAndActivate({ storeId: A, claimId: c.claimId });
     const b = await decideAndActivate({ storeId: A, claimId: c.claimId });
+    expect(a.state).toBe('auto_confirmed');
     expect(b).toEqual(a);
     expect(
       w.db.prepare("SELECT COUNT(*) n FROM billing_events WHERE type = 'manual_payment'").get()

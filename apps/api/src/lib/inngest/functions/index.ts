@@ -47,6 +47,7 @@ import { accountingProfitAnomalyCron } from './accounting-profit-anomaly';
 import { accountingExpenseOcrProcess } from './accounting-expense-ocr-process';
 import { instapayReceiptExtract } from './instapay-receipt-extract';
 import { instapayAutoConfirm } from './instapay-auto-confirm';
+import { instapayAutoDigest } from './instapay-auto-digest';
 import { analyticsDailyRollupCron, analyticsRollupOnDemand } from './analytics-daily-rollup';
 import { aiAutofillProduct } from './ai-autofill-product';
 import { aiAutofillCleanup } from './ai-autofill-cleanup';
@@ -155,6 +156,7 @@ const allInngestFunctions: JobDef[] = [
   accountingExpenseOcrProcess,
   instapayReceiptExtract,
   instapayAutoConfirm,
+  instapayAutoDigest,
   analyticsDailyRollupCron,
   analyticsRollupOnDemand,
   // Phase A: product → Meta Catalog sync (native catalog bot)

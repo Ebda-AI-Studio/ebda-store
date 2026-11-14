@@ -20,6 +20,8 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'alerts-failure-watch',
   'audit-log-archive-weekly',
   'billing-renewal-daily',
+  // INSTAPAY-AUTO-1: reads/stamps the platform auto-confirmation rows only and talks to the brain; no store data to move
+  'instapay-auto-digest',
   // reads the webhook inbox (a platform table) and re-sends events; it never opens a store table (Ruling CF-JOBS-4)
   'payment-webhook-stuck-sweep',
   // Ruling CF-JOBS-4: platform tables only (the ad-attribution ledger `BillingEvent` and the identity `User`; the legal
