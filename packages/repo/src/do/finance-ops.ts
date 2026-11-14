@@ -94,7 +94,7 @@ export function journalManualOp(
     if (found.some(r => !r.is_active))
       throw new MoneyError('ACCOUNT_INACTIVE', 'A disabled account cannot be posted to', 409);
 
-    if (postedAt < periodLockMs(db, storeId))
+    if ((postedAt as number) < periodLockMs(db, storeId))
       throw new MoneyError(
         'PERIOD_LOCKED',
         'That month is closed; post the entry in the open period',
