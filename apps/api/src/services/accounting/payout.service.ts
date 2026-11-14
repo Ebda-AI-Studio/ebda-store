@@ -16,7 +16,7 @@ import type { JournalEntry } from '@prisma/client';
  *
  * so the in-transit balance clears and the bank line on the statement matches a ledger line. Integer piastres only.
  */
-export interface PayoutInput {
+interface PayoutInput {
   fromAccountId: string;
   bankAccountId: string;
   feeAccountId: string;
@@ -25,6 +25,7 @@ export interface PayoutInput {
   reference?: string;
 }
 
+// pq-allow(unused-export): test seam, imported by tests/unit/payout-entry.test.ts (runs the lines through the real DO journal)
 export function buildPayoutLines(p: PayoutInput): JournalLineInput[] {
   if (!Number.isSafeInteger(p.grossMinor) || p.grossMinor <= 0)
     throw new AppError(422, 'PAYOUT_BAD_AMOUNT', 'The payout amount must be above zero.');

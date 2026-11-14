@@ -630,7 +630,7 @@ type MatchPick =
  * line's own side is the opposite of the bank direction. Candidates are scored on amount closeness minus a penalty per
  * day apart; the best wins only when it strictly beats the runner-up, otherwise the line stays for a human (ambiguous).
  */
-export function pickMatch(
+function pickMatch(
   btx: { date: Date; amountFils: number; direction: string },
   lines: MatchLine[]
 ): MatchPick {
