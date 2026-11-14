@@ -190,6 +190,7 @@ export function AdminLayout({
     aiUsage: t('hubTabs.aiUsage'),
     answerEngine: t('hubTabs.answerEngine'),
     marketingPixels: t('hubTabs.marketingPixels'),
+    productFeeds: t('hubTabs.productFeeds'),
     notifications: t('hubTabs.notifications'),
     newsletter: t('hubTabs.newsletter'),
     campaigns: t('hubTabs.campaigns'),

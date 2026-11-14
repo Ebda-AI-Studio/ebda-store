@@ -2248,12 +2248,6 @@
         "description": "A QR for the store and barcodes for products and invoices"
       }
     },
-    "metaCatalogCard": {
-      "provisionLabel": "Provision automatically · Ebda Store assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Ebda Store parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
-      "provisionButton": "Provision automatically",
-      "provisioningButton": "Provisioning…"
-    },
     "superAdmin": {
       "planLabel": "Store Plan",
       "loadingPlan": "Loading…",
@@ -6219,6 +6213,7 @@
         "aiUsage": "Usage",
         "answerEngine": "Answer-Engine Insights",
         "marketingPixels": "Pixels",
+        "productFeeds": "Product feeds",
         "notifications": "Notifications",
         "newsletter": "Newsletter",
         "campaigns": "Campaigns",
@@ -8207,6 +8202,90 @@
         "errorGeneric": "Could not change the number. Try again."
       }
     }
+  },
+  "productFeeds": {
+    "page": {
+      "title": "Product feeds",
+      "subtitle": "Send your whole catalogue, with sizes and colours, to Google Shopping, Facebook and Instagram, and TikTok."
+    },
+    "intro": "Each link below is a live feed of your products. Paste it once into the platform and it re-reads your prices and stock on its own schedule. Variants are sent as separate items, grouped under one product.",
+    "language": {
+      "ar": "Arabic feed",
+      "en": "English feed"
+    },
+    "copy": "Copy link",
+    "copied": "Link copied",
+    "copyFailed": "Could not copy. Select the link and copy it by hand.",
+    "parts": "Your catalogue is large, so it is split into {count} files. Add each one as its own source: the same link with &part=2, &part=3 and so on.",
+    "platforms": {
+      "google": {
+        "name": "Google Merchant Center",
+        "for": "Google Shopping ads and free product listings",
+        "format": "XML file",
+        "step1": "Open Merchant Center and go to Products, then Data sources.",
+        "step2": "Add a product source and choose to add products from a file.",
+        "step3": "Pick a scheduled fetch, then paste the link for your language.",
+        "step4": "Choose how often Google reads it. Daily is enough, because the feed is always current.",
+        "step5": "Finish by confirming your website and setting your shipping in Merchant Center, then check Diagnostics for any problems."
+      },
+      "meta": {
+        "name": "Meta Commerce Manager",
+        "for": "Facebook and Instagram catalogue ads and shops",
+        "format": "XML file",
+        "step1": "Open Commerce Manager, pick your catalogue, and go to Data sources.",
+        "step2": "Add items, then choose Data feed.",
+        "step3": "Choose a scheduled feed and paste the link for your language.",
+        "step4": "Set how often Meta reads it. Hourly or daily both work.",
+        "step5": "Open Diagnostics after the first run to see anything Meta rejected."
+      },
+      "tiktok": {
+        "name": "TikTok Catalog Manager",
+        "for": "TikTok catalogue ads",
+        "format": "CSV file",
+        "step1": "Open TikTok Ads Manager and go to Assets, then Catalog.",
+        "step2": "Create a catalogue, then add products from a data feed.",
+        "step3": "Choose a scheduled fetch and paste the CSV link for your language.",
+        "step4": "Pick your country and currency, and set how often TikTok reads it.",
+        "step5": "Check the upload report for rejected rows after the first run."
+      }
+    },
+    "steps": "Setup steps",
+    "health": {
+      "title": "Feed health",
+      "language": "Checking the {lang} feed",
+      "items": "Items in the feed",
+      "products": "Active products",
+      "excluded": "Left out",
+      "warnings": "To improve",
+      "allGood": "Every product is in the feed and nothing needs attention.",
+      "empty": "You have no active products yet, so the feeds are empty. Publish a product and it appears here.",
+      "notPublished": "Not in the feed on purpose: {draft} drafts, {archived} archived, {wholesale} wholesale-only.",
+      "shippingFlat": "Your shipping fee is the same everywhere, so it is included in the feed.",
+      "shippingVaries": "Your shipping fees differ by area, so they are not in the feed. Set shipping inside each platform instead.",
+      "truncatedIssues": "Showing the first {count} items. Fix these and refresh to see more.",
+      "scanTruncated": "Your catalogue is very large, so this report covers only part of it.",
+      "imageNote": "Platforms also check that every image is at least 500 x 500 pixels. Ebda cannot measure that here, so upload large product photos.",
+      "refresh": "Refresh",
+      "issuesTitle": "Items that need attention",
+      "product": "Item",
+      "problem": "What to fix",
+      "excludedBadge": "Left out",
+      "warningBadge": "Improve",
+      "code": {
+        "no_image": "This item has no usable image, so it is left out. Add a product photo.",
+        "zero_price": "The price is zero, so the item is left out. Set a price.",
+        "variant_inactive": "This variant is switched off, so it is left out.",
+        "no_title": "The product has no name, so it is left out.",
+        "bundle_not_sellable": "This bundle cannot be bought right now, so it is left out.",
+        "description_missing": "No description. The title is used instead, but ads perform better with a real description.",
+        "gtin_invalid": "The barcode is not a valid product code (GTIN), so it is not sent. Enter the code printed on the package.",
+        "brand_is_store_name": "No brand is set, so your store name is used. Add a Brand row in the product facts to change it.",
+        "google_category_missing": "We could not match a Google category from your category names. Add a product fact named google_product_category if you need one.",
+        "apparel_missing_attrs": "Clothing and shoes need colour, size, gender and age group. Add them as options or product facts.",
+        "variant_options_missing": "This variant has no option values (size, colour), so platforms cannot tell it apart from its siblings."
+      }
+    },
+    "loadError": "Could not load the feed report."
   },
   "answerEngine": {
     "page": {

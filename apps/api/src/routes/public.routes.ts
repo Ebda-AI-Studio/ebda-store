@@ -58,6 +58,7 @@ import { getStoreIdFromRequest } from '../utils/store-helpers';
 import { assertNotDemoStore } from '../services/plan-limit.service';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
+import { renderFeed } from '../lib/catalogue-feed/service';
 import { gateBackorderPayload } from '../lib/effective-inventory';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import {
@@ -741,6 +742,56 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     next(err);
   }
 });
+
+/**
+ * GET /public/feed/{google.xml,meta.xml,tiktok.csv}?lang=ar|en&part=N — the advertising product catalogue
+ * (`product_feeds`; every paid plan, Ruling FEEDS-1): the FULL catalogue, one item per purchasable variant, for Google
+ * Merchant Center, Meta Commerce Manager and TikTok Catalog Manager. Fail-closed like products.json: 404 when the
+ * feature is off, before any parameter is read. Cache + staleness class: lib/catalogue-feed/service.ts (Ruling FEEDS-4).
+ */
+const feedQuery = z.object({
+  lang: z.enum(['ar', 'en']).default('ar'),
+  part: z.coerce.number().int().min(1).max(200).default(1),
+});
+const feedHandler =
+  (platform: 'google' | 'meta' | 'tiktok') =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      if (!(await featureService.isFeatureEnabled(storeId, 'product_feeds'))) {
+        throw new AppError(404, 'NOT_FOUND', 'Not found');
+      }
+      const q = feedQuery.safeParse(req.query);
+      if (!q.success)
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'lang must be ar or en; part must be a positive integer'
+        );
+      const [backorderOn, bundlesEnabled] = await Promise.all([
+        featureService.isFeatureEnabled(storeId, 'inventory.backorder'),
+        featureService.isFeatureEnabled(storeId, 'bundles'),
+      ]);
+      const doc = await renderFeed({
+        storeId,
+        platform,
+        lang: q.data.lang,
+        part: q.data.part,
+        backorderOn,
+        bundlesEnabled,
+      });
+      if (!doc) throw new AppError(404, 'NOT_FOUND', 'Not found');
+      setEdgeCache(res, { sMaxAge: doc.edgeSeconds, staleWhileRevalidate: 0, neverStale: true });
+      res.setHeader('Content-Type', doc.contentType);
+      if (doc.nextPart) res.setHeader('X-Feed-Next-Part', String(doc.nextPart));
+      res.send(doc.body);
+    } catch (err) {
+      next(err);
+    }
+  };
+router.get('/feed/google.xml', feedHandler('google'));
+router.get('/feed/meta.xml', feedHandler('meta'));
+router.get('/feed/tiktok.csv', feedHandler('tiktok'));
 
 // GET /categories - List all categories (cached 120s)
 router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
