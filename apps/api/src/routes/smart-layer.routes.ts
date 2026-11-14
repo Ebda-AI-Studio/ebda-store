@@ -13,9 +13,9 @@
  *   POST /:storeId/stock/deadstock-flags/:id/dismiss     — mark dismissed
  *   GET  /:storeId/finance/anomalies                     — paginated, filter by severity + acknowledged
  *   POST /:storeId/finance/anomalies/:id/acknowledge     — mark acknowledged
- *   POST /:storeId/stock/reorder-scan/run-now            — super_admin: fire on-demand scan
- *   POST /:storeId/stock/low-stock-scan/run-now          — super_admin: fire on-demand scan
- *   POST /:storeId/stock/deadstock-scan/run-now          — super_admin: fire on-demand scan
+ *   POST /:storeId/stock/reorder-scan/run-now            — store_admin (1/hour/store) or super_admin: fire on-demand scan
+ *   POST /:storeId/stock/low-stock-scan/run-now          — store_admin (1/hour/store) or super_admin: fire on-demand scan
+ *   POST /:storeId/stock/deadstock-scan/run-now          — store_admin (1/hour/store) or super_admin: fire on-demand scan
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
@@ -29,6 +29,14 @@ import { createPoFromSuggestion } from '../services/accounting/purchase-order.se
 import { createClearanceCouponFromFlag } from '../services/accounting/deadstock-scan.service';
 import { inngest } from '../lib/inngest/client';
 import { runInStoreCtx } from '../lib/jobs/store-db';
+import { createScanNowLimiter } from '../middleware/scan-now-limiter';
+
+/** Merchant "Scan now" (gap A17): store_admin may run each scan once per hour per store; super_admin is unlimited. */
+export const scanNowLimiters = {
+  reorder: createScanNowLimiter('reorder'),
+  'low-stock': createScanNowLimiter('low-stock'),
+  deadstock: createScanNowLimiter('deadstock'),
+} as const;
 
 const router = Router({ mergeParams: true });
 
@@ -349,8 +357,9 @@ router.post(
   '/:storeId/stock/reorder-scan/run-now',
   authenticate,
   requireMfaEnrolled,
-  authorize('super_admin'),
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  scanNowLimiters['reorder'],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await inngest.send({
@@ -377,8 +386,9 @@ router.post(
   '/:storeId/stock/low-stock-scan/run-now',
   authenticate,
   requireMfaEnrolled,
-  authorize('super_admin'),
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  scanNowLimiters['low-stock'],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await inngest.send({
@@ -398,8 +408,9 @@ router.post(
   '/:storeId/stock/deadstock-scan/run-now',
   authenticate,
   requireMfaEnrolled,
-  authorize('super_admin'),
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  scanNowLimiters['deadstock'],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await inngest.send({

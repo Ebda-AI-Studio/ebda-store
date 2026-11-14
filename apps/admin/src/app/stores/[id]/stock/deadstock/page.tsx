@@ -236,7 +236,7 @@ export default function DeadstockPage() {
               </p>
             )}
           </div>
-          {isSuperAdmin && (
+          {(isSuperAdmin || user?.role === 'store_admin') && (
             <Button
               type="button"
               onClick={handleRescan}

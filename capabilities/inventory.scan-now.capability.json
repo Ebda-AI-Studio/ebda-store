@@ -1,0 +1,38 @@
+{
+  "id": "inventory.scan-now",
+  "status": "live",
+  "area": "inventory",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "شغّل فحص المخزون دلوقتي",
+  "titleEn": "Run the reorder, low-stock and dead-stock scans now",
+  "screens": [
+    "/stores/[id]/stock/dashboard",
+    "/stores/[id]/stock/reorder",
+    "/stores/[id]/stock/deadstock"
+  ],
+  "api": [
+    "POST /stores/:storeId/stock/reorder-scan/run-now",
+    "POST /stores/:storeId/stock/low-stock-scan/run-now",
+    "POST /stores/:storeId/stock/deadstock-scan/run-now"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "a scan only reads and raises suggestions"
+  },
+  "helpArticle": "scan-stock-now",
+  "questions": {
+    "ar": ["عايز اشغّل فحص المخزون دلوقتي", "ازاي اعمل scan للمخزون؟"],
+    "en": ["How do I run a stock scan now?"]
+  },
+  "steps": ["Open Stock, press Scan now / Re-scan now"],
+  "edgeCases": [
+    "One run per scan per store per hour (429 after that); platform staff are not limited",
+    "Scans never send messages to customers"
+  ],
+  "gaps": []
+}

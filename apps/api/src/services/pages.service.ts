@@ -319,8 +319,8 @@ export class PagesService {
   }
 
   /**
-   * Delete a page. Reserved for super_admin per the route layer - we
-   * don't want a store_admin nuking a critical legal page by accident.
+   * Delete a page. The route layer lets a store_admin delete custom pages
+   * and keeps the legal pages (privacy, terms, ...) for super_admin.
    */
   static async remove(storeId: string, slugRaw: string) {
     const slug = normalizeSlug(slugRaw);

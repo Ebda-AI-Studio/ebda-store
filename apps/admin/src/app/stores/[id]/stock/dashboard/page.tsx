@@ -205,7 +205,7 @@ export default function StockDashboardPage() {
 
   return (
     <AdminLayout title={t('title')}>
-      {isSuperAdmin && (
+      {(isSuperAdmin || user?.role === 'store_admin') && (
         <div className="mb-4 flex justify-end max-w-5xl">
           <Button
             type="button"

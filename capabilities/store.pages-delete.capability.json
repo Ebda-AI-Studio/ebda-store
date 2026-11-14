@@ -1,0 +1,30 @@
+{
+  "id": "store.pages-delete",
+  "status": "live",
+  "area": "content",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "امسح صفحة عملتها بنفسي",
+  "titleEn": "Delete a custom page I created",
+  "screens": ["/stores/[id]/content/[slug]"],
+  "api": ["DELETE /stores/:storeId/pages/:slug"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible"
+  },
+  "helpArticle": "delete-a-custom-page",
+  "questions": {
+    "ar": ["ازاي امسح صفحة؟", "عايز اشيل صفحة مخصصة"],
+    "en": ["How do I delete a page I made?"]
+  },
+  "steps": ["Open the page, press Delete page, confirm"],
+  "edgeCases": [
+    "Privacy, Terms, Shipping, Returns and Refund policy pages cannot be deleted by the merchant (only edited); platform staff override",
+    "Another store's page answers 404",
+    "Deleting is permanent; the cover image is cleaned up afterwards"
+  ],
+  "gaps": []
+}
