@@ -195,6 +195,10 @@ product.costPrice`. Order lines snapshot it at sale time
   (`reorder-scan.service.ts`, step 1b). The per-unit metrics (sales, on
   order, backlog) are per variant; the last-PO supplier and its lead time are
   product-level and looked up once per product per scan (issue 2344).
+  **Velocity is demand, not revenue** (INV-AUDIT-4): the 7/28-day sales count every
+  order that is not `cancelled`/`refunded` whatever its payment status (a COD
+  order stays `unpaid` until delivery settles it), net of units taken back by
+  COMPLETED returns (`sumOrderQty`). Revenue definitions are unchanged.
 - **Reorder rules have one writer** (M-107). `ReorderRule` (min qty, reorder
   qty, lead time, safety days, preferred supplier) is created, edited and
   deleted only through `reorder-rules.routes.ts`

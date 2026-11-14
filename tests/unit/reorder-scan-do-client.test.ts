@@ -31,6 +31,7 @@ const doDb = new Proxy({} as Record<string, unknown>, {
         ],
       };
     if (prop === 'orderItem') return { aggregate: orderItemAggregate };
+    if (prop === 'returnItem') return { aggregate: async () => ({ _sum: { quantity: null } }) };
     if (prop === 'purchaseOrderItem')
       return {
         findFirst: async () => null,

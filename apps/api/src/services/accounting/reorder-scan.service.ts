@@ -132,11 +132,16 @@ async function getSupplierLeadTime(
 
 // ---------------------------------------------------------------------------
 // Helper: sum OrderItem quantity for a product (or ONE of its variants) over
-// the last N days (paid orders)
+// the last N days. DEMAND, not revenue (Ruling INV-AUDIT-4): every order that
+// is not cancelled / refunded counts whatever its payment status (a COD order
+// stays `unpaid` until delivery settles it, MONEYB-7), net of units taken back
+// by COMPLETED returns. Revenue definitions are a separate decision.
 // ---------------------------------------------------------------------------
 
+const DEMAND_EXCLUDED_ORDER_STATUSES = ['cancelled', 'refunded'];
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function sumOrderQty(
+export async function sumOrderQty(
   productId: string,
   variantId: string | null,
   storeId: string,
@@ -149,20 +154,31 @@ async function sumOrderQty(
   // A store on its Durable Object (Ruling CF-JOBS-4): the read client has no raw SQL, so the same sum is an aggregate. The
   // caller says so (`onDo`): the DO client THROWS on any `$`-member, so probing `tx.$queryRaw` was itself the crash (2026-11-09 P1).
   if (onDo) {
-    const agg = await tx.orderItem.aggregate({
-      where: {
-        productId,
-        ...(variantId ? { variantId } : {}),
-        order: { storeId, paymentStatus: 'paid', createdAt: { gte: since } },
-      },
-      _sum: { quantity: true },
-    });
-    return Number(agg._sum.quantity ?? 0);
+    const orderWhere = {
+      storeId,
+      status: { notIn: DEMAND_EXCLUDED_ORDER_STATUSES },
+      createdAt: { gte: since },
+    };
+    const [sold, back] = await Promise.all([
+      tx.orderItem.aggregate({
+        where: { productId, ...(variantId ? { variantId } : {}), order: orderWhere },
+        _sum: { quantity: true },
+      }),
+      tx.returnItem.aggregate({
+        where: {
+          productId,
+          orderItem: { ...(variantId ? { variantId } : {}), order: orderWhere },
+          return: { status: 'completed', type: { in: ['return', 'refund'] } },
+        },
+        _sum: { quantity: true },
+      }),
+    ]);
+    return Math.max(0, Number(sold._sum.quantity ?? 0) - Number(back._sum.quantity ?? 0));
   }
 
   // A variant unit's velocity is that variant's own sales — summing the whole
   // product would give every variant the product's total demand.
-  const result = variantId
+  const sold = variantId
     ? await tx.$queryRaw<{ total: bigint }[]>`
     SELECT COALESCE(SUM(oi.quantity), 0) AS total
     FROM public.order_items oi
@@ -170,7 +186,7 @@ async function sumOrderQty(
     WHERE oi.product_id = ${productId}
       AND oi.variant_id = ${variantId}
       AND o.store_id = ${storeId}
-      AND o.payment_status = 'paid'
+      AND o.status NOT IN ('cancelled', 'refunded')
       AND o.created_at >= ${since}
   `
     : await tx.$queryRaw<{ total: bigint }[]>`
@@ -179,11 +195,37 @@ async function sumOrderQty(
     JOIN public.orders o ON o.id = oi.order_id
     WHERE oi.product_id = ${productId}
       AND o.store_id = ${storeId}
-      AND o.payment_status = 'paid'
+      AND o.status NOT IN ('cancelled', 'refunded')
+      AND o.created_at >= ${since}
+  `;
+  const back = variantId
+    ? await tx.$queryRaw<{ total: bigint }[]>`
+    SELECT COALESCE(SUM(ri.quantity), 0) AS total
+    FROM public.return_items ri
+    JOIN public.returns r ON r.id = ri.return_id
+    JOIN public.order_items oi ON oi.id = ri.order_item_id
+    JOIN public.orders o ON o.id = oi.order_id
+    WHERE ri.product_id = ${productId}
+      AND oi.variant_id = ${variantId}
+      AND r.status = 'completed' AND r.type IN ('return', 'refund')
+      AND o.store_id = ${storeId}
+      AND o.status NOT IN ('cancelled', 'refunded')
+      AND o.created_at >= ${since}
+  `
+    : await tx.$queryRaw<{ total: bigint }[]>`
+    SELECT COALESCE(SUM(ri.quantity), 0) AS total
+    FROM public.return_items ri
+    JOIN public.returns r ON r.id = ri.return_id
+    JOIN public.order_items oi ON oi.id = ri.order_item_id
+    JOIN public.orders o ON o.id = oi.order_id
+    WHERE ri.product_id = ${productId}
+      AND r.status = 'completed' AND r.type IN ('return', 'refund')
+      AND o.store_id = ${storeId}
+      AND o.status NOT IN ('cancelled', 'refunded')
       AND o.created_at >= ${since}
   `;
 
-  return Number(result[0]?.total ?? 0);
+  return Math.max(0, Number(sold[0]?.total ?? 0) - Number(back[0]?.total ?? 0));
 }
 
 // ---------------------------------------------------------------------------
