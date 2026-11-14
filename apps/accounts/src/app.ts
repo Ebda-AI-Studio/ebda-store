@@ -1,3 +1,4 @@
+import { logAuditEvent } from './audit-log';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod/v3';
 import bcrypt from 'bcryptjs';
@@ -1269,6 +1270,7 @@ export function createApp() {
     await c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`)
       .bind(user.id, JSON.stringify(hashed))
       .run();
+    logAuditEvent('mfa_recovery_codes_regenerated', user.id);
     return c.json({ success: true, data: { backupCodes: plain } });
   });
 
