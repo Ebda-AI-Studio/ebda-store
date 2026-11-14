@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@ebda/ui';
 import { recommendedSizeText } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { Toggle } from '../../../../../components/Toggle';
 import { ImageUpload } from '../../../../../components/ImageUpload';
@@ -199,6 +200,7 @@ export default function ContentEditorPage() {
   const slug = decodeURIComponent((params?.slug as string) || '');
   const t = useT('content.editor');
   const router = useRouter();
+  const askConfirm = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [data, setData] = useState<StorePageData>({
@@ -267,7 +269,13 @@ export default function ContentEditorPage() {
   // Self-service delete (gap A15): custom pages only. The legal pages stay (the API refuses them for a store_admin).
   const canDelete = !PROTECTED_LEGAL_SLUGS.has(slug);
   const handleDelete = async () => {
-    if (!storeId || !slug || !window.confirm(t('deleteConfirm'))) return;
+    if (!storeId || !slug) return;
+    const ok = await askConfirm({
+      object: t('deleteObject', { slug }),
+      consequence: t('deleteConfirm'),
+      confirmLabel: t('delete'),
+    });
+    if (!ok) return;
     const { error } = await apiDelete(
       `/api/v1/stores/${storeId}/pages/${encodeURIComponent(slug)}`
     );
