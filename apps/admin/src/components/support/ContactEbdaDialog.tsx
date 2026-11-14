@@ -13,7 +13,7 @@ import { RequestForm } from './RequestForm';
 
 const EVENT = 'ebda:open-contact';
 
-export function openContactEbda(topic?: string): void {
+function openContactEbda(topic?: string): void {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: { topic } }));
 }
 

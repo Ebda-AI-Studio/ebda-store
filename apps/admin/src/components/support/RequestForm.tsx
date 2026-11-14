@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiPost } from '@/lib/api';
 
-export type RequestMode = 'support' | 'appeal' | 'slug' | 'cap';
+type RequestMode = 'support' | 'appeal' | 'slug' | 'cap';
 
 interface Props {
   mode: RequestMode;

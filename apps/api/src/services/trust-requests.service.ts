@@ -20,7 +20,7 @@ import { sendAlert } from './alerts.service';
 import { emailQueue } from './email-queue.service';
 
 /** Support requests per store per rolling 24 h. */
-export const SUPPORT_REQUESTS_PER_DAY = 5;
+const SUPPORT_REQUESTS_PER_DAY = 5;
 
 /** The slice of the Prisma client these functions use (the tenant tx, `prisma`, or `withUser`'s tx). */
 export interface TrustDb {
@@ -38,7 +38,7 @@ export interface TrustDb {
     } | null>;
   };
 }
-export interface TrustRow {
+interface TrustRow {
   id: string;
   kind: string;
   status: string;
@@ -46,7 +46,7 @@ export interface TrustRow {
   createdAt: Date;
 }
 
-export interface Requester {
+interface Requester {
   userId: string;
   email?: string;
 }
@@ -147,7 +147,7 @@ export async function closeAppealsOnReactivation(db: TrustDb, storeId: string): 
   });
 }
 
-export interface SuspensionView {
+interface SuspensionView {
   kind: 'policy' | 'billing';
   reason: string | null;
   suspendedAt: string | null;
