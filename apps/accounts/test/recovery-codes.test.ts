@@ -166,5 +166,49 @@ describe('A23 regenerate emits a structured audit event', () => {
     } finally {
       spy.mockRestore();
     }
+
+describe('A23 regenerate leaves an audit row and tells the mailbox owner', () => {
+  it('writes one admin_audit row (no code, no hash) and mails a "recovery codes changed" notice', async () => {
+    const u = await seedUser();
+    const { secret, s } = await withMfa(u);
+    fakes.notices.length = 0;
+    const res = await call('/mfa/recovery-codes/regenerate', {
+      json: { password: u.password, code: await totpAt(secret) },
+      bearer: s.body.access_token,
+    });
+    expect(res.status).toBe(200);
+    const rows = await env.DB.prepare(
+      `SELECT event, user_id, email, actor, detail FROM admin_audit WHERE user_id = ?1`
+    )
+      .bind(u.id)
+      .all<{ event: string; user_id: string; email: string; actor: string; detail: string }>();
+    expect(rows.results).toHaveLength(1);
+    expect(rows.results[0]).toMatchObject({
+      event: 'mfa_recovery_codes_regenerated',
+      user_id: u.id,
+      email: u.email.toLowerCase(),
+      actor: 'self',
+    });
+    const { data } = (await res.json()) as { data: { backupCodes: string[] } };
+    for (const c of data.backupCodes) expect(JSON.stringify(rows.results)).not.toContain(c);
+    expect(fakes.notices).toEqual([
+      expect.objectContaining({ to: u.email, kind: 'recovery_codes_changed' }),
+    ]);
+  });
+
+  it('a refused step-up leaves no audit row and sends no notice', async () => {
+    const u = await seedUser();
+    const { s } = await withMfa(u);
+    fakes.notices.length = 0;
+    const res = await call('/mfa/recovery-codes/regenerate', {
+      json: { password: u.password, code: '000000' },
+      bearer: s.body.access_token,
+    });
+    expect(res.status).toBe(400);
+    const n = await env.DB.prepare(`SELECT count(*) AS n FROM admin_audit WHERE user_id = ?1`)
+      .bind(u.id)
+      .first<{ n: number }>();
+    expect(n!.n).toBe(0);
+    expect(fakes.notices).toEqual([]);
   });
 });

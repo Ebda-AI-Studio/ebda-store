@@ -1267,9 +1267,26 @@ export function createApp() {
     if (!user.mfa_enabled || !user.mfa_secret || !c.env.MFA_KEY) throw err(409, 'MFA_NOT_ENABLED');
     if (!(await checkTotp(c, user, body.code))) throw err(400, 'INVALID_CODE');
     const { plain, hashed } = await newRecoveryCodes();
-    await c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`)
-      .bind(user.id, JSON.stringify(hashed))
-      .run();
+    // The new set and its audit row land together (no code, no hash in the row; actor 'self').
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE users SET mfa_backup_codes = ?2 WHERE id = ?1`).bind(
+        user.id,
+        JSON.stringify(hashed)
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO admin_audit (event, user_id, email, actor, at, detail) VALUES ('mfa_recovery_codes_regenerated', ?1, ?2, 'self', ?3, '{}')`
+      ).bind(user.id, user.email.toLowerCase(), nowMs()),
+    ]);
+    // Tell the mailbox owner (best effort; the change already happened): a stolen session regenerating codes must not be silent.
+    queueMail(
+      c,
+      c.env.MAILER?.sendNotice({
+        to: user.email,
+        kind: 'recovery_codes_changed',
+        language: user.language === 'ar' ? 'ar' : 'en',
+        firstName: user.first_name,
+      }) ?? Promise.resolve()
+    );
     logAuditEvent('mfa_recovery_codes_regenerated', user.id);
     return c.json({ success: true, data: { backupCodes: plain } });
   });

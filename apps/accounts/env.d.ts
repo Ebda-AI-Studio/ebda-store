@@ -20,14 +20,18 @@ export interface MailerRpc {
     ttlMinutes: number;
     storeName?: string;
   }): Promise<void>;
-  /** A security notice with no code (a sign-in method was added). */
-  sendNotice(input: {
-    to: string;
-    kind: 'factor_added';
-    factor: 'totp' | 'passkey';
-    language: 'en' | 'ar';
-    firstName: string;
-  }): Promise<void>;
+  /** A security notice with no code (a sign-in method was added; the recovery codes were regenerated). */
+  sendNotice(
+    input:
+      | {
+          to: string;
+          kind: 'factor_added';
+          factor: 'totp' | 'passkey';
+          language: 'en' | 'ar';
+          firstName: string;
+        }
+      | { to: string; kind: 'recovery_codes_changed'; language: 'en' | 'ar'; firstName: string }
+  ): Promise<void>;
 }
 
 /** Service Binding RPC surface of ebda-wa (its `PlatformOtp` entrypoint, src/index.ts in ebda-whatsapp): sends from the PLATFORM number, no store id. Anything but `ok` means: fall back to the email. */
