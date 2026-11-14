@@ -90,7 +90,7 @@ import {
 } from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
 import { applyAddonGrant } from './addon-grant';
-import { ADDON_PLAN_PREFIX } from './addon-catalog';
+import { ADDON_MARKER_PREFIX, ADDON_PLAN_PREFIX } from './addon-catalog';
 import { renewDueAddons } from './addon-renewal';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
@@ -1654,7 +1654,8 @@ export async function applyWebhookEvent(
         refundRow.storeId,
         refundRow.id,
         event.kind === 'refund.succeeded',
-        event.failureReason
+        event.failureReason,
+        effects
       );
       return { duplicate: false, outcome: 'processed' };
     }
@@ -2000,7 +2001,8 @@ async function settleRefundInTx(
   storeId: string,
   refundId: string,
   succeeded: boolean,
-  reason?: string
+  reason?: string,
+  effects?: BillingEffect[]
 ): Promise<void> {
   const upd = await tx.billingEvent.updateMany({
     where: { id: refundId, storeId, status: 'pending' },
@@ -2028,6 +2030,8 @@ async function settleRefundInTx(
     // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
     if (flipped.count === 1) {
       await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', new Date(), storeId);
+      // A refunded add-on stops being an entitlement AT ONCE: drop the cached feature map (NEVER-stale class).
+      if (isAddonRow(charge)) effects?.push({ kind: 'addon_granted', storeId });
     }
   }
 }
@@ -2098,6 +2102,7 @@ export async function refundCharge(args: {
       amountMinor: amount,
       idempotencyKey: key,
     });
+    const refundEffects: BillingEffect[] = [];
     await withStore(charge.storeId, async tx => {
       await tx.billingEvent.updateMany({
         where: { id: refundId, storeId: charge.storeId, status: 'pending' },
@@ -2109,10 +2114,12 @@ export async function refundCharge(args: {
           charge.storeId,
           refundId,
           res.status === 'succeeded',
-          res.failureReason
+          res.failureReason,
+          refundEffects
         );
       }
     });
+    await runBillingEffects(refundEffects);
     // the referrer's side of a revoked grant lives in another tenant: take it back now, the sweep retries a miss
     await restoreRevokedGrants().catch(() => undefined);
     return { refundEventId: refundId, status: res.status };
@@ -2148,7 +2155,11 @@ const PUBLIC_FIELDS = {
 export async function listStoreCharges(storeId: string, limit = 50) {
   const rows = await withStore(storeId, tx =>
     tx.billingEvent.findMany({
-      where: { storeId },
+      // the append-only cancel / resume rows are bookkeeping, not charges
+      where: {
+        storeId,
+        OR: [{ planCode: null }, { NOT: { planCode: { startsWith: ADDON_MARKER_PREFIX } } }],
+      },
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(limit, 1), 200),
       select: PUBLIC_FIELDS,

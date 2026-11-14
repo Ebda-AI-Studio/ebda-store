@@ -37,11 +37,12 @@
     "Owner only: staff are refused; the store id comes from the path",
     "One payment grants one 30 day term, exactly once, even if the payment confirmation arrives twice",
     "A declined or abandoned payment grants nothing and charges nothing",
-    "Cancel stops the renewal; access stays until the paid term ends",
+    "The preview and the confirm state the renewal (amount, every 30 days, how to stop it); an email goes out before each renewal",
+    "Cancel stops the renewal; access stays until the paid term ends; cancel and resume are appended as ledger rows",
+    "A renewal is NOT charged, and the owner is told, when the price changed, the plan now includes the feature, support switched it off, or there is no saved card",
+    "A feature that support switched off cannot be bought",
     "A feature the plan already includes is not sold again",
     "A super admin can still switch any feature on or off for goodwill; that override wins over a purchase"
   ],
-  "gaps": [
-    "A declined renewal ends the add-on silently at the term end; there is no dunning message yet"
-  ]
+  "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"]
 }

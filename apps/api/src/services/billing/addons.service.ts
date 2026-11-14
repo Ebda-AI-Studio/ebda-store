@@ -25,8 +25,14 @@ import { getBillingProvider, resolveTrialCardMode } from './index';
 import { assertPayableStore } from './account.service';
 import { chargeFor } from './charge-amount';
 import { claimEvent, markFailedUnlessSettled } from './subscription-billing.service';
-import { ADDON_CATALOG, ADDON_TERM_DAYS, planCodeOfSku, type AddonItem } from './addon-catalog';
-import { activeAddons } from './addon-grant';
+import {
+  ADDON_CATALOG,
+  ADDON_TERM_DAYS,
+  planCodeOfSku,
+  renewsEachTerm,
+  type AddonItem,
+} from './addon-catalog';
+import { activeAddons, appendRenewalMarker } from './addon-grant';
 
 const TOOL = 'billing.addon-purchase';
 
@@ -36,17 +42,28 @@ function itemOf(sku: string): AddonItem {
   return item;
 }
 
+/** What the merchant agrees to, INCLUDING the renewal: the token binds all of it (ADDON-RENEW-1). */
+function terms(item: AddonItem, totalMinor: number) {
+  const renews = renewsEachTerm(item);
+  return {
+    sku: item.sku,
+    totalMinor,
+    renews,
+    renewsEveryDays: renews ? ADDON_TERM_DAYS : 0,
+    renewalMinor: renews ? totalMinor : 0,
+  };
+}
+
 const subject = (a: {
   storeId: string;
   userId: string;
-  sku: string;
-  totalMinor: number;
+  terms: ReturnType<typeof terms>;
 }): ConfirmTokenSubject => ({
   tool: TOOL,
   storeId: a.storeId,
   keyId: 'admin-ui',
   userId: a.userId,
-  argsHash: hashConfirmArgs({ sku: a.sku, totalMinor: a.totalMinor }),
+  argsHash: hashConfirmArgs(a.terms),
 });
 
 /** Everything a quote and a purchase must agree on; refuses what must not be sold. */
@@ -72,6 +89,19 @@ async function quote(storeId: string, sku: string) {
   if (sub?.status === 'comped')
     throw new AppError(409, 'STORE_COMPED', 'Comped stores are not billed');
   if (item.kind === 'feature') {
+    // A super-admin "off" (abuse, dispute) is never sold around: the owner contacts support instead.
+    const off = await withStore(storeId, tx =>
+      tx.storeFeature.findFirst({
+        where: { storeId, featureKey: item.featureKey!, enabled: false },
+        select: { featureKey: true },
+      })
+    );
+    if (off)
+      throw new AppError(
+        409,
+        'FEATURE_DISABLED_BY_SUPPORT',
+        'Ebda support switched this feature off for your store. Contact support to turn it back on.'
+      );
     const on = await featureService.isFeatureEnabled(storeId, item.featureKey!);
     if (on && !running.some(r => r.sku === sku)) {
       throw new AppError(409, 'ALREADY_INCLUDED', 'Your plan already includes this feature');
@@ -83,6 +113,7 @@ async function quote(storeId: string, sku: string) {
 
 export async function previewAddon(a: { storeId: string; userId: string; sku: string }) {
   const { item, amount } = await quote(a.storeId, a.sku);
+  const t = terms(item, amount.totalMinor);
   return {
     sku: item.sku,
     nameEn: item.nameEn,
@@ -91,7 +122,10 @@ export async function previewAddon(a: { storeId: string; userId: string; sku: st
     vatMinor: amount.vatMinor,
     totalMinor: amount.totalMinor,
     termDays: ADDON_TERM_DAYS,
-    confirmToken: signConfirmToken(subject({ ...a, totalMinor: amount.totalMinor })),
+    renews: t.renews,
+    renewsEveryDays: t.renewsEveryDays,
+    renewalMinor: t.renewalMinor,
+    confirmToken: signConfirmToken(subject({ storeId: a.storeId, userId: a.userId, terms: t })),
   };
 }
 
@@ -107,7 +141,11 @@ export async function purchaseAddon(a: {
     a.idempotencyKey,
     async () => {
       const { item, store, amount } = await quote(a.storeId, a.sku);
-      const subj = subject({ ...a, totalMinor: amount.totalMinor });
+      const subj = subject({
+        storeId: a.storeId,
+        userId: a.userId,
+        terms: terms(item, amount.totalMinor),
+      });
       if (!a.confirmToken || !verifyConfirmToken(a.confirmToken, subj)) {
         throw new AppError(
           409,
@@ -203,12 +241,9 @@ async function setCancelFlag(
     );
   const run = await latestRunning(storeId, sku);
   if (!run) throw new AppError(409, 'NOTHING_TO_CANCEL', 'This add-on is not running');
-  const raw = { ...run.raw, cancelAtPeriodEnd: cancel };
+  // Append-only: the intent is a new zero-amount ledger row, the paid row is never edited.
   await withStore(storeId, tx =>
-    tx.billingEvent.updateMany({
-      where: { id: run.eventId, storeId, status: 'succeeded' },
-      data: { raw: raw as never },
-    })
+    appendRenewalMarker(tx, { storeId, termId: run.eventId, sku, cancel })
   );
   return { effectiveAt: run.endsAt };
 }

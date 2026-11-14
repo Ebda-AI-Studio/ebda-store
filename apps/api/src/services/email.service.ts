@@ -1228,6 +1228,27 @@ export class EmailService {
    * Merchant notice from the subscription dunning cycle (SP5 task 3): a failed
    * renewal with a retry scheduled, or the final downgrade to Free.
    */
+  /** Add-on renewal notice (heads-up before the charge, or why it was not charged). Merchant notice, durable queue. */
+  static async sendAddonNotice(
+    storeId: string,
+    to: string,
+    copy: { title: string; body: string },
+    billingUrl: string,
+    lang: 'en' | 'ar'
+  ): Promise<void> {
+    const open = lang === 'ar' ? 'افتح الإضافات' : 'Open Add-ons';
+    await this.sendMerchantNotice(
+      storeId,
+      {
+        to,
+        subject: copy.title,
+        content: `<p>${escapeHtml(copy.body)}</p><p><a href="${escapeHtml(billingUrl)}">${open}</a></p>`,
+        language: lang,
+      },
+      { queue: true }
+    );
+  }
+
   static async sendSubscriptionBillingNotice(
     storeId: string,
     data: SubscriptionBillingNoticeData & { to: string },

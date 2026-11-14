@@ -39,6 +39,9 @@ interface Preview {
   vatMinor: number;
   totalMinor: number;
   termDays: number;
+  renews: boolean;
+  renewalMinor: number;
+  renewsEveryDays: number;
   confirmToken: string;
 }
 
@@ -181,6 +184,14 @@ export default function AddonsPage() {
                   name: name(preview),
                 })}
               </p>
+              {preview.renews && (
+                <p className="mt-1 text-sm" data-testid="addon-renews">
+                  {t('confirmRenews', {
+                    amount: money(preview.renewalMinor),
+                    days: preview.renewsEveryDays,
+                  })}
+                </p>
+              )}
               {preview.vatMinor > 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">
                   {t('confirmVat', { vat: money(preview.vatMinor) })}

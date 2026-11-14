@@ -11699,6 +11699,7 @@
     "returnFailed": "The payment did not go through, so nothing was added and nothing was charged.",
     "aiToday": "Today: {used} of {cap} requests used, {remaining} left.",
     "aiExtra": "Includes {extra} extra requests from your packs.",
-    "aiBuyHint": "Packs raise your store's daily limit for {days} days. They do not renew."
+    "aiBuyHint": "Packs raise your store's daily limit for {days} days. They do not renew.",
+    "confirmRenews": "Then {amount} every {days} days on your saved card until you stop it. We email you before each renewal, and you can stop it any time from Add-ons."
   }
 }

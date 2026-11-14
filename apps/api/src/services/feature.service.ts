@@ -198,7 +198,10 @@ class FeatureService {
     return map;
   }
 
-  private async readFromDb(storeId: string): Promise<Record<FeatureKey, boolean>> {
+  private async readFromDb(
+    storeId: string,
+    withAddons = true
+  ): Promise<Record<FeatureKey, boolean>> {
     // store_features is under FORCE ROW LEVEL SECURITY. This map is read from
     // BOTH request handlers (with tenant context) AND background fan-out
     // (order-created / abandoned-cart Inngest jobs) which have no tenant GUC —
@@ -214,7 +217,7 @@ class FeatureService {
         }),
         activeAddons(tx, storeId, new Date()),
       ]);
-      const addonKeys = addonFeatureKeys(running);
+      const addonKeys = withAddons ? addonFeatureKeys(running) : [];
       // The plans engine's automation flags, read in the SAME store-scope tx (one
       // connection; a transient failure retries and fails closed together).
       const planFlags = storeRow
@@ -231,6 +234,14 @@ class FeatureService {
       >;
     }
     return this.rowsToMap(store.plan as StorePlan, rows, flags, addonKeys);
+  }
+
+  /**
+   * What the store would have WITHOUT any paid add-on (plan baseline + super-admin overrides). Uncached, read by the
+   * add-on renewal to see that the plan now includes the feature (the merchant must not keep paying for it).
+   */
+  async resolveWithoutAddons(storeId: string): Promise<Record<FeatureKey, boolean>> {
+    return this.readFromDb(storeId, false);
   }
 
   /**

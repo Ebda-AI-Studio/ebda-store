@@ -15,6 +15,10 @@ import type { FeatureKey } from '@ebda/shared';
 
 export const ADDON_TERM_DAYS = 30;
 export const ADDON_PLAN_PREFIX = 'addon:';
+/** Append-only renewal intent rows (ADDON-RENEW-1): zero-amount `upgrade` rows that never start with `addon:`. */
+export const ADDON_CANCEL_PREFIX = 'addon-cancel:';
+export const ADDON_RESUME_PREFIX = 'addon-resume:';
+export const ADDON_MARKER_PREFIX = 'addon-';
 
 type AddonKind = 'feature' | 'ai_topup';
 export interface AddonItem {
@@ -66,6 +70,9 @@ const ITEMS: AddonItem[] = [
 export const ADDON_CATALOG: Record<string, AddonItem> = Object.fromEntries(
   ITEMS.map(i => [i.sku, i])
 );
+
+/** Feature add-ons renew every term on the saved card; AI packs never do. */
+export const renewsEachTerm = (item: AddonItem): boolean => item.kind === 'feature';
 
 export const planCodeOfSku = (sku: string): string => `${ADDON_PLAN_PREFIX}${sku}`;
 

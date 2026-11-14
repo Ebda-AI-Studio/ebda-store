@@ -5,9 +5,18 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const inv = vi.hoisted(() => ({ invalidate: vi.fn(), entity: vi.fn() }));
 vi.mock('@api/lib/definer', () => ({
-  getEntityStoreId: vi.fn(),
+  getEntityStoreId: inv.entity,
   getBillingRefundStoreId: vi.fn(),
+}));
+vi.mock('@api/services/feature.service', () => ({
+  featureService: { invalidateCache: inv.invalidate },
+}));
+vi.mock('@api/services/billing/grants.service', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@api/services/billing/grants.service')),
+  revokeGrantsForEvent: async () => [],
+  restoreRevokedGrants: async () => undefined,
 }));
 vi.mock('@api/services/platform/billing-d1', async () => {
   const real = await vi.importActual<Record<string, unknown>>('@api/services/platform/billing-d1');
@@ -15,7 +24,7 @@ vi.mock('@api/services/platform/billing-d1', async () => {
 });
 vi.mock('@ebda/database', () => ({
   prisma: {},
-  withStore: vi.fn(),
+  withStore: async (_id: string, fn: (t: unknown) => unknown) => fn(refundTx),
   acrossStores: vi.fn(),
   storeDirectory: vi.fn(),
   currentStoreId: () => 's1',
@@ -24,7 +33,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { settleInTx } from '@api/services/billing/subscription-billing.service';
+import { refundCharge, settleInTx } from '@api/services/billing/subscription-billing.service';
 
 const NOW = new Date('2026-11-14T10:00:00.000Z');
 const row = {
@@ -72,7 +81,7 @@ function fakeTx(grantFails = false) {
         return { count: 1 };
       }),
     },
-    storeFeature: { deleteMany: async () => ({ count: 0 }) },
+    storeFeature: { findFirst: async () => null },
     storeSubscription: { findUnique: async () => null },
   };
   return { tx, grants, status: () => status };
@@ -123,5 +132,55 @@ describe('add-on payment settlement', () => {
     await expect(settleInTx(f.tx, 'e1', { status: 'succeeded' }, NOW, [])).rejects.toThrow(
       'grant write failed'
     );
+  });
+});
+
+/** Finding 4 of the review: a refunded add-on is not an entitlement any more, and the cache must say so at once. */
+const refundTx: any = {
+  billingEvent: {
+    findUnique: vi.fn(),
+    findMany: async () => [],
+    createMany: async () => ({ count: 1 }),
+    updateMany: async () => ({ count: 1 }),
+    aggregate: async () => ({ _sum: { amountMinor: 9900 } }),
+  },
+  billingGrant: { findMany: async () => [], updateMany: async () => ({ count: 0 }) },
+};
+
+describe('refund of an add-on payment', () => {
+  const charge = (planCode: string) => ({
+    id: 'c1',
+    storeId: 's1',
+    subscriptionId: null,
+    type: 'upgrade',
+    status: 'succeeded',
+    providerRef: 'p1',
+    provider: 'kashier',
+    amountMinor: 9900,
+    planCode,
+  });
+  const provider = {
+    name: 'kashier',
+    refund: async () => ({ status: 'succeeded', refundId: 'r1' }),
+  } as any;
+  beforeEach(() => {
+    inv.entity.mockResolvedValue('s1');
+    refundTx.billingEvent.findUnique.mockReset();
+  });
+  it('drops the cached feature map as soon as the refund settles', async () => {
+    refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
+      where.id === 'c1'
+        ? charge('addon:feature:floating_widget')
+        : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
+    );
+    await refundCharge({ eventId: 'c1', provider });
+    expect(inv.invalidate).toHaveBeenCalledWith('s1');
+  });
+  it('a plan refund does not touch the feature cache from this path', async () => {
+    refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
+      where.id === 'c1' ? charge('growth') : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
+    );
+    await refundCharge({ eventId: 'c1', provider });
+    expect(inv.invalidate).not.toHaveBeenCalled();
   });
 });
