@@ -351,3 +351,42 @@ describe('backfill is paged', () => {
     );
   });
 });
+
+describe('Ruling INSTAPAY-REVERT-2 on the Store (no credits: a revert reverses what was NOT already refunded)', () => {
+  it('a partial refund recorded before the revert is not reversed twice: the void takes only the remainder, the store still gets the grace', async () => {
+    const c = seedClaim(w);
+    const out = await decideAndActivate({ storeId: A, claimId: c.claimId });
+    const { recordManualRefund } =
+      await import('../../apps/api/src/services/billing/account.service');
+    await recordManualRefund({
+      eventId: out.billingEventId!,
+      kind: 'refund',
+      reference: '880000000001',
+      recipientName: 'payer',
+      refundedAt: new Date(),
+      amountMinor: 2000,
+      note: 'part returned',
+      actorId: 'ahmad',
+    });
+    const at = Date.now() + 60_000;
+    expect(
+      (
+        await revertAutoConfirmed({
+          id: out.id!,
+          actor: 'telegram-owner',
+          reason: 'not received',
+          now: at,
+        })
+      ).result
+    ).toBe('reverted');
+    const refunds = w.db
+      .prepare(
+        "SELECT amount_minor a FROM billing_events WHERE type = 'refund' ORDER BY amount_minor"
+      )
+      .all();
+    expect(refunds).toEqual([{ a: 2000 }, { a: 3000 }]); // 2000 refunded by a person + the 3000 remainder voided: never more than paid
+    expect(
+      w.db.prepare('SELECT status FROM billing_events WHERE id = ?').get(out.billingEventId)
+    ).toEqual({ status: 'refunded' });
+  });
+});
