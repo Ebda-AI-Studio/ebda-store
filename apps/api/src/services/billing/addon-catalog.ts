@@ -16,7 +16,7 @@ import type { FeatureKey } from '@ebda/shared';
 export const ADDON_TERM_DAYS = 30;
 export const ADDON_PLAN_PREFIX = 'addon:';
 
-export type AddonKind = 'feature' | 'ai_topup';
+type AddonKind = 'feature' | 'ai_topup';
 export interface AddonItem {
   sku: string;
   kind: AddonKind;

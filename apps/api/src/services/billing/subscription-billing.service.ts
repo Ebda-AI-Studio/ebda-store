@@ -663,7 +663,7 @@ export async function settleInTx(
   return { transitioned: true };
 }
 
-export async function settleCharge(eventId: string, o: Outcome, now: Date) {
+async function settleCharge(eventId: string, o: Outcome, now: Date) {
   const effects: BillingEffect[] = [];
   const res = await inEventStore(eventId, tx => settleInTx(tx, eventId, o, now, effects), {
     transitioned: false,

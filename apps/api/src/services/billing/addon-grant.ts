@@ -15,7 +15,7 @@ import type { BillingEffect } from './billing-notify';
 
 type Tx = Prisma.TransactionClient;
 
-export interface ActiveAddon {
+interface ActiveAddon {
   eventId: string;
   sku: string;
   endsAt: Date;
