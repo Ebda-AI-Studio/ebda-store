@@ -43,6 +43,8 @@ vi.mock('@ebda/database', () => ({
   withMoneyTx: (_c: unknown, fn: (tx: unknown) => unknown) => fn(fakeTx),
   // fakeTx has no commit-hook registry: false makes notifyAfterCommit notify immediately (the no-tx path).
   afterTxCommit: () => false,
+  // the movement row's actor (INV-AUDIT-3): no ambient user in this unit
+  ambientScope: () => ({}),
 }));
 vi.mock('../../lib/public-cache', () => ({
   invalidateStoreProductCaches: (...a: unknown[]) => bustMock(...(a as [])),
