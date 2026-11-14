@@ -16,7 +16,7 @@ At enrollment every admin receives 10 one-time backup codes. If the user saved t
 
 ### Making a new set (self-service, no staff)
 
-While signed in (or right after using a code to get in), the admin opens **Account → Security → Recovery codes**, enters their password and a CURRENT authenticator code, and presses **Make new recovery codes** (`POST /mfa/recovery-codes/regenerate` on the identity service, `apps/accounts`). The old set dies in the same statement; the new 10 codes are shown once and stored only as bcrypt hashes. A recovery code is refused as the step-up, so someone holding only a code cannot mint more. `GET /mfa/recovery-codes` returns only the count left. Each regeneration logs `mfa_recovery_codes_regenerated` (user id only) in the Worker log.
+While signed in (or right after using a code to get in), the admin opens **Account → Security → Recovery codes**, enters their password and a CURRENT authenticator code, and presses **Make new recovery codes** (`POST /mfa/recovery-codes/regenerate` on the identity service, `apps/accounts`). The old set dies in the same statement; the new 10 codes are shown once and stored only as bcrypt hashes. A recovery code is refused as the step-up, so someone holding only a code cannot mint more. `GET /mfa/recovery-codes` returns only the count left.
 
 If all backup codes are exhausted AND the authenticator is lost, the user cannot regenerate: proceed to Option 2 or 3 (staff, after verifying identity).
 
