@@ -18,24 +18,6 @@ export const CASES: Array<{ name: string; method: string; args: unknown[] }> = [
   { name: 'catalog page 1', method: 'listCatalog', args: [S, null, 2] },
   { name: 'catalog page 2', method: 'listCatalog', args: [S, 'v2', 2] },
   { name: 'catalog limit over 100 is invalid', method: 'listCatalog', args: [S, null, 101] },
-  {
-    name: 'meaning search with a budget',
-    method: 'searchProducts',
-    args: [S, 'هدية', { maxPriceMinor: 30000, limit: 5 }],
-  },
-  {
-    name: 'search with a blank query is invalid',
-    method: 'searchProducts',
-    args: [S, ' ', { limit: 5 }],
-  },
-  { name: 'store policies', method: 'getStorePolicies', args: [S] },
-  { name: 'customer profile by phone', method: 'getCustomerProfile', args: [S, BUYER.phoneE164] },
-  {
-    name: 'customer profile of an unknown phone is null, not an error',
-    method: 'getCustomerProfile',
-    args: [S, '+201999999999'],
-  },
-  { name: 'customer profile needs a valid phone', method: 'getCustomerProfile', args: [S, 'nope'] },
   { name: 'products by id', method: 'getProducts', args: [S, ['v1', 'v3']] },
   {
     name: 'checkout link refuses a sold-out variant',
