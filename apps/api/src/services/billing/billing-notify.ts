@@ -176,7 +176,11 @@ function addonNoticeCopy(
 
 async function runOne(effect: BillingEffect): Promise<void> {
   if (effect.kind === 'addon_granted') {
+    // A grant AND a refund: the entitlement changed, so every layer drops at once (feature map, then the public
+    // store payload that lists the store's features; the latter has its own TTL).
     await featureService.invalidateCache(effect.storeId);
+    const ctx = await storeContext(effect.storeId);
+    if (ctx) await bustStoreCaches(effect.storeId, ctx.store.slug, ctx.store.domain);
     return;
   }
   if (effect.kind === 'addon_unapplied') {
