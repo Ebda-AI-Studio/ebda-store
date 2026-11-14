@@ -1,0 +1,45 @@
+{
+  "id": "self.provider-self-activation",
+  "status": "live",
+  "area": "payments",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "شغّل بوابة الدفع أو شركة الشحن بنفسي",
+  "titleEn": "Turn on a payment gateway or shipping carrier myself",
+  "screens": ["/stores/[id]/payment-settings", "/stores/[id]/shipping-carriers"],
+  "api": [
+    "POST /provider-activation/store/:storeId/:provider/activate/preview",
+    "POST /provider-activation/store/:storeId/:provider/activate/confirm"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "compensating"
+  },
+  "helpArticle": "payment-providers",
+  "questions": {
+    "ar": ["ليه البوابة لسه مش مفعلة؟", "ازاي أشغّل باي موب؟", "الاختبار فشل ومش عارف ليه"],
+    "en": [
+      "Why is my provider not active yet?",
+      "How do I turn on Kashier?",
+      "The connection test failed, why?"
+    ]
+  },
+  "steps": [
+    "Save the provider keys on the card",
+    "Press the on switch: Ebda Store tests the saved keys on the server",
+    "If the test passes, confirm Test and turn on; if it fails, read the one-sentence reason and fix the keys"
+  ],
+  "edgeCases": [
+    "The test result always comes from the server; nothing in the request can make it pass",
+    "The confirmation is single use, expires in 2 minutes and is bound to this provider, this mode and this exact test run: a newer test, edited keys or another user refuses it",
+    "The confirm call needs an Idempotency-Key; the same key twice enables once",
+    "A provider with no safe test call turns on with an unverified warning and the Ebda Store team is paged on its first connection (P1)",
+    "Another store's provider answers 404; staff without store settings permission are refused",
+    "The failure sentence is AI-written from the measured error code only (never keys); the fixed sentence is the fallback",
+    "Turn it off from the same switch; platform staff can also deactivate it for a store with a note"
+  ],
+  "gaps": []
+}
