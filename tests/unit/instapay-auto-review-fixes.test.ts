@@ -137,6 +137,7 @@ describe('finding 1: a person-confirmed payment claims the global index; history
       scanned: 1,
       burned: 1,
       skipped: 0,
+      nextCursor: null,
     });
     expect(dedupeRows()).toEqual([]);
     expect(await backfillDedupeFromHistory({ dryRun: false })).toMatchObject({ burned: 1 });
@@ -199,6 +200,12 @@ describe('finding 3: system-decided money always reaches the digest; stuck rows 
         .run(id, A, c.claimId, c.receiptId, `k-${id}`, old);
     ins('11111111-0000-4000-8000-000000000001', paid);
     ins('11111111-0000-4000-8000-000000000002', unpaid);
+    // the dead run had recorded the money itself (raw.recordedBy = the auto actor)
+    w.db
+      .prepare(
+        `INSERT INTO billing_events (id, store_id, type, amount_minor, provider, idempotency_key, status, raw) VALUES ('ev-1', ?, 'manual_payment', 5000, 'manual', 'manual:instapay:100000000001', 'succeeded', '{"recordedBy":"system:auto-confirm"}')`
+      )
+      .run(A);
     w.db
       .prepare(
         "UPDATE manual_payment_claims SET status = 'confirmed', billing_event_id = 'ev-1' WHERE id = ?"
@@ -332,8 +339,8 @@ describe('N2: the cumulative cap holds under concurrency (per-store serialisatio
   });
 });
 
-describe('backfill is paged', () => {
-  it('more than one page of approved receipts: every one is burned', async () => {
+describe('backfill is paged (review M5: one page per call)', () => {
+  it('501 approved receipts: the first call burns 500 and returns a cursor, the second burns the last one', async () => {
     const ins = w.db.prepare(
       `INSERT INTO instapay_receipts (id, store_id, kind, storage_key, mime_type, size_bytes, sha256, status, reference_key) VALUES (?, ?, 'subscription', 'k', 'image/png', 1, ?, 'approved', ?)`
     );
@@ -341,11 +348,10 @@ describe('backfill is paged', () => {
       const n = String(i).padStart(4, '0');
       ins.run(`rcpt-${n}`, A, n.padStart(64, 'a'), `5000000${n.padStart(5, '0')}`);
     }
-    expect(await backfillDedupeFromHistory({ dryRun: false })).toEqual({
-      scanned: 501,
-      burned: 501,
-      skipped: 0,
-    });
+    const first = await backfillDedupeFromHistory({ dryRun: false });
+    expect(first).toMatchObject({ scanned: 500, burned: 500, nextCursor: 'rcpt-0499' });
+    const second = await backfillDedupeFromHistory({ dryRun: false, cursor: first.nextCursor });
+    expect(second).toEqual({ scanned: 1, burned: 1, skipped: 0, nextCursor: null });
     expect(w.dd.prepare("SELECT COUNT(*) n FROM instapay_dedupe WHERE kind = 'ref'").get()).toEqual(
       { n: 501 }
     );
@@ -388,5 +394,147 @@ describe('Ruling INSTAPAY-REVERT-2 on the Store (no credits: a revert reverses w
     expect(
       w.db.prepare('SELECT status FROM billing_events WHERE id = ?').get(out.billingEventId)
     ).toEqual({ status: 'refunded' });
+  });
+});
+
+describe('Opus money review (I1 to M7)', () => {
+  const stuckRow = (id: string, c: { claimId: string; receiptId: string }, amount = 5000) =>
+    w.db
+      .prepare(
+        `INSERT INTO instapay_auto_confirmations (id, store_id, claim_id, receipt_id, state, reasons, amount_minor, expected_amount_minor, is_first_payment, idempotency_key, created_at) VALUES (?, ?, ?, ?, 'pending_decision', '[]', ?, 5000, 1, ?, ?)`
+      )
+      .run(id, A, c.claimId, c.receiptId, amount, `k-${id}`, Date.now() - 20 * 60_000);
+
+  it('I1: a run dies after writing its row, a PERSON confirms, the sweep runs: the row is NOT auto_confirmed', async () => {
+    const c = seedClaim(w, { reference: '600000000001' });
+    stuckRow('22222222-0000-4000-8000-000000000001', c);
+    await recordManualPayment({
+      storeId: A,
+      planCode: 'growth',
+      interval: 'monthly',
+      amountMinor: 5000,
+      method: 'instapay',
+      reference: '600000000001',
+      paidAt: new Date(),
+      actorId: 'ahmad',
+      claimId: c.claimId,
+    });
+    await sweepStuckAutoConfirmations();
+    expect(row('22222222-0000-4000-8000-000000000001')).toMatchObject({ state: 'needs_human' });
+    expect((await runAutoDigest()).listed).toBe(0);
+  });
+
+  it('I2: a receipt Chat already claimed is REFUSED for a person on the Store, and nothing is recorded', async () => {
+    const { D1DuplicateIndex } = await import('@ebda/shared');
+    const { d1Over } = await import('../helpers/instapay-auto-world');
+    const c = seedClaim(w, { reference: '600000000002', sha: 'd'.repeat(64) });
+    await new D1DuplicateIndex(d1Over(w.dd) as never).claim({
+      referenceKey: '600000000002',
+      imageSha256: 'e'.repeat(64),
+      product: 'chat',
+      ownerId: 'ws',
+      paymentId: 'req',
+    });
+    await expect(
+      recordManualPayment({
+        storeId: A,
+        planCode: 'growth',
+        interval: 'monthly',
+        amountMinor: 5000,
+        method: 'instapay',
+        reference: '600000000002',
+        paidAt: new Date(),
+        actorId: 'ahmad',
+        claimId: c.claimId,
+      })
+    ).rejects.toMatchObject({ statusCode: 409, code: 'RECEIPT_USED_ELSEWHERE' });
+    expect(
+      w.db.prepare("SELECT COUNT(*) n FROM billing_events WHERE type = 'manual_payment'").get()
+    ).toEqual({ n: 0 });
+  });
+
+  it('I2: an index error refuses the person confirm (never a money write on an unknown duplicate state)', async () => {
+    const c = seedClaim(w, { reference: '600000000003' });
+    (w.bindings.INSTAPAY_DEDUPE_DB as { batch: unknown }).batch = async () => {
+      throw new Error('dedupe down');
+    };
+    await expect(
+      recordManualPayment({
+        storeId: A,
+        planCode: 'growth',
+        interval: 'monthly',
+        amountMinor: 5000,
+        method: 'instapay',
+        reference: '600000000003',
+        paidAt: new Date(),
+        actorId: 'ahmad',
+        claimId: c.claimId,
+      })
+    ).rejects.toMatchObject({ statusCode: 503, code: 'DEDUPE_UNAVAILABLE' });
+    expect(
+      w.db.prepare("SELECT COUNT(*) n FROM billing_events WHERE type = 'manual_payment'").get()
+    ).toEqual({ n: 0 });
+  });
+
+  it('I3: with the kill switch OFF, a stuck row whose money the system recorded still reaches auto_confirmed (digest + revert)', async () => {
+    const c = seedClaim(w, { reference: '600000000004' });
+    stuckRow('22222222-0000-4000-8000-000000000004', c);
+    await recordManualPayment({
+      storeId: A,
+      planCode: 'growth',
+      interval: 'monthly',
+      amountMinor: 5000,
+      method: 'instapay',
+      reference: '600000000004',
+      paidAt: new Date(),
+      actorId: 'system:auto-confirm',
+      claimId: c.claimId,
+    });
+    await setAutoMode('off', 'ahmad', 'kill switch on for the drill');
+    await sweepStuckAutoConfirmations();
+    expect(row('22222222-0000-4000-8000-000000000004')).toMatchObject({ state: 'auto_confirmed' });
+  });
+
+  it('M4: a revert whose store-switch / audit step throws AFTER the void stays reverted (never rolled back)', async () => {
+    const c = seedClaim(w, { reference: '600000000005' });
+    const out = await decideAndActivate({ storeId: A, claimId: c.claimId });
+    h.audit.mockImplementation(async (e: { action?: string }) => {
+      if (e?.action === 'billing.instapay_auto_store_toggled') throw new Error('audit down');
+    });
+    const r = await revertAutoConfirmed({
+      id: out.id!,
+      actor: 'telegram-owner',
+      reason: 'not received',
+      now: Date.now() + 60_000,
+    });
+    h.audit.mockImplementation(async () => undefined);
+    expect(r.result).toBe('reverted');
+    expect(row(out.id!)).toMatchObject({ state: 'reverted' });
+    expect(
+      w.db.prepare('SELECT status FROM billing_events WHERE id = ?').get(out.billingEventId)
+    ).toEqual({ status: 'refunded' });
+  });
+
+  it('M6: a pending_decision row of another claim counts against the cumulative cap', async () => {
+    const other = seedClaim(w, { reference: '600000000006' });
+    stuckRow('22222222-0000-4000-8000-000000000006', other);
+    const c = seedClaim(w, { reference: '600000000007' });
+    expect(await decideAndActivate({ storeId: A, claimId: c.claimId })).toMatchObject({
+      state: 'needs_human',
+      reasons: ['FIRST_PAYMENT_OVER_CAP'],
+    });
+  });
+
+  it('M7: the bad-signature log carries no caller IP', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync(
+      new URL('../../apps/api/src/routes/internal-instapay.routes.ts', import.meta.url),
+      'utf8'
+    );
+    const line = src
+      .split('\n')
+      .find(l => l.includes('bad signature') && l.includes('logger.warn'))!;
+    expect(line).toBeTruthy();
+    expect(line).not.toContain('req.ip');
   });
 });

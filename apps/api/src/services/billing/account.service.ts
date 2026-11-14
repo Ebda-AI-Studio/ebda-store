@@ -1036,6 +1036,19 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     return approvedReceiptIds;
   };
 
+  // INSTAPAY-AUTO-1 (review I2): a person's confirmation claims the receipt in the platform-global duplicate index BEFORE money moves. A
+  // receipt already claimed elsewhere (another merchant, Ebda Chat) is refused; an index error is refused; no index bound = today's path.
+  // A claim this call made is released if the payment then fails.
+  const preclaim =
+    input.actorId !== 'system:auto-confirm' && input.method === 'instapay'
+      ? await (
+          await import('./instapay-auto-confirm.service.js')
+        ).preclaimForHumanConfirm({
+          storeId: input.storeId,
+          claimId: input.claimId ?? null,
+          reference,
+        })
+      : null;
   const result = await withStore(input.storeId, async (tx: Tx) => {
     const existing = await tx.billingEvent.findUnique({
       where: { idempotencyKey: key, storeId: input.storeId },
@@ -1211,13 +1224,11 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       periodEnd,
       approvedReceiptIds,
     };
+  }).catch(async err => {
+    await preclaim?.release();
+    throw err;
   });
 
-  if (!result.duplicate && input.actorId !== 'system:auto-confirm') {
-    // INSTAPAY-AUTO-1 (review finding 1): a person's confirmation also claims the receipt in the platform-global duplicate index
-    const { claimDedupeForHumanConfirm } = await import('./instapay-auto-confirm.service.js');
-    await claimDedupeForHumanConfirm(input.storeId, result.billingEventId).catch(() => undefined);
-  }
   if (!result.duplicate) {
     // the approved receipts' screenshots are deleted now that the approval has committed (M-003; a miss is retried weekly)
     await InstapayReceiptService.deleteImages(input.storeId, result.approvedReceiptIds ?? []);

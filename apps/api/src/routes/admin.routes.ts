@@ -701,8 +701,10 @@ router.post(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { dryRun } = z.object({ dryRun: z.boolean().default(true) }).parse(req.body ?? {});
-      res.json({ success: true, data: await backfillDedupeFromHistory({ dryRun }) });
+      const { dryRun, cursor } = z
+        .object({ dryRun: z.boolean().default(true), cursor: z.string().max(64).nullish() })
+        .parse(req.body ?? {});
+      res.json({ success: true, data: await backfillDedupeFromHistory({ dryRun, cursor }) });
     } catch (error) {
       next(error);
     }

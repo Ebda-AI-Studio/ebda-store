@@ -66,7 +66,7 @@ router.post(
         'revert'
       );
       if (!ok) {
-        logger.warn({ ip: req.ip }, '[instapay-auto] not-received call with a bad signature');
+        logger.warn('[instapay-auto] not-received call with a bad signature'); // no caller IP in logs (review M7)
         res.status(401).json({
           success: false,
           error: { code: 'INVALID_SIGNATURE', message: 'Invalid signature' },

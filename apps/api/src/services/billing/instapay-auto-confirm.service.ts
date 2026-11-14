@@ -91,6 +91,17 @@ type RowShape = {
   createdAt: Date;
 };
 
+/**
+ * Was this ledger row written by the AUTOMATIC path (review I1)? A person's confirmation must never be adopted as `auto_confirmed`: it would
+ * enter the digest and become revertable by a Telegram tap. Reads `raw.recordedBy` that `recordManualPayment` stamps on every manual payment.
+ */
+async function isSystemEvent(storeId: string, eventId: string): Promise<boolean> {
+  const ev = await withStore(storeId, tx =>
+    tx.billingEvent.findFirst({ where: { id: eventId, storeId }, select: { raw: true } })
+  ).catch(() => null);
+  return (ev?.raw as { recordedBy?: unknown } | null)?.recordedBy === AUTO_ACTOR;
+}
+
 const sortReasons = (r: Iterable<ReasonCode>): ReasonCode[] => {
   const have = new Set(r);
   return REASON_ORDER.filter(x => have.has(x));
@@ -129,14 +140,22 @@ async function cleanState(
 ): Promise<{ clean: boolean; pendingAutoMinor: number }> {
   const autos = await withStore(storeId, tx =>
     tx.instapayAutoConfirmation.findMany({
-      where: { storeId, state: 'auto_confirmed' },
-      select: { amountMinor: true, confirmedAt: true, digestSentAt: true, revertedAt: true },
+      where: { storeId, state: { in: ['auto_confirmed', 'pending_decision'] } },
+      select: {
+        state: true,
+        amountMinor: true,
+        confirmedAt: true,
+        digestSentAt: true,
+        revertedAt: true,
+      },
       take: 200,
     })
   );
+  // a `pending_decision` row (a run that died after it may have recorded money) always counts against the cap: not clean, maybe paid (review M6)
   const pendingAutoMinor = autos
     .filter(
       a =>
+        a.state === 'pending_decision' ||
         !isCleanPayment(
           {
             confirmedBy: 'auto',
@@ -510,6 +529,11 @@ async function decideAndActivateLocked(args: {
       );
       paid = await activate();
     }
+    if (paid.duplicate && !(await isSystemEvent(storeId, paid.billingEventId))) {
+      // a person already recorded this payment: never adopt it as an automatic confirmation (review I1)
+      const state = await settle('decide_human');
+      return { state, reasons: decision.reasons, id: row.id };
+    }
     const state = await settle('decide_auto', {
       billingEventId: paid.billingEventId,
       confirmedAt: new Date(now),
@@ -539,7 +563,7 @@ async function decideAndActivateLocked(args: {
     const claimNow = await withStore(storeId, tx =>
       tx.manualPaymentClaim.findFirst({ where: { id: claimId, storeId }, select: { status: true } })
     ).catch(() => null);
-    if (recorded) {
+    if (recorded && (await isSystemEvent(storeId, recorded.id))) {
       // Money WAS recorded by this system decision: the row must be auto_confirmed so it reaches the digest and stays revertable
       // (review finding 3). The dedupe claim stays held.
       await settle('decide_auto', {
@@ -612,56 +636,70 @@ async function finishRevert(
     if (code !== 'ALREADY_REFUNDED' && code !== 'NOT_REFUNDABLE' && !isUniqueViolation(err))
       throw err;
   }
-  // Burn the dedupe entries (reference + image) so this receipt can never auto-confirm again, and switch auto off for this store.
-  const receipt = await withStore(storeId, tx =>
-    tx.instapayReceipt.findFirst({ where: { id: row.receiptId, storeId } })
-  );
-  const index = getDuplicateIndex();
-  const refKey = receipt
-    ? normalizeReferenceKey(
-        autoReadOf(receipt.extracted)?.read?.extract?.reference ?? receipt.referenceKey ?? ''
-      )
-    : null;
-  if (index && receipt && refKey) {
-    await index
-      .burn({
-        referenceKey: refKey,
-        imageSha256: receipt.sha256,
-        product: 'store',
-        ownerId: storeId,
-        paymentId: receipt.id,
-      })
-      .catch(err => logger.error({ err, storeId }, '[instapay-auto] burn failed'));
-  } else {
+  // Everything after the void is best effort and idempotent: a failure here must NOT roll the revert back (the money step already happened,
+  // review M4); it is logged + alerted and a replay of the tap finishes it.
+  try {
+    // Burn the dedupe entries (reference + image) so this receipt can never auto-confirm again, and switch auto off for this store.
+    const receipt = await withStore(storeId, tx =>
+      tx.instapayReceipt.findFirst({ where: { id: row.receiptId, storeId } })
+    );
+    const index = getDuplicateIndex();
+    const refKey = receipt
+      ? normalizeReferenceKey(
+          autoReadOf(receipt.extracted)?.read?.extract?.reference ?? receipt.referenceKey ?? ''
+        )
+      : null;
+    if (index && receipt && refKey) {
+      await index
+        .burn({
+          referenceKey: refKey,
+          imageSha256: receipt.sha256,
+          product: 'store',
+          ownerId: storeId,
+          paymentId: receipt.id,
+        })
+        .catch(err => logger.error({ err, storeId }, '[instapay-auto] burn failed'));
+    } else {
+      void sendAlert({
+        level: 'p1',
+        title: 'InstaPay auto-confirm: a reverted receipt could not be burned in the dedupe index',
+        body: `store ${storeId}, row ${row.id}: the reference/image may be reusable until burned by hand`,
+      }).catch(() => undefined);
+    }
+    await setStoreAuto(storeId, false, actor, 'reverted payment');
+    await auditLog({
+      action: 'billing.instapay_auto_reverted',
+      storeId,
+      resourceType: 'instapay_auto_confirmation',
+      resourceId: row.id,
+      details: {
+        billingEventId: row.billingEventId,
+        reason,
+        actor: actor,
+        graceUntil: new Date(graceUntil).toISOString(),
+        graceMs: REVERT_GRACE_MS,
+      },
+    });
+    if (voidedNow)
+      await runBillingEffects([
+        {
+          kind: 'instapay_not_received',
+          storeId,
+          graceUntil: new Date(graceUntil),
+          billingEventId: row.billingEventId ?? undefined,
+        },
+      ]).catch(err => logger.warn({ err, storeId }, '[instapay-auto] revert notice failed'));
+  } catch (err) {
+    logger.error(
+      { err, storeId, id: row.id },
+      '[instapay-auto] revert effects after the void failed'
+    );
     void sendAlert({
       level: 'p1',
-      title: 'InstaPay auto-confirm: a reverted receipt could not be burned in the dedupe index',
-      body: `store ${storeId}, row ${row.id}: the reference/image may be reusable until burned by hand`,
+      title: 'InstaPay auto-confirm: a revert voided the payment but a later step failed',
+      body: `store ${storeId}, row ${row.id}: tap "not received" again (idempotent) to finish the burn / store switch / notice`,
     }).catch(() => undefined);
   }
-  await setStoreAuto(storeId, false, actor, 'reverted payment');
-  await auditLog({
-    action: 'billing.instapay_auto_reverted',
-    storeId,
-    resourceType: 'instapay_auto_confirmation',
-    resourceId: row.id,
-    details: {
-      billingEventId: row.billingEventId,
-      reason,
-      actor: actor,
-      graceUntil: new Date(graceUntil).toISOString(),
-      graceMs: REVERT_GRACE_MS,
-    },
-  });
-  if (voidedNow)
-    await runBillingEffects([
-      {
-        kind: 'instapay_not_received',
-        storeId,
-        graceUntil: new Date(graceUntil),
-        billingEventId: row.billingEventId ?? undefined,
-      },
-    ]).catch(err => logger.warn({ err, storeId }, '[instapay-auto] revert notice failed'));
 }
 
 /**
@@ -889,6 +927,8 @@ export async function enqueueAutoConfirm(
  */
 export async function sweepStuckAutoConfirmations(now: number = Date.now()): Promise<number> {
   if (!(await platformFamilyOnD1('payments'))) return 0;
+  // stuck rows whose money the system already recorded must reach the digest / revert even with the kill switch off (review I3)
+  await resolveStuckDecisions(now);
   if ((await getAutoMode()) === 'off') return 0;
   const stale: Array<{ id: string; storeId: string }> = await (
     await platformScope()
@@ -902,7 +942,6 @@ export async function sweepStuckAutoConfirmations(now: number = Date.now()): Pro
     orderBy: { createdAt: 'asc' },
     take: 100,
   });
-  await resolveStuckDecisions(now);
   if (stale.length === 0) return 0;
   const decided: Array<{ claimId: string }> = await (
     await platformScope()
@@ -1082,14 +1121,17 @@ async function resolveStuckDecisions(now: number): Promise<number> {
         select: { status: true, billingEventId: true, amountMinor: true },
       })
     );
-    const paid = claim?.status === 'confirmed' && claim.billingEventId;
+    const paid =
+      claim?.status === 'confirmed' &&
+      !!claim.billingEventId &&
+      (await isSystemEvent(r.storeId, claim.billingEventId));
     await withStore(r.storeId, tx =>
       tx.instapayAutoConfirmation.updateMany({
         where: { id: r.id, storeId: r.storeId, state: 'pending_decision' },
         data: paid
           ? {
               state: 'auto_confirmed',
-              billingEventId: claim!.billingEventId,
+              billingEventId: claim!.billingEventId!,
               confirmedAt: new Date(now),
             }
           : { state: 'needs_human' },
@@ -1102,51 +1144,86 @@ async function resolveStuckDecisions(now: number): Promise<number> {
 }
 
 /**
- * Review finding 1: a payment a PERSON confirmed (the existing manual path) also claims its receipt in the platform-global index, so the
- * same transfer can never be auto-confirmed later on another merchant or in Ebda Chat. Best effort after the money committed: a duplicate is
- * a P1 for Ahmad (he confirmed a receipt already used elsewhere), never a refusal of his decision.
+ * Review I2 (matching Chat confirmInstapay): before a PERSON records an InstaPay payment, its receipt(s) are claimed in the platform-global
+ * index. Already claimed elsewhere (another merchant, Ebda Chat) = refused 409 RECEIPT_USED_ELSEWHERE; an index error = refused 503 (a money
+ * write never proceeds on an unknown duplicate state); no index bound = nothing to claim (today's behaviour). Returns `release`, which frees
+ * only the claims THIS call made, for the caller to run when the payment fails.
  */
-export async function claimDedupeForHumanConfirm(
-  storeId: string,
-  billingEventId: string
-): Promise<void> {
+export async function preclaimForHumanConfirm(args: {
+  storeId: string;
+  claimId: string | null;
+  reference: string;
+}): Promise<{ release: () => Promise<void> }> {
   const index = getDuplicateIndex();
-  if (!index) return;
-  const receipts = await withStore(storeId, tx =>
-    tx.manualPaymentClaim
-      .findMany({ where: { storeId, billingEventId }, select: { id: true } })
-      .then(claims =>
-        claims.length
-          ? tx.instapayReceipt.findMany({
-              where: { storeId, claimId: { in: claims.map(c => c.id) } },
-              select: { id: true, referenceKey: true, sha256: true },
-            })
-          : []
-      )
-  );
+  const none = { release: async () => undefined };
+  if (!index) return none;
+  const { storeId } = args;
+  const normalized = normalizeInstapayReference(args.reference) ?? args.reference;
+  const receipts = await withStore(storeId, async tx => {
+    const claims = await tx.manualPaymentClaim.findMany({
+      where: args.claimId
+        ? { storeId, id: args.claimId }
+        : { storeId, method: 'instapay', payerReference: { in: [args.reference, normalized] } },
+      select: { id: true },
+    });
+    return claims.length
+      ? tx.instapayReceipt.findMany({
+          where: { storeId, claimId: { in: claims.map(c => c.id) } },
+          select: { id: true, referenceKey: true, sha256: true },
+        })
+      : [];
+  });
+  const made: DedupeEntryLike[] = [];
+  const release = async () => {
+    for (const e of made)
+      await index
+        .release(e)
+        .catch(err => logger.error({ err, storeId }, '[instapay-auto] preclaim release failed'));
+  };
   for (const r of receipts) {
     const referenceKey = normalizeReferenceKey(r.referenceKey ?? '');
-    if (!referenceKey) continue;
-    const result = await index
-      .claim({
-        referenceKey,
-        imageSha256: r.sha256,
-        product: 'store',
-        ownerId: storeId,
-        paymentId: r.id,
-      })
-      .catch(err => {
-        logger.error({ err, storeId }, '[instapay-auto] dedupe claim for a human confirm failed');
-        return null;
-      });
-    if (result === 'duplicate_reference' || result === 'duplicate_image')
-      void sendAlert({
-        level: 'p1',
-        title: 'InstaPay: a person confirmed a receipt already used elsewhere',
-        body: `store ${storeId}, event ${billingEventId}, receipt ${r.id}: ${result}. Check the transfer before keeping this payment.`,
-      }).catch(() => undefined);
+    if (!referenceKey || !/^[0-9a-f]{64}$/.test(r.sha256)) continue;
+    const entry = {
+      referenceKey,
+      imageSha256: r.sha256,
+      product: 'store' as const,
+      ownerId: storeId,
+      paymentId: r.id,
+    };
+    let result: string;
+    try {
+      result = await index.claim(entry);
+    } catch (err) {
+      await release();
+      logger.error({ err, storeId }, '[instapay-auto] dedupe unavailable for a person confirm');
+      throw new AppError(
+        503,
+        'DEDUPE_UNAVAILABLE',
+        'The duplicate check is unavailable; try again',
+        {
+          retryable: true,
+        }
+      );
+    }
+    if (result === 'duplicate_reference' || result === 'duplicate_image') {
+      await release();
+      throw new AppError(
+        409,
+        'RECEIPT_USED_ELSEWHERE',
+        'This transfer receipt was already used for another payment (another store or Ebda Chat)'
+      );
+    }
+    if (result === 'claimed') made.push(entry);
   }
+  return { release };
 }
+type DedupeEntryLike = {
+  referenceKey: string;
+  imageSha256: string;
+  product: 'store';
+  ownerId: string;
+  paymentId: string;
+};
 
 /**
  * Review finding 1 / plan R1 step 3: every receipt a person already APPROVED is burned in the global index so an old receipt can never be
@@ -1154,52 +1231,49 @@ export async function claimDedupeForHumanConfirm(
  */
 const BACKFILL_PAGE = 500;
 
-export async function backfillDedupeFromHistory(opts: { dryRun: boolean }): Promise<{
+export async function backfillDedupeFromHistory(opts: {
+  dryRun: boolean;
+  cursor?: string | null;
+}): Promise<{
   scanned: number;
   burned: number;
   skipped: number;
+  nextCursor: string | null;
 }> {
   const index = getDuplicateIndex();
   if (!index && !opts.dryRun)
     throw new AppError(503, 'DEDUPE_UNBOUND', 'The InstaPay dedupe database is not bound');
   const db = await platformScope();
-  let burned = 0;
-  let skipped = 0;
-  let scanned = 0;
-  let cursor: string | undefined;
-  // paged by id (500 per page): a large history never becomes one unbounded read
-  for (;;) {
-    const rows: Array<{
-      id: string;
-      storeId: string;
-      referenceKey: string | null;
-      sha256: string;
-    }> = await db.instapayReceipt.findMany({
-      where: { status: 'approved', ...(cursor ? { id: { gt: cursor } } : {}) },
+  // ONE page per call (review M5): the caller passes `nextCursor` back until it is null, so no request runs unbounded
+  const rows: Array<{ id: string; storeId: string; referenceKey: string | null; sha256: string }> =
+    await db.instapayReceipt.findMany({
+      where: { status: 'approved', ...(opts.cursor ? { id: { gt: opts.cursor } } : {}) },
       select: { id: true, storeId: true, referenceKey: true, sha256: true },
       orderBy: { id: 'asc' },
       take: BACKFILL_PAGE,
     });
-    if (rows.length === 0) break;
-    scanned += rows.length;
-    for (const r of rows) {
-      const referenceKey = normalizeReferenceKey(r.referenceKey ?? '');
-      if (!referenceKey || !/^[0-9a-f]{64}$/.test(r.sha256)) {
-        skipped++;
-        continue;
-      }
-      if (!opts.dryRun)
-        await index!.burn({
-          referenceKey,
-          imageSha256: r.sha256,
-          product: 'store',
-          ownerId: r.storeId,
-          paymentId: r.id,
-        });
-      burned++;
+  let burned = 0;
+  let skipped = 0;
+  for (const r of rows) {
+    const referenceKey = normalizeReferenceKey(r.referenceKey ?? '');
+    if (!referenceKey || !/^[0-9a-f]{64}$/.test(r.sha256)) {
+      skipped++;
+      continue;
     }
-    if (rows.length < BACKFILL_PAGE) break;
-    cursor = rows[rows.length - 1].id;
+    if (!opts.dryRun)
+      await index!.burn({
+        referenceKey,
+        imageSha256: r.sha256,
+        product: 'store',
+        ownerId: r.storeId,
+        paymentId: r.id,
+      });
+    burned++;
   }
-  return { scanned, burned, skipped };
+  return {
+    scanned: rows.length,
+    burned,
+    skipped,
+    nextCursor: rows.length === BACKFILL_PAGE ? rows[rows.length - 1].id : null,
+  };
 }
