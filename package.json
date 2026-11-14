@@ -166,7 +166,7 @@
     },
     "nanoid": "3.3.18",
     "magicast": "0.5.5",
-    "hono": "4.13.16",
+    "hono": "4.13.18",
     "ip-address": "10.7.5",
     "@opentelemetry/propagator-jaeger": "2.9.0",
     "rimraf": {

@@ -250,3 +250,10 @@ failure alerts on main and cron runs; without them the notify jobs skip.
   job timeout twice on a 35 KB diff while #742's 257 KB diff passed (network hangs to the model API that day).
   Pinned by `tests/unit/ai-review-hang-bound.test.ts`. Cost if wrong: a slow-but-healthy review over 8 min is retried
   and can fail where it would have finished; raise the bound with this test.
+- **Ruling DEPLOY-PLAN-CLONE-1** (2026-11-13) - every `cf-*-deploy.yml` `plan` job checks out with
+  `filter: blob:none` (full history, file contents fetched on demand) and a 15-minute limit. Evidence: on a slow link
+  (measured 56 KB/s to codeload, 350 KB/s to Cloudflare) the full-history clone ran past the old 5-minute limit and
+  cancelled the API deploys for #748 and #740 (runs for b0e2cb22e and eb26f66c0); a cancelled deploy is a deploy that
+  did not happen and nothing retries it. `deploy-plan.mjs` needs only trees (`diff --name-only`) plus two lazy
+  `git show` of `package-lock.json`, and already deploys when that read fails. Cost if wrong: a blob fetched lazily
+  per `git show` on a slow link; worst case the plan deploys when it could have skipped.

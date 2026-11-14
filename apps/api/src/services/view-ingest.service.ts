@@ -20,7 +20,8 @@
 
 import { withStore } from '@ebda/database';
 import { analyticsMoney } from '../lib/analytics-backend';
-import { regionDayStart } from '@ebda/shared';
+import { regionDayKey } from '@ebda/shared';
+import { SentryService } from './sentry.service';
 import { BoundedMap } from '../lib/bounded-map';
 import { isWorkers } from '../lib/runtime';
 import logger from '../lib/logger';
@@ -28,7 +29,8 @@ import logger from '../lib/logger';
 // ---------------------------------------------------------------------------
 // Cairo calendar day (DST-aware; same helper the rollup uses, so the JOIN is exact)
 // ---------------------------------------------------------------------------
-const dayStart = (d: Date = new Date()): Date => regionDayStart(d);
+// Ruling ANALYTICS-DAY-1: the counter's day key (UTC midnight of the Cairo day-start's UTC date), as a Date for the Postgres path.
+const dayStart = (d: Date = new Date()): Date => new Date(regionDayKey(d));
 
 // ---------------------------------------------------------------------------
 // In-memory session debounce
@@ -115,6 +117,15 @@ export async function recordProductView(
       { err: err instanceof Error ? err.message : 'unknown', storeId, productId },
       '[VIEW-INGEST] failed to record product view — tracking skipped'
     );
+    // Reported, not silent (a swallowed BAD_ARGS hid D1 for the whole DO fleet); the shopper request still succeeds.
+    try {
+      SentryService.captureException(err instanceof Error ? err : new Error(String(err)), {
+        tags: { area: 'analytics', op: 'view-record' },
+        extra: { storeId, productId },
+      });
+    } catch {
+      /* reporting must never break the shopper request */
+    }
     return false;
   }
 }

@@ -389,6 +389,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [superpowers/plans/2026-04-23-final-push-plan.md](superpowers/plans/2026-04-23-final-push-plan.md) - Final Push — Plan
 - [superpowers/plans/2026-04-23-remaining-refactors-master-plan.md](superpowers/plans/2026-04-23-remaining-refactors-master-plan.md) - Remaining Refactors — Master Plan
 - [superpowers/plans/2026-04-29-tenant-control-batch-2.md](superpowers/plans/2026-04-29-tenant-control-batch-2.md) - Tenant Control Batch 2 — 2026-04-29
+- [superpowers/plans/2026-11-14-instapay-auto-confirm.md](superpowers/plans/2026-11-14-instapay-auto-confirm.md) - InstaPay Auto-Confirm Implementation Plan
 - [superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md](superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md) - Storefront per-store PWA — extend to full size set
 - [superpowers/plans/2026-05-16-mobile-ui-ship.md](superpowers/plans/2026-05-16-mobile-ui-ship.md) - Mobile UI ship — match Storefront + Bank-Alkahraman sizing
 - [superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md](superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md) - Ebda Store Storefront UI/UX Refresh — Plan
@@ -450,3 +451,4 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-11-10-ci-full-lane-on-main.md](plans/done/2026-11-10-ci-full-lane-on-main.md) - CI-FULL-MAIN-1: every push to main and a nightly run the full CI lane (build, integration, workerd incl. route-sweep, e2e, audit); a red main opens the ci-main-red issue (2026-11-10)
 - [plans/done/2026-11-11-bootstrap-super-admin.md](plans/done/2026-11-11-bootstrap-super-admin.md) - Password-less platform super-admin bootstrap + daily 0-admin invariant (Ruling ID-20)
 - [plans/done/2026-11-12-storage-limit-enforce.md](plans/done/2026-11-12-storage-limit-enforce.md) - S3-X8: enforce maxStorageMb on the four upload routes, usage from the R2 listing (60 s bounded-stale)
+- [plans/2026-11-12-auto-recommendations.md](plans/2026-11-12-auto-recommendations.md) - Automatic product recommendations: merchant picks, then bought-together, then similar items (Vectorize), cap 8, merchant switch

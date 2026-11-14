@@ -920,6 +920,13 @@
       "loading": "Loading...",
       "title": "Recommendations: {productName}",
       "fallbackProductName": "Product",
+      "auto": {
+        "title": "Automatic recommendations",
+        "body": "Besides the products you pick, the store adds items that are often bought together and similar products, up to 8 in total. Your picks always come first. Turn this off to show only your picks.",
+        "on": "On",
+        "off": "Off",
+        "saveFailed": "Could not change the setting"
+      },
       "subtitle": "Manage cross-sell and upsell product relationships",
       "actions": {
         "save": "Save Recommendations",

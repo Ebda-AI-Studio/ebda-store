@@ -27,6 +27,7 @@ describe('server-owned settings keys: the MCP switch and the gold flag (BE:S-8, 
   });
   it('the flags a stale whole copy echoes back are listed as silently dropped', () => {
     expect([...ECHOED_SERVER_OWNED_KEYS].sort()).toEqual([
+      'autoRecommendationsEnabled',
       'goldAllowDeferredPayment',
       'mcpWriteEnabled',
     ]);
