@@ -47,6 +47,10 @@ const scheduleBody = z.object({
 function actor(req: Request) {
   return { storeId: req.params.storeId, userId: req.user!.userId };
 }
+// Read + cancel also accept super_admin (platform override, audited in the service); preview, schedule and export stay owner-only.
+function actorWithRole(req: Request) {
+  return { ...actor(req), role: req.user!.role };
+}
 
 router.get(
   '/stores/:storeId/deletion',
@@ -55,7 +59,7 @@ router.get(
     try {
       res.json({
         success: true,
-        data: await readDeletionStatus(actor(req), productionDeletionDeps()),
+        data: await readDeletionStatus(actorWithRole(req), productionDeletionDeps()),
       });
     } catch (e) {
       next(e);
@@ -106,7 +110,11 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const r = await cancelStoreDeletion(
-        { ...actor(req), ownerEmail: req.user!.email || undefined },
+        // a super_admin cancel must not email the super admin as if they were the owner
+        {
+          ...actorWithRole(req),
+          ownerEmail: req.user!.role === 'super_admin' ? undefined : req.user!.email || undefined,
+        },
         productionDeletionDeps()
       );
       res.json({ success: true, data: { id: r.id, state: r.state } });

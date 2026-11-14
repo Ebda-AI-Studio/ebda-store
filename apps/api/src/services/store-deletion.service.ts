@@ -25,7 +25,7 @@ const DELETION_TOOL = 'store.delete';
 /** The confirm token is bound to the signed-in owner session, not to an API key (the MCP key slot is unused here). */
 const KEY_SLOT = 'owner-session';
 
-type DeletionState = 'pending' | 'cancelled' | 'executed';
+type DeletionState = 'pending' | 'executing' | 'cancelled' | 'executed';
 export interface DeletionRequest {
   id: string;
   requestedBy: string;
@@ -34,6 +34,8 @@ export interface DeletionRequest {
   state: DeletionState;
   cancelledAt?: string;
   cancelledBy?: string;
+  /** Set when the system (not a person) cancelled it, e.g. the store changed owner during the window. */
+  voidedReason?: 'owner_changed';
   executedAt?: string;
   /** Why the last execution attempt was refused (the request stays pending and is re-checked). */
   lastBlock?: { code: string; at: string };
@@ -54,7 +56,18 @@ interface GuardReason {
 export interface DeletionDeps {
   now(): number;
   loadStore(storeId: string): Promise<DeletionStore | null>;
+  /** First write of a request (nothing pending exists, so nothing to race). */
   saveRequest(storeId: string, request: DeletionRequest | null): Promise<void>;
+  /**
+   * Compare-and-set of an EXISTING request: writes `to` only while the stored request still has `from.id` and `from.state`.
+   * False = somebody else moved it first (a cancel, an execution claim). Atomic on Postgres; best effort (read-after-write) on a
+   * Durable Object store, whose settings patch has no condition (see the ruling).
+   */
+  transition(
+    storeId: string,
+    from: { id: string; state: DeletionState },
+    to: DeletionRequest
+  ): Promise<boolean>;
   /** Counts of money in flight, or null when there is none (or it cannot be read before execution, see the ruling). */
   moneyInFlight(storeId: string): Promise<Record<string, number> | null>;
   hasBilledSubscription(storeId: string): Promise<boolean>;
@@ -85,11 +98,14 @@ const REASON_MESSAGES: Record<GuardReason['code'], string> = {
 export async function assertStoreOwner(
   deps: DeletionDeps,
   storeId: string,
-  userId: string
+  userId: string,
+  /** `super_admin` passes only where the caller allows it (read + cancel): the platform override, annotated at each call. */
+  allowSuperAdmin?: { role?: string }
 ): Promise<DeletionStore> {
   const store = await deps.loadStore(storeId);
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
   // Owner only: staff and store admins who are not the owner are refused (the delete is the owner's decision).
+  if (allowSuperAdmin?.role === 'super_admin') return store;
   if (!store.ownerId || store.ownerId !== userId) {
     throw new AppError(403, 'OWNER_ONLY', 'Only the store owner can do this');
   }
@@ -230,11 +246,19 @@ export async function scheduleStoreDeletion(
 }
 
 export async function cancelStoreDeletion(
-  input: { storeId: string; userId: string; ownerEmail?: string },
+  input: { storeId: string; userId: string; role?: string; ownerEmail?: string },
   deps: DeletionDeps
 ): Promise<DeletionRequest> {
-  const store = await assertStoreOwner(deps, input.storeId, input.userId);
+  // Super-admin override: the platform may cancel a pending deletion (support, a mistaken request); audited with the role.
+  const store = await assertStoreOwner(deps, input.storeId, input.userId, { role: input.role });
   const current = store.deletionRequest;
+  if (current?.state === 'executing') {
+    throw new AppError(
+      409,
+      'DELETION_IN_PROGRESS',
+      'The deletion is already running and can no longer be cancelled'
+    );
+  }
   if (!current || current.state !== 'pending') {
     throw new AppError(409, 'NO_PENDING_DELETION', 'There is no scheduled deletion to cancel');
   }
@@ -244,12 +268,22 @@ export async function cancelStoreDeletion(
     cancelledAt: new Date(deps.now()).toISOString(),
     cancelledBy: input.userId,
   };
-  await deps.saveRequest(store.id, cancelled);
+  // Compare-and-set: if the executor claimed the request between our read and this write, the cancel loses and says so.
+  if (!(await deps.transition(store.id, { id: current.id, state: 'pending' }, cancelled))) {
+    throw new AppError(
+      409,
+      'DELETION_IN_PROGRESS',
+      'The deletion is already running and can no longer be cancelled'
+    );
+  }
   await deps.audit({
     action: 'STORE_DELETION_CANCELLED',
     userId: input.userId,
     storeId: store.id,
-    details: { requestId: current.id },
+    details: {
+      requestId: current.id,
+      byRole: input.role === 'super_admin' ? 'super_admin' : 'owner',
+    },
   });
   await deps.notifyOwner('cancelled', {
     to: input.ownerEmail ?? null,
@@ -260,17 +294,23 @@ export async function cancelStoreDeletion(
 }
 
 export async function readDeletionStatus(
-  input: { storeId: string; userId: string },
+  input: { storeId: string; userId: string; role?: string },
   deps: DeletionDeps
-): Promise<{ request: DeletionRequest | null }> {
-  const store = await assertStoreOwner(deps, input.storeId, input.userId);
-  return { request: store.deletionRequest };
+): Promise<{ request: DeletionRequest | null; isOwner: boolean }> {
+  // Super-admin override: may read an owner's pending deletion (support). `isOwner` tells the UI which controls to show.
+  const store = await assertStoreOwner(deps, input.storeId, input.userId, { role: input.role });
+  return {
+    request: store.deletionRequest,
+    isOwner: !!store.ownerId && store.ownerId === input.userId,
+  };
 }
 
 type ExecuteOutcome =
   | { outcome: 'executed' }
-  | { outcome: 'not-due' | 'cancelled' | 'stale' | 'gone' | 'done' }
+  | { outcome: 'not-due' | 'cancelled' | 'stale' | 'gone' | 'done' | 'voided' }
   | { outcome: 'blocked'; reasons: GuardReason[] };
+
+const BLOCKING_DELETE_CODES = new Set(['STORE_HAS_MONEY_IN_FLIGHT', 'STORE_IS_BILLING_PARENT']);
 
 export async function executeStoreDeletion(
   input: { storeId: string; requestId: string },
@@ -283,13 +323,39 @@ export async function executeStoreDeletion(
   if (req.state === 'cancelled') return { outcome: 'cancelled' };
   if (req.state === 'executed') return { outcome: 'done' };
   if (deps.now() < Date.parse(req.executeAfter)) return { outcome: 'not-due' };
-  // The window is 14 days: money or billing may have changed since the schedule. Re-check, never delete blind.
-  const reasons = await evaluateGuards(deps, store);
-  if (reasons.length > 0) {
-    await deps.saveRequest(store.id, {
+  const nowIso = () => new Date(deps.now()).toISOString();
+  // The requester must still own the store: a transfer during the 14 days means the new owner never asked for this.
+  if (store.ownerId !== req.requestedBy) {
+    const voided: DeletionRequest = {
       ...req,
-      lastBlock: { code: reasons[0].code, at: new Date(deps.now()).toISOString() },
-    });
+      state: 'cancelled',
+      cancelledAt: nowIso(),
+      cancelledBy: 'system',
+      voidedReason: 'owner_changed',
+    };
+    if (await deps.transition(store.id, { id: req.id, state: req.state }, voided)) {
+      await deps.audit({
+        action: 'STORE_DELETION_VOIDED_OWNER_CHANGED',
+        userId: req.requestedBy,
+        storeId: store.id,
+        details: { requestId: req.id, newOwnerId: store.ownerId },
+      });
+      // No address is on the request (not stored on purpose): the production notify is a no-op without one, the audit row is the record.
+      await deps.notifyOwner('cancelled', { to: null, storeName: store.name, slug: store.slug });
+    }
+    return { outcome: 'voided' };
+  }
+  const block = async (reasons: GuardReason[], from: DeletionState): Promise<ExecuteOutcome> => {
+    // Visible state (the owner and super admin read `lastBlock`), an audit row per attempt, back to pending for the daily re-check.
+    await deps.transition(
+      store.id,
+      { id: req.id, state: from },
+      {
+        ...req,
+        state: 'pending',
+        lastBlock: { code: reasons[0].code, at: nowIso() },
+      }
+    );
     await deps.audit({
       action: 'STORE_DELETION_BLOCKED',
       userId: req.requestedBy,
@@ -297,9 +363,41 @@ export async function executeStoreDeletion(
       details: { requestId: req.id, reasons: reasons.map(r => r.code) },
     });
     return { outcome: 'blocked', reasons };
+  };
+  // The window is 14 days: money or billing may have changed since the schedule. Re-check, never delete blind.
+  const reasons = await evaluateGuards(deps, store);
+  if (reasons.length > 0) return block(reasons, req.state);
+  // Claim: pending -> executing is a compare-and-set, so a cancel that landed first wins and a cancel after it is refused.
+  // `executing` already (a crashed earlier attempt) resumes: the delete is idempotent and converges.
+  if (req.state === 'pending') {
+    if (
+      !(await deps.transition(
+        store.id,
+        { id: req.id, state: 'pending' },
+        { ...req, state: 'executing' }
+      ))
+    ) {
+      return { outcome: 'cancelled' };
+    }
   }
-  // A throw leaves the request pending so the job's retry converges (StoreService.delete reopens whatever it closed, Ruling NZ-D17).
-  await deps.deleteStore(store.id, req.requestedBy);
+  try {
+    await deps.deleteStore(store.id, req.requestedBy);
+  } catch (err) {
+    // A Durable Object store checks its money inside the delete (it cannot be read before): that 409 is a BLOCK, not a failure.
+    if (err instanceof AppError && err.statusCode === 409 && BLOCKING_DELETE_CODES.has(err.code)) {
+      return block(
+        [
+          {
+            code: err.code as GuardReason['code'],
+            message: err.message,
+            details: err.details as never,
+          },
+        ],
+        'executing'
+      );
+    }
+    throw err; // the job retries; the request stays `executing` and resumes
+  }
   await deps.audit({
     action: 'STORE_DELETED_BY_OWNER',
     userId: req.requestedBy,

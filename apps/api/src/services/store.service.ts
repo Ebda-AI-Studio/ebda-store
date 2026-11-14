@@ -83,6 +83,7 @@ import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
 import { anonymiseDeletedStore, finishStoreDeletion } from '../lib/store-delete-post-commit';
 import { purgeStoreVectors } from '../lib/search/purge-store-vectors';
+import { purgeTaxChangeRecords } from '../lib/tax-change-purge';
 import { cfBindings } from '../cf/bindings';
 import { eraseStorePlatformData, type D1Like } from '../cf/erasure/platform-subject';
 import { paymentsErasurePort } from './billing/payments-erasure';
@@ -1262,6 +1263,9 @@ export class StoreService {
 
     // PDPL (Ruling FOLD-ERASURE-2): a DO store's people are anonymised once the delete is committed (the DO stays, closed, for the
     // legal retention period; fiscal / VAT / payment rows are kept, everything that identifies a person goes).
+    // The VAT change records are platform rows for EVERY store (not only DO ones), so they are purged on both paths.
+    if (!wasOnDo)
+      await anonymiseDeletedStore(storeId, { purgeTaxChange: id => purgeTaxChangeRecords(id) });
     if (wasOnDo)
       await anonymiseDeletedStore(storeId, {
         eraseDo: async (id, requestId) =>
@@ -1283,6 +1287,7 @@ export class StoreService {
         },
         erasePayments: (id, requestId) => paymentsErasurePort.scrub([id], requestId),
         purgeVectors: id => purgeStoreVectors(id),
+        purgeTaxChange: id => purgeTaxChangeRecords(id),
       });
 
     // Invalidate store cache (best-effort, post-commit)
@@ -1794,6 +1799,58 @@ export class StoreService {
     request: Record<string, unknown> | object | null
   ) {
     await this.setSettingsKey(storeId, 'deletionRequest', request);
+  }
+
+  /**
+   * STORE-LIFECYCLE-1: compare-and-set of the deletion request. Writes `to` only while the stored request still has `from.id` and
+   * `from.state` (a cancel and the executor's claim cannot both win). Postgres: ONE conditional UPDATE. Durable Object store: the
+   * settings patch has no condition, so it is read, checked, patched and read back (the DO is single threaded per call, the window
+   * is two calls; the executor's claim + the cancel's refusal of `executing` narrow it further, Ruling STORE-LIFECYCLE-1).
+   */
+  static async compareAndSetDeletionRequest(
+    storeId: string,
+    from: { id: string; state: string },
+    to: object
+  ): Promise<boolean> {
+    const store = await this.getById(storeId);
+    if (await storeWritesToDo(storeId)) {
+      const live = ((await this.getById(storeId)).settings ?? {}) as {
+        deletionRequest?: { id?: string; state?: string };
+      };
+      const cur = live.deletionRequest;
+      if (!cur || cur.id !== from.id || cur.state !== from.state) return false;
+      await storePatchOnDo(storeId, { json: { settings: { set: { deletionRequest: to } } } });
+      const after = ((await this.getById(storeId)).settings ?? {}) as {
+        deletionRequest?: { id?: string; state?: string };
+      };
+      const ok = after.deletionRequest?.state === (to as { state?: string }).state;
+      if (ok) await this.afterDeletionRequestWrite(store, storeId);
+      return ok;
+    }
+    const rows = await withStore(
+      storeId,
+      tx => tx.$queryRaw<Array<{ settings: unknown; updatedAt?: Date }>>`
+        UPDATE stores
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), ARRAY['deletionRequest']::text[], ${JSON.stringify(to)}::jsonb),
+            updated_at = now()
+        WHERE id = ${storeId}
+          AND settings -> 'deletionRequest' ->> 'id' = ${from.id}
+          AND settings -> 'deletionRequest' ->> 'state' = ${from.state}
+        RETURNING settings, updated_at AS "updatedAt"`
+    );
+    if (!rows?.length) return false;
+    await copyStoreSettings(storeId, { settings: rows[0]?.settings ?? {}, ...stamp(rows[0]) });
+    await this.afterDeletionRequestWrite(store, storeId);
+    return true;
+  }
+
+  private static async afterDeletionRequestWrite(
+    store: { slug: string; domain?: string | null },
+    storeId: string
+  ) {
+    await StoreService.invalidateCache(store);
+    const fresh = await this.getById(storeId);
+    await bustStoreCaches(fresh.id, fresh.slug, fresh.domain);
   }
 
   /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */
