@@ -6587,6 +6587,21 @@
       "lockSaved": "Saved.",
       "lockFailed": "Could not save the closing date. Try again."
     },
+    "payout": {
+      "title": "Record a payout",
+      "description": "Book the money a payment gateway or delivery company sent to your bank, net of its fee, so your bank statement matches your books.",
+      "from": "Where the money was waiting",
+      "bank": "Bank account that received it",
+      "select": "Choose an account",
+      "gross": "Full amount of the sales settled",
+      "fee": "Fee the gateway or carrier kept",
+      "net": "The bank should show {amount} EGP.",
+      "date": "Date the bank received it",
+      "reference": "Reference (optional)",
+      "submit": "Record the payout",
+      "submitting": "Recording…",
+      "invalid": "Choose both accounts, enter the full amount, and make sure the fee is smaller than it."
+    },
     "newEntry": {
       "title": "New Manual Journal Entry",
       "description": "Post an adjusting entry for capital, a loan, an owner draw or a correction. Lines must balance (sum of debits = sum of credits).",
@@ -6821,6 +6836,7 @@
       "title": "Bank Reconciliation",
       "description": "Import bank statements (CSV or OFX) and match transactions against your ledger.",
       "importButton": "Import Statement",
+      "payoutButton": "Record a payout",
       "noStatements": "No bank statements imported yet.",
       "fileName": "File",
       "account": "GL Account",

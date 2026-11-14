@@ -10,6 +10,7 @@
  *   GET  /stores/:storeId/finance/journal           — paginated entry list (store_admin+)
  *   GET  /stores/:storeId/finance/journal/:entryId  — single entry detail (store_admin+)
  *   POST /stores/:storeId/finance/journal           — manual adjusting entry (store_admin+)
+ *   POST /stores/:storeId/finance/payouts           — a gateway payout / COD remittance net of its fee (store_admin+)
  *   POST /stores/:storeId/finance/journal/:entryId/reverse — reverse a manual entry (store_admin+)
  *   GET/PUT /stores/:storeId/finance/period-lock    — close / reopen months (store_admin+)
  *   GET  /stores/:storeId/finance/reports/tax-report       — transaction-level tax report (Enterprise)
@@ -44,6 +45,7 @@ import {
 } from '../services/accounting/account.service';
 import { idempotencyKeyOf } from '../lib/money-idempotency';
 import { postManualEntry, reverseManualEntry } from '../services/accounting/journal.service';
+import { postPayout, payoutSchema } from '../services/accounting/payout.service';
 import { StoreService } from '../services/store.service';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
@@ -342,6 +344,45 @@ router.post(
         )
       );
 
+      res.status(201).json({ data: entry });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /:storeId/finance/payouts ──────────────────────────────────────────
+
+/** Book a gateway payout or COD remittance: bank (net) + bank fees / cash in transit (gross), one balanced entry. */
+router.post(
+  '/:storeId/finance/payouts',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.basic'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = payoutSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: 'Validation failed.',
+            details: parsed.error.flatten(),
+          },
+        });
+        return;
+      }
+      const entry = await runInStoreCtx(req.params.storeId, () =>
+        postPayout(
+          req.params.storeId,
+          parsed.data,
+          req.user?.userId,
+          idempotencyKeyOf(req.header('idempotency-key'))
+        )
+      );
       res.status(201).json({ data: entry });
     } catch (err) {
       next(err);

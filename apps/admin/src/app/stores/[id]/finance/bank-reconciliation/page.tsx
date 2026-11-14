@@ -202,12 +202,20 @@ export default function BankReconciliationPage() {
       title={t('title')}
       subtitle={t('description')}
       actions={
-        <Link
-          href={`/stores/${storeId}/finance/bank-reconciliation/import`}
-          className={buttonVariants()}
-        >
-          {t('importButton')}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/stores/${storeId}/finance/payouts/new`}
+            className={buttonVariants({ variant: 'secondary' })}
+          >
+            {t('payoutButton')}
+          </Link>
+          <Link
+            href={`/stores/${storeId}/finance/bank-reconciliation/import`}
+            className={buttonVariants()}
+          >
+            {t('importButton')}
+          </Link>
+        </div>
       }
     >
       <div className="space-y-6 p-4 md:p-6">
