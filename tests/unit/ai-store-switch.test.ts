@@ -7,11 +7,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const m = vi.hoisted(() => ({ findUnique: vi.fn(), countAiUsage: vi.fn(), count: vi.fn() }));
+vi.mock('@api/services/billing/addon-grant', () => ({ activeAddons: async () => [] }));
 vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     prisma: { store: { findUnique: m.findUnique }, aiUsage: { count: m.count } },
+    withStore: async (_id: string, fn: (t: unknown) => unknown) => fn({}),
   };
 });
 vi.mock('@api/lib/repo-factory', () => ({

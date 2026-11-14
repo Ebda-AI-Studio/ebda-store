@@ -476,6 +476,12 @@ export const PAGES: PageEntry[] = [
       ar: 'باقة اشتراك ترقية فاتورة استخدام حدود',
     },
   }),
+  page('/billing/addons', 'addons.title', 'owner', {
+    syn: {
+      en: 'add-on addons buy feature widget wallet ai requests pack top up quota',
+      ar: 'اضافة اضافات شراء ميزة زر عائم محفظة طلبات ذكاء اصطناعي باقة زيادة',
+    },
+  }),
   page('/staff', 'staff.page.title', 'owner', {
     feature: 'staff_accounts',
     syn: { en: 'team members roles permissions invite employee', ar: 'موظفين فريق صلاحيات دعوة' },

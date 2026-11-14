@@ -51,6 +51,7 @@
   "services/barcode-scan.service.ts": 20,
   "services/barcode.service.ts": 2,
   "services/billing/account.service.ts": 6,
+  "services/billing/addon-renewal.ts": 1,
   "services/billing/comp-migration.ts": 1,
   "services/billing/grants.service.ts": 18,
   "services/billing/payments-erasure.ts": 8,

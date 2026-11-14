@@ -8721,7 +8721,7 @@
     },
     "premiumSubtitle": "Extra feature",
     "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
+    "featureNotEnabledBody": "Floating widget is an add-on. Buy it from Add-ons and it turns on right after the payment goes through.",
     "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -8783,7 +8783,8 @@
     "prefillExample": "Hi! I'd like to ask about…",
     "handleSampleDemoShop": "demo-shop",
     "handleSample": "mystore",
-    "emailSubjectExample": "Question about your store"
+    "emailSubjectExample": "Question about your store",
+    "featureNotEnabledCta": "Go to Add-ons"
   },
   "zoneEditor": {
     "resetToDefault": "Reset to default",
@@ -8880,7 +8881,7 @@
     "walletsWithBalance": "Customers with a balance",
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
-    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda Store support to turn it on.",
+    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Buy the Wallet at Checkout add-on in Add-ons to turn it on.",
     "colCustomer": "Customer",
     "colContact": "Contact",
     "colBalance": "Balance",
@@ -8892,7 +8893,8 @@
     "retry": "Retry",
     "statusOn": "On",
     "statusOff": "Off",
-    "emptyAction": "Go to customers"
+    "emptyAction": "Go to customers",
+    "checkoutOffCta": "Go to Add-ons"
   },
   "usageHistory": {
     "title": "Store usage history",
@@ -11278,7 +11280,8 @@
     "title": "Use AI features",
     "onHint": "The assistant can translate, write SEO text, tag products and draft campaigns for this store. Turn it off and no AI call is made for your store.",
     "offHint": "AI is off for your store. Nothing is sent to an AI model, and every AI button and automatic fill is paused until you turn it back on.",
-    "failed": "Could not change this setting. Try again."
+    "failed": "Could not change this setting. Try again.",
+    "quotaLink": "Get more requests"
   },
   "eta": {
     "title": "ETA e-receipts (Egypt)",
@@ -11664,5 +11667,38 @@
     "savedTitle": "Shipping saved",
     "savedBody": "The return policy was updated.",
     "saveLabel": "Save shipping"
+  },
+  "addons": {
+    "title": "Add-ons",
+    "subtitle": "Add a feature or more AI requests to your store. Pay by card, it turns on right after the payment goes through.",
+    "loading": "Loading add-ons...",
+    "loadFailed": "Could not load the add-ons. Try again.",
+    "cardOff": "Card payments are not available for your store yet, so add-ons cannot be bought here.",
+    "featuresHeading": "Features",
+    "aiHeading": "More AI requests",
+    "price": "{amount} for {days} days",
+    "includedInPlan": "Included in your plan",
+    "activeUntil": "Active until {date}",
+    "cancelsOn": "Ends on {date}, will not renew",
+    "renewsOn": "Renews on {date}",
+    "buy": "Buy",
+    "buyAgain": "Add another {days} days",
+    "cancel": "Stop renewing",
+    "resume": "Keep renewing",
+    "confirmTitle": "Confirm the payment",
+    "confirmBody": "You will be charged {amount} now for {days} days of {name}. Nothing is charged until you confirm.",
+    "confirmVat": "Includes {vat} VAT.",
+    "confirmYes": "Yes, charge {amount}",
+    "confirmNo": "Not now",
+    "previewError": "Could not prepare the payment. Nothing was charged.",
+    "checkoutError": "Could not start the payment. Nothing was charged.",
+    "cancelError": "Could not change this. Try again.",
+    "cancelDone": "Done. It stays on until {date}.",
+    "returnPending": "We are waiting for the bank to confirm your payment. It turns on by itself as soon as it does.",
+    "returnOk": "Payment received. Your add-on is on.",
+    "returnFailed": "The payment did not go through, so nothing was added and nothing was charged.",
+    "aiToday": "Today: {used} of {cap} requests used, {remaining} left.",
+    "aiExtra": "Includes {extra} extra requests from your packs.",
+    "aiBuyHint": "Packs raise your store's daily limit for {days} days. They do not renew."
   }
 }

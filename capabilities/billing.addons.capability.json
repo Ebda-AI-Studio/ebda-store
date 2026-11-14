@@ -1,0 +1,47 @@
+{
+  "id": "billing.addons",
+  "status": "live",
+  "area": "billing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اشتري إضافة أو فعّل ميزة خارج باقتي",
+  "titleEn": "Buy an add-on outside my plan",
+  "screens": ["/stores/[id]/billing/addons"],
+  "api": [
+    "GET /stores/:storeId/billing/addons",
+    "POST /stores/:storeId/billing/addons/preview",
+    "POST /stores/:storeId/billing/addons/checkout",
+    "POST /stores/:storeId/billing/addons/:sku/cancel",
+    "POST /stores/:storeId/billing/addons/:sku/resume"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "a payment is not refunded automatically; cancel stops the renewal and the add-on stays on until the paid term ends"
+  },
+  "helpArticle": "buy-an-add-on",
+  "questions": {
+    "ar": ["عايز افعّل الزر العائم", "ازاي اشتري إضافة؟", "الميزة دي مقفولة ليه؟"],
+    "en": ["How do I turn on a feature that is not in my plan?", "How do I buy an add-on?"]
+  },
+  "steps": [
+    "Open Billing, then Add-ons",
+    "Press Buy on the add-on and read the exact total",
+    "Press Yes, charge and pay by card on the hosted page",
+    "The add-on turns on by itself when the payment is confirmed"
+  ],
+  "edgeCases": [
+    "Owner only: staff are refused; the store id comes from the path",
+    "One payment grants one 30 day term, exactly once, even if the payment confirmation arrives twice",
+    "A declined or abandoned payment grants nothing and charges nothing",
+    "Cancel stops the renewal; access stays until the paid term ends",
+    "A feature the plan already includes is not sold again",
+    "A super admin can still switch any feature on or off for goodwill; that override wins over a purchase"
+  ],
+  "gaps": [
+    "A declined renewal ends the add-on silently at the term end; there is no dunning message yet"
+  ]
+}

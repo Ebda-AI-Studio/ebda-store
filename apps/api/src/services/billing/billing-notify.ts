@@ -10,6 +10,7 @@ import logger from '../../lib/logger';
 import { EmailService } from '../email.service';
 import { socketService } from '../socket.service';
 import { featureService } from '../feature.service';
+import { sendAlert } from '../alerts.service';
 import { bustStoreCaches } from '../store.service';
 import { reconcileStoreAccess } from './account.service';
 import { instapayDetails } from './account.service';
@@ -21,6 +22,10 @@ import type { EmailBarcode } from '../email-templates/_barcode';
 
 export type BillingEffect =
   | { kind: 'plan_changed'; storeId: string }
+  /** An add-on / AI pack term was granted: drop the store's cached feature map. */
+  | { kind: 'addon_granted'; storeId: string }
+  /** Money was taken for an add-on we cannot deliver: alert and refund it (compensating action). */
+  | { kind: 'addon_unapplied'; storeId: string; billingEventId: string }
   /** Money was recorded: lift an `unpaid` suspension, re-apply the store allowance. */
   | { kind: 'payment_recorded'; storeId: string }
   /**
@@ -92,6 +97,21 @@ export async function runBillingEffects(effects: BillingEffect[]): Promise<void>
 }
 
 async function runOne(effect: BillingEffect): Promise<void> {
+  if (effect.kind === 'addon_granted') {
+    await featureService.invalidateCache(effect.storeId);
+    return;
+  }
+  if (effect.kind === 'addon_unapplied') {
+    void sendAlert({
+      level: 'p1',
+      title: 'Add-on paid but not deliverable: refunding',
+      body: `billing_events ${effect.billingEventId} (store ${effect.storeId}) named an add-on that does not exist. A refund was attempted.`,
+    }).catch(() => undefined);
+    // Lazy import: subscription-billing imports this module.
+    const { refundCharge } = await import('./subscription-billing.service.js');
+    await refundCharge({ eventId: effect.billingEventId });
+    return;
+  }
   const ctx = await storeContext(effect.storeId);
   if (!ctx) return;
   const { store } = ctx;

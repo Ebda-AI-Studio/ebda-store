@@ -23,7 +23,7 @@ import { prisma } from '@ebda/database';
 import { config } from '../config';
 import { redis } from './redis.service';
 import { AppError } from '../middleware/error-handler';
-import { assertAiQuota } from '../lib/ai-quota';
+import { assertAiQuota, storeAiCapFactor } from '../lib/ai-quota';
 import logger from '../lib/logger';
 import { computeCostMicros } from '../lib/ai-pricing';
 import { safeFetchImage } from '../lib/safe-fetch';
@@ -146,11 +146,13 @@ async function checkBudget(storeId: string): Promise<void> {
     _sum: { inputTokens: true, outputTokens: true },
   });
   const used = (result._sum.inputTokens ?? 0) + (result._sum.outputTokens ?? 0);
-  if (used >= config.aiDailyTokenBudgetPerStore) {
+  // A paid request pack scales the token budget too, or the extra requests would hit this wall first.
+  const budget = Math.floor(config.aiDailyTokenBudgetPerStore * (await storeAiCapFactor(storeId)));
+  if (used >= budget) {
     throw new AppError(
       429,
       'AI_BUDGET_EXCEEDED',
-      `Daily AI token budget reached (${used}/${config.aiDailyTokenBudgetPerStore}). Try again tomorrow or contact support to raise the limit.`
+      `Daily AI token budget reached (${used}/${budget}). Try again tomorrow, or buy a request pack in Billing > Add-ons.`
     );
   }
 }

@@ -1,0 +1,13 @@
+# ADDON-1
+
+> Section: 2026-11-14 - Self-service gaps A8 + A9 (billing-addons)
+
+Ruling ADDON-1 (2026-11-14, builder decision, prices pending Ahmad) - a merchant buys an add-on or an AI request pack with a card and the entitlement is granted by the payment itself. Catalog and prices live in ONE file, `apps/api/src/services/billing/addon-catalog.ts` (placeholders: EGP 99 per feature per 30 days, packs EGP 49 / 149). Cost if wrong: a merchant is quoted and charged the wrong amount; the exact total is shown and confirmed first and a charge is refundable from the ledger.
+
+Ruling ADDON-2 - no new table and no new ledger type: a purchase is a `billing_events` row of type `upgrade` with `planCode = addon:<sku>`; its `forPeriodEnd` is the end of the paid term. Evidence: the `type` CHECK exists in Postgres and in the D1 platform schema, and a new store-scoped table touches the D1 split, erasure and tenant-guard snapshots. Every plan reader fails closed on the prefix (no `plans` row), and `settleInTx` branches on it (`isAddonRow`). Cost if wrong: a reader that lists `upgrade` rows shows the raw code as the plan label (the super-admin ledger does); the follow-up is a first-class `addon` type once the D1 family cutover is finished.
+
+Ruling ADDON-3 - entitlement is READ from the ledger, never stored: `activeAddons()` = succeeded, not refunded, `forPeriodEnd` ahead. Feature resolution adds the running keys after the plan baseline and BEFORE the per-store override, so a super-admin goodwill `off` still wins and a goodwill `on` still works (the grant clears a stale `off` row for the key it just sold). The AI store cap is `base + sum(extra of running packs)`; only the per-store slice moves, the platform daily and monthly caps never read it. Cost if wrong: an expired add-on can stay on in the cached feature map for up to 5 minutes (BOUNDED, in the merchant's favour).
+
+Ruling ADDON-4 - exactly once: the grant runs inside the payment's settlement transaction on the pending -> succeeded transition (dedupe claim + guarded status update), so a replayed webhook grants nothing, a failed payment grants nothing, and a failing grant write rolls the settlement back so the gateway redelivery retries it. A paid row naming an add-on that no longer exists raises a P1 and attempts a refund (`addon_unapplied`). Renewal (`addon-renewal.ts`, inside the billing cycle) charges the saved card once per (store, sku, term end); a declined renewal is not retried and the add-on ends at the term end (gap: no merchant message yet). Cost if wrong: a merchant pays and gets nothing until the retry; the P1 alert names the ledger row.
+
+Super-admin override: `PUT /admin/stores/:id/features/:key` (goodwill grant / revoke) is unchanged.

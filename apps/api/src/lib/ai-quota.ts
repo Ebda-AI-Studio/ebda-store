@@ -1,4 +1,6 @@
-import { prisma } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
+import { activeAddons } from '../services/billing/addon-grant';
+import { ADDON_CATALOG } from '../services/billing/addon-catalog';
 import { countAiUsage } from './definer';
 import { geminiKeyCount } from './ai/gemini-keys';
 import { AppError } from '../middleware/error-handler';
@@ -79,6 +81,45 @@ const DEFAULT_MONTHLY_REQUEST_CAP = 20000;
 const DEFAULT_STORE_DAILY_REQUEST_CAP = 150;
 
 /**
+ * The STORE's extra daily AI requests from running paid packs (SELF-SERVICE A9). Staleness class: NEVER-stale
+ * (entitlement) so it is NOT cached: one indexed ledger read per AI call, noise next to a model round trip, and a
+ * pack is usable the moment its payment settles. Only the per-store slice moves; the platform global daily/monthly
+ * caps below never read this, so a pack cannot spend the shared Gemini budget.
+ */
+async function storeAiExtraRequests(storeId: string, now = new Date()): Promise<number> {
+  const running = await withStore(storeId, tx => activeAddons(tx, storeId, now));
+  return running.reduce((n, r) => n + (ADDON_CATALOG[r.sku]?.aiExtraRequests ?? 0), 0);
+}
+
+function baseStoreDailyCap(): number {
+  return parseInt(
+    process.env.AI_STORE_DAILY_REQUEST_CAP ?? String(DEFAULT_STORE_DAILY_REQUEST_CAP),
+    10
+  );
+}
+
+/** The multiplier a paid pack puts on the store's own daily limits (1 with no pack); the token budget scales by it. */
+export async function storeAiCapFactor(storeId: string): Promise<number> {
+  return 1 + (await storeAiExtraRequests(storeId)) / baseStoreDailyCap();
+}
+
+const countStoreUsage = (storeId: string, since: Date) =>
+  prisma.aiUsage.count({ where: { storeId, createdAt: { gte: since }, cachedHit: false } });
+
+/** What the merchant sees in AI settings: base cap, paid extra, used today, remaining. */
+export async function storeAiAllowance(storeId: string) {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const [extra, used] = await Promise.all([
+    storeAiExtraRequests(storeId),
+    countStoreUsage(storeId, startOfDay),
+  ]);
+  const baseCap = baseStoreDailyCap();
+  const cap = baseCap + extra;
+  return { baseCap, extra, cap, used, remaining: Math.max(0, cap - used) };
+}
+
+/**
  * Enforce the platform AI request caps BEFORE spending a Gemini call.
  *
  * Layers (checked in order):
@@ -118,16 +159,13 @@ export async function assertAiQuota(
   // one statement; a per-store fan-out would cost a transaction per store on
   // every AI call. Same precedent as answer-engine/budget.ts.
   // The per-store slice stays on the ambient path — it IS store-filtered.
-  const [[today, thisMonth], storeToday] = await Promise.all([
+  const [[today, thisMonth], storeToday, storeExtra] = await Promise.all([
     Promise.all([
       countAiUsage({ since: startOfDay, cachedHit: false }),
       countAiUsage({ since: startOfMonth, cachedHit: false }),
     ]),
-    opts.storeId
-      ? prisma.aiUsage.count({
-          where: { storeId: opts.storeId, createdAt: { gte: startOfDay }, cachedHit: false },
-        })
-      : Promise.resolve(0),
+    opts.storeId ? countStoreUsage(opts.storeId, startOfDay) : Promise.resolve(0),
+    opts.storeId ? storeAiExtraRequests(opts.storeId) : Promise.resolve(0),
   ]);
 
   // The default daily cap models ONE Google project's free ceiling. Each extra
@@ -143,16 +181,13 @@ export async function assertAiQuota(
     process.env.AI_MONTHLY_REQUEST_CAP ?? String(DEFAULT_MONTHLY_REQUEST_CAP),
     10
   );
-  const storeDailyCap = parseInt(
-    process.env.AI_STORE_DAILY_REQUEST_CAP ?? String(DEFAULT_STORE_DAILY_REQUEST_CAP),
-    10
-  );
+  const storeDailyCap = baseStoreDailyCap() + storeExtra;
 
   if (opts.storeId && storeToday >= storeDailyCap) {
     throw new AppError(
       429,
       AI_QUOTA_STORE_DAILY_CODE,
-      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC.`
+      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC. Need more? Buy a request pack in Billing > Add-ons.`
     );
   }
 

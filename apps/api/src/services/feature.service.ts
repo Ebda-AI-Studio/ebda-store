@@ -9,6 +9,8 @@ import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { getAutomationFlags } from './plan-entitlements';
 import { readStorePlan } from '../lib/store-plan';
 import { storeUpdate } from '../lib/repo-factory';
+import { activeAddons } from './billing/addon-grant';
+import { ADDON_CATALOG } from './billing/addon-catalog';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -56,6 +58,13 @@ function isConnectionFailure(err: unknown): boolean {
   return [e.code, e.errorCode].some(
     c => typeof c === 'string' && CONNECTION_FAILURE_CODES.includes(c)
   );
+}
+
+function addonFeatureKeys(running: Array<{ sku: string }>): string[] {
+  return running.flatMap(r => {
+    const k = ADDON_CATALOG[r.sku]?.featureKey;
+    return k ? [k] : [];
+  });
 }
 
 class FeatureService {
@@ -139,7 +148,8 @@ class FeatureService {
       apiAccess: boolean;
       wholesalePricing: boolean;
       mcpAccess: boolean;
-    } | null
+    } | null,
+    addonKeys: readonly string[] = []
   ): Record<FeatureKey, boolean> {
     // Start with all false.
     const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
@@ -175,7 +185,11 @@ class FeatureService {
       // (mcp/merchant-write.ts); a StoreFeature override still wins both ways.
       map.merchant_mcp_write = flags.mcpAccess;
     }
-    // Layer 2: per-store overrides on top.
+    // Layer 1.7: running paid add-ons (SELF-SERVICE A8): a purchase turns the feature ON. Staleness class BOUNDED:
+    // a grant busts this cache (`addon_granted`), and an expiry is time-based so the cached map may keep the feature
+    // for at most CACHE_TTL (5 min) past the paid term's end, which only ever errs in the merchant's favour.
+    for (const key of addonKeys) map[key as FeatureKey] = true;
+    // Layer 2: per-store overrides on top (a super-admin "off" still beats a purchase: goodwill/abuse override).
     for (const row of rows) {
       if (FEATURE_KEYS_ARRAY.includes(row.featureKey as FeatureKey)) {
         map[row.featureKey as FeatureKey] = row.enabled;
@@ -191,20 +205,22 @@ class FeatureService {
     // and without it the per-store override rows return empty, so a feature
     // enabled/disabled by override would be mis-resolved (and the wrong value
     // Redis-cached). Everything is read inside one store-scope tx.
-    const [store, rows, flags] = await withStore(storeId, async tx => {
-      const [storeRow, featureRows] = await Promise.all([
+    const [store, rows, flags, addonKeys] = await withStore(storeId, async tx => {
+      const [storeRow, featureRows, running] = await Promise.all([
         readStorePlan(tx, storeId),
         tx.storeFeature.findMany({
           where: { storeId },
           select: { featureKey: true, enabled: true },
         }),
+        activeAddons(tx, storeId, new Date()),
       ]);
+      const addonKeys = addonFeatureKeys(running);
       // The plans engine's automation flags, read in the SAME store-scope tx (one
       // connection; a transient failure retries and fails closed together).
       const planFlags = storeRow
         ? await getAutomationFlags(storeId, tx, { legacyPlan: storeRow.plan })
         : null;
-      return [storeRow, featureRows, planFlags] as const;
+      return [storeRow, featureRows, planFlags, addonKeys] as const;
     });
     // If the store doesn't exist, return all-false (safe default; callers
     // already handle missing stores at the route level via requireStoreAccess).
@@ -214,7 +230,7 @@ class FeatureService {
         boolean
       >;
     }
-    return this.rowsToMap(store.plan as StorePlan, rows, flags);
+    return this.rowsToMap(store.plan as StorePlan, rows, flags, addonKeys);
   }
 
   /**
@@ -385,7 +401,8 @@ class FeatureService {
           select: { featureKey: true, enabled: true },
         });
         const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
-        return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
+        const addonKeys = addonFeatureKeys(await activeAddons(tx, storeId, new Date()));
+        return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags, addonKeys);
       })
     );
 

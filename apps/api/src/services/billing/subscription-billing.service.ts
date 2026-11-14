@@ -89,6 +89,9 @@ import {
   sweepFreeMonthGrants,
 } from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
+import { applyAddonGrant } from './addon-grant';
+import { ADDON_PLAN_PREFIX } from './addon-catalog';
+import { renewDueAddons } from './addon-renewal';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
@@ -188,7 +191,7 @@ function vatColumns(charge: ChargeAmount | undefined) {
  * already claimed (another run / a retry): the caller must NOT call the provider.
  * `ON CONFLICT DO NOTHING` — a duplicate never aborts the surrounding tx.
  */
-async function claimEvent(input: ClaimInput): Promise<string | null> {
+export async function claimEvent(input: ClaimInput): Promise<string | null> {
   const id = crypto.randomUUID();
   const { count } = await withStore(input.storeId, tx =>
     tx.billingEvent.createMany({
@@ -217,7 +220,11 @@ async function claimEvent(input: ClaimInput): Promise<string | null> {
   return count === 1 ? id : null;
 }
 
-async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown): Promise<void> {
+export async function markFailedUnlessSettled(
+  id: string,
+  reason: string,
+  raw?: unknown
+): Promise<void> {
   await inEventStore(
     id,
     (tx, storeId) =>
@@ -270,6 +277,11 @@ async function applyPlan(tx: Tx, storeId: string, planCode: string): Promise<voi
   if (plan) await storeUpdate(tx, { where: { id: storeId }, data: { plan: plan.featureTier } });
 }
 
+/** A ledger row that bought an add-on or an AI pack (`upgrade` + `addon:<sku>`), not a plan. */
+function isAddonRow(row: { type: string; planCode: string | null }): boolean {
+  return row.type === 'upgrade' && !!row.planCode?.startsWith(ADDON_PLAN_PREFIX);
+}
+
 async function applySuccess(
   tx: Tx,
   row: LedgerRow,
@@ -279,6 +291,11 @@ async function applySuccess(
 ): Promise<void> {
   if (row.type === 'card_setup') {
     await applyCardSaved(tx, row, o, now);
+    return;
+  }
+  if (isAddonRow(row)) {
+    // An add-on payment never touches the subscription (SELF-SERVICE A8/A9): it grants its own term.
+    await applyAddonGrant(tx, row, now, effects);
     return;
   }
   if (row.type === 'checkout' || row.type === 'upgrade') {
@@ -482,6 +499,10 @@ const SETTLE_LEASE_MS = 120_000;
  * notifications the interrupted attempt never sent.
  */
 async function healAppliedSuccess(tx: Tx, row: LedgerRow, effects: BillingEffect[]): Promise<void> {
+  if (isAddonRow(row)) {
+    effects.push({ kind: 'addon_granted', storeId: row.storeId });
+    return;
+  }
   const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
   const planCode = row.type === 'card_setup' ? null : (row.planCode ?? sub?.planCode ?? null);
   if (planCode) await applyPlan(tx, row.storeId, planCode);
@@ -496,6 +517,7 @@ async function healAppliedSuccess(tx: Tx, row: LedgerRow, effects: BillingEffect
 
 /** Did an earlier, interrupted settlement of this success already move the subscription? (D1 lease path only.) */
 async function alreadyApplied(tx: Tx, row: LedgerRow & { createdAt: Date }): Promise<boolean> {
+  if (isAddonRow(row)) return row.forPeriodEnd !== null; // the grant writes the term end; unset until granted
   const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
   if (!sub) return false;
   const started = sub.currentPeriodStart?.getTime();
@@ -641,7 +663,7 @@ export async function settleInTx(
   return { transitioned: true };
 }
 
-async function settleCharge(eventId: string, o: Outcome, now: Date) {
+export async function settleCharge(eventId: string, o: Outcome, now: Date) {
   const effects: BillingEffect[] = [];
   const res = await inEventStore(eventId, tx => settleInTx(tx, eventId, o, now, effects), {
     transitioned: false,
@@ -687,7 +709,7 @@ async function settleDefinitive(eventId: string, o: Outcome, now: Date) {
 
 type ChargeAttempt = { settled: 'succeeded' | 'failed' } | { settled: 'pending'; reason?: string };
 
-async function chargeAndSettle(args: {
+export async function chargeAndSettle(args: {
   provider: BillingProvider;
   eventId: string;
   token: string;
@@ -1400,6 +1422,11 @@ export async function runBillingCycle(
     );
     await sweepStuckCharges(now, provider).catch(err =>
       logger.error({ err }, '[billing] stuck-charge sweep failed')
+    );
+  }
+  if (!only) {
+    await renewDueAddons(now, provider).catch(err =>
+      logger.error({ err }, '[billing] add-on renewal pass failed')
     );
   }
   const ids = await findDueSubscriptionIds(now, only);

@@ -7,6 +7,7 @@
  * these two settings routes, so the merchant can always turn it back on.
  */
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '@/i18n/useT';
 
@@ -15,6 +16,8 @@ export function AiSwitchCard({ storeId }: { storeId: string }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [quota, setQuota] = useState<{ used: number; cap: number; remaining: number } | null>(null);
+  const tAddons = useT('addons');
   const base = `/api/v1/stores/${storeId}/ai/settings`;
 
   const load = useCallback(async () => {
@@ -25,7 +28,11 @@ export function AiSwitchCard({ storeId }: { storeId: string }) {
   }, [base]);
   useEffect(() => {
     void load();
-  }, [load]);
+    // Today's allowance (base + paid packs) from the billing add-ons read; a miss just hides the line.
+    void apiGet<{ ai: { used: number; cap: number; remaining: number } }>(
+      `/api/v1/stores/${storeId}/billing/addons`
+    ).then(r => setQuota(r.data?.ai ?? null));
+  }, [load, storeId]);
 
   const flip = async () => {
     if (enabled === null || busy) return;
@@ -63,6 +70,17 @@ export function AiSwitchCard({ storeId }: { storeId: string }) {
           />
         </button>
       </div>
+      {quota && (
+        <p className="mt-3 text-sm" data-testid="ai-quota">
+          {tAddons('aiToday', quota)}{' '}
+          <Link
+            href={`/stores/${storeId}/billing/addons#ai`}
+            className="font-medium text-primary underline"
+          >
+            {t('quotaLink')}
+          </Link>
+        </p>
+      )}
       {failed && (
         <p role="alert" className="mt-2 text-sm text-destructive-ink">
           {t('failed')}
