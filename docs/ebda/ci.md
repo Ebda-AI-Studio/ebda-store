@@ -27,8 +27,7 @@ Measured: ~11 approved PRs queued behind two heavy Mac runners. Changes (all in 
   `Unit Tests (affected)` unchanged.
 - **Lint and Type Check run on the light runner** (`EBDA_LIGHT_RUNS_ON`, GitHub Linux): no workerd or macOS need.
 - **`API Worker boots on workerd` (merge-gate REQUIRED) is a fast pass only when it provably cannot matter.** The job keeps no `if`
-  (derived required list unchanged). Its first step runs `scripts/ci/api-smoke-scope.mjs` (node builtins only, base commit fetched at
-  depth 1): the boot is SKIPPED only when EVERY changed file is on a short allowlist (docs/**, \*.md, apps/{web,admin,marketing,help,
+  (derived required list unchanged). Its first step runs `scripts/ci/api-smoke-scope.mjs` (node builtins only; checkout depth 2 = the merge commit's two parents): the boot is SKIPPED only when EVERY changed file is on a short allowlist (docs/**, \*.md, apps/{web,admin,marketing,help,
   docs,orders}/**, tests outside integration/workers). Anything else (package.json, lockfile, tsconfig, packages/**, wrangler, prisma,
   scripts/**, .github/\*\*, apps/api, an unknown path, an empty or unreadable diff) RUNS it. Every later step is gated on
   `steps.scope.outputs.run`. Pinned by `tests/unit/ci-api-smoke-scope.test.ts` (both directions, gating, no-node_modules imports).

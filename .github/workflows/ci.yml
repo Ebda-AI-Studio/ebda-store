@@ -688,7 +688,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 1 # the scope step fetches only the base commit and diffs the two trees
+          fetch-depth: 2 # PR checkout is a merge commit: depth 2 holds both parents, enough to diff base..HEAD (no deep history)
       - name: Private TMPDIR per runner
         # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
         # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
@@ -717,10 +717,13 @@ jobs:
           if [ "$EVENT" != "pull_request" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"; echo "full lane: running the whole workerd smoke"; exit 0
           fi
-          if git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null; then
-            node scripts/ci/api-smoke-scope.mjs --base "$BASE_SHA" >> "$GITHUB_OUTPUT"
+          base=""
+          if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then base="$BASE_SHA"
+          elif git rev-parse -q --verify HEAD^1 >/dev/null; then base="HEAD^1"; fi
+          if [ -n "$base" ]; then
+            node scripts/ci/api-smoke-scope.mjs --base "$base" >> "$GITHUB_OUTPUT"
           else
-            echo "run=true" >> "$GITHUB_OUTPUT"; echo "base fetch failed: running to be safe"
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "no base commit in the checkout: running to be safe"
           fi
           grep -q '^run=false' "$GITHUB_OUTPUT" \
             && echo "::notice::API Worker boots on workerd: SKIPPED (every changed file is docs/other-app/test); the full workerd suite runs on main and nightly." || true
