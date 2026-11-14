@@ -36,6 +36,7 @@ import logger from '../../lib/logger';
 import { sendAlert } from '../alerts.service';
 import { getDuplicateIndex } from '../../lib/instapay-dedupe';
 import { platformDb } from '../../lib/platform-db';
+import { cfBindings } from '../../cf/bindings';
 import { platformFamilyOnD1 } from '../platform/cutover';
 import { autoReadOf } from '../payment-providers/instapay-receipt.service';
 import { instapayHandle } from './manual-config';
@@ -479,6 +480,49 @@ export async function listAutoConfirmationsForAdmin(state?: string, take = 100) 
   });
 }
 
+type D1Run = {
+  prepare(sql: string): {
+    bind(...v: unknown[]): { run(): Promise<{ meta?: { changes?: number } }> };
+  };
+};
+
+/**
+ * The ONE atomic compare-and-set of the revert: `auto_confirmed` -> `reverted`. On D1 the router's `updateMany` is a SELECT of primary keys
+ * followed by an UPDATE by key (no state guard in the statement), so two simultaneous taps would both "win"; the production path is therefore
+ * ONE guarded statement whose `changes` says who won. Without a platform D1 (Postgres tests / local) `updateMany` with the same `where` is atomic.
+ */
+async function claimRevert(
+  storeId: string,
+  id: string,
+  actor: string,
+  reason: string,
+  now: number,
+  graceUntil: number
+): Promise<{ count: number }> {
+  const d1 = (cfBindings() as { PLATFORM_DB?: D1Run } | undefined)?.PLATFORM_DB;
+  if (d1 && (await platformFamilyOnD1('payments'))) {
+    const r = await d1
+      .prepare(
+        "UPDATE instapay_auto_confirmations SET state = 'reverted', reverted_at = ?, reverted_by = ?, revert_reason = ?, grace_until = ?, updated_at = ? WHERE id = ? AND store_id = ? AND state = 'auto_confirmed'"
+      )
+      .bind(now, actor.slice(0, 120), reason.slice(0, 300), graceUntil, now, id, storeId)
+      .run();
+    return { count: Number(r.meta?.changes ?? 0) };
+  }
+  return withStore(storeId, () =>
+    prisma.instapayAutoConfirmation.updateMany({
+      where: { id, storeId, state: 'auto_confirmed' },
+      data: {
+        state: 'reverted',
+        revertedAt: new Date(now),
+        revertedBy: actor.slice(0, 120),
+        revertReason: reason.slice(0, 300),
+        graceUntil: new Date(graceUntil),
+      },
+    })
+  );
+}
+
 /**
  * "Not received": the money did not arrive. Only an `auto_confirmed` row reverts (a human-confirmed payment is Ahmad's own decision).
  * Effects: the existing void path (keeps the reference, forces `past_due` + a 48 h grace when this payment owns the current period, revokes the
@@ -521,18 +565,7 @@ export async function revertAutoConfirmed(args: {
 
   const graceUntil = revertGraceUntil(now);
   // Claim the transition FIRST (compare-and-set on state): of two concurrent taps exactly one proceeds to the money step.
-  const won = await withStore(storeId, () =>
-    prisma.instapayAutoConfirmation.updateMany({
-      where: { id: row.id, storeId, state: 'auto_confirmed' },
-      data: {
-        state: 'reverted',
-        revertedAt: new Date(now),
-        revertedBy: args.actor.slice(0, 120),
-        revertReason: reason.slice(0, 300),
-        graceUntil: new Date(graceUntil),
-      },
-    })
-  );
+  const won = await claimRevert(storeId, row.id, args.actor, reason, now, graceUntil);
   if (won.count === 0) {
     const again = await withStore(storeId, () =>
       prisma.instapayAutoConfirmation.findFirst({ where: { id: row.id, storeId } })
@@ -723,4 +756,35 @@ export async function sweepStuckAutoConfirmations(now: number = Date.now()): Pro
     if ((await enqueueAutoConfirm(c.storeId, c.id)) === 'queued') sent++;
   }
   return sent;
+}
+
+/**
+ * A human REJECTED the claim of a payment that waited (or failed): free the dedupe entries it held so a corrected receipt of the same
+ * transfer is not blocked forever. Never touches an auto-confirmed or reverted payment (those stay held / burned).
+ */
+export async function releaseDedupeAfterReject(storeId: string, claimId: string): Promise<void> {
+  const index = getDuplicateIndex();
+  if (!index) return;
+  const row = await withStore(storeId, () =>
+    prisma.instapayAutoConfirmation.findFirst({ where: { storeId, claimId } })
+  );
+  if (!row || row.state === 'auto_confirmed' || row.state === 'reverted') return;
+  const receipt = await withStore(storeId, () =>
+    prisma.instapayReceipt.findFirst({ where: { id: row.receiptId, storeId } })
+  );
+  const refKey = receipt
+    ? normalizeReferenceKey(autoReadOf(receipt.extracted)?.read?.extract?.reference ?? '')
+    : null;
+  if (!receipt || !refKey) return;
+  await index
+    .release({
+      referenceKey: refKey,
+      imageSha256: receipt.sha256,
+      product: 'store',
+      ownerId: storeId,
+      paymentId: receipt.id,
+    })
+    .catch(err =>
+      logger.error({ err, storeId }, '[instapay-auto] dedupe release after reject failed')
+    );
 }

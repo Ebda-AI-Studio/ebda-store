@@ -5,6 +5,7 @@ import { inngest } from '../client';
 import { sweepStoresDb } from '../../jobs/store-db';
 import { stepRunUnlessEmpty } from '../empty-exit';
 import { InstapayService } from '../../../services/payment-providers/instapay.service';
+import { sweepStuckAutoConfirmations } from '../../../services/billing/instapay-auto-confirm.service';
 
 /**
  * InstaPay hold expiry (SP6a, Review Focus 3) — hourly (Ruling INNGEST-BUDGET-1).
@@ -73,7 +74,13 @@ export const instapayExpiry: JobDef = inngest.createFunction(
       else if (outcome === 'failed') failed += 1;
       else skipped += 1;
     }
-    logger.info({ scanned: due.length, expired, skipped, failed }, 'instapay-expiry completed');
-    return { scanned: due.length, expired, skipped, failed };
+    // INSTAPAY-AUTO-1 (S5): re-send the decision event for a subscription claim still undecided 10 minutes after it was filed. Rides this hourly
+    // cron (no new schedule); a no-op while the global mode is off.
+    const autoSwept = await step.run('auto-confirm-sweep', () => sweepStuckAutoConfirmations());
+    logger.info(
+      { scanned: due.length, expired, skipped, failed, autoSwept },
+      'instapay-expiry completed'
+    );
+    return { scanned: due.length, expired, skipped, failed, autoSwept };
   }
 );

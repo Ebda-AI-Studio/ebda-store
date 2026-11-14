@@ -1462,8 +1462,13 @@ async function recordManualRefundInner(input: ManualRefundInput) {
 }
 
 // The D1 reference claims these free (Ruling INSTAPAY-DO-1) are released only after the transaction commits.
-export const rejectClaim = (args: Parameters<typeof rejectClaimInner>[0]) =>
-  withClaimReleases(() => rejectClaimInner(args));
+export const rejectClaim = async (args: Parameters<typeof rejectClaimInner>[0]) => {
+  const out = await withClaimReleases(() => rejectClaimInner(args));
+  // INSTAPAY-AUTO-1: a rejected claim frees the global dedupe entries its waiting decision held (never an auto-confirmed one).
+  const { releaseDedupeAfterReject } = await import('./instapay-auto-confirm.service.js');
+  await releaseDedupeAfterReject(args.storeId, args.claimId).catch(() => undefined);
+  return out;
+};
 export const recordManualRefund = (input: Parameters<typeof recordManualRefundInner>[0]) =>
   withClaimReleases(() => recordManualRefundInner(input));
 export const submitSubscriptionReceipt = async (
