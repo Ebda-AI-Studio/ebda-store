@@ -4,6 +4,7 @@ import type { Prisma, PurchaseOrder, PurchaseOrderItem } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { getSystemAccountIdByCode } from './account.service';
 import { inngest } from '../../lib/inngest/client';
+import { postPoReceiveJournal } from './posting/po-receive-posting';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
 import { effectiveInventory } from '../../lib/effective-inventory';
@@ -179,6 +180,24 @@ export interface ReceiveInput {
 }
 
 /**
+ * ACCT-AUDIT-5: the `stock/po-received` trigger could not be enqueued. Post the receive journal inline instead (idempotent per
+ * receive pass, so a later retry or the nightly sweep posts nothing twice); a failure here is logged and left to the sweep.
+ */
+async function postReceiveInline(
+  storeId: string,
+  poId: string,
+  clearedBackorders: Array<Record<string, unknown>>,
+  enqueueErr: unknown
+): Promise<void> {
+  logger.error({ err: enqueueErr, poId }, 'Failed to enqueue stock/po-received');
+  try {
+    await postPoReceiveJournal({ storeId, poId, clearedBackorders: clearedBackorders as never });
+  } catch (err) {
+    logger.error({ err, poId }, 'stock/po-received: inline journal post failed');
+  }
+}
+
+/**
  * Receive purchase order. Implements spec Part 2.3:
  *   1. For each PO item line received:
  *      a. FIFO-clear oldest open BackorderLines for this productId+variantId
@@ -226,7 +245,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         data: { storeId: input.storeId, poId: input.poId, clearedBackorders: r.clearedBackorders },
       })
       .catch((err: unknown) =>
-        logger.error({ err, poId: input.poId }, 'Failed to enqueue stock/po-received')
+        postReceiveInline(input.storeId, input.poId, r.clearedBackorders, err)
       );
     const po = await (
       await storeDb(input.storeId)
@@ -526,9 +545,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         clearedBackorders,
       },
     })
-    .catch((err: unknown) =>
-      logger.error({ err, poId: input.poId }, 'Failed to enqueue stock/po-received')
-    );
+    .catch((err: unknown) => postReceiveInline(input.storeId, input.poId, clearedBackorders, err));
 
   return { po, clearedBackorders };
 }

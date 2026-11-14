@@ -248,3 +248,45 @@ export function journalPoReceiveOp(
     return { posted: entries > 0, entries };
   });
 }
+
+/**
+ * ACCT-AUDIT-5: the safety net for a lost posting trigger (a swallowed `inngest.send`, a feature switched off then on). Finds
+ * the POSTED expenses and stock adjustments with no journal entry and every PO that has received lines, and runs the same
+ * idempotent journal ops over them, so a replay (or a second night) posts nothing. `includeExpenses: false` keeps expenses
+ * out for a store whose `accounting.expenses` feature is off. Bounded per run.
+ */
+export function journalRepostMissingOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+): { expenses: number; stockAdjustments: number; purchaseOrders: number } {
+  const LIMIT = 200;
+  const out = { expenses: 0, stockAdjustments: 0, purchaseOrders: 0 };
+  if (a.includeExpenses !== false) {
+    const rows = db.all(
+      `SELECT x.id FROM expenses x WHERE x.store_id = ? AND x.status = 'posted' AND x.total <> 0
+         AND NOT EXISTS (SELECT 1 FROM journal_entries e WHERE e.store_id = x.store_id AND e.source = 'expense' AND e.source_id = x.id)
+       ORDER BY x.expense_date LIMIT ${LIMIT}`,
+      [storeId]
+    );
+    for (const r of rows)
+      if (journalExpenseOp(db, storeId, { expenseId: r.id }).posted) out.expenses++;
+  }
+  const adj = db.all(
+    `SELECT s.id FROM stock_adjustments s WHERE s.store_id = ? AND s.status = 'posted' AND s.total_value_impact <> 0
+       AND NOT EXISTS (SELECT 1 FROM journal_entries e WHERE e.store_id = s.store_id AND e.source = 'stock_adjustment' AND e.source_id = s.id)
+     LIMIT ${LIMIT}`,
+    [storeId]
+  );
+  for (const r of adj)
+    if (journalStockAdjustmentOp(db, storeId, { adjustmentId: r.id }).posted)
+      out.stockAdjustments++;
+  const pos = db.all(
+    `SELECT p.id FROM purchase_orders p WHERE p.store_id = ?
+       AND EXISTS (SELECT 1 FROM purchase_order_items i WHERE i.po_id = p.id AND i.qty_received > 0) LIMIT ${LIMIT * 5}`,
+    [storeId]
+  );
+  for (const r of pos)
+    if (journalPoReceiveOp(db, storeId, { poId: r.id }).posted) out.purchaseOrders++;
+  return out;
+}

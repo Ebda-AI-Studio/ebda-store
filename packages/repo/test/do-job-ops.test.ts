@@ -370,6 +370,65 @@ describe('expense / stock-adjustment / PO-receive journals (Ruling CF-JOBS-4)', 
     });
   });
 
+  describe('the nightly sweep re-posts journals whose trigger was lost (ACCT-AUDIT-5)', () => {
+    const entries = (r: ReturnType<typeof rig>) =>
+      Number(r.q('SELECT count(*) n FROM journal_entries')[0].n);
+    const seed = (r: ReturnType<typeof rig>) =>
+      r.raw.exec(
+        `INSERT INTO expenses (id, store_id, expense_number, expense_account_id, paid_from_account_id, amount, total, expense_date, status) VALUES ('e1', 's1', 'EXP-1', 'a5200', 'a1000', 500, 500, 1, 'posted'), ('e2', 's1', 'EXP-2', 'a5200', 'a1000', 700, 700, 1, 'draft');
+       INSERT INTO stock_adjustments (id, store_id, adjustment_number, type, status, total_value_impact) VALUES ('s1', 's1', 'ADJ-1', 'damage', 'posted', -300);
+       INSERT INTO suppliers (id, store_id, name) VALUES ('sup', 's1', 'Acme');
+       INSERT INTO purchase_orders (id, store_id, supplier_id, po_number, status) VALUES ('po1', 's1', 'sup', 'PO-1', 'partial');
+       INSERT INTO purchase_order_items (id, po_id, product_id, qty, qty_received, unit_cost, total) VALUES ('i1', 'po1', 'sku', 10, 4, 100, 1000);`
+      );
+
+    it('posts the posted expense, adjustment and PO receipt that have no entry; skips the draft; a second run posts nothing', () => {
+      const r = books();
+      seed(r);
+      expect(r.op('journalRepostMissing', {})).toEqual({
+        expenses: 1,
+        stockAdjustments: 1,
+        purchaseOrders: 1,
+      });
+      expect(entries(r)).toBe(3);
+      expect(r.op('journalRepostMissing', {})).toEqual({
+        expenses: 0,
+        stockAdjustments: 0,
+        purchaseOrders: 0,
+      });
+      expect(entries(r)).toBe(3);
+      expect(tb(r).debit).toBe(tb(r).credit);
+    });
+
+    it('a feature-off store keeps its expenses out of the sweep (includeExpenses false) but still heals the rest', () => {
+      const r = books();
+      seed(r);
+      expect(r.op('journalRepostMissing', { includeExpenses: false })).toEqual({
+        expenses: 0,
+        stockAdjustments: 1,
+        purchaseOrders: 1,
+      });
+      expect(
+        Number(r.q("SELECT count(*) n FROM journal_entries WHERE source = 'expense'")[0].n)
+      ).toBe(0);
+    });
+
+    it('a partially received PO whose second receipt was never journalled is topped up', () => {
+      const r = books();
+      seed(r);
+      r.op('journalPoReceive', { poId: 'po1' });
+      r.raw.exec(`UPDATE purchase_order_items SET qty_received = 10 WHERE id = 'i1'`);
+      expect(r.op('journalRepostMissing', {}).purchaseOrders).toBe(1);
+      expect(
+        Number(
+          r.q(
+            `SELECT COALESCE(SUM(l.debit),0) t FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '1200' AND l.ref_table = 'purchase_orders'`
+          )[0].t
+        )
+      ).toBe(1000);
+    });
+  });
+
   describe('partial PO receipts (ACCT-AUDIT-1)', () => {
     const seed = (r: ReturnType<typeof rig>) =>
       r.raw.exec(

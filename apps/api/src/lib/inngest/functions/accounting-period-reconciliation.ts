@@ -5,6 +5,7 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { storeMoney, storeDb } from '../../repo-factory';
+import { featureService } from '../../../services/feature.service';
 
 import { REGION } from '@ebda/shared';
 /**
@@ -12,6 +13,8 @@ import { REGION } from '@ebda/shared';
  * MUST equal SUM(JournalLine.credit where account.code IN ('4000','4010','2100')
  * AND postedAt in same window) per store. If they diverge, the GL has missed
  * a post — fire P0 alert.
+ *
+ * Before the check it re-posts posted expenses / adjustments / PO receipts that lack a journal entry (ACCT-AUDIT-5).
  *
  * Runs at 01:30 Cairo (`TZ=` cron), after daily-close.
  */
@@ -39,7 +42,29 @@ export const accountingPeriodReconciliation: JobDef = inngest.createFunction(
     );
 
     let drifts = 0;
+    let reposted = 0;
     for (const store of stores) {
+      // ACCT-AUDIT-5: the sales cross-check below cannot see a missing expense / adjustment / PO journal, so first heal them:
+      // re-post every posted source row that has no entry (idempotent, so a run with nothing missing posts nothing). The
+      // expense journals follow the `accounting.expenses` switch, so turning it back on back-fills what was skipped.
+      const healed = await step.run(`repost-${store.id}`, async () => {
+        const money = await storeMoney(store.id);
+        if (!money) return 0; // a Postgres store posts through its own job path; this sweep is for the DO ledger
+        const includeExpenses = await featureService.isFeatureEnabled(
+          store.id,
+          'accounting.expenses'
+        );
+        const r = await money.journalRepostMissing({ includeExpenses });
+        return r.expenses + r.stockAdjustments + r.purchaseOrders;
+      });
+      if (healed > 0) {
+        reposted += healed;
+        logger.warn(
+          { storeId: store.id, healed },
+          'accounting-period-reconciliation: re-posted journals whose trigger was lost'
+        );
+      }
+
       // PORTED (Ruling CF-JOBS-4): the operational total and the GL credits both follow the store's backend.
       const ops = await step.run(`ops-${store.id}`, async () => {
         const where = {
@@ -90,7 +115,10 @@ export const accountingPeriodReconciliation: JobDef = inngest.createFunction(
       }
     }
 
-    logger.info({ stores: stores.length, drifts }, 'accounting-period-reconciliation completed');
-    return { stores: stores.length, drifts };
+    logger.info(
+      { stores: stores.length, drifts, reposted },
+      'accounting-period-reconciliation completed'
+    );
+    return { stores: stores.length, drifts, reposted };
   }
 );

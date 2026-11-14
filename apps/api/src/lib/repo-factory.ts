@@ -1094,6 +1094,10 @@ export interface MoneyClient {
     poId: string;
     clearedBackorders: Array<Record<string, unknown>>;
   }): Promise<{ posted: boolean; skipped?: string; entries: number }>;
+  /** Re-post journals whose trigger was lost (ACCT-AUDIT-5); idempotent, bounded per run. */
+  journalRepostMissing(a: {
+    includeExpenses?: boolean;
+  }): Promise<{ expenses: number; stockAdjustments: number; purchaseOrders: number }>;
   /**
    * Finance admin (Ruling NZ-FEAT-1): a manual adjusting entry (balanced, active store accounts, one section), the ledger side of a
    * bank reconciliation difference, and the on-hand / disabled-variant stock value of the finance dashboard.
@@ -1625,6 +1629,7 @@ export function makeMoneyClient(
     journalExpense: a => call('journalExpense', a),
     journalStockAdjustment: a => call('journalStockAdjustment', a),
     journalPoReceive: a => call('journalPoReceive', a),
+    journalRepostMissing: a => call('journalRepostMissing', a),
     journalManual: (a, key) => call('journalManual', a, key),
     backorderCancel: (a, key) => call('backorderCancel', a, key),
     bankLedgerSide: a => call('bankLedgerSide', a),
