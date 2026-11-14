@@ -180,6 +180,8 @@ describe('light jobs route to the light runners, heavy jobs never do (Ruling HOS
         'ci.yml:app-builds',
         'ci.yml:changes',
         'ci.yml:guards',
+        'ci.yml:lint',
+        'ci.yml:typecheck',
         'ci.yml:unit-gate',
         'deploy-change-label.yml:deploy-label',
         'gitleaks.yml:notify-failure',
