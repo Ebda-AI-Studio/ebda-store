@@ -20,7 +20,7 @@
     "class": "unclassified",
     "note": "toggle yes; delete = confirm no"
   },
-  "helpArticle": null,
+  "helpArticle": "coupons",
   "questions": {
     "ar": ["اعمل كوبون خصم 10%", "كوبون العيد", "كوبون للعميل ده بس", "وقف الكوبون"],
     "en": ["Create a 10% coupon", "Disable a coupon"]

@@ -21,7 +21,7 @@
     "class": "reversible",
     "note": "yes (delete = confirm)"
   },
-  "helpArticle": null,
+  "helpArticle": "store-branches",
   "questions": {
     "ar": ["ازاي اضيف فرع؟", "عنوان الفرع على الخريطة"],
     "en": ["Add a branch"]

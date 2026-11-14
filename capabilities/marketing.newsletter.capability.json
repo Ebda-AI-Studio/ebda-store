@@ -20,7 +20,7 @@
     "class": "unclassified",
     "note": "broadcast no"
   },
-  "helpArticle": null,
+  "helpArticle": "newsletter",
   "questions": {
     "ar": ["مين اشترك في النشرة؟", "نزل المشتركين"],
     "en": ["Export newsletter subscribers"]

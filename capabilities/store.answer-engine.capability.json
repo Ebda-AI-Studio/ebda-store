@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes (fill-only; reset-field)"
   },
-  "helpArticle": null,
+  "helpArticle": "answer-engine-insights",
   "questions": {
     "ar": ["ازاي المتجر يظهر في ChatGPT؟", "ايه هو AEO؟", "هل ChatGPT بيذكر متجري؟"],
     "en": ["How do I show up in ChatGPT answers?"]

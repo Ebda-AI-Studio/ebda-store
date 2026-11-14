@@ -20,7 +20,7 @@
     "class": "unclassified",
     "note": "award: reversal via adjust (clawback #691 open)"
   },
-  "helpArticle": null,
+  "helpArticle": "loyalty-points",
   "questions": {
     "ar": ["ازاي اعمل نقاط ولاء؟", "اديله نقاط", "النقاط بتنتهي امتى؟"],
     "en": ["Set up loyalty points"]

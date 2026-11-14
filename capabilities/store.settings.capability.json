@@ -22,7 +22,7 @@
     "class": "reversible",
     "note": "yes (edit back)"
   },
-  "helpArticle": null,
+  "helpArticle": "store-details-contact-social",
   "questions": {
     "ar": ["ازاي اغير رقم التليفون في المتجر؟", "اضيف لينك الانستجرام", "غير اسم المتجر"],
     "en": ["How do I change my store contact details?", "Add my Instagram link"]

@@ -21,7 +21,7 @@
     "class": "irreversible",
     "note": "no"
   },
-  "helpArticle": null,
+  "helpArticle": "web-push-notifications",
   "questions": {
     "ar": ["ابعت اشعار لكل عملائي", "عرض فلاش"],
     "en": ["Send a push to all customers"]

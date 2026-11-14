@@ -1,0 +1,51 @@
+---
+title: Let AI assistants read your products and order from you
+description: The product feed and llms.txt that AI assistants read, and the agent key that lets one add to a cart and place an order.
+section: Selling
+order: 39
+appPath: /stores
+keywords: ai agent key agent key llms.txt product feed chatgpt shopping x-agent-key
+capabilities:
+  - store.agent-feed@1
+---
+
+AI assistants and shopping agents read your store from public files that are built for you. With a key you issue, an agent can also add to a cart and place an order. These pages are for the store owner only.
+
+## The public files
+
+On your store's address there are files anyone can read without a key:
+
+- `/feeds/products.json`: your product feed for agents.
+- `/llms.txt`: a summary of your store, categories and product links, read by AI.
+- `/.well-known/acp.json`.
+
+The product feed is available on every paid plan, and if the feature is not on for your store its address answers "not found".
+
+To refresh `llms.txt`: from **Marketing and offers** open **AI Tools**, and in the **GEO — Generative Engine Optimization** section press **Generate** on the **Generate LLMs.txt** card. If a file already exists, turn on **Replace existing** so it is overwritten. The generated file is served as it is instead of the automatic one, and it uses your AI allowance.
+
+## The agent key
+
+Without a key an agent can only **read**: search products, see product details, store details, the cart and order status. Your key is what lets it **add to a cart and place an order**. Cash on delivery completes automatically, while online payment returns a payment link.
+
+1. Open **Settings**, open the **For developers** group, then **AI agent key**.
+2. Press **Issue key**.
+3. **Copy the key right away** from the **Copy your key now** window with **Copy key**, then **I have stored it**. The key is shown **once** and nobody can read it back, including us.
+4. Store it where your agent keeps its secrets, and have it send it on every write request in the `x-agent-key` header. Never put it in a public page or a chat.
+
+For more about shopping agents see [Let AI shopping agents buy from your store](/en/ai-shopping-agents/).
+
+## Rotate or revoke the key
+
+- **Rotate key** issues a new key and stops the old one **immediately**, with no overlap.
+- **Revoke key** removes it completely, and you have to issue and hand over a new one. You must tick the acknowledgement before the button works.
+- If the key is lost, rotate it.
+
+The page shows **Key status**, **Request header** and **Last issued or changed**.
+
+## Common questions
+
+**How can ChatGPT buy from my store?** The agent must have your key and send it in `x-agent-key`.
+
+**The page says "Open writes are ON".** A platform administrator switched off the key requirement for your store, so any agent can order without a key. Ask support to switch it off once your agent uses its key.
+
+**The page is locked.** The feature needs a paid plan, and the page names the plan required (see [Plans and billing](/en/plans-and-billing/)).

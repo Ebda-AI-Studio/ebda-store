@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "home-page-sections",
   "questions": {
     "ar": ["اضيف اراء العملاء في الصفحة"],
     "en": ["Add testimonials"]

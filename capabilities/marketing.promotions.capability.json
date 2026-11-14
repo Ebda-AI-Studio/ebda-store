@@ -16,7 +16,7 @@
     "class": "unclassified",
     "note": "toggle yes (discounts all customers: money)"
   },
-  "helpArticle": null,
+  "helpArticle": "promotions",
   "questions": {
     "ar": ["اعمل عرض 2 بسعر 1", "خصم 20% على كل العبايات", "عرض رمضان", "اوقف العرض"],
     "en": ["Add 10% off all abayas for Eid"]

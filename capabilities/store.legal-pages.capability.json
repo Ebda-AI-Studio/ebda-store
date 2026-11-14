@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes (page revisions)"
   },
-  "helpArticle": null,
+  "helpArticle": "store-pages-and-policies",
   "questions": {
     "ar": ["ازاي اكتب سياسة الاسترجاع؟", "عدل صفحة الشروط"],
     "en": ["Edit my privacy policy"]

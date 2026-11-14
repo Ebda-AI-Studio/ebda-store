@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "marketing-pixels",
   "questions": {
     "ar": ["ازاي احط بكسل فيسبوك؟", "Meta pixel مش بيسجل", "تيك توك pixel", "CAPI يعني ايه"],
     "en": ["How do I add my Meta pixel?"]

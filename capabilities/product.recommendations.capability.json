@@ -22,7 +22,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "product-recommendations",
   "questions": {
     "ar": ["ازاي اظهر منتجات مقترحة؟", "اللي اشتروا ده اشتروا ده"],
     "en": ["Show related products"]

@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "store-fonts",
   "questions": {
     "ar": ["ازاي اغير الخط؟", "ارفع خط خاص"],
     "en": ["Change my store font"]

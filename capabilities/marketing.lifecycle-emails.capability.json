@@ -16,7 +16,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "setup-emails",
   "questions": {
     "ar": ["ايه الرسايل اللي بتتبعت للعميل؟"],
     "en": ["What automatic emails are sent?"]

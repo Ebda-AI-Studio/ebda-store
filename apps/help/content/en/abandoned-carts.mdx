@@ -1,0 +1,50 @@
+---
+title: Abandoned cart recovery
+description: Send reminders to shoppers who left their cart before paying, and see how many came back and ordered.
+section: Selling
+order: 32
+appPath: /stores
+keywords: abandoned cart reminder recovery email opt-in auto coupon percentage
+capabilities:
+  - marketing.abandoned-carts@1
+---
+
+An abandoned cart is a cart where a shopper added items and left without starting to pay. Ebda Store finds these by itself and sends the shopper reminders so they come back and finish. The store owner sets it up and reads the results.
+
+## Where to find it
+
+From **Marketing and offers** open the **Abandoned Carts** tab. The page is called **Abandoned Cart Recovery**, and it has three parts: the numbers, **Recovery Settings**, and the list of carts.
+
+## When a cart counts as abandoned
+
+A cart counts as abandoned when it sits with no activity for more than an hour and we can reach its owner: a shopper with an account that has an email or a phone number, or a guest who ticked "email me about my cart" at checkout. A shopper who started checkout but did not pay has a **Pending** order, not an abandoned cart, and you find it under Orders.
+
+## Set up recovery
+
+In **Recovery Settings**:
+
+1. Under **Step 1 — First Reminder**, **Step 2 — Follow-up Reminder** and **Step 3 — Final Reminder**: switch each step on or off, and set **Send after** how many **min**. Step reminders go out on the notification channels enabled for your store, and only to shoppers who have an account. A cart from a guest without an account is served by email only.
+2. In Step 3 you can turn on an **Auto-coupon**: set the **Discount** (a percentage), the **Max Discount** (or **No limit**) and the **Expiry** in hours. These fields show only when Step 3 and the auto-coupon are both on.
+3. Under **Reminder email** tick **Send a reminder email**, and set **Send after** how many minutes of inactivity. The allowed range is 60 to 1440 minutes and the default is 120.
+4. Select **Save Settings**. You will see **Saved**.
+
+## The reminder email
+
+- Only **one** email per cart, sent in your store's name.
+- It goes only to shoppers who subscribed to your **newsletter**. Anyone who unsubscribed never gets an email. See [Newsletter](/en/newsletter/).
+- It is off until you turn it on yourself. If the **Get abandoned carts back by email** card shows, select **Review settings**.
+- The email status for each cart shows in the **Email** column: **Not sent**, **Queued**, **Sent**, **Skipped**, **Failed**.
+
+## The numbers and the list
+
+The numbers on top are **Total Abandoned**, **Ordered later**, **Ordered-later rate** and **Revenue from later orders**. The list shows **Customer**, **Total**, **Items**, **Status**, **Date** and **Email**. A cart's status is one of **Pending**, **Step 1 Sent** (then 2 and 3), **Ordered later** or **Expired**. You can filter by status.
+
+## Plan and who can use it
+
+The page works when the abandoned cart feature is available for your store. If it is not, you see **Abandoned Cart Recovery not enabled** or a lock card naming the plan you need. See [Plans and billing](/en/plans-and-billing/) for cart recovery on each plan, and if the page is locked and you believe your plan includes the feature, contact support.
+
+## If something is not working
+
+- **No carts in the list:** no shopper has left a cart that meets the conditions yet, or the cart is under an hour old.
+- **No email was sent:** check that **Send a reminder email** is on, that the shopper is a newsletter subscriber, and that the status is not **Skipped**.
+- **Saving failed:** you see **Failed to save settings**. Check the delay is within the allowed range and try again.

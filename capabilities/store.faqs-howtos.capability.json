@@ -22,7 +22,7 @@
     "class": "unclassified",
     "note": "delete = confirm no"
   },
-  "helpArticle": null,
+  "helpArticle": "faqs-and-how-to-guides",
   "questions": {
     "ar": ["ازاي اضيف اسئلة شائعة؟", "اكتب FAQ للمنتجات بالذكاء"],
     "en": ["Add FAQs to my store"]

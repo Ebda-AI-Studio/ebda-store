@@ -20,7 +20,7 @@
     "class": "unclassified",
     "note": "revoke yes (re-approve)"
   },
-  "helpArticle": null,
+  "helpArticle": "wholesale-pricing",
   "questions": {
     "ar": ["ازاي ابيع جملة؟", "اقبل طلب تاجر جملة"],
     "en": ["How do I sell wholesale?"]

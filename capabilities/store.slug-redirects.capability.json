@@ -16,7 +16,7 @@
     "class": "irreversible",
     "note": "no (recreate by renaming slug back)"
   },
-  "helpArticle": null,
+  "helpArticle": "old-link-redirects",
   "questions": {
     "ar": ["غيرت رابط منتج ولينك قديم بيدي 404", "امسح تحويل قديم"],
     "en": ["Old product link gives a 404"]

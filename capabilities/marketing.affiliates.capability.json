@@ -24,7 +24,7 @@
     "class": "unclassified",
     "note": "payout no"
   },
-  "helpArticle": null,
+  "helpArticle": "affiliates",
   "questions": {
     "ar": ["ازاي اعمل نظام عمولة للمسوقين؟", "ادفع عمولة لمسوق"],
     "en": ["Pay an affiliate"]

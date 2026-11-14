@@ -1,0 +1,64 @@
+---
+title: Discount coupons
+description: Create a code shoppers type at checkout, choose who can use it and how many times, and pause or delete it at any time.
+section: Selling
+order: 30
+appPath: /stores
+keywords: coupon code discount percentage fixed amount free shipping usage limit expiry promotion
+capabilities:
+  - marketing.coupons@1
+---
+
+A coupon is a code a shopper types at checkout to get a percentage off, a fixed amount off, or free shipping. Coupons are available on every paid Ebda Store plan, and the store owner creates and edits them.
+
+## Create a coupon
+
+1. In the sidebar open **Marketing and offers**. The first tab is **Coupons**.
+2. Select **Create Coupon**. The **Create Coupon** window opens.
+3. Enter the **Coupon Code** (for example `SUMMER20`) and the **Name**. The code is saved in capital letters automatically and can be up to 50 characters. You can also add the **Name (Arabic)** and a **Description**.
+4. Pick the **Discount Type**:
+   - **Percentage Off**: enter the **Percentage (%)** as a whole number from 1 to 100.
+   - **Fixed Amount**: enter the **Amount (EGP)**, which must be more than zero.
+   - **Free Shipping**: there is no value to enter, the code removes the shipping fee.
+5. Optional: **Minimum Order (EGP)**, **Max Discount (EGP)** (shown with percentage coupons only), **Total Usage Limit** and **Limit Per Customer**.
+6. Optional: **Start Date** and **Expiry Date**. If you leave them empty the coupon works from the moment you turn it on, with no end.
+7. Keep **Coupon is active** ticked if you want it live straight away, then select **Create Coupon**.
+
+If the code already exists in your store, saving is refused, so choose another code. If the value is missing or wrong (zero, or a percentage above 100) the page tells you before sending anything.
+
+## Target certain customers or products
+
+Under **Targeting** you can set:
+
+- **Customer group**: the coupon works for the members of one group instead of **All customers**. Groups are made in [Customer groups](/en/customer-groups/), and the customer must be signed in to their account to get a group discount. A guest checking out without an account does not get it.
+- **Minimum quantity**: the number of items in the order.
+- **First order only**: the customer gets the coupon on their first order only.
+- **Specific products** or **Specific categories**: the discount is worked out on those items only. Search by name to pick them, and take them off with **Remove**.
+
+## Manage your coupons
+
+The page lists the code, name, type, value, usage and status. You can search by code and filter by status (**Active** or **Inactive**). A coupon shows one of: **Active**, **Inactive**, **Scheduled** (not started yet), **Expired**, **Exhausted** (it reached its usage limit).
+
+From the coupon options menu:
+
+- **Edit** opens the same window, and you save with **Update Coupon**.
+- **Deactivate** or **Activate** turns the code off or on without deleting anything.
+- **Delete**: customers can no longer use it and you cannot bring it back. If you only want to pause it, use **Deactivate**.
+
+## Coupons and promotions together
+
+If an [automatic promotion](/en/promotions/) also applies to the same order, Ebda Store takes the **single larger discount** of the coupon and the promotion, not both. The exception is a **Free Shipping** coupon: it works on the shipping line next to any promotion. If the promotion wins, the coupon is not counted as used and does not use up its usage limit.
+
+## If the page is locked or saving fails
+
+- If your plan does not include the feature, the page shows a locked card with the plan you need and an upgrade button. Any request from outside gets a **403** with the code `FEATURE_DISABLED` and the plan that unlocks it. See [Plans and billing](/en/plans-and-billing/).
+- If the store is suspended for billing, the page is read-only and saving fails. Open Billing and pay.
+- If you see **We could not save the coupon. Try again.**, check that the code is not a duplicate and the values are valid, then try again.
+
+## Common questions
+
+**I want a coupon for one customer only.** Put the customer in a customer group and make the coupon for that group under **Targeting**.
+
+**I want an Eid coupon for a set period.** Set a **Start Date** and an **Expiry Date**. The coupon shows **Scheduled** until it starts and **Expired** once it ends.
+
+**The coupon did not work for a customer.** Check its status (it must be **Active**), the minimum order, its dates, its usage limit, and that the customer is not outside the group you chose.

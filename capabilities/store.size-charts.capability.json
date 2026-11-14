@@ -19,7 +19,7 @@
     "class": "unclassified",
     "note": "delete = confirm"
   },
-  "helpArticle": null,
+  "helpArticle": "size-charts",
   "questions": {
     "ar": ["ازاي اعمل جدول مقاسات؟"],
     "en": ["Add a size chart"]

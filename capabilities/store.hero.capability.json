@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "home-hero-banner",
   "questions": {
     "ar": ["ازاي اغير صورة البانر؟", "ضيف سلايد"],
     "en": ["Change the hero banner"]

@@ -16,7 +16,7 @@
     "class": "unclassified",
     "note": "delete = confirm no"
   },
-  "helpArticle": null,
+  "helpArticle": "blog-posts",
   "questions": {
     "ar": ["ازاي انزل مقال؟", "شيل المدونة"],
     "en": ["How do I publish a blog post?"]

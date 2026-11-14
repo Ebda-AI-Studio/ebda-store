@@ -1,0 +1,61 @@
+---
+title: Promotions (automatic discounts)
+description: Create a discount that applies by itself at checkout with no code, for the whole store or for certain products, categories and customer groups.
+section: Selling
+order: 31
+appPath: /stores
+keywords: promotion automatic discount no code percentage fixed amount priority targeting ramadan eid
+capabilities:
+  - marketing.promotions@1
+---
+
+A promotion is a discount that applies **automatically** to the shopper's cart at checkout, with no code to type. It suits offers like "20% off all abayas" or "50 EGP off any order over 500". Promotions do not need a particular plan, and the store owner manages them.
+
+## Create a promotion
+
+1. Open **Marketing and offers**, then the **Promotions** tab.
+2. Select **Add a promotion** (or **Add your first promotion** if there are none yet).
+3. Enter the **Name**, and preferably the **Name (Arabic)** and **Description** too.
+4. Pick the **Discount type**: **Percentage** or **Fixed amount**. Then enter the **Value (%)** or **Value (EGP)**. Promotions have no free shipping option, free shipping is done with a coupon.
+5. For a percentage, you can set a **Max discount (EGP)**.
+6. Set the **Priority** (a number from 0 to 1000). When two promotions give the same discount, the one with the higher priority applies.
+7. Optional: **Start date** and **Expiry date**.
+8. Keep **Promotion is active** ticked if you want it live straight away, and select **Save**.
+
+## Targeting
+
+Under **Targeting** choose who and what gets the promotion. If you leave it empty it applies to everyone.
+
+- **Customer group**: the members of one group instead of **All customers**. Groups come from [Customer groups](/en/customer-groups/), and the customer must be signed in.
+- **Minimum order amount (EGP)** and **Minimum quantity**.
+- **First order only**.
+- **Specific products** or **Specific categories**: search and pick. The promotion is worked out on those only.
+
+The table shows the discount and targeting, and marks promotions that have conditions with **First order** and **Scoped**.
+
+## How promotions combine with other discounts
+
+- If more than one promotion fits the same cart, Ebda Store picks the **single largest one**. Promotions do not add up.
+- If a coupon is also entered, the order gets the **single larger discount** of the promotion and the coupon. More in [Discount coupons](/en/coupons/).
+- Loyalty points the customer redeems come off what is left after that discount.
+
+## Edit, pause or delete
+
+From the promotion options menu:
+
+- **Edit**: change anything, and untick **Promotion is active** to pause it without deleting it.
+- **Delete promotion**: it stops immediately and cannot be restored.
+
+A promotion applies to every matching shopper right after you save, so check the value, scope and dates before you turn it on.
+
+## If saving fails
+
+If you see **Could not save the promotion.**, check that the name and value are filled and the priority is between 0 and 1000. If the store is suspended for billing, saving fails until you pay.
+
+## Common questions
+
+**I want "buy 2 for the price of 1".** The screen supports a percentage or fixed discount on the cart or on chosen products. It has no "buy one get one" type. To sell products together at one price use [Product bundles](/en/bundles/).
+
+**I want to stop the Ramadan promotion.** Open it with **Edit** and untick **Promotion is active**, or set an **Expiry date** from the start.
+
+**The promotion did not show.** Check that it is active, that the start date has passed, and that the shopper matches the targeting (group, first order, minimum amount or quantity).

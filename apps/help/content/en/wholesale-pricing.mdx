@@ -1,0 +1,64 @@
+---
+title: Wholesale pricing and trade accounts
+description: Set quantity price breaks and a minimum order for wholesale buyers, and approve or reject wholesale account applications.
+section: Selling
+order: 41
+appPath: /stores
+keywords: wholesale trade buyers price breaks quantity minimum order moq wholesale group applications approve reject revoke wholesale only product
+capabilities:
+  - marketing.wholesale@1
+---
+
+Wholesale pricing lets you sell at a lower price to trade buyers who order in large quantities, without changing the price a retail shopper pays. The buyer applies for a wholesale account, and you approve them first. The feature is on the **Business** plan, and the store owner manages it.
+
+Nobody gets wholesale prices until you approve them, and a buyer pays the prices of the group you assign.
+
+## Step 1: a wholesale group
+
+1. From **Sales** open the **Customer groups** tab.
+2. Create a **New group** and tick **Wholesale group (members must be approved)**. Only approved, signed-in accounts get this group's prices, and a phone number or email typed at checkout never gets them.
+
+See also [Customer groups](/en/customer-groups/).
+
+## Step 2: product prices
+
+Open the product and go to the **Wholesale pricing** card on the edit page.
+
+**Price breaks:**
+
+1. Under **Add a price break** enter **From quantity** (a whole number, at least 2) and **Unit price**.
+2. Choose **Who gets it**: **Everyone**, or a specific wholesale group. If the product has variants, pick the **Variant** or **All variants**.
+3. Select **Add price break**.
+
+Rules for breaks: the break price must be **lower than the current price**, a bigger quantity must have a lower price than the smaller quantities, two breaks cannot share the same quantity and audience, and the limit is **10 breaks** per scope. If the price is below your cost you see **This price is below your cost price.** A break that is at or above the current price shows **Not applied** and is not used. Tax follows your store settings (prices with or without VAT), and the page tells you which.
+
+**Order rules** (under **Order rules**):
+
+1. **Minimum order quantity**: at least 2. Buyers cannot check out below it.
+2. **Visible to**: **Everyone**, or **Approved wholesale buyers only**. A wholesale-only product is hidden from the public catalogue, search and feeds.
+3. Select **Save wholesale rules**. They save on their own right away, and the rest of the product saves with the **Save product** button.
+
+## Step 3: wholesale account applications
+
+A buyer applies from their account page in your store, and the application shows up for you with a notification.
+
+1. From **Sales** open the **Wholesale applications** tab (the **Wholesale applications** page). The tab shows the number of applications waiting for your decision.
+2. Filter by status: **Pending**, **Approved**, **Rejected**, **Revoked**. An application waiting over 48 hours is flagged.
+3. Select:
+   - **Approve**: choose the **Wholesale group**, and write a **Note to the applicant** (optional). The applicant sees the note, so do not write internal remarks. After approval they see wholesale prices.
+   - **Reject**: the buyer is told.
+   - **Revoke access** (for a buyer approved earlier): they go back to retail prices, and orders already placed keep their prices.
+
+If there is no active wholesale group you see **There is no active wholesale group. Create one under Customer groups first.**
+
+## Plan
+
+Wholesale pricing is on the **Business** plan. On a lower plan the pricing card shows **Wholesale pricing is part of the plan**, and the groups page says it needs a higher plan. See [Plans and billing](/en/plans-and-billing/).
+
+## Common questions
+
+**How do I sell wholesale?** A wholesale group, then price breaks on products, then approve the buyers.
+
+**Accept a wholesale buyer's application?** From **Wholesale applications** select **Approve** and choose the group.
+
+**A product for buyers only?** In the order rules choose **Approved wholesale buyers only**.

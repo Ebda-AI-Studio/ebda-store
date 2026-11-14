@@ -16,7 +16,7 @@
     "class": "unclassified",
     "note": "delete = confirm"
   },
-  "helpArticle": null,
+  "helpArticle": "bundles",
   "questions": {
     "ar": ["اعمل باقة منتجات بسعر مخفض"],
     "en": ["Create a bundle"]

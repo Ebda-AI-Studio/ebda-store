@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "menu-and-footer-links",
   "questions": {
     "ar": ["ازاي اغير القايمة اللي فوق؟", "ضيف رابط في الفوتر"],
     "en": ["Edit my menu and footer links"]

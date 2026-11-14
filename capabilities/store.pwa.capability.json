@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "customer-phone-app",
   "questions": {
     "ar": ["ازاي العميل يحط متجري على الموبايل؟", "غير ايقونة التطبيق"],
     "en": ["Make my store installable on phones"]

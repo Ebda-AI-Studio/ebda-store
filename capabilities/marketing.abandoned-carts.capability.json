@@ -21,7 +21,7 @@
     "class": "reversible",
     "note": "yes (config); sending = confirm"
   },
-  "helpArticle": null,
+  "helpArticle": "abandoned-carts",
   "questions": {
     "ar": ["فيه حد سايب سلة؟", "فعل رسايل استرجاع السلة"],
     "en": ["Recover abandoned carts"]

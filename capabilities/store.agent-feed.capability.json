@@ -22,7 +22,7 @@
     "class": "reversible",
     "note": "yes (revoke key)"
   },
-  "helpArticle": null,
+  "helpArticle": "ai-shopping-agent-access",
   "questions": {
     "ar": ["ازاي ChatGPT يقدر يشتري من متجري؟", "ايه مفتاح الوكيل؟"],
     "en": ["How can AI agents shop on my store?"]

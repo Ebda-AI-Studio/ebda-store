@@ -23,7 +23,7 @@
     "class": "unclassified",
     "note": "rate history kept"
   },
-  "helpArticle": null,
+  "helpArticle": "gold-rate-pricing",
   "questions": {
     "ar": ["ازاي اسعر الدهب في المتجر؟", "السعر بيتحدث لوحده؟"],
     "en": ["How do I price products by gold rate?"]

@@ -22,7 +22,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "customer-account-area",
   "questions": {
     "ar": ["العميل مش لاقي طلباته"],
     "en": ["Customer cannot see their orders"]

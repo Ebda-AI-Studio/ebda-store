@@ -23,7 +23,7 @@
     "class": "unclassified",
     "note": "cancel before send only; no after"
   },
-  "helpArticle": null,
+  "helpArticle": "email-campaigns",
   "questions": {
     "ar": ["ابعت عرض لكل المشتركين", "اكتب ايميل لعرض رمضان", "ابعت تجربة لنفسي الاول"],
     "en": ["Send an Eid offer to my subscribers"]
