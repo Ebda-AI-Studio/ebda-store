@@ -562,6 +562,39 @@ async function assertNotBlocked(storeId: string, provider: string): Promise<void
   }
 }
 
+/**
+ * The super-admin OVERRIDE on the legacy enable routes (`/toggle`, the carrier PUT) leaves the same append-only ledger row as
+ * every other activation (`activation.activated_admin`, which also lifts a "blocked by admin" flag). Call it AFTER the enable
+ * write: if the row cannot be written, `revert` switches the provider off again and the error propagates, so "enabled"
+ * never exists without its ledger row.
+ */
+export async function recordAdminEnable(args: {
+  storeId: string;
+  provider: string;
+  mode: string;
+  revert: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await appendActivationLedger({
+      storeId: args.storeId,
+      provider: args.provider,
+      action: 'activated_admin',
+      mode: args.mode,
+      ref: null,
+    });
+  } catch (err) {
+    await args
+      .revert()
+      .catch(e =>
+        logger.error(
+          { e, storeId: args.storeId, provider: args.provider },
+          '[ACTIVATION] could not switch off after a failed ledger write'
+        )
+      );
+    throw err;
+  }
+}
+
 /** Switch the provider on/off FOR CHECKOUT. Enabling goes through the exact gate of the settings routes. */
 async function setProviderEnabled(
   storeId: string,

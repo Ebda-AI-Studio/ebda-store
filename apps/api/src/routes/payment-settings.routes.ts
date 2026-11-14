@@ -11,7 +11,8 @@ import { auditLog } from '../middleware/security';
 import { PaymentService } from '../services/payment.service';
 import { getAuthUser } from '../utils/store-helpers';
 import { paymentSettingsRouteContext } from '../middleware/tenant-context';
-import { refuseUnconfirmedEnable } from '../lib/provider-confirm-gate';
+import { recordAdminEnable } from '../services/provider-activation.service';
+import { adminEnableNeedsLedger, refuseUnconfirmedEnable } from '../lib/provider-confirm-gate';
 
 import {
   REGION,
@@ -594,6 +595,25 @@ router.put(
         w.paymentConfig.update({ where: { id: existing.id, storeId }, data: updateData }),
       ]);
 
+      if (
+        data.isEnabled === true &&
+        !existing.isEnabled &&
+        adminEnableNeedsLedger(getAuthUser(req).role, provider)
+      ) {
+        await recordAdminEnable({
+          storeId,
+          provider,
+          mode: (data.testMode ?? existing.testMode) === false ? 'live' : 'sandbox',
+          revert: async () => {
+            await w.paymentConfig.update({
+              where: { id: existing.id, storeId },
+              data: { isEnabled: false },
+            });
+            PaymentService.clearCache(storeId);
+          },
+        });
+      }
+
       await auditLog({
         action: 'store_payment_config.updated',
         userId,
@@ -787,6 +807,24 @@ router.post(
           updatedBy: userId,
         },
       });
+
+      // The super-admin override leaves the same append-only ledger row as a self-activation (reverted if it cannot be written).
+      if (enabled === true && adminEnableNeedsLedger(user.role, provider)) {
+        await recordAdminEnable({
+          storeId,
+          provider,
+          mode: existing.testMode === false ? 'live' : 'sandbox',
+          revert: async () => {
+            await (
+              await storeWriter(storeId)
+            ).paymentConfig.update({
+              where: { id: existing.id, storeId },
+              data: { isEnabled: false },
+            });
+            PaymentService.clearCache(storeId);
+          },
+        });
+      }
 
       await auditLog({
         action: enabled ? 'store_payment_config.enabled' : 'store_payment_config.disabled',

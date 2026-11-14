@@ -15,3 +15,9 @@ export function refuseUnconfirmedEnable(role: string | undefined, provider: stri
     'Turning a provider on needs a confirmation: POST /provider-activation/store/:storeId/:provider/activate/preview, then .../activate/confirm with the token and an Idempotency-Key'
   );
 }
+
+/** The super-admin override enabling a non-manual provider through a legacy route: it must leave an activation ledger row. */
+export function adminEnableNeedsLedger(role: string | undefined, provider: string): boolean {
+  const entry = getProviderEntry(provider);
+  return role === 'super_admin' && Boolean(entry && !entry.manual);
+}

@@ -22,6 +22,7 @@ const { mockPrisma, mockClearCache, mockAuditLog, currentUser, decryptSpy } = vi
       delete: vi.fn(),
     },
     store: { findUnique: vi.fn() },
+    providerVerificationEvent: { create: vi.fn() },
     $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   },
   mockClearCache: vi.fn(),
@@ -132,6 +133,7 @@ beforeEach(() => {
   currentUser.userId = 'admin-1';
   currentUser.role = 'store_admin';
   mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+  mockPrisma.providerVerificationEvent.create.mockReset().mockResolvedValue({});
   mockPrisma.paymentConfig.update.mockImplementation(async ({ data }: any) => ({
     ...row('kashier', false),
     ...data,
@@ -139,6 +141,16 @@ beforeEach(() => {
 });
 const toggle = (provider: string, enabled: boolean) =>
   request(app).post(`${BASE}/store/${STORE_ID}/${provider}/toggle`).send({ enabled });
+
+describe('adminEnableNeedsLedger', () => {
+  it('is true only for a super_admin enabling a non-manual provider', async () => {
+    const { adminEnableNeedsLedger } = await import('@api/lib/provider-confirm-gate');
+    expect(adminEnableNeedsLedger('super_admin', 'kashier')).toBe(true);
+    expect(adminEnableNeedsLedger('store_admin', 'kashier')).toBe(false);
+    expect(adminEnableNeedsLedger('super_admin', 'cod')).toBe(false);
+    expect(adminEnableNeedsLedger('super_admin', 'no-such-provider')).toBe(false);
+  });
+});
 
 describe('legacy enable routes need the confirm step', () => {
   it('toggle ON for a gateway is 409 CONFIRMATION_REQUIRED and writes nothing', async () => {
@@ -162,6 +174,50 @@ describe('legacy enable routes need the confirm step', () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(row('kashier', false));
     expect((await toggle('kashier', true)).status).toBe(200);
   });
+  it('the super-admin override leaves an activation.activated_admin ledger row', async () => {
+    currentUser.role = 'super_admin';
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(row('kashier', false));
+    expect((await toggle('kashier', true)).status).toBe(200);
+    expect(mockPrisma.providerVerificationEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        provider: 'kashier',
+        sourceStoreId: STORE_ID,
+        op: 'activation.activated_admin',
+        mode: 'sandbox',
+      }),
+    });
+  });
+  it('turning OFF, or enabling a manual provider, writes no ledger row', async () => {
+    currentUser.role = 'super_admin';
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(row('kashier', true));
+    await toggle('kashier', false);
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(row('cod', false));
+    await toggle('cod', true);
+    expect(mockPrisma.providerVerificationEvent.create).not.toHaveBeenCalled();
+  });
+  it('a failed ledger write switches the provider off again and answers an error', async () => {
+    currentUser.role = 'super_admin';
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(row('kashier', false));
+    mockPrisma.providerVerificationEvent.create.mockRejectedValue(new Error('db down'));
+    const res = await toggle('kashier', true);
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(mockPrisma.paymentConfig.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { isEnabled: false } })
+    );
+  });
+  it('the payment PUT override (off -> on) leaves a ledger row too', async () => {
+    currentUser.role = 'super_admin';
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(row('kashier', false));
+    mockPrisma.$transaction.mockImplementation(async (ops: Promise<unknown>[]) => Promise.all(ops));
+    mockPrisma.paymentConfig.updateMany.mockResolvedValue({ count: 0 });
+    const res = await request(app)
+      .put(`${BASE}/store/${STORE_ID}/kashier`)
+      .send({ provider: 'kashier', isEnabled: true });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.providerVerificationEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ op: 'activation.activated_admin' }),
+    });
+  });
   it('the payment PUT cannot flip a gateway on either', async () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(row('kashier', false));
     const res = await request(app)
@@ -169,6 +225,25 @@ describe('legacy enable routes need the confirm step', () => {
       .send({ provider: 'kashier', isEnabled: true });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CONFIRMATION_REQUIRED');
+  });
+  it('the carrier PUT override is wired to the ledger, and `activate` (mode switch) cannot turn a carrier on', () => {
+    const route = readFileSync(
+      join(__dirname, '../../apps/api/src/routes/shipping-carrier.routes.ts'),
+      'utf8'
+    );
+    expect(route).toMatch(
+      /if \(\s+body\.enabled === true &&\s+result\.config\.enabled &&\s+adminEnableNeedsLedger\(req\.user\?\.role, carrier\)/
+    );
+    // Verdict (follow-up to #776): `activate` only picks the ACTIVE mode. The row's enabled flag is
+    // `input.enabled ?? (existing.enabled && !mustDisable)`, so a mode switch can keep or clear it, never set it.
+    const svc = readFileSync(
+      join(__dirname, '../../apps/api/src/services/shipping-carrier.service.ts'),
+      'utf8'
+    );
+    expect(svc).toContain(
+      'const nextEnabled = input.enabled ?? (Boolean(existing?.enabled) && !mustDisable);'
+    );
+    expect(route).not.toMatch(/enabled:\s*body\.activate/);
   });
   it('the carrier PUT is wired to the same gate', () => {
     const src = readFileSync(
