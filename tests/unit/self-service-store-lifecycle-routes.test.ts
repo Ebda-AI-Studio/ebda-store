@@ -142,6 +142,30 @@ it('preview refusal is 409 with the named reasons', async () => {
   expect(res.status).toBe(409);
   expect(res.body.error.details.reasons[0].code).toBe('STORE_HAS_MONEY_IN_FLIGHT');
 });
+it('super_admin: status and cancel carry the role (platform override); preview does not', async () => {
+  await request(app)
+    .get('/stores/store-a/deletion')
+    .set('x-role', 'super_admin')
+    .set('x-user', 'root-1');
+  expect(m.status).toHaveBeenCalledWith(
+    expect.objectContaining({ userId: 'root-1', role: 'super_admin' }),
+    expect.anything()
+  );
+  await request(app)
+    .delete('/stores/store-a/deletion')
+    .set('x-role', 'super_admin')
+    .set('x-user', 'root-1');
+  const arg = m.cancel.mock.calls[0][0];
+  expect(arg).toMatchObject({ userId: 'root-1', role: 'super_admin' });
+  expect(arg.ownerEmail).toBeUndefined(); // never email the super admin as the owner
+  await request(app)
+    .post('/stores/store-a/deletion/preview')
+    .set('x-role', 'super_admin')
+    .set('x-user', 'root-1')
+    .send({});
+  expect(m.preview.mock.calls[0][0].role).toBeUndefined();
+});
+
 it('export: returns the zip to the owner, 413 when over the row cap, 403 for a non-owner', async () => {
   const ok = await request(app).get('/stores/store-a/export').set('x-role', 'store_admin');
   expect(ok.status).toBe(200);

@@ -46,7 +46,7 @@ import { OwnerStoreLifecycle } from './OwnerStoreLifecycle';
 
 beforeEach(() => {
   cleanup();
-  apiGet.mockReset().mockResolvedValue({ data: { request: null }, error: null });
+  apiGet.mockReset().mockResolvedValue({ data: { request: null, isOwner: true }, error: null });
   apiPost.mockReset();
   apiDelete.mockReset();
 });
@@ -117,5 +117,39 @@ describe('OwnerStoreLifecycle', () => {
     fireEvent.click(screen.getByText('Cancel the deletion'));
     await waitFor(() => expect(apiDelete).toHaveBeenCalledTimes(1));
     expect(apiDelete).toHaveBeenCalledWith('/api/v1/stores/s1/deletion');
+  });
+
+  it('a super admin who is not the owner sees only the pending deletion and can cancel it (no export, no delete dialog)', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        request: { id: 'r1', state: 'pending', executeAfter: '2026-11-28T10:00:00Z' },
+        isOwner: false,
+      },
+      error: null,
+    });
+    render(<OwnerStoreLifecycle storeId="s1" />);
+    expect(await screen.findByText(/deleted on 2026-11-28/)).toBeTruthy();
+    expect(screen.queryByText('Download my data')).toBeNull();
+    expect(screen.getByText('Cancel the deletion')).toBeTruthy();
+  });
+
+  it('an owner with nothing pending sees nothing for a non-owner with nothing pending', async () => {
+    apiGet.mockResolvedValue({ data: { request: null, isOwner: false }, error: null });
+    const { container } = render(<OwnerStoreLifecycle storeId="s1" />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+    expect(container.textContent).toBe('');
+  });
+
+  it('while executing there is no cancel button, only the running notice', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        request: { id: 'r1', state: 'executing', executeAfter: '2026-11-28T10:00:00Z' },
+        isOwner: true,
+      },
+      error: null,
+    });
+    render(<OwnerStoreLifecycle storeId="s1" />);
+    expect(await screen.findByText(/can no longer be cancelled/)).toBeTruthy();
+    expect(screen.queryByText('Cancel the deletion')).toBeNull();
   });
 });

@@ -33,6 +33,7 @@ export function productionDeletionDeps(): DeletionDeps {
       };
     },
     saveRequest: (storeId, request) => StoreService.setDeletionRequest(storeId, request),
+    transition: (storeId, from, to) => StoreService.compareAndSetDeletionRequest(storeId, from, to),
     async moneyInFlight(storeId) {
       // A store on its Durable Object keeps its money there and its check is atomic with the close (closeIfNoMoneyInFlight): it
       // runs at execution, inside StoreService.delete. Reading it here would need a close-and-reopen probe, so it is not done.

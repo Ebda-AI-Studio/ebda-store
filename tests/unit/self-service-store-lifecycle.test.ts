@@ -53,6 +53,14 @@ function makeDeps(over: Partial<DeletionDeps> = {}, store?: Partial<DeletionStor
     saveRequest: vi.fn(async (_id: string, r: DeletionRequest | null) => {
       state.store.deletionRequest = r;
     }),
+    transition: vi.fn(
+      async (_id: string, from: { id: string; state: string }, to: DeletionRequest) => {
+        const cur = state.store.deletionRequest;
+        if (!cur || cur.id !== from.id || cur.state !== from.state) return false;
+        state.store.deletionRequest = to;
+        return true;
+      }
+    ),
     moneyInFlight: vi.fn(async () => null as Record<string, number> | null),
     hasBilledSubscription: vi.fn(async () => false),
     isBillingParentWithSiblings: vi.fn(async () => false),
@@ -356,7 +364,7 @@ describe('execute (after the cooling-off)', () => {
       (await executeStoreDeletion({ storeId: 'store-a', requestId: r.id }, h.deps)).outcome
     ).toBe('executed');
   });
-  it('a delete that throws leaves the request pending (retry converges)', async () => {
+  it('a delete that throws leaves the request executing (the retry resumes and converges)', async () => {
     const del = vi.fn(async () => {
       throw new Error('boom');
     });
@@ -374,7 +382,7 @@ describe('execute (after the cooling-off)', () => {
     await expect(
       executeStoreDeletion({ storeId: 'store-a', requestId: r.id }, h.deps)
     ).rejects.toThrow('boom');
-    expect(h.state.store.deletionRequest?.state).toBe('pending');
+    expect(h.state.store.deletionRequest?.state).toBe('executing');
   });
 });
 
@@ -404,5 +412,146 @@ describe('deletionRequest is a server-owned settings key', () => {
     expect(
       mergeClientSettings({}, { deletionRequest: { state: 'pending' } }).deletionRequest
     ).toBeUndefined();
+  });
+});
+
+import { AppError } from '@api/middleware/error-handler';
+
+describe('review findings (Opus review of #772)', () => {
+  async function scheduledStore(over: Partial<DeletionDeps> = {}) {
+    const h = makeDeps(over);
+    const r = await scheduleStoreDeletion(
+      {
+        storeId: 'store-a',
+        userId: OWNER,
+        confirmToken: await mintToken(h.deps),
+        typedSlug: 'shop-a',
+      },
+      h.deps
+    );
+    h.advance(COOLING_OFF_MS + 1);
+    return { ...h, r };
+  }
+  const moneyError = () =>
+    new AppError(409, 'STORE_HAS_MONEY_IN_FLIGHT', 'money in flight', {
+      paidUndelivered: 1,
+    } as never);
+
+  it('F1: a money-in-flight 409 from the delete (Durable Object store) is BLOCKED, visible, audited, and the request stays pending', async () => {
+    const del = vi.fn(async () => {
+      throw moneyError();
+    });
+    const h = await scheduledStore({ deleteStore: del });
+    const o = await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+    expect(o.outcome).toBe('blocked');
+    expect(h.state.store.deletionRequest?.state).toBe('pending');
+    expect(h.state.store.deletionRequest?.lastBlock?.code).toBe('STORE_HAS_MONEY_IN_FLIGHT');
+    expect(h.deps.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETION_BLOCKED' })
+    );
+    // later the money settles: the next daily run deletes
+    del.mockImplementation(async () => undefined);
+    expect(
+      (await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps)).outcome
+    ).toBe('executed');
+  });
+
+  it('F2: ownership transferred during the window voids the request; the new owner loses nothing', async () => {
+    const h = await scheduledStore();
+    h.state.store.ownerId = 'owner-B';
+    const o = await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+    expect(o.outcome).toBe('voided');
+    expect(h.deps.deleteStore).not.toHaveBeenCalled();
+    expect(h.state.store.deletionRequest?.state).toBe('cancelled');
+    expect(h.deps.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETION_VOIDED_OWNER_CHANGED' })
+    );
+    expect(h.deps.notifyOwner).toHaveBeenCalledWith('cancelled', expect.anything());
+  });
+
+  it('F3: a cancel that wins the compare-and-set before the claim stops the delete; a cancel during executing is refused', async () => {
+    const h = await scheduledStore();
+    // cancel lands after execute read `pending` but before it claims: the claim loses
+    const realTransition = h.deps.transition;
+    h.deps.transition = vi.fn(async (id, from, to) => {
+      if (from.state === 'pending' && to.state === 'executing') {
+        await cancelStoreDeletion({ storeId: 'store-a', userId: OWNER }, h.deps);
+      }
+      return realTransition(id, from, to);
+    });
+    const o = await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+    expect(o.outcome).toBe('cancelled');
+    expect(h.deps.deleteStore).not.toHaveBeenCalled();
+  });
+  it('F3: cancel is refused while the deletion is executing', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(r => (release = r));
+    const h = await scheduledStore({
+      deleteStore: vi.fn(async () => {
+        await gate;
+      }),
+    });
+    const running = executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+    await vi.waitFor(() => expect(h.state.store.deletionRequest?.state).toBe('executing'));
+    await expect(
+      cancelStoreDeletion({ storeId: 'store-a', userId: OWNER }, h.deps)
+    ).rejects.toMatchObject({ statusCode: 409, code: 'DELETION_IN_PROGRESS' });
+    release();
+    expect((await running).outcome).toBe('executed');
+  });
+  it('F3: a cancel whose compare-and-set loses (the executor claimed first) is refused, not silently dropped', async () => {
+    const h = await scheduledStore();
+    h.deps.transition = vi.fn(async () => false);
+    await expect(
+      cancelStoreDeletion({ storeId: 'store-a', userId: OWNER }, h.deps)
+    ).rejects.toMatchObject({ statusCode: 409, code: 'DELETION_IN_PROGRESS' });
+    expect(h.deps.audit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETION_CANCELLED' })
+    );
+  });
+  it('F3: a crash mid-delete leaves `executing`; the retry resumes it and converges', async () => {
+    const del = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue(undefined);
+    const h = await scheduledStore({ deleteStore: del });
+    await expect(
+      executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps)
+    ).rejects.toThrow('boom');
+    expect(['pending', 'executing']).toContain(h.state.store.deletionRequest?.state);
+    expect(
+      (await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps)).outcome
+    ).toBe('executed');
+  });
+
+  it('F4: super_admin can read and cancel an owner pending deletion (audited); staff still cannot', async () => {
+    const h = await scheduledStore();
+    const st = await readDeletionStatus(
+      { storeId: 'store-a', userId: 'root-1', role: 'super_admin' },
+      h.deps
+    );
+    expect(st.request?.state).toBe('pending');
+    expect(st.isOwner).toBe(false);
+    const c = await cancelStoreDeletion(
+      { storeId: 'store-a', userId: 'root-1', role: 'super_admin' },
+      h.deps
+    );
+    expect(c.state).toBe('cancelled');
+    expect(h.deps.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'STORE_DELETION_CANCELLED',
+        userId: 'root-1',
+        details: expect.objectContaining({ byRole: 'super_admin' }),
+      })
+    );
+    await expect(
+      readDeletionStatus({ storeId: 'store-a', userId: 'staff-9', role: 'store_admin' }, h.deps)
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+  it('F4: super_admin still cannot SCHEDULE or preview for a store they do not own', async () => {
+    const h = makeDeps();
+    await expect(
+      previewStoreDeletion(
+        { storeId: 'store-a', userId: 'root-1', role: 'super_admin' } as never,
+        h.deps
+      )
+    ).rejects.toMatchObject({ statusCode: 403 });
   });
 });

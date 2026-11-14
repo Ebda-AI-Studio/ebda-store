@@ -14,7 +14,7 @@ import { apiDelete, apiFetch, apiGet, apiPost } from '@/lib/api';
  */
 interface DeletionRequest {
   id: string;
-  state: 'pending' | 'cancelled' | 'executed';
+  state: 'pending' | 'executing' | 'cancelled' | 'executed';
   executeAfter: string;
   lastBlock?: { code: string };
 }
@@ -42,6 +42,7 @@ const REASON_KEYS: Record<string, string> = {
 export function OwnerStoreLifecycle({ storeId }: { storeId: string }) {
   const t = useT('storeLifecycle');
   const { success: toastSuccess } = useToast();
+  const [visible, setVisible] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [request, setRequest] = useState<DeletionRequest | null>(null);
   const [open, setOpen] = useState(false);
@@ -56,15 +57,21 @@ export function OwnerStoreLifecycle({ storeId }: { storeId: string }) {
   const base = `/api/v1/stores/${storeId}`;
 
   const loadStatus = useCallback(async () => {
-    const { data, error: err } = await apiGet<{ request: DeletionRequest | null }>(
-      `${base}/deletion`
-    );
+    const { data, error: err } = await apiGet<{
+      request: DeletionRequest | null;
+      isOwner: boolean;
+    }>(`${base}/deletion`);
     if (err || !data) {
+      setVisible(false);
       setIsOwner(false);
       return;
     }
-    setIsOwner(true);
-    setRequest(data.request?.state === 'pending' ? data.request : null);
+    const open =
+      data.request && ['pending', 'executing'].includes(data.request.state) ? data.request : null;
+    setRequest(open);
+    setIsOwner(data.isOwner);
+    // The owner sees everything; a platform super admin who is not the owner sees only a pending deletion (and can cancel it).
+    setVisible(data.isOwner || open !== null);
   }, [base]);
 
   useEffect(() => {
@@ -152,27 +159,29 @@ export function OwnerStoreLifecycle({ storeId }: { storeId: string }) {
     }
   }, [base, t]);
 
-  if (!isOwner) return null;
+  if (!visible) return null;
 
   return (
     <section className="mt-10 space-y-6" aria-labelledby="owner-lifecycle-title">
       <h2 id="owner-lifecycle-title" className="font-semibold text-foreground">
         {t('title')}
       </h2>
-      <div className="rounded-xl border border-border p-6">
-        <p className="text-sm font-medium text-foreground">{t('exportTitle')}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{t('exportBody')}</p>
-        <div className="mt-4">
-          <Button variant="outline" onClick={download} disabled={busy} isLoading={busy}>
-            {t('exportButton')}
-          </Button>
+      {isOwner && (
+        <div className="rounded-xl border border-border p-6">
+          <p className="text-sm font-medium text-foreground">{t('exportTitle')}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t('exportBody')}</p>
+          <div className="mt-4">
+            <Button variant="outline" onClick={download} disabled={busy} isLoading={busy}>
+              {t('exportButton')}
+            </Button>
+          </div>
+          {exportMsg && (
+            <p role="alert" className="mt-3 text-sm text-destructive-ink">
+              {exportMsg}
+            </p>
+          )}
         </div>
-        {exportMsg && (
-          <p role="alert" className="mt-3 text-sm text-destructive-ink">
-            {exportMsg}
-          </p>
-        )}
-      </div>
+      )}
       <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6">
         <p className="text-sm font-medium text-foreground">{t('deleteTitle')}</p>
         {request ? (
@@ -185,11 +194,18 @@ export function OwnerStoreLifecycle({ storeId }: { storeId: string }) {
                 {t(REASON_KEYS[request.lastBlock.code] ?? 'reasonMoney')}
               </p>
             )}
-            <div className="mt-4">
-              <Button variant="outline" onClick={cancel} disabled={busy} isLoading={busy}>
-                {t('cancelButton')}
-              </Button>
-            </div>
+            {request.state === 'pending' && (
+              <div className="mt-4">
+                <Button variant="outline" onClick={cancel} disabled={busy} isLoading={busy}>
+                  {t('cancelButton')}
+                </Button>
+              </div>
+            )}
+            {request.state === 'executing' && (
+              <p role="status" className="mt-2 text-sm text-muted-foreground">
+                {t('runningBody')}
+              </p>
+            )}
           </>
         ) : (
           <>
