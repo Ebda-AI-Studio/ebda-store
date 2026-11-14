@@ -68,15 +68,16 @@ export function PlatformCard({ platform, origin }: { platform: PlatformKey; orig
       </div>
 
       <div>
-        <button
+        <Button
           type="button"
+          variant="link"
+          size="sm"
           aria-expanded={open}
           aria-controls={`feed-${platform}-steps`}
           onClick={() => setOpen(o => !o)}
-          className="text-sm font-medium text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded"
         >
           {t('steps')}
-        </button>
+        </Button>
         {open && (
           <ol
             id={`feed-${platform}-steps`}

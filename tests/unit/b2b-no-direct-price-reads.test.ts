@@ -225,6 +225,31 @@ const ALLOW: Record<string, AllowEntry> = {
     reason: 'declared value from persisted lines',
     reads: { createShipmentForOrder: 1 },
   },
+  'lib/catalogue-feed/build.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds (Google/Meta/TikTok): retail price, anonymous-safe',
+    reads: { buildProductItems: 3, buildBundleItems: 4 },
+  },
+  'lib/catalogue-feed/load.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds: retail price select, public-audience products only',
+    reads: { '<module>': 2 },
+  },
+  'lib/catalogue-feed/service.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds: purchasable bundle price',
+    reads: { getMeta: 1 },
+  },
+  'lib/inngest/functions/order-capi-conversion.ts': {
+    category: 'persisted',
+    reason: 'server-side Purchase lines from persisted order items',
+    reads: { '<module>': 1 },
+  },
+  'services/pixels-capi.service.ts': {
+    category: 'persisted',
+    reason: 'server-side Purchase lines from persisted order items',
+    reads: { purchaseContents: 1, sendMetaCAPI: 1, sendTikTokCAPI: 1 },
+  },
   'lib/product-feed.ts': {
     category: 'retail-display',
     reason: 'public feed: retail price, anonymous-safe',

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
+import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ErrorState } from '../../../../components/ErrorState';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
@@ -55,19 +56,16 @@ export default function ProductFeedsPage() {
             className="inline-flex rounded-lg border border-border p-0.5"
           >
             {LANGS.map(l => (
-              <button
+              <Button
                 key={l}
                 type="button"
+                size="sm"
+                variant={lang === l ? 'default' : 'ghost'}
                 aria-pressed={lang === l}
                 onClick={() => setLang(l)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
-                  lang === l
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
               >
                 {t(`language.${l}`)}
-              </button>
+              </Button>
             ))}
           </div>
           <FeedHealthPanel health={health} lang={lang} onRefresh={refetch} />

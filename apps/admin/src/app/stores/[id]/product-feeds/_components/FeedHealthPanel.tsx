@@ -14,7 +14,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'wa
         {label}
       </p>
       <p
-        className={`mt-1 text-2xl font-semibold ${tone === 'warn' && value > 0 ? 'text-destructive' : 'text-foreground'}`}
+        className={`mt-1 text-2xl font-semibold ${tone === 'warn' && value > 0 ? 'text-destructive-ink' : 'text-foreground'}`}
       >
         {num(value)}
       </p>
@@ -84,7 +84,7 @@ export function FeedHealthPanel({
         </p>
       )}
       {health.scanTruncated && (
-        <p className="text-sm text-destructive" dir="auto">
+        <p className="text-sm text-destructive-ink" dir="auto">
           {t('scanTruncated')}
         </p>
       )}
@@ -118,7 +118,7 @@ export function FeedHealthPanel({
                 <span
                   className={`shrink-0 self-start rounded-full px-2 py-0.5 text-xs font-medium ${
                     i.kind === 'excluded'
-                      ? 'bg-destructive/10 text-destructive'
+                      ? 'bg-destructive/10 text-destructive-ink'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >

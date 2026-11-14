@@ -8264,7 +8264,7 @@
       "shippingVaries": "Your shipping fees differ by area, so they are not in the feed. Set shipping inside each platform instead.",
       "truncatedIssues": "Showing the first {count} items. Fix these and refresh to see more.",
       "scanTruncated": "Your catalogue is very large, so this report covers only part of it.",
-      "imageNote": "Platforms also check that every image is at least 500 x 500 pixels. Ebda cannot measure that here, so upload large product photos.",
+      "imageNote": "Platforms also check that every image is at least 500 x 500 pixels. We cannot measure that here, so upload large product photos.",
       "refresh": "Refresh",
       "issuesTitle": "Items that need attention",
       "product": "Item",
