@@ -18,5 +18,5 @@
     { "match": "^/internal(/|$)", "kind": "internal" }
   ],
   "helpExemptAreas": ["platform"],
-  "smartLayerPaths": []
+  "smartLayerPaths": ["packages/shared/src/foundation/smart-layer/", "apps/api/src/smart-layer/"]
 }
