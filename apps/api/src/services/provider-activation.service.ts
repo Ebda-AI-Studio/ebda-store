@@ -119,6 +119,26 @@ function toPublic(r: RequestRow): PublicActivationRequest {
   };
 }
 
+// One site per operation on the request table (the prisma-sites ratchet, tests/unit/no-prisma-in-routes.test.ts).
+/** The store's live (requested | activated) request for a provider, or null. */
+function findOpenRequest(storeId: string, provider: string): Promise<RequestRow | null> {
+  return prisma.providerActivationRequest.findFirst({
+    where: { storeId, provider, status: { in: ['requested', 'activated'] } },
+  });
+}
+function createRequest(
+  data: Prisma.ProviderActivationRequestUncheckedCreateInput
+): Promise<RequestRow> {
+  return prisma.providerActivationRequest.create({ data });
+}
+function decideRequest(
+  id: string,
+  storeId: string,
+  data: Prisma.ProviderActivationRequestUncheckedUpdateInput
+): Promise<RequestRow> {
+  return prisma.providerActivationRequest.update({ where: { id, storeId }, data });
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -216,9 +236,7 @@ export async function requestActivation(
       'Save your credentials for this provider before requesting activation'
     );
   }
-  const open = await prisma.providerActivationRequest.findFirst({
-    where: { storeId, provider, status: { in: ['requested', 'activated'] } },
-  });
+  const open = await findOpenRequest(storeId, provider);
   if (open) {
     if (open.status === 'activated') {
       throw new AppError(
@@ -229,8 +247,11 @@ export async function requestActivation(
     }
     return { request: toPublic(open), created: false };
   }
-  const row = await prisma.providerActivationRequest.create({
-    data: { storeId, provider, status: 'requested', requestedById: actor.userId },
+  const row = await createRequest({
+    storeId,
+    provider,
+    status: 'requested',
+    requestedById: actor.userId,
   });
   await auditLog({
     action: 'provider_activation.requested',
@@ -394,9 +415,7 @@ export async function runTestForStore(
 
 /** The store's open request for a provider, or a 404/409 the route can return. */
 async function openRequest(storeId: string, provider: string): Promise<RequestRow> {
-  const row = await prisma.providerActivationRequest.findFirst({
-    where: { storeId, provider, status: { in: ['requested', 'activated'] } },
-  });
+  const row = await findOpenRequest(storeId, provider);
   if (!row) throw new AppError(404, 'NOT_FOUND', 'No open activation request for this provider');
   return row;
 }
@@ -429,9 +448,11 @@ export async function activateForStore(
         'Run the test: the latest Test connection must pass with the credentials stored now'
       );
     }
-    return prisma.providerActivationRequest.update({
-      where: { id: req.id, storeId },
-      data: { status: 'activated', decidedById: actor.userId, decidedAt: new Date(), note: null },
+    return decideRequest(req.id, storeId, {
+      status: 'activated',
+      decidedById: actor.userId,
+      decidedAt: new Date(),
+      note: null,
     });
   });
   clearProviderCaches(storeId);
@@ -708,9 +729,7 @@ export async function confirmSelfActivation(
         await setProviderEnabled(storeId, provider, entry.kind, true, actor);
         enabled = true;
         requestId = await withStore(storeId, async () => {
-          const open = await prisma.providerActivationRequest.findFirst({
-            where: { storeId, provider, status: { in: ['requested', 'activated'] } },
-          });
+          const open = await findOpenRequest(storeId, provider);
           const data = {
             status: 'activated',
             decidedById: actor.userId,
@@ -718,14 +737,14 @@ export async function confirmSelfActivation(
             note: null,
           };
           if (open) {
-            await prisma.providerActivationRequest.update({
-              where: { id: open.id, storeId },
-              data,
-            });
+            await decideRequest(open.id, storeId, data);
             return open.id;
           }
-          const row = await prisma.providerActivationRequest.create({
-            data: { storeId, provider, requestedById: actor.userId, ...data },
+          const row = await createRequest({
+            storeId,
+            provider,
+            requestedById: actor.userId,
+            ...data,
           });
           return row.id;
         });
@@ -797,13 +816,18 @@ export async function deactivateForStore(
   const entry = activatableEntry(provider);
   const conn = await withStore(storeId, () => loadConnection(storeId, provider, entry.kind));
   const wasEnabled = conn !== null && rowEnabled(conn);
-  const closed = await withStore(storeId, () =>
-    prisma.providerActivationRequest.updateMany({
-      where: { storeId, provider, status: 'activated' },
-      data: { status: 'rejected', note, decidedById: actor.userId, decidedAt: new Date() },
-    })
-  );
-  if (!wasEnabled && closed.count === 0) {
+  const open = await withStore(storeId, async () => {
+    const row = await findOpenRequest(storeId, provider);
+    if (row?.status !== 'activated') return null;
+    await decideRequest(row.id, storeId, {
+      status: 'rejected',
+      note,
+      decidedById: actor.userId,
+      decidedAt: new Date(),
+    });
+    return row;
+  });
+  if (!wasEnabled && !open) {
     throw new AppError(409, 'NOT_ACTIVE', `${provider} is not turned on for this store`);
   }
   if (wasEnabled) await setProviderEnabled(storeId, provider, entry.kind, false, actor);
@@ -841,9 +865,11 @@ export async function rejectForStore(
     if (req.status !== 'requested') {
       throw new AppError(409, 'ALREADY_DECIDED', 'This request is already activated');
     }
-    return prisma.providerActivationRequest.update({
-      where: { id: req.id, storeId },
-      data: { status: 'rejected', note, decidedById: actor.userId, decidedAt: new Date() },
+    return decideRequest(req.id, storeId, {
+      status: 'rejected',
+      note,
+      decidedById: actor.userId,
+      decidedAt: new Date(),
     });
   });
   clearProviderCaches(storeId);

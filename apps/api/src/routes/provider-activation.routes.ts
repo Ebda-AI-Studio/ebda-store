@@ -102,11 +102,7 @@ router.post(
       const { storeId } = req.params;
       const provider = parseInput(providerSchema, req.params.provider);
       const actor = actorOf(req);
-      const store = await prisma.store.findUnique({ where: { id: storeId } });
-      if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
-      if (getAuthUser(req).role !== 'super_admin' && store.ownerId !== actor.userId) {
-        throw new AppError(403, 'FORBIDDEN', 'Access denied');
-      }
+      const store = await ownedStore(req);
       const { request, created } = await requestActivation(storeId, provider, actor);
       if (created) {
         // After the request transaction committed: the row is durable before anyone is told.
