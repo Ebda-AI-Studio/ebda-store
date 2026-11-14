@@ -17,7 +17,7 @@ export const EXPORT_TABLES = [
   'return',
   'expense',
 ] as const;
-export type ExportTable = (typeof EXPORT_TABLES)[number];
+type ExportTable = (typeof EXPORT_TABLES)[number];
 
 type Reader = (storeId: string, table: string, take: number) => Promise<unknown[]>;
 
@@ -27,7 +27,7 @@ function ndjson(rows: unknown[]): string {
     .join('\n');
 }
 
-export type BundleResult =
+type BundleResult =
   | { ok: true; zip: Uint8Array; rows: number }
   | { ok: false; rows: number; cap: number };
 
