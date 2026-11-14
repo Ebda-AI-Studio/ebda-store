@@ -1,0 +1,24 @@
+---
+title: Export your store data
+description: Download everything in your store as one zip, what is inside it, the hourly limit and the size limit.
+section: Settings
+order: 62
+appPath: /stores
+keywords: export data download backup zip ndjson portability
+capabilities:
+  - account.export-erase-close@2
+---
+
+Only the owner of a store can export it. Open **Settings** and press **Download my data**.
+
+## What you get
+
+One zip with a file per table (products, categories, orders with their items, customers, coupons, reviews, returns and expenses) in NDJSON, one record per line, plus a `manifest.json` that lists the tables and row counts. API keys and payment provider credentials are never included.
+
+## Limits
+
+You can export once an hour for each store. If your store has more than 20000 rows in total, the export is refused with a clear message; export orders, products and customers from their own pages instead.
+
+## Close your account
+
+Closing your own account is in your account settings on the web app, and it is refused while you own a store with a live subscription or money in flight. To delete a store, see **Delete your store**.

@@ -46,6 +46,7 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     alarm: true,
   },
   'account-erased-propagation': { group: '2-housekeeping', kind: 'workflow', trigger: 'event' },
+  'store-deletion-execute': { group: '2-housekeeping', kind: 'workflow', trigger: 'event' },
   'audit-log-archive-weekly': {
     group: '2-housekeeping',
     kind: 'queue',

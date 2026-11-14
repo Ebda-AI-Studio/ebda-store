@@ -1,0 +1,46 @@
+{
+  "id": "account.export-erase-close",
+  "status": "live",
+  "area": "account",
+  "version": 2,
+  "versionDate": "2026-11-14",
+  "titleAr": "نزّل بياناتي أو اقفل حسابي",
+  "titleEn": "Download all my data, or close my account",
+  "screens": ["/stores/[id]/settings", "/account/settings"],
+  "api": [
+    "GET /stores/:storeId/export",
+    "GET /auth/me/export",
+    "POST /auth/me/erase",
+    "POST /auth/me/close-account",
+    "DELETE /auth/me"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": [
+    "store_admin (the store owner only, for the store export)",
+    "any signed-in user (own account)"
+  ],
+  "policy": "confirm",
+  "undo": {
+    "class": "none",
+    "note": "the export only reads; closing an account is irreversible"
+  },
+  "helpArticle": "export-your-store-data",
+  "questions": {
+    "ar": ["عايز نسخة من بيانات متجري", "ازاي اقفل حسابي؟"],
+    "en": ["Can I download all my store data?", "How do I close my account?"]
+  },
+  "steps": [
+    "Open Settings, press Download my data",
+    "You get a zip: one NDJSON file per table plus manifest.json"
+  ],
+  "edgeCases": [
+    "One export per store per hour (429 after that)",
+    "Above 20000 rows in total the export is refused with 413 EXPORT_TOO_LARGE and a plain message (an async job for bigger stores is not built)",
+    "Owner only; another store answers 404; the bundle holds only that store's rows and no API key hashes or provider credentials",
+    "Closing the account is refused while the owner has a live billed store or money in flight; the erasure job is flag-gated (PDPL_CF_ERASURE_ENABLED), flag off records the request"
+  ],
+  "gaps": [
+    "Account closure from the admin app is not built (it lives in the web account settings only)"
+  ]
+}

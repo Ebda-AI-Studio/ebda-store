@@ -1785,6 +1785,17 @@ export class StoreService {
     await this.setSettingsKey(storeId, 'qr', qr);
   }
 
+  /**
+   * STORE-LIFECYCLE-1: write the owner's store-deletion request (`settings.deletionRequest`, a SERVER-OWNED key: no generic
+   * settings write can plant, change or erase it). One atomic key write, so a concurrent settings save never clobbers it.
+   */
+  static async setDeletionRequest(
+    storeId: string,
+    request: Record<string, unknown> | object | null
+  ) {
+    await this.setSettingsKey(storeId, 'deletionRequest', request);
+  }
+
   /** BARCODE-1: replace `settings.labels` only (atomic jsonb_set, see updateQrSettings). */
   static async updateLabelSettings(storeId: string, labels: Record<string, unknown>) {
     await this.setSettingsKey(storeId, 'labels', labels);

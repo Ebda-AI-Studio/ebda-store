@@ -13,6 +13,7 @@ import { apiGet, apiPatch, apiPut } from '../../../../lib/api';
 import { PLAN_LABELS, STORE_PLANS, type StorePlan } from '@ebda/shared';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
+import { OwnerStoreLifecycle } from './_components/OwnerStoreLifecycle';
 
 /**
  * Fetches the store theme and surfaces the aiAutopilot flag as a small
@@ -760,6 +761,8 @@ export default function StoreSettingsPage() {
           </Button>
         </div>
       </Modal>
+      {/* A11: owner-only data export + store deletion (the section hides itself for anyone who is not the owner) */}
+      <OwnerStoreLifecycle storeId={storeId} />
     </AdminLayout>
   );
 }
