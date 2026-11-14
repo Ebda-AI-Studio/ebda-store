@@ -82,6 +82,18 @@ describe('stock-hold-cap', () => {
       }
     });
 
+    it('counts failed-payment orders as open holds in BOTH the identity and the IP query (Ruling INV-AUDIT-2)', async () => {
+      const t = tx(0);
+      await assertStockHoldCapNotExceeded(t, 'store1', 'cod', {
+        phone: '+201000000000',
+        ip: '1.2.3.4',
+      });
+      const sql = (t.$queryRaw.mock.calls[0][0] as readonly string[]).join('?');
+      const filters = sql.match(/"payment_status" IN \('unpaid', 'failed'\)/g) ?? [];
+      expect(filters).toHaveLength(2);
+      expect(sql).not.toMatch(/"payment_status" = 'unpaid'/);
+    });
+
     it('gateway IP cap is 4x the gateway identity cap (20) and configurable', async () => {
       await expect(
         assertStockHoldCapNotExceeded(tx(0, 19), 'store1', 'paymob', { ip: '1.2.3.4' })

@@ -177,8 +177,10 @@ function identity(input: CheckoutInput): { phone: string | null; email: string |
   const email = rawEmail.trim().toLowerCase();
   return { phone: phone || null, email: email || null };
 }
+// An open hold is an order that took stock and has no captured payment: `unpaid`, or `failed` (a declined payment still holds
+// its units: the order stays payable for a retry and nothing else closes it; Ruling INV-AUDIT-2).
 const OPEN =
-  "status IN ('pending', 'awaiting_payment_confirmation') AND payment_status = 'unpaid' AND deleted_at IS NULL";
+  "status IN ('pending', 'awaiting_payment_confirmation') AND payment_status IN ('unpaid', 'failed') AND deleted_at IS NULL";
 const LIVE = "status NOT IN ('cancelled', 'refunded')";
 
 interface OrderLine {

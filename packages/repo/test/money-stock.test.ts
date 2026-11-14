@@ -519,6 +519,20 @@ describe('checkout core: review fixes (coupon identity, targeting, trust boundar
     ).toBe(500);
   });
 
+  it('stock-hold cap counts a FAILED-payment order as an open hold (Ruling INV-AUDIT-2): declined cards cannot pin stock past the cap', () => {
+    const { raw, db, base } = fixture();
+    raw.exec(`UPDATE products SET inventory = 100 WHERE id = 'sku'`);
+    const o = () => base({ paymentMethod: 'cod', shippingAddress: { phone: '01012345678' } });
+    placeOrder(db, o());
+    placeOrder(db, o());
+    // both orders' payments were declined: the webhook moved them unpaid -> failed, and they still hold their units
+    raw.exec(`UPDATE orders SET payment_status = 'failed'`);
+    expect(err(() => placeOrder(db, o())).code).toBe('TOO_MANY_OPEN_ORDERS');
+    // a PAID order is still not a hold
+    raw.exec(`UPDATE orders SET payment_status = 'paid'`);
+    expect(placeOrder(db, o()).orderNumber).toBeTruthy();
+  });
+
   it('the hold cap is decided from the FINAL payment state: a token wallet amount does not exempt, a full wallet payment does, an omitted method is capped strictly', () => {
     const { raw, db, base } = fixture();
     raw.exec(`UPDATE products SET inventory = 100 WHERE id = 'sku'`);

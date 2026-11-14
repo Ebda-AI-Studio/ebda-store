@@ -32,9 +32,16 @@
  * `storeId`/`paymentStatus`/`status` use the SAME "open hold" definition the
  * auto-cancel cron uses for its own query — status `pending` (COD, and
  * InstaPay before `initiate`) or `awaiting_payment_confirmation` (InstaPay
- * after `initiate`), `paymentStatus: 'unpaid'`, not soft-deleted.
+ * after `initiate`), `paymentStatus` unpaid or failed, not soft-deleted.
  */
 import { AppError } from '../middleware/error-handler';
+
+/**
+ * Order payment states that still HOLD stock: `unpaid`, and `failed` (a declined payment keeps its units and stays
+ * payable for a retry, so nothing else releases it; Ruling INV-AUDIT-2). The auto-cancel sweep selects these and the
+ * cap's raw SQL below counts them; the Durable Object's checkout `OPEN` predicate is the same list.
+ */
+export const OPEN_HOLD_PAYMENT_STATUSES = ['unpaid', 'failed'] as const;
 
 /** Payment methods whose order-creation hold has no synchronous capture. */
 export const HOLD_CAPPED_PAYMENT_METHODS: ReadonlySet<string> = new Set(['cod', 'instapay']);
@@ -219,14 +226,14 @@ export async function assertStockHoldCapNotExceeded(
       (SELECT COUNT(*) FROM "orders"
        WHERE "store_id" = ${storeId}
          AND "status" IN ('pending', 'awaiting_payment_confirmation')
-         AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL
+         AND "payment_status" IN ('unpaid', 'failed') AND "deleted_at" IS NULL
          AND ((${phone}::text IS NOT NULL AND "shipping_address" #>> '{phone}' = ${phone})
            OR (${email}::text IS NOT NULL AND lower(btrim("shipping_address" #>> '{email}')) = ${email}))
       ) AS phone_or_email_count,
       (SELECT COUNT(*) FROM "orders"
        WHERE "store_id" = ${storeId}
          AND "status" IN ('pending', 'awaiting_payment_confirmation')
-         AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL
+         AND "payment_status" IN ('unpaid', 'failed') AND "deleted_at" IS NULL
          AND ${ip}::text IS NOT NULL AND "checkout_ip" = ${ip}
          AND "created_at" >= (now() AT TIME ZONE 'UTC') - make_interval(hours => ${caps.ipWindowHours}::int)
       ) AS ip_count

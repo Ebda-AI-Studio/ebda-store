@@ -113,6 +113,14 @@ describe('order-auto-cancel-unpaid throttle', () => {
     expect(timersOutsideStep.filter(ms => ms > 0)).toEqual([]);
   });
 
+  it('the sweep also selects FAILED-payment orders so their held stock is released on the same timer (Ruling INV-AUDIT-2)', async () => {
+    await h.handler!({ step });
+    const where = h.findMany.mock.calls[0][0].where;
+    expect(where.paymentStatus).toEqual({ in: ['unpaid', 'failed'] });
+    expect(where.status).toBe('pending');
+    expect(where.payments).toEqual({ none: { provider: 'cod' } });
+  });
+
   it('an order a webhook PAID after the provider answered "expired" is not cancelled (row lock + re-check)', async () => {
     h.queryRaw.mockResolvedValue([{ status: 'confirmed', payment_status: 'paid' }]);
     const r = await h.handler!({ step });

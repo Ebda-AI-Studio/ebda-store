@@ -11,6 +11,7 @@ import { AppError } from '../../../middleware/error-handler';
 import { recordPaymentEventForStore } from '../../../services/payment-event.service';
 import { sweepStoresDb } from '../../jobs/store-db';
 import { storeMoney } from '../../repo-factory';
+import { OPEN_HOLD_PAYMENT_STATUSES } from '../../stock-hold-cap';
 
 /**
  * Auto-cancel stale unpaid orders — daily cron (03:00 UTC).
@@ -155,7 +156,8 @@ export const orderAutoCancelUnpaid: JobDef = inngest.createFunction(
             where: {
               storeId,
               status: 'pending',
-              paymentStatus: 'unpaid',
+              // `failed` too: a declined payment keeps its units held and stays payable, nothing else closes it (INV-AUDIT-2)
+              paymentStatus: { in: [...OPEN_HOLD_PAYMENT_STATUSES] },
               deletedAt: null,
               createdAt: { lt: threshold },
               // Cash on delivery is never "abandoned at the gateway": the
