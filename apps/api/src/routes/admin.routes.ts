@@ -45,6 +45,17 @@ import {
   rejectClaim,
   suggestManualPeriod,
 } from '../services/billing/account.service';
+import {
+  listAutoConfirmationsForAdmin,
+  revertAutoConfirmed,
+} from '../services/billing/instapay-auto-confirm.service';
+import {
+  getAutoMode,
+  listDisabledStores,
+  setAutoMode,
+  setStoreAuto,
+} from '../services/billing/instapay-auto-settings';
+import { instapayAutoReady } from '../lib/instapay-dedupe';
 import multer from 'multer';
 import {
   INSTAPAY_RECEIPT_MAX_BYTES,
@@ -631,6 +642,92 @@ router.get(
         .object({ status: z.enum(['pending', 'confirmed', 'rejected']).default('pending') })
         .parse(req.query);
       res.json({ success: true, data: { claims: await listClaimsForAdmin(status) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * InstaPay auto-confirm controls (Ruling INSTAPAY-AUTO-1, super_admin only). Each write needs a reason and takes effect on the very next
+ * decision (no cache, no deploy). valid reason: platform kill switch / money dispute (operator-only).
+ */
+router.get(
+  '/billing/auto-confirmations',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { state } = z
+        .object({
+          state: z
+            .enum(['pending_decision', 'auto_confirmed', 'needs_human', 'reverted', 'failed'])
+            .optional(),
+        })
+        .parse(req.query);
+      const [confirmations, mode, disabledStores] = await Promise.all([
+        listAutoConfirmationsForAdmin(state),
+        getAutoMode(),
+        listDisabledStores(),
+      ]);
+      res.json({
+        success: true,
+        data: { confirmations, mode, disabledStores, readiness: instapayAutoReady() },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/billing/auto-confirmations/:id/revert',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = z.string().uuid().parse(req.params.id);
+      const { reason } = z.object({ reason: z.string().trim().min(3).max(300) }).parse(req.body);
+      const out = await revertAutoConfirmed({ id, actor: req.user!.userId, reason });
+      res.json({ success: true, data: out });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/billing/auto-confirm/mode',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { mode, reason } = z
+        .object({
+          mode: z.enum(['off', 'shadow', 'live']),
+          reason: z.string().trim().min(5).max(300),
+        })
+        .parse(req.body);
+      res.json({
+        success: true,
+        data: { mode: await setAutoMode(mode, req.user!.userId, reason) },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/stores/:id/auto-confirm',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = z.string().uuid().parse(req.params.id);
+      const { enabled, reason } = z
+        .object({ enabled: z.boolean(), reason: z.string().trim().min(5).max(300) })
+        .parse(req.body);
+      res.json({
+        success: true,
+        data: { enabled: await setStoreAuto(storeId, enabled, req.user!.userId, reason) },
+      });
     } catch (error) {
       next(error);
     }
