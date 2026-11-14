@@ -136,9 +136,10 @@ describe('accounting-expense-ocr-process on a DO store', () => {
     expect(args).toMatchObject({
       expenseAccountId: 'acc-util',
       paidFromAccountId: 'acc-cash',
-      amount: 11400,
+      // ACCT-AUDIT-2: the receipt's 114.00 total INCLUDES the 14.00 VAT, so net 100.00 + tax 14.00 = 114.00 (not 128.00)
+      amount: 10000,
       taxAmount: 1400,
-      total: 12800,
+      total: 11400,
       currency: 'EGP',
       fxRate: 1,
       createdBy: 'u1',
