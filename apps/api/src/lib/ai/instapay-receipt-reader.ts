@@ -23,6 +23,12 @@ import {
   toAsciiDigits,
   type InstapayReceiptExtraction,
 } from '@ebda/shared';
+import {
+  INSTAPAY_EXTRACT_JSON_SCHEMA,
+  INSTAPAY_EXTRACT_PROMPT,
+  parseReceiptExtraction,
+  type ParsedExtraction,
+} from '@ebda/shared';
 import { cfBindings } from '../../cf/bindings';
 import { assertAiQuota } from '../ai-quota';
 import { recordUsage } from '../../services/ai.service';
@@ -311,6 +317,100 @@ export async function readInstapayReceipt(args: {
       out.receiverMatch = null;
     }
     return out;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+// ───────────── InstaPay auto-confirm read (Ruling INSTAPAY-AUTO-1, subscription receipts ONLY) ─────────────
+// The model fills the foundation's typed object (amount, Ebda's own recipient handle, date, time, reference + two judgements about the
+// image); `parseReceiptExtraction` validates it by hand and plain code decides elsewhere. Receipt text is never an instruction: unexpected
+// keys are dropped, instruction-like text nulls the extract and raises `suspiciousText`. Order receipts never come through here (M-003: no
+// shopper personal data is extracted); their reader above is untouched.
+
+export type AutoReadCall = (args: {
+  storeId: string;
+  imageBase64: string;
+  mimeType: string;
+  signal?: AbortSignal;
+}) => Promise<unknown>;
+
+const defaultAutoCall: AutoReadCall = async ({ storeId, imageBase64, mimeType, signal }) => {
+  const ai = cfBindings()?.AI;
+  if (!ai) {
+    throw Object.assign(new Error('Workers AI binding is not available'), {
+      code: 'AI_UNAVAILABLE',
+    });
+  }
+  await assertAiQuota({ storeId });
+  const override = cfBindings()?.INSTAPAY_RECEIPT_AI_MODEL ?? process.env.INSTAPAY_RECEIPT_AI_MODEL;
+  const model =
+    (typeof override === 'string' ? override.trim() : '') || INSTAPAY_RECEIPT_AI_MODEL_DEFAULT;
+  const out = await ai.run(
+    model,
+    {
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: INSTAPAY_EXTRACT_PROMPT },
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+          ],
+        },
+      ],
+      guided_json: INSTAPAY_EXTRACT_JSON_SCHEMA,
+      max_tokens: 300,
+      temperature: 0,
+    },
+    { signal }
+  );
+  const usage = (out as { usage?: { prompt_tokens?: number; completion_tokens?: number } } | null)
+    ?.usage;
+  await recordUsage(
+    storeId,
+    'instapay-receipt',
+    usage?.prompt_tokens ?? 0,
+    usage?.completion_tokens ?? 0,
+    false,
+    { model }
+  ).catch(() => undefined);
+  return unwrapWorkersAiAnswer(out);
+};
+
+let autoCall: AutoReadCall = defaultAutoCall;
+export function setAutoReadCallForTests(fn: AutoReadCall | null): void {
+  autoCall = fn ?? defaultAutoCall;
+}
+
+/**
+ * One auto-confirm read. EVERY failure (no binding, timeout, quota, bad JSON) is `null`: the caller treats it as "no typed extract", which
+ * the decision turns into `needs_human` (the existing review stays the fallback, unchanged).
+ */
+export async function readReceiptForAutoConfirm(
+  image: { bytes: Uint8Array; mime: string },
+  opts: { storeId: string; timeoutMs?: number }
+): Promise<ParsedExtraction | null> {
+  const ctl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      ctl.abort();
+      reject(Object.assign(new Error('instapay auto read timeout'), { code: 'AI_TIMEOUT' }));
+    }, opts.timeoutMs ?? INSTAPAY_RECEIPT_AI_TIMEOUT_MS);
+  });
+  try {
+    const raw = await Promise.race([
+      autoCall({
+        storeId: opts.storeId,
+        imageBase64: Buffer.from(image.bytes).toString('base64'),
+        mimeType: image.mime,
+        signal: ctl.signal,
+      }),
+      timeout,
+    ]);
+    return parseReceiptExtraction(raw);
+  } catch {
+    return null;
   } finally {
     if (timer) clearTimeout(timer);
   }
