@@ -10,6 +10,7 @@ import {
   StoreStatus,
   currentStoreId,
   withUser,
+  withStore,
   asPlatformOperator,
 } from '@ebda/database';
 import { StoreService, type SocialLinksPatch } from '../services/store.service';
@@ -49,6 +50,11 @@ import { preserveMaskedPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
 import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
+import {
+  closeAppealsOnReactivation,
+  recordSuspension,
+  type TrustDb,
+} from '../services/trust-requests.service';
 
 const router = Router();
 
@@ -862,7 +868,11 @@ router.delete(
   }
 );
 
-const storeStatusBody = z.object({ status: z.enum(['active', 'suspended']) });
+// `reason` (suspend only): what the merchant reads at GET /stores/:storeId/suspension (A13).
+const storeStatusBody = z.object({
+  status: z.enum(['active', 'suspended']),
+  reason: z.string().trim().min(1).max(500).optional(),
+});
 const templateBody = z.object({ template: z.string().trim().min(1).max(40) });
 const domainBody = z.object({ domain: z.string().max(253).nullable() });
 
@@ -888,6 +898,20 @@ router.patch(
       // cache, leaving a suspended store serving the cached active resolve
       // — checkouts included — for up to the TTL).
       const store = await StoreService.setStatus(req.params.id, status as 'active' | 'suspended');
+
+      // A13: keep the reason for the merchant to read, and close their open appeal on a reactivation.
+      // Staff keep the decision; this only records it.
+      // The status write above is the source of truth: a failed note is logged, never a failed suspension.
+      await withStore(req.params.id, async tx => {
+        const trustDb = tx as unknown as TrustDb;
+        if (status === 'suspended') {
+          await recordSuspension(trustDb, req.params.id, req.user!, parsedStatus.data.reason);
+        } else {
+          await closeAppealsOnReactivation(trustDb, req.params.id);
+        }
+      }).catch(err => {
+        logger.warn({ err, storeId: req.params.id }, '[store.status] suspension note write failed');
+      });
 
       // Invalidate the feature cache — store.status doesn't change the
       // resolved feature map directly, but downstream gates (storefront

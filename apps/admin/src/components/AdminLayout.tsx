@@ -30,6 +30,8 @@ import { SidebarHeader } from './admin-layout/SidebarHeader';
 import { CommandPalette } from './CommandPalette';
 import { SidebarNav } from './admin-layout/SidebarNav';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
+import { ContactEbdaDialog } from './support/ContactEbdaDialog';
+import { SuspensionNotice } from './support/SuspensionNotice';
 import { TopBar } from './admin-layout/TopBar';
 import { SettingsRail } from './admin-layout/SettingsRail';
 import { DocumentTitle } from './DocumentTitle';
@@ -555,6 +557,8 @@ export function AdminLayout({
           parent={resolvedParent}
         />
 
+        {navStoreId && <SuspensionNotice storeId={navStoreId} />}
+
         {/* Hub tab nav — shown above page content when inside a multi-route hub
             (Catalog, Sales, Stock, Finance, Marketing). Empty for single-page
             hubs (Dashboard, Analytics, Settings). */}
@@ -573,6 +577,8 @@ export function AdminLayout({
           <div className="p-4 pb-20 lg:p-6 lg:pb-6">{children}</div>
         )}
       </main>
+
+      <ContactEbdaDialog storeId={navStoreId || null} />
 
       {/* Mobile Bottom Nav — store-scoped only. Renders nothing at
           md+ widths (its own internal `md:hidden`). When the merchant

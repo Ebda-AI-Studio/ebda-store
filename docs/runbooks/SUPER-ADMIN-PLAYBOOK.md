@@ -1,11 +1,12 @@
 # Super-admin playbook
 
-> How to onboard a new merchant, change plans, grant/revoke individual features, and suspend / reactivate a store.
+> Merchants run onboarding, plan changes, suspension appeals and support requests themselves. This playbook describes each merchant path first, then what a super admin does as the override or the decision.
 
 ## Roles
 
 - **`super_admin`** — Ahmad and any future Ebda AI Studio staff. Can see and toggle ALL features for any store, change plans, and suspend/reactivate. Sees the "Manage Features" link in the store sidebar.
-- **`store_admin`** — Merchant team. Can see + use only the features that resolve to enabled for their store. Does NOT see "Manage Features" or any plan-change UI. Plan is shown read-only.
+- **`store_admin`** — Merchant team. Can see + use only the features that resolve to enabled for their store. Does NOT see "Manage Features" (the per-feature override screen). A merchant DOES change their own plan: Billing page (`POST /stores/:storeId/billing/checkout`, `PUT .../billing/trial-plan` while trialing, cancel and resume). The super admin's plan dropdown is the override, not the normal path.
+- Merchants reach Ebda staff with **Contact Ebda Store** (sidebar), which stores a request and emails the support inbox (`BRAND.supportEmail`); see "Requests merchants send you" below.
 
 ## Plans
 
@@ -38,6 +39,15 @@ isFeatureEnabled(storeId, key) =
 
 ## How to onboard a new merchant
 
+**Merchant path (default).** The merchant signs up, verifies their email, and creates the store in the onboarding stepper (`POST /onboarding/store`); it starts on the Growth trial and they pick the plan billed at trial end. Nobody on staff is needed. Two blockers have their own merchant path, with staff as the decision:
+
+- **Protected brand address**: the merchant files a claim with proof (`POST /onboarding/slug-claims`). You review it; to release it, create the store as a super admin (the `allowProtected` override) or have them retry once you lift it.
+- **Daily store limit**: the merchant files a request with proof (`POST /onboarding/store-cap-requests`). You decide.
+
+Both arrive by email to the support inbox and are stored in `trust_requests` (`kind = slug_claim | store_cap`, `status = open`).
+
+**Staff path (override, for a contract-led merchant).**
+
 1. Sign the contract + collect payment.
 2. From the super-admin sidebar, create the store (existing `POST /admin/stores` flow).
 3. The store is created on `plan = free` by default. From the "Manage Features" page, **change the plan dropdown to the tier the merchant signed for** (Starter / Professional / Enterprise).
@@ -45,6 +55,10 @@ isFeatureEnabled(storeId, key) =
 5. Onboarding continues per the existing checklist (branding, catalog import, payment provider, training).
 
 ## How to change a merchant's plan
+
+**Merchant path (default).** The merchant opens **Billing**, picks a plan and pays (checkout), or changes the trial plan while trialing, or cancels and resumes. No staff step.
+
+**Staff path (override).** Use it for a negotiated plan or a fix:
 
 1. Go to the store's **Manage Features** page (super-admin sidebar).
 2. Change the plan dropdown. Confirm in the modal — overrides will be preserved.
@@ -66,22 +80,42 @@ Audit log records every toggle: action, user, store, ip, timestamp. Visible in t
 
 ## How to suspend a store
 
-Suspension is for missed renewals + AUP violations. **Super-admin only.**
+Suspension is for missed renewals + AUP violations. **The decision is super-admin only.** The merchant can read the reason and appeal once; they cannot lift it.
 
 1. Go to the store's **Settings** page → Danger Zone (visible only to super-admin).
-2. Click **"Suspend Store"**. Confirm modal.
+2. Click **"Suspend Store"**, type the **reason** (it is shown to the merchant, so write it as you would say it to them; up to 500 characters) and confirm. The API takes it as `reason` on `PATCH /stores/:id/status`.
 3. Internal effects:
    - `Store.status = 'suspended'`
    - Feature cache invalidated
    - AuditLog entry written (`action: store.suspend`)
+   - The reason is saved (`trust_requests`, `kind = suspension`) and shown in a banner on every page of that store's dashboard
 4. External effects:
    - Storefront serves the `StoreMaintenance` page (HTTP 200 with branded "we'll be back soon" + "Powered by Ebda AI Studio" link)
    - Store admin can still log into admin (so they can pay invoice + click reactivate)
    - Background jobs (Inngest functions, abandoned cart reminders, etc.) skip suspended stores
 
+## Appeals
+
+A merchant of a suspended store sees the reason in a banner and can send ONE appeal (`POST /stores/:storeId/suspension/appeal`, 1000 characters). It reaches the support inbox by email and is stored (`kind = suspension_appeal`, `status = open`). A billing suspension (`billingSuspendedReason` set) cannot be appealed: the banner tells them to settle the invoice. You decide: reply to the merchant by email, then reactivate (below) to accept. Rejecting is a reply by email; the appeal stays `open` so the merchant cannot file a second one, so mark it `rejected` in `trust_requests` once you have replied.
+
 ## How to reactivate
 
-Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request.
+Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request. Reactivating also marks the store's open appeal `resolved`.
+
+## Requests merchants send you
+
+Every request below lands in the support inbox by email (reply-to is the merchant) and in `trust_requests`:
+
+| `kind`              | Where the merchant files it                                                                                                 | Limit                       | Your action                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------- | --------------------------------- |
+| `support`           | **Contact Ebda Store** (sidebar, and inside screens that need staff, such as a 3D models card that says it is switched off) | 5 per store per day         | reply by email                    |
+| `suspension_appeal` | banner on a suspended store                                                                                                 | 1 open per store            | reply, then reactivate or reject  |
+| `slug_claim`        | onboarding, protected address                                                                                               | 1 open per user and address | verify proof, release the address |
+| `store_cap`         | onboarding, daily store limit                                                                                               | 1 open per user             | verify proof, raise the limit     |
+
+**3D models** are on by default for every plan (`product_3d`, tier core). They are off for a store only when a super admin override disables it on Manage Features; the merchant's card then says so and offers Contact Ebda Store. Clear the override to turn them back on.
+
+There is no review screen for these yet: the email is the queue, `trust_requests` is the record.
 
 ## How to delete a store
 

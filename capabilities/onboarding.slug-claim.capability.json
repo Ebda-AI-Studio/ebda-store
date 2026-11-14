@@ -1,0 +1,32 @@
+{
+  "id": "onboarding.slug-claim",
+  "status": "live",
+  "area": "trust",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اطلب عنوان متجر محمي بإثبات",
+  "titleEn": "Claim a protected store address with proof",
+  "screens": ["/onboarding (store step)"],
+  "api": ["POST /onboarding/slug-claims"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible"
+  },
+  "helpArticle": "protected-address-and-store-limit",
+  "questions": {
+    "ar": ["العنوان ده محمي ازاي اطلبه؟"],
+    "en": ["How do I claim a protected address?"]
+  },
+  "steps": [
+    "Type the address, press Claim this address, describe your proof, add a https link, send"
+  ],
+  "edgeCases": [
+    "Only addresses on the protected brand list can be claimed",
+    "One open claim per address per account (duplicate 409)",
+    "Ebda staff decide; the merchant never lifts the protection"
+  ],
+  "gaps": []
+}

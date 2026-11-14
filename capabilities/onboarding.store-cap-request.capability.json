@@ -1,0 +1,31 @@
+{
+  "id": "onboarding.store-cap-request",
+  "status": "live",
+  "area": "trust",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اطلب حد يومي أعلى لعمل المتاجر",
+  "titleEn": "Ask for a higher daily store limit",
+  "screens": ["/onboarding (store step, after the daily limit message)"],
+  "api": ["POST /onboarding/store-cap-requests"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible"
+  },
+  "helpArticle": "protected-address-and-store-limit",
+  "questions": {
+    "ar": ["وصلت الحد اليومي للمتاجر"],
+    "en": ["I hit the daily store limit"]
+  },
+  "steps": [
+    "When creation says the daily limit is reached, fill the request form with the reason and proof, send"
+  ],
+  "edgeCases": [
+    "One open request per account (second is 409)",
+    "Ebda staff decide and raise the limit"
+  ],
+  "gaps": []
+}

@@ -1,0 +1,31 @@
+{
+  "id": "store.suspension-appeal",
+  "status": "live",
+  "area": "trust",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اقرا سبب إيقاف متجري واعترض عليه",
+  "titleEn": "Read why my store is suspended and appeal",
+  "screens": ["banner on every store page while suspended"],
+  "api": ["GET /stores/:storeId/suspension", "POST /stores/:storeId/suspension/appeal"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["store_admin", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible"
+  },
+  "helpArticle": "appeal-a-store-suspension",
+  "questions": {
+    "ar": ["ليه متجري موقوف؟", "ازاي اعترض على الإيقاف؟"],
+    "en": ["Why is my store suspended?", "How do I appeal a suspension?"]
+  },
+  "steps": ["Open any store page, read the banner, press Appeal this decision, explain, send"],
+  "edgeCases": [
+    "Only one open appeal per store (second is 409)",
+    "A store that is not suspended answers 404",
+    "A billing suspension shows its billing reason and is not appealed; settle the invoice",
+    "Ebda staff decide the appeal; reactivating the store resolves it"
+  ],
+  "gaps": []
+}

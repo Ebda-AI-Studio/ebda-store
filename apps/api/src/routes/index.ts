@@ -51,6 +51,7 @@ import barcodeLabelRoutes from './barcode-labels.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
 import catalogImportRoutes from './catalog-import.routes';
+import supportRoutes from './support.routes';
 import variantRoutes from './variant.routes';
 import productModelRoutes from './product-model.routes';
 import categoryRoutes from './category.routes';
@@ -375,6 +376,8 @@ router.use('/stores', tenantContext, barcodeLabelRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);
 router.use('/stores', tenantContext, catalogImportRoutes);
+// Merchant to Ebda staff: support request, suspension reason + appeal (SELF-SERVICE A13/A14)
+router.use('/stores', tenantContext, supportRoutes);
 router.use('/stores', tenantContext, variantRoutes);
 
 // Loyalty routes. Pulled out of the bare-'/stores'-only block above (fixed

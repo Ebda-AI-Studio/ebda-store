@@ -5,6 +5,15 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireVerifiedEmail } from '../middleware/require-verified-email';
 import { tenantContext } from '../middleware/tenant-context';
 import { auditLog, writeLimiter } from '../middleware/security';
+import { withUser } from '@ebda/database';
+import { parseInput } from '../lib/parse-input';
+import { getAuthUser } from '../utils/store-helpers';
+import {
+  fileSlugClaim,
+  fileStoreCapRequest,
+  notifyStaff,
+  type TrustDb,
+} from '../services/trust-requests.service';
 import { OnboardingService } from '../services/onboarding.service';
 import { createStoreSchema } from './onboarding.schemas';
 import { applyOnboardingInstapay } from '../services/onboarding-instapay';
@@ -31,6 +40,93 @@ router.get('/state', ...merchantOnly, async (req: Request, res: Response, next: 
     next(error);
   }
 });
+
+// A16: a merchant who hits a protected brand address, or the daily store-creation cap, asks Ebda staff with evidence.
+// Filed before a store exists, so the row is keyed on the user (withUser). Staff decide: a super admin lifts the
+// protected list (`allowProtected`) or the cap through the existing super-admin paths.
+const evidenceUrl = z
+  .string()
+  .trim()
+  .max(500)
+  .refine(u => u.startsWith('https://'), 'Evidence link must be https')
+  .optional();
+const slugClaimBody = z.object({
+  slug: z.string().trim().min(1).max(60),
+  evidence: z.string().trim().min(10).max(1000),
+  evidenceUrl,
+});
+const storeCapBody = z.object({ message: z.string().trim().min(10).max(1000), evidenceUrl });
+const asTrustDb = (tx: unknown) => tx as TrustDb;
+
+router.post(
+  '/slug-claims',
+  ...merchantOnly,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = getAuthUser(req);
+      const input = parseInput(slugClaimBody, req.body);
+      const row = await withUser(user.userId, tx =>
+        fileSlugClaim(asTrustDb(tx), { userId: user.userId, email: user.email }, input)
+      );
+      await auditLog({
+        action: 'onboarding.slug_claim',
+        userId: user.userId,
+        resourceType: 'trust_request',
+        resourceId: row.id,
+        details: { slug: input.slug.toLowerCase() },
+      });
+      await notifyStaff({
+        subject: `Protected address claim: ${input.slug.toLowerCase()}`,
+        lines: [
+          `Address: ${input.slug.toLowerCase()}`,
+          user.email ? `From: ${user.email}` : '',
+          input.evidenceUrl ? `Evidence: ${input.evidenceUrl}` : '',
+          '',
+          input.evidence,
+        ].filter(l => l !== ''),
+        replyTo: user.email,
+      });
+      res.status(201).json({ success: true, data: { id: row.id } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/store-cap-requests',
+  ...merchantOnly,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = getAuthUser(req);
+      const input = parseInput(storeCapBody, req.body);
+      const row = await withUser(user.userId, tx =>
+        fileStoreCapRequest(asTrustDb(tx), { userId: user.userId, email: user.email }, input)
+      );
+      await auditLog({
+        action: 'onboarding.store_cap_request',
+        userId: user.userId,
+        resourceType: 'trust_request',
+        resourceId: row.id,
+      });
+      await notifyStaff({
+        subject: 'Daily store limit request',
+        lines: [
+          user.email ? `From: ${user.email}` : '',
+          input.evidenceUrl ? `Evidence: ${input.evidenceUrl}` : '',
+          '',
+          input.message,
+        ].filter(l => l !== ''),
+        replyTo: user.email,
+      });
+      res.status(201).json({ success: true, data: { id: row.id } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // GET /onboarding/slug-check?slug=amelia - live availability for the stepper.
 // Authenticated (and rate limited) so it is not an open scraper of taken names.

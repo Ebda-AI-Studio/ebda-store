@@ -671,6 +671,28 @@ export const systemSettings = sqliteTable('system_settings', {
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
 });
 
+export const trustRequests = sqliteTable('trust_requests', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  kind: text('kind').notNull(),
+  storeId: text('store_id'),
+  userId: text('user_id'),
+  topic: text('topic'),
+  message: text('message'),
+  pageUrl: text('page_url'),
+  slug: text('slug'),
+  evidenceUrl: text('evidence_url'),
+  status: text('status').notNull().default('open'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
 export const webhookEvents = sqliteTable('webhook_events', {
   id: text('id')
     .primaryKey()

@@ -58,6 +58,7 @@ export const FAMILIES = {
     'provider_verifications',
     'provider_verification_events',
     'provider_activation_requests',
+    'trust_requests',
     'merchant_api_keys',
     'SlugRedirect',
   ],
