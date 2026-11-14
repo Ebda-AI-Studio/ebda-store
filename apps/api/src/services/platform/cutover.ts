@@ -68,7 +68,8 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
   // N-10d. MONEY: the InstaPay receipts of the subscription flow (and of order flows of stores still on Postgres) and the
   // manual-payment claims a super-admin confirms into the billing ledger. Own marker (never folded into `billing`, whose
   // marker may already exist in production: adding models to a flipped family would serve them empty).
-  payments: ['instapayReceipt', 'manualPaymentClaim'],
+  payments: ['instapayReceipt', 'manualPaymentClaim', 'instapayAutoConfirmation'],
+  // INSTAPAY-AUTO-1: `instapayAutoConfirmation` is born on D1 (new table, no Postgres rows to copy; the table exists in D1 from migration 0013).
   // N-10d. Non-money platform tables: per-store monthly usage snapshots, platform CI findings, answer-engine provider keys.
   // NZ-C-11: + oneSignalSubscription, the admin / staff / super_admin push devices (user-keyed, no store).
   ops: ['answerEngineProviderConfig', 'storeUsageSnapshot', 'ciInsight', 'oneSignalSubscription'],

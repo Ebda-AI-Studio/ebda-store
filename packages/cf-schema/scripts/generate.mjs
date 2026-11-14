@@ -783,6 +783,8 @@ const ANALYTICS_STORE_TABLES = [
 const ANALYTICS_PLATFORM_TABLES = ['ai_usage'];
 // Ruling NZ-C-11: admin push devices (family ops), added after 0001 went live.
 const ONESIGNAL_PLATFORM_TABLES = ['onesignal_subscriptions'];
+// Ruling INSTAPAY-AUTO-1: the auto-confirm decision rows, added after 0001 went live.
+const INSTAPAY_AUTO_PLATFORM_TABLES = ['instapay_auto_confirmations'];
 const onlyTables = (db, names) => ({
   ...db,
   tables: db.tables.filter(t => names.includes(t.name)),
@@ -827,6 +829,10 @@ function main() {
     'migrations/platform/0006_onesignal_subscriptions.sql': emitSql(
       onlyTables(out.d1, ONESIGNAL_PLATFORM_TABLES),
       'D1 onesignal_subscriptions (Ruling NZ-C-11), for a D1 that already ran 0001'
+    ),
+    'migrations/platform/0013_instapay_auto_confirm.sql': emitSql(
+      onlyTables(out.d1, INSTAPAY_AUTO_PLATFORM_TABLES),
+      'D1 instapay_auto_confirmations (Ruling INSTAPAY-AUTO-1), for a D1 that already ran 0001'
     ),
     ...Object.fromEntries(
       Object.entries(LATE_COLUMN_MIGRATIONS).map(([n, name]) => [

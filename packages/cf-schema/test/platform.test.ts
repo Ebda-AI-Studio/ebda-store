@@ -12,7 +12,7 @@ describe('D1 platform schema', () => {
 
   it('creates the manifest tables only: 29 models + entity_index + platform_audit_log, no identity table', () => {
     expect(tableNames(db)).toEqual(Object.keys(manifest.databases.d1.columnCounts).sort());
-    expect(tableNames(db).length).toBe(31);
+    expect(tableNames(db).length).toBe(32);
     for (const t of ['users', 'refresh_tokens', 'verification_tokens', 'passkey_credentials'])
       expect(tableNames(db)).not.toContain(t);
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);

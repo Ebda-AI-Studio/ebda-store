@@ -186,6 +186,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       subscription: 'StoreSubscription',
       billingEvents: 'BillingEvent',
       manualPaymentClaims: 'ManualPaymentClaim',
+      instapayAutoConfirmations: 'InstapayAutoConfirmation',
       instapayReceipts: 'InstapayReceipt',
       billingReminders: 'BillingReminder',
       lifecycleEmails: 'StoreLifecycleEmail',
@@ -1478,6 +1479,14 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
   {
     name: 'ManualPaymentClaim',
     table: 'manual_payment_claims',
+    storeId: true,
+    relations: {
+      store: 'Store',
+    },
+  },
+  {
+    name: 'InstapayAutoConfirmation',
+    table: 'instapay_auto_confirmations',
     storeId: true,
     relations: {
       store: 'Store',

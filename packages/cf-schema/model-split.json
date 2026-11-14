@@ -543,6 +543,10 @@
     "target": "d1",
     "reason": "plans/billing: platform-owned, read by super-admin across stores"
   },
+  "InstapayAutoConfirmation": {
+    "target": "d1",
+    "reason": "plans/billing: platform-owned, read by super-admin across stores"
+  },
   "BillingReminder": {
     "target": "d1",
     "reason": "plans/billing: platform-owned, read by super-admin across stores"
