@@ -35,6 +35,7 @@ const h = vi.hoisted(() => ({
   calls: [] as string[],
 }));
 
+vi.mock('@api/services/billing/addon-grant', () => ({ activeAddons: async () => [] }));
 vi.mock('@ebda/database', async () => {
   const { AsyncLocalStorage: ALS } = await import('node:async_hooks');
   const guardMod = await import('../../packages/database/src/tenant-guard');
