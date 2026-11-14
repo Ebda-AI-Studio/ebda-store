@@ -21,7 +21,7 @@
 - Revert ("not received") puts the plan back to unpaid with a 48 h grace; the merchant is told plainly to upload a correct receipt or pay by card before paid features pause; unused Chat top-up credits from that payment are removed; idempotent; logged (Ahmad).
 - Digest: one Telegram message a day to Ahmad via @EbdaAIStudiobot with a one-tap "not received" per payment, plus an immediate message for anything waiting on him (spec 7.4).
 - Per-store flag and a global kill switch, changeable without a deploy (spec 6.9 rollout controls).
-- Ebda copy: Egyptian-Arabic full sentences; never bare "Ebda"; no orange; zero Force AI references in Ebda repos.
+- Ebda copy: Egyptian-Arabic full sentences; never bare "Ebda"; no orange; no references to any other company brand in Ebda repos.
 - The shared module changes only in `ebda-foundation`; consumers never edit vendored files (`foundation.lock.json` + parity test enforce it).
 - Every feature ships with its docs in the same PR (help articles ar/en, rulings, RETENTION doc for the new table).
 - GitHub Advanced Security stays off; no new cron on a Neon-backed app without `neon-audit` (this plan piggybacks the existing hourly `instapay-expiry` cron).
