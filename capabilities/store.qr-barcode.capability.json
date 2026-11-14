@@ -22,7 +22,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": "qr-codes; help/product-labels",
+  "helpArticle": "qr-codes",
   "questions": {
     "ar": ["ازاي اطبع QR للمتجر؟", "اطبع باركود للمنتجات", "QR بيوجه لفين؟"],
     "en": ["How do I print a QR code for my store?"]
@@ -37,5 +37,8 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Analytics of QR scans broken on DO stores until #752 merges"]
+  "gaps": [
+    "Analytics of QR scans broken on DO stores until #752 merges",
+    "also documented in: product-labels"
+  ]
 }

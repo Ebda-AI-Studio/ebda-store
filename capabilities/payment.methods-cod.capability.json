@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": "orders-and-cod; help/payment-providers",
+  "helpArticle": "orders-and-cod",
   "questions": {
     "ar": [
       "ازاي افعل الدفع عند الاستلام؟",
@@ -40,5 +40,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": []
+  "gaps": ["also documented in: payment-providers"]
 }

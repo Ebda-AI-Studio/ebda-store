@@ -16,7 +16,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": "whatsapp/use-the-shared-number; help/whatsapp/verify-your-business-on-meta; help/whatsapp/meta-fees-explained; help/whatsapp/campaigns-and-opt-out; help/whatsapp/cod-confirmations; help/whatsapp/instapay-orders-in-whatsapp; help/whatsapp/service-menu-hours-and-location; help/whatsapp/team-members-and-seats; help/whatsapp/wallet-top-ups-and-refunds; help/whatsapp/your-customers-data; help/whatsapp/delete-your-workspace",
+  "helpArticle": "whatsapp/use-the-shared-number",
   "questions": {
     "ar": [
       "ميتا بتاخد كام على الرسايل؟",
@@ -39,5 +39,8 @@
     "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Chat actions not enumerated here (separate catalogue needed for ebda-whatsapp)"]
+  "gaps": [
+    "Chat actions not enumerated here (separate catalogue needed for ebda-whatsapp)",
+    "also documented in: whatsapp/verify-your-business-on-meta, whatsapp/meta-fees-explained, whatsapp/campaigns-and-opt-out, whatsapp/cod-confirmations, whatsapp/instapay-orders-in-whatsapp, whatsapp/service-menu-hours-and-location, whatsapp/team-members-and-seats, whatsapp/wallet-top-ups-and-refunds, whatsapp/your-customers-data, whatsapp/delete-your-workspace"
+  ]
 }
