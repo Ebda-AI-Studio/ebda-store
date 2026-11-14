@@ -352,12 +352,16 @@ describe('fraud matrix', () => {
 
   it('fraud: 20 concurrent decisions for one claim: exactly one ledger row and one decision row', async () => {
     const c = seedClaim(w);
-    const outs = await Promise.all(
+    const settled = await Promise.allSettled(
       Array.from({ length: 20 }, () => decideAndActivate({ storeId: A, claimId: c.claimId }))
     );
+    // concurrent decisions of one store are serialised: the others are a retryable AUTO_BUSY, never a second decision
+    for (const o of settled)
+      if (o.status === 'rejected') expect((o.reason as { code?: string }).code).toBe('AUTO_BUSY');
+    const retried = await decideAndActivate({ storeId: A, claimId: c.claimId });
     expect(events()).toHaveLength(1);
     expect(rowsOf()).toHaveLength(1);
-    expect(outs.filter(o => o.state === 'auto_confirmed').length).toBeGreaterThanOrEqual(1);
+    expect(retried.state).toBe('auto_confirmed');
   });
 
   it('fraud: 20 concurrent receipts of ONE transfer on 20 stores: exactly one wins, every other waits with a duplicate reason', async () => {

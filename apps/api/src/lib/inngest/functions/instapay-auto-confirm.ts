@@ -15,7 +15,8 @@ export const instapayAutoConfirm: JobDef = inngest.createFunction(
     id: 'instapay-auto-confirm',
     name: 'InstaPay: auto-confirm a matching subscription receipt',
     retries: 2,
-    concurrency: { limit: 3, key: 'event.data.storeId' },
+    // ONE decision per store at a time (Ruling INSTAPAY-CAP-1: the cumulative cap reads a sum); the D1 lock in the service is the backstop
+    concurrency: { limit: 1, key: 'event.data.storeId' },
     triggers: [{ event: 'instapay/auto-confirm.requested' }],
   },
   async ({ event, step }) => {

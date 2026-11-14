@@ -287,3 +287,67 @@ describe('finding 9: a revert that crashed after its state claim is finished by 
     expect(notices).toHaveLength(1);
   });
 });
+
+describe('N2: the cumulative cap holds under concurrency (per-store serialisation)', () => {
+  it('5 concurrent first payments of one store: at most one month is auto-confirmed, the rest wait or are retried', async () => {
+    const claims = Array.from({ length: 5 }, (_, i) =>
+      seedClaim(w, { reference: `30000000000${i}` })
+    );
+    const outs = await Promise.allSettled(
+      claims.map(c => decideAndActivate({ storeId: A, claimId: c.claimId }))
+    );
+    const confirmed = outs.filter(
+      o => o.status === 'fulfilled' && o.value.state === 'auto_confirmed'
+    );
+    expect(confirmed.length).toBeLessThanOrEqual(1);
+    // a busy store is a retryable refusal, never a decision taken on a stale sum
+    for (const o of outs)
+      if (o.status === 'rejected') expect((o.reason as { code?: string }).code).toBe('AUTO_BUSY');
+    // the retries (sequential, as the job retries them) never exceed the cap either
+    for (const c of claims)
+      await decideAndActivate({ storeId: A, claimId: c.claimId }).catch(() => undefined);
+    const total = (
+      w.db
+        .prepare(
+          "SELECT COUNT(*) n FROM instapay_auto_confirmations WHERE state = 'auto_confirmed'"
+        )
+        .get() as { n: number }
+    ).n;
+    expect(total).toBe(1);
+  });
+  it('a stale lock (a crashed run) does not block the store forever', async () => {
+    w.db
+      .prepare(
+        `INSERT INTO system_settings (id, key, value, category, created_at) VALUES (?, ?, '{}', 'billing', ?)`
+      )
+      .run(
+        `instapay.auto_confirm.lock.${A}`,
+        `instapay.auto_confirm.lock.${A}`,
+        Date.now() - 10 * 60_000
+      );
+    const c = seedClaim(w, { reference: '400000000001' });
+    expect((await decideAndActivate({ storeId: A, claimId: c.claimId })).state).toBe(
+      'auto_confirmed'
+    );
+  });
+});
+
+describe('backfill is paged', () => {
+  it('more than one page of approved receipts: every one is burned', async () => {
+    const ins = w.db.prepare(
+      `INSERT INTO instapay_receipts (id, store_id, kind, storage_key, mime_type, size_bytes, sha256, status, reference_key) VALUES (?, ?, 'subscription', 'k', 'image/png', 1, ?, 'approved', ?)`
+    );
+    for (let i = 0; i < 501; i++) {
+      const n = String(i).padStart(4, '0');
+      ins.run(`rcpt-${n}`, A, n.padStart(64, 'a'), `5000000${n.padStart(5, '0')}`);
+    }
+    expect(await backfillDedupeFromHistory({ dryRun: false })).toEqual({
+      scanned: 501,
+      burned: 501,
+      skipped: 0,
+    });
+    expect(w.dd.prepare("SELECT COUNT(*) n FROM instapay_dedupe WHERE kind = 'ref'").get()).toEqual(
+      { n: 501 }
+    );
+  });
+});

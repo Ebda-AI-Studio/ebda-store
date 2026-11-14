@@ -229,7 +229,65 @@ async function notifyWaiting(
   }
 }
 
+const LOCK_TTL_MS = 2 * 60_000;
+type LockD1 = {
+  prepare(sql: string): {
+    bind(...v: unknown[]): { run(): Promise<{ meta?: { changes?: number } }> };
+  };
+};
+
+/**
+ * Per-store serialisation of decisions (review N2, Ruling INSTAPAY-CAP-1): the cumulative first-payment cap reads the sum of not-yet-clean
+ * auto payments, so two concurrent decisions must not both read it before either writes. ONE conditional insert of a lock row (primary
+ * key = the store) on the platform D1 decides who runs; the loser gets a retryable AUTO_BUSY (the job retries, the hourly sweep catches the
+ * rest). A lock older than 2 minutes is a crashed run and is taken over. Without a platform D1 (Node tests on Postgres) the job's per-store
+ * concurrency of 1 is the serialisation.
+ */
+async function withStoreDecisionLock<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+  const d1 = (cfBindings() as { PLATFORM_DB?: LockD1 } | undefined)?.PLATFORM_DB;
+  if (!d1) return fn();
+  const id = `instapay.auto_confirm.lock.${storeId}`;
+  const token = JSON.stringify({ t: crypto.randomUUID() });
+  const now = Date.now();
+  await d1
+    .prepare('DELETE FROM system_settings WHERE id = ? AND created_at < ?')
+    .bind(id, now - LOCK_TTL_MS)
+    .run();
+  const got = await d1
+    .prepare(
+      "INSERT OR IGNORE INTO system_settings (id, key, value, category, created_at, updated_at) VALUES (?, ?, ?, 'billing', ?, ?)"
+    )
+    .bind(id, id, token, now, now)
+    .run();
+  if (Number(got.meta?.changes ?? 0) === 0)
+    throw new AppError(
+      409,
+      'AUTO_BUSY',
+      'Another InstaPay decision for this store is running; retry',
+      {
+        retryable: true,
+      }
+    );
+  try {
+    return await fn();
+  } finally {
+    await d1
+      .prepare('DELETE FROM system_settings WHERE id = ? AND value = ?')
+      .bind(id, token)
+      .run()
+      .catch(err => logger.error({ err, storeId }, '[instapay-auto] decision lock release failed'));
+  }
+}
+
 export async function decideAndActivate(args: {
+  storeId: string;
+  claimId: string;
+  now?: number;
+}): Promise<AutoOutcome> {
+  return withStoreDecisionLock(args.storeId, () => decideAndActivateLocked(args));
+}
+
+async function decideAndActivateLocked(args: {
   storeId: string;
   claimId: string;
   now?: number;
@@ -1094,6 +1152,8 @@ export async function claimDedupeForHumanConfirm(
  * Review finding 1 / plan R1 step 3: every receipt a person already APPROVED is burned in the global index so an old receipt can never be
  * replayed into an automatic confirmation. Idempotent (burn = INSERT OR IGNORE + UPDATE), `dryRun` only counts. Super-admin route.
  */
+const BACKFILL_PAGE = 500;
+
 export async function backfillDedupeFromHistory(opts: { dryRun: boolean }): Promise<{
   scanned: number;
   burned: number;
@@ -1103,30 +1163,43 @@ export async function backfillDedupeFromHistory(opts: { dryRun: boolean }): Prom
   if (!index && !opts.dryRun)
     throw new AppError(503, 'DEDUPE_UNBOUND', 'The InstaPay dedupe database is not bound');
   const db = await platformScope();
-  const rows: Array<{ id: string; storeId: string; referenceKey: string | null; sha256: string }> =
-    await db.instapayReceipt.findMany({
-      where: { status: 'approved' },
-      select: { id: true, storeId: true, referenceKey: true, sha256: true },
-      orderBy: { createdAt: 'asc' },
-      take: 5000,
-    });
   let burned = 0;
   let skipped = 0;
-  for (const r of rows) {
-    const referenceKey = normalizeReferenceKey(r.referenceKey ?? '');
-    if (!referenceKey || !/^[0-9a-f]{64}$/.test(r.sha256)) {
-      skipped++;
-      continue;
+  let scanned = 0;
+  let cursor: string | undefined;
+  // paged by id (500 per page): a large history never becomes one unbounded read
+  for (;;) {
+    const rows: Array<{
+      id: string;
+      storeId: string;
+      referenceKey: string | null;
+      sha256: string;
+    }> = await db.instapayReceipt.findMany({
+      where: { status: 'approved', ...(cursor ? { id: { gt: cursor } } : {}) },
+      select: { id: true, storeId: true, referenceKey: true, sha256: true },
+      orderBy: { id: 'asc' },
+      take: BACKFILL_PAGE,
+    });
+    if (rows.length === 0) break;
+    scanned += rows.length;
+    for (const r of rows) {
+      const referenceKey = normalizeReferenceKey(r.referenceKey ?? '');
+      if (!referenceKey || !/^[0-9a-f]{64}$/.test(r.sha256)) {
+        skipped++;
+        continue;
+      }
+      if (!opts.dryRun)
+        await index!.burn({
+          referenceKey,
+          imageSha256: r.sha256,
+          product: 'store',
+          ownerId: r.storeId,
+          paymentId: r.id,
+        });
+      burned++;
     }
-    if (!opts.dryRun)
-      await index!.burn({
-        referenceKey,
-        imageSha256: r.sha256,
-        product: 'store',
-        ownerId: r.storeId,
-        paymentId: r.id,
-      });
-    burned++;
+    if (rows.length < BACKFILL_PAGE) break;
+    cursor = rows[rows.length - 1].id;
   }
-  return { scanned: rows.length, burned, skipped };
+  return { scanned, burned, skipped };
 }
