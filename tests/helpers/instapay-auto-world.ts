@@ -133,7 +133,7 @@ export function seedClaim(w: World, s: Seed = {}) {
       .prepare(
         `INSERT INTO store_subscriptions (id, store_id, plan_code, status, updated_at, payment_reference) VALUES (?, ?, 'growth', 'trialing', 1, ?)`
       )
-      .run(uuid(), storeId, `EBD-${storeId.slice(0, 4)}`);
+      .run(uuid(), storeId, `EBD-${storeId.slice(-12)}`);
   w.db
     .prepare(
       `INSERT INTO manual_payment_claims (id, store_id, plan_code, billing_interval, amount_minor, method, payment_reference, payer_reference, status, created_at) VALUES (?, ?, 'growth', ?, ?, 'instapay', ?, ?, 'pending', ?)`

@@ -210,4 +210,24 @@ describe('S4 decide and activate', () => {
     expect(w.dd.prepare('SELECT COUNT(*) n FROM instapay_dedupe').get()).toEqual({ n: 0 });
     expect(h.alert).toHaveBeenCalled();
   });
+
+  it('a claim that is not the quoted charge (price changed after it was filed) waits even when the receipt matches the new price', async () => {
+    const c = seedClaim(w, { amountMinor: 4000 });
+    expect(await decideAndActivate({ storeId: A, claimId: c.claimId })).toMatchObject({
+      state: 'needs_human',
+      reasons: ['AMOUNT_MISMATCH'],
+    });
+    expect(events()).toHaveLength(0);
+  });
+
+  it('when the ledger row IS recorded but the rest of the activation fails, the dedupe claim stays held (the payment must stay unreusable)', async () => {
+    const c = seedClaim(w);
+    h.storeUpdate.mockRejectedValue(new Error('store write down'));
+    const out = await decideAndActivate({ storeId: A, claimId: c.claimId });
+    h.storeUpdate.mockResolvedValue({});
+    expect(out.state).toBe('failed');
+    expect(events()).toHaveLength(1);
+    expect(w.dd.prepare('SELECT COUNT(*) n FROM instapay_dedupe').get()).toEqual({ n: 2 });
+    expect(h.alert).toHaveBeenCalled();
+  });
 });
