@@ -58,6 +58,7 @@ export type NavLabels = {
   /** Legal documents + material-change notices (super_admin only, Ruling LEGAL-4) */
   platformPolicyUpdates: string;
   platformCiInsights: string;
+  platformActivation: string;
   /** Platform-wide settings, e.g. Ebda's own VAT (super_admin only) */
   platformSettings: string;
   // Super-admin store-scoped item
@@ -140,6 +141,12 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       name: labels.platformCiInsights,
       href: '/ci-insights',
       icon: 'M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2V17h5v-1.1c0-.8.4-1.5 1-2A6 6 0 0012 3z M10 21h4',
+    },
+    {
+      // Funnel icon — merchant activation: time from signup to first order, help needed, where orders stopped.
+      name: labels.platformActivation,
+      href: '/activation',
+      icon: 'M3 4h18l-7 8v6l-4 2v-8L3 4z',
     },
     {
       // Cog icon — platform-wide settings (Ebda's own VAT).

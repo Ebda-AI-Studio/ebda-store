@@ -6280,7 +6280,8 @@
       "navPlatformSettings": "إعدادات المنصة",
       "navPlatformProviderActivation": "طلبات التفعيل (المنصة)",
       "wholesalePendingBadge": "{count} طلب جملة مستني ردك",
-      "navPlatformCiInsights": "ذكاء العملاء"
+      "navPlatformCiInsights": "ذكاء العملاء",
+      "navPlatformActivation": "تفعيل التجار"
     },
     "errorState": {
       "defaultTitle": "حصلت مشكلة",
@@ -11664,5 +11665,55 @@
     "savedTitle": "اتحفظ الشحن",
     "savedBody": "سياسة الإرجاع اتحدّثت.",
     "saveLabel": "احفظ الشحن"
+  },
+  "activation": {
+    "title": "تفعيل التجار",
+    "subtitle": "كل متجر أخد قد إيه من التسجيل لحد أول أوردر وأول أوردر اتسلّم، وفين احتاج مساعدة.",
+    "loadFailed": "مقدرناش نحمّل.",
+    "loading": "جارٍ التحميل",
+    "empty": "مفيش متاجر لسه.",
+    "unavailable": "بيانات التفعيل مش متاحة في البيئة دي.",
+    "loadMore": "اعرض متاجر أكتر",
+    "helpNeeded": "احتاج مساعدة",
+    "steps": {
+      "store_created": "إنشاء المتجر",
+      "payment_methods": "طرق الدفع",
+      "went_live": "فتح المتجر للناس",
+      "first_order": "أول أوردر",
+      "first_fulfilled_order": "أول أوردر اتسلّم"
+    },
+    "col": { "step": "الخطوة", "store": "المتجر", "stopped": "الأوردر وقف فين" },
+    "funnel": {
+      "title": "القمع حسب تاريخ التسجيل",
+      "body": "المتاجر اللي سجّلت في الفترة دي: كام واحد وصل لكل خطوة، ومتوسط الوقت من التسجيل. بيتحدّث مرة في اليوم.",
+      "from": "من",
+      "to": "إلى",
+      "stores": "{n} متجر سجّل في الفترة دي.",
+      "truncated": "قرينا أول المتاجر بس، ضيّق الفترة.",
+      "count": "وصلوا",
+      "median": "متوسط الوقت من التسجيل",
+      "help": "متاجر احتاجت مساعدة"
+    },
+    "stores": { "title": "المتاجر" },
+    "channel": { "storefront": "المتجر", "whatsapp": "واتساب", "admin": "لوحة التاجر" },
+    "helpKind": {
+      "assistant_used": "استخدم مساعد Ebda AI Studio",
+      "super_admin_action": "الدعم عدّل في المتجر"
+    },
+    "fact": {
+      "placed": "الأوردر اتعمل ولسه مدفعش ولا اتأكد",
+      "payment_failed": "الدفع فشل",
+      "paid": "اتدفع ولسه ما اتشحنش",
+      "cod_confirmed": "الدفع عند الاستلام اتأكد والشحنة ما اتحجزتش",
+      "cod_unconfirmed": "الدفع عند الاستلام ما اتأكدش",
+      "cancelled": "اتلغى",
+      "refunded": "اترجّع فلوسه",
+      "booked": "الشحنة اتحجزت ومحدش استلمها",
+      "picked_up": "المندوب استلمها ولسه ما اتسلّمتش",
+      "attempted": "حاولوا يسلّموا ومنفعش",
+      "delivered": "اتسلّم",
+      "returned": "رجع"
+    },
+    "duration": { "minutes": "{n} دقيقة", "hours": "{n} ساعة", "days": "{n} يوم" }
   }
 }

@@ -130,6 +130,7 @@ export function AdminLayout({
     platformTaxArchive: t('navPlatformTaxArchive'),
     platformPolicyUpdates: t('navPlatformPolicyUpdates'),
     platformCiInsights: t('navPlatformCiInsights'),
+    platformActivation: t('navPlatformActivation'),
     platformSettings: t('navPlatformSettings'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),

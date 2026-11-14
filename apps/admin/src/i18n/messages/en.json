@@ -6280,7 +6280,8 @@
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)",
       "wholesalePendingBadge": "{count} wholesale applications waiting",
-      "navPlatformCiInsights": "Customer Intelligence"
+      "navPlatformCiInsights": "Customer Intelligence",
+      "navPlatformActivation": "Merchant activation"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -11664,5 +11665,55 @@
     "savedTitle": "Shipping saved",
     "savedBody": "The return policy was updated.",
     "saveLabel": "Save shipping"
+  },
+  "activation": {
+    "title": "Merchant activation",
+    "subtitle": "How long each store takes from signup to its first order and its first delivered order, and where help was needed.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "No stores yet.",
+    "unavailable": "Activation data is not available in this environment.",
+    "loadMore": "Show more stores",
+    "helpNeeded": "Help needed",
+    "steps": {
+      "store_created": "Store created",
+      "payment_methods": "Payment methods",
+      "went_live": "Went live",
+      "first_order": "First order",
+      "first_fulfilled_order": "First delivered order"
+    },
+    "col": { "step": "Step", "store": "Store", "stopped": "Where the order stopped" },
+    "funnel": {
+      "title": "Funnel by signup date",
+      "body": "Stores that signed up in the range: how many reached each step and the median time from signup. Updated once a day.",
+      "from": "From",
+      "to": "To",
+      "stores": "{n} stores signed up in this range.",
+      "truncated": "Only the first stores were read; narrow the range.",
+      "count": "Reached",
+      "median": "Median time from signup",
+      "help": "Stores that needed help"
+    },
+    "stores": { "title": "Stores" },
+    "channel": { "storefront": "Storefront", "whatsapp": "WhatsApp", "admin": "Merchant admin" },
+    "helpKind": {
+      "assistant_used": "used the Ebda AI Studio assistant",
+      "super_admin_action": "support changed the store"
+    },
+    "fact": {
+      "placed": "Order placed, not paid or confirmed",
+      "payment_failed": "Payment failed",
+      "paid": "Paid, not shipped",
+      "cod_confirmed": "COD confirmed, shipment not booked",
+      "cod_unconfirmed": "COD never confirmed",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded",
+      "booked": "Shipment booked, not picked up",
+      "picked_up": "Picked up, not delivered",
+      "attempted": "Delivery attempted, not delivered",
+      "delivered": "Delivered",
+      "returned": "Returned"
+    },
+    "duration": { "minutes": "{n} min", "hours": "{n} h", "days": "{n} d" }
   }
 }
