@@ -1,0 +1,74 @@
+{
+  "billingEvents": {
+    "tabs": {
+      "auto": "Auto-confirm"
+    },
+    "autoConfirm": {
+      "title": "InstaPay auto-confirm",
+      "loading": "Loading…",
+      "failedToLoad": "Failed to load the auto-confirm list.",
+      "empty": "Nothing here yet.",
+      "mode": {
+        "title": "Global switch",
+        "current": "Current mode: {mode}",
+        "off": "Off",
+        "shadow": "Shadow",
+        "live": "Live",
+        "reason": "Why (5+ characters)",
+        "apply": "Apply",
+        "reasonRequired": "Write why (5+ characters)",
+        "failed": "The switch was not changed.",
+        "changed": "Switch updated."
+      },
+      "stores": {
+        "title": "Switched off for a store",
+        "none": "No store is switched off.",
+        "storeId": "Store id",
+        "disable": "Switch off",
+        "enable": "Switch on",
+        "reason": "Why (5+ characters)",
+        "failed": "The store switch was not changed.",
+        "changed": "Store switch updated."
+      },
+      "columns": {
+        "date": "Date",
+        "store": "Store",
+        "amount": "Amount",
+        "state": "State",
+        "reasons": "Reasons",
+        "action": "Action"
+      },
+      "states": {
+        "pending_decision": "Deciding",
+        "auto_confirmed": "Confirmed automatically",
+        "needs_human": "Waiting for review",
+        "reverted": "Marked not received",
+        "failed": "Failed"
+      },
+      "notReceived": "Not received",
+      "revertTitle": "Mark as not received",
+      "revertReason": "Why (3+ characters)",
+      "revertSubmit": "Mark not received",
+      "revertFailed": "Could not mark it not received.",
+      "reverted": "Marked not received. The store has 48 hours to upload a correct receipt or pay by card.",
+      "noReasons": "All checks passed",
+      "reasons": {
+        "KILL_GLOBAL": "Auto-confirm is switched off",
+        "KILL_STORE": "Auto-confirm is switched off for this store",
+        "SHADOW_MODE": "Shadow mode: decided but not activated",
+        "EXTRACT_INCOMPLETE": "The receipt could not be read fully",
+        "AMOUNT_MISMATCH": "The amount is not the exact quoted amount",
+        "WRONG_HANDLE": "The receiver is not our InstaPay address",
+        "DATE_STALE": "The transfer is more than 48 hours old",
+        "DATE_FUTURE": "The transfer is dated in the future",
+        "DUPLICATE_REFERENCE": "This transfer reference was already used",
+        "DUPLICATE_IMAGE": "This receipt image was already used",
+        "FIRST_PAYMENT_OVER_CAP": "First payment is above one month of the plan",
+        "ABOVE_DUAL_CONTROL_THRESHOLD": "The amount needs two approvers",
+        "LOOKS_EDITED": "The image looks edited",
+        "SUSPICIOUS_TEXT": "The image contains text that looks like an instruction",
+        "LOW_CONFIDENCE": "The reader was not confident enough"
+      }
+    }
+  }
+}
