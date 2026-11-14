@@ -295,6 +295,13 @@ export function clearStoredSession(): void {
   // evidence goes, or a dead session buys one doomed refresh per page load.
   localStorage.removeItem(SESSION_MARKER_KEY);
   localStorage.removeItem('csrfToken');
+  // The assistant's conversation ids belong to the person who is leaving (a shared shop computer: the next sign-in must not inherit them).
+  try {
+    for (const k of Object.keys(sessionStorage))
+      if (k.startsWith('assistant.conversation.')) sessionStorage.removeItem(k);
+  } catch {
+    /* storage unavailable: nothing was kept */
+  }
   if (typeof document !== 'undefined') {
     for (const c of sessionHintCookieClears()) document.cookie = c;
   }
