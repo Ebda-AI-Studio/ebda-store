@@ -1,3 +1,16 @@
+---
+capabilities:
+  - packages.list-checkout@1
+  - packages.plan-status@1
+  - packages.yearly-switch@1
+  - wallet.card-topup@1
+  - wallet.instapay@1
+  - wallet.instapay-auto-confirm@2
+  - wallet.refund-request@2
+  - wallet.statement@1
+  - wallet.view@1
+---
+
 # Wallet, top-ups and refunds
 
 The wallet is a prepaid balance in Egyptian pounds. It pays Meta's cost on the **shared number**, and the cost of AI credits depending on your package.
@@ -23,6 +36,12 @@ While card payment is not switched on for your account, you pay by InstaPay tran
 5. Our team reviews it **within 4 business hours** (Sunday to Thursday, 9:00 to 17:00 Cairo time). Nothing is added to your account before it is confirmed. The request shows **under review**, then **confirmed** (the package starts or the balance grows by the amount) or **rejected** with the reason (make a new request with the right receipt).
 
 *Notes:* the reference is valid for **48 hours**; after that the request expires and you start a new one. A receipt uploaded after it expired is refused. One reference is used for one payment only. Only the owner can pay.
+
+
+## Automatic confirmation of InstaPay payments
+When you upload a receipt that matches exactly (the amount due, our InstaPay address, a transfer from the last 48 hours, and a transaction number never used before), your payment can be confirmed **within minutes** with no one reviewing it. Anything that does not match waits for a person, as before.
+- The **first** automatic payment is limited to **one month** of the plan (for a top-up, one month of your current package). A bigger first payment, such as a yearly package, is reviewed by a person.
+- If our check shows the money **did not arrive**, the payment goes back to unpaid and you have **48 hours** to upload a correct receipt or pay by card before paid features pause. Credits that payment gave you and you have not used are removed; credits you already used stay used.
 
 ## Buy a package
 1. Open **Wallet** and find the **Packages** card (the owner sees it; it appears once package purchase is switched on for your account).
@@ -56,7 +75,7 @@ From **Wallet > Statement** choose a month to see every entry (top-up, message, 
 - **Not refundable:** card fees already paid, AI credits that came with the package, the current package period (it keeps working until the period ends), and purchased AI credits that were used or are older than 14 days.
 - Financial records are kept even after you cancel or ask for data deletion, as the law requires.
 
-To request one, write to the Ebda AI Studio team at ahlan@ebda.app, or use the refund request in your account if available. For a yearly package, the whole months left after the current one are refundable at the package's monthly price (the yearly price ÷ 12), up to what you paid for that year; the current month is not refunded.
+To request one, open **Wallet** and press **Request a refund**, enter the amount (at least 50 EGP and no more than your available balance) and an optional note, then send it. It appears under **Your requests** and the Ebda AI Studio team reviews it and gets back to you. You can ask after your plan ends or is cancelled, within 12 months. For help, write to ahlan@ebda.app. For a yearly package, the whole months left after the current one are refundable at the package's monthly price (the yearly price ÷ 12), up to what you paid for that year; the current month is not refunded.
 
 ## Troubleshooting
 - **I paid but the balance did not grow:** wait a few minutes. If it persists, email the transaction number to ahlan@ebda.app.
@@ -64,4 +83,4 @@ To request one, write to the Ebda AI Studio team at ahlan@ebda.app, or use the r
 - **I was charged for a message that did not arrive:** we only charge messages Meta counts as billable.
 
 ---
-Last checked: 2026-10-25. Refunds and fees are subject to the final terms of service. Meta's rules change.
+Last checked: 2026-11-14. Refunds and fees are subject to the final terms of service. Meta's rules change.

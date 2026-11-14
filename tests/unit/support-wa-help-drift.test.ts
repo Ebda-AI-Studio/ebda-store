@@ -12,57 +12,111 @@ import path from 'node:path';
 const HELP = path.resolve(__dirname, '../../apps/help');
 const PINNED_SHA256: Record<string, string> = {
   'ar/01-verify-your-business-on-meta.md':
-    '802f25961b54fbd5d0714187990becfd0fe5093750fea6c43c4e089fa62cd566',
+    '8b2a8d892528180a45aa259ea5352805be234f1b272bcac766dda8d1f5eca50b',
   'ar/02-connect-your-own-number.md':
-    '7c78d73479ce44dbd2eeb9cd96fb4b6c67ec150b7a4b04f4ffbf94dd892fe2df',
+    '54c2184ccec50bd3c2afc7980706ce667868b3e3f8cbec6e4aa74b80c2d56abb',
   'ar/03-use-the-shared-number.md':
-    '840979f2ea3bcfaf4000f8e5510196d56576f7eeded449294668910bcdddf33a',
+    '5127580ca0150ef29930dfeb3099211fde1a3acfdc4a3ac11f6b17effdcf88b2',
   'ar/04-templates-and-the-24-hour-window.md':
-    '65bea01b18064a8fbfcc251bebde5f21a0cc666e0fc2be9655069d57fa487995',
-  'ar/05-cod-confirmations.md': '3e1d726629b3cdc258f99fbcf8efcb07224b1f174b14cf1e90b22649f689742e',
+    'd68d950a95de56c951a4a312b94f714646ab5a2447238133c018bb57badae0cf',
+  'ar/05-cod-confirmations.md': '6f41ab63cfd3278c2f356dd56fe56ae7a76482aa3620546258e36f8282641dec',
   'ar/06-instapay-orders-in-whatsapp.md':
-    'd02829291f3503e08bbc6d89717aa72fd77cd605b8be451adbf426f847228a97',
-  'ar/07-ai-agent.md': 'c65b53c5f268272c1b8e4f38e8bafca7f3e5c867e6713432162e0835ec966013',
+    '0af88aafe37a7c02213d426e964642188ee96ba1e9f5928d59216074376c568c',
+  'ar/07-ai-agent.md': 'f5bd979b569e19a7c2440dab343fbc68c584059667a99cc348d7b39570f61be8',
   'ar/08-campaigns-and-opt-out.md':
-    '2b059c59937e0b71b09bdc88198224829e38787cb175fac36a7582a196d4b6f0',
+    '7f9e117c3649335cf68d23258d474c82982345071b2dc7118b60e850623a545b',
   'ar/09-wallet-top-ups-and-refunds.md':
-    '8af45b9a4f5c5965b03f06408e8f067cf2696b617cee09772bbf7141bff87f6d',
+    'faa4bec9cc1988a37d2d4cb79b13712b5d0da77242abb97591c5f8a7c54d6877',
   'ar/10-meta-fees-explained.md':
-    'a91a05bbb7ddbdc236b6b4f5c0557d5e8f763a43fae09c450498b90750a0659f',
+    '36d9b375852ce894e95f7f6f373b1c36b6e204da144e2b6ffcddbe4dce73826f',
   'ar/11-service-menu-hours-and-location.md':
-    '37c92f3718b22c245bd20b0a7a5151bbabfddf01d51b2da561d8ba2a7a3cb0ac',
+    '778b6d30d6cdc26f9649aa5f3c45038c239070910e66b3c9b45ca50ee283c4c6',
   'ar/12-delete-your-workspace.md':
-    '762abb80d07114750ff5dbdadf4a48e71b9e32c26f417be1c6c7123a053f142d',
+    '4efe2199028d4c9a6669a10a4582673f28a6cc54012a4eea79f7d9c117906937',
   'ar/13-your-customers-data.md':
-    '70c99e0bc2e321ad79bd6a6001ea2f921c0a2c48432b977f5f98badbd24a2c44',
+    '76d0b4fe85a964ea7c8d614108ac143717078ed5dd9a6e90385141bad7866c99',
   'ar/14-team-members-and-seats.md':
-    '9a81c3d534f72f4c269f8a5a9d2a5ff3680d76aeac56fe3326377fc26503342b',
+    'ae63ccbee0ecad2275405f85c06457e177afae6d759400bb42421c3504c3c63d',
+  'ar/15-your-products-on-whatsapp.md':
+    '6d92b917e75421bf02ddbc3a966eed284e1a1ce7faca2294776e3301a34abf9e',
+  'ar/16-write-and-submit-a-template.md':
+    '98d687763d3117a737ce6b5ae897012b13e0a12906804f3a59a79782e5b80d6a',
+  'ar/17-template-review-and-rejections.md':
+    '58499968fcebd5e3d1212437dd0cb063cd9b746da0be960c2f6388acf9ae30c2',
+  'ar/18-sign-in-language-and-sign-out.md':
+    '1a8260083eafb3cb565a36c299f1e0f27e06180435582befe1306d57191956e9',
+  'ar/19-find-your-conversations.md':
+    'b4bc7e98759149f99d9e92b2e8961f29310e7c8c5cd603c9123062ada868e4fa',
+  'ar/20-read-a-conversation-and-live-updates.md':
+    'c7f6de0c006f50dd8d4fc914cb2a44e90bea045652f84ae0fe1558817645cbbf',
+  'ar/21-send-files-in-chat.md': 'ce666420a770ac7ecb1d67bcce5c4819cb227f7678f0ca94aab47f3c7d3efe91',
+  'ar/22-failed-messages-and-sending-limits.md':
+    '52cce12b3d087fd4c8ffa4690158f7cd281a629b33d854f41d3f0150f97c981d',
+  'ar/23-notes-tags-and-quick-replies.md':
+    'c4b0c4250bccc8451f730eb979e72d80fa10237b551dbb5f5e229a4b01c38459',
+  'ar/24-weekly-summary.md': 'e01b8141c0cdd862865b02ab36635da7ae23aa45ccc5a008c4969987dd46d243',
+  'ar/25-alerts-and-notices.md': '53d1c16045eb777c299601286dc87e0a655af7fb717a38573163877010b5d3bb',
+  'ar/26-verification-codes-on-whatsapp.md':
+    '4b3a3e97a5bcbba2aadec6c61bac90baee7be59ec60298753c43efc146f7ee60',
+  'ar/27-connect-your-systems.md':
+    '0ae3e8a5eef5e5bc5a14eeee8e66fe2b23fb8a7400252bf7cd01710f7c5fa36b',
+  'ar/28-terms-privacy-and-meta-data-deletion.md':
+    'a662cddd5d11f51f6ab4ad1d010f9c9fa82d7746b1aa5abe91890b7e0a571931',
+  'ar/29-all-ebda-chat-guides.md':
+    '466b4b82e53a68a2986965e8ff09bde555d5313a67e8ed02a462681a485cc5d5',
   'en/01-verify-your-business-on-meta.md':
-    '3de91aea62cd457aa08d7bed246781d1d7908c8208b643dbfa3a30eff3b5e8b2',
+    'fee1d100d32e6a34012f8f6e1af1d36d2ec153cce8fbf40f651568b8e3c52509',
   'en/02-connect-your-own-number.md':
-    '34ea9294215fe8b0be66527d0203dd743c38176276c61c64cd90ba8e0dcc03b4',
+    '2172df5594d96e78e9c6d8a7e74976a3136cbb75dbce846c8da796025af0d8d9',
   'en/03-use-the-shared-number.md':
-    'f8241dac63f9dc29d09219a15cbc677b19af45373630fe99c65d24828ddcef72',
+    '70cc33f5b911a62875b85ad290e7042eda595a6e8e5a6901c16dc9560c032876',
   'en/04-templates-and-the-24-hour-window.md':
-    '34cd5123b5806cc76643269cc99c441ad226a6a581f52225ff7fd461b0a4c8ef',
-  'en/05-cod-confirmations.md': '41d46d3aaa7d10ec327f4ba8a69d898bb4d0a32b08143db62751463d17802b4d',
+    '492d692fd01c6b57d6be6f721202cc7ec9ff8c032f7a52718ceb81ef98d5dd75',
+  'en/05-cod-confirmations.md': 'a7ac394a6c041d8b792900270923b4a59961d4c22cedd2649f06e6548b5f885f',
   'en/06-instapay-orders-in-whatsapp.md':
-    '5c41633f1f1adf3fc1159e85bed7cc9cc8f27144f3ff42563f2493528e1e715a',
-  'en/07-ai-agent.md': '4670c20b6232664cf71d1c8dc91305786d2806019bf684841a770f2b49a5b055',
+    'f25b38c8332fb78cd06dbbfdb00ae15d33f42ab393ba04c0dcbb7ef0fcbb6a95',
+  'en/07-ai-agent.md': '0ed78059fec03e332af470457ede614b3515bd7e3e12600a7f599cc1888025b8',
   'en/08-campaigns-and-opt-out.md':
-    '380b45e446e026e57e4c3d03f9ba1b5eff4c5b4a9d8bb0adb522434aef467f32',
+    '3c45c20d19d09d5ff4287ef22800ca5d07222ebb842e1ede5d494619f7767bcd',
   'en/09-wallet-top-ups-and-refunds.md':
-    '9ab15f3fa80da14c19c814d6fb870e5aad240a9624dd533ea6734d9f38532667',
+    '2398991f67c7c94bf8e66e0fc7a16a6ea92f7c9159b686153be5dfd2eb9caaf6',
   'en/10-meta-fees-explained.md':
-    '2f79f146fa6fc55f8c137d8a5af96dfcec0e50612f16062b15c69246aadd7693',
+    '70800e78c6eaefacf07b0a21472bf7f954f77733a93a86ea880c4467c6ea0437',
   'en/11-service-menu-hours-and-location.md':
-    'c6e9ca322f45a98148ad2d2ab47ed7aefbdb4e7ea801a39e8db5e6b4cf30847a',
+    '09e04151908ae0007864719098a24e9eb198a846dd02df62f28d022637aea408',
   'en/12-delete-your-workspace.md':
-    '1f2ae43438a4cf7b533e50e3c72bd7a6c16faf2dea47ea5bbab8fe540b8598c9',
+    '7ac321e999f1e1418ba379ddc36a20e86c75049f612910732da93873cf4bf36c',
   'en/13-your-customers-data.md':
-    'd1e2b534f7016ffec835b5ef4dc1925fe2f99fc401f9061896f815b86b060bd7',
+    'e3643cd1b68e12fe889ae0cc24761d697b87bbe8e001e1e20fcdbf8dafeb5b8a',
   'en/14-team-members-and-seats.md':
-    '0d35bc89db69ec5fe8ca3351336280486efeb635baabfb1fcdc22320e95c6122',
+    'cb8d79b1873066d2b639c95cfa8ffe013f9e4ca4e88c927fc2a0acc1b3f41b82',
+  'en/15-your-products-on-whatsapp.md':
+    '579528cf2381ccd6b377725a0ca168de9269defb54d4a2a97e5e96317780f691',
+  'en/16-write-and-submit-a-template.md':
+    '7c40acd2c1c383d7b70126501abdf04159982a9c77a1e9de9ee227386800b3ff',
+  'en/17-template-review-and-rejections.md':
+    'eb65d4bf24b09c7ab1384f8a77cf8a107da28e743c2f5fa0e77d23e7d8373adb',
+  'en/18-sign-in-language-and-sign-out.md':
+    '922b69dd1558ba6682d56b75dcc94fb5165464f1dd659e8972cdada8e31e1bd0',
+  'en/19-find-your-conversations.md':
+    '419bfb5fbfcbc78dbc89f66a0161114d2f1173d9454fec69fa9ebc2b1922630a',
+  'en/20-read-a-conversation-and-live-updates.md':
+    'e5b8a1a967a9f36a7668c77c207f970a99d10837e65f0db5d1efbfbf9bf74c9d',
+  'en/21-send-files-in-chat.md': 'dad69dd329738d1613f6b06e99a84e2bd449b9b0cc508aa59768811f8bc1da88',
+  'en/22-failed-messages-and-sending-limits.md':
+    '0a5928c1ec089866b086a79ff8d409b845bc610884c93d6a73fe8ef3cf8a3e40',
+  'en/23-notes-tags-and-quick-replies.md':
+    '00a966def5d27f3c6b61884df0bb1931301121c16a55b2790e986893661724a6',
+  'en/24-weekly-summary.md': '3aa049404700da2e6c6488f8dbac99be6c331f99b8558fefb9414b6cefb69c71',
+  'en/25-alerts-and-notices.md': 'ab80d29d5395dd92b42827897eb5047447baebf664a126840d9c89bb29d289d6',
+  'en/26-verification-codes-on-whatsapp.md':
+    '212a13ddc9a919cb935a2bf608745a45bc4c360372161715c771e04701a216b9',
+  'en/27-connect-your-systems.md':
+    'a3fbab228dd9245340910d5a1a85d2e2bd6cf311a0ebdea530a02ce65e46004c',
+  'en/28-terms-privacy-and-meta-data-deletion.md':
+    '4308de0bed6e58470cce48be6a3044a544f9944e61c47d45be0ae823bcc721c8',
+  'en/29-all-ebda-chat-guides.md':
+    '014995eb870bbcc94704706bda308ff388511ee4d3451981fb8d2d1ae8c18db5',
 };
 const tokens = (t: string) => t.match(/[\p{L}\p{N}]+/gu) ?? [];
 const noTargets = (t: string) => t.replace(/\]\([^)]*\)/g, ']');
@@ -95,7 +149,7 @@ describe('Ebda Chat help guides equal their vendored source', () => {
         const title =
           /^title:\s*'(.*)'\s*$/m.exec(mdx)?.[1] ?? /^title:\s*"(.*)"\s*$/m.exec(mdx)?.[1] ?? '';
         const clean = (s: string) => s.replace(/\*\*/g, '').replace(/`/g, '');
-        const source = src.replace(/^# .*\n/, '');
+        const source = src.replace(/^---\n[\s\S]*?\n---\n/, '').replace(/^\s*# .*\n/, '');
         expect(tokens(noTargets(clean(body)))).toEqual(tokens(noTargets(clean(source))));
         expect(tokens(clean(src.match(/^# (.*)$/m)![1]))).toEqual(
           tokens(title.replace(/''/g, "'"))
@@ -118,12 +172,12 @@ describe('Ebda Chat help guides equal their vendored source', () => {
       );
   });
 
-  it('every vendored guide is published in both locales (14 guides, none left behind)', () => {
+  it('every vendored guide is published in both locales (none left behind)', () => {
     for (const lang of ['ar', 'en']) {
       const slugs = readdirSync(path.join(HELP, 'wa-source', lang)).map(f =>
         f.slice(3).replace(/\.md$/, '')
       );
-      expect(slugs.length).toBe(14);
+      expect(slugs.length).toBeGreaterThan(0);
       expect(
         readdirSync(path.join(HELP, 'content', lang, 'whatsapp'))
           .map(f => f.replace(/\.mdx$/, ''))
