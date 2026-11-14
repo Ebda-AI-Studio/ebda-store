@@ -100,7 +100,7 @@ async function quote(storeId: string, sku: string) {
       throw new AppError(
         409,
         'FEATURE_DISABLED_BY_SUPPORT',
-        'Ebda support switched this feature off for your store. Contact support to turn it back on.'
+        'Support switched this feature off for your store. Contact support to turn it back on.'
       );
     const on = await featureService.isFeatureEnabled(storeId, item.featureKey!);
     if (on && !running.some(r => r.sku === sku)) {

@@ -137,7 +137,7 @@ function addonNoticeCopy(
     ],
     disabled: [
       `${v.name} was not renewed`,
-      `${v.name} was switched off for your store by Ebda support, so we did not charge a renewal. Contact support if this is a mistake.`,
+      `${v.name} was switched off for your store by Ebda Store support, so we did not charge a renewal. Contact support if this is a mistake.`,
     ],
     no_card: [
       `${v.name} was not renewed: no saved card`,
@@ -163,7 +163,7 @@ function addonNoticeCopy(
     ],
     disabled: [
       `${v.name} ماتجددتش`,
-      `دعم ابدأ قفل ${v.name} لمتجرك، فمخصمناش تجديد. كلّم الدعم لو ده حصل بالغلط.`,
+      `دعم ابدأ ستور قفل ${v.name} لمتجرك، فمخصمناش تجديد. كلّم الدعم لو ده حصل بالغلط.`,
     ],
     no_card: [
       `${v.name} ماتجددتش: مفيش كارت محفوظ`,
