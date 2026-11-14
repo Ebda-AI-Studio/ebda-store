@@ -303,6 +303,8 @@ export function createDoPort(): BridgePort {
       };
     },
 
+    // Only ACTIVE products (Ruling BRIDGE-ACTIVE-1): same rule as `catalogPage`. A draft or archived product is "not there" for the cart check
+    // and the event sync, so Ebda Chat neither accepts it in a cart nor pushes it back into Meta.
     async catalogByIds(storeId, ids) {
       const d = await db(storeId);
       const variants: any[] = await d.productVariant.findMany({
@@ -311,7 +313,7 @@ export function createDoPort(): BridgePort {
       });
       const productIds = [...new Set([...variants.map(v => v.productId as string), ...ids])];
       const products: any[] = await d.product.findMany({
-        where: { storeId, id: { in: productIds }, deletedAt: null },
+        where: { storeId, id: { in: productIds }, status: 'active', deletedAt: null },
         select: PRODUCT_SELECT,
       });
       return rowsForProducts(storeId, d, products, new Set(ids));
