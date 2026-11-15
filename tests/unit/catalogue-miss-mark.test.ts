@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { Request, Response } from 'express';
-import { catalogueMissRoute, isVerifiedCatalogueMiss } from '../catalogue-miss';
-import { setResolvedStoreId } from '../../utils/resolved-store';
+import {
+  catalogueMissRoute,
+  isVerifiedCatalogueMiss,
+} from '../../apps/api/src/middleware/catalogue-miss';
+import { setResolvedStoreId } from '../../apps/api/src/utils/resolved-store';
 
 const STORE = '11111111-1111-4111-8111-111111111111';
 const mkReq = (params: Record<string, string> = {}) => ({ params }) as unknown as Request;
