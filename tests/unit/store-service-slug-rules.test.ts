@@ -46,7 +46,7 @@ vi.mock('@ebda/database', () => ({
 // `ebda_store_id_by_slug` / `ebda_store_id_by_domain` definers (an id, or null when free).
 // R-TRIAL-ONCE-1: the used-trial marker lives in system_settings, not under test here
 vi.mock('@api/services/billing/trial-eligibility', () => ({
-  ownerEmailOf: async () => 'o@x.com',
+  ownerEmailOf: async () => ({ email: 'o@x.com', unknown: false }),
   ownerHasUsedTrial: async () => false,
   markOwnerTrialUsed: async () => undefined,
 }));

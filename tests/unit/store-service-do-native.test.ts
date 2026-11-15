@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
   paymentsScrubbed: [] as string[],
   pgProbes: 0,
   trialUsed: new Set<string>(),
+  emailUnreadable: false,
 }));
 
 vi.mock('@ebda/database', () => {
@@ -112,7 +113,8 @@ vi.mock('../../apps/api/src/lib/identity-client', () => ({
 }));
 // R-TRIAL-ONCE-1: the durable used-trial marker (system_settings in prod) as an in-memory set keyed by owner email
 vi.mock('../../apps/api/src/services/billing/trial-eligibility', () => ({
-  ownerEmailOf: async (id: string) => `${id}@x.co`,
+  ownerEmailOf: async (id: string) =>
+    h.emailUnreadable ? { unknown: true } : { email: `${id}@x.co`, unknown: false },
   ownerHasUsedTrial: async (email: string) => h.trialUsed.has(email),
   markOwnerTrialUsed: async (email: string) => void h.trialUsed.add(email),
 }));
@@ -155,6 +157,7 @@ const fakeD1 = () => ({
 
 beforeEach(() => {
   h.trialUsed.clear();
+  h.emailUnreadable = false;
   sqlite = new DatabaseSync(':memory:');
   sqlite.exec(
     ['0001_init.sql', '0002_invariants.sql']
@@ -234,6 +237,23 @@ describe('R-TRIAL-ONCE-1: one signup trial per owner on the DO create path', () 
     const s = sub(second.id);
     expect(s.status).not.toBe('trialing');
     expect(['growth', 'business']).not.toContain(s.plan_code);
+  });
+});
+
+describe('R-TRIAL-ONCE-1: an unreadable owner email fails CLOSED for the trial', () => {
+  it('the store is still created, with no trial and no paid tier', async () => {
+    h.emailUnreadable = true;
+    const store = (await StoreService.create('owner-1', { name: 'Blind Shop' } as never)) as Record<
+      string,
+      any
+    >;
+    expect(store.plan).toBe('starter');
+    const s = sqlite
+      .prepare('SELECT plan_code, status FROM store_subscriptions WHERE store_id=?')
+      .get(store.id) as { plan_code: string; status: string };
+    expect(s.status).not.toBe('trialing');
+    expect(['growth', 'business']).not.toContain(s.plan_code);
+    expect(h.trialUsed.size).toBe(0);
   });
 });
 

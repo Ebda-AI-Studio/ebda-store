@@ -51,18 +51,23 @@ export async function markOwnerTrialUsed(email: string, storeId: string): Promis
 
 /**
  * The owner's email, from the identity service once `access` is on D1 (there is no Postgres `users` read then), else Postgres.
- * Fails OPEN (undefined = no marker lookup): an unreadable account must not block creating a store, and the trial it could
- * wrongly grant is the pre-fix behaviour.
+ * Fails CLOSED for the trial only: an unreadable account (`unknown: true`) gets NO trial, and the store is still created
+ * (unpaid, payment required before go-live). Logs the owner id only, never the address.
  */
-export async function ownerEmailOf(ownerId: string): Promise<string | undefined> {
+export async function ownerEmailOf(ownerId: string): Promise<{ email?: string; unknown: boolean }> {
   try {
-    if (await onAccessD1()) return (await getAccountState(ownerId))?.email ?? undefined;
-    const u = await withUser(ownerId, tx =>
-      tx.user.findUnique({ where: { id: ownerId }, select: { email: true } })
-    );
-    return u?.email;
+    const email = (await onAccessD1())
+      ? ((await getAccountState(ownerId))?.email ?? undefined)
+      : (
+          await withUser(ownerId, tx =>
+            tx.user.findUnique({ where: { id: ownerId }, select: { email: true } })
+          )
+        )?.email;
+    if (email) return { email, unknown: false };
+    logger.warn({ ownerId }, '[trial] owner email not found; no trial granted');
+    return { unknown: true };
   } catch (err) {
-    logger.warn({ err, ownerId }, '[trial] owner email unreadable; trial check skipped');
-    return undefined;
+    logger.warn({ err, ownerId }, '[trial] owner email unreadable; no trial granted');
+    return { unknown: true };
   }
 }

@@ -659,7 +659,8 @@ export class StoreService {
     // N-18 (Ruling NZ-D11): a store created on D1 + its Durable Object has no Postgres row.
     const onDo = storeCreateOnDo();
     // R-TRIAL-ONCE-1: the FIRST store of an owner who never had a signup trial (deleted stores included).
-    const ownerEmail = !opts.platformOperator ? await ownerEmailOf(ownerId) : undefined;
+    const ownerLookup = !opts.platformOperator ? await ownerEmailOf(ownerId) : undefined;
+    const ownerEmail = ownerLookup?.email;
     // `isFirst` (no live store) and `trialEligible` (isFirst AND no earlier trial) are SEPARATE facts: a trial-used owner
     // who recreates is still a first store but must get neither the trial nor a paid tier (R-TRIAL-ONCE-1).
     const merchantCreate = !opts.platformOperator
@@ -668,7 +669,10 @@ export class StoreService {
             (await countOwnerStores(ownerId, () =>
               withUser(ownerId, tx => tx.store.count({ where: { ownerId, deletedAt: null } }))
             )) === 0;
-          const trialEligible = isFirst && !(ownerEmail && (await ownerHasUsedTrial(ownerEmail)));
+          const trialEligible =
+            isFirst &&
+            !ownerLookup?.unknown &&
+            !(ownerEmail && (await ownerHasUsedTrial(ownerEmail)));
           return { isFirst, trialEligible };
         })()
       : null;
