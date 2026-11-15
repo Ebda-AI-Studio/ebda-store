@@ -64,6 +64,8 @@ export class StoreMailer {
     opts: {
       /** A test send to the merchant's OWN address: transactional to the merchant, so it is not refused for a suspended store. */
       toMerchant?: boolean;
+      /** The caller already checked `storeOperational` for this whole batch (campaign-send): skip the per-message lookup. */
+      operationalChecked?: boolean;
       to: string;
       subject: string;
       html: string;
@@ -73,7 +75,7 @@ export class StoreMailer {
   ): Promise<{ id: string }> {
     // Ruling SUSPEND-OUT-1: no marketing mail for a store that is not `active` (the one chokepoint of every campaign,
     // cart-recovery and test-to-subscriber send). The caller treats a thrown error as a failed send.
-    if (!opts.toMerchant) await assertStoreOperational(store.id);
+    if (!opts.toMerchant && !opts.operationalChecked) await assertStoreOperational(store.id);
     const sender = resolveSender(store);
     return sendMail({
       from: sender.from,

@@ -26,6 +26,14 @@ export function isStoreOperational(status: string | null | undefined): boolean {
   return status === 'active';
 }
 
+/**
+ * Ruling SUSPEND-OUT-1b: an order whose payment was taken still gets its RECEIPT (payment-success mail, customer invoice)
+ * while the store is suspended. Paid = `completed` or `partially_refunded`; COD-pending, pending and refunded are not.
+ */
+export function isPaidOrder(paymentStatus: string | null | undefined): boolean {
+  return paymentStatus === 'completed' || paymentStatus === 'partially_refunded';
+}
+
 /** May this store send to customers / pay out right now? Unknown or soft-deleted = no. A lookup failure throws (a retry beats a wrong send). */
 export async function storeOperational(storeId: string): Promise<boolean> {
   const hit = await lookupStore({ id: storeId }, ['active']);

@@ -1,4 +1,4 @@
-import { storeOperational } from '../../store-operational';
+import { isPaidOrder, storeOperational } from '../../store-operational';
 import type { JobDef } from '../../jobs/types';
 import { storeDb } from '../../repo-factory';
 import { runInStoreCtx } from '../../jobs/store-db';
@@ -30,16 +30,6 @@ export const invoiceEmail: JobDef = inngest.createFunction(
       return;
     }
 
-    // Ruling SUSPEND-OUT-1: an invoice to a CUSTOMER is not sent for a store that is not `active` (a click queued before the
-    // suspension). The owner copy (`toMerchant`) is a transactional mail to the merchant themself and goes out.
-    if (!toMerchant && !(await step.run('check-store-active', () => storeOperational(storeId)))) {
-      logger.info(
-        { storeId, orderId },
-        '[invoice-email] store not active; customer invoice not sent'
-      );
-      return;
-    }
-
     // InvoiceService.generateInvoiceEmail reads the order through the store's backend (its Durable Object, or Postgres).
     // runInStoreCtx opens the tenant scope a Postgres store needs for FORCE RLS (Inngest has no HTTP middleware context).
     const html = await step.run('render-invoice', () =>
@@ -52,12 +42,26 @@ export const invoiceEmail: JobDef = inngest.createFunction(
           await storeDb(storeId)
         ).order.findUnique({
           where: { id: orderId, storeId },
-          select: { orderNumber: true, locale: true },
+          select: { orderNumber: true, locale: true, paymentStatus: true },
         });
         if (!row) throw new Error(`Order ${orderId} not found`);
         return row;
       })
     );
+
+    // Ruling SUSPEND-OUT-1: an invoice to a CUSTOMER for an order NOT yet paid is not sent for a store that is not `active`.
+    // Ruling SUSPEND-OUT-1b: the invoice of a PAID order is a receipt and still sends; so does the owner copy (`toMerchant`).
+    if (
+      !toMerchant &&
+      !isPaidOrder(order.paymentStatus) &&
+      !(await step.run('check-store-active', () => storeOperational(storeId)))
+    ) {
+      logger.info(
+        { storeId, orderId },
+        '[invoice-email] store not active; unpaid-order invoice not sent'
+      );
+      return;
+    }
 
     const orderLocale = (order.locale ?? undefined) as 'en' | 'ar' | undefined;
 

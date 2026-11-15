@@ -6,10 +6,11 @@
  * status, and any exhausted step re-throws so the run dead-letters.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+const op = vi.hoisted(() => ({ value: true }));
 vi.mock('@api/lib/store-operational', () => ({
   STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
   isStoreOperational: (s: unknown) => s === 'active',
-  storeOperational: async () => true,
+  storeOperational: async () => op.value,
   storeMayMessageCustomers: async () => true,
   assertStoreOperational: async () => undefined,
   activeStoreIds: async () => ({ has: () => true }) as unknown as Set<string>,
@@ -103,6 +104,7 @@ const ORDER = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  op.value = true;
   h.orderFindUnique.mockResolvedValue(ORDER);
   h.orderUpdateMany.mockResolvedValue({ count: 1 });
   h.storeFindUnique.mockResolvedValue({ name: 'Test Store' });
@@ -163,6 +165,14 @@ describe('order-status-changed fanout', () => {
     await handleOrderStatusChanged('o1', 's1', 'confirmed', false, stepStub);
     expect(h.sendPaymentSuccess).toHaveBeenCalled();
     expect(h.createShipment).not.toHaveBeenCalled();
+  });
+
+  it('SUSPEND-OUT-1b: a suspended store still sends the payment-success RECEIPT but not the shipped email', async () => {
+    op.value = false;
+    await handleOrderStatusChanged('o1', 's1', 'confirmed', false, stepStub);
+    expect(h.sendPaymentSuccess).toHaveBeenCalled();
+    await handleOrderStatusChanged('o1', 's1', 'shipped', false, stepStub);
+    expect(h.sendOrderShipped).not.toHaveBeenCalled();
   });
 
   it('refunded WITHOUT captured payment → no refund email/dispatch', async () => {

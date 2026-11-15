@@ -41,6 +41,15 @@ vi.mock('@api/lib/jobs/store-db', async orig => ({
   storeActiveForJob: vi.fn(async () => storeActive.value),
 }));
 
+// The per-batch operational read (Ruling SUSPEND-OUT-1): independent of storeActiveForJob so a store can be suspended MID-send.
+const operational = vi.hoisted(() => ({ value: true, reads: 0 }));
+vi.mock('@api/lib/store-operational', () => ({
+  storeOperational: vi.fn(async () => {
+    operational.reads++;
+    return operational.value;
+  }),
+}));
+
 vi.mock('@ebda/database', () => ({
   get prisma() {
     return holder.prisma;
@@ -151,6 +160,8 @@ beforeEach(() => {
   process.env.CAMPAIGN_SEND_THROTTLE_MS = String(THROTTLE);
   delete process.env.CAMPAIGN_DAILY_SEND_CAP;
   storeActive.value = true;
+  operational.value = true;
+  operational.reads = 0;
 });
 
 afterEach(() => {
@@ -193,6 +204,27 @@ describe('campaign-send', () => {
 
     expect(sendMarketingEmail).not.toHaveBeenCalled();
     expect(campaign().status).toBe('scheduled');
+  });
+
+  it('a store suspended MID-send pauses the campaign: nothing failed, recipients stay queued, one status read per batch', async () => {
+    seed(['a@x.test', 'b@x.test', 'c@x.test']);
+    operational.value = false;
+
+    await expect(runJob()).resolves.toEqual({ paused: 'store-not-operational' });
+
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(db.recipients.map(r => r.status)).toEqual(['queued', 'queued', 'queued']);
+    expect(campaign().status).toBe('draft');
+    expect(campaign().lastError).toBe('STORE_NOT_OPERATIONAL');
+    expect(operational.reads).toBe(1);
+  });
+
+  it('an operational store reads its status once per batch, not once per recipient', async () => {
+    seed(['a@x.test', 'b@x.test', 'c@x.test']);
+    await runJob();
+    expect(sendMarketingEmail).toHaveBeenCalledTimes(3);
+    expect(operational.reads).toBe(1);
+    for (const c of sendMarketingEmail.mock.calls) expect(c[1].operationalChecked).toBe(true);
   });
 
   it('sends ONE email per consented subscriber, to one address each, then marks the campaign sent', async () => {

@@ -7,7 +7,7 @@ import { useT } from '../i18n/useT';
 import { STORE_NOT_OPERATIONAL_EVENT } from '../lib/api';
 
 /** mailto: the appeal goes to the Ebda support mailbox (there is no appeal page; support handles it). */
-export function appealHref(): string {
+function appealHref(): string {
   return `mailto:${BRAND.supportEmail}?subject=${encodeURIComponent('Store suspension appeal')}`;
 }
 

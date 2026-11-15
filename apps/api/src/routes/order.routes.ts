@@ -1,4 +1,4 @@
-import { assertStoreOperational } from '../lib/store-operational';
+import { assertStoreOperational, isPaidOrder } from '../lib/store-operational';
 import { readAuditByResource } from '../lib/audit-read';
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
@@ -861,9 +861,10 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      // Ruling SUSPEND-OUT-1: an invoice mailed to the CUSTOMER is refused (423) for a store that is not `active`.
-      await assertStoreOperational(storeId);
       const order = await OrderService.getById(storeId, orderId);
+      // Ruling SUSPEND-OUT-1: an invoice mailed to the CUSTOMER of an unpaid order is refused (423) for a store that is
+      // not `active`. Ruling SUSPEND-OUT-1b: the invoice of a PAID order is a receipt and is still sent.
+      if (!isPaidOrder(order.paymentStatus)) await assertStoreOperational(storeId);
       const customerEmail =
         order.customer?.email ?? (order.shippingAddress as Record<string, string> | null)?.email;
       if (!customerEmail) {
