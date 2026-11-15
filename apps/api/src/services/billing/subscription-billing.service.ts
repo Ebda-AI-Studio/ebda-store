@@ -2047,7 +2047,7 @@ async function settleRefundInTx(
       data: { status: 'refunded' },
     });
     // R-REFUND-PERIOD-1: a full refund of the charge that paid the current period takes the period back.
-    if (flipped.count === 1) {
+    if (flipped.count > 0) {
       const keep = (refund.raw as { keepAccess?: unknown } | null)?.keepAccess === true;
       await rollBackPeriodForRefund(tx, charge, keep, new Date());
     }
