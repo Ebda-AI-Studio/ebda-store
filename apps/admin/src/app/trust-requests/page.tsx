@@ -5,8 +5,8 @@
  *
  * Every request a merchant files with Ebda staff lands here: support requests, suspension appeals, protected-address
  * claims and store-limit requests. Filter by kind, status, store and created date; open one to read it in full; RESOLVE
- * (staff acted) or REJECT (declined) it. Each decision is audited server-side (MFA + super_admin). Reactivating a store,
- * granting a protected address or changing a plan also closes the matching request on its own.
+ * (staff acted) or REJECT (declined) it. Each decision is audited server-side (MFA + super_admin). Reactivating a store
+ * or granting a protected address also closes the matching request on its own.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
@@ -65,6 +65,8 @@ function Inner() {
   const [detail, setDetail] = useState<TrustRow | null>(null);
   const [working, setWorking] = useState(false);
   const [decisionError, setDecisionError] = useState(false);
+  // store-limit requests: RESOLVE carries the new limit (the API checks it is above the current one, at most 20)
+  const [limit, setLimit] = useState('4');
 
   const load = useCallback(
     async (cursor?: string) => {
@@ -87,6 +89,7 @@ function Inner() {
   const open = async (id: string) => {
     setOpenId(id);
     setDetail(null);
+    setLimit('4');
     setDecisionError(false);
     const r = await apiGet<{ request: TrustRow }>(`/api/v1/admin/trust-requests/${id}`);
     if (r.error || !r.data) return setDecisionError(true);
@@ -97,7 +100,11 @@ function Inner() {
     if (!detail) return;
     setWorking(true);
     setDecisionError(false);
-    const r = await apiPost(`/api/v1/admin/trust-requests/${detail.id}/${action}`);
+    const grant = action === 'resolve' && detail.kind === 'store_cap';
+    const r = await apiPost(
+      `/api/v1/admin/trust-requests/${detail.id}/${action}`,
+      grant ? { limit: Number(limit) } : undefined
+    );
     setWorking(false);
     if (r.error) return setDecisionError(true);
     setOpenId(null);
@@ -276,6 +283,22 @@ function Inner() {
                 <p role="alert" className="mt-2 text-sm text-destructive-ink">
                   {t('detail.failed')}
                 </p>
+              )}
+              {detail.status === 'open' && detail.kind === 'store_cap' && (
+                <label className="mt-3 flex flex-col gap-1 text-xs text-muted-foreground">
+                  {t('detail.newLimit')}
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={4}
+                    max={20}
+                    step={1}
+                    className={`${field} w-28`}
+                    value={limit}
+                    onChange={e => setLimit(e.target.value)}
+                  />
+                  <span>{t('detail.newLimitHelp')}</span>
+                </label>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
                 {detail.status === 'open' ? (

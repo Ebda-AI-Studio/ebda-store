@@ -6544,7 +6544,7 @@
         "support": "Tell us what you need. A person at Ebda Store reads it and replies by email.",
         "appeal": "Explain why your store should be switched back on. A person at Ebda Store reviews it and decides.",
         "slug": "Tell us why this address is yours, for example a trademark or your registered business name. A person at Ebda Store reviews it.",
-        "cap": "Tell us why you need more stores today and how you can prove it. A person at Ebda Store reviews it."
+        "cap": "Tell us why you need more stores and how you can prove it. A person at Ebda Store reviews it."
       },
       "message": {
         "support": "Your message",
@@ -9385,8 +9385,8 @@
         "create": "Create my store",
         "creating": "Creating…",
         "createFailed": "We could not create the store. Please try again.",
-        "dailyLimit": "You have created several stores today. Ask for a higher daily limit below, or try again tomorrow.",
-        "limit": "You have reached the store limit for this account.",
+        "dailyLimit": "You have created several stores today. Try again tomorrow.",
+        "limit": "You have reached the store limit for this account. Ask for a higher limit below.",
         "claimAddress": "Claim this address"
       },
       "template": {
@@ -11774,6 +11774,8 @@
       "reject": "Reject",
       "close": "Close",
       "decided": "This request was already decided.",
+      "newLimit": "New store limit",
+      "newLimitHelp": "Whole number above the owner's current limit (3 by default), at most 20.",
       "failed": "Could not save the decision. It may already be decided; reload the list."
     }
   },

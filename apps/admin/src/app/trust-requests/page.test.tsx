@@ -80,9 +80,32 @@ describe('super-admin trust requests page', () => {
     const before = calls.length;
     fireEvent.click(screen.getByText(button));
     await waitFor(() =>
-      expect(apiPost).toHaveBeenCalledWith(`/api/v1/admin/trust-requests/${ID}/${action}`)
+      expect(apiPost).toHaveBeenCalledWith(
+        `/api/v1/admin/trust-requests/${ID}/${action}`,
+        undefined
+      )
     );
     await waitFor(() => expect(calls.length).toBeGreaterThan(before));
+  });
+
+  it('resolving a store-limit request sends the new limit; reject sends none', async () => {
+    const cap = { ...row, kind: 'store_cap', slug: null };
+    apiGet.mockImplementation(async (url: string) =>
+      url.includes(`/trust-requests/${ID}`)
+        ? { data: { request: cap }, error: null }
+        : { data: { rows: [cap], nextCursor: null }, error: null }
+    );
+    apiPost.mockResolvedValue({ data: {}, error: null });
+    render(<TrustRequestsPage />);
+    fireEvent.click(await screen.findByText('detail.open'));
+    const input = (await screen.findByLabelText(/detail.newLimit/)) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '6' } });
+    fireEvent.click(screen.getByText('detail.resolve'));
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith(`/api/v1/admin/trust-requests/${ID}/resolve`, {
+        limit: 6,
+      })
+    );
   });
 
   it('a failed decision shows an error and keeps the request open for review', async () => {

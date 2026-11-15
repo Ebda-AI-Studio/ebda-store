@@ -21059,6 +21059,13 @@
           "list": false,
           "optional": true
         },
+        "grantedLimit": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "granted_limit",
+          "list": false,
+          "optional": true
+        },
         "createdAt": {
           "kind": "scalar",
           "type": "DateTime",

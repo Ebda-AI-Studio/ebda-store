@@ -170,7 +170,7 @@
         "provider_verification_events": 10,
         "billing_referrals": 3,
         "billing_grants": 17,
-        "trust_requests": 15,
+        "trust_requests": 16,
         "stores": 32,
         "entity_index": 5,
         "platform_audit_log": 8
@@ -1360,6 +1360,12 @@
     {
       "kind": "check",
       "name": "trust_requests_cap_slot_check",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "trust_requests_granted_limit_check",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
     },

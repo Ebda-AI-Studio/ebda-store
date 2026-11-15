@@ -42,7 +42,7 @@ router.get('/state', ...merchantOnly, async (req: Request, res: Response, next: 
   }
 });
 
-// A16: a merchant who hits a protected brand address, or the daily store-creation cap, asks Ebda staff with evidence.
+// A16: a merchant who hits a protected brand address, or the per-owner store limit, asks Ebda staff with evidence.
 // Filed before a store exists, so the row is keyed on the user (withUser). Staff decide: a super admin lifts the
 // protected list (`allowProtected`) or the cap through the existing super-admin paths.
 const evidenceUrl = z
@@ -117,7 +117,7 @@ router.post(
       });
       void deferAfterTenantCommit('onboarding-request.notify', () =>
         notifyStaff({
-          subject: 'Daily store limit request',
+          subject: 'Store limit request',
           lines: [
             user.email ? `From: ${user.email}` : '',
             input.evidenceUrl ? `Evidence: ${input.evidenceUrl}` : '',

@@ -1,7 +1,7 @@
 /**
  * SELF-SERVICE gaps A13 + A14 + A16: a merchant reads why their store was suspended and files ONE open appeal,
  * sends a support request to Ebda staff from inside the product (5 per store per day), and claims a protected
- * brand slug or asks for a higher daily store cap with evidence. Staff keep every decision (the override).
+ * brand slug or asks for a higher store limit with evidence. Staff keep every decision (the override).
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
@@ -338,7 +338,7 @@ describe('A16 slug claim and store cap request', () => {
     expect(res.status).toBe(400);
   });
 
-  it('stores a daily store-cap request with evidence; a second open one is 409', async () => {
+  it('stores a store-limit request with evidence; a second open one is 409', async () => {
     const body = {
       message: 'I run 12 branches and open them all this week.',
       evidenceUrl: 'https://example.com/proof',

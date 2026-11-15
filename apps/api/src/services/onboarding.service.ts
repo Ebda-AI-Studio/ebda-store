@@ -38,6 +38,7 @@ import { readInStoreContext } from '../lib/store-scoped-read';
 import { storeIdBySlug } from '../lib/definer';
 import { assertOwnerMayCreateStore, ownerStoreAllowance } from './plan-limit.service';
 import { countOwnerStores, storeCreateOnDo } from '../lib/store-create-do';
+import { MAX_SELF_SERVE_STORES_PER_OWNER, ownerStoreLimit } from './owner-store-limit';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 import { assertStoreMayGoLive } from './billing/go-live-gate';
 import {
@@ -47,8 +48,7 @@ import {
 import { DEFAULT_TRIAL_CHOICE, type TrialChoice } from './billing/trial';
 import { emitEbdaConversion } from './ebda-ads-emit';
 
-/** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
-export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
+export { MAX_SELF_SERVE_STORES_PER_OWNER };
 
 /**
  * Bare-skin choice, kept for callers that predate looks (new clients send `lookId`). Only skins
@@ -246,7 +246,9 @@ export class OnboardingService {
             tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
           )
     );
-    if (owned >= MAX_SELF_SERVE_STORES_PER_OWNER) {
+    // A store-limit request staff resolved raises this owner's limit (owner-store-limit.ts); no request = the constant.
+    const storeLimit = await ownerStoreLimit(owner.userId);
+    if (owned >= storeLimit) {
       throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');
     }
 
@@ -294,12 +296,21 @@ export class OnboardingService {
       if (!owner.isSuperAdmin) await assertStoreCreationBudget(owner.userId);
       // Plan gate (locked pricing): a SECOND store needs a plan that allows it
       // (Business = 3). Also stops a Basic/Growth owner farming fresh Growth trials.
-      if (!owner.isSuperAdmin) await assertOwnerMayCreateStore(owner.userId);
+      if (!owner.isSuperAdmin) await assertOwnerMayCreateStore(owner.userId, storeLimit);
       const ownedNow = await countOwnerStores(owner.userId, () =>
         withUser(owner.userId, tx =>
           tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
         )
       );
+      // Cap the new store's row count on the DO: the staff-granted limit also lifts a lower plan allowance.
+      const maxOwned = async () => {
+        const plan = (await ownerStoreAllowance(owner.userId)).allowance;
+        const granted = storeLimit > MAX_SELF_SERVE_STORES_PER_OWNER;
+        return Math.min(
+          storeLimit,
+          plan === null ? storeLimit : granted ? Math.max(plan, storeLimit) : plan
+        );
+      };
       try {
         const result = await ProvisioningService.provisionStore({
           storeName: input.name,
@@ -309,14 +320,7 @@ export class OnboardingService {
           // (only reachable on a plan that allows it) is covered by the owner's
           // Business plan and starts on it, with no second trial.
           plan: ownedNow > 0 ? 'enterprise' : 'professional',
-          maxOwnedStores:
-            owner.isSuperAdmin || !storeCreateOnDo()
-              ? null
-              : Math.min(
-                  MAX_SELF_SERVE_STORES_PER_OWNER,
-                  (await ownerStoreAllowance(owner.userId)).allowance ??
-                    MAX_SELF_SERVE_STORES_PER_OWNER
-                ),
+          maxOwnedStores: owner.isSuperAdmin || !storeCreateOnDo() ? null : await maxOwned(),
           growthTrial: ownedNow === 0,
           trialChoice,
           status: 'inactive',

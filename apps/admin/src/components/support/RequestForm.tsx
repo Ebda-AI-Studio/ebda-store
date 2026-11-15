@@ -2,7 +2,7 @@
 
 /**
  * One small form for every "ask Ebda Store staff" request (SELF-SERVICE A13/A14/A16): a support request, a suspension
- * appeal, a protected-address claim, a higher daily store limit. Staff decide; this only files the request.
+ * appeal, a protected-address claim, a higher store limit. Staff decide; this only files the request.
  */
 import { useState } from 'react';
 import { Input, Select, Textarea } from '@ebda/ui';

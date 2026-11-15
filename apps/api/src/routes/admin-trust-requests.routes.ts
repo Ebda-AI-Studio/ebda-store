@@ -39,6 +39,8 @@ const listQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 const idParam = z.string().uuid();
+// Resolving a store-limit request carries the new limit; every other decision takes no body.
+const decisionBody = z.object({ limit: z.number().int().optional() }).strict();
 
 router.get(
   '/trust-requests',
@@ -79,8 +81,9 @@ for (const [action, decision] of DECISIONS) {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const id = parseInput(idParam, req.params.id);
+        const body = parseInput(decisionBody, req.body ?? {});
         const done = await asOperator(req.user!.userId, () =>
-          decideTrustRequest(db(), id, decision)
+          decideTrustRequest(db(), id, decision, { grantedLimit: body.limit })
         );
         await auditLog({
           action: `trust_request.${action}`,
@@ -88,7 +91,11 @@ for (const [action, decision] of DECISIONS) {
           ...(done.storeId ? { storeId: done.storeId } : {}),
           resourceType: 'trust_request',
           resourceId: id,
-          details: { kind: done.kind, status: done.status },
+          details: {
+            kind: done.kind,
+            status: done.status,
+            ...(done.grantedLimit !== null ? { grantedLimit: done.grantedLimit } : {}),
+          },
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });

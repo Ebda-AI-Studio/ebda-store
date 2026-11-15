@@ -17,16 +17,22 @@ const match = (r: Row, where: Row = {}) =>
   Object.entries(where).every(([k, v]) => {
     if (v && typeof v === 'object' && !(v instanceof Date)) {
       if ('in' in v) return v.in.includes(r[k]);
+      if ('not' in v) return r[k] !== v.not && r[k] !== undefined;
       if ('gte' in v || 'lte' in v)
         return (!('gte' in v) || r[k] >= v.gte) && (!('lte' in v) || r[k] <= v.lte);
     }
     return r[k] === v;
   });
 const trustRequest = {
-  findMany: async ({ where, take, cursor, skip }: any) => {
+  findMany: async ({ where, take, cursor, skip, orderBy }: any) => {
+    const byLimit = !Array.isArray(orderBy) && orderBy?.grantedLimit === 'desc';
     const hit = h.rows
       .filter(r => match(r, where))
-      .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : -1));
+      .sort((a, b) =>
+        byLimit
+          ? b.grantedLimit - a.grantedLimit
+          : b.createdAt - a.createdAt || (a.id < b.id ? 1 : -1)
+      );
     const start = cursor ? hit.findIndex(r => r.id === cursor.id) + (skip ?? 0) : 0;
     return hit.slice(start, start + take);
   },
@@ -64,12 +70,6 @@ vi.mock('@api/middleware/security', async () => {
   );
   return { ...real, auditLog: h.audit };
 });
-
-vi.mock('@api/lib/repo-factory', () => ({
-  storeDb: async () => ({
-    store: { findUnique: async ({ where }: any) => (where.id === S1 ? { ownerId: U1 } : null) },
-  }),
-}));
 
 const seed = () => {
   const t = Date.now();
@@ -199,7 +199,9 @@ describe('RESOLVE and REJECT for every kind', () => {
     [3, 'slug_claim'],
     [4, 'store_cap'],
   ])('request %i (%s): resolve then it cannot be decided again', async (n, kind) => {
-    const res = await request(app).post(`/admin/trust-requests/${id(n)}/resolve`);
+    const res = await request(app)
+      .post(`/admin/trust-requests/${id(n)}/resolve`)
+      .send(kind === 'store_cap' ? { limit: 5 } : {});
     expect(res.status).toBe(200);
     expect(h.rows.find(r => r.id === id(n))!.status).toBe('resolved');
     expect(h.audit).toHaveBeenCalledWith(
@@ -208,7 +210,7 @@ describe('RESOLVE and REJECT for every kind', () => {
         resourceType: 'trust_request',
         resourceId: id(n),
         userId: 'admin-1',
-        details: { kind, status: 'resolved' },
+        details: { kind, status: 'resolved', ...(kind === 'store_cap' ? { grantedLimit: 5 } : {}) },
       })
     );
     expect((await request(app).post(`/admin/trust-requests/${id(n)}/reject`)).status).toBe(409);
@@ -280,27 +282,60 @@ describe('grant helpers close the matching open request', () => {
       ['adidas', 'open'],
     ]);
   });
-  it("a plan grant resolves that owner's open store-limit request only", async () => {
-    const svc = await import('@api/services/trust-requests.service');
+});
+
+describe('RESOLVE of a store-limit request grants the new limit in the same step', () => {
+  const url = `/admin/trust-requests/${id(4)}/resolve`;
+  it('stores the granted limit on the request, closes it and audits the limit', async () => {
+    const res = await request(app).post(url).send({ limit: 6 });
+    expect(res.status).toBe(200);
+    expect(res.body.data.grantedLimit).toBe(6);
+    expect(h.rows.find(r => r.id === id(4))).toMatchObject({ status: 'resolved', grantedLimit: 6 });
+    expect(h.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ details: expect.objectContaining({ grantedLimit: 6 }) })
+    );
+  });
+  it.each([
+    ['no limit', {}],
+    ['the current limit (3)', { limit: 3 }],
+    ['below it', { limit: 2 }],
+    ['above the maximum (21)', { limit: 21 }],
+    ['a fraction', { limit: 4.5 }],
+    ['a string', { limit: '5' }],
+  ])('refuses %s (400) and nothing changes', async (_n, body) => {
+    const res = await request(app).post(url).send(body);
+    expect(res.status).toBe(400);
+    expect(h.rows.find(r => r.id === id(4))).toMatchObject({ status: 'open' });
+    expect(h.audit).not.toHaveBeenCalled();
+  });
+  it('a second grant must exceed the first (limit 5 granted, 5 again is refused, 6 passes)', async () => {
     h.rows.push({
       id: id(9),
       kind: 'store_cap',
-      status: 'open',
+      status: 'resolved',
       storeId: null,
-      userId: 'u2',
-      createdAt: new Date(),
+      userId: U1,
+      grantedLimit: 5,
+      createdAt: new Date(Date.now() - 9000),
     });
-    expect(await svc.closeGrantedRequests({ trustRequest } as any, { ownerId: U1 })).toBe(1);
-    expect(h.rows.find(r => r.id === id(4))!.status).toBe('resolved');
-    expect(h.rows.find(r => r.id === id(9))!.status).toBe('open');
+    expect((await request(app).post(url).send({ limit: 5 })).status).toBe(400);
+    expect((await request(app).post(url).send({ limit: 6 })).status).toBe(200);
   });
-});
-
-describe('closeCapRequestOnPlanGrant (PUT /admin/stores/:id/subscription)', () => {
-  it("resolves the store owner's open store-limit request; an unknown store closes nothing", async () => {
-    const { closeCapRequestOnPlanGrant } = await import('@api/services/trust-grants');
-    expect(await closeCapRequestOnPlanGrant('admin-1', S1)).toBe(1);
-    expect(h.rows.find(r => r.id === id(4))!.status).toBe('resolved');
-    expect(await closeCapRequestOnPlanGrant('admin-1', S2)).toBe(0);
+  it('a limit on any other decision is refused; reject takes none', async () => {
+    expect(
+      (
+        await request(app)
+          .post(`/admin/trust-requests/${id(1)}/resolve`)
+          .send({ limit: 5 })
+      ).status
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post(`/admin/trust-requests/${id(4)}/reject`)
+          .send({ limit: 5 })
+      ).status
+    ).toBe(400);
+    expect((await request(app).post(`/admin/trust-requests/${id(4)}/reject`)).status).toBe(200);
   });
 });

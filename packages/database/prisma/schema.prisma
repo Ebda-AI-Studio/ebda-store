@@ -5743,6 +5743,10 @@ model TrustRequest {
   // cap_slot); a lost race is a unique violation, so the daily cap is atomic on Postgres and D1 alike
   capDay      String?  @map("cap_day")
   capSlot     Int?     @map("cap_slot")
+  // store_cap requests only: the owner's self-serve store limit granted when staff RESOLVED it (> the previous limit,
+  // <= STORE_LIMIT_MAX). The owner's effective limit is the largest granted_limit among their resolved requests,
+  // else MAX_SELF_SERVE_STORES_PER_OWNER (services/owner-store-limit.ts).
+  grantedLimit Int?    @map("granted_limit")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

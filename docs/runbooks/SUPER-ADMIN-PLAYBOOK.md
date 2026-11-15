@@ -42,9 +42,9 @@ isFeatureEnabled(storeId, key) =
 **Merchant path (default).** The merchant signs up, verifies their email, and creates the store in the onboarding stepper (`POST /onboarding/store`); it starts on the Growth trial and they pick the plan billed at trial end. Nobody on staff is needed. Two blockers have their own merchant path, with staff as the decision:
 
 - **Protected brand address**: the merchant files a claim with proof (`POST /onboarding/slug-claims`). You review it; to release it, create the store as a super admin (the `allowProtected` override) or have them retry once you lift it.
-- **Daily store limit**: the merchant files a request with proof (`POST /onboarding/store-cap-requests`). You decide.
+- **Store limit**: one self-serve account may hold 3 stores (`MAX_SELF_SERVE_STORES_PER_OWNER`); at the limit the merchant files a request with proof (`POST /onboarding/store-cap-requests`). You decide in the Support and trust requests screen: **Resolve** asks for the new limit (a whole number above the owner's current limit, at most 20), stores it on the request (`granted_limit`) and closes it in one audited step; the owner's limit is then the largest `granted_limit` among their resolved requests. The separate per-day creation cap (`STORE_DAILY_LIMIT`, 2 stores per rolling 24 hours) is not affected.
 
-Both arrive by email to the support inbox and are stored in `trust_requests` (`kind = slug_claim | store_cap`, `status = open`). Review them in the admin app under **Support and trust requests** (`/trust-requests`, below). Granting the address (creating or renaming a store onto it as a super admin) or changing the owner's plan (`PUT /admin/stores/:id/subscription`) closes the matching open request by itself, so the merchant can ask again; otherwise press Resolve or Reject on the request.
+Both arrive by email to the support inbox and are stored in `trust_requests` (`kind = slug_claim | store_cap`, `status = open`). Review them in the admin app under **Support and trust requests** (`/trust-requests`, below). Granting the address (creating or renaming a store onto it as a super admin) closes the matching claim by itself, so the merchant can ask again; otherwise press Resolve or Reject on the request.
 
 ## Support and trust requests screen
 
@@ -118,7 +118,7 @@ Every request below lands in the support inbox by email (reply-to is the merchan
 | `support`           | **Contact Ebda Store** (sidebar, and inside screens that need staff, such as a 3D models card that says it is switched off) | 5 per store per day         | reply by email                    |
 | `suspension_appeal` | banner on a suspended store                                                                                                 | 1 open per store            | reply, then reactivate or reject  |
 | `slug_claim`        | onboarding, protected address                                                                                               | 1 open per user and address | verify proof, release the address |
-| `store_cap`         | onboarding, daily store limit                                                                                               | 1 open per user             | verify proof, raise the limit     |
+| `store_cap`         | onboarding, store limit                                                                                                     | 1 open per user             | verify proof, set the new limit   |
 
 **3D models** are on by default for every plan (`product_3d`, tier core). They are off for a store only when a super admin override disables it on Manage Features; the merchant's card then says so and offers Contact Ebda Store. Clear the override to turn them back on.
 

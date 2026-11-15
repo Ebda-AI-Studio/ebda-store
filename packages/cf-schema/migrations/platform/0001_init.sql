@@ -641,6 +641,7 @@ CREATE TABLE IF NOT EXISTS "trust_requests" (
   "rejected_at" INTEGER,
   "cap_day" TEXT,
   "cap_slot" INTEGER,
+  "granted_limit" INTEGER,
   "created_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   "updated_at" INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "trust_requests_pkey" PRIMARY KEY ("id"),
@@ -648,7 +649,8 @@ CREATE TABLE IF NOT EXISTS "trust_requests" (
   CONSTRAINT "trust_requests_kind_check" CHECK ("kind" IN ('support', 'suspension', 'suspension_appeal', 'slug_claim', 'store_cap')),
   CONSTRAINT "trust_requests_status_check" CHECK ("status" IN ('open', 'resolved', 'rejected')),
   CONSTRAINT "trust_requests_len_check" CHECK (length(coalesce("message", '')) <= 2000 AND length(coalesce("page_url", '')) <= 500 AND length(coalesce("evidence_url", '')) <= 500),
-  CONSTRAINT "trust_requests_cap_slot_check" CHECK ("cap_slot" IS NULL OR "cap_slot" BETWEEN 1 AND 5)
+  CONSTRAINT "trust_requests_cap_slot_check" CHECK ("cap_slot" IS NULL OR "cap_slot" BETWEEN 1 AND 5),
+  CONSTRAINT "trust_requests_granted_limit_check" CHECK ("granted_limit" IS NULL OR ("granted_limit" BETWEEN 1 AND 20 AND "kind" = 'store_cap'))
 );
 CREATE INDEX IF NOT EXISTS "trust_requests_store_id_kind_created_at_idx" ON "trust_requests" ("store_id", "kind", "created_at" DESC);
 CREATE INDEX IF NOT EXISTS "trust_requests_user_id_kind_status_idx" ON "trust_requests" ("user_id", "kind", "status");

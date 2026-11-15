@@ -111,7 +111,7 @@ import {
   hubUsers,
 } from '../lib/platform-hub';
 import { storeDb } from '../lib/repo-factory';
-import { closeCapRequestOnPlanGrant, closeClaimsOnSlugGrant } from '../services/trust-grants';
+import { closeClaimsOnSlugGrant } from '../services/trust-grants';
 import { customerRows } from '../lib/customer-directory';
 
 const router = Router();
@@ -931,8 +931,6 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const input = assignSubscriptionSchema.parse(req.body);
-      // the owner's store allowance changes: their open store-limit request is answered first (loud, Ruling TRUST-2)
-      await closeCapRequestOnPlanGrant(req.user!.userId, req.params.id);
       const result = await planService.assignPlan(req.params.id, input);
       await auditLog({
         action: 'store.plan_assigned',

@@ -17,6 +17,11 @@ import { isP2002 } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 import { emailQueue } from './email-queue.service';
+import {
+  STORE_LIMIT_MAX,
+  grantedStoreLimit,
+  MAX_SELF_SERVE_STORES_PER_OWNER,
+} from './owner-store-limit';
 
 /** Support requests per store per UTC day (slots 1..N, each claimed by a unique insert). */
 const SUPPORT_REQUESTS_PER_DAY = 5;
@@ -295,7 +300,7 @@ export async function fileAppeal(
 }
 
 // ---------------------------------------------------------------------------
-// A16 protected slug claim + daily store cap request (filed before a store exists, keyed on the user)
+// A16 protected slug claim + store-limit request (filed before a store exists, keyed on the user)
 // ---------------------------------------------------------------------------
 
 export async function fileSlugClaim(
@@ -401,14 +406,33 @@ const REVIEW_SELECT = {
   slug: true,
   evidenceUrl: true,
   rejectedAt: true,
+  grantedLimit: true,
   createdAt: true,
   updatedAt: true,
 } as const;
 
+/** The columns of REVIEW_SELECT. */
+interface TrustReviewRow {
+  id: string;
+  kind: string;
+  status: string;
+  storeId: string | null;
+  userId: string | null;
+  topic: string | null;
+  message: string | null;
+  pageUrl: string | null;
+  slug: string | null;
+  evidenceUrl: string | null;
+  rejectedAt: Date | null;
+  grantedLimit: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ReviewDb {
   trustRequest: {
-    findMany(args: Record<string, unknown>): Promise<Array<Record<string, any>>>;
-    findFirst(args: Record<string, unknown>): Promise<Record<string, any> | null>;
+    findMany(args: Record<string, unknown>): Promise<TrustReviewRow[]>;
+    findFirst(args: Record<string, unknown>): Promise<TrustReviewRow | null>;
     updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
   };
 }
@@ -450,49 +474,75 @@ export async function getTrustRequest(db: ReviewDb, id: string) {
 
 /**
  * Staff decision on ANY request kind: open -> resolved | rejected, once. Only an `open` row moves (a second click is
- * 404 NOT_OPEN, never a silent overwrite). `rejected_at` is stamped on every rejection (it is what starts the appeal
- * cooldown). The update names the row's own store / user so it stays tenant-scoped on D1.
+ * 409 TRUST_REQUEST_NOT_OPEN, never a silent overwrite). `rejected_at` is stamped on every rejection (it starts the
+ * appeal cooldown). RESOLVING a store-limit request REQUIRES the new limit (`grantedLimit`: an integer above the
+ * owner's current limit and at most STORE_LIMIT_MAX) and stores it in the same update that closes the request, so the
+ * grant and the closure are one step. The update names the row's own store / user so it stays tenant-scoped on D1.
  */
 export async function decideTrustRequest(
   db: ReviewDb,
   id: string,
-  decision: TrustDecision
-): Promise<{ id: string; kind: string; storeId: string | null; status: TrustDecision }> {
+  decision: TrustDecision,
+  opts: { grantedLimit?: number } = {}
+): Promise<{
+  id: string;
+  kind: string;
+  storeId: string | null;
+  status: TrustDecision;
+  grantedLimit: number | null;
+}> {
   const row = await getTrustRequest(db, id);
   if (row.status !== 'open') {
     throw new AppError(409, 'TRUST_REQUEST_NOT_OPEN', 'This request was already decided');
   }
+  let grantedLimit: number | null = null;
+  if (decision === 'resolved' && row.kind === 'store_cap') {
+    const want = opts.grantedLimit;
+    const current = Math.max(
+      (row.userId ? await grantedStoreLimit(db as never, row.userId) : null) ?? 0,
+      MAX_SELF_SERVE_STORES_PER_OWNER
+    );
+    if (!Number.isInteger(want) || want! <= current || want! > STORE_LIMIT_MAX) {
+      throw new AppError(
+        400,
+        'INVALID_STORE_LIMIT',
+        `Give the new store limit: a whole number above ${current} and at most ${STORE_LIMIT_MAX}`
+      );
+    }
+    grantedLimit = want!;
+  } else if (opts.grantedLimit !== undefined) {
+    throw new AppError(
+      400,
+      'LIMIT_NOT_APPLICABLE',
+      'A limit applies only to resolving a store-limit request'
+    );
+  }
   const { count } = await db.trustRequest.updateMany({
     where: { id, status: 'open', storeId: row.storeId, userId: row.userId },
-    data: { status: decision, ...(decision === 'rejected' ? { rejectedAt: new Date() } : {}) },
+    data: {
+      status: decision,
+      ...(decision === 'rejected' ? { rejectedAt: new Date() } : {}),
+      ...(grantedLimit !== null ? { grantedLimit } : {}),
+    },
   });
   if (count === 0) {
     throw new AppError(409, 'TRUST_REQUEST_NOT_OPEN', 'This request was already decided');
   }
-  return { id, kind: row.kind, storeId: row.storeId, status: decision };
+  return { id, kind: row.kind, storeId: row.storeId, status: decision, grantedLimit };
 }
 
 /**
- * The matching grant closes the request in the SAME flow (called BEFORE the grant and failing loud, Ruling TRUST-2),
- * so a helped merchant is never left with an open request that blocks asking again.
- *  - protected address: a super admin creates / renames a store onto the slug -> every open claim for that slug.
- *  - store limit: a super admin changes the owner's plan (their store allowance) -> that owner's open cap request.
- * Returns how many requests were closed.
+ * A super admin putting a store on a protected address closes every open slug claim for it in the SAME flow (called
+ * BEFORE the grant and failing loud, Ruling TRUST-2), so a helped merchant can ask again. Returns how many closed.
+ * (A store-limit request is closed by RESOLVING it in the trust-requests screen, which sets the new limit.)
  */
 export async function closeGrantedRequests(
   db: Pick<ReviewDb, 'trustRequest'>,
-  grant: { slug: string } | { ownerId: string }
+  grant: { slug: string }
 ): Promise<number> {
-  if ('slug' in grant) {
-    // cross-user by design: ANY merchant's open claim for this address is answered by the grant
-    const { count } = await db.trustRequest.updateMany({
-      where: { kind: 'slug_claim', slug: grant.slug.trim().toLowerCase(), status: 'open' },
-      data: { status: 'resolved' },
-    });
-    return count;
-  }
+  // cross-user by design: ANY merchant's open claim for this address is answered by the grant
   const { count } = await db.trustRequest.updateMany({
-    where: { kind: 'store_cap', userId: grant.ownerId, status: 'open' },
+    where: { kind: 'slug_claim', slug: grant.slug.trim().toLowerCase(), status: 'open' },
     data: { status: 'resolved' },
   });
   return count;
