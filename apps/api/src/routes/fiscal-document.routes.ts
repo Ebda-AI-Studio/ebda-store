@@ -138,6 +138,11 @@ const superAdmin = [authenticate, requireMfaEnrolled, authorize('super_admin')];
 
 export const fiscalArchiveRoutes = Router();
 
+/** The retained Postgres copy (SECURITY DEFINER), which still holds a deleted store's documents. */
+function archiveRowsViaDefiner(userId: string, storeId: string) {
+  return withUser(userId, () => fiscalArchive(storeId));
+}
+
 async function archiveRows(userId: string, storeId: string) {
   return (await hubOnD1())
     ? await fiscalArchiveHub(storeId)
@@ -155,9 +160,21 @@ fiscalArchiveRoutes.get(
         ...(q.from ? { from: q.from } : {}),
         ...(q.to ? { to: q.to } : {}),
       };
-      const base = (await hubOnD1())
+      const userId = req.user!.userId;
+      let base = (await hubOnD1())
         ? await fiscalArchiveStoresHub()
-        : await withUser(req.user!.userId, () => fiscalArchiveStores());
+        : await withUser(userId, () => fiscalArchiveStores());
+      if (await hubOnD1()) {
+        // Deleted stores have no live tables: the retained Postgres copy still lists them (7-year retention).
+        const kept = await (async () => withUser(userId, () => fiscalArchiveStores()))().catch(
+          err => {
+            logger.warn({ err }, '[FISCAL] retained archive store list unavailable');
+            return [];
+          }
+        );
+        const have = new Set(base.map(s => s.storeId));
+        base = [...base, ...kept.filter(s => !s.storeExists && !have.has(s.storeId))];
+      }
       // Live stores get their period totals + tax / ETA status; a deleted store has no live tables, so null.
       const live = base.filter(s => s.storeExists).map(s => s.storeId);
       const summaries = new Map(
@@ -184,10 +201,34 @@ fiscalArchiveRoutes.get(
     try {
       const storeId = parseInput(UUID, req.params.storeId);
       const { summary: withSummary, ...f } = parseInput(archiveListQuery, req.query);
-      // Live-database path = keyset query; the definer (retention) path pages the rows it returned.
-      const result = (await hubOnD1())
-        ? await listFiscalDocuments(storeId, f)
-        : await pageFiscalRows(storeId, await archiveRows(req.user!.userId, storeId), f);
+      // Live store = keyset query on its own tables. A store that no longer has live tables (deleted: the 7-year
+      // retention case) is read from the retained Postgres copy through the definer, paged in memory. If neither
+      // source answers, say so (`unavailable`) instead of failing the page.
+      const userId = req.user!.userId;
+      const retained = async () =>
+        pageFiscalRows(storeId, await archiveRowsViaDefiner(userId, storeId), f);
+      let result: Awaited<ReturnType<typeof listFiscalDocuments>> & { unavailable?: true };
+      if (await hubOnD1()) {
+        const unfiltered = !f.cursor && !f.docType && !f.q && !f.from && !f.to;
+        try {
+          result = await listFiscalDocuments(storeId, f);
+          if (unfiltered && result.documents.length === 0) {
+            const kept = await retained().catch(() => null);
+            if (kept && kept.documents.length) result = kept;
+          }
+        } catch (liveErr) {
+          logger.warn(
+            { err: liveErr, storeId },
+            '[FISCAL] live archive unavailable, trying retained copy'
+          );
+          result = await retained().catch(err => {
+            logger.warn({ err, storeId }, '[FISCAL] retained archive unavailable');
+            return { documents: [], nextCursor: null, unavailable: true as const };
+          });
+        }
+      } else {
+        result = await retained();
+      }
       // The store card (current month); null for a store that no longer exists.
       const summary = withSummary
         ? await fiscalStoreSummary(storeId, defaultPeriod()).catch(() => null)

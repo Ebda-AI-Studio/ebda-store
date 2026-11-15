@@ -59,6 +59,7 @@ vi.mock('@api/lib/logger', () => ({
 import { renderFiscalDocumentHtml } from '@api/services/fiscal-document-render';
 import { allocateLineVat } from '@api/services/fiscal-document-lines';
 import { maskContact, pageFiscalRows, pickEtaReceipt } from '@api/services/fiscal-document-list';
+import { fiscalArchive, fiscalArchiveStores } from '@api/lib/definer';
 import { fiscalArchiveRoutes } from '@api/routes/fiscal-document.routes';
 
 const STORE = '11111111-1111-4111-8111-111111111111';
@@ -520,6 +521,114 @@ describe('super-admin archive endpoints', () => {
     });
     const plain = await request(app).get(`/admin/fiscal-archive/${STORE}`);
     expect('summary' in plain.body.data).toBe(false);
+  });
+
+  describe('a deleted store on the D1 hub path (retention)', () => {
+    const mk = (i: number, docType = 'receipt') => ({
+      id: `00000000-0000-4000-8000-00000000000${i}`,
+      storeId: STORE,
+      orderId: null,
+      docType,
+      number: `RCT-00000${i}`,
+      status: 'issued',
+      issuedAt: new Date(Date.UTC(2026, 10, i)),
+      cancelledAt: null,
+      originalNumber: null,
+      currency: 'EGP',
+      netAmount: 1,
+      vatAmount: 0,
+      totalAmount: 1,
+      vatRateBps: null,
+      sellerTrn: null,
+      payload: { orderNumber: `ORD-${i}` },
+      retainUntil: new Date('2033-01-01'),
+    });
+    const gone = () => Object.assign(new Error('store has no live database'), { status: 404 });
+
+    it('lists from the retained copy with filters and a keyset cursor when the live tables are gone', async () => {
+      h.db.fiscalDocument.findMany.mockRejectedValue(gone());
+      vi.mocked(fiscalArchive).mockResolvedValue([
+        mk(1),
+        mk(2),
+        mk(3, 'credit_note'),
+        mk(4),
+      ] as any);
+      const p1 = await request(app).get(`/admin/fiscal-archive/${STORE}?limit=2`);
+      expect(p1.status).toBe(200);
+      expect(p1.body.data.documents.map((d: any) => d.number)).toEqual([
+        'RCT-000004',
+        'RCT-000003',
+      ]);
+      // enrichment cannot reach the dead store: degrades to nulls, never throws
+      expect(p1.body.data.documents[0]).toMatchObject({
+        customerName: null,
+        etaStatus: null,
+        paymentMethod: null,
+      });
+      const p2 = await request(app).get(
+        `/admin/fiscal-archive/${STORE}?limit=2&cursor=${encodeURIComponent(p1.body.data.nextCursor)}`
+      );
+      expect(p2.body.data.documents.map((d: any) => d.number)).toEqual([
+        'RCT-000002',
+        'RCT-000001',
+      ]);
+      const f = await request(app).get(`/admin/fiscal-archive/${STORE}?docType=credit_note`);
+      expect(f.body.data.documents.map((d: any) => d.number)).toEqual(['RCT-000003']);
+    });
+
+    it('an unfiltered first page that is empty live is completed from the retained copy', async () => {
+      h.db.fiscalDocument.findMany.mockResolvedValue([]);
+      vi.mocked(fiscalArchive).mockResolvedValue([mk(1)] as any);
+      const r = await request(app).get(`/admin/fiscal-archive/${STORE}`);
+      expect(r.body.data.documents.map((d: any) => d.number)).toEqual(['RCT-000001']);
+    });
+
+    it('answers 200 with unavailable when neither source can be read', async () => {
+      h.db.fiscalDocument.findMany.mockRejectedValue(gone());
+      vi.mocked(fiscalArchive).mockRejectedValue(new Error('no retained copy'));
+      const r = await request(app).get(`/admin/fiscal-archive/${STORE}`);
+      expect(r.status).toBe(200);
+      expect(r.body.data).toMatchObject({ documents: [], nextCursor: null, unavailable: true });
+    });
+
+    it('a live store is unchanged: no definer call when the live page has rows', async () => {
+      vi.mocked(fiscalArchive).mockClear();
+      h.db.fiscalDocument.findMany.mockResolvedValue([{ ...mk(1), refundRef: null }]);
+      const r = await request(app).get(`/admin/fiscal-archive/${STORE}`);
+      expect(r.body.data.documents).toHaveLength(1);
+      expect(fiscalArchive).not.toHaveBeenCalled();
+    });
+
+    it('the store list also shows deleted stores from the retained copy, with no live summary', async () => {
+      const DEAD = '55555555-5555-4555-8555-555555555555';
+      vi.mocked(fiscalArchiveStores).mockResolvedValue([
+        {
+          storeId: DEAD,
+          storeName: null,
+          documentCount: 4,
+          lastIssuedAt: new Date('2026-10-01'),
+          storeExists: false,
+        },
+      ] as any);
+      h.db.fiscalDocument.count.mockResolvedValue(0);
+      h.db.fiscalDocument.findFirst.mockResolvedValue(null);
+      h.db.fiscalDocument.aggregate.mockResolvedValue({ _sum: {}, _count: { _all: 0 } });
+      h.db.storeTaxProfile.findFirst.mockResolvedValue(null);
+      h.db.etaConnection.findFirst.mockResolvedValue(null);
+      const r = await request(app).get('/admin/fiscal-archive');
+      const dead = r.body.data.stores.find((s: any) => s.storeId === DEAD);
+      expect(dead).toMatchObject({ storeExists: false, documentCount: 4, summary: null });
+      vi.mocked(fiscalArchiveStores).mockResolvedValue([]);
+    });
+
+    it('the store card of a deleted store is null, not an error', async () => {
+      h.db.fiscalDocument.count.mockRejectedValue(gone());
+      h.db.fiscalDocument.findMany.mockResolvedValue([]);
+      vi.mocked(fiscalArchive).mockResolvedValue([]);
+      const r = await request(app).get(`/admin/fiscal-archive/${STORE}?summary=1`);
+      expect(r.status).toBe(200);
+      expect(r.body.data.summary).toBeNull();
+    });
   });
 
   it('never uses an offset when there is no cursor', async () => {
