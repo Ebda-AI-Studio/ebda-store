@@ -3,12 +3,13 @@
   "status": "live",
   "area": "billing",
   "version": 1,
-  "versionDate": "2026-11-14",
+  "versionDate": "2026-11-15",
   "titleAr": "اشتري إضافة أو فعّل ميزة خارج باقتي",
   "titleEn": "Buy an add-on outside my plan",
   "screens": ["/stores/[id]/billing/addons"],
   "api": [
     "GET /stores/:storeId/billing/addons",
+    "GET /stores/:storeId/billing/addons/history",
     "POST /stores/:storeId/billing/addons/preview",
     "POST /stores/:storeId/billing/addons/checkout",
     "POST /stores/:storeId/billing/addons/:sku/cancel",
@@ -42,7 +43,13 @@
     "A renewal is NOT charged, and the owner is told, when the price changed, the plan now includes the feature, support switched it off, or there is no saved card",
     "A feature that support switched off cannot be bought",
     "A feature the plan already includes is not sold again",
-    "A super admin can still switch any feature on or off for goodwill; that override wins over a purchase"
+    "A super admin can still switch any feature on or off for goodwill; that override wins over a purchase",
+    "Each add-on shows one state from the ledger: available, waiting for payment, payment failed, active/renewing, ends soon (cancelled at period end), ended, refunded, in your plan, or turned on by support",
+    "The page asks the server after the card page and never turns anything on in the browser; a pending payment grants nothing",
+    "A locked screen for a sellable feature offers Get this add-on (the Add-ons page), not Contact support",
+    "The cached entitlement expires at the paid term end (not on a 5 minute TTL); a daily run also clears every cache layer for stores whose term ended",
+    "Receipts and payment history (paid, waiting, failed, refunded) are listed on the page; no provider fields",
+    "InstaPay is not offered for add-ons yet (card only)"
   ],
   "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"]
 }

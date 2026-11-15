@@ -6297,7 +6297,8 @@
       "unlocksGeneric": "This feature is not included in your current plan.",
       "availableOn": "Available on the {plan} plan and above.",
       "upgradeCta": "Upgrade to {plan}",
-      "seePlansCta": "See plans"
+      "seePlansCta": "See plans",
+      "getAddonCta": "Get this add-on"
     },
     "languageSwitcher": {
       "ariaLabel": "Language",
@@ -7815,7 +7816,8 @@
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
-    "alsoIncluded": "Also included in this plan"
+    "alsoIncluded": "Also included in this plan",
+    "getAddonCta": "Get this add-on"
   },
   "aiTools": {
     "title": "AI Tools",
@@ -9192,7 +9194,8 @@
     "viewReceipt": "View receipt",
     "receiptProcessing": "Your payment went through. Your receipt will print here in a moment.",
     "cancelObject": "Cancelling your plan subscription",
-    "cancelAction": "Cancel subscription"
+    "cancelAction": "Cancel subscription",
+    "addonsLink": "Need more? Add features or AI requests"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -11700,6 +11703,39 @@
     "aiToday": "Today: {used} of {cap} requests used, {remaining} left.",
     "aiExtra": "Includes {extra} extra requests from your packs.",
     "aiBuyHint": "Packs raise your store's daily limit for {days} days. They do not renew.",
-    "confirmRenews": "Then {amount} every {days} days on your saved card until you stop it. We email you before each renewal, and you can stop it any time from Add-ons."
+    "confirmRenews": "Then {amount} every {days} days on your saved card until you stop it. We email you before each renewal, and you can stop it any time from Add-ons.",
+    "tryAgain": "Try again",
+    "returnDone": "Back from the payment page. Your add-ons below show the latest status.",
+    "instapayNote": "Paying by InstaPay is not available for add-ons yet. Use a card for now.",
+    "historyHeading": "Your add-on payments",
+    "historyEmpty": "No add-on payments yet.",
+    "historyUntil": "covers until {date}",
+    "receipt": "Receipt",
+    "receiptItem": "Add-on",
+    "receiptClose": "Close receipt",
+    "history": {
+      "succeeded": "Paid",
+      "pending": "Waiting for payment",
+      "failed": "Not paid",
+      "refunded": "Refunded"
+    },
+    "state": {
+      "available": "Not added",
+      "pending_payment": "Waiting for payment",
+      "failed": "Payment failed",
+      "active": "Active",
+      "renewing": "Active, renews",
+      "cancelled_at_period_end": "Ends soon",
+      "expired": "Ended",
+      "refunded": "Refunded",
+      "included": "In your plan",
+      "granted": "Turned on for you",
+      "pending_paymentHint": "We are waiting for the bank to confirm your payment. It turns on by itself as soon as it does.",
+      "failedHint": "The payment did not go through, so nothing was added and nothing was charged.",
+      "expiredHint": "This add-on has ended. Buy it again to turn it back on.",
+      "refundedHint": "This payment was refunded and the add-on is off.",
+      "includedHint": "Included in your plan, nothing to buy.",
+      "grantedHint": "Ebda support turned this on for your store, nothing to buy."
+    }
   }
 }

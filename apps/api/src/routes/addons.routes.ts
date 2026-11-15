@@ -14,6 +14,7 @@ import { idempotencyKeyOf } from '../lib/money-idempotency';
 import { AppError } from '../middleware/error-handler';
 import {
   cancelAddon,
+  listAddonHistory,
   listAddons,
   previewAddon,
   purchaseAddon,
@@ -58,6 +59,15 @@ const audit = (req: Request, action: string, details: Record<string, unknown>) =
 router.get('/', ...read, async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.json({ success: true, data: await listAddons(req.params.storeId) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** The merchant's own add-on purchases, renewals, failures and refunds (receipt data; no provider fields). */
+router.get('/history', ...read, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ success: true, data: { items: await listAddonHistory(req.params.storeId) } });
   } catch (err) {
     next(err);
   }

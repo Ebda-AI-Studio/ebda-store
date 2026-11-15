@@ -27,12 +27,17 @@ import { chargeFor } from './charge-amount';
 import { claimEvent, markFailedUnlessSettled } from './subscription-billing.service';
 import {
   ADDON_CATALOG,
+  ADDON_PLAN_PREFIX,
   ADDON_TERM_DAYS,
   planCodeOfSku,
   renewsEachTerm,
+  skuOfPlanCode,
   type AddonItem,
 } from './addon-catalog';
 import { activeAddons, appendRenewalMarker } from './addon-grant';
+import { deriveAddonState, type AttemptRow } from './addon-state';
+
+const RECENT_ATTEMPTS = 100;
 
 const TOOL = 'billing.addon-purchase';
 
@@ -254,13 +259,45 @@ export const cancelAddon = (a: { storeId: string; sku: string }) =>
 export const resumeAddon = (a: { storeId: string; sku: string }) =>
   setCancelFlag(a.storeId, a.sku, false);
 
+/** Add-on ledger rows (purchases, renewals, failures, refunds), newest first. Cancel/resume markers use `addon-`, not `addon:`. */
+async function addonRows(storeId: string, take: number) {
+  return withStore(storeId, tx =>
+    tx.billingEvent.findMany({
+      where: { storeId, type: 'upgrade', planCode: { startsWith: ADDON_PLAN_PREFIX } },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: {
+        id: true,
+        planCode: true,
+        status: true,
+        amountMinor: true,
+        vatMinor: true,
+        vat: true,
+        currency: true,
+        failureReason: true,
+        forPeriodEnd: true,
+        createdAt: true,
+      },
+    })
+  );
+}
+
 export async function listAddons(storeId: string) {
   const now = new Date();
-  const [running, features, ai] = await Promise.all([
+  const [running, features, withoutAddons, overrides, rows, ai] = await Promise.all([
     withStore(storeId, tx => activeAddons(tx, storeId, now)),
     featureService.getStoreFeatures(storeId),
+    featureService.resolveWithoutAddons(storeId),
+    withStore(storeId, tx =>
+      tx.storeFeature.findMany({
+        where: { storeId, enabled: true },
+        select: { featureKey: true },
+      })
+    ),
+    addonRows(storeId, RECENT_ATTEMPTS),
     storeAiAllowance(storeId),
   ]);
+  const overrideOn = new Set(overrides.map(o => o.featureKey));
   let cardAvailable = true;
   try {
     cardAvailable = resolveTrialCardMode() === 'card_on_file';
@@ -274,15 +311,40 @@ export async function listAddons(storeId: string) {
       const mine = running
         .filter(r => r.sku === i.sku)
         .sort((x, y) => y.endsAt.getTime() - x.endsAt.getTime());
+      const newestRow = rows.find(r => skuOfPlanCode(r.planCode) === i.sku);
+      const newest: AttemptRow | null = newestRow
+        ? {
+            status: newestRow.status,
+            createdAt: newestRow.createdAt,
+            forPeriodEnd: newestRow.forPeriodEnd,
+          }
+        : null;
+      const isFeature = i.kind === 'feature';
+      const on = isFeature && withoutAddons[i.featureKey!] === true;
+      const state = deriveAddonState({
+        renews: renewsEachTerm(i),
+        isFeature,
+        running: mine[0] ?? null,
+        onWithoutAddon: on,
+        overrideOn: isFeature && overrideOn.has(i.featureKey!),
+        newest,
+        now,
+      });
       return {
         sku: i.sku,
         kind: i.kind,
+        featureKey: i.featureKey ?? null,
         nameEn: i.nameEn,
         nameAr: i.nameAr,
+        descEn: i.descEn,
+        descAr: i.descAr,
+        previewImage: i.previewImage ?? null,
         priceMinor: i.priceMinor,
         aiExtraRequests: i.aiExtraRequests ?? null,
-        includedInPlan:
-          i.kind === 'feature' && features[i.featureKey!] === true && mine.length === 0,
+        state,
+        includedInPlan: state === 'included' || state === 'granted',
+        // `features` already contains the paid term; kept so a reader can see the live gate answer too.
+        enabled: isFeature ? features[i.featureKey!] === true : null,
         active: mine[0]
           ? { endsAt: mine[0].endsAt, cancelAtPeriodEnd: mine[0].cancelAtPeriodEnd }
           : null,
@@ -290,4 +352,32 @@ export async function listAddons(storeId: string) {
     }),
     ai,
   };
+}
+
+/** The merchant's add-on purchase history: every attempt with what it cost, newest first. Receipt data only. */
+export async function listAddonHistory(storeId: string, limit = 50) {
+  const rows = await addonRows(storeId, Math.min(Math.max(limit, 1), 200));
+  return rows.flatMap(r => {
+    const sku = skuOfPlanCode(r.planCode);
+    const item = sku ? ADDON_CATALOG[sku] : null;
+    if (!item) return [];
+    return [
+      {
+        id: r.id,
+        sku: item.sku,
+        nameEn: item.nameEn,
+        nameAr: item.nameAr,
+        status: r.status,
+        amountMinor: r.amountMinor,
+        vatMinor: r.vatMinor ?? 0,
+        vat: r.vat,
+        currency: r.currency,
+        termEnd: r.forPeriodEnd,
+        createdAt: r.createdAt,
+        // Provider / config errors are for operators only (same rule as /billing/invoices).
+        failureReason: r.failureReason ? 'payment_not_completed' : null,
+        planCode: r.planCode,
+      },
+    ];
+  });
 }

@@ -7,6 +7,7 @@
  * looks the message up, so every page shows the designed card without each one being rewritten.
  * Bounded (last 50): a stale entry can only make an identical message render as the card, which is what it already means.
  */
+import { addonSkuForFeature } from '@ebda/shared';
 import { isPlanGateError } from './route-feature-gates';
 
 export interface PlanGateInfo {
@@ -40,6 +41,8 @@ export function planGateFor(message: string | null | undefined): PlanGateInfo | 
 }
 
 export interface PlanGateView {
+  /** Catalogue sku when the refused feature can be bought from Settings -> Add-ons. */
+  addonSku: string | null;
   limitKey: string | null;
   required: string | null;
   plan: { code: string; nameAr: string; nameEn: string } | null;
@@ -56,7 +59,9 @@ export function planGateView(info: PlanGateInfo): PlanGateView {
   } else if (typeof up === 'string' && up) {
     plan = { code: up, nameAr: up, nameEn: up };
   }
+  const sellable = addonSkuForFeature(typeof d.feature === 'string' ? d.feature : null);
   return {
+    addonSku: typeof d.addonSku === 'string' ? d.addonSku : sellable,
     limitKey: typeof d.limitKey === 'string' ? d.limitKey : null,
     required: typeof d.required === 'string' ? d.required : null,
     plan,

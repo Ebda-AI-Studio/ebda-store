@@ -380,3 +380,25 @@ describe('finding 5: cancel and resume APPEND a ledger row, they never edit a pa
     expect(await activeAddons(tx as any, 's1', NOW)).toEqual([]);
   });
 });
+
+describe('ADDON-SS-3: a term that ended is an entitlement change (cache layers cleared by the daily run)', () => {
+  it('emits ONE addon_granted (cache bust) effect per lapsed store, and none for a running term', async () => {
+    const { renewDueAddons } = await import('@api/services/billing/addon-renewal');
+    h.events = [
+      term({ id: 'gone1', forPeriodEnd: new Date(NOW.getTime() - 0.5 * DAY) }),
+      term({
+        id: 'gone2',
+        planCode: 'addon:feature:loyalty',
+        forPeriodEnd: new Date(NOW.getTime() - 1 * DAY),
+      }),
+    ];
+    await renewDueAddons(NOW);
+    expect(h.effects.filter(e => e.kind === 'addon_granted')).toEqual([
+      { kind: 'addon_granted', storeId: 's1' },
+    ]);
+    h.effects = [];
+    h.events = [term({ forPeriodEnd: new Date(NOW.getTime() + 0.5 * DAY) })];
+    await renewDueAddons(NOW);
+    expect(h.effects.filter(e => e.kind === 'addon_granted')).toEqual([]);
+  });
+});

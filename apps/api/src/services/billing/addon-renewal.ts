@@ -80,12 +80,17 @@ export async function renewDueAddons(now: Date, providerArg?: BillingProvider): 
   );
   let charged = 0;
   const effects: BillingEffect[] = [];
+  // A term that has ended is an entitlement change: drop every layer for that store once per run (Ruling ADDON-SS-3).
+  // The feature-map cache already dies at the term end (`ttlFor`); this also clears the public store payload and any
+  // entry written before the clamp shipped. `addon_granted` is the existing "entitlement changed" effect.
+  const lapsed = new Set<string>();
   for (const c of parts.flatMap(p => p.value)) {
     try {
       const sku = skuOfPlanCode(c.planCode);
       if (!sku || !c.forPeriodEnd) continue;
       const item = ADDON_CATALOG[sku];
       const end = c.forPeriodEnd;
+      if (end.getTime() <= now.getTime()) lapsed.add(c.storeId);
       const stamp = `${c.storeId}:${sku}:${end.toISOString()}`;
       const notice = async (reason: Reason) => {
         if ((await claimNotice(`addon-notice:${reason}:${stamp}`)) !== 'first') return;
@@ -181,6 +186,7 @@ export async function renewDueAddons(now: Date, providerArg?: BillingProvider): 
       logger.error({ err, storeId: c.storeId, planCode: c.planCode }, '[addons] renewal threw');
     }
   }
+  for (const storeId of lapsed) effects.push({ kind: 'addon_granted', storeId });
   await runBillingEffects(effects);
   return charged;
 }

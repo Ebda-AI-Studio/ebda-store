@@ -10,6 +10,7 @@ import {
   upgradePlanFor,
   planIncludesMerchantMcp,
   upgradeTargetForDisabledFeature,
+  addonSkuForFeature,
 } from '@ebda/shared';
 
 /** Features whose availability comes from the plan's boolean limits. */
@@ -44,6 +45,8 @@ function featureDisabledBody(
       message: 'Feature not available',
       details: {
         feature: featureKey,
+        // A feature the owner can buy from Settings -> Add-ons: the client shows "Get this add-on", not a dead end.
+        ...(addonSkuForFeature(featureKey) ? { addonSku: addonSkuForFeature(featureKey) } : {}),
         ...(upgradeTo ? { upgradeTo, messageEn, messageAr } : {}),
       },
     },

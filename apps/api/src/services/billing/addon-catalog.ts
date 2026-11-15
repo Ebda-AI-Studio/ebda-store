@@ -30,25 +30,74 @@ export interface AddonItem {
   priceMinor: number;
   nameEn: string;
   nameAr: string;
+  /** What it does for the merchant, one or two sentences (Egyptian Arabic, full sentences). */
+  descEn: string;
+  descAr: string;
+  /** Preview image under `apps/admin/public/addons/` (served at `/addons/<file>`); the card renders without one. */
+  previewImage?: string;
 }
 
 const FEATURE_PRICE_MINOR = 9900;
-const feature = (key: FeatureKey, nameEn: string, nameAr: string): AddonItem => ({
+const feature = (
+  key: FeatureKey,
+  nameEn: string,
+  nameAr: string,
+  descEn: string,
+  descAr: string
+): AddonItem => ({
   sku: `feature:${key}`,
   kind: 'feature',
   featureKey: key,
   priceMinor: FEATURE_PRICE_MINOR,
   nameEn,
   nameAr,
+  descEn,
+  descAr,
 });
 
 const ITEMS: AddonItem[] = [
-  feature('floating_widget', 'Floating Widget', 'الزر العائم'),
-  feature('customer_wallet_checkout', 'Pay with Wallet at Checkout', 'الدفع من المحفظة عند الشراء'),
-  feature('loyalty', 'Loyalty Program', 'برنامج الولاء'),
-  feature('upsell_crosssell', 'Upsell & Cross-sell', 'البيع الإضافي'),
-  feature('push_notifications', 'Push Notifications', 'الإشعارات'),
-  feature('affiliate', 'Affiliate Program', 'برنامج التسويق بالعمولة'),
+  feature(
+    'floating_widget',
+    'Floating Widget',
+    'الزر العائم',
+    'A button that floats on every page of your store so shoppers can reach WhatsApp, a call or a link in one tap.',
+    'زر بيطفو على كل صفحات متجرك، فالعميل يوصلك على واتساب أو يكلمك أو يفتح لينك بضغطة واحدة.'
+  ),
+  feature(
+    'customer_wallet_checkout',
+    'Pay with Wallet at Checkout',
+    'الدفع من المحفظة عند الشراء',
+    'Customers spend the balance in their wallet when they check out, so refunds and credits turn into repeat orders.',
+    'العميل يدفع من رصيد محفظته وهو بيكمل الطلب، فالمبالغ المرجّعة والرصيد بيرجعوا لك طلبات تانية.'
+  ),
+  feature(
+    'loyalty',
+    'Loyalty Program',
+    'برنامج الولاء',
+    'Customers earn points on every order and redeem them for discounts, which brings them back to buy again.',
+    'العميل بيكسب نقاط على كل طلب ويستبدلها بخصم، فبيرجع يشتري تاني.'
+  ),
+  feature(
+    'upsell_crosssell',
+    'Upsell & Cross-sell',
+    'البيع الإضافي',
+    'Suggest related products on the product page and in the cart to raise the value of each order.',
+    'اقترح منتجات مكمّلة في صفحة المنتج وفي السلة عشان قيمة كل طلب تزيد.'
+  ),
+  feature(
+    'push_notifications',
+    'Push Notifications',
+    'الإشعارات',
+    'Send a notification to the phones and browsers of shoppers who allowed it, for offers and order updates.',
+    'ابعت إشعار على موبايلات ومتصفحات العملاء اللي وافقوا عليه، للعروض وتحديثات الطلبات.'
+  ),
+  feature(
+    'affiliate',
+    'Affiliate Program',
+    'برنامج التسويق بالعمولة',
+    'Let partners promote your store with their own link and earn a commission on the orders they bring.',
+    'خلّي شركاءك يسوّقوا لمتجرك بلينك خاص بيهم ويكسبوا عمولة على الطلبات اللي بيجيبوها.'
+  ),
   {
     sku: 'ai:topup_300',
     kind: 'ai_topup',
@@ -56,6 +105,10 @@ const ITEMS: AddonItem[] = [
     priceMinor: 4900,
     nameEn: '+300 AI requests a day',
     nameAr: '300 طلب ذكاء اصطناعي زيادة كل يوم',
+    descEn:
+      'Raises your store daily AI limit by 300 requests for 30 days. Use it when you run out before the day ends.',
+    descAr:
+      'بيزوّد حد الذكاء الاصطناعي اليومي لمتجرك 300 طلب لمدة 30 يوم. اشتريه لو بيخلص منك قبل آخر اليوم.',
   },
   {
     sku: 'ai:topup_1000',
@@ -64,6 +117,10 @@ const ITEMS: AddonItem[] = [
     priceMinor: 14900,
     nameEn: '+1000 AI requests a day',
     nameAr: '1000 طلب ذكاء اصطناعي زيادة كل يوم',
+    descEn:
+      'Raises your store daily AI limit by 1000 requests for 30 days, for stores that use AI on many products every day.',
+    descAr:
+      'بيزوّد حد الذكاء الاصطناعي اليومي لمتجرك 1000 طلب لمدة 30 يوم، للمتاجر اللي بتستخدم الذكاء الاصطناعي على منتجات كتير كل يوم.',
   },
 ];
 

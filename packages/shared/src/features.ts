@@ -772,3 +772,24 @@ export const featureUpdatesSchema = z
   .refine(val => Object.keys(val).every(k => FEATURE_KEYS_ARRAY.includes(k as FeatureKey)), {
     message: 'Unknown feature key in update.',
   });
+
+/**
+ * Features a merchant can buy themselves from Settings -> Add-ons (SELF-SERVICE A8). The billing catalogue
+ * (`apps/api/.../addon-catalog.ts`) sells exactly these (a unit test pins the two together), and the admin uses this
+ * list to turn a locked screen into a "Get this add-on" path instead of a plan upsell.
+ */
+const SELLABLE_ADDON_FEATURES = [
+  'floating_widget',
+  'customer_wallet_checkout',
+  'loyalty',
+  'upsell_crosssell',
+  'push_notifications',
+  'affiliate',
+] as const satisfies readonly FeatureKey[];
+
+/** The catalogue sku that sells this feature, or null when it is plan-only. */
+export function addonSkuForFeature(key: string | null | undefined): string | null {
+  return key && (SELLABLE_ADDON_FEATURES as readonly string[]).includes(key)
+    ? `feature:${key}`
+    : null;
+}

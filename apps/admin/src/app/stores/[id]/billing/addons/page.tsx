@@ -4,25 +4,44 @@
  * Add-ons — /stores/:id/billing/addons (SELF-SERVICE A8 + A9). The owner buys a feature outside the plan or a pack of
  * extra daily AI requests with a card. Two steps, never one click: preview shows the exact total and mints a
  * single-use token; only the explicit "Yes, charge" sends it (with an Idempotency-Key) and opens the hosted card page.
- * Nothing turns on in the browser: the entitlement arrives from the signed payment webhook.
+ * Nothing turns on in the browser: the entitlement arrives from the signed payment webhook, and a page that returned
+ * from the card page polls until the server says the payment settled or failed.
+ * `?sku=` (from a locked screen's "Get this add-on") scrolls to that card.
  */
 import { useParams, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
 import { formatMoney } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
+import { EbdaBillingReceipt } from '@/components/billing/EbdaBillingReceipt';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost, apiRequest } from '../../../../../lib/api';
 import { fmtDate } from '../../../../../components/billing/format';
 import { useT } from '../../../../../i18n/useT';
+
+type AddonState =
+  | 'available'
+  | 'pending_payment'
+  | 'failed'
+  | 'active'
+  | 'renewing'
+  | 'cancelled_at_period_end'
+  | 'expired'
+  | 'refunded'
+  | 'included'
+  | 'granted';
 
 interface AddonRow {
   sku: string;
   kind: 'feature' | 'ai_topup';
   nameEn: string;
   nameAr: string;
+  descEn: string;
+  descAr: string;
+  previewImage: string | null;
   priceMinor: number;
+  state: AddonState;
   includedInPlan: boolean;
   active: { endsAt: string; cancelAtPeriodEnd: boolean } | null;
 }
@@ -31,6 +50,19 @@ interface AddonsData {
   termDays: number;
   addons: AddonRow[];
   ai: { baseCap: number; extra: number; cap: number; used: number; remaining: number };
+}
+interface HistoryRow {
+  id: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  status: string;
+  amountMinor: number;
+  vatMinor: number;
+  vat: { rateBps: number; trn?: string | null } | null;
+  termEnd: string | null;
+  createdAt: string;
+  planCode: string | null;
 }
 interface Preview {
   sku: string;
@@ -43,38 +75,81 @@ interface Preview {
   renewalMinor: number;
   renewsEveryDays: number;
   confirmToken: string;
+  /** One key per confirmation dialog: a double click or a retry re-sends the SAME key, so the server charges once. */
+  idempotencyKey: string;
 }
+
+const POLL_MS = 3000;
+const POLL_MAX_MS = 90_000;
+const BADGE: Record<AddonState, string> = {
+  available: 'bg-muted text-muted-ink',
+  pending_payment: 'bg-warning/15 text-warning-ink',
+  failed: 'bg-destructive/10 text-destructive-ink',
+  active: 'bg-success/15 text-success-ink',
+  renewing: 'bg-success/15 text-success-ink',
+  cancelled_at_period_end: 'bg-warning/15 text-warning-ink',
+  expired: 'bg-muted text-muted-ink',
+  refunded: 'bg-muted text-muted-ink',
+  included: 'bg-primary/10 text-primary-ink',
+  granted: 'bg-primary/10 text-primary-ink',
+};
 
 export default function AddonsPage() {
   const storeId = useParams()?.id as string;
   const t = useT('addons');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
-  const returned = useSearchParams()?.get('checkout') === 'return';
+  const search = useSearchParams();
+  const returned = search?.get('checkout') === 'return';
+  const focusSku = search?.get('sku') ?? null;
   const { success: toastSuccess, error: toastError } = useToast();
   const [data, setData] = useState<AddonsData | null>(null);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
   const [failed, setFailed] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<HistoryRow | null>(null);
+  const [polling, setPolling] = useState(returned);
   const base = `/api/v1/stores/${storeId}/billing/addons`;
   const money = (minor: number) => formatMoney(minor, locale, { fixedDecimals: true });
   const name = (a: { nameEn: string; nameAr: string }) => (locale === 'ar' ? a.nameAr : a.nameEn);
 
   const load = useCallback(async () => {
-    const r = await apiGet<AddonsData>(base);
+    const [r, h] = await Promise.all([
+      apiGet<AddonsData>(base),
+      apiGet<{ items: HistoryRow[] }>(`${base}/history`),
+    ]);
     if (r.error || !r.data) return setFailed(true);
     setFailed(false);
     setData(r.data);
+    if (h.data) setHistory(h.data.items);
+    return r.data;
   }, [base]);
   useEffect(() => {
     void load();
   }, [load]);
 
+  // Back from the card page: ask the server (never assume) until nothing is pending, for at most 90 s.
+  const startedAt = useRef(Date.now());
+  useEffect(() => {
+    if (!polling) return;
+    const id = setInterval(async () => {
+      const d = await load();
+      const pending = d?.addons.some(a => a.state === 'pending_payment');
+      if (!pending || Date.now() - startedAt.current > POLL_MAX_MS) setPolling(false);
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [polling, load]);
+
+  useEffect(() => {
+    if (focusSku && data) document.getElementById(`addon-${focusSku}`)?.scrollIntoView?.();
+  }, [focusSku, data]);
+
   async function startBuy(sku: string) {
     setBusy(sku);
-    const r = await apiPost<Preview>(`${base}/preview`, { sku });
+    const r = await apiPost<Omit<Preview, 'idempotencyKey'>>(`${base}/preview`, { sku });
     setBusy(null);
     if (r.error || !r.data) return toastError(t('previewError'), r.error?.message);
-    setPreview(r.data);
+    setPreview({ ...r.data, idempotencyKey: crypto.randomUUID() });
   }
 
   async function confirmBuy() {
@@ -82,7 +157,7 @@ export default function AddonsPage() {
     setBusy(preview.sku);
     const r = await apiRequest<{ redirectUrl: string }>(`${base}/checkout`, {
       method: 'POST',
-      headers: { 'Idempotency-Key': crypto.randomUUID() },
+      headers: { 'Idempotency-Key': preview.idempotencyKey },
       body: JSON.stringify({ sku: preview.sku, confirmToken: preview.confirmToken }),
     });
     if (r.error || !r.data) {
@@ -107,55 +182,108 @@ export default function AddonsPage() {
 
   const group = (kind: AddonRow['kind']) => data?.addons.filter(a => a.kind === kind) ?? [];
 
-  const row = (a: AddonRow) => (
-    <li key={a.sku} className="flex flex-wrap items-center justify-between gap-3 py-3">
-      <div className="min-w-0">
-        <p className="text-sm font-medium">{name(a)}</p>
-        <p className="text-xs text-muted-foreground">
-          {a.includedInPlan
-            ? t('includedInPlan')
-            : a.active
-              ? a.active.cancelAtPeriodEnd
-                ? t('cancelsOn', { date: fmtDate(a.active.endsAt, locale) })
-                : a.kind === 'feature'
-                  ? t('renewsOn', { date: fmtDate(a.active.endsAt, locale) })
-                  : t('activeUntil', { date: fmtDate(a.active.endsAt, locale) })
-              : t('price', { amount: money(a.priceMinor), days: data!.termDays })}
-        </p>
-      </div>
-      {!a.includedInPlan && (
-        <div className="flex gap-2">
-          {a.kind === 'feature' && a.active && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy === a.sku}
-              onClick={() =>
-                void setRenewal(a.sku, a.active!.cancelAtPeriodEnd ? 'resume' : 'cancel')
-              }
-            >
-              {a.active.cancelAtPeriodEnd ? t('resume') : t('cancel')}
-            </Button>
+  function stateLine(a: AddonRow): string {
+    const date = a.active ? fmtDate(a.active.endsAt, locale) : '';
+    switch (a.state) {
+      case 'renewing':
+        return t('renewsOn', { date });
+      case 'active':
+        return t('activeUntil', { date });
+      case 'cancelled_at_period_end':
+        return t('cancelsOn', { date });
+      case 'available':
+        return t('price', { amount: money(a.priceMinor), days: data!.termDays });
+      default:
+        return t(`state.${a.state}Hint`);
+    }
+  }
+
+  const row = (a: AddonRow) => {
+    const canBuy =
+      a.kind === 'ai_topup' ||
+      a.state === 'available' ||
+      a.state === 'failed' ||
+      a.state === 'expired' ||
+      a.state === 'refunded';
+    return (
+      <li
+        key={a.sku}
+        id={`addon-${a.sku}`}
+        data-testid={`addon-${a.sku}`}
+        data-state={a.state}
+        className={`flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between ${
+          focusSku === a.sku ? 'rounded-lg bg-primary/5 px-3' : ''
+        }`}
+      >
+        <div className="flex min-w-0 gap-3">
+          {a.previewImage && (
+            // eslint-disable-next-line @next/next/no-img-element -- static asset from /public, fixed size
+            <img
+              src={a.previewImage}
+              alt=""
+              loading="lazy"
+              width={96}
+              height={64}
+              className="h-16 w-24 shrink-0 rounded-md border border-border object-cover"
+            />
           )}
-          {(a.kind === 'ai_topup' || !a.active) && (
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium">{name(a)}</p>
+              <span
+                data-testid="addon-state"
+                className={`rounded-full px-2 py-0.5 text-xs ${BADGE[a.state]}`}
+              >
+                {t(`state.${a.state}`)}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {locale === 'ar' ? a.descAr : a.descEn}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{stateLine(a)}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {a.kind === 'feature' &&
+            a.active &&
+            (a.state === 'renewing' || a.state === 'cancelled_at_period_end') && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy === a.sku}
+                onClick={() =>
+                  void setRenewal(
+                    a.sku,
+                    a.state === 'cancelled_at_period_end' ? 'resume' : 'cancel'
+                  )
+                }
+              >
+                {a.state === 'cancelled_at_period_end' ? t('resume') : t('cancel')}
+              </Button>
+            )}
+          {canBuy && (
             <Button
               size="sm"
               disabled={!data!.cardAvailable || busy === a.sku}
               onClick={() => void startBuy(a.sku)}
             >
-              {a.active ? t('buyAgain', { days: data!.termDays }) : t('buy')}
+              {a.state === 'active'
+                ? t('buyAgain', { days: data!.termDays })
+                : a.state === 'failed'
+                  ? t('tryAgain')
+                  : t('buy')}
             </Button>
           )}
         </div>
-      )}
-    </li>
-  );
+      </li>
+    );
+  };
 
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
-      {returned && (
+      {(returned || polling) && (
         <p role="status" className="mb-4 rounded-lg border border-border bg-card p-3 text-sm">
-          {t('returnPending')}
+          {polling ? t('returnPending') : t('returnDone')}
         </p>
       )}
       {failed && (
@@ -210,6 +338,9 @@ export default function AddonsPage() {
           <section className="rounded-xl border border-border bg-card p-4">
             <h2 className="text-sm font-semibold">{t('featuresHeading')}</h2>
             <ul className="divide-y divide-border">{group('feature').map(row)}</ul>
+            <p className="mt-3 text-xs text-muted-foreground" data-testid="addon-instapay-note">
+              {t('instapayNote')}
+            </p>
           </section>
           <section className="rounded-xl border border-border bg-card p-4" id="ai">
             <h2 className="text-sm font-semibold">{t('aiHeading')}</h2>
@@ -221,6 +352,58 @@ export default function AddonsPage() {
               {t('aiBuyHint', { days: data.termDays })}
             </p>
             <ul className="divide-y divide-border">{group('ai_topup').map(row)}</ul>
+          </section>
+          <section
+            className="rounded-xl border border-border bg-card p-4"
+            data-testid="addon-history"
+          >
+            <h2 className="text-sm font-semibold">{t('historyHeading')}</h2>
+            {history.length === 0 ? (
+              <p className="mt-1 text-sm text-muted-foreground">{t('historyEmpty')}</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {history.map(h => (
+                  <li
+                    key={h.id}
+                    className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">{name(h)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {fmtDate(h.createdAt, locale)} · {money(h.amountMinor)} ·{' '}
+                        {t(`history.${h.status}`)}
+                        {h.termEnd && h.status === 'succeeded'
+                          ? ` · ${t('historyUntil', { date: fmtDate(h.termEnd, locale) })}`
+                          : ''}
+                      </p>
+                    </div>
+                    {(h.status === 'succeeded' || h.status === 'refunded') && (
+                      <Button variant="outline" size="sm" onClick={() => setReceipt(h)}>
+                        {t('receipt')}
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {receipt && (
+              <div className="mt-4" data-testid="addon-receipt">
+                <EbdaBillingReceipt
+                  charge={receipt}
+                  planName={name(receipt)}
+                  itemLabel={t('receiptItem')}
+                  locale={locale}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setReceipt(null)}
+                >
+                  {t('receiptClose')}
+                </Button>
+              </div>
+            )}
           </section>
         </div>
       )}
