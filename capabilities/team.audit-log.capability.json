@@ -10,7 +10,7 @@
   "api": ["GET /stores/:storeId/activity"],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "free",
   "undo": {
     "class": "none",
