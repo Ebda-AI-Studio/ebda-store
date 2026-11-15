@@ -1226,6 +1226,36 @@ export async function findDueSubscriptionIds(
   return rows.map(r => r.id);
 }
 
+/** Ledger rows matching `where` in every store (one D1 query, or one scope per store on Postgres); a failing store is logged. */
+async function ledgerRowsAcrossStores(
+  where: Prisma.BillingEventWhereInput,
+  label: string
+): Promise<
+  Array<{
+    id: string;
+    storeId: string;
+    idempotencyKey: string;
+    providerRef: string | null;
+    createdAt: Date;
+  }>
+> {
+  const parts = await acrossBilling(
+    storeId =>
+      prisma.billingEvent.findMany({
+        where: { ...(storeId ? { storeId } : {}), ...where },
+        select: {
+          id: true,
+          storeId: true,
+          idempotencyKey: true,
+          providerRef: true,
+          createdAt: true,
+        },
+      }),
+    { onStoreError: (storeId, err) => logger.error({ err, storeId }, `[billing] ${label} failed`) }
+  );
+  return parts.flatMap(p => p.value);
+}
+
 /** A renewal / upgrade charge is "stuck" when its outcome has not arrived this long after it was claimed. */
 export const STUCK_CHARGE_AFTER_MS = 3_600_000;
 
@@ -1246,28 +1276,10 @@ export async function sweepStuckCharges(
   provider?: BillingProvider
 ): Promise<{ polled: number; settled: number; notFound: number; stillStuck: number }> {
   const cutoff = new Date(now.getTime() - STUCK_CHARGE_AFTER_MS);
-  const parts = await acrossBilling(
-    storeId =>
-      prisma.billingEvent.findMany({
-        where: {
-          ...(storeId ? { storeId } : {}),
-          type: { in: ['renewal', 'upgrade'] },
-          status: 'pending',
-          createdAt: { lt: cutoff },
-        },
-        select: {
-          id: true,
-          storeId: true,
-          idempotencyKey: true,
-          providerRef: true,
-          createdAt: true,
-        },
-      }),
-    {
-      onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] stuck scan failed'),
-    }
+  const rows = await ledgerRowsAcrossStores(
+    { type: { in: ['renewal', 'upgrade'] }, status: 'pending', createdAt: { lt: cutoff } },
+    'stuck scan'
   );
-  const rows = parts.flatMap(p => p.value);
   let active: BillingProvider | null = provider ?? null;
   if (!active && rows.length > 0) {
     try {
@@ -1607,6 +1619,7 @@ export async function applyWebhookEvent(
   const scopedStoreId = webhookStoreId;
   const reversals: ReversalOutcome[] = [];
   let unmatchedReversal = false;
+  let ambiguousReversal = false;
   const applyInner = async (tx: Tx): Promise<WebhookResult> => {
     const ignore = async (detail: string): Promise<WebhookResult> => {
       await tx.billingWebhookEvent.updateMany({
@@ -1643,6 +1656,31 @@ export async function applyWebhookEvent(
         if (!charge) {
           unmatchedReversal = true;
           return ignore('unknown_refund');
+        }
+        const known = await reversalIdentity(tx, charge, providerName, event.providerRef);
+        if (known.kind === 'booked') return ignore('refund_already_booked');
+        if (known.kind === 'ebda_refund_pending') {
+          // Ebda started this refund and its API call has not returned yet (the row exists, its ref not yet written):
+          // the webhook belongs to THAT row. Same amount (or none stated) = attach and settle it; otherwise let the
+          // gateway redeliver once the API call has written the ref.
+          if (event.amountMinor === null || event.amountMinor === known.row.amountMinor) {
+            await tx.billingEvent.updateMany({
+              where: { id: known.row.id, storeId: charge.storeId, status: 'pending' },
+              data: { providerRef: event.providerRef },
+            });
+            await settleRefundInTx(tx, charge.storeId, known.row.id, true);
+            return { duplicate: false, outcome: 'processed', detail: 'attached_to_ebda_refund' };
+          }
+          throw new AppError(
+            503,
+            'REFUND_NOT_YET_RECORDED',
+            'An Ebda Store refund for this charge is still being recorded; retry shortly',
+            { retryable: true }
+          );
+        }
+        if (known.kind === 'ebda_refund_unreferenced') {
+          ambiguousReversal = true;
+          return ignore('refund_ambiguous');
         }
         const out = await applyOutOfBandReversalInTx(
           tx,
@@ -1813,10 +1851,11 @@ export async function applyWebhookEvent(
   if (unmatchedReversal) {
     void sendAlert({
       level: 'p1',
-      title: 'Billing: a gateway refund matches no Ebda charge',
-      body: `${providerName} confirmed a refund (transaction ${event.providerRef}, order ${event.merchantOrderId ?? 'none'}, amount ${event.amountMinor ?? 'not stated'} piastres) that Ebda did not start and that matches no charge. Nothing was revoked. Find the store in the gateway dashboard and record it by hand.`,
+      title: 'Billing: a gateway refund matches no Ebda Store charge',
+      body: `${providerName} confirmed a refund (transaction ${event.providerRef}, order ${event.merchantOrderId ?? 'none'}, amount ${event.amountMinor ?? 'not stated'} piastres) that Ebda Store did not start and that matches no charge. Nothing was revoked. Find the store in the gateway dashboard and record it by hand.`,
     }).catch(() => undefined);
   }
+  if (ambiguousReversal) void alertAmbiguousReversal(providerName, event.providerRef);
   return result;
 }
 
@@ -1852,6 +1891,53 @@ interface ReversalOutcome {
   excessMinor: number;
   fullReversal: boolean;
   revokedPlan: boolean;
+}
+
+/**
+ * Has this gateway reversal already been booked, or could it be one Ebda Store started itself? The gateway's reversal
+ * id is the ONE identity for Ebda-started and external refunds alike:
+ *  - `booked`: a refund row with this provider + ref exists, in ANY status (Ebda-started or out-of-band);
+ *  - `ebda_refund_pending`: Ebda started a refund on this charge whose API call has not written its ref yet (the
+ *    webhook can beat the response; refundCharge records the pending row BEFORE it calls the gateway);
+ *  - `ebda_refund_unreferenced`: a succeeded Ebda refund on this charge has no ref (the gateway returned none), so it
+ *    cannot be told apart: never auto-booked, a person is paged;
+ *  - `new`: nothing Ebda knows of.
+ */
+async function reversalIdentity(
+  tx: Tx,
+  charge: BillingEventRow,
+  provider: string,
+  ref: string
+): Promise<
+  | { kind: 'booked' | 'ebda_refund_unreferenced' | 'new' }
+  | { kind: 'ebda_refund_pending'; row: BillingEventRow }
+> {
+  const sameRef = await tx.billingEvent.findFirst({
+    where: { storeId: charge.storeId, type: 'refund', provider, providerRef: ref },
+    select: { id: true },
+  });
+  if (sameRef) return { kind: 'booked' };
+  const unref = await tx.billingEvent.findFirst({
+    where: {
+      storeId: charge.storeId,
+      type: 'refund',
+      relatedEventId: charge.id,
+      providerRef: null,
+      status: { in: ['pending', 'succeeded'] },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (unref?.status === 'pending') return { kind: 'ebda_refund_pending', row: unref };
+  if (unref) return { kind: 'ebda_refund_unreferenced' };
+  return { kind: 'new' };
+}
+
+function alertAmbiguousReversal(provider: string, ref: string | null, chargeId?: string): void {
+  void sendAlert({
+    level: 'p1',
+    title: 'Billing: a gateway refund may duplicate an Ebda Store refund',
+    body: `${provider} reports reversal ${ref ?? '(no id)'}${chargeId ? ` on charge ${chargeId}` : ''}, and that charge has an Ebda Store refund with no gateway id, so they cannot be told apart. Nothing was booked or revoked. Compare the gateway dashboard with /billing-events and record it by hand if it is a second refund.`,
+  }).catch(() => undefined);
 }
 
 async function findReversedCharge(
@@ -1897,8 +1983,12 @@ async function applyOutOfBandReversalInTx(
 ): Promise<ReversalOutcome | null> {
   const storeId = charge.storeId;
   const key = `oob-reversal:${fact.provider}:${fact.ref}`;
-  const seen = await tx.billingEvent.findUnique({ where: { idempotencyKey: key, storeId } });
-  if (seen) return null;
+  // The webhook path settles the Ebda-started cases itself; here (both paths) anything not `new` books nothing.
+  const known = await reversalIdentity(tx, charge, fact.provider, fact.ref);
+  if (known.kind === 'ebda_refund_unreferenced' && fact.source === 'reconcile') {
+    alertAmbiguousReversal(fact.provider, fact.ref, charge.id);
+  }
+  if (known.kind !== 'new') return null;
   const prior = await tx.billingEvent.aggregate({
     where: { storeId, relatedEventId: charge.id, type: 'refund', status: 'succeeded' },
     _sum: { amountMinor: true },
@@ -1988,7 +2078,7 @@ function alertReversal(r: ReversalOutcome): void {
   const what = r.operation === 'chargeback' || r.operation === 'dispute' ? 'chargeback' : 'refund';
   void sendAlert({
     level: 'p1',
-    title: `Billing: a ${what} was made outside Ebda (${r.provider})`,
+    title: `Billing: a ${what} was made outside Ebda Store (${r.provider})`,
     body:
       `Store ${r.storeId}, charge ${r.chargeId}: ${r.provider} reports a ${r.operation} of ` +
       `${r.reportedMinor ?? 'an unstated amount (booked as the whole remainder)'} piastres (via ${r.source}). ` +
@@ -2031,27 +2121,19 @@ export async function reconcileGatewayReversals(
   }
   if (!active.listReversals) return out;
   const since = new Date(now.getTime() - REVERSAL_LOOKBACK_DAYS * 86_400_000);
-  const parts = await acrossBilling(
-    storeId =>
-      prisma.billingEvent.findMany({
-        where: {
-          ...(storeId ? { storeId } : {}),
-          provider: active!.name,
-          type: { in: CARD_MONEY_IN_TYPES },
-          status: 'succeeded',
-          providerRef: { not: null },
-          createdAt: { gte: since },
-        },
-        select: { id: true, storeId: true, providerRef: true },
-      }),
+  const charges = await ledgerRowsAcrossStores(
     {
-      onStoreError: (storeId, err) =>
-        logger.error({ err, storeId }, '[billing] reversal reconcile scan failed'),
-    }
+      provider: active.name,
+      type: { in: CARD_MONEY_IN_TYPES },
+      status: 'succeeded',
+      providerRef: { not: null },
+      createdAt: { gte: since },
+    },
+    'reversal reconcile scan'
   );
   const failures: string[] = [];
   const unknown: string[] = [];
-  for (const c of parts.flatMap(p => p.value)) {
+  for (const c of charges) {
     out.checked++;
     try {
       const res = await active.listReversals({ chargeId: c.providerRef!, merchantOrderId: c.id });

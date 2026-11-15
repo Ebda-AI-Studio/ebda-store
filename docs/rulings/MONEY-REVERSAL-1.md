@@ -9,6 +9,12 @@ Two paths book it, and both share `applyOutOfBandReversalInTx` and one idempoten
 - **The webhook path.** A signed, gateway-confirmed (PROVIDERS-17) `refund.succeeded` that matches no Ebda refund row is matched to the charge it reverses, by the echoed merchant order id or else by the charge's transaction id.
 - **A daily reconcile** (`reconcileGatewayReversals` in `billing-renewal-daily`). It reads `listReversals` (the gateway's own transaction record) for every card charge of the last 120 days that still counts as paid.
 
+**One identity for every refund:** the gateway's reversal id.
+
+- A refund row with the same provider and ref, in ANY status, means the reversal is already booked. This covers refunds Ebda Store started and out-of-band ones alike, on both paths.
+- `refundCharge` records its pending refund row BEFORE it calls the gateway. A webhook that arrives before the API call has written the ref attaches to that row when the amount matches or is not stated. Otherwise it answers a retryable 503, so the gateway redelivers.
+- A succeeded Ebda refund with no gateway ref cannot be told apart from a new reversal. Nothing is booked and a person is paged.
+
 What happens once it is booked:
 
 - **Recorded in full, never refused** (global never-abort rule). The reported amount stays in `raw`. The ledger amount is clamped to what the charge still holds, and any excess is paged.

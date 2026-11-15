@@ -230,7 +230,7 @@ describe('a refund made outside Ebda (webhook)', () => {
     expect(alerts()).toContainEqual(
       expect.objectContaining({
         level: 'p1',
-        title: expect.stringContaining('matches no Ebda charge'),
+        title: expect.stringContaining('matches no Ebda Store charge'),
       })
     );
   });
@@ -271,5 +271,70 @@ describe('daily reversal reconcile (chargebacks no webhook reports)', () => {
     stub.outOfBandReversals.set('txn-pay', { reversals: [], unknownOperations: ['retrieval'] });
     await reconcileGatewayReversals(new Date(), stub);
     expect(alerts().some(a => a.body.includes('retrieval'))).toBe(true);
+  });
+});
+
+describe('an Ebda-started refund is never booked a second time as out-of-band (one identity: the gateway ref)', () => {
+  const ebdaRefund = (db: DatabaseSync, over: { status: string; ref: string | null }) =>
+    db
+      .prepare(
+        `INSERT INTO billing_events (id, store_id, type, plan_code, amount_minor, provider, provider_ref, idempotency_key, status, related_event_id, created_at) VALUES ('55555555-5555-4555-8555-555555555555', ?, 'refund', 'growth', 1000, 'stub', ?, ?, ?, ?, ?)`
+      )
+      .run(STORE, over.ref, `refund:${CHARGE}:1`, over.status, CHARGE, Date.now() - 60_000);
+
+  it('race: the webhook beats the refund API response -> it attaches to the pending Ebda row, no second booking, plan untouched', async () => {
+    const db = rig();
+    ebdaRefund(db, { status: 'pending', ref: null });
+    const out = await applyWebhookEvent('stub', refundHook());
+    expect(out).toMatchObject({ outcome: 'processed', detail: 'attached_to_ebda_refund' });
+    expect(refunds(db)).toEqual([{ a: 1000, r: 'txn-rf-1', c: CHARGE, s: 'succeeded' }]);
+    expect(sub(db)).toEqual({ p: 'growth', s: 'active' }); // an Ebda refund is a super-admin decision, no auto-revoke
+  });
+
+  it('race with a different amount: not booked, the gateway is asked to redeliver (retryable 503)', async () => {
+    const db = rig();
+    ebdaRefund(db, { status: 'pending', ref: null });
+    await expect(applyWebhookEvent('stub', refundHook({ amountMinor: 400 }))).rejects.toMatchObject(
+      {
+        statusCode: 503,
+        code: 'REFUND_NOT_YET_RECORDED',
+      }
+    );
+    expect(refunds(db)).toHaveLength(1);
+  });
+
+  it('a succeeded Ebda refund + its webhook (another delivery) -> no second booking, plan untouched', async () => {
+    const db = rig();
+    ebdaRefund(db, { status: 'succeeded', ref: 'txn-rf-1' });
+    expect(await applyWebhookEvent('stub', refundHook())).toMatchObject({
+      outcome: 'ignored',
+      detail: 'refund_already_booked',
+    });
+    expect(refunds(db)).toHaveLength(1);
+    expect(sub(db)).toEqual({ p: 'growth', s: 'active' });
+  });
+
+  it('a succeeded Ebda refund with no gateway ref cannot be told apart -> nothing booked, P1', async () => {
+    const db = rig();
+    ebdaRefund(db, { status: 'succeeded', ref: null });
+    expect(await applyWebhookEvent('stub', refundHook())).toMatchObject({
+      detail: 'refund_ambiguous',
+    });
+    expect(refunds(db)).toHaveLength(1);
+    expect(sub(db)).toEqual({ p: 'growth', s: 'active' });
+    expect(alerts().some(a => a.title.includes('may duplicate'))).toBe(true);
+  });
+
+  it('reconcile: an Ebda refund the gateway lists is not booked again', async () => {
+    const db = rig();
+    ebdaRefund(db, { status: 'succeeded', ref: 'txn-rf-1' });
+    const stub = new StubBillingProvider();
+    stub.outOfBandReversals.set('txn-pay', {
+      reversals: [{ ref: 'txn-rf-1', operation: 'refund', amountMinor: 1000 }],
+      unknownOperations: [],
+    });
+    expect(await reconcileGatewayReversals(new Date(), stub)).toMatchObject({ booked: 0 });
+    expect(refunds(db)).toHaveLength(1);
+    expect(sub(db)).toEqual({ p: 'growth', s: 'active' });
   });
 });
