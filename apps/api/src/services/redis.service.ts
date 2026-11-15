@@ -284,6 +284,18 @@ class RedisService {
     return count;
   }
 
+  /**
+   * Undo one `incrementRateLimit` on the SAME key (a reservation released). Atomic DECR on the strong (AuthState DO) path; a
+   * result at or below zero (the key had already expired and DECR re-created it) deletes the key so no stray `-1` outlives it.
+   * No-op when Redis is unavailable.
+   */
+  async decrementRateLimit(key: string): Promise<void> {
+    if (!this.isAvailable()) return;
+    const client = this.getConnectedClient();
+    const redisKey = `ratelimit:${key}`;
+    if ((await client.decr(redisKey)) <= 0) await client.del(redisKey);
+  }
+
   async getRateLimitCount(key: string): Promise<number> {
     if (!this.isAvailable()) return 0;
     const count = await this.getConnectedClient().get(`ratelimit:${key}`);

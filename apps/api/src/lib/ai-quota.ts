@@ -3,6 +3,7 @@ import { countAiUsage } from './definer';
 import { geminiKeyCount } from './ai/gemini-keys';
 import { AppError } from '../middleware/error-handler';
 import { AI_DISABLED_BY_MERCHANT_CODE, assertStoreAiEnabled } from './store-ai-switch';
+import { releaseStoreSlot, reserveStoreSlot } from './ai-store-reservation';
 
 export const AI_QUOTA_DAILY_CODE = 'AI_QUOTA_DAILY_EXCEEDED';
 export const AI_QUOTA_MONTHLY_CODE = 'AI_QUOTA_MONTHLY_EXCEEDED';
@@ -101,6 +102,23 @@ export async function assertAiQuota(
   // The merchant's own switch comes first: off means no AI spend at all for this store.
   if (opts.storeId) await assertStoreAiEnabled(opts.storeId);
 
+  // Reserve the store's slice BEFORE counting (issue #845, ai-store-reservation.ts): the rows are written after the
+  // model call, so a count alone lets concurrent calls all pass at cap-1. A refusal gives the slot straight back; an
+  // accepted call's slot is released by `recordUsage` once its row exists.
+  const inFlight = opts.storeId ? await reserveStoreSlot(opts.storeId) : null;
+  try {
+    await checkQuota(opts, inFlight ?? 1);
+  } catch (err) {
+    if (opts.storeId && inFlight !== null) await releaseStoreSlot(opts.storeId);
+    throw err;
+  }
+}
+
+async function checkQuota(
+  opts: { storeId?: string; bulk?: boolean },
+  /** Slots in flight for the store, this call included (1 when the atomic counter is unavailable). */
+  inFlight: number
+): Promise<void> {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const startOfMonth = new Date();
@@ -148,11 +166,11 @@ export async function assertAiQuota(
     10
   );
 
-  if (opts.storeId && storeToday >= storeDailyCap) {
+  if (opts.storeId && storeToday + inFlight > storeDailyCap) {
     throw new AppError(
       429,
       AI_QUOTA_STORE_DAILY_CODE,
-      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC.`
+      `This store's daily AI request cap is reached (${storeToday + inFlight - 1}/${storeDailyCap}). Resets at 00:00 UTC.`
     );
   }
 

@@ -24,6 +24,7 @@ import { config } from '../config';
 import { redis } from './redis.service';
 import { AppError } from '../middleware/error-handler';
 import { assertAiQuota } from '../lib/ai-quota';
+import { releaseStoreSlot } from '../lib/ai-store-reservation';
 import logger from '../lib/logger';
 import { computeCostMicros } from '../lib/ai-pricing';
 import { safeFetchImage } from '../lib/safe-fetch';
@@ -324,6 +325,10 @@ export async function recordUsage(
   } catch (err) {
     // Never fail the user-facing request because we couldn't log usage.
     logger.warn({ err, storeId, feature }, 'Failed to record AI usage');
+  } finally {
+    // The call's per-store slot (taken by `assertAiQuota`) is released once its row exists, so a settled call is never
+    // counted twice. A cached hit never reserved one. Never throws.
+    if (!cachedHit) await releaseStoreSlot(storeId);
   }
 }
 
