@@ -443,6 +443,7 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     await expect(assertAiQuota({ storeId: 's1' })).rejects.toThrow(/Add-ons/);
   });
   it('the allowance shows base, extra, used and remaining', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '2000'; // a platform that can back the pack
     const { storeAiAllowance } = await import('@api/lib/ai-quota');
     h.aiStoreToday.mockResolvedValue(100);
     h.events = [
@@ -455,6 +456,51 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
       used: 100,
       remaining: 350,
     });
+    delete process.env.AI_DAILY_REQUEST_CAP;
+  });
+  it('P6: with the platform at 450 a +1000 store stops at its 225 share; the next store still gets its first call', async () => {
+    const { assertAiQuota } = await import('@api/lib/ai-quota');
+    h.events = [
+      ev({ planCode: 'addon:ai:topup_1000', forPeriodEnd: new Date(Date.now() + 10 * DAY) }),
+    ];
+    h.countAiUsage.mockResolvedValue(225); // store A alone has used 225 of the shared 450
+    h.aiStoreToday.mockResolvedValue(225);
+    await expect(assertAiQuota({ storeId: 's1' })).rejects.toMatchObject({
+      code: 'AI_QUOTA_STORE_DAILY_EXCEEDED',
+    });
+    // store B: no pack, nothing used today, the shared pool is only half spent
+    h.events = [];
+    h.aiStoreToday.mockResolvedValue(0);
+    await expect(assertAiQuota({ storeId: 's2' })).resolves.toBeUndefined();
+  });
+  it('P6: pack-funded calls pause at 70% of the pool, base-slice calls of other stores keep working', async () => {
+    const { assertAiQuota } = await import('@api/lib/ai-quota');
+    h.countAiUsage.mockResolvedValue(320); // 70% of 450 is 315
+    h.events = [
+      ev({ planCode: 'addon:ai:topup_300', forPeriodEnd: new Date(Date.now() + 10 * DAY) }),
+    ];
+    h.aiStoreToday.mockResolvedValue(160); // past its 150 base slice: this call is pack-funded
+    await expect(assertAiQuota({ storeId: 's1' })).rejects.toMatchObject({
+      code: 'AI_QUOTA_DAILY_EXCEEDED',
+    });
+    h.aiStoreToday.mockResolvedValue(100); // still inside the base slice: unaffected by the reserve
+    await expect(assertAiQuota({ storeId: 's1' })).resolves.toBeUndefined();
+    h.events = [];
+    h.aiStoreToday.mockResolvedValue(10); // another store, no pack
+    await expect(assertAiQuota({ storeId: 's3' })).resolves.toBeUndefined();
+  });
+  it('P6: a top-up the platform cannot back is not sold (nothing charged); with enough capacity it is', async () => {
+    const { previewAddon } = await import('@api/services/billing/addons.service');
+    const ctx = { storeId: 's1', userId: 'u1' };
+    await expect(previewAddon({ ...ctx, sku: 'ai:topup_300' })).rejects.toMatchObject({
+      code: 'AI_CAPACITY_UNAVAILABLE',
+    });
+    expect(h.claimEvent).not.toHaveBeenCalled();
+    process.env.AI_DAILY_REQUEST_CAP = '2000';
+    await expect(previewAddon({ ...ctx, sku: 'ai:topup_300' })).resolves.toMatchObject({
+      sku: 'ai:topup_300',
+    });
+    delete process.env.AI_DAILY_REQUEST_CAP;
   });
 });
 

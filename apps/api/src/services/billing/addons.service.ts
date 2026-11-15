@@ -12,7 +12,12 @@ import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { withIdempotencyKey } from '../../lib/money-idempotency';
-import { storeAiAllowance, storeAiUsageByFeature } from '../../lib/ai-quota';
+import {
+  maxStoreDailyRequests,
+  storeAiAllowance,
+  storeAiExtraRequests,
+  storeAiUsageByFeature,
+} from '../../lib/ai-quota';
 import {
   consumeConfirmToken,
   hashConfirmArgs,
@@ -126,6 +131,17 @@ export async function quoteAddon(
         ? 'Your plan already includes this feature'
         : 'This feature cannot be added to your current plan. Choose a plan first.'
     );
+  }
+  if (item.kind === 'ai_topup') {
+    // Never sell capacity the platform cannot back (money-abuse audit P6): base + packs <= one store's share of the day.
+    const extra = await storeAiExtraRequests(storeId);
+    const base = (await storeAiAllowance(storeId)).baseCap;
+    if (base + extra + (item.aiExtraRequests ?? 0) > maxStoreDailyRequests())
+      throw new AppError(
+        409,
+        'AI_CAPACITY_UNAVAILABLE',
+        'The shared AI capacity cannot back this top-up right now. Nothing was charged.'
+      );
   }
   if (item.kind === 'feature') {
     // A super-admin "off" (abuse, dispute) is never sold around: the owner contacts support instead.
