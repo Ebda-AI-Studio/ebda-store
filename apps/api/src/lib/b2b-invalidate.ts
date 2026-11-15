@@ -32,3 +32,18 @@ export async function assertWholesaleEntitled(storeId: string): Promise<void> {
     );
   }
 }
+
+/** True when a customer-group body switches a wholesale benefit ON (so the plan gate applies); turning one off never needs the entitlement. */
+export function enablesWholesale(b: {
+  pricingMode?: string;
+  discountBps?: number;
+  requiresApproval?: boolean;
+  isWholesale?: boolean;
+}): boolean {
+  return (
+    (b.pricingMode !== undefined && b.pricingMode !== 'none') ||
+    (b.discountBps !== undefined && b.discountBps > 0) ||
+    b.requiresApproval === true ||
+    b.isWholesale === true
+  );
+}
