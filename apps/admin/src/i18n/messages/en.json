@@ -8925,7 +8925,7 @@
     "hidden": "Hidden",
     "unlimited": "Unlimited",
     "priceNotSet": "Not set",
-    "priceHint": "Prices are in EGP (stored as piastres). A blank price means not set yet, not free.",
+    "priceHint": "Prices are in EGP. An empty price is not free: it means no price has been set for that period yet.",
     "save": "Save plan",
     "saving": "Saving…",
     "table": {
@@ -8941,10 +8941,21 @@
       "nameAr": "Name (Arabic)",
       "sort": "Sort order",
       "isPublic": "Shown on the public pricing page",
-      "priceMonthly": "Monthly price (EGP)",
-      "priceYearly": "Yearly price (EGP)",
-      "limitsTitle": "Limits",
-      "bpsHint": "Fees are in basis points (100 = 1%). Online and cash-on-delivery fees are set separately."
+      "priceMonthly": "Monthly price",
+      "priceYearly": "Yearly price",
+      "priceMonthlyHelp": "Leave empty if there is no monthly price yet. The plan then shows \"price soon\" and merchants cannot subscribe monthly.",
+      "priceYearlyHelp": "Leave empty if there is no yearly price yet. The plan then shows \"price soon\" and merchants cannot subscribe yearly.",
+      "currency": "EGP",
+      "feesHelp": "Percentage of each order value kept by the platform, from 0 to 100 with up to 2 decimals (for example 2.5).",
+      "invalidFee": "Enter a percentage from 0 to 100 with up to 2 decimals.",
+      "sectionVisibility": "Visibility and order",
+      "sectionPrices": "Prices",
+      "sectionLimits": "Limits",
+      "sectionFees": "Fees",
+      "sectionFeatures": "Features",
+      "sectionTiers": "Analytics and support",
+      "isPublicHelp": "Off hides the plan from the public pricing page.",
+      "close": "Close"
     },
     "limits": {
       "maxProducts": "Products",
@@ -8952,8 +8963,8 @@
       "maxOrdersPerMonth": "Orders per month",
       "maxStorageMb": "Storage (MB)",
       "customDomain": "Custom domain",
-      "platformFeeBps": "Platform fee, online orders (bps)",
-      "codPlatformFeeBps": "Platform fee, cash on delivery (bps)",
+      "platformFeeBps": "Platform fee on online orders (%)",
+      "codPlatformFeeBps": "Platform fee on cash on delivery (%)",
       "abandonedCartAutomation": "Abandoned-cart recovery",
       "whatsappAutomation": "WhatsApp automation",
       "maxStores": "Stores per owner",
@@ -8972,7 +8983,7 @@
       "priority": "Priority"
     },
     "errors": {
-      "invalidNumber": "Enter valid numbers for the price and sort order.",
+      "invalidNumber": "Enter valid numbers for the prices and sort order.",
       "saveFailed": "Could not save the plan."
     },
     "toasts": {
