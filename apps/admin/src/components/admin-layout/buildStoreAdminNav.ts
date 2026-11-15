@@ -217,7 +217,11 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       // Trending-up arrow (Heroicons v2 `arrow-trending-up`) — a rising
       // line reads as growth/analytics; visually distinct from the new
       // archive-box on Stock so the two hubs no longer look alike.
-      icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22 M16.106 8.818l5.94 2.281 M22.046 11.099l-2.28 5.941',
+      // Absolute coordinates: the old path's arrowhead was anchored 6px
+      // left of the line tip (a floating "L"). Heroicons v2 geometry, both
+      // arrow barbs now start at the tip (21.86, 8.82). Not directional-RTL
+      // (a rising trend reads the same in both languages).
+      icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519L21.86 8.818 M21.86 8.818L15.92 6.538 M21.86 8.818l-2.28 5.941',
     },
     {
       name: labels.marketing,
