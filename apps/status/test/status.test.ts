@@ -3,7 +3,7 @@ import { runInDurableObject } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import worker, { alertOnOutcome, runProbes, thresholdsFrom } from '../src/index';
 import { SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
-import { COMPONENTS } from '../src/config';
+import { COMPONENTS, DEFAULT_TIMEOUT_MS, SLOW_THRESHOLD_MS } from '../src/config';
 import { probe, probeErrorAr, type Fetcher } from '../src/probe';
 import type { ProbeResult, Snapshot } from '../src/types';
 
@@ -91,6 +91,81 @@ describe('probe', () => {
       throw new TypeError('network');
     });
     expect(r).toMatchObject({ ok: false, status: null, error: 'fetch failed (TypeError)' });
+  });
+});
+
+describe('slow is degraded, not down (quiet-hour cold renders, 8 s < t <= 15 s)', () => {
+  const api = COMPONENTS.find(c => c.id === 'api')!;
+  const after =
+    (ms: number): Fetcher =>
+    () =>
+      new Promise<Response>(r => setTimeout(() => r(new Response(body)), ms));
+  const slowFor =
+    (id: string): Fetcher =>
+    url =>
+      url.includes(id) ? after(60)(url) : healthy(url);
+
+  it('the hard deadline is 15 s and the slow line 8 s', () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(15000);
+    expect(SLOW_THRESHOLD_MS).toBe(8000);
+  });
+
+  it('a 200 with the right body slower than the slow line is ok + slow, a fast one is not slow', async () => {
+    const slow = await probe(api, after(60), 1000, 30);
+    expect(slow).toMatchObject({ ok: true, slow: true, error: null });
+    expect(slow.latencyMs).toBeGreaterThanOrEqual(30);
+    expect((await probe(api, healthy, 1000, 30)).slow).toBe(false);
+  });
+
+  it('only a response past the hard deadline is a timeout failure', async () => {
+    const r = await probe(api, after(200), 40, 20);
+    expect(r).toMatchObject({ ok: false, status: null });
+    expect(r.error).toMatch(/timeout after 40ms/);
+  });
+
+  it('one slow probe shows DEGRADED with its duration, opens no incident and pages nobody', async () => {
+    const now = Date.now();
+    const outcome = await runProbes(env, { fetcher: slowFor('api.ebda.app'), now, slowMs: 30 });
+    expect(outcome).toEqual({ opened: [], resolved: [] });
+    const snap = await snapshot();
+    const apiC = snap.components.find(c => c.id === 'api')!;
+    expect(apiC).toMatchObject({ status: 'degraded', slow: true });
+    expect(apiC.latencyMs).toBeGreaterThanOrEqual(30);
+    expect(snap.active).toHaveLength(0);
+    expect(snap.overall).toBe('degraded');
+  });
+
+  it('a fast probe after a slow one returns to operational', async () => {
+    const now = Date.now();
+    await runProbes(env, { fetcher: slowFor('api.ebda.app'), now, slowMs: 30 });
+    await runProbes(env, { fetcher: healthy, now: now + 5 * MIN, slowMs: 30 });
+    const apiC = (await snapshot()).components.find(c => c.id === 'api')!;
+    expect(apiC).toMatchObject({ status: 'operational', slow: false });
+  });
+
+  it('two slow probes in a row open ONE incident (DOWN); slow, fast, slow does not', async () => {
+    const now = Date.now();
+    const slowApi = slowFor('api.ebda.app');
+    await runProbes(env, { fetcher: slowApi, now, slowMs: 30 });
+    await runProbes(env, { fetcher: healthy, now: now + 5 * MIN, slowMs: 30 });
+    const broken = await runProbes(env, { fetcher: slowApi, now: now + 10 * MIN, slowMs: 30 });
+    expect(broken.opened).toHaveLength(0); // the fast probe reset the streak
+    const second = await runProbes(env, { fetcher: slowApi, now: now + 15 * MIN, slowMs: 30 });
+    expect(second.opened).toHaveLength(1);
+    const snap = await snapshot();
+    expect(snap.components.find(c => c.id === 'api')!.status).toBe('outage');
+    expect(snap.active[0].updates[0].body).toContain('slow 2 probes in a row');
+  });
+
+  it('the status page shows the response time and the slow marker in both languages', async () => {
+    await runProbes(env, { fetcher: slowFor('api.ebda.app'), now: Date.now(), slowMs: 30 });
+    const en = await (await get('/en')).text();
+    const ar = await (await get('/')).text();
+    expect(has(en, 'Response time:')).toBe(true);
+    expect(has(en, '(slow: over 8 s)')).toBe(true);
+    expect(has(en, 'Degraded')).toBe(true);
+    expect(has(ar, 'زمن الاستجابة:')).toBe(true);
+    expect(has(ar, 'بطيء: أكتر من 8 ثواني')).toBe(true);
   });
 });
 

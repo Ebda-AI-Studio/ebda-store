@@ -49,9 +49,16 @@ export { urlLocaleOf };
  * `delete` would clear one data centre only; the epoch reaches all of them.
  *
  * CACHE CLASS: price/stock/gold-rate price/status/theme/layout = NEVER-stale, event-invalidated as above; categories, blog
- * and static pages = BOUNDED-stale under the same purge (category writes purge `categories:<id>` since S2-REVIVE). The TTL
- * (fresh 60 s, then served stale for up to 600 s while one request refreshes) is only an outer bound and applies the same
- * epoch check to the stale copy. Residuals (Ruling STORE-EDGE-2, cost if wrong: a shopper sees an old listing price or
+ * and static pages = BOUNDED-stale under the same purge (category writes purge `categories:<id>` since S2-REVIVE; blog
+ * writes purge `blog:<id>` since STORE-EDGE-4). The TTL (fresh 60 s, then served stale for up to {@link STORE_EDGE_STALE_S}
+ * = 6 h while one request refreshes) is only an outer bound and applies the same epoch check to the stale copy.
+ * STORE-EDGE-4 (quiet hours, measured 2026-11-14/15 on ebda-web: p50 2-4 s, p99 6-12 s at 100-300 req/h because a page
+ * not asked for within the old 600 s window was a MISS, a cold render in front of the shopper): the stale window grew from
+ * 10 min to 6 h so a quiet-hour visitor gets the copy at once and the refresh runs in waitUntil. This is safe ONLY because
+ * every write that changes what a page renders purges its store's epoch (map and guard: tests/unit/storefront-edge-write-paths.test.ts);
+ * the TTL is no longer what keeps price/stock right, so a write path that stops purging is a bug, not a 10-minute blip.
+ * The cost of the longer window is the loss residual below: a purge the API could not deliver now leaves the copy up to 6 h
+ * (was 10 min; the API retries 3 times and logs `purge LOST` at error level, so it is alertable). Residuals (Ruling STORE-EDGE-2, cost if wrong: a shopper sees an old listing price or
  * stock figure for that long; checkout re-reads both from the store and stays authoritative): (1) the order path coalesces
  * its purge to one per 10 s per store (public-cache.ts ORDER_PURGE_COALESCE_MS); (2) a purge the API could not deliver
  * (secret missing, Worker down) leaves the copy until the TTL, the same floor the Next data cache already has; (3) each
@@ -66,7 +73,7 @@ export { urlLocaleOf };
  * copy an older build rendered. No version id = the layer does not cache.
  */
 export const STORE_EDGE_FRESH_S = 60;
-export const STORE_EDGE_STALE_S = 600;
+export const STORE_EDGE_STALE_S = 21_600;
 const META = 'x-store-edge-meta';
 const APEX_SLUG_SUFFIX = '.ebda.app';
 
@@ -205,7 +212,7 @@ export function epochKeysForTag(tag: string): string[] {
   if (!m) return ['all'];
   const [, kind, value] = m;
   if (
-    ['products', 'categories', 'bundles', 'layout', 'pwa'].includes(kind) &&
+    ['products', 'categories', 'bundles', 'layout', 'pwa', 'blog'].includes(kind) &&
     /^[\w-]{8,64}$/.test(value)
   )
     return [`id/${value}`];
