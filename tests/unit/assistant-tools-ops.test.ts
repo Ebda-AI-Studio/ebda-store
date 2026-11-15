@@ -403,6 +403,27 @@ const confirms: Case[] = [
       }),
   },
   {
+    name: 'stock_adjustment_create',
+    args: { type: 'damage', items: [{ productId: 'P1', newQty: 7 }] },
+    deny: 'staff',
+    spy: () => m.adj.post,
+    reasons: ['money', 'irreversible'],
+  },
+  {
+    name: 'order_invoice_email',
+    args: { orderId: 'O1' },
+    deny: 'customer',
+    spy: () => m.invoice.queue,
+    reasons: ['customer_message', 'irreversible'],
+  },
+  {
+    name: 'eta_receipt_retry',
+    args: { orderId: 'O1', receiptId: 'E1' },
+    deny: 'staff',
+    spy: () => m.eta.retry,
+    reasons: ['money', 'irreversible'],
+  },
+  {
     name: 'gold_rate_set',
     args: { rates: [{ karat: 21, ratePerGramEgp: 4100 }] },
     deny: 'staff',
