@@ -147,7 +147,7 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
       results.filter(r => r.ms > budgetFor(r.timeouts)),
       summary
     ).toEqual([]);
-    void summary;
+    console.info(`API-HANG-1 cold reads: ${summary}`);
   }, 120_000);
   // The `x-dev-authstate-*` headers are honoured only with DEV_STATS=1 (this test config; never production): see
   // cf/auth-state-client.ts `call`. They make local workerd behave like production: a real DO round trip, or a stuck instance.
