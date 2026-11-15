@@ -11,6 +11,7 @@ import logger from '../../logger';
 import { shippingAddressNotAnonymized } from './order-anonymize-where';
 import { inngest } from '../client';
 import { auditLog } from '../../../middleware/security';
+import { purgeReplaceBackupsAcrossStores } from '../../../services/catalogue-replace-backup.service';
 import {
   purgeSearchLogAcrossStores,
   SEARCH_LOG_RETENTION_DAYS,
@@ -123,7 +124,7 @@ export const abandonedCartPurge: JobDef = inngest.createFunction(
 export const searchLogPurge: JobDef = inngest.createFunction(
   {
     id: 'search-log-purge-daily',
-    name: `Purge storefront search log rows older than ${SEARCH_LOG_RETENTION_DAYS} days`,
+    name: `Purge storefront search log rows and AI replace undo history older than ${SEARCH_LOG_RETENTION_DAYS} days`,
     retries: 1,
     triggers: [{ cron: '30 4 * * *' }],
   },
@@ -134,11 +135,18 @@ export const searchLogPurge: JobDef = inngest.createFunction(
       { purged, failedStores, retentionDays: SEARCH_LOG_RETENTION_DAYS },
       'search-log-purge: completed'
     );
+    // The AI replace undo history rides this daily run (Ruling AITOOLS-5, 90 days, batch-bounded per store).
+    const replace = await step.run('purge-ai-replace-backups', () =>
+      purgeReplaceBackupsAcrossStores()
+    );
+    logger.info(replace, 'ai-replace-backups-purge: completed');
     // Loud, after every other store was purged: the run fails, so the failure watch sees it.
-    if (failedStores > 0) {
-      throw new Error(`search-log-purge: ${failedStores} store(s) failed; see the per-store log`);
+    if (failedStores > 0 || replace.failedStores > 0) {
+      throw new Error(
+        `search-log-purge: ${failedStores} search-log and ${replace.failedStores} replace-backup store(s) failed; see the per-store log`
+      );
     }
-    return { purged };
+    return { purged, replaceBackupsPurged: replace.purged };
   }
 );
 

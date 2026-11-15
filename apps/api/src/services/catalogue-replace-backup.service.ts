@@ -14,6 +14,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { storeDb, storeWriter } from '../lib/repo-factory';
+import { doStoreIdList } from '../lib/store-backend';
 import logger from '../lib/logger';
 import { requestStoreReindex } from '../lib/search/reindex';
 import { AppError } from '../middleware/error-handler';
@@ -127,40 +128,39 @@ export async function replaceCategoriesWithBackup(
   if (idsKey(a.previousIds) === idsKey(a.nextIds)) return 'already';
   if (await hasBackupInRun(ctx, 'product_categories', a.productId, 'categories')) return 'already';
 
-  const db = await storeDb(ctx.storeId);
-  const now = await db.productCategory.findMany({
-    where: { productId: a.productId },
-    select: { categoryId: true },
-  });
-  if (idsKey(now.map(r => r.categoryId)) !== idsKey(a.previousIds)) return 'stale';
-
   const w = await storeWriter(ctx.storeId);
-  await w.$transaction([
-    w.aiReplaceBackup.create({
-      data: {
-        id: randomUUID(),
-        storeId: ctx.storeId,
-        jobId: ctx.jobId,
-        tool: ctx.tool,
-        entityKind: 'product_categories',
-        entityId: a.productId,
-        productId: a.productId,
-        field: 'categories',
-        previousValue: idsKey(a.previousIds),
-        newValue: idsKey(a.nextIds),
-        userId: ctx.userId,
-      },
-      select: { id: true },
+  const backupId = randomUUID();
+  const backup = w.aiReplaceBackup.create({
+    data: {
+      id: backupId,
+      storeId: ctx.storeId,
+      jobId: ctx.jobId,
+      tool: ctx.tool,
+      entityKind: 'product_categories',
+      entityId: a.productId,
+      productId: a.productId,
+      field: 'categories',
+      previousValue: idsKey(a.previousIds),
+      newValue: idsKey(a.nextIds),
+      userId: ctx.userId,
+    },
+    select: { id: true },
+  });
+  // The store is on its Durable Object (the only backend in production, NZ-D23): the set swap is ONE compare-and-set procedure in
+  // the same atomic batch as the backup. A set the merchant changed since the sweep read it swaps nothing (0) and the backup goes.
+  const [, swapped] = (await w.$transaction([
+    backup,
+    w.$proc('productCategoriesCas', {
+      productId: a.productId,
+      storeId: ctx.storeId,
+      expected: a.previousIds,
+      next: a.nextIds.map((categoryId, position) => ({ categoryId, position })),
     }),
-    w.productCategory.deleteMany({ where: { productId: a.productId } }),
-    w.productCategory.createMany({
-      data: a.nextIds.map((categoryId, position) => ({
-        productId: a.productId,
-        categoryId,
-        position,
-      })),
-    }),
-  ]);
+  ])) as [unknown, number];
+  if (Number(swapped) === 0) {
+    await w.aiReplaceBackup.deleteMany({ where: { id: backupId, storeId: ctx.storeId } });
+    return 'stale';
+  }
   return 'replaced';
 }
 
@@ -336,16 +336,6 @@ async function restoreOne(
 
   if (row.entityKind === 'product_categories') {
     const db = await storeDb(storeId);
-    const product = await db.product.findFirst({
-      where: { id: row.entityId, storeId },
-      select: { id: true },
-    });
-    if (!product) return 'gone';
-    const now = await db.productCategory.findMany({
-      where: { productId: row.entityId },
-      select: { categoryId: true },
-    });
-    if (idsKey(now.map(r => r.categoryId)) !== next) return 'edited_since';
     const prevIds = JSON.parse(prev) as string[];
     // a category deleted since the run cannot come back: restore the ones that still exist
     const alive = await db.category.findMany({
@@ -353,15 +343,24 @@ async function restoreOne(
       select: { id: true },
     });
     const aliveIds = new Set(alive.map(c => c.id));
-    await w.$transaction([
-      w.productCategory.deleteMany({ where: { productId: row.entityId } }),
-      w.productCategory.createMany({
-        data: prevIds
-          .filter(id => aliveIds.has(id))
-          .map((categoryId, position) => ({ productId: row.entityId, categoryId, position })),
-      }),
-      mark(),
-    ]);
+    // ONE compare-and-set: the set is restored only while it still equals what the AI wrote. A manual change at any moment before
+    // the write (even between the reads above and it) makes it 0 rows: the same `edited_since` refusal as a text field.
+    const swapped = await w.$proc('productCategoriesCas', {
+      productId: row.entityId,
+      storeId,
+      expected: JSON.parse(next) as string[],
+      next: prevIds
+        .filter(id => aliveIds.has(id))
+        .map((categoryId, position) => ({ categoryId, position })),
+    });
+    if (Number(swapped) === 0) {
+      const gone = await db.product.findFirst({
+        where: { id: row.entityId, storeId },
+        select: { id: true },
+      });
+      return gone ? 'edited_since' : 'gone';
+    }
+    await mark();
     return 'ok';
   }
 
@@ -401,4 +400,67 @@ async function restoreOne(
   }
   await mark();
   return 'ok';
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Retention (Ruling AITOOLS-5): the undo history is kept 90 days, then deleted. Run by the existing daily
+// `search-log-purge-daily` job (lib/inngest/functions/data-retention.ts), no cron of its own.
+
+// pq-allow(unused-export): pinned by the retention unit test
+export const REPLACE_BACKUP_RETENTION_DAYS = 90;
+const PURGE_BATCH = 500;
+const PURGE_MAX_BATCHES = 20;
+
+/** Delete this store's backups older than the retention window, at most `batch * maxBatches` rows per call. Returns rows deleted. */
+// pq-allow(unused-export): the unit test drives the per-store purge with small batch bounds
+export async function purgeReplaceBackups(
+  storeId: string,
+  opts: { now?: Date; batch?: number; maxBatches?: number } = {}
+): Promise<number> {
+  const cutoff = new Date(
+    (opts.now ?? new Date()).getTime() - REPLACE_BACKUP_RETENTION_DAYS * 86_400_000
+  );
+  const batch = opts.batch ?? PURGE_BATCH;
+  const db = await storeDb(storeId);
+  const w = await storeWriter(storeId);
+  let purged = 0;
+  for (let i = 0; i < (opts.maxBatches ?? PURGE_MAX_BATCHES); i++) {
+    const old = await db.aiReplaceBackup.findMany({
+      where: { storeId, createdAt: { lt: cutoff } },
+      orderBy: { createdAt: 'asc' },
+      take: batch,
+      select: { id: true },
+    });
+    if (old.length === 0) break;
+    const res = (await w.aiReplaceBackup.deleteMany({
+      where: { storeId, id: { in: old.map(r => r.id) } },
+    })) as { count: number };
+    purged += res.count;
+    if (old.length < batch) break;
+  }
+  return purged;
+}
+
+/** Every store on its Durable Object; one failing store never stops the rest (counted, logged, the job fails loudly after). */
+export async function purgeReplaceBackupsAcrossStores(
+  opts: { storeIds?: string[]; now?: Date } = {}
+): Promise<{ purged: number; failedStores: number }> {
+  const storeIds = opts.storeIds ?? (await doStoreIdList());
+  let purged = 0;
+  let failedStores = 0;
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(8, storeIds.length) }, async () => {
+      while (next < storeIds.length) {
+        const storeId = storeIds[next++];
+        try {
+          purged += await purgeReplaceBackups(storeId, { now: opts.now });
+        } catch (err) {
+          failedStores += 1;
+          logger.error({ storeId, err }, '[ai-replace] backup purge failed for store');
+        }
+      }
+    })
+  );
+  return { purged, failedStores };
 }

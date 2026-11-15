@@ -8174,9 +8174,9 @@
     "replaceConsequenceUndo": "What is already there will be replaced with new AI text. The old value is saved first, so you can undo it from the undo history on this page.",
     "undo": {
       "title": "Undo history",
-      "intro": "Every change an AI tool made over something that was already there. Undo puts the old value back, unless you edited that field after the run.",
+      "intro": "Every change an AI tool made over something that was already there. Undo puts the old value back, unless you edited that field after the run. History is kept 90 days.",
       "productTitle": "AI changes you can undo",
-      "productIntro": "The AI replaced these values on this product. Undo puts the old one back, unless you edited the field since.",
+      "productIntro": "The AI replaced these values on this product. Undo puts the old one back, unless you edited the field since. History is kept 90 days.",
       "loading": "Loading…",
       "empty": "Nothing to undo. When you tick “Replace what's already there” on a tool, the old values show up here.",
       "errorLoad": "Could not load the undo history. Try again in a moment.",
