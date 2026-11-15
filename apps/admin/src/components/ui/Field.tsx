@@ -8,13 +8,7 @@
  * Layout inside a pane is decided by the pane, never by the window (Ruling EPUX-1): these primitives are
  * full-width blocks; a parent that wants two columns uses a container query (`@container` + `@xs:`), not `sm:`.
  */
-import {
-  forwardRef,
-  useId,
-  type InputHTMLAttributes,
-  type ReactNode,
-  type SelectHTMLAttributes,
-} from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '@ebda/ui/cn';
 
 const CONTROL =
@@ -79,25 +73,6 @@ export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLIn
   )
 );
 TextInput.displayName = 'TextInput';
-
-export const SelectInput = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  ({ className, children, ...p }, ref) => (
-    <span className="relative block">
-      <select
-        ref={ref}
-        className={fieldControlClasses(cn('appearance-none pe-9', className))}
-        {...p}
-      >
-        {children}
-      </select>
-      <Chevron
-        aria-hidden="true"
-        className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-ink"
-      />
-    </span>
-  )
-);
-SelectInput.displayName = 'SelectInput';
 
 export interface SegmentOption {
   value: string;
