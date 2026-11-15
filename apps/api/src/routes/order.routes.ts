@@ -936,132 +936,25 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      const db = await storeDb(storeId);
       const user = getAuthUser(req);
-
-      const order = await db.order.findFirst({
-        where: { id: orderId, storeId },
-        include: { payments: true },
-      });
-
-      if (!order) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Order not found' },
-        });
-        return;
-      }
-
-      // Verify this is a COD order
-      const codPayment = order.payments.find(p => p.provider === 'cod');
-      if (!codPayment) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'NOT_COD', message: 'This order is not a Cash on Delivery order' },
-        });
-        return;
-      }
-
-      if (order.paymentStatus === 'paid') {
-        res.status(400).json({
-          success: false,
-          error: { code: 'ALREADY_PAID', message: 'Order is already marked as paid' },
-        });
-        return;
-      }
-      // A cancelled / refunded order (incl. a returned-to-origin COD parcel)
-      // collected nothing: marking it paid would book a sale that never
-      // happened (sense audit O8).
-      if (order.status === 'cancelled' || order.status === 'refunded') {
-        res.status(409).json({
-          success: false,
-          error: {
-            code: 'ORDER_NOT_PAYABLE',
-            message: 'A cancelled or refunded order cannot be marked paid',
-          },
-        });
-        return;
-      }
-
-      // Update payment and order status atomically. Only advance a still-pending
-      // order to `confirmed`; leave a further-along order (processing/shipped/
-      // delivered) untouched. COD cash is collected AT delivery, so marking paid
-      // typically happens after fulfilment — forcing `confirmed` there regressed
-      // the order's status and lost fulfilment progress.
-      const money = await storeMoney(storeId);
-      // the payment row that was actually flipped (on a Durable Object store: the one the section updated)
-      let flipped = { paymentId: codPayment.id, fromStatus: codPayment.status as string };
-      if (money) {
-        // Durable Object store (Ruling NZ-A-2): the same writes in ONE section there.
-        const done = await money.codMarkPaid({ orderIds: [orderId] });
-        if (done.updated.length === 0) {
-          res.status(409).json({
-            success: false,
-            error: { code: 'ORDER_NOT_PAYABLE', message: 'The order can no longer be marked paid' },
-          });
-          return;
-        }
-        flipped = { paymentId: done.updated[0].paymentId, fromStatus: done.updated[0].fromStatus };
-      } else {
-        await prisma.$transaction([
-          prisma.payment.update({
-            where: { id: codPayment.id },
-            data: { status: 'completed', paidAt: new Date() },
-          }),
-          prisma.order.update({
-            where: { id: orderId, storeId },
-            data: {
-              paymentStatus: 'paid',
-              ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
-            },
-          }),
-        ]);
-      }
-
-      // Append-only audit row for the COD completion.
-      await (money ? recordPaymentEventForStore : recordPaymentEvent)({
-        paymentId: flipped.paymentId,
-        storeId: order.storeId,
-        orderId,
-        eventType: 'status_change',
-        fromStatus: flipped.fromStatus as typeof codPayment.status,
-        toStatus: 'completed',
-        provider: 'cod',
-        triggeredByUserId: user.userId,
-        details: { reason: 'cod_marked_paid', orderNumber: order.orderNumber },
-      });
-
-      // Fire the same post-payment fanout the webhook handler does —
-      // accounting journal relies on this event.
-      inngest
-        .send({
-          name: 'order/created',
-          data: {
-            orderId,
-            storeId: order.storeId,
-            paymentMethod: codPayment.provider,
-            locale: undefined,
-          },
-        })
-        .catch((err: unknown) =>
-          logger.error({ err, orderId }, '[COD] Failed to enqueue order/created')
-        );
+      // The logic lives in OrderService.markCodPaid so the merchant assistant calls the same path.
+      const { orderNumber, amount } = await OrderService.markCodPaid(storeId, orderId, user.userId);
 
       await auditLog({
         action: 'order.cod_marked_paid',
         userId: user.userId,
         resourceType: 'order',
         resourceId: orderId,
-        details: { orderNumber: order.orderNumber, amount: codPayment.amount },
+        details: { orderNumber, amount },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      logger.info({ orderId, orderNumber: order.orderNumber }, '[COD] Order marked as paid');
+      logger.info({ orderId, orderNumber }, '[COD] Order marked as paid');
 
       res.json({
         success: true,
-        data: { message: 'Order marked as paid', orderNumber: order.orderNumber },
+        data: { message: 'Order marked as paid', orderNumber },
       });
     } catch (error) {
       next(error);
