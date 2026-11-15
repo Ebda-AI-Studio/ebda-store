@@ -16,10 +16,7 @@
   ],
   "mcpTool": null,
   "planGate": null,
-  "roles": [
-    "store_admin (the store owner only, for the store export)",
-    "any signed-in user (own account)"
-  ],
+  "roles": ["owner", "staff"],
   "policy": "confirm",
   "undo": {
     "class": "none",
