@@ -1,0 +1,39 @@
+{
+  "id": "builder.ai-v2",
+  "status": "planned",
+  "plan": "self-service spec 2026-11-14 section 8 (project 3)",
+  "area": "ai",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ذكاء المحرر الجديد",
+  "titleEn": "Page-builder AI v2: knows products, brand, look; adds blocks, links products, fixes mobile, creates pages",
+  "screens": ["/stores/[id]/builder"],
+  "api": ["(planned) engine tools over the builder document + catalogue"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (single preview, one undo)"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [
+      "اعملي صفحة هبوط لمنتجات رمضان",
+      "حط المنتجات الجديدة في القسم ده",
+      "اظبط الموبايل لوحدك"
+    ],
+    "en": ["Build me a landing page for my new collection"]
+  },
+  "steps": [
+    "Not available yet. Assistant should say: for now it can reorder, hide, restyle; adding blocks/pages is coming."
+  ],
+  "edgeCases": [
+    "Preview must show one combined plan",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
+  ],
+  "gaps": ["NOT BUILT: spec section 8; register row Page-builder AI context-aware"]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "marketing.lifecycle-emails",
+  "status": "live",
+  "area": "marketing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "رسائل البداية",
+  "titleEn": "Setup / lifecycle emails (welcome, tips)",
+  "screens": ["/stores/[id]/lifecycle-emails"],
+  "api": ["GET /stores/:storeId/lifecycle-emails"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "setup-lifecycle-emails",
+  "questions": {
+    "ar": ["ايه الرسايل اللي بتتبعت للعميل؟", "ايه الايميلات التلقائية؟", "ليه جالي ايميل ترحيب"],
+    "en": ["What automatic emails are sent?"]
+  },
+  "steps": ["View-only list."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["View only; no per-email edit; no help article"]
+}

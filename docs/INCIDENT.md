@@ -15,7 +15,7 @@ Companion docs: **who to call and when** → [`ops/escalation.md`](ops/escalatio
 | `ebda-orders`                                | `orders.ebda.app`                           | calls the API                                                                                 |
 | `ebda-accounts`                              | `accounts.ebda.app`                         | D1 `ebda-identity` (merchant sign-in, MFA, passkeys)                                          |
 | `ebda-marketing` / `ebda-help` / `ebda-docs` | `ebda.app` / help / docs                    | static                                                                                        |
-| `ebda-status`                                | `status.ebda.app`                           | probes every component once a minute                                                          |
+| `ebda-status`                                | `status.ebda.app`                           | probes every component every 5 minutes                                                        |
 
 Ebda Chat / WhatsApp is a separate repo and Worker (`ebda-whatsapp`, `wa.ebda.app`) with its own per-alert runbooks.
 
@@ -30,9 +30,15 @@ Ebda Chat / WhatsApp is a separate repo and Worker (`ebda-whatsapp`, `wa.ebda.ap
 
 ## Detection (where an incident shows up)
 
-1. **status.ebda.app** (`apps/status`, Worker `ebda-status`): probes every component once a minute (8 s timeout); an
-   incident **opens after 3 consecutive failures**, resolves after 2 good probes, and each open/resolve goes to
-   **Telegram** (`apps/status/src/alert.ts`). Probes: `apps/status/src/config.ts`.
+1. **status.ebda.app** (`apps/status`, Worker `ebda-status`): probes every component every 5 minutes (15 s hard timeout; was 1 min until 2026-11-14,
+   8 s until 2026-11-15); an incident **opens after 2 consecutive failures** (detection 5-10 min), resolves after 1 good probe, and each
+   open/resolve goes to **Telegram** (`apps/status/src/alert.ts`). **Slow is not down (STORE-EDGE-4):** a 200 with the right body
+   that took 8 s < t <= 15 s shows the component as **Degraded** (amber, "slow: over 8 s", response time on the page and in
+   `/api/status.json` `latencyMs` + `slow`) and pages nobody; a failure is non-200, body mismatch, timeout > 15 s, or **2 slow probes in a
+   row** (that one opens the incident at once). Cadence stays 5 min (frugality ruling), never back to 1 min. Constants:
+   `DEFAULT_TIMEOUT_MS`, `SLOW_THRESHOLD_MS`, `SLOW_STREAK_FAILS` in `apps/status/src/config.ts`. A lone Degraded storefront in quiet
+   hours is a cold render, not an outage: check `x-store-edge` on the page (`MISS` = cold, `STALE`/`HIT` = edge).
+   Probes: `apps/status/src/config.ts`.
 2. **API alerts → Telegram** (`apps/api/src/services/alerts.service.ts`): P1 alerts from jobs, queues, payment webhooks,
    email/SMS dead letters, `alerts-failure-watch`.
 3. **Sentry** (error tracker for api/web/admin/orders) → alert bridge → Telegram.
