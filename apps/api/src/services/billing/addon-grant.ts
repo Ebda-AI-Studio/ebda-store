@@ -121,6 +121,51 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
 const GRANT_PREFIX = 'addon-grant:';
 
 /**
+ * Insert a zero-amount marker row under its UNIQUE idempotency key; true = THIS caller inserted it (the claim).
+ * D1: one native statement (prisma-lite counts are not claims). Postgres: `createMany` + `skipDuplicates`, race-safe.
+ */
+export async function claimMarkerRow(
+  tx: Tx,
+  m: {
+    id: string;
+    storeId: string;
+    planCode: string;
+    relatedEventId: string;
+    endAt: Date;
+    key: string;
+  }
+): Promise<boolean> {
+  if (await onD1())
+    return claimAddonMarkerD1({
+      id: m.id,
+      storeId: m.storeId,
+      planCode: m.planCode,
+      relatedEventId: m.relatedEventId,
+      endMs: m.endAt.getTime(),
+      key: m.key,
+    });
+  const { count } = await tx.billingEvent.createMany({
+    data: [
+      {
+        id: m.id,
+        storeId: m.storeId,
+        type: 'upgrade',
+        planCode: m.planCode,
+        forPeriodEnd: m.endAt,
+        amountMinor: 0,
+        currency: 'EGP',
+        provider: 'ebda',
+        status: 'succeeded',
+        relatedEventId: m.relatedEventId,
+        idempotencyKey: m.key,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return count === 1;
+}
+
+/**
  * A payment whose term must NOT anchor later terms (ADDON-CHAIN-2/3): `refunded`, or `failed` for good. Access is
  * checked by end date only, so a dead payment that kept anchoring would hand the next buyer free days. A `failed` row
  * that holds a fresh settle lease is a late success being applied right now, not dead; `pending` may still settle.
@@ -206,28 +251,7 @@ async function grantTerm(
       endMs: end.getTime(),
       key,
     };
-    const won = D1
-      ? await claimAddonMarkerD1(marker)
-      : (
-          await tx.billingEvent.createMany({
-            data: [
-              {
-                id: marker.id,
-                storeId: marker.storeId,
-                type: 'upgrade',
-                planCode: marker.planCode,
-                forPeriodEnd: end,
-                amountMinor: 0,
-                currency: 'EGP',
-                provider: 'ebda',
-                status: 'succeeded',
-                relatedEventId: marker.relatedEventId,
-                idempotencyKey: key,
-              },
-            ],
-            skipDuplicates: true,
-          })
-        ).count === 1;
+    const won = await claimMarkerRow(tx, { ...marker, endAt: end });
     if (won) return setEnd(end);
     const held = await tx.billingEvent.findFirst({
       where: { storeId: row.storeId, idempotencyKey: key },

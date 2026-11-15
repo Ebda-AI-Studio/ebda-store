@@ -223,6 +223,7 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   'order-status-changed-fanout': { group: '6-comms', kind: 'workflow', trigger: 'event' },
   'review-moderation': { group: '6-comms', kind: 'workflow', trigger: 'event' },
   'review-request': { group: '6-comms', kind: 'workflow', trigger: 'event' },
+  'addon-overlap-reconcile': { group: '7-money', kind: 'queue', trigger: 'cron' },
   'billing-renewal-daily': { group: '7-money', kind: 'workflow', trigger: 'cron' },
   'instapay-expiry': {
     group: '7-money',

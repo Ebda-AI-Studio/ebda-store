@@ -58,6 +58,7 @@ import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
 import { instapayExpiry } from './instapay-expiry';
 import { shipmentCreate } from './shipment-create';
 import { storeUsageSnapshot } from './store-usage-snapshot';
+import { addonOverlapReconcile } from './addon-overlap-reconcile';
 import { billingRenewalDaily } from './billing-renewal';
 import { domainClaimSweep } from './domain-claim-sweep';
 import { r2OrphanSweep } from './r2-orphan-sweep';
@@ -179,6 +180,7 @@ const allInngestFunctions: JobDef[] = [
   // SP7: carrier booking off the order path, retried, merchant notified when it gives up.
   shipmentCreate,
   storeUsageSnapshot,
+  addonOverlapReconcile,
   billingRenewalDaily,
   domainClaimSweep,
   // Weekly R2 orphan sweep: lists bucket vs DB references and reports
