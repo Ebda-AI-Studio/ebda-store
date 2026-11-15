@@ -232,7 +232,7 @@ Ruling EPUX-5 - Merchant colours are never validated or blocked; contrast is adv
 
 ## Decisions only Ahmad can make (defaults taken, none block)
 
-1. Drag-resizable panes: default not now (fixed 320/360 at >= 1280). Cost if wrong: power users want wider.
+1. Drag-resizable panes: **decided by Ahmad 2026-11-15: YES, in PR A** (overrides the earlier default). Left min 280 / max 480 (default 320), right min 300 / max 520 (default 360), canvas keeps >= 400 px, width remembered per user and pane, double-click resets, keyboard separator (Left/Right 16 px, Home/End), handle on the inner edge mirrored in RTL.
 2. Live per-store thumbnails in the gallery: default yes if the preview endpoint renders without writing, else webp + live large preview. Cost if wrong: thumbs show demo content.
-3. Tab label "Colours and fonts" -> "Style": default only if still wrapping after PR A.
+3. Tab label "Colours and fonts" -> "Style": taken in PR A (four tabs cannot fit at the 280 px pane minimum with the long label; Arabic "المظهر").
 4. Icon set: default the one already in `packages/ui`/admin (checked in PR A); no new dependency.
