@@ -82,6 +82,7 @@ import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
 import { anonymiseDeletedStore, finishStoreDeletion } from '../lib/store-delete-post-commit';
+import { notifyStandingChanged } from '../lib/wa/standing-state';
 import { purgeStoreVectors } from '../lib/search/purge-store-vectors';
 import { cfBindings } from '../cf/bindings';
 import { eraseStorePlatformData, type D1Like } from '../cf/erasure/platform-subject';
@@ -1259,6 +1260,13 @@ export class StoreService {
 
     // Ruling NZ-D14: lookups read D1 and a DO store keeps its data in the DO; neither is touched by the Postgres delete above.
     await finishStoreDeletion({ storeId, wasOnDo });
+    // Ebda Chat stops every send for this store (STORE-STANDING-1, #839): a DO store's delete never passes the Prisma observer.
+    await notifyStandingChanged(storeId, { deleted: true }).catch(e =>
+      logger.error(
+        { err: e, storeId },
+        '[STORE_DELETE] Ebda Chat standing notify failed (Chat keeps its package until period end)'
+      )
+    );
 
     // PDPL (Ruling FOLD-ERASURE-2): a DO store's people are anonymised once the delete is committed (the DO stays, closed, for the
     // legal retention period; fiscal / VAT / payment rows are kept, everything that identifies a person goes).

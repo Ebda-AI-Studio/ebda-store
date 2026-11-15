@@ -131,6 +131,14 @@ vi.mock('@api/lib/wa/plan-state', () => ({
   PLAN_CHANGED_EVENT: 'store/plan-changed',
   planChangedInput: async () => ({ input: { type: 'plan.changed' }, seed: 'plan:x' }),
 }));
+vi.mock('@api/lib/wa/standing-state', () => ({
+  STANDING_CHANGED_EVENT: 'store/standing-changed',
+  standingInput: async () => ({
+    input: { type: 'store.reactivated' },
+    seed: 'standing:x',
+    deleted: false,
+  }),
+}));
 vi.mock('@api/services/shipping-carrier.service', () => ({
   shippingCarrierService: { createShipmentForOrder: h.createShipment },
 }));
@@ -538,14 +546,14 @@ describe('warehouse reconcile on a DO store', () => {
 });
 
 describe('wa-plan-sync on a DO store', () => {
-  it('its alarm finds the linked DO store and sends the plan state, with no Postgres', async () => {
+  it('its alarm finds the linked DO store and sends the plan state and the standing (STORE-STANDING-1), with no Postgres', async () => {
     h.doDb.storeWhatsAppLink.findUnique.mockResolvedValue({ storeId: DO_STORE });
     h.doDb.storeWhatsAppConsent.findMany.mockResolvedValue([]);
     const r = (await (waPlanSync as unknown as Handler).handler({ event: alarm, step })) as {
       sent: number;
     };
-    expect(r.sent).toBe(1);
-    expect(h.sendStoreEvents).toHaveBeenCalledTimes(1);
+    expect(r.sent).toBe(2);
+    expect(h.sendStoreEvents).toHaveBeenCalledTimes(2);
   });
   it('a store with no link row is idle', async () => {
     h.doDb.storeWhatsAppLink.findUnique.mockResolvedValue(null);

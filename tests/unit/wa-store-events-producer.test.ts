@@ -577,9 +577,9 @@ describe('customer.consent_changed v1.5 wording (WA-OPTIN-WORDING-1)', () => {
     }
   });
 
-  it('the vendored contract is v1.5', async () => {
+  it('the vendored contract is v1.6 (v1.5 wording kept)', async () => {
     const { CONTRACT_VERSION } = await import('@api/contracts/wa-v1');
-    expect(CONTRACT_VERSION).toBe('1.5');
+    expect(CONTRACT_VERSION).toBe('1.6');
   });
 });
 
