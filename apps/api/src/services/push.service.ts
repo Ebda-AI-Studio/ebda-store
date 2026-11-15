@@ -441,7 +441,7 @@ class PushService {
     const rows = await analyticsRead(
       storeId,
       r => r.notificationLog.findMany(args),
-      () => prisma.notificationLog.findMany(args)
+      () => withStore(storeId, tx => tx.notificationLog.findMany(args))
     );
     return rows.map(row => {
       const m = (row.metadata ?? {}) as {
