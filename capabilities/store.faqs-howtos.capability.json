@@ -19,10 +19,10 @@
   "roles": ["owner", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "delete = confirm no"
+    "class": "reversible",
+    "note": "FAQ edit: yes (before text restored); create: compensating (undo hides it); delete = confirm, not an assistant tool"
   },
-  "helpArticle": null,
+  "helpArticle": "store-content-faqs-pages-blog",
   "questions": {
     "ar": ["ازاي اضيف اسئلة شائعة؟", "اكتب FAQ للمنتجات بالذكاء"],
     "en": ["Add FAQs to my store"]
@@ -35,8 +35,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": [
-    "No create endpoint listed for store-level FAQs here (inferred: via pages/AI)",
-    "No help article"
-  ]
+  "gaps": ["No create endpoint listed for store-level FAQs here (inferred: via pages/AI)"]
 }

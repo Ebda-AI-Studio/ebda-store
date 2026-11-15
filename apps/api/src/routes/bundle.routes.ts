@@ -501,6 +501,90 @@ router.get(
   }
 );
 
+/**
+ * Creates a bundle: the one write path of POST /:storeId/bundles, also called by the Ebda Store assistant (`bundle_create`).
+ * Validates the price against the component sum, writes the bundle and its components atomically, then busts the product caches.
+ */
+export async function createBundle(storeId: string, data: z.infer<typeof createSchema>) {
+  assertPricingValueInRange(data.pricingType, data.pricingValue);
+
+  const { lines, componentSum } = await resolveBundleLines(storeId, data.items);
+  assertPriceWithinComponentSum(data.pricingType, data.pricingValue, componentSum);
+  const price = computeBundlePrice(componentSum, data.pricingType, data.pricingValue);
+
+  // The point of this task: an unrepresentable price is rejected at SAVE
+  // time with a suggested nearest value, so the edge case reaches the
+  // merchant while configuring rather than a customer at checkout.
+  //
+  // RULING T9-a: this used to be a bespoke `res.status(422).json({
+  // error: 'price_not_allocatable', suggested })` body — the ONE route
+  // in this app that didn't use the standard `{ success, error: {
+  // code, message, details } }` envelope. That forced its one admin
+  // consumer (apps/admin's bundle editor) to bypass `apiPost`/`apiPut`
+  // with a raw `apiFetch` + a hand-rolled parser just to read
+  // `suggested` back out. Routing it through `AppError` instead keeps
+  // every error response in this app on one shape; `suggested` now
+  // travels in `details`, the same field Zod validation errors use for
+  // structured extra data.
+  if (!isAllocatable(lines, price)) {
+    throw new AppError(
+      422,
+      'PRICE_NOT_ALLOCATABLE',
+      "This price can't be split exactly across the bundle's components.",
+      { suggested: nearestAllocatablePrice(lines, price, componentSum) }
+    );
+  }
+
+  const bundleData = {
+    storeId,
+    name: data.name,
+    nameAr: data.nameAr ?? null,
+    slug: data.slug,
+    description: data.description ?? null,
+    descriptionAr: data.descriptionAr ?? null,
+    image: data.image ?? null,
+    pricingType: data.pricingType,
+    pricingValue: data.pricingValue,
+    isActive: data.isActive ?? true,
+    startsAt: data.startsAt ?? null,
+    expiresAt: data.expiresAt ?? null,
+  };
+  const componentRows = data.items.map(item => ({
+    productId: item.productId,
+    variantId: item.variantId ?? null,
+    quantity: item.quantity,
+  }));
+  let created: { id: string };
+  if (await bundlesOnDo(storeId)) {
+    // The Durable Object takes the bundle and its components as ONE atomic batch (no nested relation writes there).
+    const dw = await storeWriter(storeId);
+    const id = randomUUID();
+    await dw.$transaction([
+      dw.bundle.create({ data: { id, ...bundleData } as never }),
+      dw.bundleItem.createMany({
+        data: componentRows.map(r => ({ bundleId: id, ...r })) as never,
+      }),
+    ]);
+    created = { id };
+  } else {
+    created = await prisma.bundle.create({
+      data: { ...bundleData, items: { create: componentRows } },
+      select: { id: true },
+    });
+  }
+
+  const bundle = await resolveBundle(await bundleDb(storeId), storeId, created.id);
+  // Task 10: the AI product feed caches bundle data (getCached, under
+  // the same `public:products:${storeId}:` prefix product writes bust)
+  // — a new bundle must invalidate it the same way a new product does,
+  // or it silently won't appear in the feed for up to the cache TTL.
+  // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
+  // in the SAME outbound request — a separate bundles-only purge
+  // here was a second purge POST per write (issue 2202).
+  await invalidateStoreProductCaches(storeId);
+  return bundle;
+}
+
 // POST /:storeId/bundles - create (admin)
 router.post(
   '/:storeId/bundles',
@@ -509,82 +593,7 @@ router.post(
     try {
       const { storeId } = req.params;
       const data = createSchema.parse(req.body);
-      assertPricingValueInRange(data.pricingType, data.pricingValue);
-
-      const { lines, componentSum } = await resolveBundleLines(storeId, data.items);
-      assertPriceWithinComponentSum(data.pricingType, data.pricingValue, componentSum);
-      const price = computeBundlePrice(componentSum, data.pricingType, data.pricingValue);
-
-      // The point of this task: an unrepresentable price is rejected at SAVE
-      // time with a suggested nearest value, so the edge case reaches the
-      // merchant while configuring rather than a customer at checkout.
-      //
-      // RULING T9-a: this used to be a bespoke `res.status(422).json({
-      // error: 'price_not_allocatable', suggested })` body — the ONE route
-      // in this app that didn't use the standard `{ success, error: {
-      // code, message, details } }` envelope. That forced its one admin
-      // consumer (apps/admin's bundle editor) to bypass `apiPost`/`apiPut`
-      // with a raw `apiFetch` + a hand-rolled parser just to read
-      // `suggested` back out. Routing it through `AppError` instead keeps
-      // every error response in this app on one shape; `suggested` now
-      // travels in `details`, the same field Zod validation errors use for
-      // structured extra data.
-      if (!isAllocatable(lines, price)) {
-        throw new AppError(
-          422,
-          'PRICE_NOT_ALLOCATABLE',
-          "This price can't be split exactly across the bundle's components.",
-          { suggested: nearestAllocatablePrice(lines, price, componentSum) }
-        );
-      }
-
-      const bundleData = {
-        storeId,
-        name: data.name,
-        nameAr: data.nameAr ?? null,
-        slug: data.slug,
-        description: data.description ?? null,
-        descriptionAr: data.descriptionAr ?? null,
-        image: data.image ?? null,
-        pricingType: data.pricingType,
-        pricingValue: data.pricingValue,
-        isActive: data.isActive ?? true,
-        startsAt: data.startsAt ?? null,
-        expiresAt: data.expiresAt ?? null,
-      };
-      const componentRows = data.items.map(item => ({
-        productId: item.productId,
-        variantId: item.variantId ?? null,
-        quantity: item.quantity,
-      }));
-      let created: { id: string };
-      if (await bundlesOnDo(storeId)) {
-        // The Durable Object takes the bundle and its components as ONE atomic batch (no nested relation writes there).
-        const dw = await storeWriter(storeId);
-        const id = randomUUID();
-        await dw.$transaction([
-          dw.bundle.create({ data: { id, ...bundleData } as never }),
-          dw.bundleItem.createMany({
-            data: componentRows.map(r => ({ bundleId: id, ...r })) as never,
-          }),
-        ]);
-        created = { id };
-      } else {
-        created = await prisma.bundle.create({
-          data: { ...bundleData, items: { create: componentRows } },
-          select: { id: true },
-        });
-      }
-
-      const bundle = await resolveBundle(await bundleDb(storeId), storeId, created.id);
-      // Task 10: the AI product feed caches bundle data (getCached, under
-      // the same `public:products:${storeId}:` prefix product writes bust)
-      // — a new bundle must invalidate it the same way a new product does,
-      // or it silently won't appear in the feed for up to the cache TTL.
-      // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
-      // in the SAME outbound request — a separate bundles-only purge
-      // here was a second purge POST per write (issue 2202).
-      await invalidateStoreProductCaches(storeId);
+      const bundle = await createBundle(storeId, data);
       res.status(201).json({ success: true, data: { bundle } });
     } catch (error) {
       next(error);
