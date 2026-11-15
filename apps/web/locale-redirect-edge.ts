@@ -30,12 +30,22 @@ import {
   storeKeyForHost,
 } from './src/lib/locale-paths';
 
+/** The subset of the Workers Cache API used here (structurally the same as store-edge-cache's CacheLike). */
+export interface RedirectCache {
+  match(key: string): Promise<Response | undefined>;
+  put(key: string, res: Response): Promise<void>;
+}
+
+/** Ruling WEB-COLD-4: how long a cached cookie-less 308 may be served. Same window as the per-isolate verdict memo. */
+export const REDIRECT_CACHE_TTL_S = 60;
+
 export type DefaultLanguageOf = (host: string) => Promise<'ar' | 'en' | null>;
 
 export async function edgeLocaleRedirect(
   request: Request,
   env: Record<string, unknown>,
-  defaultLanguageOf: DefaultLanguageOf
+  defaultLanguageOf: DefaultLanguageOf,
+  cache?: { store: RedirectCache; waitUntil(p: Promise<unknown>): void }
 ): Promise<Response | null> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const url = new URL(request.url);
@@ -55,6 +65,23 @@ export async function edgeLocaleRedirect(
     method: request.method,
   });
   if (decision.kind !== 'pending') return null;
+  const hasCookie = /(?:^|;\s*)force-language=(ar|en)(?:;|$)/.test(
+    request.headers.get('cookie') ?? ''
+  );
+  // Ruling WEB-COLD-4: the cookie-less 308 depends only on host + path, so it is remembered across isolates and data centres'
+  // Cache API colo (a cold isolate then skips the resolver subrequest). Cookie visitors never touch it (their target differs).
+  const cacheKey = `https://${url.hostname}/__edge-locale-redirect${url.pathname}${url.search}`;
+  if (cache && !hasCookie) {
+    try {
+      const hit = await cache.store.match(cacheKey);
+      const loc = hit?.headers.get('x-redirect-location');
+      if (loc && loc.startsWith('/') && !loc.startsWith('//')) {
+        return new Response(null, { status: 308, headers: permanentHeaders(loc) });
+      }
+    } catch {
+      // cache unavailable: decide live
+    }
+  }
   let defaultLocale: 'ar' | 'en' | null = null;
   try {
     defaultLocale = await defaultLanguageOf(url.hostname);
@@ -73,10 +100,30 @@ export async function edgeLocaleRedirect(
   });
   // Same-origin path only (the rules already produce one; refuse anything else rather than redirect off-site).
   if (!target.location.startsWith('/') || target.location.startsWith('//')) return null;
+  if (cache && !hasCookie && target.permanent) {
+    cache.waitUntil(
+      cache.store
+        .put(
+          cacheKey,
+          new Response(null, {
+            status: 200,
+            headers: {
+              'x-redirect-location': target.location,
+              'cache-control': `public, max-age=${REDIRECT_CACHE_TTL_S}`,
+            },
+          })
+        )
+        .catch(() => {})
+    );
+  }
   return new Response(null, {
     status: target.permanent ? 308 : 307,
     headers: target.permanent
-      ? { location: target.location, 'cache-control': 'private, max-age=300', vary: 'Cookie' }
+      ? permanentHeaders(target.location)
       : { location: target.location, 'cache-control': 'private, no-store' },
   });
+}
+
+function permanentHeaders(location: string): Record<string, string> {
+  return { location, 'cache-control': 'private, max-age=300', vary: 'Cookie' };
 }
