@@ -11,14 +11,19 @@ import { useT } from '@/i18n/useT';
 import {
   conversationIdFor,
   forgetConversation,
+  applyPreview,
   getConversation,
   postTurn,
   sendFeedback,
+  undoApplied,
+  type AssistantMode,
   type AssistantSegment,
   type AssistantStatus,
+  type PreviewCardData,
 } from '@/lib/assistant';
 import { Button } from '@/components/ui/Button';
 import { Segments } from './Citation';
+import { PreviewCard } from './PreviewCard';
 
 const MAX = 2000;
 type Item =
@@ -29,16 +34,20 @@ type Item =
       segments: AssistantSegment[];
       turnId?: string;
       status?: AssistantStatus;
+      previews?: PreviewCardData[];
     };
 
 export function AssistantPanel({
   storeId,
   userId,
+  mode = 'answer-only',
   onClose,
   onUnavailable,
 }: {
   storeId: string;
   userId: string;
+  /** What the store's assistant may do now (the server decides; the card only mirrors it). */
+  mode?: AssistantMode;
   onClose: () => void;
   onUnavailable: () => void;
 }) {
@@ -132,6 +141,7 @@ export function AssistantPanel({
           segments: r.data!.segments,
           turnId: r.data!.turnId,
           status: r.data!.status,
+          previews: r.data!.previews,
         },
       ]);
     },
@@ -200,7 +210,9 @@ export function AssistantPanel({
         {!off && items.length === 0 && (
           <div className="m-auto grid gap-2 text-center">
             <p className="text-base font-medium">{t('emptyTitle')}</p>
-            <p className="text-sm text-muted-foreground">{t('intro')}</p>
+            <p className="text-sm text-muted-foreground">
+              {t(mode === 'answer-only' ? 'intro' : 'introDo')}
+            </p>
             <ul className="mt-2 grid list-none justify-items-center gap-2 p-0">
               {(['s1', 's2', 's3'] as const).map(k => (
                 <li key={k}>
@@ -237,6 +249,15 @@ export function AssistantPanel({
               <p className="whitespace-pre-wrap break-words leading-relaxed">
                 <Segments segments={m.segments} storeId={storeId} onNavigate={() => undefined} />
               </p>
+              {m.previews?.map(c => (
+                <PreviewCard
+                  key={c.previewId}
+                  card={c}
+                  mode={mode}
+                  onApply={id => applyPreview(storeId, id, locale)}
+                  onUndo={id => undoApplied(storeId, id, locale)}
+                />
+              ))}
               {m.turnId && m.status === 'answered' && (
                 <div
                   role="group"

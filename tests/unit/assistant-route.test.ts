@@ -327,11 +327,13 @@ describe('assistant route: status (does the panel appear)', () => {
     configureAssistant({ controls: mode('off') } as never);
     expect((await request(app).get(`/stores/${A}/assistant/status`)).body.data).toEqual({
       enabled: false,
+      mode: 'off',
     });
     configureAssistant({ controls: mode('answer-only') } as never);
     h.user = { userId: 'u-staff', role: 'staff', storeId: A };
     expect((await request(app).get(`/stores/${A}/assistant/status`)).body.data).toEqual({
       enabled: true,
+      mode: 'answer-only',
     });
     configureAssistant({
       controls: {
@@ -341,6 +343,7 @@ describe('assistant route: status (does the panel appear)', () => {
     } as never);
     expect((await request(app).get(`/stores/${A}/assistant/status`)).body.data).toEqual({
       enabled: false,
+      mode: 'off',
     });
     expect((await request(app).get(`/stores/${B}/assistant/status`)).status).toBe(403);
   });

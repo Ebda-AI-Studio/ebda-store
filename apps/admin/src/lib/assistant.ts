@@ -13,12 +13,41 @@ export type AssistantStatus =
   | 'handoff'
   | 'off'
   | 'limited';
+export type AssistantMode = 'answer-only' | 'suggest' | 'act';
+export interface PreviewRowData {
+  label: { ar: string; en: string };
+  before?: unknown;
+  after?: unknown;
+  source?: 'merchant' | 'untrusted';
+}
+/** A change the assistant proposes. It carries an approval ID at most; the one-time token travels separately (never inside a card). */
+export interface PreviewCardData {
+  previewId: string;
+  summary: { ar: string; en: string };
+  rows: PreviewRowData[];
+  policy: 'preview' | 'confirm';
+  reasons: string[];
+  undo: 'none' | 'reversible' | 'compensating' | 'irreversible';
+  costCredits?: number;
+  approvalId?: string;
+}
+export interface ApprovalGrant {
+  approvalId: string;
+  token: string;
+}
 interface AssistantTurn {
   status: AssistantStatus;
   segments: AssistantSegment[];
-  previews: unknown[];
+  previews: PreviewCardData[];
+  approvals?: ApprovalGrant[];
   turnId: string;
 }
+export type ApplyData =
+  | { status: 'applied'; appliedId: string; undoUntil: number }
+  | { status: 'stale'; card: PreviewCardData; approvals?: ApprovalGrant[] };
+export type UndoData =
+  | { status: 'undone' }
+  | { status: 'stale' | 'needs_confirm'; card: PreviewCardData; approvals?: ApprovalGrant[] };
 interface StoredTurn {
   id: string;
   role: 'merchant' | 'assistant';
@@ -29,7 +58,13 @@ interface StoredTurn {
 const base = (storeId: string) => `/api/v1/stores/${encodeURIComponent(storeId)}/assistant`;
 
 export const getAssistantStatus = (storeId: string) =>
-  apiGet<{ enabled: boolean }>(`${base(storeId)}/status`);
+  apiGet<{ enabled: boolean; mode?: AssistantMode }>(`${base(storeId)}/status`);
+export const applyPreview = (storeId: string, previewId: string, locale: 'ar' | 'en') =>
+  apiPost<ApplyData>(`${base(storeId)}/previews/${encodeURIComponent(previewId)}/apply`, {
+    locale,
+  });
+export const undoApplied = (storeId: string, appliedId: string, locale: 'ar' | 'en') =>
+  apiPost<UndoData>(`${base(storeId)}/applied/${encodeURIComponent(appliedId)}/undo`, { locale });
 export const postTurn = (
   storeId: string,
   body: { conversationId: string; text: string; locale: 'ar' | 'en' }

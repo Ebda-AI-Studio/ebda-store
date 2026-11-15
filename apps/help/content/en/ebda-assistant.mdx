@@ -1,6 +1,6 @@
 ---
 title: 'Ebda Store assistant: ask how to do anything'
-description: Ask the assistant how to do something in your store and it shows you the screen. At this stage it only answers and explains; it changes nothing.
+description: Ask the assistant how to do something in your store and it shows you the screen. It can also prepare a change as a preview that you apply and undo yourself.
 section: AI
 order: 20
 appPath: /stores
@@ -9,7 +9,7 @@ capabilities:
   - ai.merchant-assistant@1
 ---
 
-The Ebda Store assistant answers your questions about your store in plain language and shows you the screen you need. At this stage it only answers and explains; it does not change anything in your store.
+The Ebda Store assistant answers your questions about your store in plain language and shows you the screen you need. Until it is switched to suggestion or action mode for your store it only answers and explains; it does not change anything.
 
 ## How to open it
 1. Press the **Assistant** button in the side rail, or press `Ctrl` + `J` (`⌘` + `J` on a Mac).
@@ -23,8 +23,15 @@ The Ebda Store assistant answers your questions about your store in plain langua
 
 ## What it never does
 - It never asks for a password, a verification code, a key or card details, and it does not accept them if you type them. You enter those on the secure screen only, and it shows you where.
-- It never says it did something it did not do. At this stage every change is made by you.
+- It never says it did something it did not do. A change only happens after you press the button on its preview.
 - It cannot see other stores. It works on your store only.
+
+## When it prepares a change
+- Ask in your own words, for example "make the announcement bar say free shipping this week". The assistant prepares a **preview** with the old and the new value side by side. Nothing changes yet.
+- In suggestion mode you see the preview only. In action mode you press **Apply change** and it is done with exactly your permissions: a team member can only do what that role may do.
+- After it is applied you can press **Undo** for 24 hours. If you edited the same thing by hand in between, the assistant shows you the new situation instead of overwriting your edit.
+- Prices, money, deleting, messages to customers, more than 20 items at once and anything customers see at checkout always wait for your explicit confirmation.
+- It never overwrites text you wrote yourself unless you asked it to in that conversation.
 
 ## Privacy and limits
 - Phone numbers, e-mails and card numbers are masked before any text is stored or sent to the model.

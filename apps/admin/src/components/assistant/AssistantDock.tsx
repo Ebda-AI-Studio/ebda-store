@@ -5,7 +5,7 @@ import { CircleHelp } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useT } from '@/i18n/useT';
-import { getAssistantStatus } from '@/lib/assistant';
+import { getAssistantStatus, type AssistantMode } from '@/lib/assistant';
 import { Button } from '@/components/ui/Button';
 import { AssistantPanel } from './AssistantPanel';
 
@@ -15,6 +15,7 @@ export function AssistantDock({ storeId }: { storeId: string }) {
   const userId = user?.id ?? 'anonymous';
   const [enabled, setEnabled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<AssistantMode>('answer-only');
 
   useEffect(() => {
     let alive = true;
@@ -22,7 +23,9 @@ export function AssistantDock({ storeId }: { storeId: string }) {
     setOpen(false);
     if (!storeId) return;
     void getAssistantStatus(storeId).then(r => {
-      if (alive) setEnabled(r.data?.enabled === true);
+      if (!alive) return;
+      setEnabled(r.data?.enabled === true);
+      setMode(r.data?.mode === 'suggest' || r.data?.mode === 'act' ? r.data.mode : 'answer-only');
     });
     return () => {
       alive = false;
@@ -66,6 +69,7 @@ export function AssistantDock({ storeId }: { storeId: string }) {
         <AssistantPanel
           storeId={storeId}
           userId={userId}
+          mode={mode}
           onClose={close}
           onUnavailable={() => {
             setEnabled(false);

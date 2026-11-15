@@ -11692,6 +11692,28 @@
     "rateGroup": "Rate the answer",
     "thumbUp": "This answer helped",
     "thumbDown": "This answer did not help",
-    "thanks": "Thank you, we got your feedback."
+    "thanks": "Thank you, we got your feedback.",
+    "card": {
+      "label": "Proposed change",
+      "before": "Before",
+      "after": "After",
+      "apply": "Apply change",
+      "applying": "Applying…",
+      "undo": "Undo ({hours}h left)",
+      "applied": "Done. You can undo it for 24 hours.",
+      "appliedNoUndo": "Done. The undo window has ended.",
+      "undone": "I put it back the way it was.",
+      "stale": "The data changed, this is the new version. Review it before you apply.",
+      "untrusted": "This text came from a customer or from a source outside your store.",
+      "suggestionMode": "The assistant is in suggestion mode: it prepares the preview but does not apply. Applying opens later.",
+      "needsConfirm": "This change needs your explicit confirmation before it is applied.",
+      "failed": {
+        "forbidden": "Your role does not allow this change. Ask the store owner.",
+        "expired": "This preview expired. Ask the assistant to prepare it again.",
+        "killed": "The assistant is paused right now. Nothing was changed.",
+        "error": "I could not apply it. Nothing was changed, try again."
+      }
+    },
+    "introDo": "I tell you how to do something, show you the screen and prepare the change as a preview. You review and apply it, and you can undo it."
   }
 }

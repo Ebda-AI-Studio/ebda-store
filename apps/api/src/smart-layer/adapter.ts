@@ -11,6 +11,7 @@ import {
   type RefCheck,
   type RegistryView,
   type SmartLayerAdapter,
+  type ToolSpec,
   type TurnCtx,
 } from '@ebda/shared/smart-layer';
 import { cfBindings } from '../cf/bindings';
@@ -56,6 +57,8 @@ export type StoreAdapterDeps = {
   registry?: RegistryView;
   ai?: AiBinding;
   tools?: Partial<Pick<ToolDeps, 'read' | 'plans' | 'setupGuide'>>;
+  /** Test seam: replaces the write tools (production never sets it). */
+  changeTools?: ToolSpec[];
   quota?: Parameters<typeof storeQuota>[1];
   controls?: Parameters<typeof storeControls>[1];
   checkRef?: (storeId: string, r: RefCheck) => Promise<boolean>;
@@ -90,7 +93,7 @@ export function storeAdapter(d: StoreAdapterDeps): SmartLayerAdapter {
       assistantCapability: ASSISTANT_CAPABILITY,
       ...(d.tools ?? {}),
     }),
-    ...changeTools(),
+    ...(d.changeTools ?? changeTools()),
   ];
   return {
     product: 'store',

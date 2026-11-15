@@ -10,10 +10,16 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import {
   BUDGET,
+  applyPreview,
   buildSystemPrompt,
   checkAdapterContract,
   computeReleaseId,
+  issueApproval,
   runTurn,
+  undoApplied,
+  type ApprovalToken,
+  type PreviewCard,
+  type SmartLayerAdapter,
   type TurnCtx,
 } from '@ebda/shared/smart-layer';
 import { authenticate, authorize } from '../middleware/auth';
@@ -74,6 +80,75 @@ async function assertOn(storeId: string): Promise<void> {
 let contractChecked = false;
 let release: Promise<string> | undefined;
 
+/** Builds the adapter + the turn context for ONE request: the membership-checked store, the caller's own id and store role, the release id. */
+async function engineFor(
+  req: Request,
+  locale: 'ar' | 'en',
+  conversationId: string
+): Promise<{ adapter: SmartLayerAdapter; ctx: TurnCtx }> {
+  const storeId = req.params.storeId!;
+  const user = getAuthUser(req);
+  // The journal lives on the store's own Durable Object: a store not on its DO has no assistant (503, never a fallback).
+  await storeSmartLayer(storeId);
+  const adapter = storeAdapter({ storeId, ...override });
+  if (!contractChecked) {
+    const problems = checkAdapterContract(adapter);
+    if (problems.length) throw new Error(`assistant adapter contract: ${problems.join('; ')}`);
+    contractChecked = true;
+  }
+  release ??= computeReleaseId({
+    systemPrompt: buildSystemPrompt('ar'),
+    tools: adapter.tools(),
+    models: adapter.models,
+    budget: BUDGET,
+  });
+  return {
+    adapter,
+    ctx: {
+      product: 'store',
+      storeId,
+      userId: user.userId,
+      role: user.role,
+      locale,
+      now: Date.now(),
+      conversationId,
+      releaseId: await release,
+    },
+  };
+}
+/** The approval ids and one-time tokens of confirm cards, handed to the browser OUT OF BAND: never inside a card, a turn row, an audit row or a model request. */
+const approvalsOut = (t: ApprovalToken[]) =>
+  t.map(({ approvalId, token }) => ({ approvalId, token }));
+/** A re-preview card that now needs the merchant's explicit confirmation gets its approval here (the engine issues it for turns, not for a stale re-preview). */
+async function approvalForCard(
+  adapter: SmartLayerAdapter,
+  ctx: TurnCtx,
+  card: PreviewCard,
+  tokens: ApprovalToken[]
+): Promise<PreviewCard> {
+  if (card.policy !== 'confirm' || card.approvalId) return card;
+  const rec = await adapter.storage.getPreview(ctx.storeId, card.previewId);
+  if (!rec) return card;
+  const issued = await issueApproval(adapter, ctx, rec);
+  tokens.push({ approvalId: issued.approvalId, previewId: rec.id, token: issued.token });
+  return { ...card, approvalId: issued.approvalId };
+}
+const ACTION_HTTP: Record<string, [number, string]> = {
+  mode: [409, 'ASSISTANT_MODE'],
+  killed: [409, 'ASSISTANT_OFF'],
+  forbidden: [403, 'FORBIDDEN'],
+  failed: [502, 'APPLY_FAILED'],
+  not_found: [404, 'NOT_FOUND'],
+  expired: [410, 'EXPIRED'],
+  needs_confirm: [409, 'NEEDS_CONFIRM'],
+  irreversible: [409, 'IRREVERSIBLE'],
+};
+const actionError = (status: string): AppError => {
+  const [code, name] = ACTION_HTTP[status] ?? [500, 'ACTION_FAILED'];
+  return new AppError(code, name, `The assistant action ended: ${status}`);
+};
+const actionBody = z.object({ locale: z.enum(['ar', 'en']).default('ar') }).strict();
+
 export const assistantRoutes = Router({ mergeParams: true });
 // Merchant roles only (a shopper's token never reaches this surface), then membership of THIS store.
 assistantRoutes.use(
@@ -88,7 +163,7 @@ assistantRoutes.get('/status', async (req: Request, res: Response, next: NextFun
   try {
     const c = await storeControls(req.params.storeId!, override.controls);
     res.setHeader('Cache-Control', 'private, no-store');
-    res.json({ success: true, data: { enabled: c.mode !== 'off' } });
+    res.json({ success: true, data: { enabled: c.mode !== 'off', mode: c.mode } });
   } catch (err) {
     next(err);
   }
@@ -100,37 +175,28 @@ assistantRoutes.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = turnBody.parse(req.body);
-      const storeId = req.params.storeId!;
-      const user = getAuthUser(req);
-      // The journal lives on the store's own Durable Object: a store not on its DO has no assistant (503, never a fallback).
-      await storeSmartLayer(storeId);
-      const adapter = storeAdapter({ storeId, ...override });
-      if (!contractChecked) {
-        const problems = checkAdapterContract(adapter);
-        if (problems.length) throw new Error(`assistant adapter contract: ${problems.join('; ')}`);
-        contractChecked = true;
-      }
-      release ??= computeReleaseId({
-        systemPrompt: buildSystemPrompt('ar'),
-        tools: adapter.tools(),
-        models: adapter.models,
-        budget: BUDGET,
-      });
-      const ctx: TurnCtx = {
-        product: 'store',
-        storeId,
-        userId: user.userId,
-        role: user.role,
-        locale: body.locale,
-        now: Date.now(),
-        conversationId: ownConversation(user.userId, body.conversationId),
-        releaseId: await release,
-      };
-      const r = await runTurn(adapter, ctx, { text: body.text });
+      const { adapter, ctx } = await engineFor(
+        req,
+        body.locale,
+        ownConversation(getAuthUser(req).userId, body.conversationId)
+      );
+      const approvals: ApprovalToken[] = [];
+      const r = await runTurn(
+        adapter,
+        ctx,
+        { text: body.text },
+        { onApprovalToken: t => approvals.push(t) }
+      );
       res.setHeader('Cache-Control', 'private, no-store');
       res.json({
         success: true,
-        data: { status: r.status, segments: r.segments, previews: r.previews, turnId: r.turnId },
+        data: {
+          status: r.status,
+          segments: r.segments,
+          previews: r.previews,
+          turnId: r.turnId,
+          approvals: approvalsOut(approvals),
+        },
       });
     } catch (err) {
       next(err);
@@ -215,6 +281,82 @@ assistantRoutes.post(
           },
         ]);
       res.json({ success: true, data: { ok: true } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Apply a preview card: the engine re-reads the controls, re-previews and checks the etag, then applies (a changed etag returns the NEW card instead).
+// Confirm-class cards never apply here: they need the approval route (C2).
+assistantRoutes.post(
+  '/previews/:previewId/apply',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const previewId = z.string().uuid().parse(req.params.previewId);
+      const { locale } = actionBody.parse(req.body ?? {});
+      const storeId = req.params.storeId!;
+      await assertOn(storeId);
+      const { adapter, ctx } = await engineFor(
+        req,
+        locale,
+        ownConversation(getAuthUser(req).userId, 'action')
+      );
+      const out = await applyPreview(adapter, ctx, previewId);
+      res.setHeader('Cache-Control', 'private, no-store');
+      if (out.status === 'applied')
+        return void res.json({
+          success: true,
+          data: { status: 'applied', appliedId: out.appliedId, undoUntil: out.undoUntil },
+        });
+      if (out.status === 'stale') {
+        const tokens: ApprovalToken[] = [];
+        const card = await approvalForCard(adapter, ctx, out.card, tokens);
+        return void res.json({
+          success: true,
+          data: { status: 'stale', card, approvals: approvalsOut(tokens) },
+        });
+      }
+      throw actionError(out.status);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Undo what the assistant applied (24 h). Changed since (the merchant edited it by hand) -> the card of what undo WOULD do, nothing written.
+assistantRoutes.post(
+  '/applied/:appliedId/undo',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const appliedId = z.string().uuid().parse(req.params.appliedId);
+      const { locale } = actionBody.parse(req.body ?? {});
+      const storeId = req.params.storeId!;
+      await assertOn(storeId);
+      const { adapter, ctx } = await engineFor(
+        req,
+        locale,
+        ownConversation(getAuthUser(req).userId, 'action')
+      );
+      const tokens: ApprovalToken[] = [];
+      const out = await undoApplied(adapter, ctx, appliedId, {
+        onApprovalToken: t => tokens.push(t),
+      });
+      res.setHeader('Cache-Control', 'private, no-store');
+      if (out.status === 'undone')
+        return void res.json({ success: true, data: { status: 'undone' } });
+      if (out.status === 'stale' || out.status === 'needs_confirm')
+        return void res.json({
+          success: true,
+          data: {
+            status: out.status,
+            card: await approvalForCard(adapter, ctx, out.card, tokens),
+            approvals: approvalsOut(tokens),
+          },
+        });
+      throw actionError(out.status);
     } catch (err) {
       next(err);
     }
