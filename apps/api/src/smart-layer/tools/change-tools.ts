@@ -1,0 +1,19 @@
+/** Every write tool of the Store assistant, in one list (plan 4 B6 / C2 / E1-E5). Each module exports a function returning its `ToolSpec`s. */
+import type { ToolSpec } from '@ebda/shared/smart-layer';
+import { productsTools } from './products.tools';
+import { inventoryTools } from './inventory.tools';
+import { marketingTools } from './marketing.tools';
+import { contentTools } from './content.tools';
+import { storeSettingsTools } from './store-settings.tools';
+import { seoTools } from './seo.tools';
+
+export function changeTools(): ToolSpec[] {
+  return [
+    ...productsTools(),
+    ...inventoryTools(),
+    ...marketingTools(),
+    ...contentTools(),
+    ...storeSettingsTools(),
+    ...seoTools(),
+  ];
+}

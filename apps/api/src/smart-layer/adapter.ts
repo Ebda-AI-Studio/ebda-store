@@ -28,6 +28,7 @@ import {
 import { storeQuota } from './quota';
 import { storeRegistry } from './registry';
 import { doStorage } from './storage-do';
+import { changeTools } from './tools/change-tools';
 import { readTools, type ToolDeps } from './tools/read.tools';
 
 // pq-allow(unused-export): imported by tests/unit/assistant-adapter.test.ts
@@ -82,12 +83,15 @@ export function storeAdapter(d: StoreAdapterDeps): SmartLayerAdapter {
   const storage = doStorage(async (op, args) => (await storeSmartLayer(d.storeId))(op, args));
   const searchHelp = (q: string, locale: TurnCtx['locale'], k: number) =>
     helpSearch(help, q, locale, k);
-  const tools = readTools({
-    helpSearch: searchHelp,
-    registry,
-    assistantCapability: ASSISTANT_CAPABILITY,
-    ...(d.tools ?? {}),
-  });
+  const tools = [
+    ...readTools({
+      helpSearch: searchHelp,
+      registry,
+      assistantCapability: ASSISTANT_CAPABILITY,
+      ...(d.tools ?? {}),
+    }),
+    ...changeTools(),
+  ];
   return {
     product: 'store',
     registry: () => registry,
