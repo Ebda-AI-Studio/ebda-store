@@ -32,6 +32,8 @@ vi.mock('@api/lib/repo-factory', () => ({
 }));
 vi.mock('@api/services/store.service', () => ({ StoreService: m.svc }));
 
+import { MerchantForbidden } from '@api/mcp/run-as-merchant';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 import { storeSettingsTools } from '@api/smart-layer/tools/store-settings.tools';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
@@ -54,9 +56,37 @@ const cases: Array<{
   svc: keyof typeof m.svc;
   restore: Record<string, unknown>;
   edited?: Record<string, unknown>;
+  feature?: boolean;
+  /** a stored row full of nulls / empty strings / odd legacy values: the undo must still pass the tool's own validation */
+  hostile: Record<string, unknown>;
+  all: Record<string, unknown>;
 }> = [
   {
     name: 'store_settings_update',
+    hostile: { phone: '', email: null, whatsapp: null, name: 'N', socialLinks: { instagram: '' } },
+    all: {
+      email: 'a@b.co',
+      phone: '010',
+      phoneAr: '010',
+      whatsapp: '01012345678',
+      address: 'a',
+      addressAr: 'a',
+      businessHours: 'h',
+      googleMapsUrl: 'https://maps.example/x',
+      name: 'n',
+      nameAr: 'n',
+      description: 'd',
+      descriptionAr: 'd',
+      facebook: 'https://f.com/x',
+      instagram: null,
+      twitter: null,
+      tiktok: null,
+      youtube: null,
+      snapchat: null,
+      linkedin: null,
+      wikidata: null,
+      wikipedia: null,
+    },
     row: { phone: '010', socialLinks: { instagram: 'https://i.com/a' }, name: 'Old' },
     args: { phone: '011', instagram: 'https://i.com/b', facebook: null },
     svc: 'updateBrandingBundle',
@@ -64,6 +94,22 @@ const cases: Array<{
   },
   {
     name: 'branding_update',
+    hostile: {
+      theme: {
+        primaryColor: 'token:primary',
+        secondaryColor: 'hsl(40 30% 50%)',
+        accentColor: '#abc',
+        backgroundColor: '',
+        textColor: null,
+      },
+    },
+    all: {
+      primaryColor: '#111111',
+      secondaryColor: '#222222',
+      accentColor: '#333333',
+      backgroundColor: '#444444',
+      textColor: '#555555',
+    },
     row: { theme: { primaryColor: '#111111' } },
     args: { primaryColor: '#B08D57', accentColor: null },
     svc: 'updateBrandingBundle',
@@ -71,6 +117,18 @@ const cases: Array<{
   },
   {
     name: 'announcement_set',
+    hostile: { announcementBar: { enabled: null, dismissible: null, text: '', bgColor: '' } },
+    all: {
+      enabled: true,
+      text: 't',
+      textAr: 't',
+      link: '/sale',
+      linkText: 'l',
+      linkTextAr: 'l',
+      dismissible: true,
+      bgColor: '#111111',
+      textColor: '#ffffff',
+    },
     row: { announcementBar: { text: 'old', enabled: false } },
     args: { text: 'خصم العيد', enabled: true },
     svc: 'updateAnnouncementBar',
@@ -78,6 +136,16 @@ const cases: Array<{
   },
   {
     name: 'hero_set',
+    hostile: { heroTitle: '', heroCtaLink: null },
+    all: {
+      heroTitle: 'a',
+      heroTitleAr: 'a',
+      heroSubtitle: 'a',
+      heroSubtitleAr: 'a',
+      heroCtaText: 'a',
+      heroCtaTextAr: 'a',
+      heroCtaLink: '/products',
+    },
     row: { heroTitle: 'A' },
     args: { heroTitle: 'B', heroCtaLink: '/products' },
     svc: 'update',
@@ -85,6 +153,22 @@ const cases: Array<{
   },
   {
     name: 'menu_update',
+    hostile: {
+      settings: {
+        navMenu: [{ label: 'A', href: '/a' }],
+        footerLinks: {
+          shop: [{ name: 'S', href: '/s', enabled: false }],
+          support: [],
+          company: [{ name: 'C', nameAr: 'ج', href: 'https://x.com' }],
+        },
+      },
+    },
+    all: {
+      navMenu: [{ label: 'A', href: '/a' }],
+      footerShop: [{ name: 'S', href: '/s', enabled: false }],
+      footerSupport: [],
+      footerCompany: [{ name: 'C', href: '/c' }],
+    },
     row: { settings: { navMenu: [{ label: 'Shop', href: '/products' }] } },
     args: { navMenu: [{ label: 'About', href: '/about' }] },
     svc: 'update',
@@ -92,6 +176,8 @@ const cases: Array<{
   },
   {
     name: 'look_update',
+    hostile: { look: null, template: null },
+    all: { lookId: 'qamar.atelier' },
     row: { look: 'qamar.atelier', template: 'qamar' },
     args: { lookId: 'qamar.atelier' },
     svc: 'applyLook',
@@ -99,6 +185,30 @@ const cases: Array<{
   },
   {
     name: 'whatsapp_buttons_set',
+    feature: true,
+    hostile: {
+      settings: {
+        floatingWidget: {
+          buttons: [
+            {
+              id: 'w',
+              kind: 'whatsapp',
+              whatsappPhone: '201012345678',
+              label: '',
+              whatsappMessage: '',
+            },
+          ],
+        },
+      },
+    },
+    all: {
+      enabled: true,
+      position: 'bl',
+      whatsappPhone: '01012345678',
+      whatsappMessage: 'hi',
+      label: 'l',
+      labelAr: 'l',
+    },
     row: { settings: { floatingWidget: { enabled: false, buttons: [] } } },
     args: { enabled: true, whatsappPhone: '01012345678' },
     svc: 'updateFloatingWidget',
@@ -107,6 +217,8 @@ const cases: Array<{
   },
   {
     name: 'store_language_set',
+    hostile: { settings: null },
+    all: { defaultLanguage: 'ar' },
     row: { settings: { defaultLanguage: 'en' } },
     args: { defaultLanguage: 'ar' },
     svc: 'update',
@@ -174,6 +286,53 @@ describe('store settings tools', () => {
         await expect(t.apply!(ctx('staff'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
         expect(m.svc[c.svc]).not.toHaveBeenCalled();
         expect(m.insertAuditLog).not.toHaveBeenCalled();
+      });
+
+      it('staff is refused at PREVIEW: the card is never built (mutation: delete the roles gate)', async () => {
+        m.row = c.row;
+        await expect(
+          tool(c.name).preview!(ctx('staff'), parse(c.name, c.args))
+        ).rejects.toBeInstanceOf(MerchantForbidden);
+      });
+
+      it('a platform super admin never acts through the assistant (preview and apply)', async () => {
+        m.row = c.row;
+        const t = tool(c.name);
+        const args = parse(c.name, c.args);
+        await expect(t.preview!(ctx('super_admin'), args)).rejects.toBeInstanceOf(
+          MerchantForbidden
+        );
+        const d = await t.preview!(ctx(), args);
+        await expect(t.apply!(ctx('super_admin'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
+        expect(m.svc[c.svc]).not.toHaveBeenCalled();
+      });
+
+      if (c.feature)
+        it('a plan without the feature is refused at preview and at apply (mutation: delete the feature gate)', async () => {
+          m.row = c.row;
+          const t = tool(c.name);
+          const args = parse(c.name, c.args);
+          const d = await t.preview!(ctx(), args);
+          m.featureEnabled.mockResolvedValue(false);
+          await expect(t.preview!(ctx(), args)).rejects.toBeInstanceOf(MerchantForbidden);
+          await expect(t.apply!(ctx(), args, d)).rejects.toBeInstanceOf(ToolForbidden);
+          expect(m.svc[c.svc]).not.toHaveBeenCalled();
+        });
+
+      it('a stored row full of nulls, empty strings and legacy values still previews (its undo passes the tool own validation)', async () => {
+        m.row = c.hostile;
+        const t = tool(c.name);
+        const args = parse(c.name, c.all);
+        const d = await t.preview!(ctx(), args);
+        const inv = t.inverse!(ctx(), args, d, { ok: true, etagAfter: 'x' });
+        if (inv) expect(t.args.safeParse(inv.args).success).toBe(true);
+      });
+
+      it('engine round trip: apply then undo ends undone', async () => {
+        m.row = c.row;
+        const r = await applyThenUndo(storeSettingsTools(), tool(c.name), c.args);
+        expect(r.applied).toBe('applied');
+        expect(['undone', 'needs_confirm']).toContain(r.undo);
       });
 
       it('the inverse restores the before values through the same tool', async () => {
