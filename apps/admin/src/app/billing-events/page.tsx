@@ -144,6 +144,28 @@ function LedgerPanel({
     setRefreshKey(k => k + 1);
   }
 
+  async function reverseInstapay(row: LedgerRow) {
+    const amount = formatMoney(row.amountMinor, locale, { fixedDecimals: true });
+    const ok = await askConfirm({
+      object: t('reverseObject', { amount }),
+      consequence: t('confirmReverse', { amount }),
+      confirmLabel: t('reverseAction'),
+    });
+    if (!ok) return;
+    setBusy(row.id);
+    setMessage(null);
+    const res = await apiPost(`/api/v1/admin/billing/events/${row.id}/reverse-instapay-addon`, {
+      reason: t('reverseReason'),
+    });
+    setBusy(null);
+    if (res.error) {
+      setMessage(t('refundFailed', { message: res.error.message || 'error' }));
+      return;
+    }
+    setMessage(t('reverseDone'));
+    setRefreshKey(k => k + 1);
+  }
+
   const columns: DataTableColumn<LedgerRow>[] = [
     {
       header: t('columns.date'),
@@ -292,6 +314,18 @@ function LedgerPanel({
             onClick={() => onRecordRefund({ eventId: r.id, storeName: r.storeName })}
           >
             {t('recordRefund')}
+          </Button>
+        ) : r.status === 'succeeded' && r.type === 'upgrade' && r.provider === 'instapay' ? (
+          // An InstaPay add-on payment never touched a gateway: reverse it here (ends the term, money returns by hand).
+          <Button
+            variant="outline"
+            size="sm"
+            className="max-md:min-h-11 max-md:px-4"
+            disabled={busy === r.id}
+            data-testid="reverse-instapay-addon"
+            onClick={() => reverseInstapay(r)}
+          >
+            {t('reverseAction')}
           </Button>
         ) : r.status === 'succeeded' && r.type !== 'refund' && r.providerRef ? (
           <Button

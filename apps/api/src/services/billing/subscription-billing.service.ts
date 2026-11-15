@@ -2168,6 +2168,74 @@ export async function refundCharge(args: {
   }
 }
 
+/**
+ * Reverse an approved InstaPay ADD-ON purchase (money-abuse audit P5): the receipt was a mistake or a fake. Super admin
+ * only (route). The money goes back OUTSIDE the gateway (InstaPay is push-only), so this records it and ends the
+ * entitlement: a `refund` ledger row (provider `instapay`, key `addon-reverse:<id>`, once) settles through the same
+ * transition a gateway refund uses, which flips the payment to `refunded` (the term ends AT ONCE: entitlement reads only
+ * succeeded rows), revokes grants and emits `addon_granted` (drops the feature cache and the public store payload).
+ * A replay returns the first reversal; nothing is ever reversed twice.
+ */
+export async function reverseInstapayAddonPayment(args: {
+  eventId: string;
+  reason: string;
+  actorId: string;
+}): Promise<{ refundEventId: string; duplicate: boolean }> {
+  const storeId = await getEntityStoreId('billing_event', args.eventId);
+  const charge = storeId
+    ? await withStore(storeId, tx =>
+        tx.billingEvent.findUnique({ where: { id: args.eventId, storeId } })
+      )
+    : null;
+  if (!charge || !storeId) throw new AppError(404, 'NOT_FOUND', 'No such charge');
+  if (charge.type !== 'upgrade' || !isAddonRow(charge) || charge.provider !== 'instapay')
+    throw new AppError(
+      409,
+      'NOT_AN_INSTAPAY_ADDON',
+      'Only an InstaPay add-on payment can be reversed here'
+    );
+  const key = `addon-reverse:${charge.id}`;
+  const existing = await withStore(storeId, tx =>
+    tx.billingEvent.findFirst({ where: { storeId, idempotencyKey: key }, select: { id: true } })
+  );
+  if (existing) return { refundEventId: existing.id, duplicate: true };
+  if (charge.status !== 'succeeded')
+    throw new AppError(409, 'NOT_REVERSIBLE', 'Only a succeeded payment can be reversed');
+  const refundId = await claimEvent({
+    storeId,
+    subscriptionId: charge.subscriptionId,
+    type: 'refund',
+    planCode: charge.planCode,
+    amountMinor: charge.amountMinor,
+    provider: 'instapay',
+    idempotencyKey: key,
+    relatedEventId: charge.id,
+  });
+  if (!refundId) {
+    const raced = await withStore(storeId, tx =>
+      tx.billingEvent.findFirst({ where: { storeId, idempotencyKey: key }, select: { id: true } })
+    );
+    return { refundEventId: raced?.id ?? '', duplicate: true };
+  }
+  const effects: BillingEffect[] = [];
+  await withStore(storeId, async tx => {
+    await tx.billingEvent.updateMany({
+      where: { id: refundId, storeId, status: 'pending' },
+      data: {
+        raw: {
+          outsideGateway: true,
+          reason: args.reason.slice(0, 500),
+          actorId: args.actorId,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await settleRefundInTx(tx, storeId, refundId, true, undefined, effects);
+  });
+  await runBillingEffects(effects);
+  await restoreRevokedGrants().catch(() => undefined);
+  return { refundEventId: refundId, duplicate: false };
+}
+
 // ───────────────────────────── read models (UI) ───────────────────────────
 
 const PUBLIC_FIELDS = {

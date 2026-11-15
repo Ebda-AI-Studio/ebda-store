@@ -15,11 +15,14 @@
     "POST /stores/:storeId/billing/addons/:sku/cancel",
     "POST /stores/:storeId/billing/addons/:sku/resume",
     "GET /stores/:storeId/billing/addons/:sku/instapay",
-    "POST /stores/:storeId/billing/addons/:sku/instapay/receipts/:receiptId/submit"
+    "POST /stores/:storeId/billing/addons/:sku/instapay/receipts/:receiptId/submit",
+    "POST /admin/billing/claims/:id/approve-addon",
+    "POST /admin/billing/events/:id/reverse-instapay-addon",
+    "GET /stores/:storeId/my-features"
   ],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
     "class": "irreversible",
@@ -53,7 +56,9 @@
     "Receipts and payment history (paid, waiting, failed, refunded) are listed on the page; no provider fields",
     "InstaPay: the merchant transfers the quoted total and uploads the receipt; that opens an entry in the existing super-admin claims queue and the add-on stays OFF until a super admin approves it (approve-addon); reject or silence leaves nothing active; a pending InstaPay claim blocks a second purchase of the same add-on",
     "Refunds stay a super-admin action; there is no merchant self-refund",
-    "The AI packs show a credits meter: requests left today, what used them (from the AI usage ledger) and each running pack with its end date"
+    "The AI packs show a credits meter: requests left today, what used them (from the AI usage ledger) and each running pack with its end date",
+    "A super admin can reverse an approved InstaPay add-on purchase from the billing ledger: the term ends at once, a refund row is recorded (money returned outside the gateway) and every entitlement cache layer is dropped; audit logged",
+    "AI top-ups never consume the shared pool beyond a store's share: a store may use at most half of the platform AI day, pack-funded requests pause at 70% of the day, and a top-up the platform cannot back is not sold"
   ],
   "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"],
   "assistantNote": "assistant says plan/override cause and links billing; cannot enable"

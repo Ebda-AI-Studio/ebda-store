@@ -9802,7 +9802,12 @@
       }
     },
     "refundObject": "Refund {amount}",
-    "refundAction": "Refund the payment"
+    "refundAction": "Refund the payment",
+    "reverseAction": "Reverse InstaPay purchase",
+    "reverseObject": "the InstaPay add-on payment of {amount}",
+    "confirmReverse": "The add-on turns off for the store right now and the payment is marked refunded. Send the {amount} back to the merchant yourself: nothing is returned automatically.",
+    "reverseReason": "Reversed from the ledger by a super admin",
+    "reverseDone": "Purchase reversed. The add-on is off. Return the money outside the gateway."
   },
   "codReconciliation": {
     "title": "COD reconciliation",

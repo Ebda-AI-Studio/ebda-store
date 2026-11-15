@@ -37,6 +37,7 @@ import {
   listLedger,
   listSubscriptionsForAdmin,
   refundCharge,
+  reverseInstapayAddonPayment,
 } from '../services/billing/subscription-billing.service';
 import {
   listClaimsForAdmin,
@@ -901,6 +902,37 @@ router.post(
         resourceType: 'billing_event',
         resourceId: req.params.id,
         details: { amountMinor: amountMinor ?? null, status: out.status },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: out });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Reverse an approved InstaPay add-on purchase: ends the term at once, money returned outside the gateway. */
+router.post(
+  '/billing/events/:id/reverse-instapay-addon',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { reason } = z
+        .object({ reason: z.string().trim().min(3).max(500) })
+        .strict()
+        .parse(req.body ?? {});
+      const out = await reverseInstapayAddonPayment({
+        eventId: req.params.id,
+        reason,
+        actorId: req.user!.userId,
+      });
+      await auditLog({
+        action: 'billing.addon_instapay_reversed',
+        userId: req.user!.userId,
+        resourceType: 'billing_event',
+        resourceId: req.params.id,
+        details: { reason, refundEventId: out.refundEventId, duplicate: out.duplicate },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });

@@ -468,6 +468,7 @@
   "POST /admin/billing/claims/:id/reject",
   "POST /admin/billing/events/:id/manual-refund",
   "POST /admin/billing/events/:id/refund",
+  "POST /admin/billing/events/:id/reverse-instapay-addon",
   "POST /admin/email-queue/corrupt/discard",
   "POST /admin/email-queue/failed/retry",
   "POST /admin/images/backfill-variants",
