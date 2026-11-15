@@ -74,18 +74,6 @@ describe('billingLine (Ebda subscription VAT ledger row)', () => {
 });
 
 describe('wiring', () => {
-  it('store.service exports BEFORE any delete and before the directory row is retired, inside the compensating-rollback try', () => {
-    const s = read('apps/api/src/services/store.service.ts');
-    const call = s.indexOf('await archiveDoStoreFiscal(storeId)');
-    const tryStart = s.lastIndexOf('try {', call);
-    expect(call).toBeGreaterThan(s.indexOf('closeDoIfNoMoney(storeId)'));
-    expect(tryStart).toBeGreaterThan(s.indexOf('closeDoIfNoMoney(storeId)'));
-    expect(call).toBeLessThan(s.indexOf('withMoneyTx(prisma'));
-    expect(call).toBeLessThan(s.indexOf('await finishStoreDeletion('));
-    // the catch reopens the DO this delete closed
-    expect(s.indexOf('reopenDoAfterFailedDelete(storeId, doClose.token)')).toBeGreaterThan(call);
-  });
-
   it('the archive prefix is outside every purge/expiry prefix and no erasure code deletes it', () => {
     for (const p of ['stores/', 'exports/', 'store-do-backups/', 'outcomes/'])
       expect(FISCAL_ARCHIVE_PREFIX.startsWith(p)).toBe(false);

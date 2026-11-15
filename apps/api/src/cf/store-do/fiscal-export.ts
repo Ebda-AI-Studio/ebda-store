@@ -3,8 +3,9 @@
  * (closing blocks writes, never reads). Keyset pages by primary key so a store with many documents never loads in one call.
  *
  * PII (Ruling FISCAL-ARCHIVE-1): fiscal_documents.payload goes out AS STORED (it legally contains what the document needs: nothing
- * for a plain receipt, buyer name + address for a tax invoice). eta_receipts goes out WITHOUT `document` (the submitted buyer block)
- * and WITHOUT `error_message` (can echo it): only the submission state and ids. Those two columns stay in the closed DO.
+ * for a plain receipt, buyer name + address for a tax invoice). eta_receipts goes out WITH `document` (the exact signed payload that was
+ * submitted to the authority: same legal basis and retention as the tax invoice, so it adds no new class of personal data) and WITHOUT
+ * `error_message` (ETA text that can echo buyer fields) and `line_map` (internal mapping). Those two stay in the closed DO.
  */
 export type FiscalSection = 'documents' | 'eta' | 'counters';
 
@@ -52,6 +53,7 @@ const ETA_COLUMNS = [
   'receipt_number',
   'uuid',
   'previous_uuid',
+  'document',
   'total_piastres',
   'issued_at',
   'deadline_at',

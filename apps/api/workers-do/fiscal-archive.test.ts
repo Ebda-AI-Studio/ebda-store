@@ -101,10 +101,10 @@ describe('fiscal archive of a deleted DO store', () => {
       documentCount: 3,
       storeExists: false,
     });
-    // PII: the receipts name no buyer; ETA rows carry no document body / error text
+    // PII: the receipts name no buyer; ETA rows keep the signed document but never the ETA error text
     expect(JSON.stringify(a.documents.map(d => d.payload))).not.toMatch(/Mona|01000000001/);
     for (const x of a.eta) {
-      expect(x).not.toHaveProperty('document');
+      expect(x).toHaveProperty('document');
       expect(x).not.toHaveProperty('error_message');
     }
   });

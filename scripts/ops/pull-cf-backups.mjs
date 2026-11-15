@@ -7,6 +7,9 @@
 //   ROOT/objects/<encSha256>                      every encrypted artifact once (content-addressed; reused artifacts cost nothing)
 //   ROOT/days/<YYYY-MM-DD>/<name>.<ext>.gz.age    hard links into objects/ + manifest.json; the newest KEEP (30) days are kept
 //   ROOT/media/<backupKey> + media/manifest.json  append-only mirror of media/ (never pruned: an image deleted in production stays)
+//   ROOT/fiscal-archive/v1/{manifests,data}/      SECOND COPY of the fiscal archive of deleted stores (R2 ebda-private, Ruling
+//                                                 FISCAL-ARCHIVE-1): each data object sha256-checked against its manifest; NEVER
+//                                                 pruned by the 30-day rotation (legal retention is 7 years); a mismatch is a P1 alert
 //
 // Every file is sha256-checked against the backup manifest before it is linked; the newest backup must be <= 2 days old.
 // Nothing is decrypted here: the age private key stays in the Keychain, and decryptability is what the restore drill proves.
@@ -34,6 +37,8 @@ import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_ACCOUNT_ID = '69188202efc4df480140dd76545aa3ab';
 export const BUCKET = 'ebda-db-backups';
+export const PRIVATE_BUCKET = 'ebda-private';
+export const FISCAL_PREFIX = 'fiscal-archive/v1/';
 export const MAX_AGE_DAYS = 2;
 const sha256 = b => createHash('sha256').update(b).digest('hex');
 const DAY_MS = 86_400_000;
@@ -46,8 +51,11 @@ export async function pullBackups({ get, root, keep = 30, now = new Date(), log 
   };
   const latest = await json('cf/latest.json');
   if (!latest?.day) throw new Error('cf/latest.json missing: no backup has completed');
-  const age = Math.floor((Date.parse(now.toISOString().slice(0, 10)) - Date.parse(latest.day)) / DAY_MS);
-  if (age > MAX_AGE_DAYS) throw new Error(`newest backup is ${latest.day}, ${age} days old (limit ${MAX_AGE_DAYS})`);
+  const age = Math.floor(
+    (Date.parse(now.toISOString().slice(0, 10)) - Date.parse(latest.day)) / DAY_MS
+  );
+  if (age > MAX_AGE_DAYS)
+    throw new Error(`newest backup is ${latest.day}, ${age} days old (limit ${MAX_AGE_DAYS})`);
   const manifest = await json(`cf/daily/${latest.day}/manifest.json`);
   if (!manifest) throw new Error(`manifest for ${latest.day} missing`);
 
@@ -71,7 +79,8 @@ export async function pullBackups({ get, root, keep = 30, now = new Date(), log 
   for (const name of names) {
     const e = manifest.artifacts[name];
     const obj = path.join(objects, e.encSha256);
-    if (!verifiedLocal(obj, e.encSha256)) writeFileSync(obj, await fetchVerified(e.key, e.encSha256), { mode: 0o600 });
+    if (!verifiedLocal(obj, e.encSha256))
+      writeFileSync(obj, await fetchVerified(e.key, e.encSha256), { mode: 0o600 });
     const link = path.join(dayDir, `${name}.${e.ext}.gz.age`);
     rmSync(link, { force: true });
     linkSync(obj, link);
@@ -87,7 +96,8 @@ export async function pullBackups({ get, root, keep = 30, now = new Date(), log 
   if (media) {
     for (const e of Object.values(media.objects)) {
       const file = path.join(root, e.backupKey);
-      if (!path.resolve(file).startsWith(path.resolve(root) + path.sep)) throw new Error(`unsafe media key ${e.backupKey}`);
+      if (!path.resolve(file).startsWith(path.resolve(root) + path.sep))
+        throw new Error(`unsafe media key ${e.backupKey}`);
       if (!verifiedLocal(file, e.encSha256)) {
         mkdirSync(path.dirname(file), { recursive: true });
         writeFileSync(file, await fetchVerified(e.backupKey, e.encSha256), { mode: 0o600 });
@@ -99,21 +109,38 @@ export async function pullBackups({ get, root, keep = 30, now = new Date(), log 
   } else log('media: no media/manifest.json yet (the first nightly with ICEBERG-BK-2 has not run)');
 
   // retention: newest `keep` day folders; an object no day folder links to any more is removed
-  const days = readdirSync(path.join(root, 'days')).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const days = readdirSync(path.join(root, 'days'))
+    .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort();
   const pruned = days.slice(0, Math.max(0, days.length - keep));
   for (const d of pruned) rmSync(path.join(root, 'days', d), { recursive: true, force: true });
   let orphans = 0;
   for (const f of readdirSync(objects))
     if (statSync(path.join(objects, f)).nlink <= 1) (rmSync(path.join(objects, f)), orphans++);
-  return { day: latest.day, artifacts: names.length, media: mediaCount, downloaded, downloadedBytes, pruned, orphans };
+  return {
+    day: latest.day,
+    artifacts: names.length,
+    media: mediaCount,
+    downloaded,
+    downloadedBytes,
+    pruned,
+    orphans,
+  };
 }
 
 /**
  * Cloudflare REST GET of one object, throttled to <= 2 requests/second (sleep after each request; the R2 API quota is 1200 per
  * 5 min, shared with the nightly job). A 429/5xx is retried at most 3 times after the server's Retry-After (capped at 300 s).
  */
-export function restGet({ accountId, token, fetchImpl = fetch, gapMs = 500, sleep = ms => new Promise(r => setTimeout(r, ms)) }) {
-  const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${BUCKET}/objects`;
+export function restGet({
+  accountId,
+  token,
+  bucket = BUCKET,
+  fetchImpl = fetch,
+  gapMs = 500,
+  sleep = ms => new Promise(r => setTimeout(r, ms)),
+}) {
+  const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}/objects`;
   return async key => {
     let res;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -132,8 +159,92 @@ export function restGet({ accountId, token, fetchImpl = fetch, gapMs = 500, slee
   };
 }
 
+/** Cloudflare REST list of every key under `prefix` (paged by cursor, throttled like restGet). */
+export function restList({
+  accountId,
+  token,
+  bucket = PRIVATE_BUCKET,
+  fetchImpl = fetch,
+  gapMs = 500,
+  sleep = ms => new Promise(r => setTimeout(r, ms)),
+}) {
+  const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}/objects`;
+  return async prefix => {
+    const keys = [];
+    let cursor;
+    do {
+      const q = new URLSearchParams({ prefix, per_page: '1000', ...(cursor ? { cursor } : {}) });
+      const res = await fetchImpl(`${base}?${q}`, {
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(120_000),
+      });
+      await sleep(gapMs);
+      if (!res.ok) throw new Error(`LIST ${prefix}: HTTP ${res.status}`);
+      const j = await res.json();
+      keys.push(...(j.result ?? []).map(o => o.key));
+      cursor = j.result_info?.is_truncated ? j.result_info.cursor : undefined;
+    } while (cursor);
+    return keys;
+  };
+}
+
+/**
+ * Second copy of the fiscal archive (Ruling FISCAL-ARCHIVE-1). Every data object is sha256-checked against ITS manifest before it
+ * is written; a mismatch or a missing data object is collected (never overwrites a good local copy) and returned as `bad`, so the
+ * caller raises a P1 alert. Nothing here prunes: these files are kept for the 7-year legal retention (keep-forever; a
+ * retain_until-based prune would be a separate, explicit job).
+ */
+export async function pullFiscalArchive({ list, get, root, log = () => {} }) {
+  const dirM = path.join(root, 'fiscal-archive', 'v1', 'manifests');
+  const dirD = path.join(root, 'fiscal-archive', 'v1', 'data');
+  mkdirSync(dirM, { recursive: true });
+  mkdirSync(dirD, { recursive: true });
+  const bad = [];
+  let stores = 0;
+  let downloaded = 0;
+  for (const key of await list(`${FISCAL_PREFIX}manifests/`)) {
+    const name = path.basename(key);
+    if (!/^[\w-]+\.json$/.test(name)) {
+      bad.push(`${key}: unexpected key`);
+      continue;
+    }
+    const mBuf = await get(key);
+    if (!mBuf) {
+      bad.push(`${key}: listed but missing`);
+      continue;
+    }
+    const m = JSON.parse(mBuf.toString('utf8'));
+    const id = name.slice(0, -5);
+    const dataFile = path.join(dirD, `${id}.ndjson.gz`);
+    if (existsSync(dataFile) && sha256(readFileSync(dataFile)) === m.sha256) {
+      writeFileSync(path.join(dirM, name), mBuf, { mode: 0o600 });
+      stores++;
+      continue;
+    }
+    const d = await get(`${FISCAL_PREFIX}data/${id}.ndjson.gz`);
+    if (!d) {
+      bad.push(`${id}: data object missing in R2`);
+      continue;
+    }
+    if (sha256(d) !== m.sha256) {
+      bad.push(`${id}: data sha256 differs from its manifest`);
+      continue;
+    }
+    writeFileSync(dataFile, d, { mode: 0o600 });
+    writeFileSync(path.join(dirM, name), mBuf, { mode: 0o600 });
+    downloaded++;
+    stores++;
+  }
+  log(
+    `fiscal-archive: ${stores} store archive(s) verified, ${downloaded} downloaded, ${bad.length} bad`
+  );
+  return { stores, downloaded, bad };
+}
+
 const keychain = service => {
-  const r = spawnSync('security', ['find-generic-password', '-s', service, '-w'], { encoding: 'utf8' });
+  const r = spawnSync('security', ['find-generic-password', '-s', service, '-w'], {
+    encoding: 'utf8',
+  });
   return r.status === 0 ? r.stdout.trim() : '';
 };
 
@@ -149,16 +260,26 @@ async function main() {
         body: JSON.stringify({ chat_id: chat, text }),
       }).catch(e => ({ ok: false, status: String(e) }));
       stamp(`telegram alert ${r.ok ? 'sent' : `NOT sent (${r.status})`}`);
-    } else stamp('telegram alert NOT sent: no TELEGRAM_* env or ebda-alert-telegram-* Keychain items');
-    spawnSync('osascript', ['-e', `display notification ${JSON.stringify(text.slice(0, 200))} with title "Ebda backup pull"`]);
+    } else
+      stamp('telegram alert NOT sent: no TELEGRAM_* env or ebda-alert-telegram-* Keychain items');
+    spawnSync('osascript', [
+      '-e',
+      `display notification ${JSON.stringify(text.slice(0, 200))} with title "Ebda backup pull"`,
+    ]);
   };
   const token = process.env.EBDA_R2_READ_TOKEN || keychain('ebda-r2-backup-read');
   if (!token) {
-    stamp('FATAL: no EBDA_R2_READ_TOKEN and no Keychain item ebda-r2-backup-read; NOTHING was pulled');
-    await alert('Ebda off-account backup pull did NOT run: the R2 read token is missing (Keychain item ebda-r2-backup-read).');
+    stamp(
+      'FATAL: no EBDA_R2_READ_TOKEN and no Keychain item ebda-r2-backup-read; NOTHING was pulled'
+    );
+    await alert(
+      'Ebda off-account backup pull did NOT run: the R2 read token is missing (Keychain item ebda-r2-backup-read).'
+    );
     process.exit(2);
   }
-  const root = process.env.EBDA_CF_BACKUP_PULL_ROOT || path.join(homedir(), 'Desktop/projects/_backups/ebda-cf-encrypted');
+  const root =
+    process.env.EBDA_CF_BACKUP_PULL_ROOT ||
+    path.join(homedir(), 'Desktop/projects/_backups/ebda-cf-encrypted');
   try {
     stamp(`start -> ${root}`);
     const r = await pullBackups({
@@ -167,6 +288,20 @@ async function main() {
       keep: Number(process.env.EBDA_CF_BACKUP_PULL_KEEP) || 30,
       log: stamp,
     });
+    const acct = process.env.EBDA_CF_ACCOUNT_ID || DEFAULT_ACCOUNT_ID;
+    const fa = await pullFiscalArchive({
+      list: restList({ accountId: acct, token }),
+      get: restGet({ accountId: acct, token, bucket: PRIVATE_BUCKET }),
+      root,
+      log: stamp,
+    });
+    if (fa.bad.length) {
+      stamp(`P1 fiscal archive integrity: ${fa.bad.join('; ')}`);
+      await alert(
+        `P1 Ebda fiscal archive second copy: ${fa.bad.length} problem(s): ${fa.bad.slice(0, 3).join('; ')}`
+      );
+      process.exit(1);
+    }
     stamp(
       `done - day ${r.day}, ${r.artifacts} artifacts + ${r.media} media verified, ${r.downloaded} downloaded (${(r.downloadedBytes / 1048576).toFixed(2)} MiB), ${r.pruned.length} day(s) pruned, ${r.orphans} orphan object(s) removed`
     );
@@ -177,4 +312,5 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  await main();
