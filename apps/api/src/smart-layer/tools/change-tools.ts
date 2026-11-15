@@ -6,6 +6,14 @@ import { marketingTools } from './marketing.tools';
 import { contentTools } from './content.tools';
 import { storeSettingsTools } from './store-settings.tools';
 import { seoTools } from './seo.tools';
+import { ordersTools } from './orders.tools';
+import { returnsTools } from './returns.tools';
+import { shippingTools } from './shipping.tools';
+import { paymentsTools } from './payments.tools';
+import { notificationsTools } from './notifications.tools';
+import { customersTools } from './customers.tools';
+import { financeTools } from './finance.tools';
+import { accountTools } from './account.tools';
 
 export function changeTools(): ToolSpec[] {
   return [
@@ -15,5 +23,13 @@ export function changeTools(): ToolSpec[] {
     ...contentTools(),
     ...storeSettingsTools(),
     ...seoTools(),
+    ...ordersTools(),
+    ...returnsTools(),
+    ...shippingTools(),
+    ...paymentsTools(),
+    ...notificationsTools(),
+    ...customersTools(),
+    ...financeTools(),
+    ...accountTools(),
   ];
 }
