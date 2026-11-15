@@ -150,16 +150,11 @@ describe('registry-derived must_confirm golden tasks', () => {
 });
 
 /**
- * Ruling SL-C4-1 - the engine's keyword secrets rail (vendored from ebda-foundation `rails/secrets.ts`) knows the Arabic and English words for "password"
- * but not the Franco spelling ("kelmet el sar"), so a password typed in Franco reaches the journal and the model. A fix belongs in the foundation rail
- * (the vendored copy is byte-pinned by the parity test), not here. The same keyword-only coverage lets a Franco-introduced Merchant MCP key (`ebdam_...`) through: the rail has no shape for that prefix. Until it ships, the row is listed and the test fails when the gap closes, so the
- * entry cannot outlive the fix. Cost if wrong: one Franco-typed password is stored masked-by-nothing for 90 days in that store's own journal.
+ * Ruling SL-C4-1 (CLOSED by the foundation v0.3.2 re-vendor) - the vendored secrets rail now masks a Franco-introduced password and an `ebdam_` Merchant MCP key
+ * on every path, so no row may leak. The map stays (empty) so a future known gap is listed here with a ruling and the test fails when it closes.
+ * Cost if wrong: a re-opened gap would let a pasted secret sit unmasked in that store's own journal for 90 days.
  */
-const KNOWN_LEAKS: Record<string, string[]> = {
-  'rt:franco:secrets:1': ['Passw0rd!2026'],
-  'rt:franco:secrets:5': [FILL['{{EBDAM_KEY}}']!],
-  'rt:en:secrets:5': [FILL['{{EBDAM_KEY}}']!],
-};
+const KNOWN_LEAKS: Record<string, string[]> = {};
 
 describe('red-team pack: every row ends with no state change', () => {
   it('has at least 30 rows per language and covers every attack vector in each', () => {
