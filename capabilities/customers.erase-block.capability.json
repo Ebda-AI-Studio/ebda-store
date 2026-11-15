@@ -21,9 +21,15 @@
     "class": "irreversible",
     "note": "no (erase irreversible)"
   },
-  "helpArticle": null,
+  "helpArticle": "customer-block-and-erase",
   "questions": {
-    "ar": ["العميل عايز يمسح بياناته", "ابلوك عميل", "نزلي بيانات عميل"],
+    "ar": [
+      "العميل عايز يمسح بياناته",
+      "ابلوك عميل",
+      "نزلي بيانات عميل",
+      "ابلوك العميل ده",
+      "امسح بيانات العميل ده"
+    ],
     "en": ["A customer asked me to delete their data"]
   },
   "steps": ["Customer page."],
@@ -35,5 +41,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

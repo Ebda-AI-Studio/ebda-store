@@ -24,7 +24,12 @@
   },
   "helpArticle": "smart-hints",
   "questions": {
-    "ar": ["ايه التلميحات الذكية؟", "عميل ده خطر COD؟"],
+    "ar": [
+      "ايه التلميحات الذكية؟",
+      "عميل ده خطر COD؟",
+      "فعّل التلميحات الذكية",
+      "قفل مشاركة الاشارات بين المتاجر"
+    ],
     "en": ["What are smart hints?"]
   },
   "steps": ["Turn on in smart hints page."],

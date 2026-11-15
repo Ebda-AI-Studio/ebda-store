@@ -70,8 +70,11 @@ import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.se
 import { config } from '../config';
 import type { Currency, PaymentProvider } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
-import { idempotencyKeyOf, opKey, withIdempotencyKey } from '../lib/money-idempotency';
-import { refundMayHaveExecuted } from '../services/payment-providers/refund-outcome';
+import { idempotencyKeyOf } from '../lib/money-idempotency';
+import {
+  lookupRefundTarget,
+  refundThroughProvider,
+} from '../services/order-provider-refund.service';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
   resolveRefundSettlement,
@@ -1894,9 +1897,12 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      const db = await storeDb(storeId);
       const user = getAuthUser(req);
       const data = refundViaProviderSchema.parse(req.body ?? {});
+      // The lookup, the money-moving chain and their refusals live in services/order-provider-refund.service.ts (shared with the assistant's
+      // `order_refund` tool). PaymentService.refund covers the provider call, the Payment/Order status flip and applyRefundEffects; a failure
+      // ANYWHERE in that chain surfaces as a non-2xx (money-integrity audit F2).
+      const target = await lookupRefundTarget(storeId, orderId);
       const idem = idempotencyKeyOf(req.header('idempotency-key'));
       if (!idem)
         throw new AppError(
@@ -1904,32 +1910,14 @@ router.post(
           'IDEMPOTENCY_KEY_REQUIRED',
           'This refund needs an Idempotency-Key header (one per refund attempt). Nothing was done.'
         );
-
-      const order = await db.order.findFirst({
-        where: { id: orderId, storeId, deletedAt: null },
-        include: {
-          payments: {
-            // A partially refunded payment still has a refundable balance
-            // (#1360) — PaymentService.refund budgets against
-            // `amount - refundedAmount` and accepts it as a starting state, as
-            // ReturnService does. Filtering to 'completed' alone left this
-            // button dead after the first partial return.
-            where: { status: { in: ['completed', 'partially_refunded'] } },
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-          },
-        },
-      });
-      if (!order) {
+      if (target.kind === 'not_found') {
         res.status(404).json({
           success: false,
           error: { code: 'NOT_FOUND', message: 'Order not found' },
         });
         return;
       }
-
-      const payment = order.payments[0];
-      if (!payment || !payment.transactionId) {
+      if (target.kind === 'no_payment') {
         res.status(400).json({
           success: false,
           error: {
@@ -1940,8 +1928,7 @@ router.post(
         });
         return;
       }
-
-      if (order.paymentStatus === 'refunded') {
+      if (target.kind === 'already_refunded') {
         res.status(400).json({
           success: false,
           error: {
@@ -1951,66 +1938,16 @@ router.post(
         });
         return;
       }
-
-      // `PaymentService.refund` covers the whole money-moving chain: the
-      // provider refund call, the Payment/Order status flip, and firing
-      // `applyRefundEffects` (which enqueues `order/refunded` — the sole
-      // trigger for inventory/coupon/affiliate/loyalty reversal + the
-      // customer refund email/admin push). A failure ANYWHERE in that
-      // chain must surface as a non-2xx — this used to catch only the
-      // provider-call error and swallow everything else into an HTTP 200
-      // (money-integrity audit F2: operator gets no signal a refund
-      // broke). We forward to `next(err)` instead of writing the response ourselves, so every
-      // failure mode in the chain — not just the provider call — reaches
-      // the client as a real error.
-      let result;
-      try {
-        const scope = `refund-via-provider:${storeId}:${orderId}`;
-        result = (
-          await withIdempotencyKey(
-            scope,
-            idem,
-            () =>
-              runInStoreCtx(storeId, async () =>
-                // the store id selects the store's backend (a Durable Object store refunds through its own section)
-                PaymentService.refund(
-                  {
-                    transactionId: payment.transactionId!,
-                    amount: data.amount,
-                    reason: data.reason,
-                    attemptKey: opKey(scope, idem),
-                  },
-                  undefined,
-                  storeId
-                )
-              ),
-            refundMayHaveExecuted,
-            { required: true }
-          )
-        ).value;
-      } catch (refundError) {
-        // a replay refusal / a may-have-executed failure keeps its own code (409 / 502): the admin must check, not retry
-        if (
-          refundError instanceof AppError &&
-          (refundError.statusCode < 500 || refundMayHaveExecuted(refundError))
-        )
-          throw refundError;
-        const refundMessage =
-          refundError instanceof Error ? refundError.message : 'Unknown refund error';
-        logger.error(
-          {
-            err: refundError,
-            orderId,
-            orderNumber: order.orderNumber,
-            transactionId: payment.transactionId,
-            provider: payment.provider,
-            amount: data.amount,
-          },
-          '[Refund] admin-initiated provider refund failed'
-        );
-        next(new AppError(502, 'REFUND_FAILED', refundMessage));
-        return;
-      }
+      const { order, payment } = target;
+      const result = await refundThroughProvider({
+        storeId,
+        orderId,
+        orderNumber: order.orderNumber,
+        payment,
+        amount: data.amount,
+        reason: data.reason,
+        idempotencyKey: idem,
+      });
 
       await auditLog({
         action: 'order.refund_via_provider',

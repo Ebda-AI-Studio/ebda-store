@@ -23,8 +23,8 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "cancel shipment possible before pickup"
+    "class": "compensating",
+    "note": "a shipment can be cancelled until the carrier collects it"
   },
   "helpArticle": "shipping-providers",
   "questions": {
