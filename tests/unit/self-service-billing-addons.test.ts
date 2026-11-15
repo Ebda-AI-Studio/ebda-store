@@ -86,12 +86,18 @@ const fakeTx = () => ({
         .filter(
           e =>
             e.storeId === where.storeId &&
-            e.planCode === where.planCode &&
-            e.status === 'succeeded' &&
+            (where.planCode === undefined ||
+              (typeof where.planCode === 'string'
+                ? e.planCode === where.planCode
+                : e.planCode.startsWith(where.planCode.startsWith))) &&
+            (where.status === undefined || e.status === where.status) &&
+            (where.relatedEventId === undefined || e.relatedEventId === where.relatedEventId) &&
+            (where.idempotencyKey === undefined || e.idempotencyKey === where.idempotencyKey) &&
             e.id !== where.id?.not &&
-            e.forPeriodEnd > where.forPeriodEnd.gt
+            (where.forPeriodEnd?.gt === undefined || e.forPeriodEnd > where.forPeriodEnd.gt)
         )
         .sort((a, b) => b.forPeriodEnd - a.forPeriodEnd)[0] ?? null,
+    createMany: vi.fn(async () => ({ count: 1 })),
     updateMany: vi.fn(async () => ({ count: 1 })),
     create: vi.fn(async () => ({})),
   },

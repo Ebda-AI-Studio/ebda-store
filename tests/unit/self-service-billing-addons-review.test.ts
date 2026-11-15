@@ -42,6 +42,9 @@ vi.mock('@api/services/billing/billing-notify', () => ({
 }));
 vi.mock('@api/services/encryption.service', () => ({ encryption: { decrypt: () => 'tok' } }));
 vi.mock('@api/services/platform/billing-d1', () => ({
+  onD1: async () => false,
+  claimAddonMarkerD1: vi.fn(),
+  setTermEndOnceD1: vi.fn(),
   acrossBilling: async (fn: (s?: string) => Promise<unknown>) => [
     { storeId: 's1', value: await fn('s1') },
   ],
@@ -129,12 +132,15 @@ function fakeTx() {
           : true)) &&
     (w.forPeriodEnd?.gt === undefined || (e.forPeriodEnd && e.forPeriodEnd > w.forPeriodEnd.gt)) &&
     (w.relatedEventId?.in === undefined || w.relatedEventId.in.includes(e.relatedEventId)) &&
+    (typeof w.relatedEventId !== 'string' || e.relatedEventId === w.relatedEventId) &&
+    (w.idempotencyKey === undefined || e.idempotencyKey === w.idempotencyKey) &&
     (w.id?.not === undefined || e.id !== w.id.not);
   return {
     billingEvent: {
       findMany: async ({ where }: any) => h.events.filter(e => match(e, where)),
       findFirst: async ({ where }: any) => h.events.filter(e => match(e, where))[0] ?? null,
       updateMany: vi.fn(async () => ({ count: 1 })),
+      createMany: vi.fn(async () => ({ count: 1 })),
       create: vi.fn(async ({ data }: any) => {
         h.created.push(data);
         h.events.push({ createdAt: new Date(), ...data });

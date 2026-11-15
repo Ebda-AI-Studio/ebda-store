@@ -60,6 +60,7 @@ function fakeTx(grantFails = false) {
     billingEvent: {
       findUnique: async () => ({ ...row, status }),
       findFirst: async () => null,
+      createMany: async () => ({ count: 1 }),
       updateMany: vi.fn(async ({ where, data }: any) => {
         if (data.status) {
           if (

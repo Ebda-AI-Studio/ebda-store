@@ -10,6 +10,7 @@
  */
 import crypto from 'crypto';
 import type { Prisma } from '@ebda/database';
+import { claimAddonMarkerD1, onD1, setTermEndOnceD1 } from '../platform/billing-d1';
 import { addDays } from './period';
 import {
   ADDON_CANCEL_PREFIX,
@@ -115,6 +116,110 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
   return out;
 }
 
+const GRANT_PREFIX = 'addon-grant:';
+const CHAIN_TRIES = 6;
+
+/**
+ * Give the paid row its term, exactly once and never overlapping another payment of the same add-on, WITHOUT counting
+ * on a prisma-lite write count (not atomic on the platform D1):
+ *  - a zero-amount marker row (`addon-grant:<sku>`, `relatedEventId` = this payment, `forPeriodEnd` = the term end) is
+ *    inserted under a UNIQUE key that names the term's PREDECESSOR (`addon-after:<store>:<sku>:<predecessor id>`). A term
+ *    follows exactly one predecessor, so two racing payments cannot both take the same slot: the loser reads the winner's
+ *    marker, adopts it as its predecessor and tries the next slot;
+ *  - if the slot is already held by THIS payment (a concurrent or earlier settle), the grant was already made: only make
+ *    sure the paid row carries the end (set once);
+ *  - the term end on the paid row is set ONCE (`for_period_end IS NULL`).
+ */
+async function grantTerm(
+  tx: Tx,
+  row: { id: string; storeId: string; planCode: string | null },
+  sku: string,
+  now: Date
+): Promise<void> {
+  const D1 = await onD1();
+  const setEnd = async (end: Date): Promise<void> => {
+    if (D1) await setTermEndOnceD1(row.id, row.storeId, end.getTime());
+    else
+      await tx.billingEvent.updateMany({
+        where: { id: row.id, storeId: row.storeId, forPeriodEnd: null },
+        data: { forPeriodEnd: end },
+      });
+  };
+  // This payment already has its marker (a crash between the marker and the end, or a replay): finish, never re-chain.
+  const mine = await tx.billingEvent.findFirst({
+    where: {
+      storeId: row.storeId,
+      type: 'upgrade',
+      planCode: { startsWith: GRANT_PREFIX },
+      relatedEventId: row.id,
+    },
+    select: { forPeriodEnd: true },
+  });
+  if (mine?.forPeriodEnd) return setEnd(mine.forPeriodEnd);
+
+  const latest = await tx.billingEvent.findFirst({
+    where: {
+      storeId: row.storeId,
+      type: 'upgrade',
+      planCode: row.planCode!,
+      status: 'succeeded',
+      id: { not: row.id },
+      forPeriodEnd: { gt: new Date(0) },
+    },
+    orderBy: { forPeriodEnd: 'desc' },
+    select: { id: true, forPeriodEnd: true },
+  });
+  let predId = latest?.id ?? 'none';
+  let predEnd = latest?.forPeriodEnd ?? null;
+  for (let i = 0; i < CHAIN_TRIES; i++) {
+    const start = predEnd && predEnd.getTime() > now.getTime() ? predEnd : now;
+    const end = addDays(start, ADDON_TERM_DAYS);
+    const key = `addon-after:${row.storeId}:${sku}:${predId}`;
+    const marker = {
+      id: crypto.randomUUID(),
+      storeId: row.storeId,
+      planCode: `${GRANT_PREFIX}${sku}`,
+      relatedEventId: row.id,
+      endMs: end.getTime(),
+      key,
+    };
+    const won = D1
+      ? await claimAddonMarkerD1(marker)
+      : (
+          await tx.billingEvent.createMany({
+            data: [
+              {
+                id: marker.id,
+                storeId: marker.storeId,
+                type: 'upgrade',
+                planCode: marker.planCode,
+                forPeriodEnd: end,
+                amountMinor: 0,
+                currency: 'EGP',
+                provider: 'ebda',
+                status: 'succeeded',
+                relatedEventId: marker.relatedEventId,
+                idempotencyKey: key,
+              },
+            ],
+            skipDuplicates: true,
+          })
+        ).count === 1;
+    if (won) return setEnd(end);
+    const held = await tx.billingEvent.findFirst({
+      where: { storeId: row.storeId, idempotencyKey: key },
+      select: { relatedEventId: true, forPeriodEnd: true },
+    });
+    if (!held?.forPeriodEnd || !held.relatedEventId) continue;
+    if (held.relatedEventId === row.id) return setEnd(held.forPeriodEnd); // already granted by another settle
+    predId = held.relatedEventId;
+    predEnd = held.forPeriodEnd;
+  }
+  throw new Error(
+    'ADDON_GRANT_CHAIN_CONTENDED: could not place the term, the settlement will be retried'
+  );
+}
+
 export async function applyAddonGrant(
   tx: Tx,
   row: { id: string; storeId: string; planCode: string | null },
@@ -140,23 +245,6 @@ export async function applyAddonGrant(
       return;
     }
   }
-  // A second payment while a term runs stacks after it, so a merchant never loses days by paying early.
-  const running = await tx.billingEvent.findFirst({
-    where: {
-      storeId: row.storeId,
-      type: 'upgrade',
-      planCode: row.planCode!,
-      status: 'succeeded',
-      id: { not: row.id },
-      forPeriodEnd: { gt: now },
-    },
-    orderBy: { forPeriodEnd: 'desc' },
-    select: { forPeriodEnd: true },
-  });
-  const start = running?.forPeriodEnd ?? now;
-  await tx.billingEvent.updateMany({
-    where: { id: row.id, storeId: row.storeId },
-    data: { forPeriodEnd: addDays(start, ADDON_TERM_DAYS) },
-  });
+  await grantTerm(tx, row, sku, now);
   effects.push({ kind: 'addon_granted', storeId: row.storeId });
 }
