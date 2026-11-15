@@ -28,6 +28,9 @@ vi.mock('@api/lib/store-ai-switch', () => ({
   assertStoreAiEnabled: async () => undefined,
   requireAiEnabled: (_q: unknown, _s: unknown, next: () => void) => next(),
 }));
+vi.mock('../../apps/api/src/lib/ai-plan-gate', () => ({
+  assertStoreAiPlan: async () => undefined,
+}));
 vi.mock('@ebda/database', () => ({
   prisma: { aiUsage: { count: h.ambientCount } },
 }));
