@@ -71,10 +71,23 @@ describe('approved prices and messaging', () => {
   it('every approved price belongs to a feature that is actually sellable (no stale price), and the catalogue uses it', async () => {
     const { ADDON_FEATURE_PRICE_MINOR, addonFeaturePriceMinor } = await import('@ebda/shared');
     for (const [k, v] of Object.entries(ADDON_FEATURE_PRICE_MINOR)) {
-      expect(sold).toContain(k as FeatureKey);
+      // priced ahead of time (a feature Business does not hold yet, or one still hidden) is fine; priced AND held by
+      // Business AND not sold is a stale price
+      const heldByBusiness = (PLAN_BASELINE.enterprise as readonly string[]).includes(k);
+      if (heldByBusiness && !FEATURE_REGISTRY[k as FeatureKey].hidden)
+        expect(sold).toContain(k as FeatureKey);
       expect(Number.isSafeInteger(v) && (v as number) > 0).toBe(true);
-      expect(ADDON_CATALOG[`feature:${k}`].priceMinor).toBe(v);
+      if (ADDON_CATALOG[`feature:${k}`]) expect(ADDON_CATALOG[`feature:${k}`].priceMinor).toBe(v);
     }
+    for (const [k, minor] of [
+      ['bundles', 14900],
+      ['remove_branding', 24900],
+      ['customer_intelligence', 14900],
+      ['merchant_mcp', 19900],
+      ['merchant_mcp_write', 9900],
+      ['b2b.wholesale', 39900],
+    ] as const)
+      expect(addonFeaturePriceMinor(k)).toBe(minor);
     expect(ADDON_CATALOG['feature:loyalty'].priceMinor).toBe(24900);
     expect(ADDON_CATALOG['feature:floating_widget'].priceMinor).toBe(7900);
     expect(addonFeaturePriceMinor('loyalty')).toBe(24900);

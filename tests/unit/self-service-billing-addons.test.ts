@@ -489,6 +489,37 @@ describe('A9 AI top-up raises the STORE cap only; platform caps still apply', ()
     h.aiStoreToday.mockResolvedValue(10); // another store, no pack
     await expect(assertAiQuota({ storeId: 's3' })).resolves.toBeUndefined();
   });
+  it('P6 at the prod cap (1800/day, 54000/month): +300 is sold, +1000 is refused (listing is covered in addons-list-history)', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '1800';
+    process.env.AI_MONTHLY_REQUEST_CAP = '54000';
+    try {
+      const { previewAddon } = await import('@api/services/billing/addons.service');
+      const ctx = { storeId: 's1', userId: 'u1' };
+      // a store may use half the day: 900. 150 base + 300 = 450 fits; 150 + 1000 = 1150 does not.
+      await expect(previewAddon({ ...ctx, sku: 'ai:topup_300' })).resolves.toMatchObject({
+        sku: 'ai:topup_300',
+      });
+      await expect(previewAddon({ ...ctx, sku: 'ai:topup_1000' })).rejects.toMatchObject({
+        code: 'AI_CAPACITY_UNAVAILABLE',
+      });
+    } finally {
+      delete process.env.AI_DAILY_REQUEST_CAP;
+      delete process.env.AI_MONTHLY_REQUEST_CAP;
+    }
+  });
+  it('P6 at a 450 cap (the old default): no top-up is sold', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450';
+    try {
+      const { previewAddon } = await import('@api/services/billing/addons.service');
+      const ctx = { storeId: 's1', userId: 'u1' };
+      for (const sku of ['ai:topup_300', 'ai:topup_1000'])
+        await expect(previewAddon({ ...ctx, sku })).rejects.toMatchObject({
+          code: 'AI_CAPACITY_UNAVAILABLE',
+        });
+    } finally {
+      delete process.env.AI_DAILY_REQUEST_CAP;
+    }
+  });
   it('P6: a top-up the platform cannot back is not sold (nothing charged); with enough capacity it is', async () => {
     const { previewAddon } = await import('@api/services/billing/addons.service');
     const ctx = { storeId: 's1', userId: 'u1' };

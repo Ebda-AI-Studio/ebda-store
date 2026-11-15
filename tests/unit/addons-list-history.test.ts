@@ -25,7 +25,8 @@ vi.mock('@api/services/feature.service', () => ({
     resolveWithoutAddons: async () => h.withoutAddons,
   },
 }));
-vi.mock('@api/lib/ai-quota', () => ({
+vi.mock('@api/lib/ai-quota', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   storeAiAllowance: async () => ({ baseCap: 150, extra: 0, cap: 150, used: 0, remaining: 150 }),
   storeAiUsageByFeature: async () => h.aiByFeature,
 }));
@@ -268,5 +269,34 @@ describe('AI credits meter data (existing quota ledger, no new table)', () => {
     expect(ai.packs).toHaveLength(1);
     expect(ai.packs[0]).toMatchObject({ sku: 'ai:topup_300', extraRequests: 300 });
     expect(new Date(ai.packs[0].endsAt).getTime()).toBe(NOW.getTime() + 5 * DAY);
+  });
+});
+
+describe('top-ups the EFFECTIVE platform cap cannot back are not listed', () => {
+  const topups = async () =>
+    (await listAddons('s1')).addons.filter(a => a.kind === 'ai_topup').map(a => a.sku);
+  it('prod cap 1800/day: a store share is 900, so +300 is listed and +1000 is not', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '1800';
+    try {
+      expect(await topups()).toEqual(['ai:topup_300']);
+    } finally {
+      delete process.env.AI_DAILY_REQUEST_CAP;
+    }
+  });
+  it('cap 450: no top-up is listed', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '450';
+    try {
+      expect(await topups()).toEqual([]);
+    } finally {
+      delete process.env.AI_DAILY_REQUEST_CAP;
+    }
+  });
+  it('cap 5000: both are listed', async () => {
+    process.env.AI_DAILY_REQUEST_CAP = '5000';
+    try {
+      expect(await topups()).toEqual(['ai:topup_300', 'ai:topup_1000']);
+    } finally {
+      delete process.env.AI_DAILY_REQUEST_CAP;
+    }
   });
 });

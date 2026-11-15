@@ -35,6 +35,14 @@ export const ADDON_FEATURE_PRICE_MINOR: Partial<Record<FeatureKey, number>> = {
   'accounting.multi_currency': egp(149),
   'accounting.bank_reconcile': egp(299),
   payment_abandonment: egp(149),
+  // Approved 2026-11-15 for the features Business-all-features makes sellable to lower plans. b2b.wholesale is hidden until
+  // it ships, so it is sold only then (the sellable set excludes hidden features).
+  bundles: egp(149),
+  remove_branding: egp(249),
+  customer_intelligence: egp(149),
+  merchant_mcp: egp(199),
+  merchant_mcp_write: egp(99),
+  'b2b.wholesale': egp(399),
 };
 
 export function addonFeaturePriceMinor(key: FeatureKey): number {

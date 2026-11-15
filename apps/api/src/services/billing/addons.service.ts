@@ -377,6 +377,10 @@ export async function listAddons(storeId: string) {
       ),
     ]);
   const overrideOn = new Set(overrides.map(o => o.featureKey));
+  const runningExtra = running.reduce(
+    (n, r) => n + (ADDON_CATALOG[r.sku]?.aiExtraRequests ?? 0),
+    0
+  );
   let cardAvailable = true;
   try {
     cardAvailable = resolveTrialCardMode() === 'card_on_file';
@@ -400,6 +404,14 @@ export async function listAddons(storeId: string) {
           }
         : null;
       const isFeature = i.kind === 'feature';
+      // A top-up the EFFECTIVE platform cap cannot back is not offered (same rule as the quote): base + packs running +
+      // this pack must fit one store's share of the day, unless this pack is already running.
+      if (
+        i.kind === 'ai_topup' &&
+        !mine[0] &&
+        ai.baseCap + runningExtra + (i.aiExtraRequests ?? 0) > maxStoreDailyRequests()
+      )
+        return [];
       const on = isFeature && withoutAddons[i.featureKey!] === true;
       const state = deriveAddonState({
         // An InstaPay term cannot renew by itself (ADDON-SS-6): it shows as active until its end date.
