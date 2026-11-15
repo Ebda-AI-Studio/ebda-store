@@ -8,8 +8,8 @@ import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { formatDateTime } from '../../../../lib/format';
 
-export const ASSISTANT_MODES = ['off', 'answer-only', 'suggest', 'act'] as const;
-export type AssistantMode = (typeof ASSISTANT_MODES)[number];
+const ASSISTANT_MODES = ['off', 'answer-only', 'suggest', 'act'] as const;
+type AssistantMode = (typeof ASSISTANT_MODES)[number];
 
 interface ModeState {
   mode: AssistantMode;
