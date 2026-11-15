@@ -289,6 +289,18 @@ const ALLOW: Record<string, AllowEntry> = {
       'merchant-facing assistant card: the list price the merchant is changing, shown before and after',
     reads: { state: 1, createInput: 1, describe: 1 },
   },
+  'smart-layer/tools/orders.tools.ts': {
+    category: 'admin-display',
+    reason:
+      'merchant-facing assistant confirm card: the order total / line prices the merchant is about to act on',
+    reads: { state: 1, describe: 2 },
+  },
+  'smart-layer/tools/products-confirm.tools.ts': {
+    category: 'admin-display',
+    reason:
+      'merchant-facing assistant confirm card: the list price a delete or bulk price change acts on, and the before-price the undo restores',
+    reads: { state: 1, describe: 2, afterPrice: 1, plan: 4, resolveItems: 1, run: 3 },
+  },
   'smart-layer/tools/marketing.tools.ts': {
     category: 'admin-display',
     reason: 'merchant-facing assistant card: the list price a bundle or coupon is computed against',

@@ -87,7 +87,7 @@ export function ConfirmCard({
                 : 'error',
     });
 
-  const confirm = async () => {
+  const pressYes = async () => {
     if (!card.approvalId || !token) return;
     setPhase({ k: 'busy' });
     const r = await onConfirm(card.approvalId, token);
@@ -223,7 +223,7 @@ export function ConfirmCard({
             type="button"
             size="sm"
             disabled={phase.k === 'busy'}
-            onClick={() => void confirm()}
+            onClick={() => void pressYes()}
           >
             {phase.k === 'busy' ? t('card.applying') : t('confirm.yes')}
           </Button>
