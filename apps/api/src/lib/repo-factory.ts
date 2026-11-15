@@ -1472,7 +1472,7 @@ export function requestPlanMemo<T>(storeId: string, fn: () => Promise<T>): Promi
   return hit;
 }
 
-export function forgetRequestPlan(storeId: string): void {
+function forgetRequestPlan(storeId: string): void {
   scopes.getStore()?.plans?.delete(storeId);
 }
 
