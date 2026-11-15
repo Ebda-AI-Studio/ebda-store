@@ -133,6 +133,7 @@ export function AdminLayout({
     platformPolicyUpdates: t('navPlatformPolicyUpdates'),
     platformCiInsights: t('navPlatformCiInsights'),
     platformActivation: t('navPlatformActivation'),
+    platformTrustRequests: t('navPlatformTrustRequests'),
     platformSettings: t('navPlatformSettings'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),

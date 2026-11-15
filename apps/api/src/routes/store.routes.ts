@@ -50,6 +50,7 @@ import { preserveMaskedPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
 import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
+import { closeClaimsOnSlugGrant } from '../services/trust-grants';
 import {
   closeAppealsOnReactivation,
   recordSuspension,
@@ -754,6 +755,8 @@ router.post(
       // provider verifies ownership). Only a super_admin may set one here.
       if (!isSuperAdmin) delete data.domain;
 
+      // A protected address granted by a super admin answers the merchant's open claim for it (before the grant, loud).
+      if (isSuperAdmin) await closeClaimsOnSlugGrant(actor.userId, data.slug);
       const create = () =>
         StoreService.create(
           actor.userId,
@@ -805,6 +808,7 @@ router.put(
       // provider verifies ownership). Only a super_admin may set one here.
       if (user.role !== 'super_admin') delete data.domain;
 
+      if (user.role === 'super_admin') await closeClaimsOnSlugGrant(user.userId, data.slug);
       const store = await StoreService.update(
         id,
         { ...data, settings: data.settings as Prisma.InputJsonValue },

@@ -47,6 +47,7 @@ import pwaRoutes from './pwa.routes';
 import qrRoutes from './qr.routes';
 import ciRoutes from './ci.routes';
 import adminCiRoutes from './admin-ci.routes';
+import adminTrustRequestsRoutes from './admin-trust-requests.routes';
 import barcodeLabelRoutes from './barcode-labels.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
@@ -208,6 +209,7 @@ router.use('/admin', adminLegalPolicyRoutes);
 // Customer Intelligence insights + hint kill switches (CI-2/CI-3, Rulings CI-9/CI-10). Same reachability
 // rule: before adminRoutes' catch-all MFA gate; it carries its own authenticate -> MFA -> super_admin chain.
 router.use('/admin', adminCiRoutes);
+router.use('/admin', adminTrustRequestsRoutes);
 
 // Provider activation queue (PROVIDERS-ACTIVATION). Same reachability rule as the tax routes: before
 // adminRoutes' catch-all MFA gate; it carries its own authenticate → MFA → super_admin chain.

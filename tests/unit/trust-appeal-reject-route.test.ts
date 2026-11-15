@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   rows: [] as Record<string, any>[],
   audit: vi.fn(),
   failNote: false,
+  failUpdate: false,
   order: [] as string[],
   storeStatus: 'active',
 }));
@@ -18,6 +19,7 @@ const match = (r: any, where: any) => Object.entries(where).every(([k, v]) => r[
 const db = {
   findFirst: async ({ where }: any) => h.rows.find(r => match(r, where)) ?? null,
   updateMany: async ({ where, data }: any) => {
+    if (h.failUpdate && where.kind === 'slug_claim') throw new Error('d1 down');
     const hit = h.rows.filter(r => match(r, where));
     hit.forEach(r => Object.assign(r, data));
     return { count: hit.length };
@@ -31,6 +33,9 @@ const db = {
   },
   count: vi.fn(),
 };
+vi.mock('@api/lib/platform-scope', () => ({
+  asOperator: (_id: string, fn: () => unknown) => fn(),
+}));
 vi.mock('@api/lib/definer', () => ({ insertAuditLog: h.audit }));
 vi.mock('@api/middleware/auth', () => ({
   rejectImpersonated: (_q: any, _s: any, n: any) => n(),
@@ -137,6 +142,9 @@ beforeEach(async () => {
   h.rows.length = 0;
   h.audit.mockReset().mockResolvedValue(undefined);
   h.failNote = false;
+  h.failUpdate = false;
+  svc.update.mockResolvedValue({ id: STORE_ID, slug: 'ok' });
+  svc.create.mockResolvedValue({ id: STORE_ID, slug: 'ok' });
   h.order.length = 0;
   h.storeStatus = 'active';
   svc.setStatus.mockReset().mockImplementation(async () => {
@@ -221,5 +229,41 @@ describe('PATCH /stores/:id/status writes the note before the status and fails l
     spy.mockRestore();
     expect(res.status).toBe(404);
     expect(h.rows).toHaveLength(0);
+  });
+});
+
+describe('super-admin store create / update on a protected address closes the open claim (same flow)', () => {
+  const claim = (slug: string, userId = 'u9') =>
+    h.rows.push({ id: `c-${slug}`, kind: 'slug_claim', status: 'open', userId, slug });
+
+  it('PUT /stores/:id with the claimed slug resolves that claim and no other', async () => {
+    claim('nike');
+    claim('adidas');
+    const res = await request(app).put(`/stores/${STORE_ID}`).send({ slug: 'nike' });
+    expect(res.status).toBe(200);
+    expect(h.rows.find(r => r.slug === 'nike')!.status).toBe('resolved');
+    expect(h.rows.find(r => r.slug === 'adidas')!.status).toBe('open');
+  });
+  it('POST /stores (super admin provisioning) does the same', async () => {
+    claim('nike');
+    const res = await request(app).post('/stores').send({ name: 'Nike', slug: 'nike' });
+    expect(res.status).toBe(201);
+    expect(h.rows.find(r => r.slug === 'nike')!.status).toBe('resolved');
+  });
+  it('a merchant renaming their own store never closes anyone claim', async () => {
+    claim('nike');
+    await request(app)
+      .put(`/stores/${STORE_ID}`)
+      .set('x-role', 'store_admin')
+      .send({ slug: 'nike' });
+    expect(h.rows.find(r => r.slug === 'nike')!.status).toBe('open');
+  });
+  it('closing fails loud: no grant happens when the claim cannot be closed', async () => {
+    claim('nike');
+    h.failUpdate = true;
+    svc.update.mockClear();
+    const res = await request(app).put(`/stores/${STORE_ID}`).send({ slug: 'nike' });
+    expect(res.status).toBe(500);
+    expect(svc.update).not.toHaveBeenCalled();
   });
 });

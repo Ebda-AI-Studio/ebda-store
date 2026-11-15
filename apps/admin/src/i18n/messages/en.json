@@ -6281,7 +6281,8 @@
       "navPlatformProviderActivation": "Activation requests (platform)",
       "wholesalePendingBadge": "{count} wholesale applications waiting",
       "navPlatformCiInsights": "Customer Intelligence",
-      "navPlatformActivation": "Merchant activation"
+      "navPlatformActivation": "Merchant activation",
+      "navPlatformTrustRequests": "Support and trust requests"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -11720,6 +11721,61 @@
     "savedTitle": "Shipping saved",
     "savedBody": "The return policy was updated.",
     "saveLabel": "Save shipping"
+  },
+  "trustRequests": {
+    "title": "Support and trust requests",
+    "subtitle": "Everything merchants send to Ebda staff: support requests, suspension appeals, protected address claims and store limit requests.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "No requests match.",
+    "loadMore": "Show more",
+    "filter": {
+      "title": "Filters",
+      "kind": "Type",
+      "status": "Status",
+      "store": "Store id",
+      "storePlaceholder": "Store id (UUID)",
+      "from": "Created from",
+      "to": "Created to",
+      "all": "All"
+    },
+    "kind": {
+      "support": "Support request",
+      "suspension_appeal": "Suspension appeal",
+      "slug_claim": "Protected address claim",
+      "store_cap": "Store limit request"
+    },
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved",
+      "rejected": "Rejected"
+    },
+    "list": {
+      "title": "Requests"
+    },
+    "col": {
+      "kind": "Type",
+      "status": "Status",
+      "store": "Store",
+      "summary": "Request",
+      "created": "Created",
+      "open": "Open"
+    },
+    "detail": {
+      "title": "Request",
+      "open": "Open",
+      "message": "Message",
+      "requester": "Requester id",
+      "topic": "Topic",
+      "slug": "Address",
+      "page": "Page",
+      "evidence": "Evidence",
+      "resolve": "Resolve",
+      "reject": "Reject",
+      "close": "Close",
+      "decided": "This request was already decided.",
+      "failed": "Could not save the decision. It may already be decided; reload the list."
+    }
   },
   "activation": {
     "title": "Merchant activation",

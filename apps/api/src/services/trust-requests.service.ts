@@ -13,7 +13,6 @@
  */
 import { BRAND, validateStoreSlug, type SupportTopic } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
-import { withSavepoint } from '../lib/savepoint';
 import { isP2002 } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
@@ -126,20 +125,20 @@ export async function createSupportRequest(
   });
   for (let slot = used + 1; slot <= SUPPORT_REQUESTS_PER_DAY; slot++) {
     try {
-      return await withSavepoint(() =>
-        db.trustRequest.create({
-          data: {
-            kind: 'support',
-            storeId,
-            userId: who.userId,
-            topic: input.topic,
-            message: input.message,
-            pageUrl: input.pageUrl ?? null,
-            capDay,
-            capSlot: slot,
-          },
-        })
-      );
+      // No Postgres savepoint: trust_requests lives on D1, where a failed INSERT aborts nothing (and a savepoint
+      // statement does not exist). A unique violation just moves on to the next slot.
+      return await db.trustRequest.create({
+        data: {
+          kind: 'support',
+          storeId,
+          userId: who.userId,
+          topic: input.topic,
+          message: input.message,
+          pageUrl: input.pageUrl ?? null,
+          capDay,
+          capSlot: slot,
+        },
+      });
     } catch (err) {
       if (!isP2002(err)) throw err; // slot taken by a parallel request: try the next one
     }
@@ -285,11 +284,9 @@ export async function fileAppeal(
     );
   try {
     // the partial UNIQUE (one open appeal per store) settles a double click that passes the check above
-    return await withSavepoint(() =>
-      db.trustRequest.create({
-        data: { kind: 'suspension_appeal', storeId, userId: who.userId, message },
-      })
-    );
+    return await db.trustRequest.create({
+      data: { kind: 'suspension_appeal', storeId, userId: who.userId, message },
+    });
   } catch (err) {
     if (isP2002(err))
       throw new AppError(409, 'APPEAL_ALREADY_OPEN', 'You already have an appeal under review');
@@ -331,17 +328,15 @@ export async function fileSlugClaim(
       `You can have ${MAX_OPEN_SLUG_CLAIMS} address claims under review at once. Wait for a decision first.`
     );
   try {
-    return await withSavepoint(() =>
-      db.trustRequest.create({
-        data: {
-          kind: 'slug_claim',
-          userId: who.userId,
-          slug,
-          message: input.evidence,
-          evidenceUrl: input.evidenceUrl ?? null,
-        },
-      })
-    );
+    return await db.trustRequest.create({
+      data: {
+        kind: 'slug_claim',
+        userId: who.userId,
+        slug,
+        message: input.evidence,
+        evidenceUrl: input.evidenceUrl ?? null,
+      },
+    });
   } catch (err) {
     if (isP2002(err))
       throw new AppError(409, 'CLAIM_ALREADY_OPEN', 'You already claimed this address');
@@ -360,19 +355,145 @@ export async function fileStoreCapRequest(
   if (open)
     throw new AppError(409, 'CAP_REQUEST_ALREADY_OPEN', 'You already asked for a higher limit');
   try {
-    return await withSavepoint(() =>
-      db.trustRequest.create({
-        data: {
-          kind: 'store_cap',
-          userId: who.userId,
-          message: input.message,
-          evidenceUrl: input.evidenceUrl ?? null,
-        },
-      })
-    );
+    return await db.trustRequest.create({
+      data: {
+        kind: 'store_cap',
+        userId: who.userId,
+        message: input.message,
+        evidenceUrl: input.evidenceUrl ?? null,
+      },
+    });
   } catch (err) {
     if (isP2002(err))
       throw new AppError(409, 'CAP_REQUEST_ALREADY_OPEN', 'You already asked for a higher limit');
     throw err;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Super-admin side: review every kind (the admin app's trust-requests screen)
+// ---------------------------------------------------------------------------
+
+export const TRUST_KINDS = ['support', 'suspension_appeal', 'slug_claim', 'store_cap'] as const;
+export const TRUST_STATUSES = ['open', 'resolved', 'rejected'] as const;
+export type TrustDecision = 'resolved' | 'rejected';
+
+interface TrustListFilter {
+  kind?: (typeof TRUST_KINDS)[number];
+  status?: (typeof TRUST_STATUSES)[number];
+  storeId?: string;
+  from?: Date;
+  to?: Date;
+  cursor?: string;
+  limit?: number;
+}
+
+/** The columns a staff reviewer sees: the filing text is theirs to read (it is why the request exists). */
+const REVIEW_SELECT = {
+  id: true,
+  kind: true,
+  status: true,
+  storeId: true,
+  userId: true,
+  topic: true,
+  message: true,
+  pageUrl: true,
+  slug: true,
+  evidenceUrl: true,
+  rejectedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+export interface ReviewDb {
+  trustRequest: {
+    findMany(args: Record<string, unknown>): Promise<Array<Record<string, any>>>;
+    findFirst(args: Record<string, unknown>): Promise<Record<string, any> | null>;
+    updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
+  };
+}
+
+/**
+ * Staff list, newest first, cursor-paged. Spans stores BY DESIGN (super admin behind authorize + MFA; D1 has no RLS,
+ * the route is the gate), so it is the one tenant-less read of this table (exempt in d1-tenant-filter-guard).
+ * The `suspension` notes are the merchant-visible reason, not a request: never listed.
+ */
+export async function listTrustRequests(db: ReviewDb, f: TrustListFilter) {
+  const limit = Math.min(Math.max(f.limit ?? 25, 1), 100);
+  const rows = await db.trustRequest.findMany({
+    where: {
+      kind: f.kind ?? { in: [...TRUST_KINDS] },
+      ...(f.status ? { status: f.status } : {}),
+      ...(f.storeId ? { storeId: f.storeId } : {}),
+      ...(f.from || f.to
+        ? { createdAt: { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lte: f.to } : {}) } }
+        : {}),
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: limit + 1,
+    ...(f.cursor ? { cursor: { id: f.cursor }, skip: 1 } : {}),
+    select: REVIEW_SELECT,
+  });
+  const more = rows.length > limit;
+  const page = more ? rows.slice(0, limit) : rows;
+  return { rows: page, nextCursor: more ? (page[page.length - 1]?.id as string) : null };
+}
+
+export async function getTrustRequest(db: ReviewDb, id: string) {
+  const row = await db.trustRequest.findFirst({
+    where: { id, kind: { in: [...TRUST_KINDS] } },
+    select: REVIEW_SELECT,
+  });
+  if (!row) throw new AppError(404, 'TRUST_REQUEST_NOT_FOUND', 'Request not found');
+  return row;
+}
+
+/**
+ * Staff decision on ANY request kind: open -> resolved | rejected, once. Only an `open` row moves (a second click is
+ * 404 NOT_OPEN, never a silent overwrite). `rejected_at` is stamped on every rejection (it is what starts the appeal
+ * cooldown). The update names the row's own store / user so it stays tenant-scoped on D1.
+ */
+export async function decideTrustRequest(
+  db: ReviewDb,
+  id: string,
+  decision: TrustDecision
+): Promise<{ id: string; kind: string; storeId: string | null; status: TrustDecision }> {
+  const row = await getTrustRequest(db, id);
+  if (row.status !== 'open') {
+    throw new AppError(409, 'TRUST_REQUEST_NOT_OPEN', 'This request was already decided');
+  }
+  const { count } = await db.trustRequest.updateMany({
+    where: { id, status: 'open', storeId: row.storeId, userId: row.userId },
+    data: { status: decision, ...(decision === 'rejected' ? { rejectedAt: new Date() } : {}) },
+  });
+  if (count === 0) {
+    throw new AppError(409, 'TRUST_REQUEST_NOT_OPEN', 'This request was already decided');
+  }
+  return { id, kind: row.kind, storeId: row.storeId, status: decision };
+}
+
+/**
+ * The matching grant closes the request in the SAME flow (called BEFORE the grant and failing loud, Ruling TRUST-2),
+ * so a helped merchant is never left with an open request that blocks asking again.
+ *  - protected address: a super admin creates / renames a store onto the slug -> every open claim for that slug.
+ *  - store limit: a super admin changes the owner's plan (their store allowance) -> that owner's open cap request.
+ * Returns how many requests were closed.
+ */
+export async function closeGrantedRequests(
+  db: Pick<ReviewDb, 'trustRequest'>,
+  grant: { slug: string } | { ownerId: string }
+): Promise<number> {
+  if ('slug' in grant) {
+    // cross-user by design: ANY merchant's open claim for this address is answered by the grant
+    const { count } = await db.trustRequest.updateMany({
+      where: { kind: 'slug_claim', slug: grant.slug.trim().toLowerCase(), status: 'open' },
+      data: { status: 'resolved' },
+    });
+    return count;
+  }
+  const { count } = await db.trustRequest.updateMany({
+    where: { kind: 'store_cap', userId: grant.ownerId, status: 'open' },
+    data: { status: 'resolved' },
+  });
+  return count;
 }

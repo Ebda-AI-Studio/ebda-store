@@ -6281,7 +6281,8 @@
       "navPlatformProviderActivation": "طلبات التفعيل (المنصة)",
       "wholesalePendingBadge": "{count} طلب جملة مستني ردك",
       "navPlatformCiInsights": "ذكاء العملاء",
-      "navPlatformActivation": "تفعيل التجار"
+      "navPlatformActivation": "تفعيل التجار",
+      "navPlatformTrustRequests": "طلبات الدعم والثقة"
     },
     "errorState": {
       "defaultTitle": "حصلت مشكلة",
@@ -11720,6 +11721,61 @@
     "savedTitle": "اتحفظ الشحن",
     "savedBody": "سياسة الإرجاع اتحدّثت.",
     "saveLabel": "احفظ الشحن"
+  },
+  "trustRequests": {
+    "title": "طلبات الدعم والثقة",
+    "subtitle": "كل اللي التجار بيبعتوه لفريق ابدأ: طلبات الدعم، اعتراضات الإيقاف، مطالبات العناوين المحمية، وطلبات رفع حد المتاجر.",
+    "loadFailed": "مقدرناش نحمّل البيانات.",
+    "loading": "بيحمّل",
+    "empty": "مفيش طلبات مطابقة.",
+    "loadMore": "اعرض أكتر",
+    "filter": {
+      "title": "الفلاتر",
+      "kind": "النوع",
+      "status": "الحالة",
+      "store": "رقم المتجر",
+      "storePlaceholder": "رقم المتجر (UUID)",
+      "from": "اتعمل من",
+      "to": "اتعمل لحد",
+      "all": "الكل"
+    },
+    "kind": {
+      "support": "طلب دعم",
+      "suspension_appeal": "اعتراض على الإيقاف",
+      "slug_claim": "مطالبة بعنوان محمي",
+      "store_cap": "طلب رفع حد المتاجر"
+    },
+    "status": {
+      "open": "مفتوح",
+      "resolved": "اتحل",
+      "rejected": "مرفوض"
+    },
+    "list": {
+      "title": "الطلبات"
+    },
+    "col": {
+      "kind": "النوع",
+      "status": "الحالة",
+      "store": "المتجر",
+      "summary": "الطلب",
+      "created": "تاريخ الإنشاء",
+      "open": "فتح"
+    },
+    "detail": {
+      "title": "الطلب",
+      "open": "فتح",
+      "message": "الرسالة",
+      "requester": "رقم صاحب الطلب",
+      "topic": "الموضوع",
+      "slug": "العنوان",
+      "page": "الصفحة",
+      "evidence": "الإثبات",
+      "resolve": "تم الحل",
+      "reject": "رفض",
+      "close": "إغلاق",
+      "decided": "الطلب ده اتقرر فيه قبل كده.",
+      "failed": "مقدرناش نحفظ القرار. ممكن يكون اتقرر قبل كده، حدّث القايمة."
+    }
   },
   "activation": {
     "title": "تفعيل التجار",
