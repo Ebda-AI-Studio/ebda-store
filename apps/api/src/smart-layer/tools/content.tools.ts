@@ -172,7 +172,28 @@ function parseChart(x: unknown) {
     );
   return r.data;
 }
-const chartView = (c: Record<string, unknown>) => subset(c, CHART_KEYS);
+/**
+ * A stored chart in the shape the tool schema accepts: the database may hold null for text cells/labels/notes that the schema types as plain strings,
+ * and a restore built from that null would fail its own validation (the undo would be refused). Nulls become '' (what the schema's own defaults mean).
+ */
+const chartView = (c: Record<string, unknown>) => {
+  const v = subset(c, CHART_KEYS);
+  const str = (x: unknown) => (typeof x === 'string' ? x : '');
+  return {
+    name: str(v.name),
+    nameAr: str(v.nameAr),
+    unit: v.unit === 'in' ? 'in' : 'cm',
+    columns: (Array.isArray(v.columns) ? v.columns : []).map((col: Record<string, unknown>) => ({
+      label: str(col?.label),
+      labelAr: str(col?.labelAr),
+    })),
+    rows: (Array.isArray(v.rows) ? v.rows : []).map((r: unknown[]) =>
+      (Array.isArray(r) ? r : []).map(str)
+    ),
+    note: str(v.note),
+    noteAr: str(v.noteAr),
+  };
+};
 
 type ChartCreateArgs = ChartFields & {
   columns: NonNullable<ChartFields['columns']>;
@@ -277,20 +298,59 @@ const LEGAL_LABELS: Record<string, [string, string]> = {
   contentBlocksAr: ['نص الصفحة (عربي)', 'Page text (Arabic)'],
   isPublished: ['منشورة', 'Published'],
 };
+const BLOCK_TYPES = ['heading', 'paragraph', 'bullets', 'numbered', 'image', 'button'] as [
+  string,
+  ...string[],
+];
 const blockShape = {
-  type: f.enum(['heading', 'paragraph', 'bullets', 'numbered'], 'Block kind'),
+  type: f.enum(BLOCK_TYPES, 'Block kind'),
   level: f.int('Heading level 2 or 3', { min: 2, max: 3 }),
   text: f.text('Heading or paragraph text', { max: 10000 }),
   items: f.list(f.text('One list item', { max: 2000 }), { max: 100 }),
+  url: f.text('image or button link', { max: 2048 }),
+  alt: f.text('image alt text', { max: 500 }),
+  label: f.text('button label', { max: 200 }),
 };
 function assertBlocks(blocks: Block[] | null | undefined): void {
   for (const b of blocks ?? []) {
     const ok =
       (b.type === 'heading' && typeof b.text === 'string' && (b.level === 2 || b.level === 3)) ||
       (b.type === 'paragraph' && typeof b.text === 'string') ||
-      ((b.type === 'bullets' || b.type === 'numbered') && Array.isArray(b.items));
+      ((b.type === 'bullets' || b.type === 'numbered') && Array.isArray(b.items)) ||
+      (b.type === 'image' && typeof b.url === 'string' && typeof b.alt === 'string') ||
+      (b.type === 'button' && typeof b.url === 'string' && typeof b.label === 'string');
     if (!ok) throw new Error(`Invalid page block: ${JSON.stringify(b).slice(0, 80)}`);
   }
+}
+/** A stored body in the shape the tool schema accepts (known keys per block type only), or null. Used for the BEFORE values an undo restores. */
+function cleanBlocks(x: unknown): Block[] | null {
+  if (!Array.isArray(x)) return null;
+  const out: Block[] = [];
+  for (const raw of x as Block[]) {
+    if (!raw || typeof raw !== 'object') continue;
+    const str = (v: unknown) => (typeof v === 'string' ? v : '');
+    switch (raw.type) {
+      case 'heading':
+        out.push({ type: 'heading', level: raw.level === 3 ? 3 : 2, text: str(raw.text) });
+        break;
+      case 'paragraph':
+        out.push({ type: 'paragraph', text: str(raw.text) });
+        break;
+      case 'bullets':
+      case 'numbered':
+        out.push({ type: raw.type, items: (Array.isArray(raw.items) ? raw.items : []).map(str) });
+        break;
+      case 'image':
+        out.push({ type: 'image', url: str(raw.url), alt: str(raw.alt) });
+        break;
+      case 'button':
+        out.push({ type: 'button', label: str(raw.label), url: str(raw.url) });
+        break;
+      default:
+        break;
+    }
+  }
+  return out;
 }
 const legalBlocks = (d: string) =>
   f.nullable(f.list(f.obj(blockShape, ['type']), { max: 200, description: d }));
@@ -302,8 +362,8 @@ const legalPageUpdate = change<LegalArgs>({
   schema: shape<LegalArgs>(
     {
       slug: f.enum(['privacy', 'terms', 'shipping', 'returns'], 'Which policy page'),
-      title: f.nullable(f.text('Page title', { max: 300 })),
-      titleAr: f.nullable(f.text('Page title in Arabic', { max: 300 })),
+      title: f.nullable(f.text('Page title', { max: 2000 })),
+      titleAr: f.nullable(f.text('Page title in Arabic', { max: 2000 })),
       contentBlocks: legalBlocks('English body'),
       contentBlocksAr: legalBlocks('Arabic body'),
       isPublished: f.bool('false hides the page'),
@@ -318,13 +378,25 @@ const legalPageUpdate = change<LegalArgs>({
       string,
       unknown
     > | null;
-    return p
+    // A missing page shows the platform's default text, which is what a published page with empty content shows too (CmsPageContent falls back on empty
+    // content), so its BEFORE state is "published, empty": the undo of creating it restores exactly that (PagesService has no delete for a store admin).
+    const blank = {
+      title: null,
+      titleAr: null,
+      contentBlocks: null,
+      contentBlocksAr: null,
+      isPublished: true,
+    };
+    const v = p
       ? {
-          exists: true,
-          ...subset(p, Object.keys(LEGAL_LABELS)),
-          updatedAt: iso(p.updatedAt as Date),
+          title: p.title ?? null,
+          titleAr: p.titleAr ?? null,
+          contentBlocks: cleanBlocks(p.contentBlocks),
+          contentBlocksAr: cleanBlocks(p.contentBlocksAr),
+          isPublished: p.isPublished !== false,
         }
-      : { exists: false, ...Object.fromEntries(Object.keys(LEGAL_LABELS).map(k => [k, null])) };
+      : blank;
+    return { exists: !!p, ...v, updatedAt: p ? iso(p.updatedAt as Date) : null };
   },
   describe: (_ctx, a, st): Described => {
     const { slug, ...fields } = a;

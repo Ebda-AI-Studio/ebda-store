@@ -1,6 +1,11 @@
 /** SEO assistant tools (plan 4 B6): store search appearance and the answer-engine description, both through StoreService.updateSeo behind the `seo` plan feature. */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { ToolForbidden, type TurnCtx, type ToolSpec } from '@ebda/shared/smart-layer';
+import {
+  ToolForbidden,
+  effectivePolicy,
+  type TurnCtx,
+  type ToolSpec,
+} from '@ebda/shared/smart-layer';
 
 const m = vi.hoisted(() => ({
   row: {} as Record<string, unknown>,
@@ -25,6 +30,9 @@ vi.mock('@api/lib/repo-factory', () => ({
 }));
 vi.mock('@api/services/store.service', () => ({ StoreService: { updateSeo: m.updateSeo } }));
 
+import { MerchantForbidden } from '@api/mcp/run-as-merchant';
+import { storeRegistry } from '@api/smart-layer/registry';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 import { seoTools } from '@api/smart-layer/tools/seo.tools';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
@@ -46,12 +54,23 @@ const cases = [
     row: { metaTitle: 'Old', settings: { hideFromSearchEngines: false } },
     args: { metaTitle: 'عنوان جديد', hideFromSearchEngines: true },
     restore: { metaTitle: 'Old', hideFromSearchEngines: false },
+    hostile: { metaTitle: '', metaTitleAr: null, settings: null },
+    all: {
+      metaTitle: 'a',
+      metaTitleAr: 'a',
+      metaDescription: 'a',
+      metaDescriptionAr: 'a',
+      twitterHandle: 'a',
+      hideFromSearchEngines: false,
+    },
   },
   {
     name: 'answer_engine_settings',
     row: { metaDescriptionAeo: 'old' },
     args: { metaDescriptionAeo: 'We sell gold jewellery in Cairo.' },
     restore: { metaDescriptionAeo: 'old' },
+    hostile: { metaDescriptionAeo: '', metaDescriptionAeoAr: null },
+    all: { metaDescriptionAeo: 'a', metaDescriptionAeoAr: 'a' },
   },
 ];
 
@@ -109,6 +128,40 @@ describe('seo tools', () => {
         expect(m.updateSeo).not.toHaveBeenCalled();
       });
 
+      it('staff is refused at PREVIEW, the card is never built (mutation: delete the roles gate)', async () => {
+        m.row = c.row;
+        await expect(
+          tool(c.name).preview!(ctx('staff'), parse(c.name, c.args))
+        ).rejects.toBeInstanceOf(MerchantForbidden);
+        await expect(
+          tool(c.name).preview!(ctx('super_admin'), parse(c.name, c.args))
+        ).rejects.toBeInstanceOf(MerchantForbidden);
+      });
+
+      it('the seo plan feature off is refused at PREVIEW too (mutation: delete the feature gate)', async () => {
+        m.row = c.row;
+        m.featureEnabled.mockResolvedValue(false);
+        await expect(tool(c.name).preview!(ctx(), parse(c.name, c.args))).rejects.toBeInstanceOf(
+          MerchantForbidden
+        );
+      });
+
+      it('a stored row of nulls and empty strings still previews and its undo passes validation', async () => {
+        m.row = c.hostile;
+        const t = tool(c.name);
+        const args = parse(c.name, c.all);
+        const d = await t.preview!(ctx(), args);
+        const inv = t.inverse!(ctx(), args, d, { ok: true, etagAfter: 'x' });
+        expect(t.args.safeParse(inv!.args).success).toBe(true);
+      });
+
+      it('engine round trip: apply then undo ends undone', async () => {
+        m.row = c.row;
+        const r = await applyThenUndo(seoTools(), tool(c.name), c.args);
+        expect(r.applied).toBe('applied');
+        expect(r.undo).toBe('undone');
+      });
+
       it('the inverse restores the before values', async () => {
         m.row = c.row;
         const t = tool(c.name);
@@ -129,5 +182,24 @@ describe('seo tools', () => {
     expect(
       tool('answer_engine_settings').args.safeParse({ metaDescriptionAeo: 'x'.repeat(401) }).success
     ).toBe(false);
+  });
+
+  it('hiding the store from search engines escalates to confirm and says so; other changes stay a preview', async () => {
+    const t = tool('seo_meta_update');
+    const cap = storeRegistry().caps.get('store.seo')!;
+    m.row = { metaTitle: 'x', settings: { hideFromSearchEngines: false } };
+    const hide = await t.preview!(ctx(), parse('seo_meta_update', { hideFromSearchEngines: true }));
+    expect(hide.touchesCheckout).toBe(true);
+    expect(hide.summary.en).toMatch(/disappears from Google/);
+    expect(effectivePolicy(t, hide, { cap }).policy).toBe('confirm');
+    const title = await t.preview!(ctx(), parse('seo_meta_update', { metaTitle: 'y' }));
+    expect(effectivePolicy(t, title, { cap }).policy).toBe('preview');
+    // turning it back on (visible again) is not escalated
+    m.row = { settings: { hideFromSearchEngines: true } };
+    const show = await t.preview!(
+      ctx(),
+      parse('seo_meta_update', { hideFromSearchEngines: false })
+    );
+    expect(effectivePolicy(t, show, { cap }).policy).toBe('preview');
   });
 });

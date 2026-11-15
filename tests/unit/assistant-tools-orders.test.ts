@@ -42,6 +42,7 @@ vi.mock('@api/services/order.service', async () => ({
 }));
 
 import { ordersTools } from '@api/smart-layer/tools/orders.tools';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
   product: 'store',
@@ -62,12 +63,12 @@ const baseOrder = (o: Record<string, unknown> = {}) => ({
   paymentStatus: 'unpaid',
   total: 25050,
   updatedAt: '2026-11-14T10:00:00.000Z',
-  payments: [{ provider: 'cod' }],
+  payments: [{ provider: 'cod', amount: 24000 }],
   ...o,
 });
 const cases = [
   { name: 'order_set_status', args: { orderId: 'O1', status: 'confirmed' }, svc: 'updateStatus' },
-  { name: 'order_cancel', args: { orderId: 'O1', restoreInventory: true }, svc: 'updateStatus' },
+  { name: 'order_cancel', args: { orderId: 'O1' }, svc: 'updateStatus' },
   { name: 'order_mark_paid', args: { orderId: 'O1' }, svc: 'markCodPaid' },
 ] as const;
 
@@ -125,6 +126,23 @@ describe('order confirm tools', () => {
         });
       });
 
+      it('a role the route does not allow never gets a card (refused at PREVIEW)', async () => {
+        for (const role of ['customer', 'super_admin'])
+          await expect(
+            tool(c.name).preview!(ctx(role), parse(c.name, c.args))
+          ).rejects.toBeInstanceOf(Error);
+        expect(m.svc.getById).not.toHaveBeenCalled();
+      });
+
+      it('a role the route does not allow is refused at APPLY and nothing runs', async () => {
+        const t = tool(c.name);
+        const args = parse(c.name, c.args);
+        const d = await t.preview!(ctx(), args);
+        await expect(t.apply!(ctx('customer'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
+        expect(m.svc[c.svc]).not.toHaveBeenCalled();
+        expect(m.insertAuditLog).not.toHaveBeenCalled();
+      });
+
       it('a super admin is refused and nothing runs', async () => {
         const t = tool(c.name);
         const args = parse(c.name, c.args);
@@ -154,7 +172,7 @@ describe('order confirm tools', () => {
   it('a foreign order id never reaches run (the store-scoped read 404s)', async () => {
     m.svc.getById.mockRejectedValue(new Error('Order not found'));
     const t = tool('order_cancel');
-    const args = parse('order_cancel', { orderId: 'X', restoreInventory: true });
+    const args = parse('order_cancel', { orderId: 'X' });
     await expect(t.preview!(ctx(), args)).rejects.toThrow('not found');
     await expect(t.apply!(ctx(), args, {} as never)).rejects.toThrow('not found');
     expect(m.svc.updateStatus).not.toHaveBeenCalled();
@@ -177,22 +195,34 @@ describe('order confirm tools', () => {
       );
   });
 
-  it('cancel passes restoreInventory to the service and shows the total from state', async () => {
+  it('cancel shows the total and the customer notice, calls the service like the route (no options), and offers no restoreInventory option', async () => {
     const t = tool('order_cancel');
-    const args = parse('order_cancel', { orderId: 'O1', restoreInventory: false });
+    expect(t.args.safeParse({ orderId: 'O1', restoreInventory: false }).success).toBe(false);
+    const args = parse('order_cancel', { orderId: 'O1' });
     const d = await t.preview!(ctx(), args);
     expect(d.rows.some(r => r.after === '250.5')).toBe(true);
+    expect(d.rows.some(r => r.label.en === 'Customer notice')).toBe(true);
     await t.apply!(ctx(), args, d);
-    expect(m.svc.updateStatus).toHaveBeenCalledWith('S1', 'O1', 'cancelled', {
-      restoreInventory: false,
-    });
+    expect(m.svc.updateStatus).toHaveBeenCalledWith('S1', 'O1', 'cancelled');
+  });
+
+  it('cancel is BLOCKED at preview for a paid or disputed order (it would claim a refund that never happens)', async () => {
+    const t = tool('order_cancel');
+    const args = parse('order_cancel', { orderId: 'O1' });
+    for (const ps of ['paid', 'disputed']) {
+      m.order = baseOrder({ paymentStatus: ps });
+      await expect(t.preview!(ctx(), args)).rejects.toThrow(/refund or returns flow/);
+    }
+    expect(m.svc.updateStatus).not.toHaveBeenCalled();
   });
 
   it('mark paid: the amount shown comes from state(), a model-typed amount is rejected', async () => {
     const t = tool('order_mark_paid');
     expect(t.args.safeParse({ orderId: 'O1', amount: 1 }).success).toBe(false);
     const d = await t.preview!(ctx(), parse('order_mark_paid', { orderId: 'O1' }));
-    expect(d.rows.some(r => r.after === '250.5')).toBe(true);
+    // the booked amount is the COD payment row (240), not the order total (250.5)
+    expect(d.rows.some(r => r.after === '240')).toBe(true);
+    expect(d.rows.some(r => r.after === '250.5')).toBe(false);
   });
 
   it('mark paid is refused at preview for a non-COD, already paid or cancelled order', async () => {
@@ -266,7 +296,7 @@ describe('order_create_phone', () => {
     expect(m.insertAuditLog.mock.calls[0][0].details).toMatchObject({ actor: 'assistant' });
     expect(t.inverse!(ctx(), a, d, r)).toEqual({
       tool: 'order_cancel',
-      args: { orderId: 'O9', restoreInventory: true },
+      args: { orderId: 'O9' },
     });
   });
 
@@ -275,6 +305,25 @@ describe('order_create_phone', () => {
     const a = parse('order_create_phone', args);
     const d = await t.preview!(ctx(), a);
     await expect(t.apply!(ctx('customer'), a, d)).rejects.toBeInstanceOf(ToolForbidden);
+    expect(m.svc.createAdminOrder).not.toHaveBeenCalled();
+  });
+
+  it('the engine undo of a phone order is the confirm-class cancel: needs_confirm with a card', async () => {
+    m.order = baseOrder({ status: 'pending', paymentStatus: 'unpaid' });
+    const r = await applyThenUndo(ordersTools(), tool('order_create_phone'), args);
+    expect(r.applied).toBe('applied');
+    expect(r.undo).toBe('needs_confirm');
+    expect(r.card).toBeTruthy();
+  });
+
+  it('a role the route does not allow never gets a phone-order card, and cannot apply', async () => {
+    const t = tool('order_create_phone');
+    await expect(
+      t.preview!(ctx('customer'), parse('order_create_phone', args))
+    ).rejects.toBeInstanceOf(Error);
+    await expect(
+      t.apply!(ctx('customer'), parse('order_create_phone', args), {} as never)
+    ).rejects.toBeInstanceOf(ToolForbidden);
     expect(m.svc.createAdminOrder).not.toHaveBeenCalled();
   });
 
