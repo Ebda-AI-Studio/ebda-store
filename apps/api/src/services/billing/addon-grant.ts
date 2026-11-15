@@ -172,10 +172,12 @@ async function grantTerm(
   });
   let predId = latest?.id ?? 'none';
   let predEnd = latest?.forPeriodEnd ?? null;
+  let gen = 0;
   for (let i = 0; i < CHAIN_TRIES; i++) {
     const start = predEnd && predEnd.getTime() > now.getTime() ? predEnd : now;
     const end = addDays(start, ADDON_TERM_DAYS);
-    const key = `addon-after:${row.storeId}:${sku}:${predId}`;
+    // `gen` > 0 only after the slot was held by a REFUNDED payment (a dead anchor, see below).
+    const key = `addon-after:${row.storeId}:${sku}:${predId}${gen > 0 ? `:r${gen}` : ''}`;
     const marker = {
       id: crypto.randomUUID(),
       storeId: row.storeId,
@@ -213,6 +215,18 @@ async function grantTerm(
     });
     if (!held?.forPeriodEnd || !held.relatedEventId) continue;
     if (held.relatedEventId === row.id) return setEnd(held.forPeriodEnd); // already granted by another settle
+    // A REFUNDED payment must not anchor the chain (ADDON-CHAIN-2): its slot is dead, so take the next slot under the
+    // same predecessor instead of starting after the refunded term's end (that would leave a gap). Only `refunded` is
+    // dead: a `pending`/`failed` row can be a payment whose settle is still in flight (the D1 path flips the status AFTER
+    // the grant), and adopting those is what keeps racing payments from overlapping.
+    const heldPayment = await tx.billingEvent.findFirst({
+      where: { id: held.relatedEventId, storeId: row.storeId },
+      select: { status: true },
+    });
+    if (heldPayment?.status === 'refunded') {
+      gen++;
+      continue;
+    }
     predId = held.relatedEventId;
     predEnd = held.forPeriodEnd;
   }

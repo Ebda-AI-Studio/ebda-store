@@ -28,13 +28,13 @@ async function store() {
     .run();
   return id;
 }
-async function paid(storeId: string) {
+async function paid(storeId: string, status = 'succeeded') {
   const id = uid('ev');
   await e.PLATFORM_DB.prepare(
     `INSERT INTO billing_events (id, store_id, type, plan_code, amount_minor, provider, idempotency_key, status)
-     VALUES (?1, ?2, 'upgrade', ?3, 9900, 'kashier', ?4, 'succeeded')`
+     VALUES (?1, ?2, 'upgrade', ?3, 9900, 'kashier', ?4, ?5)`
   )
-    .bind(id, storeId, PLAN, `k-${id}`)
+    .bind(id, storeId, PLAN, `k-${id}`, status)
     .run();
   return { id, storeId, planCode: PLAN };
 }
@@ -104,6 +104,43 @@ describe('add-on grant on the platform D1: once per payment, never overlapping',
     expect(await setTermEndOnceD1(a.id, s, NOW.getTime() + DAY)).toBe(true);
     expect(await setTermEndOnceD1(a.id, s, NOW.getTime() + 2 * DAY)).toBe(false);
     expect(await endOf(a.id)).toBe(NOW.getTime() + DAY);
+  });
+
+  it('buy, refund, re-buy: the refunded payment does not anchor the chain, access starts now with no gap and no free days', async () => {
+    const s = await store();
+    const a = await paid(s);
+    await applyAddonGrant(tx, a, NOW, [] as never);
+    await e.PLATFORM_DB.prepare("UPDATE billing_events SET status = 'refunded' WHERE id = ?1")
+      .bind(a.id)
+      .run();
+    const mid = new Date(NOW.getTime() + 5 * DAY); // inside the refunded term's window
+    const b = await paid(s);
+    await applyAddonGrant(tx, b, mid, [] as never);
+    expect(await endOf(b.id)).toBe(mid.getTime() + 30 * DAY); // from now, not from the refunded end
+  });
+
+  it('a payment whose settle is still in flight (status pending) still anchors: the next one chains after it, never overlaps', async () => {
+    const s = await store();
+    const a = await paid(s, 'pending'); // the D1 settle path flips the status AFTER the grant
+    await applyAddonGrant(tx, a, NOW, [] as never);
+    const b = await paid(s);
+    await applyAddonGrant(tx, b, NOW, [] as never);
+    expect(await endOf(b.id)).toBe(NOW.getTime() + 60 * DAY);
+  });
+
+  it('refunding the EARLIER of two chained terms leaves the later one in place and a new payment still stacks after it', async () => {
+    const s = await store();
+    const a = await paid(s);
+    await applyAddonGrant(tx, a, NOW, [] as never);
+    const b = await paid(s);
+    await applyAddonGrant(tx, b, NOW, [] as never);
+    await e.PLATFORM_DB.prepare("UPDATE billing_events SET status = 'refunded' WHERE id = ?1")
+      .bind(a.id)
+      .run();
+    const c = await paid(s);
+    await applyAddonGrant(tx, c, NOW, [] as never);
+    expect(await endOf(b.id)).toBe(NOW.getTime() + 60 * DAY);
+    expect(await endOf(c.id)).toBe(NOW.getTime() + 90 * DAY);
   });
 
   it('a later payment after the term expired starts from now, not from the old end', async () => {
