@@ -773,7 +773,7 @@ const loyaltySettings = change<LoyaltyArgs>({
     birthdayBonus: f.num('Points on a birthday', { min: 0 }),
   }),
   policy: 'confirm',
-  undo: 'reversible',
+  undo: 'irreversible', // the registry class of marketing.loyalty is irreversible (points awards cannot be taken back), and the engine never lets a tool be softer than its capability
   // routes/loyalty.routes.ts PUT /loyalty/settings: authorize(store_admin, super_admin) + requireFeature('loyalty')
   gate: { ...OWNER, feature: 'loyalty' },
   audit: {
@@ -813,7 +813,6 @@ const loyaltySettings = change<LoyaltyArgs>({
       ...(Object.keys(settings).length ? { settings } : {}),
     });
   },
-  inverse: (_a, restore) => ({ tool: 'loyalty_settings_set', args: restore }),
 });
 
 // ---- wallet ---------------------------------------------------------------------------------------------------------------------------------
@@ -926,7 +925,7 @@ const customerArg = shape<{ customerId?: string }>({ customerId: f.id('A custome
 
 const campaignsOverview = readTool({
   name: 'campaigns_overview',
-  capabilityId: 'marketing.campaigns',
+  capabilityId: 'marketing.overview',
   description:
     'Show the latest email campaigns (status, how many were sent) and how many newsletter subscribers a campaign would reach now, with the daily sending limit ("حملاتي", "كام مشترك هيوصله الايميل", "my campaigns").',
   roles: ['store_admin'],
@@ -947,7 +946,7 @@ const campaignsOverview = readTool({
 });
 const newsletterSummary = readTool({
   name: 'newsletter_subscribers_summary',
-  capabilityId: 'marketing.newsletter',
+  capabilityId: 'marketing.overview',
   description:
     'Count the newsletter subscribers and show the newest few with masked emails ("مين اشترك في النشرة؟", "how many subscribers do I have"). To get the full list as a file the merchant uses Export on the Newsletter screen.',
   roles: ['store_admin'],
@@ -973,7 +972,7 @@ const newsletterSummary = readTool({
 });
 const pushRecent = readTool({
   name: 'push_recent_broadcasts',
-  capabilityId: 'marketing.push-web',
+  capabilityId: 'marketing.overview',
   description:
     'Show the last web push notifications sent to shoppers with delivery and click counts ("اخر اشعارات بعتها", "how did my last push do").',
   roles: ['store_admin'],
@@ -988,7 +987,7 @@ const pushRecent = readTool({
 });
 const whatsappStatus = readTool({
   name: 'whatsapp_link_status',
-  capabilityId: 'notify.whatsapp-link',
+  capabilityId: 'marketing.overview',
   description:
     'Say whether the store is linked to Ebda Chat (WhatsApp) and whether the plan includes it ("المتجر مربوط بواتساب؟", "is WhatsApp connected"). Connecting or disconnecting is done on the Notifications screen.',
   roles: ['store_admin'],
@@ -1004,7 +1003,7 @@ const lifecycleOverview = readTool({
 });
 const affiliatesOverview = readTool({
   name: 'affiliates_overview',
-  capabilityId: 'marketing.affiliates',
+  capabilityId: 'marketing.overview',
   description:
     'Show the affiliate program totals and the newest partners with their status and pending commission ("المسوقين بتوعي", "who is waiting for approval", "how much do I owe affiliates").',
   roles: ['store_admin'],
@@ -1029,7 +1028,7 @@ const affiliatesOverview = readTool({
 });
 const loyaltyOverview = readTool({
   name: 'loyalty_overview',
-  capabilityId: 'marketing.loyalty',
+  capabilityId: 'marketing.overview',
   description:
     'Show the loyalty program settings and totals, or one customer\'s points when customerId is given ("النقاط بتنتهي امتى؟", "how many points does she have", "loyalty stats").',
   roles: ['store_admin'],
@@ -1048,7 +1047,7 @@ const loyaltyOverview = readTool({
 });
 const walletOverview = readTool({
   name: 'wallet_overview',
-  capabilityId: 'marketing.wallet',
+  capabilityId: 'marketing.overview',
   description:
     'Show one customer\'s store-credit balance when customerId is given, otherwise the customers holding the biggest balances and the total owed ("العميل رصيده ايه؟", "who has store credit").',
   roles: ['store_admin'],
