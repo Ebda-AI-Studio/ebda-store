@@ -32,7 +32,7 @@ export const ZONE_ORDER = [
 ] as const;
 
 /** The same zones, grouped by where they sit on the storefront (plan F14): closed by default. */
-export const ZONE_GROUPS = [
+const ZONE_GROUPS = [
   { id: 'top', zones: ['beforeHeader', 'header', 'storeName'] },
   { id: 'headings', zones: ['sectionKicker', 'sectionTitle', 'sectionSubtitle', 'sectionSeeAll'] },
   {
