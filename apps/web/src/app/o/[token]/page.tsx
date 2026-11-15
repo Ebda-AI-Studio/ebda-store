@@ -51,7 +51,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
   const ar = data.locale === 'ar';
   const L = (a: string, e: string) => (ar ? a : e);
   const status = STATUS[data.status]?.[ar ? 0 : 1] ?? data.status;
-  const total = new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', {
+  const total = new Intl.NumberFormat(ar ? 'ar-EG-u-nu-latn' : 'en-EG', {
     style: 'currency',
     currency: data.currency,
   }).format(data.total / 100);

@@ -25,7 +25,7 @@ export const storeEventSchema = z.discriminatedUnion('type', [
   // v1.4 (additive, WA-GRACE-1): `pastDueSince` = when the subscription first went past_due (set only while status is past_due). WhatsApp ends its
   // grace at min(periodEnd, pastDueSince + 7 days).
   ev('store.plan_changed', z.object({ planCode: z.string(), includesWhatsApp: z.boolean(), ownerUserId: z.string(), effectiveAt: iso, status: planStatus.optional(), periodEnd: iso.optional(), pastDueSince: iso.optional() })),
-  // v1.6 (additive): `storefrontOrigin` = where the store's customers shop (custom domain, else <slug>.ebda.app). Chat submits its per-store COD v2 template (fixed URL base) with it.
+  // v1.6 (additive): `storefrontOrigin` = where the store's customers shop (its custom domain, else the platform subdomain). Chat submits its per-store COD v2 template (fixed URL base) with it.
   ev('store.linked', z.object({ ownerUserId: z.string(), storefrontOrigin: z.string().url().max(200).optional() })),
   ev('store.unlinked', z.object({ ownerUserId: z.string() })),
   ev('catalog.product_upserted', z.object({ productId: z.string().min(1), variantIds: z.array(z.string().min(1)), updatedAt: iso })),
