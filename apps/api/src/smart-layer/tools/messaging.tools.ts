@@ -998,7 +998,7 @@ const lifecycleOverview = readTool({
   name: 'lifecycle_emails_overview',
   capabilityId: 'marketing.lifecycle-emails',
   description:
-    'List the setup and onboarding emails Ebda sends the merchant (welcome, tips) and whether each was sent, skipped or is still pending ("ايه الرسايل اللي بتتبعت لي؟", "what automatic emails are sent").',
+    'List the setup and onboarding emails Ebda Store sends the merchant (welcome, tips) and whether each was sent, skipped or is still pending ("ايه الرسايل اللي بتتبعت لي؟", "what automatic emails are sent").',
   roles: ['store_admin', 'staff'],
   read: ctx => listLifecycleLog(ctx.storeId),
 });
@@ -1073,7 +1073,6 @@ const walletOverview = readTool({
   },
 });
 
-// pq-allow(unused-export): wired into change-tools.ts by the controller after this slice merges
 export function messagingTools(): ToolSpec[] {
   return [
     campaignSend,
