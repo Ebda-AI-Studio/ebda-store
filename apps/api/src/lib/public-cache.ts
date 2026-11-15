@@ -407,6 +407,15 @@ export async function invalidateStoreProductCaches(storeId: string): Promise<voi
 }
 
 /**
+ * A blog post write (create / update / delete): the storefront renders /blog and /blog/<slug> server-side, so the
+ * edge HTML copy and the Next data cache (fetches tagged `blog:<storeId>`) must drop. Without this the HTML edge copy of a
+ * blog page could outlive the edit for its whole stale window (STORE-EDGE-4). Fire-and-forget like every purge.
+ */
+export function purgeStorefrontBlog(storeId: string): void {
+  revalidateStorefront({ tags: [`blog:${storeId}`] });
+}
+
+/**
  * Cache key for a store's public purchasable-bundle list (`bundle.routes.ts`).
  * v2 (PR 2301): the cached value now holds each bundle's sale window instead
  * of a pre-applied `isPurchasable` (issue 2111). A v1 entry read by the v2

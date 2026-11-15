@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { DEFAULT_PLAN_SEEDS, FEATURE_KEYS_ARRAY } from '@ebda/shared';
+import { TEST_PASSWORD_HASH } from './fixtures/test-password-hash';
 
 // Ruling ROLE-GUARD-LAZY-1: with Postgres unreachable (Neon quota, 2026-10-31) the built Worker still serves
 // everything D1 / a Durable Object answers. Run with EBDA_WORKERS_TEST_DB_URL pointing at a dead port.
@@ -428,8 +429,7 @@ describe.skipIf(e.E2E_DB === '1')('customer auth on a StoreDO with Postgres unre
   const EMAIL = 'shopper@exit-test.invalid';
   const PW = 'Passw0rd!xyz';
   const PW2 = 'N3wPassw0rd!abc';
-  // bcrypt cost 4 of PW (test fixture only)
-  const HASH = '$2b$04$jYDlZaJj/X/kmBmzPXDwsOP4.aIZ2IBm.rDUDGyiC8iKKUZPb/Rzm';
+  const HASH = TEST_PASSWORD_HASH;
   const sha = async (t: string) =>
     [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))]
       .map(b => b.toString(16).padStart(2, '0'))

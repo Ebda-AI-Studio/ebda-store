@@ -49,9 +49,18 @@ export { urlLocaleOf };
  * `delete` would clear one data centre only; the epoch reaches all of them.
  *
  * CACHE CLASS: price/stock/gold-rate price/status/theme/layout = NEVER-stale, event-invalidated as above; categories, blog
- * and static pages = BOUNDED-stale under the same purge (category writes purge `categories:<id>` since S2-REVIVE). The TTL
- * (fresh 60 s, then served stale for up to 600 s while one request refreshes) is only an outer bound and applies the same
- * epoch check to the stale copy. Residuals (Ruling STORE-EDGE-2, cost if wrong: a shopper sees an old listing price or
+ * and static pages = BOUNDED-stale under the same purge (category writes purge `categories:<id>` since S2-REVIVE; blog
+ * writes purge `blog:<id>` since STORE-EDGE-4). The TTL (fresh 60 s, then served stale for up to {@link STORE_EDGE_STALE_S}
+ * = 6 h while one request refreshes) is only an outer bound and applies the same epoch check to the stale copy.
+ * STORE-EDGE-4 (quiet hours, measured 2026-11-14/15 on ebda-web: p50 2-4 s, p99 6-12 s at 100-300 req/h because a page
+ * not asked for within the old 600 s window was a MISS, a cold render in front of the shopper): the stale window grew from
+ * 10 min to 6 h so a quiet-hour visitor gets the copy at once and the refresh runs in waitUntil. This is safe ONLY because
+ * every write that changes what a page renders purges its store's epoch (map and guard: tests/unit/storefront-edge-write-paths.test.ts);
+ * the TTL is no longer what keeps price/stock right, so a write path that stops purging is a bug, not a 10-minute blip.
+ * A lost purge is NOT left to the TTL: the API's in-request attempt (3 tries) is the fast path, and a purge it cannot land is
+ * queued (`storefront-purge-retry`, jobs queue: retries with backoff, then the dead-letter path raises the P1 alert). Bundle sale
+ * windows change buyability with no write, so the API schedules a purge at each boundary (`storefront-bundle-boundary`) AND
+ * publishes the next boundary as `bundle-boundary:<id>:<ms>`, which caps a cached page's life there (see bumpEpochs). Residuals (Ruling STORE-EDGE-2, cost if wrong: a shopper sees an old listing price or
  * stock figure for that long; checkout re-reads both from the store and stays authoritative): (1) the order path coalesces
  * its purge to one per 10 s per store (public-cache.ts ORDER_PURGE_COALESCE_MS); (2) a purge the API could not deliver
  * (secret missing, Worker down) leaves the copy until the TTL, the same floor the Next data cache already has; (3) each
@@ -66,7 +75,7 @@ export { urlLocaleOf };
  * copy an older build rendered. No version id = the layer does not cache.
  */
 export const STORE_EDGE_FRESH_S = 60;
-export const STORE_EDGE_STALE_S = 600;
+export const STORE_EDGE_STALE_S = 21_600;
 const META = 'x-store-edge-meta';
 const APEX_SLUG_SUFFIX = '.ebda.app';
 
@@ -205,7 +214,7 @@ export function epochKeysForTag(tag: string): string[] {
   if (!m) return ['all'];
   const [, kind, value] = m;
   if (
-    ['products', 'categories', 'bundles', 'layout', 'pwa'].includes(kind) &&
+    ['products', 'categories', 'bundles', 'layout', 'pwa', 'blog'].includes(kind) &&
     /^[\w-]{8,64}$/.test(value)
   )
     return [`id/${value}`];
@@ -222,9 +231,34 @@ const epochObject = (key: string) => `html-epoch/${key}`;
 export const EPOCH_MEMO_MS = 2_000;
 const epochMemo = new Map<string, { v: number; until: number }>();
 
+/**
+ * BUNDLE BOUNDARY (STORE-EDGE-4, belt and braces): a bundle's sale window starting or ending is not a write, so no purge
+ * fires by itself; the API schedules one (storefront-bundle-boundary job) AND publishes the store's NEXT boundary here as the
+ * tag `bundle-boundary:<storeId>:<epochMs>`. An entry rendered before that instant is not served at or after it, even if the
+ * scheduled purge never ran: a cached page's life is capped at the store's next bundle boundary.
+ */
+const BOUNDARY_TAG = /^bundle-boundary:([\w-]{8,64}):(\d{10,15})$/;
+const boundaryKey = (storeId: string) => `boundary/${storeId}`;
+
 /** Record a purge: after this, no page rendered before `now` is served for these tags' stores. */
 export async function bumpEpochs(r2: R2Like, tags: string[], now: number): Promise<void> {
-  const keys = new Set(tags.flatMap(epochKeysForTag));
+  const boundaries: Array<[string, string]> = [];
+  const plain: string[] = [];
+  for (const t of tags) {
+    const b = BOUNDARY_TAG.exec(t);
+    if (b) boundaries.push([b[1], b[2]]);
+    else plain.push(t);
+  }
+  if (boundaries.length) {
+    epochMemo.clear();
+    try {
+      await Promise.all(boundaries.map(([id, ms]) => r2.put(epochObject(boundaryKey(id)), ms)));
+    } finally {
+      epochMemo.clear();
+    }
+  }
+  if (plain.length === 0) return;
+  const keys = new Set(plain.flatMap(epochKeysForTag));
   // This isolate forgets before and after, so it never serves its own pre-purge copy.
   epochMemo.clear();
   try {
@@ -269,7 +303,16 @@ export async function entryEpochState(
   }
   if (!stamps.every(Number.isFinite)) return 'unknown';
   // 1 s of margin for clock skew between the Worker that rendered and the one that purged.
-  return stamps.every(s => s < meta.at - 1000) ? 'current' : 'purged';
+  if (!stamps.every(s => s < meta.at - 1000)) return 'purged';
+  // Bundle boundary cap: a boundary crossed since this copy's render began ends its life.
+  let boundary: number;
+  try {
+    boundary = await readEpoch(r2, boundaryKey(meta.id), now);
+  } catch {
+    return 'unknown';
+  }
+  if (!Number.isFinite(boundary)) return 'unknown';
+  return boundary > 0 && meta.at < boundary && boundary <= now ? 'purged' : 'current';
 }
 
 /** Test seam. */

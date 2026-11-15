@@ -133,6 +133,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## ebda - Ebda program: plans, research, brand, templates
 
+- [ebda-assistant-rollout.md](ebda-assistant-rollout.md) - Ebda Store assistant: rollout stages and safety gate
 - [ebda/ads-tracking.md](ebda/ads-tracking.md) - Ebda Store acquisition tracking (own Meta ads + PostHog funnel)
 - [ebda/brand/ebda-brief-v2.html](ebda/brand/ebda-brief-v2.html) - ebda brief v2
 - [ebda/brand/operator.md](ebda/brand/operator.md) - Operator of Ebda
@@ -387,6 +388,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [superpowers/plans/2026-04-23-final-push-plan.md](superpowers/plans/2026-04-23-final-push-plan.md) - Final Push — Plan
 - [superpowers/plans/2026-04-23-remaining-refactors-master-plan.md](superpowers/plans/2026-04-23-remaining-refactors-master-plan.md) - Remaining Refactors — Master Plan
 - [superpowers/plans/2026-04-29-tenant-control-batch-2.md](superpowers/plans/2026-04-29-tenant-control-batch-2.md) - Tenant Control Batch 2 — 2026-04-29
+- [superpowers/plans/2026-11-14-instapay-auto-confirm.md](superpowers/plans/2026-11-14-instapay-auto-confirm.md) - InstaPay Auto-Confirm Implementation Plan
 - [superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md](superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md) - Storefront per-store PWA — extend to full size set
 - [superpowers/plans/2026-05-16-mobile-ui-ship.md](superpowers/plans/2026-05-16-mobile-ui-ship.md) - Mobile UI ship — match Storefront + Bank-Alkahraman sizing
 - [superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md](superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md) - Ebda Store Storefront UI/UX Refresh — Plan
