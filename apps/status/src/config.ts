@@ -106,7 +106,7 @@ export const COMPONENTS: readonly ComponentConfig[] = [
 ];
 
 export const DEFAULT_TIMEOUT_MS = 8000;
-export const DEFAULT_FAIL_THRESHOLD = 3;
-export const DEFAULT_RECOVER_THRESHOLD = 2;
+export const DEFAULT_FAIL_THRESHOLD = 2;
+export const DEFAULT_RECOVER_THRESHOLD = 1;
 /** Days of daily rollups kept and shown. */
 export const HISTORY_DAYS = 90;
