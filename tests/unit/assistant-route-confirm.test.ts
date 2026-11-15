@@ -25,6 +25,14 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (
+    req: { user?: { impersonatedBy?: string } },
+    res: { status(n: number): { json(b: unknown): void } },
+    next: () => void
+  ) =>
+    req.user?.impersonatedBy
+      ? res.status(403).json({ success: false, error: { code: 'IMPERSONATION_FORBIDDEN' } })
+      : next(),
   authenticate: (
     req: { user?: unknown; headers: Record<string, string | undefined> },
     res: { status(n: number): { json(b: unknown): void } },

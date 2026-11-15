@@ -20,7 +20,7 @@ import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
  * StoreDO (customer-auth cutover, Ruling NZ-N9-6) reads its directory there; a soft-deleted customer is dropped like a
  * Postgres row that no longer matches. Otherwise the unchanged Postgres `users` read, scoped to the store's customer accounts.
  */
-async function storeCustomerIdentities(
+export async function storeCustomerIdentities(
   storeId: string,
   ids: string[]
 ): Promise<Map<string, { id: string; email: string; firstName: string; lastName: string }>> {

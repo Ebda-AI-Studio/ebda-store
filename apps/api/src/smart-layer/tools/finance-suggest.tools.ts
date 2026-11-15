@@ -63,9 +63,9 @@ const STORE_ROLES = ['store_admin'] as const; // the routes' `authorize('store_a
 /**
  * `POST /finance/journal` is `authorize('super_admin')` (finance.routes.ts) with the comment "store admins post via service helpers, not raw GL, in v1",
  * while capability finance.journal-accounts lists the owner and the owner's decision is "the AI proposes, the merchant clicks each entry". The tool
- * follows the capability; the controller must confirm with Ahmad (or set this to ['super_admin'], which makes the tool refuse every merchant).
+ * is therefore CLOSED (empty list: every role is refused at preview and apply) until the route lets owners post; then set this to STORE_ROLES.
  */
-const JOURNAL_ROLES = STORE_ROLES;
+const JOURNAL_ROLES: readonly Role[] = []; // fail closed: no role may use the tool until the route allows owners
 const minor = (v: number) => Math.round(v * 100);
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -487,12 +487,25 @@ const anomalyAck = change<AnomalyArgs>({
 });
 
 // ---- vat_registration_submit ------------------------------------------------------------------------------------------------------------
-const vatSubmit = change<Record<string, never>>({
+/** The legal statement the route demands (`taxProfileSubmitSchema.attest`), verbatim from the VAT screen's copy (admin i18n `attest`). The card shows it and the confirm covers it. */
+const VAT_ATTESTATION = {
+  ar: 'أقرّ بأن هذه المنشأة مسجّلة في ضريبة القيمة المضافة لدى مصلحة الضرائب المصرية',
+  en: 'I confirm this business is registered for VAT with the Egyptian Tax Authority',
+} as const;
+const attestField = {
+  z: z.literal(true),
+  js: {
+    type: 'boolean',
+    enum: [true],
+    description: 'Must be true: the merchant attests, on the card, the statement it shows.',
+  },
+};
+const vatSubmit = change<{ attest: true }>({
   name: 'vat_registration_submit',
   capabilityId: 'finance.tax-vat',
   description:
     "Submit the merchant's VAT registration (تسجيل ضريبة القيمة المضافة) for review: sends the saved tax registration number, legal name and uploaded documents to Ebda Store for verification. It cannot be withdrawn from the assistant; VAT is only charged after approval.",
-  schema: shape<Record<string, never>>({}),
+  schema: shape<{ attest: true }>({ attest: attestField }, ['attest']),
   policy: 'confirm',
   undo: 'irreversible',
   gate: { roles: STORE_ROLES }, // routes/tax.routes.ts: authorize('store_admin', 'super_admin'), no requireFeature
@@ -507,7 +520,13 @@ const vatSubmit = change<Record<string, never>>({
       submittedAt: iso(p.submittedAt),
     };
   },
-  describe: (_ctx, _a, st): Described => {
+  describe: (_ctx, a, st): Described => {
+    if (a.attest !== true)
+      throw new AppError(
+        400,
+        'ATTESTATION_REQUIRED',
+        'The VAT attestation must be shown and confirmed.'
+      );
     const s = st as {
       status: string;
       taxRegistrationNumber: string | null;
@@ -533,9 +552,16 @@ const vatSubmit = change<Record<string, never>>({
         row('الرقم الضريبي', 'Tax registration number', null, s.taxRegistrationNumber),
         row('الاسم القانوني', 'Legal name', null, s.legalName),
         row('عدد المستندات', 'Documents', null, s.documents.length),
+        row(
+          'الإقرار (يشمله التأكيد)',
+          'Attestation (covered by your confirmation)',
+          null,
+          `${VAT_ATTESTATION.ar} / ${VAT_ATTESTATION.en}`
+        ),
         row('الحالة', 'Status', s.status, 'submitted'),
       ],
       affectedCount: 1,
+      restore: { attestation: VAT_ATTESTATION },
     };
   },
   run: ctx => TaxProfileService.submit(ctx.storeId, { userId: ctx.userId }),

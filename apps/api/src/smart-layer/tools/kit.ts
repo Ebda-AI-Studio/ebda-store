@@ -157,6 +157,12 @@ type ChangeDef<A> = {
   resultTrust?: ToolSpec['resultTrust'];
 };
 
+/** name -> the parts of a registered tool another tool needs: its argument schema and the etag of its targets. A create tool's undo is ANOTHER tool, so the etag stored after the create must be the one the inverse tool's own preview will compute. */
+const registered = new Map<
+  string,
+  { args: ToolSpec['args']; etag: (ctx: TurnCtx, args: unknown) => Promise<string> }
+>();
+
 const etagOf = async (state: unknown): Promise<string> =>
   (await sha256Hex(canonicalJson(state ?? null))).slice(0, 32);
 export const pair = (ar: string, en: string) => ({ ar, en });
@@ -197,6 +203,18 @@ export function change<A>(d: ChangeDef<A>): ToolSpec {
       await assertMerchantMay(gate(ctx)); // a merchant who may not do this never gets a card for it
       const st = await readState(ctx, a);
       const x = await d.describe(ctx, a, st);
+      // An undo that cannot pass its own tool's validation is a card that lies ("you can undo this"): refuse it now. (A create tool's inverse needs the new id, so
+      // it can only be checked after the apply; the engine-level round-trip tests cover those.)
+      let inv: InverseOp | null = null;
+      try {
+        inv = d.inverse?.(a, x.restore ?? null, undefined) ?? null;
+      } catch {
+        inv = null;
+      }
+      if (inv && inv.tool === d.name && !d.schema.args.safeParse(inv.args).success)
+        throw new Error(
+          `${d.name}: the undo of this change does not pass its own validation (restore ${JSON.stringify(x.restore)})`
+        );
       return {
         summary: x.summary,
         rows: x.rows,
@@ -208,7 +226,7 @@ export function change<A>(d: ChangeDef<A>): ToolSpec {
         ...(x.costCredits !== undefined ? { costCredits: x.costCredits } : {}),
       };
     },
-    async apply(ctx, a) {
+    async apply(ctx, a, draft) {
       try {
         const result = await runAsMerchant(
           {
@@ -223,7 +241,15 @@ export function change<A>(d: ChangeDef<A>): ToolSpec {
           },
           async () => d.run(ctx, a, await d.state(ctx, a))
         );
-        return { ok: true, etagAfter: await etagOf(await readState(ctx, a)), result };
+        // etagAfter is what the UNDO's preview will compute: for a same-tool inverse the targets' state; for a create tool whose inverse is another tool, that tool's state on the created id.
+        const inv = d.inverse?.(a, (draft.payload as { restore: unknown }).restore, result) ?? null;
+        const other = inv && inv.tool !== d.name ? registered.get(inv.tool) : undefined;
+        let etagAfter: string;
+        if (other) {
+          const parsed = other.args.safeParse(inv!.args);
+          etagAfter = await other.etag(ctx, parsed.success ? parsed.data : inv!.args);
+        } else etagAfter = await etagOf(await readState(ctx, a));
+        return { ok: true, etagAfter, result };
       } catch (err) {
         if (err instanceof MerchantForbidden) throw new ToolForbidden();
         throw err;
@@ -237,6 +263,10 @@ export function change<A>(d: ChangeDef<A>): ToolSpec {
       : {}),
   };
   gates.set(spec, ctx => assertMerchantMay(gate(ctx)));
+  registered.set(d.name, {
+    args: d.schema.args as ToolSpec['args'],
+    etag: async (ctx, args) => etagOf(await readState(ctx, args as A)),
+  });
   return spec as unknown as ToolSpec;
 }
 
