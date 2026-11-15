@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../components/AdminLayout';
@@ -16,21 +16,32 @@ function StoreArchiveInner({ storeId }: { storeId: string }) {
   const [documents, setDocuments] = useState<FiscalDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  // A deleted store is served from the platform archive in keyset pages (`nextCursor`); a live store returns everything at once.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (cursor: string | null, isCancelled: () => boolean) => {
+      const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const { data, error } = await apiGet<{
+        documents: FiscalDocument[];
+        nextCursor?: string | null;
+      }>(`/api/v1/admin/fiscal-archive/${storeId}${qs}`);
+      if (isCancelled()) return;
+      setLoadError(!!error);
+      setDocuments(prev => [...(cursor ? prev : []), ...(data?.documents ?? [])]);
+      setNextCursor(data?.nextCursor ?? null);
+      setLoading(false);
+    },
+    [storeId]
+  );
 
   useEffect(() => {
     let cancelled = false;
-    void apiGet<{ documents: FiscalDocument[] }>(`/api/v1/admin/fiscal-archive/${storeId}`).then(
-      ({ data, error }) => {
-        if (cancelled) return;
-        setLoadError(!!error);
-        setDocuments(data?.documents ?? []);
-        setLoading(false);
-      }
-    );
+    void load(null, () => cancelled);
     return () => {
       cancelled = true;
     };
-  }, [storeId]);
+  }, [load]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
@@ -60,6 +71,15 @@ function StoreArchiveInner({ storeId }: { storeId: string }) {
             </div>
           }
         />
+      )}
+      {nextCursor && (
+        <button
+          type="button"
+          className="text-sm text-primary hover:underline"
+          onClick={() => void load(nextCursor, () => false)}
+        >
+          {t('loadMore')}
+        </button>
       )}
     </div>
   );

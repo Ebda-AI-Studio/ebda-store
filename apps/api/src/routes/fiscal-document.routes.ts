@@ -1,5 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { fiscalArchiveHub, fiscalArchiveStoresHub } from '../lib/fiscal-archive-hub';
+import { hubStoresById } from '../lib/platform-hub';
+import { archiveBucket, backfillOne } from '../lib/fiscal-archive-do';
+import {
+  listArchivedStores,
+  loadArchive,
+  pageArchivedDocuments,
+} from '../lib/fiscal-archive-store';
 import { hubOnD1 } from '../lib/platform-hub';
 import { z } from 'zod/v3';
 import { prisma, withUser } from '@ebda/database';
@@ -43,6 +50,16 @@ const listQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
   docType: z.enum(DOC_TYPES).optional(),
   /** Search by document number (INV-000042) or the number of the document a credit note reverses. */
+  q: z.string().trim().min(1).max(64).optional(),
+});
+/** Keyset list of a deleted store's archive: `cursor` is the previous page's `nextCursor`. */
+const archiveListQuery = z.object({
+  cursor: z
+    .string()
+    .regex(/^\d+:[\w-]+$/)
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  docType: z.enum(DOC_TYPES).optional(),
   q: z.string().trim().min(1).max(64).optional(),
 });
 const localeQuery = z.object({ locale: z.enum(['ar', 'en']).optional() });
@@ -111,6 +128,19 @@ fiscalDocumentRoutes.get(
   }
 );
 
+/**
+ * A DELETED DO store (Ruling FISCAL-ARCHIVE-1): its directory row is retired, so the store DO can no longer be reached through
+ * `storeDb`; its documents are read from the platform archive instead. null = the store is live (or has no archive): use the live path.
+ */
+async function deletedStoreArchive(storeId: string) {
+  const r2 = archiveBucket();
+  if (!r2 || !(await hubOnD1())) return null;
+  if ((await hubStoresById([storeId])).length > 0) return null;
+  const a = await loadArchive(r2, storeId);
+  if (!a) throw new AppError(404, 'NOT_FOUND', 'No archived fiscal records for this store');
+  return a;
+}
+
 const superAdmin = [authenticate, requireMfaEnrolled, authorize('super_admin')];
 
 export const fiscalArchiveRoutes = Router();
@@ -120,9 +150,21 @@ fiscalArchiveRoutes.get(
   ...superAdmin,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const stores = (await hubOnD1())
-        ? await fiscalArchiveStoresHub()
-        : await withUser(req.user!.userId, () => fiscalArchiveStores());
+      let stores: unknown[];
+      if (await hubOnD1()) {
+        const live = await fiscalArchiveStoresHub();
+        const r2 = archiveBucket();
+        const archived: Awaited<ReturnType<typeof listArchivedStores>>['stores'] = [];
+        let cursor: string | undefined;
+        if (r2)
+          do {
+            const page = await listArchivedStores(r2, { cursor, limit: 1000 });
+            archived.push(...page.stores);
+            cursor = page.nextCursor ?? undefined;
+          } while (cursor);
+        const liveIds = new Set(live.map(l => l.storeId));
+        stores = [...live, ...archived.filter(a => !liveIds.has(a.storeId))];
+      } else stores = await withUser(req.user!.userId, () => fiscalArchiveStores());
       res.json({ success: true, data: { stores } });
     } catch (error) {
       next(error);
@@ -136,6 +178,27 @@ fiscalArchiveRoutes.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = parseInput(UUID, req.params.storeId);
+      const deleted = await deletedStoreArchive(storeId);
+      if (deleted) {
+        const q = parseInput(archiveListQuery, req.query);
+        const { documents, nextCursor } = pageArchivedDocuments(deleted.documents, q);
+        res.json({
+          success: true,
+          data: {
+            documents: documents.map(({ payload, ...d }) => ({
+              ...d,
+              orderNumber: (payload as { orderNumber?: string } | null)?.orderNumber ?? null,
+            })),
+            nextCursor,
+            archive: {
+              exportedAt: deleted.manifest.exportedAt,
+              retainUntilMax: deleted.manifest.retainUntilMax,
+              sha256: deleted.manifest.sha256,
+            },
+          },
+        });
+        return;
+      }
       const rows = (await hubOnD1())
         ? await fiscalArchiveHub(storeId)
         : await withUser(req.user!.userId, () => fiscalArchive(storeId));
@@ -159,12 +222,37 @@ fiscalArchiveRoutes.get(
       const storeId = parseInput(UUID, req.params.storeId);
       const docId = parseInput(UUID, req.params.docId);
       const { locale } = parseInput(localeQuery, req.query);
+      const deleted = await deletedStoreArchive(storeId);
+      if (deleted) {
+        const d = deleted.documents.find(r => r.id === docId);
+        if (!d) throw new AppError(404, 'NOT_FOUND', 'Document not found');
+        res.type('html').send(renderFiscalDocumentHtml(d, locale ?? 'ar'));
+        return;
+      }
       const rows = (await hubOnD1())
         ? await fiscalArchiveHub(storeId)
         : await withUser(req.user!.userId, () => fiscalArchive(storeId));
       const doc = rows.find(r => r.id === docId);
       if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
       res.type('html').send(renderFiscalDocumentHtml(doc, locale ?? 'ar'));
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * Backfill of DO stores deleted before the platform archive existed (Ruling FISCAL-ARCHIVE-1). Super-admin + MFA. Read-only unless
+ * `?apply=1`; idempotent. Refuses anything that is not a retired DO store.
+ */
+fiscalArchiveRoutes.post(
+  '/fiscal-archive/:storeId/backfill',
+  ...superAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = parseInput(UUID, req.params.storeId);
+      const result = await backfillOne(storeId, req.query.apply === '1');
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

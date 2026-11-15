@@ -87,6 +87,7 @@ import { cfBindings } from '../cf/bindings';
 import { eraseStorePlatformData, type D1Like } from '../cf/erasure/platform-subject';
 import { paymentsErasurePort } from './billing/payments-erasure';
 import { storeDo } from '../lib/store-backend';
+import { archiveDoStoreFiscal } from '../lib/fiscal-archive-do';
 import { invalidateStoreDirectory } from '../lib/store-directory';
 import {
   assertOwnerMayCreateStore,
@@ -1061,6 +1062,10 @@ export class StoreService {
     let erasedOwnerId: string | null = null;
 
     try {
+      // Ruling FISCAL-ARCHIVE-1: a DO store's fiscal records are copied into the platform archive AFTER the close (no late sale can
+      // be missed) and BEFORE anything is deleted or its directory row retired. A failure throws (P1 alert inside): the catch below
+      // reopens the DO this call closed, nothing was deleted, and the delete can be retried (idempotent).
+      if (wasOnDo) await archiveDoStoreFiscal(storeId);
       if (!doNative)
         await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
           // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE

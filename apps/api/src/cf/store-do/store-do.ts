@@ -84,6 +84,7 @@ import * as repo from './repo';
 import { StoreError } from './repo';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
 import { exportOrder, storeTables } from './tables';
+import { exportFiscalPage, type FiscalSection } from './fiscal-export';
 import {
   countCustomerRows,
   eraseCustomerRows,
@@ -1078,6 +1079,22 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   /** READ-ONLY money-in-flight gate for the all-or-nothing merchant erasure preflight (Ruling NZ-D20). Writes and closes nothing. */
   async moneyInFlight(): Promise<Record<string, number>> {
     return moneyInFlightOnDo(this.sync) as unknown as Record<string, number>;
+  }
+
+  /**
+   * READ-ONLY page of this store's fiscal records for the platform fiscal archive (Ruling FISCAL-ARCHIVE-1). Allowed on a CLOSED
+   * store (a deletion exports AFTER the close, so the export cannot miss a late sale). Never writes; PII minimised (see fiscal-export.ts).
+   */
+  fiscalExportPage(
+    storeId: string,
+    section: FiscalSection,
+    after: string | null,
+    limit: number
+  ): Result<{ rows: Record<string, unknown>[]; next: string | null }> {
+    return run(() => {
+      this.bind(storeId);
+      return exportFiscalPage(this.ctx.storage.sql, section, after, limit);
+    });
   }
 
   /** Merchant: wipe the whole DO (rows, alarm). Customer: delete/scrub the registry rows that match. */

@@ -188,6 +188,8 @@ edit a backup that was already taken yesterday.
 
 **Cloudflare storage (from the cutover, G8/G10).** The same boundary applies to the new copies: nightly StoreDO exports (`ebda-private/store-do-backups/`), D1 exports (`d1-backups/`) and their copy on the Mac (`_backups/ebda-cloudflare/`, 30 days) keep a pre-erasure row until they rotate, and StoreDO PITR / D1 Time Travel keep 30 days. A restore from any of them must be followed by re-running the ledger's erasures (`erasure-ledger/<requestId>.json` lists every request; the job is idempotent). Erasure design and per-surface tests: `docs/privacy/erasure-export.md`.
 
+**Fiscal archive of deleted DO stores (Ruling FISCAL-ARCHIVE-1).** `ebda-private/fiscal-archive/v1/` holds a deleted Durable Object store's fiscal documents, numbering, ETA submission state and subscription VAT ledger, kept until issue date + 7 years (`FISCAL_RETENTION_YEARS`) so they stay producible after the store is gone. Class: legal-retention, KEEP: customer/merchant erasure never deletes it (no erasure surface references the prefix; guarded by `tests/unit/fiscal-archive-do.test.ts`). Contains only what the fiscal document legally carries (no ETA document body, no ETA error text). Read by the super-admin `/tax-archive`.
+
 **Windows today (2026-11-10, Neon retired 2026-11-05; the Neon bullets below are history).** D1 Time Travel and StoreDO
 PITR 30 days; `ebda-db-backups/cf/` (D1 `ebda-platform`, D1 `ebda-identity`, every StoreDO) daily 7 days, weekly 28 days,
 monthly **93 days**; its Mac off-account copy (`_backups/ebda-cf-encrypted/`) 30 days; the `media/` copy of R2 `ebda-media`

@@ -9995,6 +9995,7 @@
     },
     "deletedStore": "Deleted store",
     "viewDocuments": "View documents",
+    "loadMore": "Load more",
     "loading": "Loading…",
     "loadFailed": "Could not load the archive. Please try again.",
     "empty": "No archived documents yet.",
