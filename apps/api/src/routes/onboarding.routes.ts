@@ -7,6 +7,7 @@ import { tenantContext } from '../middleware/tenant-context';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { withUser } from '@ebda/database';
 import { parseInput } from '../lib/parse-input';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { getAuthUser } from '../utils/store-helpers';
 import {
   fileSlugClaim,
@@ -76,18 +77,20 @@ router.post(
         resourceId: row.id,
         details: { slug: input.slug.toLowerCase() },
       });
-      await notifyStaff({
-        subject: `Protected address claim: ${input.slug.toLowerCase()}`,
-        lines: [
-          `Address: ${input.slug.toLowerCase()}`,
-          user.email ? `From: ${user.email}` : '',
-          input.evidenceUrl ? `Evidence: ${input.evidenceUrl}` : '',
-          '',
-          input.evidence,
-        ].filter(l => l !== ''),
-        replyTo: user.email,
-        ref: { requestId: row.id, kind: 'slug_claim' },
-      });
+      void deferAfterTenantCommit('onboarding-request.notify', () =>
+        notifyStaff({
+          subject: `Protected address claim: ${input.slug.toLowerCase()}`,
+          lines: [
+            `Address: ${input.slug.toLowerCase()}`,
+            user.email ? `From: ${user.email}` : '',
+            input.evidenceUrl ? `Evidence: ${input.evidenceUrl}` : '',
+            '',
+            input.evidence,
+          ].filter(l => l !== ''),
+          replyTo: user.email,
+          ref: { requestId: row.id, kind: 'slug_claim' },
+        })
+      );
       res.status(201).json({ success: true, data: { id: row.id } });
     } catch (error) {
       next(error);
@@ -112,17 +115,19 @@ router.post(
         resourceType: 'trust_request',
         resourceId: row.id,
       });
-      await notifyStaff({
-        subject: 'Daily store limit request',
-        lines: [
-          user.email ? `From: ${user.email}` : '',
-          input.evidenceUrl ? `Evidence: ${input.evidenceUrl}` : '',
-          '',
-          input.message,
-        ].filter(l => l !== ''),
-        replyTo: user.email,
-        ref: { requestId: row.id, kind: 'store_cap' },
-      });
+      void deferAfterTenantCommit('onboarding-request.notify', () =>
+        notifyStaff({
+          subject: 'Daily store limit request',
+          lines: [
+            user.email ? `From: ${user.email}` : '',
+            input.evidenceUrl ? `Evidence: ${input.evidenceUrl}` : '',
+            '',
+            input.message,
+          ].filter(l => l !== ''),
+          replyTo: user.email,
+          ref: { requestId: row.id, kind: 'store_cap' },
+        })
+      );
       res.status(201).json({ success: true, data: { id: row.id } });
     } catch (error) {
       next(error);

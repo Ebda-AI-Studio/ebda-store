@@ -892,27 +892,40 @@ router.patch(
       }
       const status: StoreStatus = parsedStatus.data.status;
 
+      // A13 ordering (Ruling TRUST-2). The Store row and the request notes cannot share one transaction: the Store is
+      // written through D1 + its Durable Object, the notes through the platform D1 client. So the note write goes FIRST
+      // and FAILS LOUD (no swallowed error): a suspension never lands without its reason row, and a reactivation never
+      // lands with the appeal still open (which would block every future appeal through the one-open-appeal unique).
+      // The failure modes left are harmless and self-healing on retry: an unused note on a store that never got
+      // suspended (getSuspension answers 404 NOT_SUSPENDED), or an appeal closed on a store still suspended (the
+      // merchant can file again).
+      const storeId = req.params.id;
+      const current = await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { status: true } })
+      );
+      if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+      await withStore(storeId, async tx => {
+        const trustDb = tx as unknown as TrustDb;
+        if (status === 'suspended') {
+          await recordSuspension(
+            trustDb,
+            storeId,
+            req.user!,
+            parsedStatus.data.reason,
+            String(current.status) === 'suspended'
+          );
+        } else {
+          await closeAppealsOnReactivation(trustDb, storeId);
+        }
+      });
+
       // StoreService.setStatus owns the write AND the public-cache bust
       // (resolve/slug/id keys + storefront revalidate purge) — account
       // status is NEVER-stale, so the invalidation lives with the write
       // (adversarial audit P1-7; this handler used to bust only the feature
       // cache, leaving a suspended store serving the cached active resolve
       // — checkouts included — for up to the TTL).
-      const store = await StoreService.setStatus(req.params.id, status as 'active' | 'suspended');
-
-      // A13: keep the reason for the merchant to read, and close their open appeal on a reactivation.
-      // Staff keep the decision; this only records it.
-      // The status write above is the source of truth: a failed note is logged, never a failed suspension.
-      await withStore(req.params.id, async tx => {
-        const trustDb = tx as unknown as TrustDb;
-        if (status === 'suspended') {
-          await recordSuspension(trustDb, req.params.id, req.user!, parsedStatus.data.reason);
-        } else {
-          await closeAppealsOnReactivation(trustDb, req.params.id);
-        }
-      }).catch(err => {
-        logger.warn({ err, storeId: req.params.id }, '[store.status] suspension note write failed');
-      });
+      const store = await StoreService.setStatus(storeId, status as 'active' | 'suspended');
 
       // Invalidate the feature cache — store.status doesn't change the
       // resolved feature map directly, but downstream gates (storefront

@@ -155,16 +155,25 @@ export async function createSupportRequest(
 // A13 suspension reason + appeal
 // ---------------------------------------------------------------------------
 
-/** Super-admin side: remember WHY a store was suspended so the merchant can read it. Never on a reactivation. */
+/**
+ * Super-admin side: remember WHY a store was suspended so the merchant can read it. Never on a reactivation.
+ * One note per suspension EPISODE: written when the store is not already suspended (even with no reason, so a stale
+ * note from an earlier episode can never be shown), and on a repeat suspend only when a new reason is given. A repeat
+ * suspend with no reason writes nothing, so it never masks the real reason with null. `getSuspension` reads the latest
+ * note, which is therefore always the current episode's. Returns whether a note was written.
+ */
 export async function recordSuspension(
   db: TrustDb,
   storeId: string,
   actor: { userId: string },
-  reason: string | undefined
-): Promise<void> {
+  reason: string | undefined,
+  alreadySuspended: boolean
+): Promise<boolean> {
+  if (alreadySuspended && !reason) return false;
   await db.trustRequest.create({
     data: { kind: 'suspension', storeId, userId: actor.userId, message: reason ?? null },
   });
+  return true;
 }
 
 /**

@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { SUPPORT_TOPICS } from '@ebda/shared';
+import { assertTenantScoped, TenantScopeViolation } from '../../packages/database/src/tenant-guard';
 
 type Row = Record<string, any>;
 const m = vi.hoisted(() => ({
@@ -354,7 +355,7 @@ describe('staff side of A13 (the decision stays with the super admin)', () => {
   it('suspending records the reason the merchant reads; reactivating resolves the open appeal', async () => {
     const svc = await import('@api/services/trust-requests.service');
     const db = fakePrisma as any;
-    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'Counterfeit goods');
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'Counterfeit goods', false);
     expect((await request(app).get('/stores/store-a/suspension')).body.data.reason).toBe(
       'Counterfeit goods'
     );
@@ -364,14 +365,12 @@ describe('staff side of A13 (the decision stays with the super admin)', () => {
     expect(appeal?.status).toBe('resolved');
   });
 
-  it('the super-admin status route is wired to both (a merchant route never resolves anything)', async () => {
-    const fs = await import('node:fs');
-    const src = fs.readFileSync('apps/api/src/routes/store.routes.ts', 'utf8');
-    expect(src).toContain('recordSuspension(trustDb');
-    expect(src).toContain('closeAppealsOnReactivation(trustDb');
-    const merchant = fs.readFileSync('apps/api/src/routes/support.routes.ts', 'utf8');
-    expect(merchant).not.toContain('closeAppealsOnReactivation');
-    expect(merchant).not.toMatch(/status:\s*'resolved'/);
+  it('a merchant route never resolves or rejects anything (no status write in support.routes)', async () => {
+    // behaviour: the merchant appeal route only ever files; a second file is 409 and nothing is decided
+    m.rows.push({ kind: 'suspension', storeId: 'store-a', message: 'x', createdAt: new Date() });
+    await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'again please' });
+    await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'again please' });
+    expect(m.rows.filter(r => r.kind === 'suspension_appeal').map(r => r.status)).toEqual(['open']);
   });
 });
 
@@ -487,5 +486,83 @@ describe('review fixes: alert carries ids only, cooldown, atomic cap, claim cap'
           .send({ slug: 'facebook', evidence: 'We own this brand, registration attached.' })
       ).status
     ).toBe(201);
+  });
+});
+
+describe('episode notes (recordSuspension / getSuspension)', () => {
+  it('a re-suspension with no reason shows NO reason, never the earlier episode reason', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    const db = fakePrisma as any;
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'Counterfeit goods', false);
+    await svc.closeAppealsOnReactivation(db, 'store-a'); // reactivated
+    await new Promise(r => setTimeout(r, 2));
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, undefined, false); // suspended again
+    expect((await request(app).get('/stores/store-a/suspension')).body.data.reason).toBeNull();
+  });
+  it('a repeat suspend of an already suspended store with no reason writes nothing and keeps the reason', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    const db = fakePrisma as any;
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'Counterfeit goods', false);
+    expect(await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, undefined, true)).toBe(
+      false
+    );
+    expect(m.rows.filter(r => r.kind === 'suspension')).toHaveLength(1);
+    expect((await request(app).get('/stores/store-a/suspension')).body.data.reason).toBe(
+      'Counterfeit goods'
+    );
+  });
+  it('a repeat suspend WITH a new reason replaces what the merchant reads', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    const db = fakePrisma as any;
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'first', false);
+    await new Promise(r => setTimeout(r, 2));
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'second', true);
+    expect((await request(app).get('/stores/store-a/suspension')).body.data.reason).toBe('second');
+  });
+});
+
+describe('A16 under the REAL tenant guard (withUser, no ambient store)', () => {
+  // wraps the fake db so every call first runs the production guard with the scope withUser sets
+  const guarded = (userId: string) => {
+    const wrap: any = {};
+    for (const op of ['create', 'findFirst', 'count', 'updateMany'] as const)
+      wrap[op] = async (args: any) => {
+        assertTenantScoped('TrustRequest', op, args, { userId });
+        return (trustRequest as any)[op](args);
+      };
+    return { trustRequest: wrap, store: fakePrisma.store } as any;
+  };
+  it('slug claim and store-cap request pass the guard for the ambient user', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    await expect(
+      svc.fileSlugClaim(
+        guarded('u1'),
+        { userId: 'u1' },
+        { slug: 'nike', evidence: 'We own it, papers attached.' }
+      )
+    ).resolves.toBeDefined();
+    await expect(
+      svc.fileStoreCapRequest(
+        guarded('u1'),
+        { userId: 'u1' },
+        { message: 'I open twelve branches.' }
+      )
+    ).resolves.toBeDefined();
+  });
+  it('the guard still refuses another user and a missing user', () => {
+    const bad = (where: any, scope: any) =>
+      expect(() => assertTenantScoped('TrustRequest', 'count', { where }, scope)).toThrow(
+        TenantScopeViolation
+      );
+    bad({ userId: 'u2', kind: 'slug_claim' }, { userId: 'u1' });
+    bad({ userId: 'u1' }, {});
+    expect(() =>
+      assertTenantScoped(
+        'TrustRequest',
+        'create',
+        { data: { userId: 'u2', kind: 'store_cap' } },
+        { userId: 'u1' }
+      )
+    ).toThrow(TenantScopeViolation);
   });
 });

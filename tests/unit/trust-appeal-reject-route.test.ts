@@ -10,18 +10,25 @@ import request from 'supertest';
 const h = vi.hoisted(() => ({
   rows: [] as Record<string, any>[],
   audit: vi.fn(),
+  failNote: false,
+  order: [] as string[],
+  storeStatus: 'active',
 }));
+const match = (r: any, where: any) => Object.entries(where).every(([k, v]) => r[k] === v);
 const db = {
-  findFirst: async ({ where }: any) =>
-    h.rows.find(
-      r => r.storeId === where.storeId && r.kind === where.kind && r.status === where.status
-    ) ?? null,
+  findFirst: async ({ where }: any) => h.rows.find(r => match(r, where)) ?? null,
   updateMany: async ({ where, data }: any) => {
-    const hit = h.rows.filter(r => r.id === where.id && r.status === where.status);
+    const hit = h.rows.filter(r => match(r, where));
     hit.forEach(r => Object.assign(r, data));
     return { count: hit.length };
   },
-  create: vi.fn(),
+  create: async ({ data }: any) => {
+    if (h.failNote) throw new Error('d1 down');
+    const r = { id: `n${h.rows.length + 1}`, status: 'open', ...data };
+    h.rows.push(r);
+    h.order.push('note');
+    return r;
+  },
   count: vi.fn(),
 };
 vi.mock('@api/lib/definer', () => ({ insertAuditLog: h.audit }));
@@ -59,7 +66,14 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@ebda/database', () => ({
-  prisma: { store: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() }, trustRequest: db },
+  prisma: {
+    store: {
+      findUnique: async () => ({ status: h.storeStatus }),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    trustRequest: db,
+  },
   Prisma: { DbNull: null },
   StoreStatus: { active: 'active', suspended: 'suspended' },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
@@ -122,6 +136,13 @@ let app: express.Express;
 beforeEach(async () => {
   h.rows.length = 0;
   h.audit.mockReset().mockResolvedValue(undefined);
+  h.failNote = false;
+  h.order.length = 0;
+  h.storeStatus = 'active';
+  svc.setStatus.mockReset().mockImplementation(async () => {
+    h.order.push('status');
+    return { id: STORE_ID, slug: 'ok', status: 'x' };
+  });
   if (!app) {
     const { default: router } = await import('@api/routes/store.routes');
     const { errorHandler } = await import('@api/middleware/error-handler');
@@ -161,5 +182,44 @@ describe('POST /stores/:id/suspension/appeal/reject', () => {
     const res = await request(app).post(url).set('x-role', 'store_admin');
     expect(res.status).toBe(403);
     expect(h.rows[0].status).toBe('open');
+  });
+});
+
+describe('PATCH /stores/:id/status writes the note before the status and fails loud (Ruling TRUST-2)', () => {
+  const url = `/stores/${STORE_ID}/status`;
+  it('suspend: note first, then status', async () => {
+    const res = await request(app).patch(url).send({ status: 'suspended', reason: 'Counterfeit' });
+    expect(res.status).toBe(200);
+    expect(h.order).toEqual(['note', 'status']);
+    expect(h.rows[0]).toMatchObject({ kind: 'suspension', message: 'Counterfeit' });
+  });
+  it('a failed note write fails the request and the store is NOT suspended', async () => {
+    h.failNote = true;
+    const res = await request(app).patch(url).send({ status: 'suspended', reason: 'x' });
+    expect(res.status).toBe(500);
+    expect(svc.setStatus).not.toHaveBeenCalled();
+  });
+  it('reactivate closes the open appeal before the status flip', async () => {
+    h.storeStatus = 'suspended';
+    h.rows.push({ id: 'a1', storeId: STORE_ID, kind: 'suspension_appeal', status: 'open' });
+    const res = await request(app).patch(url).send({ status: 'active' });
+    expect(res.status).toBe(200);
+    expect(h.rows[0].status).toBe('resolved');
+    expect(svc.setStatus).toHaveBeenCalledTimes(1);
+  });
+  it('a repeat suspend with no reason writes no note; with a reason it writes one', async () => {
+    h.storeStatus = 'suspended';
+    await request(app).patch(url).send({ status: 'suspended' });
+    expect(h.rows).toHaveLength(0);
+    await request(app).patch(url).send({ status: 'suspended', reason: 'new reason' });
+    expect(h.rows).toHaveLength(1);
+  });
+  it('an unknown store is 404 and nothing is written', async () => {
+    const { prisma } = await import('@ebda/database');
+    const spy = vi.spyOn(prisma.store, 'findUnique').mockResolvedValueOnce(null as never);
+    const res = await request(app).patch(url).send({ status: 'suspended', reason: 'x' });
+    spy.mockRestore();
+    expect(res.status).toBe(404);
+    expect(h.rows).toHaveLength(0);
   });
 });

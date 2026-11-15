@@ -88,7 +88,8 @@ Suspension is for missed renewals + AUP violations. **The decision is super-admi
    - `Store.status = 'suspended'`
    - Feature cache invalidated
    - AuditLog entry written (`action: store.suspend`)
-   - The reason is saved (`trust_requests`, `kind = suspension`) and shown in a banner on every page of that store's dashboard
+   - The reason is saved (`trust_requests`, `kind = suspension`) BEFORE the status flips, and a failed save fails the suspension (retry it). One note per suspension: a repeat suspend with no reason writes nothing and keeps the earlier reason; a first suspend with no reason shows the merchant "no reason recorded". It is shown in a banner on every page of that store's dashboard
+   - Reactivating closes the open appeal first (same rule: a failure fails the reactivation, retry it)
 4. External effects:
    - Storefront serves the `StoreMaintenance` page (HTTP 200 with branded "we'll be back soon" + "Powered by Ebda AI Studio" link)
    - Store admin can still log into admin (so they can pay invoice + click reactivate)
