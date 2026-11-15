@@ -837,7 +837,6 @@ const locationDelete = change<LocationDeleteArgs>({
   },
 });
 
-// pq-allow(unused-export): wired into changeTools() by the controller (E-phase wiring), imported by tests/unit/assistant-tools-storefront.test.ts
 export function storefrontTools(): ToolSpec[] {
   return [
     pagesList,

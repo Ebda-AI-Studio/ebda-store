@@ -14,6 +14,7 @@ import { notificationsTools } from './notifications.tools';
 import { customersTools } from './customers.tools';
 import { financeTools } from './finance.tools';
 import { accountTools } from './account.tools';
+import { storefrontTools } from './storefront.tools';
 import { opsTools } from './ops.tools';
 import { financeSuggestTools } from './finance-suggest.tools';
 import { messagingTools } from './messaging.tools';
@@ -37,6 +38,7 @@ export function changeTools(): ToolSpec[] {
     ...customersTools(),
     ...financeTools(),
     ...accountTools(),
+    ...storefrontTools(),
     ...opsTools(),
     ...financeSuggestTools(),
     ...messagingTools(),
