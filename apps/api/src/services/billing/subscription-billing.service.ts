@@ -693,6 +693,13 @@ async function settleCharge(eventId: string, o: Outcome, now: Date) {
   return res;
 }
 
+/**
+ * A super admin approved an InstaPay payment for a pending ledger row (add-on purchase): settle it through the SAME
+ * guarded pending -> succeeded transition a card webhook uses, so the grant happens exactly once and a replay is a no-op.
+ */
+export const settleApprovedPayment = (eventId: string, providerRef: string, now: Date) =>
+  settleDefinitive(eventId, { status: 'succeeded', providerRef }, now);
+
 /** Test seam: the pause between settle retries (ms per attempt). */
 export const settleRetry = { delayMs: 250, attempts: 3 };
 

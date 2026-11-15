@@ -102,3 +102,37 @@ describe('deriveAddonState', () => {
       deriveAddonState({ ...base, isFeature: false, renews: false, onWithoutAddon: true })
     ).toBe('available'));
 });
+
+describe('InstaPay claim states (nothing is on until a super admin approves)', () => {
+  const claim = (status: string, createdAgo: number) => ({ status, createdAt: ago(createdAgo) });
+  it('a fresh pending claim is waiting_confirmation', () =>
+    expect(deriveAddonState({ ...base, claim: claim('pending', 60_000) })).toBe(
+      'waiting_confirmation'
+    ));
+  it('a pending claim older than 7 days is stale: Buy returns (the claim stays in the queue)', () =>
+    expect(deriveAddonState({ ...base, claim: claim('pending', 8 * 86_400_000) })).toBe(
+      'available'
+    ));
+  it('a rejected claim shows rejected for 7 days, then available', () => {
+    expect(deriveAddonState({ ...base, claim: claim('rejected', 1000) })).toBe('rejected');
+    expect(deriveAddonState({ ...base, claim: claim('rejected', 8 * 86_400_000) })).toBe(
+      'available'
+    );
+  });
+  it('a running paid term outranks a pending claim (renewal bought a second way)', () =>
+    expect(
+      deriveAddonState({
+        ...base,
+        running: { endsAt: now, cancelAtPeriodEnd: false },
+        claim: claim('pending', 1000),
+      })
+    ).toBe('renewing'));
+  it('a newer failed card attempt outranks an older rejected claim', () =>
+    expect(
+      deriveAddonState({
+        ...base,
+        newest: row('failed', 1000),
+        claim: claim('rejected', 5000),
+      })
+    ).toBe('failed'));
+});

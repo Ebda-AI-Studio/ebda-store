@@ -101,6 +101,7 @@ const fakeTx = () => ({
     updateMany: vi.fn(async () => ({ count: 1 })),
     create: vi.fn(async () => ({})),
   },
+  manualPaymentClaim: { count: async () => 0 },
   store: { findUnique: async () => h.storeRow },
   storeSubscription: { findUnique: async () => h.sub },
   storeFeature: {
@@ -245,6 +246,14 @@ describe('purchase: confirm token, idempotency, ledger row', () => {
     expect(typeof p.confirmToken).toBe('string');
     expect(h.claimEvent).not.toHaveBeenCalled();
     expect(h.createCheckout).not.toHaveBeenCalled();
+  });
+  it('an InstaPay payment already waiting for approval blocks a second purchase of the same add-on', async () => {
+    const { previewAddon } = await import('@api/services/billing/addons.service');
+    (tx as any).manualPaymentClaim.count = async () => 1;
+    await expect(previewAddon({ ...ctx, sku: 'feature:floating_widget' })).rejects.toMatchObject({
+      code: 'ADDON_AWAITING_CONFIRMATION',
+    });
+    expect(h.claimEvent).not.toHaveBeenCalled();
   });
   it('checkout without a token charges nothing', async () => {
     const { purchaseAddon } = await import('@api/services/billing/addons.service');

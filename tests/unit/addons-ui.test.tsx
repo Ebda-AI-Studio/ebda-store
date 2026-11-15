@@ -44,6 +44,19 @@ vi.mock('../../apps/admin/src/components/billing/EbdaBillingReceipt', () => ({
   ),
 }));
 
+vi.mock('../../apps/admin/src/components/billing/InstapayPanel', () => ({
+  InstapayPanel: ({ instapay }: { instapay: { handle: string; amountMinor: number } }) => (
+    <div data-testid="instapay-panel">
+      {instapay.handle}:{instapay.amountMinor}
+    </div>
+  ),
+}));
+vi.mock('../../apps/admin/src/components/instapay/InstapayReceiptForm', () => ({
+  InstapayReceiptForm: (p: { baseUrl: string; submitBaseUrl?: string }) => (
+    <div data-testid="instapay-form" data-base={p.baseUrl} data-submit={p.submitBaseUrl} />
+  ),
+}));
+
 import AddonsPage from '../../apps/admin/src/app/stores/[id]/billing/addons/page';
 import { FeatureUpgradeGate } from '../../apps/admin/src/components/FeatureUpgradeGate';
 import { PlanLockedCard } from '../../apps/admin/src/components/PlanLockedCard';
@@ -66,9 +79,29 @@ const row = (sku: string, state: string, extra: Record<string, unknown> = {}) =>
 const listing = (addons: unknown[]) => ({
   data: {
     cardAvailable: true,
+    instapayAvailable: true,
     termDays: 30,
     addons,
-    ai: { baseCap: 150, extra: 0, cap: 150, used: 0, remaining: 150 },
+    ai: {
+      baseCap: 150,
+      extra: 300,
+      cap: 450,
+      used: 90,
+      remaining: 360,
+      byFeature: [
+        { feature: 'translate', count: 60 },
+        { feature: 'weird-new-feature', count: 30 },
+      ],
+      packs: [
+        {
+          sku: 'ai:topup_300',
+          extraRequests: 300,
+          nameEn: 'P',
+          nameAr: 'P',
+          endsAt: '2026-12-01T00:00:00Z',
+        },
+      ],
+    },
   },
 });
 
@@ -106,10 +139,10 @@ describe('Add-ons page', () => {
     expect(states('feature:loyalty')).toBe('pending_payment');
     const buyCount = (sku: string) =>
       screen.getByTestId(`addon-${sku}`).querySelectorAll('button').length;
-    expect(buyCount('feature:floating_widget')).toBe(1);
+    expect(buyCount('feature:floating_widget')).toBe(2); // card + InstaPay
     expect(buyCount('feature:loyalty')).toBe(0); // pending: never a second purchase
     expect(buyCount('feature:affiliate')).toBe(0); // included in plan
-    expect(buyCount('feature:upsell_crosssell')).toBe(1); // failed: try again
+    expect(buyCount('feature:upsell_crosssell')).toBe(2); // failed: try again
     expect(screen.getByTestId('addon-instapay-note')).toBeTruthy();
   });
 
@@ -244,6 +277,72 @@ describe('Add-ons page', () => {
     render(<AddonsPage />);
     await screen.findByTestId('addon-feature:loyalty');
     await waitFor(() => expect(scroll).toHaveBeenCalled());
+  });
+});
+
+describe('AI credits meter', () => {
+  it('shows what is left, a progressbar, the packs and what used the requests', async () => {
+    mockGets([row('ai:topup_300', 'available')]);
+    render(<AddonsPage />);
+    const meter = await screen.findByTestId('ai-meter');
+    expect(meter.textContent).toContain('aiMeterLeft:{"remaining":360}');
+    const bar = meter.querySelector('[role="progressbar"]')!;
+    expect(bar.getAttribute('aria-valuenow')).toBe('90');
+    expect(bar.getAttribute('aria-valuemax')).toBe('450');
+    expect(screen.getByTestId('ai-packs').querySelectorAll('li').length).toBe(1);
+    const lines = Array.from(screen.getByTestId('ai-breakdown').querySelectorAll('li')).map(
+      li => li.textContent
+    );
+    expect(lines).toEqual(['aiFeature.translate60', 'weird-new-feature30']);
+  });
+});
+
+describe('InstaPay add-on purchase', () => {
+  it('Pay by InstaPay shows the exact transfer details and the receipt form posts to the ADD-ON submit route', async () => {
+    mockGets([row('feature:loyalty', 'available')]);
+    api.get.mockImplementation(async (url: string) =>
+      url.endsWith('/instapay')
+        ? {
+            data: {
+              sku: 'feature:loyalty',
+              nameEn: 'L',
+              nameAr: 'L',
+              handle: 'ebda@instapay',
+              qrUrl: null,
+              reference: 'EBD-X',
+              amountMinor: 9900,
+              vatMinor: 0,
+            },
+          }
+        : url.endsWith('/history')
+          ? { data: { items: [] } }
+          : listing([row('feature:loyalty', 'available')])
+    );
+    render(<AddonsPage />);
+    const card = await screen.findByTestId('addon-feature:loyalty');
+    const instaBtn = Array.from(card.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('payInstapay')
+    )!;
+    fireEvent.click(instaBtn);
+    expect((await screen.findByTestId('instapay-panel')).textContent).toBe('ebda@instapay:9900');
+    const form = screen.getByTestId('instapay-form');
+    expect(form.getAttribute('data-base')).toBe('/api/v1/stores/s1/billing/receipts');
+    expect(form.getAttribute('data-submit')).toBe(
+      '/api/v1/stores/s1/billing/addons/feature%3Aloyalty/instapay/receipts'
+    );
+    expect(api.post).not.toHaveBeenCalled(); // nothing is bought or charged by opening the details
+  });
+
+  it('waiting_confirmation and rejected: no Buy, no InstaPay button on a waiting add-on', async () => {
+    mockGets([
+      row('feature:loyalty', 'waiting_confirmation'),
+      row('feature:affiliate', 'rejected'),
+    ]);
+    render(<AddonsPage />);
+    await screen.findByTestId('addon-feature:loyalty');
+    expect(screen.getByTestId('addon-feature:loyalty').querySelectorAll('button').length).toBe(0);
+    // rejected may pay again
+    expect(screen.getByTestId('addon-feature:affiliate').querySelectorAll('button').length).toBe(2);
   });
 });
 

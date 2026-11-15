@@ -13,6 +13,8 @@ const h = vi.hoisted(() => ({
   withoutAddons: {} as Record<string, boolean>,
   allFeatures: {} as Record<string, boolean>,
   created: [] as Array<Record<string, any>>,
+  claims: [] as Array<Record<string, any>>,
+  aiByFeature: [] as Array<{ feature: string; count: number }>,
 }));
 
 vi.mock('@api/services/feature.service', () => ({
@@ -24,6 +26,7 @@ vi.mock('@api/services/feature.service', () => ({
 }));
 vi.mock('@api/lib/ai-quota', () => ({
   storeAiAllowance: async () => ({ baseCap: 150, extra: 0, cap: 150, used: 0, remaining: 150 }),
+  storeAiUsageByFeature: async () => h.aiByFeature,
 }));
 vi.mock('@api/services/billing/index', () => ({
   getBillingProvider: () => ({ name: 'kashier' }),
@@ -63,6 +66,13 @@ const tx = {
     },
   },
   storeFeature: { findMany: async () => h.overrides },
+  manualPaymentClaim: {
+    findMany: async ({ where }: any) =>
+      h.claims
+        .filter(c => where.status.in.includes(c.status))
+        .sort((a, b) => +b.createdAt - +a.createdAt),
+    count: async () => h.claims.filter(c => c.status === 'pending').length,
+  },
 };
 vi.mock('@ebda/database', () => ({
   prisma: {},
@@ -97,6 +107,8 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   h.events = [];
   h.created = [];
+  h.claims = [];
+  h.aiByFeature = [];
   h.overrides = [];
   h.withoutAddons = {};
   h.allFeatures = {};
@@ -181,5 +193,77 @@ describe('listAddonHistory is receipt data only', () => {
     expect(JSON.stringify(items)).not.toContain('secret-provider-ref');
     expect(Object.keys(items[0])).not.toContain('provider');
     expect(items[0].vatMinor).toBe(1200);
+  });
+});
+
+describe('InstaPay add-on claims: waiting is never "on"', () => {
+  const claim = (over: Record<string, any> = {}) => ({
+    id: 'c1',
+    planCode: `addon:${SKU}`,
+    status: 'pending',
+    amountMinor: 9900,
+    reviewNote: null,
+    createdAt: new Date(NOW.getTime() - 3_600_000),
+    ...over,
+  });
+
+  it('a pending claim: waiting_confirmation, the live gate answer stays OFF, instapay offered', async () => {
+    h.claims = [claim()];
+    const out = await listAddons('s1');
+    const a = out.addons.find(x => x.sku === SKU)!;
+    expect(a.state).toBe('waiting_confirmation');
+    expect(a.enabled).toBe(false);
+    expect(a.active).toBeNull();
+    expect(typeof out.instapayAvailable).toBe('boolean');
+  });
+
+  it('a rejected claim leaves nothing active and says rejected', async () => {
+    h.claims = [claim({ status: 'rejected' })];
+    const a = (await listAddons('s1')).addons.find(x => x.sku === SKU)!;
+    expect(a.state).toBe('rejected');
+    expect(a.enabled).toBe(false);
+  });
+
+  it('an expired (stale) pending claim leaves nothing active and Buy returns', async () => {
+    h.claims = [claim({ createdAt: new Date(NOW.getTime() - 8 * DAY) })];
+    expect(await stateOf()).toBe('available');
+  });
+
+  it('history shows the waiting and rejected claims as such, never as a payment', async () => {
+    h.claims = [
+      claim(),
+      claim({ id: 'c2', status: 'rejected', createdAt: new Date(NOW.getTime() - DAY) }),
+    ];
+    const items = await listAddonHistory('s1');
+    expect(items.map(i => [i.id, i.status])).toEqual([
+      ['c1', 'waiting_confirmation'],
+      ['c2', 'rejected'],
+    ]);
+  });
+});
+
+describe('AI credits meter data (existing quota ledger, no new table)', () => {
+  it('returns what used today by feature, and the running packs with their end date', async () => {
+    h.aiByFeature = [
+      { feature: 'translate', count: 40 },
+      { feature: 'seo', count: 7 },
+    ];
+    h.events = [
+      row({
+        id: 'p1',
+        planCode: 'addon:ai:topup_300',
+        forPeriodEnd: new Date(NOW.getTime() + 5 * DAY),
+      }),
+      row({
+        id: 'p2',
+        planCode: 'addon:ai:topup_300',
+        forPeriodEnd: new Date(NOW.getTime() - DAY),
+      }), // ended
+    ];
+    const { ai } = await listAddons('s1');
+    expect(ai.byFeature).toEqual(h.aiByFeature);
+    expect(ai.packs).toHaveLength(1);
+    expect(ai.packs[0]).toMatchObject({ sku: 'ai:topup_300', extraRequests: 300 });
+    expect(new Date(ai.packs[0].endsAt).getTime()).toBe(NOW.getTime() + 5 * DAY);
   });
 });

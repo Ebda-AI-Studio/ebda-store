@@ -15,6 +15,8 @@ import { useToast } from '@ebda/ui';
 import { formatMoney } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 import { EbdaBillingReceipt } from '@/components/billing/EbdaBillingReceipt';
+import { InstapayPanel } from '@/components/billing/InstapayPanel';
+import { InstapayReceiptForm } from '@/components/instapay/InstapayReceiptForm';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost, apiRequest } from '../../../../../lib/api';
 import { fmtDate } from '../../../../../components/billing/format';
@@ -23,6 +25,8 @@ import { useT } from '../../../../../i18n/useT';
 type AddonState =
   | 'available'
   | 'pending_payment'
+  | 'waiting_confirmation'
+  | 'rejected'
   | 'failed'
   | 'active'
   | 'renewing'
@@ -47,9 +51,24 @@ interface AddonRow {
 }
 interface AddonsData {
   cardAvailable: boolean;
+  instapayAvailable: boolean;
   termDays: number;
   addons: AddonRow[];
-  ai: { baseCap: number; extra: number; cap: number; used: number; remaining: number };
+  ai: {
+    baseCap: number;
+    extra: number;
+    cap: number;
+    used: number;
+    remaining: number;
+    byFeature: Array<{ feature: string; count: number }>;
+    packs: Array<{
+      sku: string;
+      extraRequests: number;
+      nameEn: string;
+      nameAr: string;
+      endsAt: string;
+    }>;
+  };
 }
 interface HistoryRow {
   id: string;
@@ -63,6 +82,16 @@ interface HistoryRow {
   termEnd: string | null;
   createdAt: string;
   planCode: string | null;
+}
+interface InstapayInfo {
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  handle: string;
+  qrUrl: string | null;
+  reference: string;
+  amountMinor: number;
+  vatMinor: number;
 }
 interface Preview {
   sku: string;
@@ -84,6 +113,8 @@ const POLL_MAX_MS = 90_000;
 const BADGE: Record<AddonState, string> = {
   available: 'bg-muted text-muted-ink',
   pending_payment: 'bg-warning/15 text-warning-ink',
+  waiting_confirmation: 'bg-warning/15 text-warning-ink',
+  rejected: 'bg-destructive/10 text-destructive-ink',
   failed: 'bg-destructive/10 text-destructive-ink',
   active: 'bg-success/15 text-success-ink',
   renewing: 'bg-success/15 text-success-ink',
@@ -108,6 +139,7 @@ export default function AddonsPage() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<HistoryRow | null>(null);
+  const [insta, setInsta] = useState<InstapayInfo | null>(null);
   const [polling, setPolling] = useState(returned);
   const base = `/api/v1/stores/${storeId}/billing/addons`;
   const money = (minor: number) => formatMoney(minor, locale, { fixedDecimals: true });
@@ -152,6 +184,15 @@ export default function AddonsPage() {
     setPreview({ ...r.data, idempotencyKey: crypto.randomUUID() });
   }
 
+  async function startInstapay(sku: string) {
+    setBusy(sku);
+    const r = await apiGet<InstapayInfo>(`${base}/${encodeURIComponent(sku)}/instapay`);
+    setBusy(null);
+    if (r.error || !r.data) return toastError(t('instapayError'), r.error?.message);
+    setPreview(null);
+    setInsta(r.data);
+  }
+
   async function confirmBuy() {
     if (!preview) return;
     setBusy(preview.sku);
@@ -180,6 +221,17 @@ export default function AddonsPage() {
     await load();
   }
 
+  const AI_FEATURES = [
+    'translate',
+    'seo',
+    'categorize',
+    'product-excerpt',
+    'product-faq',
+    'product-meta-aeo',
+    'product-tags',
+  ];
+  const aiFeatureLabel = (f: string) => (AI_FEATURES.includes(f) ? t(`aiFeature.${f}`) : f);
+
   const group = (kind: AddonRow['kind']) => data?.addons.filter(a => a.kind === kind) ?? [];
 
   function stateLine(a: AddonRow): string {
@@ -203,6 +255,7 @@ export default function AddonsPage() {
       a.kind === 'ai_topup' ||
       a.state === 'available' ||
       a.state === 'failed' ||
+      a.state === 'rejected' ||
       a.state === 'expired' ||
       a.state === 'refunded';
     return (
@@ -274,6 +327,16 @@ export default function AddonsPage() {
                   : t('buy')}
             </Button>
           )}
+          {canBuy && data!.instapayAvailable && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy === a.sku}
+              onClick={() => void startInstapay(a.sku)}
+            >
+              {t('payInstapay')}
+            </Button>
+          )}
         </div>
       </li>
     );
@@ -295,6 +358,47 @@ export default function AddonsPage() {
       {data && (
         <div className="max-w-2xl space-y-6">
           {!data.cardAvailable && <p className="text-sm text-muted-foreground">{t('cardOff')}</p>}
+          {insta && (
+            <section
+              aria-labelledby="addon-instapay-title"
+              className="rounded-xl border border-border bg-card p-4"
+              data-testid="addon-instapay"
+            >
+              <h2 id="addon-instapay-title" className="text-sm font-semibold">
+                {t('instapayTitle', { name: name(insta) })}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t('instapayHowItWorks')}</p>
+              <div className="mt-3">
+                <InstapayPanel
+                  locale={locale}
+                  instapay={{
+                    available: true,
+                    handle: insta.handle,
+                    reference: insta.reference,
+                    amountMinor: insta.amountMinor,
+                    qrUrl: insta.qrUrl,
+                    vat: null,
+                    pendingClaims: 0,
+                  }}
+                />
+              </div>
+              <div className="mt-4">
+                <InstapayReceiptForm
+                  baseUrl={`/api/v1/stores/${storeId}/billing/receipts`}
+                  submitBaseUrl={`${base}/${encodeURIComponent(insta.sku)}/instapay/receipts`}
+                  reviewerNote={t('instapayReviewerNote')}
+                  onSubmitted={() => {
+                    setInsta(null);
+                    toastSuccess(t('instapaySent'));
+                    void load();
+                  }}
+                />
+              </div>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => setInsta(null)}>
+                {t('instapayClose')}
+              </Button>
+            </section>
+          )}
           {preview && (
             <section
               role="alertdialog"
@@ -339,15 +443,62 @@ export default function AddonsPage() {
             <h2 className="text-sm font-semibold">{t('featuresHeading')}</h2>
             <ul className="divide-y divide-border">{group('feature').map(row)}</ul>
             <p className="mt-3 text-xs text-muted-foreground" data-testid="addon-instapay-note">
-              {t('instapayNote')}
+              {t(data.instapayAvailable ? 'instapayNote' : 'instapayOff')}
             </p>
           </section>
           <section className="rounded-xl border border-border bg-card p-4" id="ai">
             <h2 className="text-sm font-semibold">{t('aiHeading')}</h2>
-            <p className="mt-1 text-sm">
-              {t('aiToday', { used: data.ai.used, cap: data.ai.cap, remaining: data.ai.remaining })}
-              {data.ai.extra > 0 && ` ${t('aiExtra', { extra: data.ai.extra })}`}
-            </p>
+            <div className="mt-2" data-testid="ai-meter">
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-medium">
+                  {t('aiMeterLeft', { remaining: data.ai.remaining })}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {t('aiMeterUsed', { used: data.ai.used, cap: data.ai.cap })}
+                </span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label={t('aiMeterLeft', { remaining: data.ai.remaining })}
+                aria-valuemin={0}
+                aria-valuemax={data.ai.cap}
+                aria-valuenow={Math.min(data.ai.used, data.ai.cap)}
+                className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className="h-2 rounded-full bg-primary"
+                  style={{
+                    width: `${data.ai.cap > 0 ? Math.min(100, Math.round((data.ai.used / data.ai.cap) * 100)) : 0}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('aiMeterSplit', { base: data.ai.baseCap, extra: data.ai.extra })}
+              </p>
+              {data.ai.packs.length > 0 && (
+                <ul className="mt-1 text-xs text-muted-foreground" data-testid="ai-packs">
+                  {data.ai.packs.map(p => (
+                    <li key={`${p.sku}-${p.endsAt}`}>
+                      {t('aiPackEnds', { name: name(p), date: fmtDate(p.endsAt, locale) })}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-3 text-xs font-medium">{t('aiBreakdownTitle')}</p>
+              {data.ai.byFeature.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t('aiBreakdownEmpty')}</p>
+              ) : (
+                <ul className="mt-1 space-y-0.5 text-xs" data-testid="ai-breakdown">
+                  {data.ai.byFeature.map(f => (
+                    <li key={f.feature} className="flex justify-between">
+                      <span>{aiFeatureLabel(f.feature)}</span>
+                      <span className="tabular-nums">{f.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">{t('aiResets')}</p>
+            </div>
             <p className="text-xs text-muted-foreground">
               {t('aiBuyHint', { days: data.termDays })}
             </p>

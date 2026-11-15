@@ -154,6 +154,7 @@ function fakeTx() {
         owner: { email: 'm@x.test', firstName: 'M' },
       }),
     },
+    manualPaymentClaim: { count: async () => 0 },
     storeSubscription: { findUnique: async () => h.sub },
     storeFeature: {
       findFirst: vi.fn(async () => h.offRow),

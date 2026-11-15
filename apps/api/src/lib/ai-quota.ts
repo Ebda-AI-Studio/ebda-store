@@ -106,6 +106,27 @@ export async function storeAiCapFactor(storeId: string): Promise<number> {
 const countStoreUsage = (storeId: string, since: Date) =>
   prisma.aiUsage.count({ where: { storeId, createdAt: { gte: since }, cachedHit: false } });
 
+/**
+ * What used today's AI requests, by feature (the existing `ai_usage` ledger; cached hits cost nothing and are excluded,
+ * exactly as the cap counts them). Bounded read: a day is at most the cap, so the take never truncates real usage.
+ */
+export async function storeAiUsageByFeature(
+  storeId: string
+): Promise<Array<{ feature: string; count: number }>> {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const rows = await prisma.aiUsage.findMany({
+    where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
+    select: { feature: true },
+    take: 5000,
+  });
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.feature, (counts.get(r.feature) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([feature, count]) => ({ feature, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 /** What the merchant sees in AI settings: base cap, paid extra, used today, remaining. */
 export async function storeAiAllowance(storeId: string) {
   const startOfDay = new Date();

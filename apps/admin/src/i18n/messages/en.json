@@ -9728,7 +9728,9 @@
       "suggestedPeriod": "Paid period if approved: {start} to {end}",
       "subscriptionState": "Subscription: {status}",
       "storeSuspended": "The store is paused ({reason}).",
-      "close": "Close"
+      "close": "Close",
+      "addonApproved": "Add-on approved: it is on for the store now.",
+      "addonApproveFailed": "Could not approve the add-on. Nothing was turned on."
     },
     "vatLine": "incl. VAT {rate}% {vat} · TRN {trn}",
     "vatBreakdown": "Net {net} · VAT {vat} · Gross {gross}",
@@ -11706,7 +11708,7 @@
     "confirmRenews": "Then {amount} every {days} days on your saved card until you stop it. We email you before each renewal, and you can stop it any time from Add-ons.",
     "tryAgain": "Try again",
     "returnDone": "Back from the payment page. Your add-ons below show the latest status.",
-    "instapayNote": "Paying by InstaPay is not available for add-ons yet. Use a card for now.",
+    "instapayNote": "Paying by InstaPay: an add-on bought this way turns on after Ebda Store confirms your transfer, usually within one working day.",
     "historyHeading": "Your add-on payments",
     "historyEmpty": "No add-on payments yet.",
     "historyUntil": "covers until {date}",
@@ -11717,7 +11719,9 @@
       "succeeded": "Paid",
       "pending": "Waiting for payment",
       "failed": "Not paid",
-      "refunded": "Refunded"
+      "refunded": "Refunded",
+      "waiting_confirmation": "Waiting for confirmation",
+      "rejected": "Not accepted"
     },
     "state": {
       "available": "Not added",
@@ -11735,7 +11739,35 @@
       "expiredHint": "This add-on has ended. Buy it again to turn it back on.",
       "refundedHint": "This payment was refunded and the add-on is off.",
       "includedHint": "Included in your plan, nothing to buy.",
-      "grantedHint": "Ebda Store support turned this on for your store, nothing to buy."
+      "grantedHint": "Ebda Store support turned this on for your store, nothing to buy.",
+      "waiting_confirmation": "Waiting for confirmation",
+      "rejected": "Transfer not accepted",
+      "waiting_confirmationHint": "We received your InstaPay receipt and are checking it. The add-on turns on only after Ebda Store confirms it.",
+      "rejectedHint": "We could not accept this InstaPay transfer, so nothing was added. You can pay again."
+    },
+    "instapayOff": "InstaPay is not available for add-ons right now. Use a card.",
+    "payInstapay": "Pay by InstaPay",
+    "instapayError": "Could not load the InstaPay details. Nothing was charged.",
+    "instapayTitle": "Pay for {name} by InstaPay",
+    "instapayHowItWorks": "Transfer the exact amount below, then upload the receipt. The add-on stays off until Ebda Store confirms the transfer.",
+    "instapayReviewerNote": "Ebda Store will check your transfer. The add-on turns on only after it is confirmed.",
+    "instapaySent": "Receipt sent. We will confirm it soon and the add-on turns on after that.",
+    "instapayClose": "Close",
+    "aiMeterLeft": "{remaining} AI requests left today",
+    "aiMeterUsed": "{used} of {cap} used",
+    "aiMeterSplit": "{base} included every day, plus {extra} from your packs.",
+    "aiPackEnds": "{name}: until {date}",
+    "aiBreakdownTitle": "What used them today",
+    "aiBreakdownEmpty": "Nothing has used AI requests today.",
+    "aiResets": "The count starts again every day at midnight (UTC).",
+    "aiFeature": {
+      "translate": "Translation",
+      "seo": "SEO",
+      "categorize": "Categorising",
+      "product-excerpt": "Product short description",
+      "product-faq": "Product questions and answers",
+      "product-meta-aeo": "Search and AI-answer text",
+      "product-tags": "Product tags"
     }
   }
 }

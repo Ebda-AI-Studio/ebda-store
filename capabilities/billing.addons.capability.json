@@ -13,7 +13,9 @@
     "POST /stores/:storeId/billing/addons/preview",
     "POST /stores/:storeId/billing/addons/checkout",
     "POST /stores/:storeId/billing/addons/:sku/cancel",
-    "POST /stores/:storeId/billing/addons/:sku/resume"
+    "POST /stores/:storeId/billing/addons/:sku/resume",
+    "GET /stores/:storeId/billing/addons/:sku/instapay",
+    "POST /stores/:storeId/billing/addons/:sku/instapay/receipts/:receiptId/submit"
   ],
   "mcpTool": null,
   "planGate": null,
@@ -49,7 +51,9 @@
     "A locked screen for a sellable feature offers Get this add-on (the Add-ons page), not Contact support",
     "The cached entitlement expires at the paid term end (not on a 5 minute TTL); a daily run also clears every cache layer for stores whose term ended",
     "Receipts and payment history (paid, waiting, failed, refunded) are listed on the page; no provider fields",
-    "InstaPay is not offered for add-ons yet (card only)"
+    "InstaPay: the merchant transfers the quoted total and uploads the receipt; that opens an entry in the existing super-admin claims queue and the add-on stays OFF until a super admin approves it (approve-addon); reject or silence leaves nothing active; a pending InstaPay claim blocks a second purchase of the same add-on",
+    "Refunds stay a super-admin action; there is no merchant self-refund",
+    "The AI packs show a credits meter: requests left today, what used them (from the AI usage ledger) and each running pack with its end date"
   ],
   "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"]
 }

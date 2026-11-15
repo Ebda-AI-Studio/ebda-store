@@ -8,6 +8,8 @@
 export type AddonState =
   | 'available'
   | 'pending_payment'
+  | 'waiting_confirmation'
+  | 'rejected'
   | 'failed'
   | 'active'
   | 'renewing'
@@ -20,6 +22,8 @@ export type AddonState =
 const PENDING_FRESH_MS = 30 * 60_000;
 const FAILED_VISIBLE_MS = 7 * 86_400_000;
 const ENDED_VISIBLE_MS = 30 * 86_400_000;
+/** An InstaPay claim waits for a human: after this long it is stale (the merchant may buy again) but stays in the queue. */
+const CLAIM_FRESH_MS = 7 * 86_400_000;
 
 export interface AttemptRow {
   status: string;
@@ -38,6 +42,8 @@ interface StateInput {
   overrideOn: boolean;
   /** Newest ledger row for this SKU (`addon:<sku>`), or null. */
   newest: AttemptRow | null;
+  /** Newest InstaPay claim for this SKU (pending = awaiting a super admin, rejected = refused), or null. */
+  claim?: { status: string; createdAt: Date } | null;
   now: Date;
 }
 
@@ -48,6 +54,12 @@ export function deriveAddonState(i: StateInput): AddonState {
   }
   if (i.isFeature && i.onWithoutAddon) return i.overrideOn ? 'granted' : 'included';
   const n = i.newest;
+  const c = i.claim;
+  if (c && (!n || c.createdAt.getTime() >= n.createdAt.getTime())) {
+    const cAge = i.now.getTime() - c.createdAt.getTime();
+    if (c.status === 'pending' && cAge < CLAIM_FRESH_MS) return 'waiting_confirmation';
+    if (c.status === 'rejected' && cAge < FAILED_VISIBLE_MS) return 'rejected';
+  }
   if (!n) return 'available';
   const age = i.now.getTime() - n.createdAt.getTime();
   if (n.status === 'pending') return age < PENDING_FRESH_MS ? 'pending_payment' : 'available';

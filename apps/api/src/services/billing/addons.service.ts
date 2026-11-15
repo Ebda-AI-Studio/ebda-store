@@ -12,7 +12,7 @@ import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { withIdempotencyKey } from '../../lib/money-idempotency';
-import { storeAiAllowance } from '../../lib/ai-quota';
+import { storeAiAllowance, storeAiUsageByFeature } from '../../lib/ai-quota';
 import {
   consumeConfirmToken,
   hashConfirmArgs,
@@ -36,6 +36,7 @@ import {
 } from './addon-catalog';
 import { activeAddons, appendRenewalMarker } from './addon-grant';
 import { deriveAddonState, type AttemptRow } from './addon-state';
+import { instapayHandle } from './manual-config';
 
 const RECENT_ATTEMPTS = 100;
 
@@ -72,12 +73,28 @@ const subject = (a: {
 });
 
 /** Everything a quote and a purchase must agree on; refuses what must not be sold. */
-async function quote(storeId: string, sku: string) {
+export async function quoteAddon(
+  storeId: string,
+  sku: string,
+  opts: { card: boolean } = { card: true }
+) {
   const item = itemOf(sku);
   await assertPayableStore(storeId);
-  if (resolveTrialCardMode() !== 'card_on_file') {
+  if (opts.card && resolveTrialCardMode() !== 'card_on_file') {
     throw new AppError(409, 'CARD_PAYMENTS_DISABLED', 'Card payments are not available yet');
   }
+  // An InstaPay payment for this add-on is already waiting for a super admin: never sell it a second way meanwhile.
+  const waiting = await withStore(storeId, tx =>
+    tx.manualPaymentClaim.count({
+      where: { storeId, status: 'pending', planCode: planCodeOfSku(sku) },
+    })
+  );
+  if (waiting > 0)
+    throw new AppError(
+      409,
+      'ADDON_AWAITING_CONFIRMATION',
+      'This add-on is already waiting for confirmation'
+    );
   const [store, sub, running] = await Promise.all([
     withStore(storeId, tx =>
       tx.store.findUnique({
@@ -117,7 +134,7 @@ async function quote(storeId: string, sku: string) {
 }
 
 export async function previewAddon(a: { storeId: string; userId: string; sku: string }) {
-  const { item, amount } = await quote(a.storeId, a.sku);
+  const { item, amount } = await quoteAddon(a.storeId, a.sku);
   const t = terms(item, amount.totalMinor);
   return {
     sku: item.sku,
@@ -145,7 +162,7 @@ export async function purchaseAddon(a: {
     `addon-checkout:${a.storeId}`,
     a.idempotencyKey,
     async () => {
-      const { item, store, amount } = await quote(a.storeId, a.sku);
+      const { item, store, amount } = await quoteAddon(a.storeId, a.sku);
       const subj = subject({
         storeId: a.storeId,
         userId: a.userId,
@@ -282,21 +299,47 @@ async function addonRows(storeId: string, take: number) {
   );
 }
 
+/** InstaPay claims for add-ons that are still open or were refused (a confirmed one has a ledger row), newest first. */
+async function addonClaims(storeId: string, take: number) {
+  return withStore(storeId, tx =>
+    tx.manualPaymentClaim.findMany({
+      where: {
+        storeId,
+        planCode: { startsWith: ADDON_PLAN_PREFIX },
+        status: { in: ['pending', 'rejected'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: {
+        id: true,
+        planCode: true,
+        status: true,
+        amountMinor: true,
+        reviewNote: true,
+        createdAt: true,
+      },
+    })
+  );
+}
+
 export async function listAddons(storeId: string) {
   const now = new Date();
-  const [running, features, withoutAddons, overrides, rows, ai] = await Promise.all([
-    withStore(storeId, tx => activeAddons(tx, storeId, now)),
-    featureService.getStoreFeatures(storeId),
-    featureService.resolveWithoutAddons(storeId),
-    withStore(storeId, tx =>
-      tx.storeFeature.findMany({
-        where: { storeId, enabled: true },
-        select: { featureKey: true },
-      })
-    ),
-    addonRows(storeId, RECENT_ATTEMPTS),
-    storeAiAllowance(storeId),
-  ]);
+  const [running, features, withoutAddons, overrides, rows, claims, ai, aiByFeature] =
+    await Promise.all([
+      withStore(storeId, tx => activeAddons(tx, storeId, now)),
+      featureService.getStoreFeatures(storeId),
+      featureService.resolveWithoutAddons(storeId),
+      withStore(storeId, tx =>
+        tx.storeFeature.findMany({
+          where: { storeId, enabled: true },
+          select: { featureKey: true },
+        })
+      ),
+      addonRows(storeId, RECENT_ATTEMPTS),
+      addonClaims(storeId, RECENT_ATTEMPTS),
+      storeAiAllowance(storeId),
+      storeAiUsageByFeature(storeId),
+    ]);
   const overrideOn = new Set(overrides.map(o => o.featureKey));
   let cardAvailable = true;
   try {
@@ -306,6 +349,7 @@ export async function listAddons(storeId: string) {
   }
   return {
     cardAvailable,
+    instapayAvailable: instapayHandle() !== null,
     termDays: ADDON_TERM_DAYS,
     addons: Object.values(ADDON_CATALOG).map(i => {
       const mine = running
@@ -328,6 +372,7 @@ export async function listAddons(storeId: string) {
         onWithoutAddon: on,
         overrideOn: isFeature && overrideOn.has(i.featureKey!),
         newest,
+        claim: claims.find(c => skuOfPlanCode(c.planCode) === i.sku) ?? null,
         now,
       });
       return {
@@ -350,14 +395,52 @@ export async function listAddons(storeId: string) {
           : null,
       };
     }),
-    ai,
+    ai: {
+      ...ai,
+      /** What spent today's requests (same ledger the cap counts), biggest first. */
+      byFeature: aiByFeature,
+      /** The packs that raise today's cap and when each ends. */
+      packs: running
+        .filter(r => ADDON_CATALOG[r.sku]?.kind === 'ai_topup')
+        .map(r => ({
+          sku: r.sku,
+          extraRequests: ADDON_CATALOG[r.sku].aiExtraRequests ?? 0,
+          nameEn: ADDON_CATALOG[r.sku].nameEn,
+          nameAr: ADDON_CATALOG[r.sku].nameAr,
+          endsAt: r.endsAt,
+        })),
+    },
   };
 }
 
 /** The merchant's add-on purchase history: every attempt with what it cost, newest first. Receipt data only. */
 export async function listAddonHistory(storeId: string, limit = 50) {
-  const rows = await addonRows(storeId, Math.min(Math.max(limit, 1), 200));
-  return rows.flatMap(r => {
+  const take = Math.min(Math.max(limit, 1), 200);
+  const [rows, claims] = await Promise.all([addonRows(storeId, take), addonClaims(storeId, take)]);
+  const claimItems = claims.flatMap(c => {
+    const sku = skuOfPlanCode(c.planCode);
+    const item = sku ? ADDON_CATALOG[sku] : null;
+    if (!item) return [];
+    return [
+      {
+        id: c.id,
+        sku: item.sku,
+        nameEn: item.nameEn,
+        nameAr: item.nameAr,
+        // InstaPay: nothing is on until a super admin approves, so this is a wait, never a payment.
+        status: c.status === 'pending' ? 'waiting_confirmation' : 'rejected',
+        amountMinor: c.amountMinor,
+        vatMinor: 0,
+        vat: null,
+        currency: 'EGP',
+        termEnd: null,
+        createdAt: c.createdAt,
+        failureReason: null,
+        planCode: c.planCode,
+      },
+    ];
+  });
+  const ledgerItems = rows.flatMap(r => {
     const sku = skuOfPlanCode(r.planCode);
     const item = sku ? ADDON_CATALOG[sku] : null;
     if (!item) return [];
@@ -380,4 +463,7 @@ export async function listAddonHistory(storeId: string, limit = 50) {
       },
     ];
   });
+  return [...ledgerItems, ...claimItems]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, take);
 }
