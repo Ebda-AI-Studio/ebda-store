@@ -151,8 +151,8 @@ export type ChangeDef<A> = {
   describe: (ctx: TurnCtx, a: A, state: unknown) => Described | Promise<Described>;
   /** The mutation: MUST call the same service method the admin route calls. */
   run: (ctx: TurnCtx, a: A, state: unknown) => Promise<unknown>;
-  /** Restores `restore` through a tool (usually this one). null = nothing to restore. */
-  inverse?: (a: A, restore: unknown) => InverseOp | null;
+  /** Restores `restore` through a tool (usually this one). `result` is what `run` returned (a create tool needs the new id). null = nothing to restore. */
+  inverse?: (a: A, restore: unknown, result: unknown) => InverseOp | null;
   /** Rows from other shoppers' text (a review, a customer note) are untrusted. */
   resultTrust?: ToolSpec['resultTrust'];
 };
