@@ -5369,6 +5369,20 @@
         "overridesCleared": "Overrides cleared",
         "overridesClearedDescription": "Store is now using plan defaults.",
         "resetFailed": "Reset failed"
+      },
+      "expiry": {
+        "edit": "Expiry",
+        "title": "Override expiry",
+        "hint": "After this date the override stops and the feature goes back to the plan's default. Leave the date empty for no expiry.",
+        "dateLabel": "Expires on",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "For example: bundles add-on, paid until 16 Dec",
+        "save": "Save",
+        "expiresOn": "Expires {date}",
+        "expired": "Expired {date}, plan default applies",
+        "saved": "Expiry saved",
+        "saveFailed": "Could not save the expiry",
+        "pastDate": "Pick a date in the future"
       }
     }
   },

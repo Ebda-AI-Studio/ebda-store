@@ -137,6 +137,7 @@ const ENTERPRISE_ADDITIONS: FeatureKey[] = [
 // super-admin StoreFeature override, so every existing merchant (on every
 // plan) is unaffected until they are explicitly opted in. Do NOT add it to
 // STARTER_CORE/PROFESSIONAL_ADDITIONS/ENTERPRISE_ADDITIONS above.
+// A sold override should carry an `expiresAt` (Ruling SF-EXPIRY-1): past it, the override is ignored and the store is back on its plan.
 
 /**
  * Features that resolve to ENABLED for a store on this plan by default.

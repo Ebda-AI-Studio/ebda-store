@@ -8793,6 +8793,20 @@
           "list": false,
           "optional": true
         },
+        "expiresAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "expires_at",
+          "list": false,
+          "optional": true
+        },
+        "reason": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "reason",
+          "list": false,
+          "optional": true
+        },
         "updatedAt": {
           "kind": "scalar",
           "type": "DateTime",

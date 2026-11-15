@@ -131,7 +131,7 @@ class FeatureService {
    */
   private rowsToMap(
     plan: StorePlan,
-    rows: Array<{ featureKey: string; enabled: boolean }>,
+    rows: Array<{ featureKey: string; enabled: boolean; expiresAt?: Date | null }>,
     flags?: {
       abandonedCartAutomation: boolean;
       whatsappAutomation: boolean;
@@ -175,8 +175,13 @@ class FeatureService {
       // (mcp/merchant-write.ts); a StoreFeature override still wins both ways.
       map.merchant_mcp_write = flags.mcpAccess;
     }
-    // Layer 2: per-store overrides on top.
+    // Layer 2: per-store overrides on top. An override past its `expiresAt` is ignored: the feature falls back to the
+    // plan baseline (Ruling SF-EXPIRY-1; resolved at read time, no sweep). The map is cached CACHE_TTL (5 min) and the
+    // public store payload 120 s on top, so an expiry takes effect within that BOUNDED-stale window (no write event
+    // happens at the expiry instant, so there is nothing to invalidate on; the window is accepted for a grant measured in days).
+    const nowMs = Date.now();
     for (const row of rows) {
+      if (row.expiresAt && row.expiresAt.getTime() <= nowMs) continue;
       if (FEATURE_KEYS_ARRAY.includes(row.featureKey as FeatureKey)) {
         map[row.featureKey as FeatureKey] = row.enabled;
       }
@@ -196,7 +201,7 @@ class FeatureService {
         readStorePlan(tx, storeId),
         tx.storeFeature.findMany({
           where: { storeId },
-          select: { featureKey: true, enabled: true },
+          select: { featureKey: true, enabled: true, expiresAt: true },
         }),
       ]);
       // The plans engine's automation flags, read in the SAME store-scope tx (one
@@ -346,7 +351,12 @@ class FeatureService {
   async updateStoreFeatures(
     storeId: string,
     updates: Partial<Record<FeatureKey, boolean>>,
-    userId: string
+    userId: string,
+    /**
+     * Expiry + reason for the overrides written by this call (Ruling SF-EXPIRY-1). Present: both are SET on every key
+     * (`null` = never expires / no reason). Absent: an existing row keeps its own, a new row gets none.
+     */
+    meta?: { expiresAt: Date | null; reason: string | null }
   ): Promise<Record<FeatureKey, boolean>> {
     const now = new Date();
 
@@ -366,11 +376,14 @@ class FeatureService {
               enabled: enabled as boolean,
               enabledAt: enabled ? now : null,
               enabledBy: userId,
+              expiresAt: meta?.expiresAt ?? null,
+              reason: meta?.reason ?? null,
             },
             update: {
               enabled: enabled as boolean,
               enabledAt: enabled ? now : null,
               enabledBy: userId,
+              ...(meta ? { expiresAt: meta.expiresAt, reason: meta.reason } : {}),
             },
           });
         }
@@ -382,7 +395,7 @@ class FeatureService {
         });
         const rows = await tx.storeFeature.findMany({
           where: { storeId },
-          select: { featureKey: true, enabled: true },
+          select: { featureKey: true, enabled: true, expiresAt: true },
         });
         const flags = await getAutomationFlags(storeId, tx, { legacyPlan: store?.plan ?? 'free' });
         return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows, flags);
@@ -407,9 +420,10 @@ class FeatureService {
     storeId: string,
     featureKey: FeatureKey,
     enabled: boolean,
-    userId: string
+    userId: string,
+    meta?: { expiresAt: Date | null; reason: string | null }
   ): Promise<Record<FeatureKey, boolean>> {
-    return this.updateStoreFeatures(storeId, { [featureKey]: enabled }, userId);
+    return this.updateStoreFeatures(storeId, { [featureKey]: enabled }, userId, meta);
   }
 
   /**

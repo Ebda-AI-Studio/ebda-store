@@ -27,8 +27,15 @@ interface OverrideMetadata {
   enabled: boolean;
   enabledAt: string | null;
   enabledBy: string | null;
+  /** Ruling SF-EXPIRY-1: ISO date after which the override is ignored; null = never. */
+  expiresAt: string | null;
+  reason: string | null;
   updatedAt: string;
 }
+
+/** An override past its expiry no longer decides anything: the plan default applies. */
+const isExpired = (row: OverrideMetadata | undefined) =>
+  !!row?.expiresAt && new Date(row.expiresAt).getTime() <= Date.now();
 
 interface FeaturesResponse {
   features: Record<string, boolean>;
@@ -51,7 +58,7 @@ function triState(
   overrideRow: OverrideMetadata | undefined
 ): TriState {
   const inBaseline = isInBaseline(plan, key);
-  if (overrideRow !== undefined) {
+  if (overrideRow !== undefined && !isExpired(overrideRow)) {
     if (overrideRow.enabled) {
       // Row exists and is enabled
       return inBaseline ? 'baseline_on' : 'override_on';
@@ -123,10 +130,19 @@ interface FeatureRowProps {
   overrideRow: OverrideMetadata | undefined;
   inFlight: boolean;
   onAction: (key: FeatureKey, state: TriState) => void;
+  onEditExpiry: (row: OverrideMetadata) => void;
 }
 
-function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureRowProps) {
+function FeatureRowItem({
+  def,
+  plan,
+  overrideRow,
+  inFlight,
+  onAction,
+  onEditExpiry,
+}: FeatureRowProps) {
   const tFeatures = useT('features');
+  const tExpiry = useT('features.matrix.expiry');
   const state = triState(plan, def.key, overrideRow);
   const isEffectivelyOn = state === 'baseline_on' || state === 'override_on';
 
@@ -158,6 +174,26 @@ function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureR
               {overrideRow.enabledAt ? ` · ${formatDate(overrideRow.enabledAt)}` : ''}
             </span>
           )}
+          {overrideRow?.expiresAt && (
+            <span className="text-xs text-muted-foreground">
+              {isExpired(overrideRow)
+                ? tExpiry('expired', { date: formatDate(overrideRow.expiresAt) })
+                : tExpiry('expiresOn', { date: formatDate(overrideRow.expiresAt) })}
+            </span>
+          )}
+          {overrideRow?.reason && (
+            <span className="text-xs text-muted-foreground">· {overrideRow.reason}</span>
+          )}
+          {overrideRow && (
+            <button
+              type="button"
+              onClick={() => onEditExpiry(overrideRow)}
+              disabled={inFlight}
+              className="text-xs text-primary hover:underline"
+            >
+              {tExpiry('edit')}
+            </button>
+          )}
         </div>
       </div>
       <div className="flex-shrink-0 pt-1">
@@ -180,6 +216,7 @@ interface CategorySectionProps {
   overrideMap: Map<string, OverrideMetadata>;
   inFlightKeys: Set<string>;
   onAction: (key: FeatureKey, state: TriState) => void;
+  onEditExpiry: (row: OverrideMetadata) => void;
 }
 
 function CategorySection({
@@ -189,6 +226,7 @@ function CategorySection({
   overrideMap,
   inFlightKeys,
   onAction,
+  onEditExpiry,
 }: CategorySectionProps) {
   const t = useT('features.matrix');
   const tFeatures = useT('features');
@@ -214,6 +252,7 @@ function CategorySection({
             overrideRow={overrideMap.get(def.key)}
             inFlight={inFlightKeys.has(def.key)}
             onAction={onAction}
+            onEditExpiry={onEditExpiry}
           />
         ))}
       </div>
@@ -263,6 +302,18 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   // Reset modal
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+
+  // Override expiry modal (Ruling SF-EXPIRY-1)
+  const tExpiry = useT('features.matrix.expiry');
+  const [expiryTarget, setExpiryTarget] = useState<OverrideMetadata | null>(null);
+  const [expiryDate, setExpiryDate] = useState('');
+  const [expiryReason, setExpiryReason] = useState('');
+  const [expirySaving, setExpirySaving] = useState(false);
+  const openExpiry = useCallback((row: OverrideMetadata) => {
+    setExpiryTarget(row);
+    setExpiryDate(row.expiresAt ? row.expiresAt.slice(0, 10) : '');
+    setExpiryReason(row.reason ?? '');
+  }, []);
 
   // ── Fetch store info ───────────────────────────────────────────────────────
   const fetchStore = useCallback(async () => {
@@ -321,6 +372,40 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
     },
     [inFlightKeys, storeId, fetchFeatures, refreshFeatureContext, toastError, t]
   );
+
+  // ── Override expiry ────────────────────────────────────────────────────────
+  const saveExpiry = useCallback(async () => {
+    if (!expiryTarget) return;
+    // End of the chosen day (UTC), so "until 16 Dec" includes the 16th; an empty date = never expires.
+    const expiresAt = expiryDate ? `${expiryDate}T23:59:59.000Z` : null;
+    if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
+      toastError(tExpiry('saveFailed'), tExpiry('pastDate'));
+      return;
+    }
+    setExpirySaving(true);
+    const { error: apiErr } = await apiPut(
+      `/api/v1/admin/stores/${storeId}/features/${expiryTarget.featureKey}`,
+      { enabled: expiryTarget.enabled, expiresAt, reason: expiryReason.trim() || null }
+    );
+    if (apiErr) {
+      toastError(tExpiry('saveFailed'), apiErr.message);
+    } else {
+      toastSuccess(tExpiry('saved'));
+      setExpiryTarget(null);
+      await Promise.all([fetchFeatures(), refreshFeatureContext()]);
+    }
+    setExpirySaving(false);
+  }, [
+    expiryTarget,
+    expiryDate,
+    expiryReason,
+    storeId,
+    fetchFeatures,
+    refreshFeatureContext,
+    toastSuccess,
+    toastError,
+    tExpiry,
+  ]);
 
   // ── Plan change ────────────────────────────────────────────────────────────
   const handlePlanChange = useCallback(async () => {
@@ -483,6 +568,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
               overrideMap={overrideMap}
               inFlightKeys={inFlightKeys}
               onAction={handleAction}
+              onEditExpiry={openExpiry}
             />
           );
         })}
@@ -581,6 +667,49 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
             isLoading={planChanging}
           >
             {tCommon('confirm')}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Override expiry */}
+      <Modal
+        isOpen={expiryTarget !== null}
+        onClose={() => setExpiryTarget(null)}
+        title={tExpiry('title')}
+        size="sm"
+      >
+        <p className="text-sm text-muted-foreground">{tExpiry('hint')}</p>
+        <label className="mt-4 block text-sm font-medium text-foreground">
+          {tExpiry('dateLabel')}
+          <input
+            type="date"
+            value={expiryDate}
+            onChange={e => setExpiryDate(e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+          />
+        </label>
+        <label className="mt-3 block text-sm font-medium text-foreground">
+          {tExpiry('reasonLabel')}
+          <input
+            type="text"
+            maxLength={200}
+            value={expiryReason}
+            onChange={e => setExpiryReason(e.target.value)}
+            placeholder={tExpiry('reasonPlaceholder')}
+            className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+          />
+        </label>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="outline" onClick={() => setExpiryTarget(null)} disabled={expirySaving}>
+            {tCommon('cancel')}
+          </Button>
+          <Button
+            variant="default"
+            onClick={saveExpiry}
+            disabled={expirySaving}
+            isLoading={expirySaving}
+          >
+            {tExpiry('save')}
           </Button>
         </div>
       </Modal>

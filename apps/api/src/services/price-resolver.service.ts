@@ -41,9 +41,11 @@ import { storeDb } from '../lib/repo-factory';
 export async function wholesaleEntitledUncached(storeId: string): Promise<boolean> {
   const override = await prisma.storeFeature.findFirst({
     where: { storeId, featureKey: 'b2b.wholesale' },
-    select: { enabled: true },
+    select: { enabled: true, expiresAt: true },
   });
-  if (override) return override.enabled;
+  // An expired override no longer decides (Ruling SF-EXPIRY-1): fall through to the plan limit.
+  if (override && !(override.expiresAt && override.expiresAt.getTime() <= Date.now()))
+    return override.enabled;
   const flags = await getAutomationFlags(storeId);
   return flags?.wholesalePricing ?? false;
 }
