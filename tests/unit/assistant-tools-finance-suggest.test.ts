@@ -134,61 +134,22 @@ beforeEach(() => {
   m.bankTx.clear();
 });
 
-describe('journal_entry_suggest', () => {
-  const j = () => t('journal_entry_suggest');
-  it('there is no tool that posts more than one journal entry per apply', async () => {
+describe('journal_entry_suggest is closed to every merchant role until the route allows owners', () => {
+  const j = () => journalEntrySuggest;
+  it('an owner (store_admin) is refused at preview and at apply; nothing is posted', async () => {
+    const args = j().args.parse(entry) as never;
+    await expect(j().preview!(ctx('store_admin'), args)).rejects.toThrow(/FORBIDDEN/);
+    await expect(j().apply!(ctx('store_admin'), args, {} as never)).rejects.toBeInstanceOf(
+      ToolForbidden
+    );
+    await expect(j().preview!(ctx('staff'), args)).rejects.toThrow(/FORBIDDEN/);
+    expect(m.postManualEntry).not.toHaveBeenCalled();
+  });
+  it('the args schema rejects a list of entries', () => {
     expect(j().args.safeParse([entry, entry]).success).toBe(false);
     expect(j().args.safeParse({ entries: [entry] }).success).toBe(false);
     expect(financeSuggestTools().some(x => /batch|bulk/i.test(x.name))).toBe(false);
-    const args = j().args.parse(entry) as never;
-    const d = await j().preview!(ctx(), args);
-    expect(d.affectedCount).toBe(1);
-    expect(d.etag).toMatch(/^[0-9a-f]{32}$/);
-    await j().apply!(ctx(), args, d);
-    expect(m.postManualEntry).toHaveBeenCalledTimes(1);
-    const call = m.postManualEntry.mock.calls[0][0];
-    expect(call.lines).toEqual([
-      expect.objectContaining({ accountId: 'A1', debit: 10050, credit: 0, currency: 'EGP' }),
-      expect.objectContaining({ accountId: 'A2', debit: 0, credit: 10050, currency: 'EGP' }),
-    ]);
-    expect(m.insertAuditLog.mock.calls[0][0].details).toMatchObject({
-      actor: 'assistant',
-      tool: 'journal_entry_suggest',
-    });
-  });
-  it('is confirm, money, irreversible, no inverse; an unbalanced, disabled or foreign line never reaches run', async () => {
-    const d = await j().preview!(ctx(), j().args.parse(entry) as never);
-    const e = effectivePolicy(j(), d);
-    expect(e.reasons).toEqual(expect.arrayContaining(['declared', 'money', 'irreversible']));
-    expect(j().inverse).toBeUndefined();
-    const bad = (lines: unknown) => j().preview!(ctx(), j().args.parse({ lines }) as never);
-    await expect(
-      bad([
-        { accountId: 'A1', debitEgp: 5 },
-        { accountId: 'A2', creditEgp: 6 },
-      ])
-    ).rejects.toThrow(/must equal/);
-    await expect(
-      bad([
-        { accountId: 'OFF', debitEgp: 5 },
-        { accountId: 'A2', creditEgp: 5 },
-      ])
-    ).rejects.toThrow(/disabled/);
-    await expect(
-      bad([
-        { accountId: 'FOREIGN', debitEgp: 5 },
-        { accountId: 'A2', creditEgp: 5 },
-      ])
-    ).rejects.toThrow();
-    expect(m.postManualEntry).not.toHaveBeenCalled();
-  });
-  it('staff and a store without accounting get ToolForbidden at apply', async () => {
-    const args = j().args.parse(entry) as never;
-    const d = await j().preview!(ctx(), args);
-    await expect(j().apply!(ctx('staff'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
-    m.featureEnabled.mockResolvedValue(false);
-    await expect(j().apply!(ctx(), args, d)).rejects.toBeInstanceOf(ToolForbidden);
-    expect(m.postManualEntry).not.toHaveBeenCalled();
+    expect(financeSuggestTools().some(x => x.name === 'journal_entry_suggest')).toBe(false);
   });
 });
 
@@ -293,28 +254,44 @@ describe('fx, anomaly and VAT submit', () => {
     await a.apply!(ctx(), args, d);
     expect(m.acknowledgeProfitAnomaly).toHaveBeenCalledWith('S1', 'N1', 'u1');
   });
+  const profile = {
+    status: 'none',
+    taxRegistrationNumber: '123',
+    legalName: 'X Co',
+    documents: [{ id: 'd1' }],
+    submittedAt: null,
+  };
   it('vat_registration_submit is confirm + irreversible and refuses an incomplete profile', async () => {
     const v = t('vat_registration_submit');
     expect(v.policy).toBe('confirm');
     expect(v.undo).toBe('irreversible');
     m.getProfile.mockResolvedValue({
-      status: 'none',
+      ...profile,
       taxRegistrationNumber: null,
       legalName: null,
       documents: [],
-      submittedAt: null,
     });
-    await expect(v.preview!(ctx(), {} as never)).rejects.toThrow();
-    m.getProfile.mockResolvedValue({
-      status: 'none',
-      taxRegistrationNumber: '123',
-      legalName: 'X Co',
-      documents: [{ id: 'd1' }],
-      submittedAt: null,
-    });
-    const d = await v.preview!(ctx(), {} as never);
-    await v.apply!(ctx(), {} as never, d);
+    await expect(v.preview!(ctx(), v.args.parse({ attest: true }) as never)).rejects.toThrow();
+    m.getProfile.mockResolvedValue(profile);
+    const args = v.args.parse({ attest: true }) as never;
+    const d = await v.preview!(ctx(), args);
+    await v.apply!(ctx(), args, d);
     expect(m.submit).toHaveBeenCalledWith('S1', { userId: 'u1' });
+  });
+  it('the legal statement is a card row and part of the hashed payload; without the attestation the tool refuses', async () => {
+    const v = t('vat_registration_submit');
+    m.getProfile.mockResolvedValue(profile);
+    expect(v.args.safeParse({}).success).toBe(false);
+    expect(v.args.safeParse({ attest: false }).success).toBe(false);
+    const d = await v.preview!(ctx(), v.args.parse({ attest: true }) as never);
+    const row = d.rows.find(r => String(r.after).includes('مسجّلة في ضريبة القيمة المضافة'));
+    expect(row).toBeTruthy();
+    expect(String(row!.after)).toContain('registered for VAT with the Egyptian Tax Authority');
+    expect(JSON.stringify(d.payload)).toContain('مسجّلة في ضريبة القيمة المضافة');
+    expect(JSON.stringify(d.payload)).toContain('attest');
+    expect(await v.preview!(ctx(), { attest: false } as never).catch(() => 'refused')).toBe(
+      'refused'
+    );
   });
 });
 
@@ -331,5 +308,87 @@ describe('Ruling SL-E4-1', () => {
   it('the raw journal entry tool is built but never offered (the route is super_admin only)', () => {
     expect(financeSuggestTools().some(x => x.name === 'journal_entry_suggest')).toBe(false);
     expect(journalEntrySuggest.name).toBe('journal_entry_suggest');
+  });
+});
+
+// ---- gates of EVERY tool: staff at preview, staff at apply, plan feature off ------------------------------------------------------------
+const GOOD: Record<string, unknown> = {
+  account_add: { parentId: 'A1', code: '101010', nameEn: 'Petty' },
+  bank_match_suggest: { transactionId: 'T1', action: 'ignore' },
+  fx_rate_set: { currency: 'USD', rate: 48.5 },
+  profit_anomaly_ack: { anomalyId: 'N1' },
+  vat_registration_submit: { attest: true },
+};
+const FEATURE: Record<string, boolean> = {
+  account_add: true,
+  bank_match_suggest: true,
+  fx_rate_set: true,
+  profit_anomaly_ack: true,
+  vat_registration_submit: false,
+};
+
+describe.each(Object.keys(GOOD))('%s gates', name => {
+  beforeEach(() => {
+    m.bankTx.set('T1', bankRow('T1'));
+    m.getProfitAnomaly.mockResolvedValue({
+      id: 'N1',
+      metric: 'm',
+      severity: 'p0',
+      deltaPercent: 1,
+      acknowledged: false,
+    });
+    m.latestFxRate.mockResolvedValue(null);
+    m.getProfile.mockResolvedValue({
+      status: 'none',
+      taxRegistrationNumber: '123',
+      legalName: 'X',
+      documents: [{ id: 'd' }],
+      submittedAt: null,
+    });
+  });
+  const args = () => t(name).args.parse(GOOD[name]) as never;
+  it('staff never gets a card', async () => {
+    await expect(t(name).preview!(ctx('staff'), args())).rejects.toThrow(/FORBIDDEN/);
+  });
+  it('staff is refused at apply and nothing runs', async () => {
+    await expect(t(name).apply!(ctx('staff'), args(), {} as never)).rejects.toBeInstanceOf(
+      ToolForbidden
+    );
+    for (const fn of [m.applyManualMatch, m.recordFxRate, m.acknowledgeProfitAnomaly, m.submit])
+      expect(fn).not.toHaveBeenCalled();
+  });
+  it.runIf(FEATURE[name])(
+    'a store without the plan feature is refused at preview and apply',
+    async () => {
+      m.featureEnabled.mockResolvedValue(false);
+      await expect(t(name).preview!(ctx(), args())).rejects.toThrow(/FORBIDDEN/);
+      await expect(t(name).apply!(ctx(), args(), {} as never)).rejects.toBeInstanceOf(
+        ToolForbidden
+      );
+    }
+  );
+});
+
+describe.each([
+  ['finance_overview', {}, true],
+  ['finance_profit_and_loss', {}, true],
+  ['finance_balance_sheet', {}, true],
+  ['finance_vat_report', { from: '2026-10-01', to: '2026-10-31' }, true],
+  ['bank_unmatched_list', {}, true],
+  ['profit_anomalies_list', {}, true],
+  ['invoices_list', {}, false],
+  ['invoice_get', { documentId: 'D1' }, false],
+])('%s read gates', (name, a, hasFeature) => {
+  const run = (role: string) => t(name).read!(ctx(role), t(name).args.parse(a) as never);
+  it('a customer role is refused', async () => {
+    await expect(run('customer')).rejects.toThrow(/forbidden/);
+  });
+  it('staff is refused where the route is owner-only', async () => {
+    if (name.startsWith('invoice')) return; // routes allow staff
+    await expect(run('staff')).rejects.toThrow(/forbidden/);
+  });
+  it.runIf(hasFeature)('a store without the plan feature is refused', async () => {
+    m.featureEnabled.mockResolvedValue(false);
+    await expect(run('store_admin')).rejects.toThrow(/forbidden/);
   });
 });
