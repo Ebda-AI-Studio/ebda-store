@@ -375,7 +375,7 @@
           },
           "act": {
             "label": "Act",
-            "meaning": "It can apply changes for the merchant. Sensitive actions still need the merchant's confirmation."
+            "meaning": "The merchant can apply changes with one press; sensitive ones still need their confirmation."
           }
         }
       }
