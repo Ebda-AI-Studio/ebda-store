@@ -19,6 +19,7 @@ import {
   type LabelItem,
 } from '@ebda/shared';
 
+import { ReceiptBarcodePicker } from '../../apps/admin/src/components/ReceiptBarcodePicker';
 import { ShapePicker } from '../../apps/admin/src/app/stores/[id]/codes/_labels/_components/ShapePicker';
 
 const item: LabelItem = {
@@ -172,5 +173,51 @@ describe('price never wraps its currency', () => {
   it('en price too, and the Arabic sample variant is not a lone letter', () => {
     const l = layoutLabel(labelPresetById('a4-3x7')!, item, { ...settings, lang: 'en' });
     expect(l.texts.find(t => t.role === 'price')!.text).toBe('EGP 250');
+  });
+});
+
+describe('receipt (order barcode) picker shares the same layout-stable tiles', () => {
+  const html = (v: string) =>
+    render('en', <ReceiptBarcodePicker storeId="s1" value={v} onSaved={() => {}} />);
+  const tiles = (h: string) => [...h.matchAll(/<button[^>]*class="([^"]*)"/g)].map(m => m[1]);
+  const SIZE = /^(border-\d|border-[xytblr]\b|p[xytblr]?-|m[xytblr]?-|w-|h-|scale-)/;
+
+  it('selected vs idle differ only by colour + ring; art clipped; columns minmax(0,1fr)', () => {
+    const h = html('plain');
+    const t = tiles(h).filter(c => c.includes('rounded-lg'));
+    expect(t).toHaveLength(RECEIPT_BARCODE_SHAPES.length + 2);
+    const sel = t[0].split(' ');
+    const idle = t[2].split(' ');
+    const diff = [...sel.filter(c => !idle.includes(c)), ...idle.filter(c => !sel.includes(c))];
+    for (const c of diff) expect(c, c).not.toMatch(SIZE);
+    expect(sel).toContain('ring-2');
+    expect(h).toContain('minmax(0,1fr)');
+    expect(h).toContain('overflow-hidden');
+    expect(h).toContain('[&amp;&gt;svg]:w-full');
+    expect(h).not.toMatch(/<svg[^>]* width="/);
+    expect(h).not.toContain('[&amp;&gt;svg]:w-auto');
+  });
+
+  it('"No barcode" is a crossed-out barcode glyph in a same-size tile, not a lone dash', () => {
+    const h = html('off');
+    const off = h.split('<button').find(b => b.includes('aria-label="No barcode"')) ?? '';
+    expect(off).toContain('<line');
+    expect(off).toContain('aria-hidden="true"');
+    expect(h).not.toContain('>-</span>');
+    expect(h).toMatch(/aria-label="No barcode"/);
+    const t = tiles(h).filter(c => c.includes('rounded-lg'));
+    expect(t[1]).toContain('p-2');
+    expect(t[1]).toContain('border');
+  });
+});
+
+describe('BARKOD credit line', () => {
+  it('shows the credit without the permission clause in both pickers', () => {
+    const a = render('en', <ShapePicker value="plain" onChange={() => {}} />);
+    const b = render('en', <ReceiptBarcodePicker storeId="s1" value="plain" onSaved={() => {}} />);
+    for (const h of [a, b]) {
+      expect(h).toContain('Shape drawings by BARKOD studio (barkod.studio).');
+      expect(h).not.toContain('used with permission');
+    }
   });
 });

@@ -16,8 +16,7 @@ export const receiptBarcodeShapeSchema = z.enum(['plain', 'off', ...RECEIPT_BARC
 export type ReceiptBarcodeShape = z.infer<typeof receiptBarcodeShapeSchema>;
 export const DEFAULT_RECEIPT_BARCODE_SHAPE = 'plain';
 
-export const BARCODE_SHAPE_CREDIT =
-  'Shape drawings by BARKOD studio (barkod.studio), used with permission.';
+export const BARCODE_SHAPE_CREDIT = 'Shape drawings by BARKOD studio (barkod.studio).';
 
 export function barcodeShapeData(id: string) {
   return BARKOD_SHAPE_DATA[id];
