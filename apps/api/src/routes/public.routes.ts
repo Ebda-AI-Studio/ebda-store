@@ -599,7 +599,7 @@ router.get('/size-charts', async (req: Request, res: Response, next: NextFunctio
 /**
  * GET /public/feed/products.json — AI Product Feed (agent_feed; all paid plans).
  * Fail-closed: 404 when the feature is not enabled for the store, so the
- * URL does not reveal the add-on's existence on stores that didn't buy it.
+ * URL does not reveal the feature's existence on stores whose plan does not include it.
  * Response is the raw feed JSON (no {success,data} envelope) — this is a
  * public, machine-readable document consumed directly by AI shopping
  * agents, not an internal API response.

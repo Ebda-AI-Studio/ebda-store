@@ -7815,6 +7815,9 @@
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
+    "availableOnOrBuyOne": "Available on the {plan} plan. Upgrade, or add just this feature.",
+    "addJustThisCta": "Add just this feature",
+    "businessOffBody": "“{feature}” is part of your Business plan, but it is switched off for this store right now. Contact us and we will turn it on.",
     "alsoIncluded": "Also included in this plan"
   },
   "aiTools": {
@@ -8719,9 +8722,6 @@
     "common": {
       "loading": "Loading…"
     },
-    "premiumSubtitle": "Extra feature",
-    "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
     "mainSubtitle": "Fixed buttons your customer sees on every page, like WhatsApp and call",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",

@@ -280,8 +280,8 @@ router.get(
 // CRUD). The customer-facing related products feed has three layers:
 //   1. Manual cross-sell relations  (admin curates)
 //   2. AI recommendations           (bulk-ai-recommendations sweep)
-//   3. Same-category fallback       (basic catalog UX, no addon)
-// Gating layers 2 + 3 behind the addon defeats the point of running
+//   3. Same-category fallback       (basic catalog UX, no feature gate)
+// Gating layers 2 + 3 behind the feature gate defeats the point of running
 // the AI sweep and breaks the "you might also like" baseline UX. The
 // service itself layers manual > AI > FBT > same-category, so if a
 // merchant doesn't have manual relations the storefront still gets

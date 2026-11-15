@@ -12,6 +12,9 @@
  *   - Unlocking plan: lowestPlanForFeature() from @ebda/shared.
  *   - Plan display label: publicPlanLabelForFeature() (sold plans only).
  *
+ * Business never sees a lock (Ruling BIZ-ALL-1): when a Business store still lands here, the feature was switched
+ * off for that one store, so the card says so and offers support, never an upgrade or a purchase.
+ *
  * Contact CTA:
  *   Both the primary upgrade button and the secondary "Talk to us" link point
  *   to UPGRADE_CONTACT_WHATSAPP below. Ahmad can swap the number in one place.
@@ -21,6 +24,8 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { AdminLayout } from './AdminLayout';
+import { useCurrentStore } from '../hooks/useCurrentStore';
+import { featureAddHref } from '../lib/feature-add-link';
 import {
   FEATURE_REGISTRY,
   BRAND,
@@ -54,6 +59,8 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
   const t = useTranslations('featureUpgrade');
   const locale = useLocale();
   const isAr = locale === 'ar';
+  const { store } = useCurrentStore(storeId);
+  const onBusiness = store?.plan === 'enterprise';
 
   // Resolve the feature definition from the registry. Fall back gracefully
   // if an unknown key is somehow passed (shouldn't happen in practice).
@@ -72,6 +79,7 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
   }#plans`;
 
   const upgradeLink = buildUpgradeMailto(storeId, featureName);
+  const addLink = featureAddHref(storeId, featureKey);
 
   // Up to 3 sibling features from the same category — same plan gate or higher —
   // shown as an "also included" list to reinforce upsell value.
@@ -90,6 +98,32 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
           )
           .slice(0, 3)
       : [];
+
+  if (onBusiness) {
+    return (
+      <AdminLayout title={pageTitle ?? featureName}>
+        <div className="flex items-center justify-center min-h-[60vh] px-4 py-12">
+          <div
+            className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-sm"
+            role="status"
+            dir={isAr ? 'rtl' : 'ltr'}
+          >
+            <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
+              {pageTitle ?? featureName}
+            </h1>
+            <p className="mb-6 text-base leading-relaxed text-muted-foreground">
+              {t('businessOffBody', { feature: featureName })}
+            </p>
+            <a href={upgradeLink} target="_blank" rel="noopener noreferrer">
+              <Button type="button" variant="outline">
+                {t('contactCta')}
+              </Button>
+            </a>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   // Rendered INSIDE the admin chrome (#2236): pages `return gate`, and a
   // bare card here unmounted the sidebar, hub tabs and topbar — a store_admin
@@ -157,7 +191,7 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
                   className="text-sm font-medium text-foreground/80 mb-6"
                   dir={isAr ? 'rtl' : 'ltr'}
                 >
-                  {t('availableOn', { plan: planLabel })}
+                  {t('availableOnOrBuyOne', { plan: planLabel })}
                 </p>
               )}
 
@@ -173,7 +207,14 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
                   </Button>
                 </Link>
 
-                {/* Secondary: talk to us */}
+                {/* Secondary: buy just this one feature without changing plan (flow lives in the add-ons stack) */}
+                <Link href={addLink} className="flex-1" data-testid="feature-add-link">
+                  <Button type="button" variant="outline" className="w-full">
+                    {t('addJustThisCta')}
+                  </Button>
+                </Link>
+
+                {/* Tertiary: talk to us */}
                 <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">
                   <Button type="button" variant="outline" className="w-full">
                     {t('contactCta')}

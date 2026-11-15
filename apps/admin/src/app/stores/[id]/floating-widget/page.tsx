@@ -9,6 +9,7 @@ import { StickySaveBar } from '../../../../components/StickySaveBar';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { ColorField } from '../../../../components/ColorField';
 import { useFeatures } from '../../../../hooks/useFeatures';
+import { FeatureUpgradeGate } from '../../../../components/FeatureUpgradeGate';
 import { useT } from '@/i18n/useT';
 import type {
   FloatingButton,
@@ -175,16 +176,7 @@ export default function FloatingWidgetPage() {
   }
 
   if (!featureEnabled) {
-    return (
-      <AdminLayout title={t('pageTitle')} subtitle={t('premiumSubtitle')}>
-        <div className="max-w-xl rounded-2xl border border-border bg-card p-8 text-center">
-          <h2 className="mb-2 text-lg font-semibold text-foreground">
-            {t('featureNotEnabledTitle')}
-          </h2>
-          <p className="text-sm text-muted-foreground">{t('featureNotEnabledBody')}</p>
-        </div>
-      </AdminLayout>
-    );
+    return <FeatureUpgradeGate featureKey="floating_widget" storeId={storeId} />;
   }
 
   return (
