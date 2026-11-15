@@ -20,8 +20,10 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@api/lib/definer', () => ({
-  lookupStore: async (m: { id?: string }) =>
-    h.status.value ? (h.status.value === 'active' ? { id: m.id, status: 'active' } : null) : null,
+  lookupStore: async (m: { id?: string }) => {
+    if (h.status.value === 'throw') throw new Error('D1 down');
+    return h.status.value === 'active' ? { id: m.id, status: 'active' } : null;
+  },
 }));
 vi.mock('@ebda/database', () => {
   const db = {
@@ -149,6 +151,17 @@ describe('notification dispatcher (customer SMS + storefront push)', () => {
   it('the refund notice still goes out for a suspended store', async () => {
     await notificationDispatcher.dispatch('s1', 'refund_processed', { ...base, amount: 10 });
     expect(h.enqueue).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('dispatcher fails closed when the status lookup fails', () => {
+  it('a throwing lookup sends nothing and dispatch does not throw', async () => {
+    h.status.value = 'throw';
+    await expect(
+      notificationDispatcher.dispatch('s1', 'order_shipped', base)
+    ).resolves.toBeUndefined();
+    expect(h.enqueue).not.toHaveBeenCalled();
+    expect(h.sendToStore).not.toHaveBeenCalled();
   });
 });
 

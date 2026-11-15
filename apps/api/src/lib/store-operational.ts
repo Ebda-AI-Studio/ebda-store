@@ -50,9 +50,22 @@ export async function activeStoreIds(): Promise<Set<string>> {
   return new Set((await storeDirectory(s => isStoreOperational(s.status))).map(s => s.id));
 }
 
-/** For a sender that must SKIP quietly (a job, a dispatcher): false = do not send. Logs once at debug. */
+/**
+ * For a sender that must SKIP quietly (the dispatcher, which NEVER throws): false = do not send. A failed lookup fails
+ * CLOSED for customer sends (no message goes out on an unknown status) and never throws; only ids are logged.
+ * Money-out does not use this: `assertStoreOperational` throws on a failed lookup, which is right there.
+ */
 export async function storeMayMessageCustomers(storeId: string, what: string): Promise<boolean> {
-  const ok = await storeOperational(storeId);
+  let ok: boolean;
+  try {
+    ok = await storeOperational(storeId);
+  } catch {
+    logger.warn(
+      { storeId, what },
+      '[store-operational] status lookup failed; customer send skipped'
+    );
+    return false;
+  }
   if (!ok) logger.debug({ storeId, what }, '[store-operational] store not active; not sending');
   return ok;
 }

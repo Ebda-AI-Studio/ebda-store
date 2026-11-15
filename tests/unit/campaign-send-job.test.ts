@@ -368,6 +368,33 @@ describe('campaign-send', () => {
     expect(sentTo().sort()).toEqual(emails.slice(5).sort());
   });
 
+  it("a resume with OTHER campaigns' sends today: cap 10, others 4, own 5 sent, audience 8 -> need 3 > headroom 1, refused", async () => {
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '10';
+    const emails = Array.from({ length: 8 }, (_, i) => `u${i}@x.test`);
+    seed(emails);
+    for (const e of emails.slice(0, 5))
+      db.recipients.push({
+        id: uuid(),
+        campaignId,
+        storeId: STORE_A,
+        email: e,
+        status: 'sent',
+        sentAt: new Date(),
+      });
+    for (let i = 0; i < 4; i++)
+      db.recipients.push({
+        id: uuid(),
+        campaignId: 'other',
+        storeId: STORE_A,
+        email: `o${i}@x.test`,
+        status: 'sent',
+        sentAt: new Date(),
+      });
+    await runJob();
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
+  });
+
   it('a resume that still has more to send than the headroom fails DAILY_CAP_EXCEEDED', async () => {
     process.env.CAMPAIGN_DAILY_SEND_CAP = '6';
     const emails = Array.from({ length: 8 }, (_, i) => `u${i}@x.test`);
