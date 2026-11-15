@@ -1,3 +1,4 @@
+import { storeOperational } from '../../store-operational';
 import type { JobDef } from '../../jobs/types';
 import { customerRow, isLiveCustomer } from '../../customer-directory';
 
@@ -152,6 +153,12 @@ export async function handleOrderStatusChanged(
   // any exhausted failure so the run dead-letters (alerts-failure-watch).
   const jobs: Array<Promise<unknown>> = [];
   const ran: string[] = [];
+  // Ruling SUSPEND-OUT-1: the customer emails below are not sent for a store that is not `active` (the SMS / push
+  // dispatchers check it themselves). Read in a step of its own, only for the statuses that mail a customer.
+  const customerMailOk =
+    status === 'confirmed' || status === 'shipped'
+      ? await step.run('check-store-operational', () => storeOperational(storeId))
+      : false;
   const add = (id: string, fn: () => Promise<unknown>) => {
     ran.push(id);
     jobs.push(step.run(id, fn));
@@ -191,47 +198,61 @@ export async function handleOrderStatusChanged(
       inngest.send({ name: 'shipment/create.requested', data: { storeId, orderId } })
     );
     if (shippingAddrFull) {
+      // Ruling SUSPEND-OUT-1: customer mail is not sent for a store that is not `active`.
       add('email-payment-success', () =>
-        EmailService.sendPaymentSuccess(
-          storeId,
-          {
-            orderNumber: order.orderNumber,
-            customerName,
-            customerEmail,
-            // Bundle boxes collapse to ONE row each (see
-            // groupOrderLinesForDisplay) — the payment-success email must
-            // show "Ramadan Box · 12.000 EGP", never the per-component
-            // allocated shares that fund that one price.
-            items: groupOrderLinesForDisplay(order.items).map(row =>
-              row.kind === 'bundle'
-                ? { name: row.name, nameAr: row.nameAr, quantity: row.quantity, price: row.total }
-                : { name: row.item.productName, quantity: row.item.quantity, price: row.item.price }
-            ),
-            subtotal: order.subtotal,
-            tax: order.tax,
-            taxIncludedInPrice: order.taxIncludedInPrice,
-            // Tax-invoice identity frozen at sale (ruling TAX-2); null = no VAT wording.
-            sellerTaxRegistrationNumber: order.sellerTaxRegistrationNumber,
-            sellerTaxLegalName: order.sellerTaxLegalName,
-            taxRateBps: order.taxRateBps,
-            shipping: order.shipping,
-            codFee: order.codFee,
-            taxableAmount: order.taxableAmount,
-            total: order.total,
-            currency: order.currency,
-            shippingAddress: shippingAddrFull,
-          },
-          orderLocale
-        )
+        !customerMailOk
+          ? Promise.resolve(undefined)
+          : EmailService.sendPaymentSuccess(
+              storeId,
+              {
+                orderNumber: order.orderNumber,
+                customerName,
+                customerEmail,
+                // Bundle boxes collapse to ONE row each (see
+                // groupOrderLinesForDisplay) — the payment-success email must
+                // show "Ramadan Box · 12.000 EGP", never the per-component
+                // allocated shares that fund that one price.
+                items: groupOrderLinesForDisplay(order.items).map(row =>
+                  row.kind === 'bundle'
+                    ? {
+                        name: row.name,
+                        nameAr: row.nameAr,
+                        quantity: row.quantity,
+                        price: row.total,
+                      }
+                    : {
+                        name: row.item.productName,
+                        quantity: row.item.quantity,
+                        price: row.item.price,
+                      }
+                ),
+                subtotal: order.subtotal,
+                tax: order.tax,
+                taxIncludedInPrice: order.taxIncludedInPrice,
+                // Tax-invoice identity frozen at sale (ruling TAX-2); null = no VAT wording.
+                sellerTaxRegistrationNumber: order.sellerTaxRegistrationNumber,
+                sellerTaxLegalName: order.sellerTaxLegalName,
+                taxRateBps: order.taxRateBps,
+                shipping: order.shipping,
+                codFee: order.codFee,
+                taxableAmount: order.taxableAmount,
+                total: order.total,
+                currency: order.currency,
+                shippingAddress: shippingAddrFull,
+              },
+              orderLocale
+            )
       );
     }
   } else if (status === 'shipped') {
     add('email-shipped', () =>
-      EmailService.sendOrderShipped(
-        storeId,
-        { customerEmail, customerName, orderNumber: order.orderNumber },
-        orderLocale
-      )
+      !customerMailOk
+        ? Promise.resolve(undefined)
+        : EmailService.sendOrderShipped(
+            storeId,
+            { customerEmail, customerName, orderNumber: order.orderNumber },
+            orderLocale
+          )
     );
     add('dispatch-shipped', () =>
       notificationDispatcher.dispatch(storeId, 'order_shipped', {

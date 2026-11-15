@@ -79,6 +79,22 @@ Suspension is for missed renewals + AUP violations. **Super-admin only.**
    - Store admin can still log into admin (so they can pay invoice + click reactivate)
    - Background jobs (Inngest functions, abandoned cart reminders, etc.) skip suspended stores
 
+### What a suspension stops (Ruling SUSPEND-OUT-1)
+
+One predicate, `apps/api/src/lib/store-operational.ts` (`isStoreOperational`: only `status = 'active'`), is checked at every send and payout entry point. It reads the store live (never the 60 s directory cache), so the next send after the flip is already refused.
+
+| Stopped while suspended / inactive                                                                              | Where                                                                                |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Abandoned-cart recovery: the sweep skips the store; email, SMS, push                                            | `abandoned-cart.service.ts`, `cart-recovery-email.service.ts`                        |
+| Customer SMS + storefront push on order events and back-in-stock                                                | `notification-dispatcher.service.ts`                                                 |
+| Marketing email: campaigns, newsletter broadcast (admin gets 423 `STORE_NOT_OPERATIONAL`)                       | `store-mailer.service.ts`, `campaign.routes.ts`, `newsletter.routes.ts`              |
+| Push broadcast to storefront subscribers (423)                                                                  | `onesignal.service.ts`                                                               |
+| Ebda Chat events that message a customer: order created, status changed, shipment, cart                         | `wa-store-events.ts`                                                                 |
+| Customer emails: order confirmation, payment success, shipped, invoice to the customer (423 on the admin click) | `order-created.ts`, `order-status-changed.ts`, `invoice-email.ts`, `order.routes.ts` |
+| Affiliate payouts, the money-OUT path (423)                                                                     | `affiliate.service.ts`                                                               |
+
+Still allowed on purpose: refunds to customers and the refund notice, the merchant's own mail (owner invoice copy, campaign test send to their own address, new-order alerts), data export, and the appeal / support routes. The admin UI shows the refusal from the error code `STORE_NOT_OPERATIONAL` (`details.messageEn` / `details.messageAr`; admin string `common.storeNotOperational`). Reactivating the store lifts all of it at once; nothing queued while suspended is replayed.
+
 ## How to reactivate
 
 Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request.

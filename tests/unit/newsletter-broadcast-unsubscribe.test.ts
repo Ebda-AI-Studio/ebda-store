@@ -4,6 +4,15 @@
  * the public endpoint unsubscribes idempotently and store-scoped.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+vi.mock('@api/lib/store-operational', () => ({
+  STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
+  isStoreOperational: (s: unknown) => s === 'active',
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+  activeStoreIds: async () => ({ has: () => true }) as unknown as Set<string>,
+  requireOperationalStore: (_q: unknown, _r: unknown, next: () => void) => next(),
+}));
 import express, { type Express } from 'express';
 import request from 'supertest';
 import {

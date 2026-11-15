@@ -2,6 +2,7 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
+    "storeNotOperational": "This store is suspended, so Ebda has paused messages to customers and payouts. Contact support to get it reactivated.",
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close",

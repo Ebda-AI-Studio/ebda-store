@@ -1,3 +1,4 @@
+import { assertStoreOperational } from '../lib/store-operational';
 import { readAuditByResource } from '../lib/audit-read';
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
@@ -860,6 +861,8 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
+      // Ruling SUSPEND-OUT-1: an invoice mailed to the CUSTOMER is refused (423) for a store that is not `active`.
+      await assertStoreOperational(storeId);
       const order = await OrderService.getById(storeId, orderId);
       const customerEmail =
         order.customer?.email ?? (order.shippingAddress as Record<string, string> | null)?.email;

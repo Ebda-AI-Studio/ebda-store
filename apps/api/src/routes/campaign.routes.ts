@@ -1,3 +1,4 @@
+import { assertStoreOperational } from '../lib/store-operational';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { prisma, Prisma, runInTenantContext } from '@ebda/database';
@@ -364,6 +365,8 @@ router.post(
       const { storeId } = req.params;
       const { campaignId } = idParam.parse(req.params);
       const body = campaignSendSchema.parse(req.body ?? {});
+      // Ruling SUSPEND-OUT-1: a campaign to customers is refused (423) for a store that is not `active`.
+      await assertStoreOperational(storeId);
       const campaign = await findCampaignOr404(storeId, campaignId);
       if (campaign.status !== 'draft') {
         throw new AppError(409, 'CAMPAIGN_NOT_DRAFT', 'This campaign has already been sent');
@@ -605,6 +608,7 @@ campaignTestSendRouter.post(
           hidePoweredBy,
         });
         await StoreMailer.sendMarketingEmail(store as CampaignStoreContext, {
+          toMerchant: true,
           to: user.email,
           subject,
           html,

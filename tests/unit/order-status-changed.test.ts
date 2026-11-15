@@ -6,6 +6,15 @@
  * status, and any exhausted step re-throws so the run dead-letters.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('@api/lib/store-operational', () => ({
+  STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
+  isStoreOperational: (s: unknown) => s === 'active',
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+  activeStoreIds: async () => ({ has: () => true }) as unknown as Set<string>,
+  requireOperationalStore: (_q: unknown, _r: unknown, next: () => void) => next(),
+}));
 
 const h = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),

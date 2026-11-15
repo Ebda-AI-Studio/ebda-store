@@ -1,3 +1,4 @@
+import { assertStoreOperational } from '../lib/store-operational';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { storeDb } from '../lib/repo-factory';
@@ -223,6 +224,8 @@ router.post(
     try {
       const { storeId } = req.params;
       const body = broadcastSchema.parse(req.body);
+      // Ruling SUSPEND-OUT-1: a broadcast to subscribers is refused (423) for a store that is not `active`.
+      await assertStoreOperational(storeId);
 
       // Fetch the store context for the branded shell.
       // `defaultLanguage` lives inside the `settings` JSON column, not a

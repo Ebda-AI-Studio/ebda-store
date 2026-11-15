@@ -1,3 +1,4 @@
+import { storeOperational } from '../../store-operational';
 import type { JobDef } from '../../jobs/types';
 import { storeDb } from '../../repo-factory';
 import { runInStoreCtx } from '../../jobs/store-db';
@@ -22,10 +23,20 @@ export const invoiceEmail: JobDef = inngest.createFunction(
     triggers: [{ event: 'order/invoice.email-requested' }],
   },
   async ({ event, step }) => {
-    const { orderId, storeId, to } = event.data;
+    const { orderId, storeId, to, toMerchant } = event.data;
 
     if (!orderId || !storeId || !to) {
       logger.warn({ event: event.name }, 'invoice email-requested fired without ids — skipping');
+      return;
+    }
+
+    // Ruling SUSPEND-OUT-1: an invoice to a CUSTOMER is not sent for a store that is not `active` (a click queued before the
+    // suspension). The owner copy (`toMerchant`) is a transactional mail to the merchant themself and goes out.
+    if (!toMerchant && !(await step.run('check-store-active', () => storeOperational(storeId)))) {
+      logger.info(
+        { storeId, orderId },
+        '[invoice-email] store not active; customer invoice not sent'
+      );
       return;
     }
 
