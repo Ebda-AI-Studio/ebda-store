@@ -15,6 +15,7 @@
 import { randomUUID } from 'node:crypto';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import logger from '../lib/logger';
+import { requestStoreReindex } from '../lib/search/reindex';
 import { AppError } from '../middleware/error-handler';
 
 type ReplaceTool = 'translate_ar' | 'translate_en' | 'categorize' | 'image_alt';
@@ -298,11 +299,16 @@ export async function undoBackups(
     take: UNDO_CAP,
   });
   const out: UndoResult = { restored: 0, refused: [] };
+  let productTextRestored = false;
   for (const row of rows) {
     const outcome = await restoreOne(storeId, userId, row);
-    if (outcome === 'ok') out.restored++;
-    else out.refused.push({ id: row.id, reason: outcome });
+    if (outcome === 'ok') {
+      out.restored++;
+      if (row.entityKind === 'product') productTextRestored = true;
+    } else out.refused.push({ id: row.id, reason: outcome });
   }
+  // restored names / descriptions feed the search embedding: one reindex request after the writes, never per row
+  if (productTextRestored) await requestStoreReindex(storeId, 'ai-replace-undo');
   logger.info(
     { storeId, userId, scope, restored: out.restored, refused: out.refused.length },
     '[ai-replace] undo'

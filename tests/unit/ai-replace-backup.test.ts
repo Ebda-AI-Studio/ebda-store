@@ -35,6 +35,8 @@ const client = new Proxy(
     },
   }
 );
+const reindex = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock('../../apps/api/src/lib/search/reindex', () => ({ requestStoreReindex: reindex }));
 vi.mock('../../apps/api/src/lib/repo-factory', () => ({
   storeDb: async () => client,
   storeWriter: async () => client,
@@ -136,6 +138,7 @@ describe('undo', () => {
     await swap();
     const res = await undoBackups(STORE, 'u2', { productId: 'p1' });
     expect(res).toEqual({ restored: 1, refused: [] });
+    expect(reindex).toHaveBeenCalledWith(STORE, 'ai-replace-undo');
     expect(product('p1').name_ar).toBe('تيشرت');
     expect(await listBackups(STORE, { productId: 'p1' })).toHaveLength(0); // undone rows drop off the undoable list
     const all = await listBackups(STORE, { productId: 'p1', includeRestored: true });
