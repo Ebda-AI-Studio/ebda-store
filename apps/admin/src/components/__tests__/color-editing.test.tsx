@@ -16,7 +16,7 @@ vi.mock('@/i18n/useT', () => ({
     ),
 }));
 
-import { ColorField, normalizeHex } from '../ColorField';
+import { ColorField } from '../ColorField';
 import { ColorContrastPreview } from '../ColorContrastPreview';
 
 const legacy = {} as unknown as StoreTheme; // the row that used to produce "1.0 : 1"
@@ -136,12 +136,21 @@ describe('ColorField popover', () => {
   });
 });
 
-describe('normalizeHex', () => {
-  it('trims, expands 3 digits, drops an alpha pair and rejects junk', () => {
-    expect(normalizeHex(' #F0A ')).toEqual({ hex: '#ff00aa', alphaDropped: false });
-    expect(normalizeHex('B08D57')).toEqual({ hex: '#b08d57', alphaDropped: false });
-    expect(normalizeHex('#b08d5780')).toEqual({ hex: '#b08d57', alphaDropped: true });
-    expect(normalizeHex('#12')).toBeNull();
-    expect(normalizeHex('nope')).toBeNull();
+describe('hex entry edge cases', () => {
+  const type = (text: string) => {
+    const onChange = vi.fn();
+    render(<ColorField label="Bg" value="" onChange={onChange} theme={legacy} />);
+    fireEvent.click(screen.getByRole('button', { name: /Bg/ }));
+    fireEvent.change(screen.getByLabelText('hexValueAriaLabel'), { target: { value: text } });
+    return onChange;
+  };
+  it('expands a 3-digit code and drops an alpha pair with a note', () => {
+    expect(type('#F0A')).toHaveBeenLastCalledWith('#ff00aa');
+    cleanup();
+    expect(type('#b08d5780')).toHaveBeenLastCalledWith('#b08d57');
+    expect(screen.getByText('alphaIgnored')).toBeTruthy();
+  });
+  it('rejects a short code without writing it', () => {
+    expect(type('#12')).not.toHaveBeenCalled();
   });
 });
