@@ -1,0 +1,44 @@
+{
+  "id": "order.list-detail",
+  "status": "live",
+  "area": "orders",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الطلبات",
+  "titleEn": "View orders, search, filter, order timeline",
+  "screens": ["/stores/[id]/orders", "/orders/[orderId]"],
+  "api": [
+    "GET /stores/:storeId/orders",
+    "GET .../orders/:id",
+    "GET .../orders/:orderId/timeline",
+    "GET /stores/:storeId/search"
+  ],
+  "mcpTool": "admin_list_orders; admin_get_order",
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "orders-and-cod",
+  "questions": {
+    "ar": [
+      "فين طلباتي؟",
+      "اوردر رقم 1234 حالته ايه؟",
+      "طلبات النهارده",
+      "الطلبات اللي لسه مادفعتش"
+    ],
+    "en": ["Show today's orders", "What is the status of order 1234?"]
+  },
+  "steps": ["Orders page."],
+  "edgeCases": [
+    "Customer PII: assistant masks phone/address in logs",
+    "Guest orders",
+    "Pagination 5,000+",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

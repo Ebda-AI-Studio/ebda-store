@@ -7,3 +7,7 @@ Secret: `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`, then `gh secret set CLA
 Cost if wrong: while the secret is missing, every risky PR is red by design.
 
 Fork PRs are never skipped and never reviewed with secrets: the check is red until a maintainer adds the label `ai-review-passed` (foundation AIR-5).
+
+## AI-REVIEW-LABEL-1 (2026-11-15)
+
+Ruling AI-REVIEW-LABEL-1 - the AI review workflow removes `ai-review-passed` only on a real review verdict with critical findings (`review.mjs` writes `verdict=critical`). The classify step no longer removes it, and the 400 KB refusal, a crashed or timed-out model call and any other infra failure leave every label untouched. Evidence: PR #803 lost the controller's label 3x on 2026-11-15 and the merge drain held it. Staleness against a new head is the drain's check (label set after the head), not this workflow's. Cost if wrong: a stale label from an older head survives until the drain's set-after-head check rejects it.

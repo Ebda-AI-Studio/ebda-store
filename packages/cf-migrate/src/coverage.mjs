@@ -62,6 +62,34 @@ export const DO_RUNTIME_TABLES = {
     erasure: 'ttl',
     why: 'InstaPay order receipts of a DO store (Ruling INSTAPAY-DO-1): payer fields scrubbed 180 days after a decision and on the shopper erasure, screenshots deleted by the retention sweep; imported from the platform table at cutover (PG_SOURCED_DO_TABLES, Ruling CF-R6A-4)',
   },
+  sl_turns: {
+    erasure: 'ttl',
+    why: "the assistant's masked journal (Smart Layer, Ruling SL-STORE-1; do/smart-layer.ts): turns; kept 90 days by the DO alarm, removed with the store; created at DO start, never imported by the cutover",
+  },
+  sl_audit: {
+    erasure: 'ttl',
+    why: "the assistant's masked journal (Smart Layer, Ruling SL-STORE-1; do/smart-layer.ts): audit rows; kept 90 days by the DO alarm, removed with the store; created at DO start, never imported by the cutover",
+  },
+  sl_previews: {
+    erasure: 'ttl',
+    why: "the assistant's masked journal (Smart Layer, Ruling SL-STORE-1; do/smart-layer.ts): previews; kept 90 days by the DO alarm, removed with the store; created at DO start, never imported by the cutover",
+  },
+  sl_applied: {
+    erasure: 'ttl',
+    why: "the assistant's masked journal (Smart Layer, Ruling SL-STORE-1; do/smart-layer.ts): applied records; kept 90 days by the DO alarm, removed with the store; created at DO start, never imported by the cutover",
+  },
+  sl_approvals: {
+    erasure: 'ttl',
+    why: "the assistant's masked journal (Smart Layer, Ruling SL-STORE-1; do/smart-layer.ts): approvals (token hash only); kept 90 days by the DO alarm, removed with the store; created at DO start, never imported by the cutover",
+  },
+  sl_decisions: {
+    erasure: 'ttl',
+    why: "the assistant's masked journal (Smart Layer, Ruling SL-STORE-1; do/smart-layer.ts): confirm decisions; kept 90 days by the DO alarm, removed with the store; created at DO start, never imported by the cutover",
+  },
+  sl_counters: {
+    erasure: 'ttl',
+    why: "the assistant's masked journal (Smart Layer, Ruling SL-STORE-1; do/smart-layer.ts): rate-limit hits; kept 90 days by the DO alarm, removed with the store; created at DO start, never imported by the cutover",
+  },
   _cauth_users: {
     erasure: 'ttl',
     why: 'storefront customer credentials of a DO store (NEON-ZERO-1 N-9, Ruling NZ-A3): internal, excluded from the backup / export; erased by eraseCustomer (anonymise), imported from Postgres by cutover-customer-auth.mjs (not by __import)',

@@ -214,6 +214,16 @@ order, payment, stock and gateway field. See `scripts/buy-flow-parity/README.md`
 - Include request/response examples
 - Document error responses
 
+## How a new feature joins the capability registry
+
+Every merchant-facing page, route, MCP tool and plan gate belongs to exactly one capability (lens 192: AI-native, self-service, help article). The registry is `capabilities/<id>.capability.json`; the guard config is `capabilities/guard.config.json`; the schema, rules and guards are the vendored `@ebda/foundation` v0.2.0 modules in `packages/shared/src/foundation/`.
+
+1. Add `capabilities/<area>.<feature>.capability.json` (copy a neighbour; the id is the file name). Fill: `status` (`live`, `in-pr` with `pr`, `planned` with `plan`), `screens` (admin paths such as `/stores/[id]/orders`, a trailing `/*` covers a subtree), `api` (exact `METHOD /path` strings as mounted, no wildcards), `mcpTool`, `planGate`, `roles`, `policy` (`free` | `preview` | `confirm` | `forbidden`; any write, money, customer message or DELETE is `confirm`), `undo.class`, and Arabic (3-6) plus English (1-3) example `questions`.
+2. A `live` capability that merchants use also needs a help article in BOTH languages under `apps/help/content/{ar,en}/` whose front matter lists `capabilities:` as `id@version`, and `helpArticle` set to its slug. Bump `version` when behaviour changes; the article must then list the new version (`help-stale`).
+3. Run `npx vitest run tests/unit/capability-registry.test.ts tests/unit/capability-coverage.test.ts tests/unit/self-service-routes-guard.test.ts tests/unit/smart-layer-bypass-guard.test.ts tests/unit/capability-help-guard.test.ts`. A new offender fails from day one.
+4. Baselines (`capabilities/baselines/*.json`) hold today's debt and are shrink-only: fixing an offender means deleting its id in the same PR (`CAPABILITY_WRITE_BASELINES=1 npx vitest run tests/unit/capability-baselines-write.test.ts` rewrites them). A PR that adds an id fails the `capability-ratchet` job in `pr-quality.yml`. Never add an id to hide a new offender.
+5. A model call (Workers AI binding, provider SDK or REST host) outside the Smart Layer is a `model-call-outside-smart-layer` violation; do not add one.
+
 ## Questions?
 
 If you have questions, please:
