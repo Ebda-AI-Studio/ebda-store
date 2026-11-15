@@ -257,7 +257,7 @@ export const HUBS: HubDefinition[] = [
       { label: labels.campaigns, href: `/stores/${storeId}/campaigns` },
       { label: labels.abandonedCarts, href: `/stores/${storeId}/abandoned-carts` },
       { label: labels.paymentAbandonments, href: `/stores/${storeId}/payment-abandonments` },
-      { label: labels.lifecycleEmails, href: `/stores/${storeId}/lifecycle-emails` },
+      { label: labels.lifecycleEmails, href: `/stores/${storeId}/lifecycle-emails`, ownerOnly: true },
       // Staff may manage order alerts, and the Settings hub is owner-only, so Notifications stays here (Ruling T3-1).
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.affiliates, href: `/stores/${storeId}/affiliates`, groupStart: true },
@@ -314,4 +314,16 @@ export function detectHub(pathname: string, storeId: string): HubDefinition | nu
 
   // Find first hub with a matching urlPrefix
   return HUBS.find(h => h.urlPrefixes.some(p => p !== '' && rest.startsWith(p))) ?? null;
+}
+
+/**
+ * Whether a hub tab (and its ⌘K palette entry) is shown: `ownerOnly` tabs are hidden from staff, and a
+ * feature-keyed tab only once the feature map has loaded and the feature is on (never on the loading default).
+ */
+export function isHubTabVisible(
+  tab: HubTab,
+  ctx: { role: string | undefined; featuresLoading: boolean; isEnabled: (key: string) => boolean }
+): boolean {
+  if (tab.ownerOnly && ctx.role === 'staff') return false;
+  return !tab.featureKey || (!ctx.featuresLoading && ctx.isEnabled(tab.featureKey));
 }

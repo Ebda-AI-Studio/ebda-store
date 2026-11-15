@@ -1066,7 +1066,7 @@ const lifecycleOverview = readTool({
   capabilityId: 'marketing.lifecycle-emails',
   description:
     'List the setup and onboarding emails Ebda Store sends the merchant (welcome, tips) and whether each was sent, skipped or is still pending ("ايه الرسايل اللي بتتبعت لي؟", "what automatic emails are sent").',
-  roles: ['store_admin', 'staff'],
+  roles: ['store_admin'], // the Setup emails page is owner-only (staff get 403 on the route too)
   read: ctx => listLifecycleLog(ctx.storeId),
 });
 const affiliatesOverview = readTool({

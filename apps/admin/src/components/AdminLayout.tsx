@@ -21,7 +21,7 @@ import {
   type StoreBranding,
 } from './admin-layout/buildStoreAdminNav';
 import { HubTabs, type HubTab } from './admin-layout/HubTabs';
-import { detectHub, type HubLabels } from './admin-layout/hubs';
+import { detectHub, isHubTabVisible as hubTabVisible, type HubLabels } from './admin-layout/hubs';
 import {
   buildStorePaletteItems,
   type PaletteItem,
@@ -81,7 +81,11 @@ export function AdminLayout({
   // feature map has loaded AND the feature is on — never on the loading
   // default, so a store without the feature never sees the tab flash.
   const isHubTabVisible = (tab: HubTab) =>
-    !tab.featureKey || (!featuresLoading && isFeatureEnabled(tab.featureKey));
+    hubTabVisible(tab, {
+      role: user?.role,
+      featuresLoading,
+      isEnabled: isFeatureEnabled,
+    });
   const { isFocused, focusStoreId, enterFocusMode } = useFocusMode();
 
   // When a super_admin is browsing inside a specific store
