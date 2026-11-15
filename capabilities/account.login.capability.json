@@ -1,0 +1,39 @@
+{
+  "id": "account.login",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تسجيل الدخول",
+  "titleEn": "Sign in (email/phone, passkey, MFA step)",
+  "screens": ["/login", "accounts:/sign-in"],
+  "api": [
+    "POST /auth/login",
+    "POST /auth/session",
+    "POST /auth/refresh",
+    "POST accounts:/login",
+    "/login/mfa",
+    "/passkey/login/*"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["public"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "account-security",
+  "questions": {
+    "ar": ["مش عارف ادخل", "كود MFA غلط", "الحساب اتقفل"],
+    "en": ["I cannot sign in"]
+  },
+  "steps": ["Login page."],
+  "edgeCases": [
+    "Rate limit lockout",
+    "Wrong tenant/store after multi-store",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

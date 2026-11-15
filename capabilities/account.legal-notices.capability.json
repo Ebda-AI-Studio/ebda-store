@@ -1,0 +1,32 @@
+{
+  "id": "account.legal-notices",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الاشعارات القانونية والموافقة على السياسات",
+  "titleEn": "Read and accept platform legal notices / policy updates",
+  "screens": [],
+  "api": ["GET /me/legal-notices", "GET /me/legal-acceptances", "POST /me/legal-acceptances"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["جالي اشعار سياسة جديدة اعمل ايه؟"],
+    "en": ["I got a policy update notice, what do I do?"]
+  },
+  "steps": ["Banner/modal in admin shell."],
+  "edgeCases": [
+    "Blocking modal until accepted (inferred)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}

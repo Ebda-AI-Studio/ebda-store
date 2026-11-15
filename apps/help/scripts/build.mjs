@@ -1,7 +1,7 @@
 // Static build for help.ebda.app: in-repo MDX articles, Arabic-first (/) + English (/en/),
 // with a build-time MiniSearch index searched client-side. Every article may link back to
 // store.ebda.app via `appPath` frontmatter.
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRAND, BRAND_STORE_APP_URL, siteMedalHtml, siteNavMap } from '@ebda/shared/brand';
@@ -20,6 +20,7 @@ import {
 import { assertNoBrokenLinks } from '@ebda/site-kit/build/links';
 import { writeSearchAssets } from '@ebda/site-kit/build/search';
 import { loadContent, resetOut, writePage } from '@ebda/site-kit/build/site';
+import { buildManifest } from './help-manifest.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'out');
@@ -264,6 +265,24 @@ for (const lang of ['ar', 'en']) {
 }
 
 await writeSearchAssets(out, searchDocs);
+// help-manifest.json: slug, language, the capabilities each article documents (front matter `capabilities: [id@version]`) and a body hash.
+writeFileSync(
+  path.join(out, 'help-manifest.json'),
+  JSON.stringify(
+    buildManifest(
+      ['ar', 'en'].flatMap(lang =>
+        content[lang].map(a => ({
+          lang,
+          path: a.path,
+          body: a.body,
+          raw: readFileSync(path.join(root, 'content', lang, `${a.path}.mdx`), 'utf8'),
+        }))
+      )
+    ),
+    null,
+    2
+  ) + '\n'
+);
 writeSeoFiles(out, ORIGIN, urls);
 // 404 pages, one per language: Workers Static Assets serves the NEAREST 404.html, so /en/* gets the English one.
 // Apple-style: one calm sentence, live search, a compact map of the sections. Status stays 404 (not_found_handling).

@@ -105,8 +105,16 @@ export const COMPONENTS: readonly ComponentConfig[] = [
   },
 ];
 
-export const DEFAULT_TIMEOUT_MS = 8000;
-export const DEFAULT_FAIL_THRESHOLD = 3;
-export const DEFAULT_RECOVER_THRESHOLD = 2;
+/**
+ * Hard deadline for one probe. 15 s, not 8 s: in quiet hours a cold isolate answers a storefront page in 2-12 s
+ * (measured 2026-11-14/15, worker ebda-web: p50 2-4 s, p99 6-12 s), which is SLOW, not DOWN.
+ */
+export const DEFAULT_TIMEOUT_MS = 15000;
+/** A successful probe slower than this is `degraded` (shown, never paged); two in a row open an incident. */
+export const SLOW_THRESHOLD_MS = 8000;
+/** Consecutive slow probes that count as one failure. */
+export const SLOW_STREAK_FAILS = 2;
+export const DEFAULT_FAIL_THRESHOLD = 2;
+export const DEFAULT_RECOVER_THRESHOLD = 1;
 /** Days of daily rollups kept and shown. */
 export const HISTORY_DAYS = 90;

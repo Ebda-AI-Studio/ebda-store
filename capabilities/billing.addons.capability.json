@@ -44,5 +44,6 @@
     "A feature the plan already includes is not sold again",
     "A super admin can still switch any feature on or off for goodwill; that override wins over a purchase"
   ],
-  "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"]
+  "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"],
+  "assistantNote": "assistant says plan/override cause and links billing; cannot enable"
 }
