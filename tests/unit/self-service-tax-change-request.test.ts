@@ -24,6 +24,8 @@ const m = vi.hoisted(() => ({
   alert: vi.fn(),
   keyN: 0,
   settingsDown: false,
+  beforeClaim: null as null | (() => void),
+  upsertFail: false,
 }));
 
 vi.mock('@api/middleware/auth', async () => {
@@ -54,6 +56,7 @@ vi.mock('@api/lib/platform-scope', () => ({
   withPlatformUser: (_id: string, fn: () => unknown) => fn(),
   platformHubOnD1: async () => false,
 }));
+vi.mock('@api/services/tax-change-claim', () => ({ claimPendingChangeD1: async () => null }));
 vi.mock('@api/services/alerts.service', () => ({
   sendAlert: (o: any) => {
     m.alert(o);
@@ -97,12 +100,17 @@ vi.mock('@ebda/database', () => ({
         if (m.settings.has(data.key)) throw new Error('unique');
         m.settings.set(data.key, data.value);
       },
-      upsert: async ({ where, create }: any) => void m.settings.set(where.key, create.value),
+      upsert: async ({ where, create }: any) => {
+        if (m.upsertFail) throw new Error('d1 down');
+        m.settings.set(where.key, create.value);
+      },
       deleteMany: async ({ where }: any) => {
         if (m.settingsDown) throw new Error('d1 down');
-        return {
-          count: m.loseClaim ? 0 : m.settings.delete(where.key) ? 1 : 0,
-        };
+        m.beforeClaim?.();
+        const row = m.settings.get(where.key) as { id?: string } | undefined;
+        const idFilter = where.value?.path?.[0] === 'id' ? where.value.equals : undefined;
+        if (idFilter !== undefined && row?.id !== idFilter) return { count: 0 };
+        return { count: m.loseClaim ? 0 : m.settings.delete(where.key) ? 1 : 0 };
       },
     },
   },
@@ -124,6 +132,8 @@ beforeEach(() => {
   m.settings.clear();
   m.loseClaim = false;
   m.settingsDown = false;
+  m.beforeClaim = null;
+  m.upsertFail = false;
   m.createFail = null;
   m.alert.mockReset();
   m.keyN = 0;
@@ -296,6 +306,17 @@ describe('A10 change request on a verified registration', () => {
     expect(m.deletePrivate).toHaveBeenCalledWith('stores/s/tax-documents/x0.pdf');
   });
 
+  it('a failed create does not delete the merchant last rejection notice', async () => {
+    m.settings.set(`tax.change-result.${STORE}`, { reason: 'earlier reason', at: 'x' });
+    const token = await preview();
+    m.createFail = new Error('d1 down');
+    expect((await send('store_admin', { token })).status).toBe(500);
+    expect(m.settings.has(`tax.change-result.${STORE}`)).toBe(true);
+    m.createFail = null;
+    expect((await send('store_admin', { token })).status).toBe(201);
+    expect(m.settings.has(`tax.change-result.${STORE}`)).toBe(false); // a new request does clear it
+  });
+
   it('a failed R2 upload does not burn the confirm token', async () => {
     const token = await preview();
     m.putPrivate.mockRejectedValueOnce(new Error('r2 down'));
@@ -444,6 +465,51 @@ describe('A10 super-admin decision', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.noop).toBe(true);
     expect(m.apply).not.toHaveBeenCalled();
+  });
+
+  it('a decision claims the request it read: a withdraw + resubmit in between is not approved and the new evidence stays', async () => {
+    await pending();
+    const old = m.settings.get(`tax.change.${STORE}`) as { id: string };
+    m.beforeClaim = () => {
+      m.beforeClaim = null;
+      m.settings.set(`tax.change.${STORE}`, { ...old, id: 'new-request-id' });
+    };
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/change-decision`)
+      .set('x-role', 'super_admin')
+      .send({ decision: 'approve' });
+    expect(res.body.data.noop).toBe(true);
+    expect(m.apply).not.toHaveBeenCalled();
+    expect((m.settings.get(`tax.change.${STORE}`) as { id: string }).id).toBe('new-request-id');
+    expect(m.deletePrivate).not.toHaveBeenCalled();
+  });
+
+  it('a restore that cannot put the request back pages p1', async () => {
+    await pending();
+    m.apply.mockRejectedValueOnce(new Error('boom'));
+    m.createFail = new Error('d1 down'); // the restore create fails too
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/change-decision`)
+      .set('x-role', 'super_admin')
+      .send({ decision: 'approve' });
+    expect(res.status).toBe(500);
+    expect(m.alert.mock.calls.some(c => c[0].level === 'p1' && /restore/i.test(c[0].title))).toBe(
+      true
+    );
+  });
+
+  it('a rejection whose notice cannot be saved still completes and pages p1', async () => {
+    await pending();
+    m.upsertFail = true;
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/change-decision`)
+      .set('x-role', 'super_admin')
+      .send({ decision: 'reject', reason: 'name differs from the card' });
+    expect(res.status).toBe(200);
+    expect(m.deletePrivate).toHaveBeenCalled();
+    expect(m.alert.mock.calls.some(c => c[0].level === 'p1' && /notice/i.test(c[0].title))).toBe(
+      true
+    );
   });
 
   it('a failed apply puts the request back so it can be decided again', async () => {

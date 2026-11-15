@@ -24,6 +24,7 @@ import {
   verifyConfirmToken,
 } from '../mcp/merchant-confirm-token';
 import { withPlatformUser } from '../lib/platform-scope';
+import { claimPendingChangeD1 } from './tax-change-claim';
 import logger from '../lib/logger';
 
 /**
@@ -139,10 +140,37 @@ async function readStored(storeId: string): Promise<StoredChange | null> {
 
 const resultKeyOf = (storeId: string) => `tax.change-result.${storeId}`;
 
-/** Deletes the pending row and says whether THIS call removed it (the atomic claim a decision takes first). */
-async function deleteStored(storeId: string): Promise<boolean> {
-  const out = await settings().deleteMany({ where: { key: keyOf(storeId) } });
+/**
+ * Deletes the pending row and says whether THIS call removed it (the atomic claim a decision takes first). With `requestId` the
+ * claim only matches THAT request (JSON path on the stored id): a withdraw + resubmit while a decision is in flight is a different
+ * request and must not be claimed (nor its evidence orphaned) by the older decision.
+ */
+async function deleteStored(storeId: string, requestId?: string): Promise<boolean> {
+  // On D1 the lite deleteMany count is not atomic (see tax-change-claim.ts): claim by id with ONE statement.
+  if (requestId) {
+    const claimed = await claimPendingChangeD1(keyOf(storeId), requestId);
+    if (claimed !== null) return claimed;
+  }
+  const out = await settings().deleteMany({
+    where: {
+      key: keyOf(storeId),
+      ...(requestId ? { value: { path: ['id'], equals: requestId } } : {}),
+    },
+  });
   return out.count > 0;
+}
+
+/** A silent failure path an operator must see: the request or its notice would otherwise vanish without a trace. */
+function pageSilentFailure(storeId: string, title: string, err: unknown): void {
+  logger.error({ err, storeId }, `[tax-change] ${title}`);
+  void sendAlert({
+    level: 'p1',
+    scope: 'store',
+    store: { id: storeId, name: storeId },
+    source: 'tax-change.silent-failure',
+    title: `VAT change request: ${title}`,
+    body: `${title} for store ${storeId}. Check the pending request and the merchant's last notice by hand.`,
+  }).catch(() => undefined);
 }
 
 async function dropEvidence(change: StoredChange, storeId: string): Promise<void> {
@@ -261,13 +289,6 @@ export async function requestTaxChange(
     requestedAt: new Date().toISOString(),
     precheck: precheck(input, extracted),
   };
-  // A new request clears the last answer. Before the create so a failure here also leaves the token alone.
-  await settings()
-    .deleteMany({ where: { key: resultKeyOf(storeId) } })
-    .catch(err => {
-      void dropEvidence(change, storeId);
-      throw err;
-    });
   try {
     // The atomic step: the unique key admits ONE request; of two concurrent confirms the loser gets a clear 409.
     await settings().create({
@@ -283,13 +304,17 @@ export async function requestTaxChange(
       );
     throw err;
   }
+  // The new request replaces the last answer; only now, so a failed create never deletes the merchant's last rejection notice.
+  await settings()
+    .deleteMany({ where: { key: resultKeyOf(storeId) } })
+    .catch(err => logger.error({ err, storeId }, '[tax-change] could not clear the last answer'));
   // Only now spend the single-use token. A replay (token already used) rolls the row and the object back.
   let used = false;
   try {
     used = await consumeConfirmToken(confirmToken);
   } finally {
     if (!used) {
-      await deleteStored(storeId).catch(() => undefined);
+      await deleteStored(storeId, change.id).catch(() => undefined);
       await dropEvidence(change, storeId);
     }
   }
@@ -347,7 +372,7 @@ export async function getTaxChangeForMerchant(storeId: string) {
 export async function withdrawTaxChange(storeId: string, actor: Actor): Promise<void> {
   const c = await readStored(storeId);
   if (!c) throw new AppError(404, 'NOT_FOUND', 'No pending change request');
-  await deleteStored(storeId);
+  if (!(await deleteStored(storeId, c.id))) return; // already decided or replaced: nothing of this request left to remove
   await dropEvidence(c, storeId);
   await auditLog({
     action: 'tax_profile.change_withdrawn',
@@ -407,7 +432,7 @@ export async function decideTaxChange(
   // Idempotent: a request already decided (or never made) is a no-op, never a second apply.
   if (!c) return { decision: decision.decision, noop: true };
   // Claim first: of two concurrent decisions only the one that removes the row proceeds; the other is a no-op (no double apply).
-  if (!(await deleteStored(storeId))) return { decision: decision.decision, noop: true };
+  if (!(await deleteStored(storeId, c.id))) return { decision: decision.decision, noop: true };
   if (decision.decision === 'approve') {
     try {
       await applyApprovedTaxChange(storeId, c, actor);
@@ -417,21 +442,27 @@ export async function decideTaxChange(
         .create({
           data: { key: keyOf(storeId), value: c as never, category: 'tax', isPublic: false },
         })
-        .catch(() => undefined);
+        .catch(restoreErr =>
+          // a newer request already holds the key, or the write failed: the old request is gone, say so
+          pageSilentFailure(storeId, 'restore after a failed approve did not happen', restoreErr)
+        );
       throw err;
     }
     await settings().deleteMany({ where: { key: resultKeyOf(storeId) } });
   } else {
-    await settings().upsert({
-      where: { key: resultKeyOf(storeId) },
-      create: {
-        key: resultKeyOf(storeId),
-        value: { reason: decision.reason, at: new Date().toISOString() },
-        category: 'tax',
-        isPublic: false,
-      },
-      update: { value: { reason: decision.reason, at: new Date().toISOString() } },
-    });
+    // The claim already happened: a notice that cannot be saved must not undo the rejection (page instead).
+    await settings()
+      .upsert({
+        where: { key: resultKeyOf(storeId) },
+        create: {
+          key: resultKeyOf(storeId),
+          value: { reason: decision.reason, at: new Date().toISOString() },
+          category: 'tax',
+          isPublic: false,
+        },
+        update: { value: { reason: decision.reason, at: new Date().toISOString() } },
+      })
+      .catch(err => pageSilentFailure(storeId, 'rejection notice could not be saved', err));
     await dropEvidence(c, storeId);
   }
   await auditLog({
@@ -459,7 +490,7 @@ export async function discardTaxChange(storeId: string, actor?: Actor): Promise<
   await settings().deleteMany({ where: { key: resultKeyOf(storeId) } });
   const c = await readStored(storeId);
   if (!c) return;
-  await deleteStored(storeId);
+  if (!(await deleteStored(storeId, c.id))) return;
   await dropEvidence(c, storeId);
   await auditLog({
     action: 'tax_profile.change_discarded',
