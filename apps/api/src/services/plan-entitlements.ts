@@ -9,7 +9,9 @@
  * Resolution order:
  *   1. `store_subscriptions` row -> `plans` row. A `canceled` subscription falls
  *      back to the free plan's limits (the store keeps its data, loses the paid
- *      ceiling). `trialing`/`active`/`past_due`/`comped` use the plan's own limits.
+ *      ceiling), and so does a LAPSED InstaPay row (`past_due` whose grace ended,
+ *      `isLapsedManualSubscription`, #836). `trialing`/`active`/`past_due` (in its
+ *      grace) /`comped` use the plan's own limits.
  *   2. No subscription row (a store created before the migration, or by a path
  *      that has not been taught to create one) -> Ebda Store's legacy `Store.plan` enum
  *      mapped onto a plan code. The migration backfills every existing store, so
@@ -63,6 +65,26 @@ export interface Entitlements {
   billingMethod: string | null;
   /** A card the trial-end/renewal job can charge is on file. */
   hasSavedCard: boolean;
+}
+
+/**
+ * An InstaPay subscription whose grace is over: `past_due` with the retry (= suspension date) already cleared. The
+ * billing cycle downgrades such a row to free / `canceled` (#836); until it runs (or for a row an earlier build left
+ * behind) it is entitled to the free plan, never to the plan it stopped paying for. A card row is never in this state
+ * (its dunning keeps a `nextRetryAt` until the downgrade).
+ */
+function isLapsedManualSubscription(
+  sub:
+    | { status: string; billingMethod?: string | null; nextRetryAt?: Date | null }
+    | null
+    | undefined
+): boolean {
+  return (
+    !!sub &&
+    sub.status === 'past_due' &&
+    sub.billingMethod === 'instapay' &&
+    sub.nextRetryAt == null
+  );
 }
 
 function seedFor(code: string) {
@@ -126,7 +148,10 @@ export async function getEntitlements(
     }
     const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[plan0.plan];
     const status: SubscriptionStatus | 'none' = sub?.status ?? 'none';
-    const effectiveCode = status === 'canceled' ? FALLBACK_PLAN_CODE : subscribedPlanCode;
+    const effectiveCode =
+      status === 'canceled' || isLapsedManualSubscription(sub)
+        ? FALLBACK_PLAN_CODE
+        : subscribedPlanCode;
 
     const plan = fromD1
       ? await fromD1.plan.findUnique({ where: { code: effectiveCode } })
