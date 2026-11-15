@@ -28,6 +28,7 @@ function str(v: unknown): string | null {
 }
 
 /** Which store (if any) a database write changes the STANDING of. Pure; the unit test drives it with every write shape. */
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-standing-state.test.ts
 export function standingChangeStoreId(e: ModelWriteEvent): string | null {
   if (e.model !== 'Store') return null;
   const args = (e.args ?? {}) as { where?: Record<string, unknown>; data?: unknown };
