@@ -25,8 +25,16 @@
   },
   "helpArticle": "vat-registration",
   "questions": {
-    "ar": ["عايز اغيّر الرقم الضريبي بعد التوثيق", "ازاي اعدّل الاسم القانوني في التسجيل الضريبي؟"],
-    "en": ["How do I change my tax registration number after verification?"]
+    "ar": [
+      "عايز اغيّر الرقم الضريبي بعد التوثيق",
+      "ازاي اعدّل الاسم القانوني في التسجيل الضريبي؟",
+      "الرقم الضريبي اللي سجلته غلط"
+    ],
+    "en": [
+      "How do I change my tax registration number after verification?",
+      "How do I change the legal name on my tax registration?",
+      "I entered the wrong tax number"
+    ]
   },
   "steps": [
     "Open Tax & VAT, press Request a change",
