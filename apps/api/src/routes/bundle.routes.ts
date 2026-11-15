@@ -50,6 +50,7 @@ import {
   type ResolvedBundle,
 } from '../services/bundle.service';
 import { invalidateStoreProductCaches, bundlesCacheKey, getCached } from '../lib/public-cache';
+import { scheduleBundleBoundary } from '../lib/storefront-purge-jobs';
 
 /** Most bundles the public storefront list serves (newest first). */
 export const PUBLIC_BUNDLE_LIST_CAP = 200;
@@ -594,6 +595,7 @@ router.post(
       const { storeId } = req.params;
       const data = createSchema.parse(req.body);
       const bundle = await createBundle(storeId, data);
+      await scheduleBundleBoundary(storeId);
       res.status(201).json({ success: true, data: { bundle } });
     } catch (error) {
       next(error);
@@ -750,6 +752,7 @@ router.put(
       const data = updateSchema.parse(req.body);
 
       const bundle = await updateBundle(storeId, id, data);
+      await scheduleBundleBoundary(storeId);
       res.json({ success: true, data: { bundle } });
     } catch (error) {
       next(error);
@@ -796,6 +799,7 @@ router.delete(
       // in the SAME outbound request — a separate bundles-only purge
       // here was a second purge POST per write (issue 2202).
       await invalidateStoreProductCaches(storeId);
+      await scheduleBundleBoundary(storeId);
 
       res.json({
         success: true,
