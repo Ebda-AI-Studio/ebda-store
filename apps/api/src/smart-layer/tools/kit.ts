@@ -226,8 +226,8 @@ export function change<A>(d: ChangeDef<A>): ToolSpec {
     },
     ...(d.inverse
       ? {
-          inverse: (_ctx, a, draft) =>
-            d.inverse!(a, (draft.payload as { restore: unknown }).restore),
+          inverse: (_ctx, a, draft, applied) =>
+            d.inverse!(a, (draft.payload as { restore: unknown }).restore, applied.result),
         }
       : {}),
   };
