@@ -53,6 +53,7 @@ import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
 import {
   closeAppealsOnReactivation,
   recordSuspension,
+  rejectAppeal,
   type TrustDb,
 } from '../services/trust-requests.service';
 
@@ -943,6 +944,37 @@ router.patch(
       });
 
       res.json({ success: true, data: toSafeStoreResponse(store) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:id/suspension/appeal/reject - Reject the open suspension appeal (super_admin only).
+// Staff reply to the merchant by e-mail first; this records the decision, starts the merchant's 24 h cooldown
+// (rejected_at) and leaves the store suspended. Reactivating (PATCH /:id/status) is the accept path.
+router.post(
+  '/:id/suspension/appeal/reject',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = req.params.id;
+      const { id } = await withStore(storeId, tx =>
+        rejectAppeal(tx as unknown as TrustDb, storeId)
+      );
+      await insertAuditLog({
+        action: 'store.suspension_appeal_reject',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'trust_request',
+        resourceId: id,
+        details: {},
+        ip: req.ip ?? null,
+        userAgent: req.headers['user-agent'] ?? null,
+      });
+      res.json({ success: true, data: { id, status: 'rejected' } });
     } catch (error) {
       next(error);
     }

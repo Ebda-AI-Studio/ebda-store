@@ -685,6 +685,9 @@ export const trustRequests = sqliteTable('trust_requests', {
   slug: text('slug'),
   evidenceUrl: text('evidence_url'),
   status: text('status').notNull().default('open'),
+  rejectedAt: integer('rejected_at', { mode: 'timestamp_ms' }),
+  capDay: text('cap_day'),
+  capSlot: integer('cap_slot'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),

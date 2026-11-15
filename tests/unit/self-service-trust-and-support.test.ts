@@ -17,7 +17,6 @@ const m = vi.hoisted(() => ({
   audit: vi.fn(),
   seq: 0,
   alert: vi.fn(),
-  calls: [] as string[],
 }));
 
 const matches = (r: Row, where: Row = {}): boolean =>
@@ -43,7 +42,17 @@ const trustRequest = {
         )) ||
       (data.kind === 'store_cap' &&
         m.rows.some(r => r.kind === data.kind && r.userId === data.userId && r.status === 'open'));
-    if (dup) throw Object.assign(new Error('unique'), { code: 'P2002' });
+    const slotTaken =
+      data.kind === 'support' &&
+      data.capSlot != null &&
+      m.rows.some(
+        r =>
+          r.kind === 'support' &&
+          r.storeId === data.storeId &&
+          r.capDay === data.capDay &&
+          r.capSlot === data.capSlot
+      );
+    if (dup || slotTaken) throw Object.assign(new Error('unique'), { code: 'P2002' });
     const row = { id: `t${++m.seq}`, status: 'open', createdAt: new Date(), ...data };
     m.rows.push(row);
     return row;
@@ -52,10 +61,11 @@ const trustRequest = {
     const hit = m.rows.filter(r => matches(r, where));
     return (orderBy ? [...hit].reverse() : hit)[0] ?? null;
   },
-  count: async ({ where }: { where?: Row }) => (
-    m.calls.push('count'),
-    m.rows.filter(r => matches(r, where)).length
-  ),
+  count: async ({ where }: { where?: Row }) => {
+    const n = m.rows.filter(r => matches(r, where)).length;
+    await new Promise(r => setTimeout(r, 2)); // a real DB round trip: parallel requests interleave here
+    return n;
+  },
   updateMany: async ({ where, data }: { where?: Row; data: Row }) => {
     const hit = m.rows.filter(r => matches(r, where));
     hit.forEach(r => Object.assign(r, data));
@@ -63,7 +73,6 @@ const trustRequest = {
   },
 };
 const fakePrisma = {
-  $executeRaw: async () => (m.calls.push('lock'), 0),
   trustRequest,
   store: { findUnique: async () => m.store },
 };
@@ -131,7 +140,6 @@ beforeAll(async () => {
 beforeEach(() => {
   m.rows.length = 0;
   m.seq = 0;
-  m.calls.length = 0;
   m.alert.mockReset().mockResolvedValue(undefined);
   m.store = { status: 'suspended', billingSuspendedReason: null };
   m.enqueue.mockReset().mockResolvedValue(undefined);
@@ -256,6 +264,8 @@ describe('A14 support request', () => {
         kind: 'support',
         storeId: 'store-a',
         createdAt: new Date(Date.now() - 25 * 3600_000),
+        capDay: new Date(Date.now() - 25 * 3600_000).toISOString().slice(0, 10),
+        capSlot: i + 1,
       });
     expect((await request(app).post('/stores/store-a/support-requests').send(body)).status).toBe(
       201
@@ -412,7 +422,7 @@ describe('review fixes: alert carries ids only, cooldown, atomic cap, claim cap'
       storeId: 'store-a',
       status: 'rejected',
       createdAt: new Date(Date.now() - 72 * 3600_000),
-      updatedAt: new Date(Date.now() - 3600_000),
+      rejectedAt: new Date(Date.now() - 3600_000),
     });
     const blocked = await request(app)
       .post('/stores/store-a/suspension/appeal')
@@ -420,18 +430,38 @@ describe('review fixes: alert carries ids only, cooldown, atomic cap, claim cap'
     expect(blocked.status).toBe(429);
     expect(blocked.body.error.code).toBe('APPEAL_COOLDOWN');
     expect(m.rows.filter(r => r.kind === 'suspension_appeal')).toHaveLength(1);
-    m.rows[m.rows.length - 1].updatedAt = new Date(Date.now() - 25 * 3600_000);
+    m.rows[m.rows.length - 1].rejectedAt = new Date(Date.now() - 25 * 3600_000);
     expect(
       (await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'again' }))
         .status
     ).toBe(201);
   });
 
-  it('support cap: the advisory lock is taken before the count (count+insert is serialised)', async () => {
-    await request(app)
-      .post('/stores/store-a/support-requests')
-      .send({ topic: SUPPORT_TOPICS[0], message: 'hi' });
-    expect(m.calls.slice(0, 2)).toEqual(['lock', 'count']);
+  it('support cap: 8 parallel requests store exactly 5 and refuse 3 (atomic slot claim, no lock)', async () => {
+    const body = { topic: SUPPORT_TOPICS[0], message: 'burst' };
+    const res = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        request(app).post('/stores/store-a/support-requests').send(body)
+      )
+    );
+    expect(res.filter(r => r.status === 201)).toHaveLength(5);
+    expect(res.filter(r => r.status === 429)).toHaveLength(3);
+    expect(m.rows.filter(r => r.kind === 'support')).toHaveLength(5);
+    expect(m.enqueue).toHaveBeenCalledTimes(5);
+  });
+
+  it('a rejected appeal with only updated_at recent (no rejected_at) does not trigger the cooldown', async () => {
+    seedReason();
+    m.rows.push({
+      kind: 'suspension_appeal',
+      storeId: 'store-a',
+      status: 'rejected',
+      createdAt: new Date(Date.now() - 72 * 3600_000),
+      updatedAt: new Date(),
+    });
+    expect(
+      (await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'x' })).status
+    ).toBe(201);
   });
 
   it('slug claims: at most 3 open per user, a 4th is 429; another user is unaffected', async () => {

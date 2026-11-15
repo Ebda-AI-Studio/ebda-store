@@ -19,25 +19,15 @@ import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 import { emailQueue } from './email-queue.service';
 
-/** Support requests per store per rolling 24 h. */
+/** Support requests per store per UTC day (slots 1..N, each claimed by a unique insert). */
 const SUPPORT_REQUESTS_PER_DAY = 5;
 /** A rejected appeal cannot be re-filed for this long (staff replied; no hammering). */
 const APPEAL_COOLDOWN_MS = 24 * 3600_000;
 /** Open protected-address claims one user may hold at once. */
 const MAX_OPEN_SLUG_CLAIMS = 3;
 
-/**
- * Transaction-scoped advisory lock: serialises count-then-insert per key (same pattern as return.service
- * lockOrderReturns). Released when the request transaction ends; a no-op outside one.
- */
-async function lockKey(db: TrustDb, key: string): Promise<void> {
-  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
-}
-
 /** The slice of the Prisma client these functions use (the tenant tx, `prisma`, or `withUser`'s tx). */
 export interface TrustDb {
-  /** Tagged-template raw exec (the tenant tx / `prisma`); used only for the transaction-scoped advisory lock. */
-  $executeRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>;
   trustRequest: {
     create(args: { data: Record<string, unknown> }): Promise<TrustRow>;
     findFirst(args: Record<string, unknown>): Promise<TrustRow | null>;
@@ -127,29 +117,38 @@ export async function createSupportRequest(
   who: Requester,
   input: { topic: SupportTopic; message: string; pageUrl?: string }
 ): Promise<TrustRow> {
-  // the lock makes count+insert atomic: a burst of N parallel requests cannot all read "4 so far"
-  await lockKey(db, `trust-support:${storeId}`);
-  const since = new Date(Date.now() - 24 * 3600_000);
-  const today = await db.trustRequest.count({
-    where: { storeId, kind: 'support', createdAt: { gte: since } },
+  // Atomic and backend-neutral (Postgres and D1): each request claims one slot 1..N for (store, UTC day) through the
+  // partial UNIQUE (store_id, cap_day, cap_slot). A burst cannot overrun: the loser gets a unique violation and
+  // takes the next slot, and once all N are taken it is refused. No advisory lock, no read-then-write.
+  const capDay = new Date().toISOString().slice(0, 10);
+  const used = await db.trustRequest.count({
+    where: { storeId, kind: 'support', capDay },
   });
-  if (today >= SUPPORT_REQUESTS_PER_DAY) {
-    throw new AppError(
-      429,
-      'SUPPORT_REQUEST_LIMIT',
-      `You can send ${SUPPORT_REQUESTS_PER_DAY} requests a day. Please try again tomorrow.`
-    );
+  for (let slot = used + 1; slot <= SUPPORT_REQUESTS_PER_DAY; slot++) {
+    try {
+      return await withSavepoint(() =>
+        db.trustRequest.create({
+          data: {
+            kind: 'support',
+            storeId,
+            userId: who.userId,
+            topic: input.topic,
+            message: input.message,
+            pageUrl: input.pageUrl ?? null,
+            capDay,
+            capSlot: slot,
+          },
+        })
+      );
+    } catch (err) {
+      if (!isP2002(err)) throw err; // slot taken by a parallel request: try the next one
+    }
   }
-  return db.trustRequest.create({
-    data: {
-      kind: 'support',
-      storeId,
-      userId: who.userId,
-      topic: input.topic,
-      message: input.message,
-      pageUrl: input.pageUrl ?? null,
-    },
-  });
+  throw new AppError(
+    429,
+    'SUPPORT_REQUEST_LIMIT',
+    `You can send ${SUPPORT_REQUESTS_PER_DAY} requests a day. Please try again tomorrow.`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +165,24 @@ export async function recordSuspension(
   await db.trustRequest.create({
     data: { kind: 'suspension', storeId, userId: actor.userId, message: reason ?? null },
   });
+}
+
+/**
+ * Super-admin side: reject the open appeal (staff replied by e-mail, the store stays suspended). Stamps `rejected_at`,
+ * which starts the merchant's 24 h cooldown. 404 when there is no open appeal.
+ */
+export async function rejectAppeal(db: TrustDb, storeId: string): Promise<{ id: string }> {
+  const open = await db.trustRequest.findFirst({
+    where: { storeId, kind: 'suspension_appeal', status: 'open' },
+  });
+  if (!open) throw new AppError(404, 'NO_OPEN_APPEAL', 'This store has no open appeal');
+  // conditional on still being open: two staff clicking at once reject it once
+  const { count } = await db.trustRequest.updateMany({
+    where: { id: open.id, storeId, status: 'open' },
+    data: { status: 'rejected', rejectedAt: new Date() },
+  });
+  if (count === 0) throw new AppError(404, 'NO_OPEN_APPEAL', 'This store has no open appeal');
+  return { id: open.id };
 }
 
 /** Reactivation resolves the open appeal (staff acted on it). Super-admin status route only. */
@@ -248,7 +265,7 @@ export async function fileAppeal(
       storeId,
       kind: 'suspension_appeal',
       status: 'rejected',
-      updatedAt: { gte: new Date(Date.now() - APPEAL_COOLDOWN_MS) },
+      rejectedAt: { gte: new Date(Date.now() - APPEAL_COOLDOWN_MS) },
     },
   });
   if (rejected)
@@ -288,12 +305,13 @@ export async function fileSlugClaim(
   if (check.code !== 'SLUG_PROTECTED') {
     throw new AppError(400, check.code, check.message);
   }
-  // one lock per user: the per-slug duplicate check and the per-user cap below stay consistent under a burst
-  await lockKey(db, `trust-slug-claim:${who.userId}`);
   const open = await db.trustRequest.findFirst({
     where: { userId: who.userId, kind: 'slug_claim', slug, status: 'open' },
   });
   if (open) throw new AppError(409, 'CLAIM_ALREADY_OPEN', 'You already claimed this address');
+  // Residual (Ruling TRUST-1): the per-user cap is count-then-insert with no unique slot (claims have no store id),
+  // so a parallel burst by ONE authenticated, rate-limited user could exceed 3 by the burst size. Staff decide every
+  // claim; cost if wrong: a few extra review items from one account.
   const openClaims = await db.trustRequest.count({
     where: { userId: who.userId, kind: 'slug_claim', status: 'open' },
   });

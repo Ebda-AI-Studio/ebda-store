@@ -14,7 +14,6 @@ const m = vi.hoisted(() => ({
 }));
 
 const fakePrisma = {
-  $executeRaw: async () => 0,
   trustRequest: {
     create: async ({ data }: any) => {
       const r = { id: 't1', status: 'open', createdAt: new Date(), ...data };

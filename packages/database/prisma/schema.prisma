@@ -5737,6 +5737,12 @@ model TrustRequest {
   evidenceUrl String?  @map("evidence_url")
   // open | resolved | rejected
   status      String   @default("open")
+  // set by the super-admin reject route; the merchant's appeal cooldown keys on it (never on updated_at)
+  rejectedAt  DateTime? @map("rejected_at")
+  // support requests only: claim one of 5 slots per store per UTC day through a partial UNIQUE (store_id, cap_day,
+  // cap_slot); a lost race is a unique violation, so the daily cap is atomic on Postgres and D1 alike
+  capDay      String?  @map("cap_day")
+  capSlot     Int?     @map("cap_slot")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

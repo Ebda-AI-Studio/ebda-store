@@ -170,7 +170,7 @@
         "provider_verification_events": 10,
         "billing_referrals": 3,
         "billing_grants": 17,
-        "trust_requests": 12,
+        "trust_requests": 15,
         "stores": 32,
         "entity_index": 5,
         "platform_audit_log": 8
@@ -473,6 +473,14 @@
       "unique": true,
       "pgCols": "\"user_id\"",
       "pgWhere": "\"kind\" = 'store_cap' AND \"status\" = 'open'"
+    },
+    {
+      "name": "trust_requests_support_cap_slot",
+      "table": "trust_requests",
+      "db": "d1",
+      "unique": true,
+      "pgCols": "\"store_id\", \"cap_day\", \"cap_slot\"",
+      "pgWhere": "\"kind\" = 'support' AND \"cap_slot\" IS NOT NULL"
     }
   ],
   "supersededUniques": [
@@ -1350,6 +1358,12 @@
       "disposition": "d1:trust_requests"
     },
     {
+      "kind": "check",
+      "name": "trust_requests_cap_slot_check",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
       "kind": "index",
       "name": "users_admin_email_key",
       "table": "users",
@@ -1700,6 +1714,12 @@
     {
       "kind": "index",
       "name": "trust_requests_one_open_store_cap",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "index",
+      "name": "trust_requests_support_cap_slot",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
     }
