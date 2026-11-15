@@ -553,7 +553,6 @@ const staffRemove = change<{ email: string }>({
   run: (ctx, _a, state) => removeStaffFromStore(ctx.storeId, (state as { userId: string }).userId),
 });
 
-// pq-allow(unused-export): wired into change-tools.ts by the controller (phase E wiring)
 export function accountBillingTools(): ToolSpec[] {
   return [
     billingOverview,
