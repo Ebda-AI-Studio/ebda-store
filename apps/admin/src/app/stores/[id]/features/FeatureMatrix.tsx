@@ -185,14 +185,14 @@ function FeatureRowItem({
             <span className="text-xs text-muted-foreground">· {overrideRow.reason}</span>
           )}
           {overrideRow && (
-            <button
-              type="button"
+            <Button
+              variant="link"
+              size="sm"
               onClick={() => onEditExpiry(overrideRow)}
               disabled={inFlight}
-              className="text-xs text-primary hover:underline"
             >
               {tExpiry('edit')}
-            </button>
+            </Button>
           )}
         </div>
       </div>
