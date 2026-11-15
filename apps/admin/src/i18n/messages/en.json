@@ -11724,7 +11724,7 @@
   },
   "trustRequests": {
     "title": "Support and trust requests",
-    "subtitle": "Everything merchants send to Ebda staff: support requests, suspension appeals, protected address claims and store limit requests.",
+    "subtitle": "Everything merchants send to Ebda Store staff: support requests, suspension appeals, protected address claims and store limit requests.",
     "loadFailed": "Could not load.",
     "loading": "Loading",
     "empty": "No requests match.",
