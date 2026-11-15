@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "store-fonts",
   "questions": {
     "ar": ["ازاي اغير الخط؟", "ارفع خط خاص"],
     "en": ["Change my store font"]
@@ -30,5 +30,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }
