@@ -7,8 +7,8 @@ import logger from '../lib/logger';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { getAutomationFlags } from './plan-entitlements';
-import { readStorePlan, reconcileDoPlan } from '../lib/store-plan';
-import { storeUpdate, syncStoreEntitlement } from '../lib/repo-factory';
+import { readStorePlan } from '../lib/store-plan';
+import { storeUpdate } from '../lib/repo-factory';
 
 // Versioned namespace (2026-09-25, customer wallet D1). The release that wired
 // behaviour to the previously hidden `customer_wallet` key also resets a stale
@@ -214,12 +214,7 @@ class FeatureService {
         boolean
       >;
     }
-    const plan = await reconcileDoPlan(storeId, store.plan, id => {
-      void syncStoreEntitlement(id).catch(err =>
-        logger.warn({ err, storeId: id }, '[FeatureService] DO plan mirror re-sync failed')
-      );
-    });
-    return this.rowsToMap(plan as StorePlan, rows, flags);
+    return this.rowsToMap(store.plan as StorePlan, rows, flags);
   }
 
   /**

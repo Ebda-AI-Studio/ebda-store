@@ -14,8 +14,8 @@ vi.mock('@api/services/redis.service', () => ({ redis: {} }));
 vi.mock('@api/services/store.service', () => ({ bustStoreCaches: vi.fn() }));
 vi.mock('@api/services/plan-entitlements', () => ({ getAutomationFlags: vi.fn() }));
 vi.mock('@api/services/plan-sync', () => ({ syncSubscriptionFromLegacyPlan: vi.fn() }));
-vi.mock('@api/lib/store-plan', () => ({ readStorePlan: vi.fn(), reconcileDoPlan: vi.fn() }));
-vi.mock('@api/lib/repo-factory', () => ({ storeUpdate: vi.fn(), syncStoreEntitlement: vi.fn() }));
+vi.mock('@api/lib/store-plan', () => ({ readStorePlan: vi.fn() }));
+vi.mock('@api/lib/repo-factory', () => ({ storeUpdate: vi.fn() }));
 vi.mock('@api/lib/public-cache', () => ({ invalidateStoreProductCaches: vi.fn() }));
 
 import { FEATURE_KEYS_ARRAY, BUSINESS_BASELINE_EXCLUSIONS, type FeatureKey } from '@ebda/shared';

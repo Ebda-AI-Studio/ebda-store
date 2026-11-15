@@ -1,3 +1,4 @@
+import { readStorePlan } from '../lib/store-plan';
 import { prisma, withStore, runInTenantContext, type Prisma } from '@ebda/database';
 import {
   storeDb,
@@ -76,9 +77,7 @@ export function campaignDailyCap(plan?: string | null): number {
 
 /** The cap for one store, reading its plan tier in the store's own scope. */
 export async function storeCampaignDailyCap(storeId: string): Promise<number> {
-  const store = await withStore(storeId, tx =>
-    tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-  );
+  const store = await withStore(storeId, tx => readStorePlan(tx, storeId));
   return campaignDailyCap(store?.plan);
 }
 
