@@ -13,8 +13,8 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "reversible",
-    "note": "yes (delete = confirm; or set draft)"
+    "class": "compensating",
+    "note": "assistant undo archives the created product (set status archived); deleting is a confirm-class action"
   },
   "helpArticle": "products-and-csv-import",
   "questions": {

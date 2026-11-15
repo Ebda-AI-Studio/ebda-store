@@ -49,6 +49,7 @@ vi.mock('@api/services/accounting/reorder-rule.service', () => ({
   deleteReorderRule: m.deleteRule,
 }));
 
+import { applyThenUndo } from './helpers/undo-roundtrip';
 import { inventoryTools } from '@api/smart-layer/tools/inventory.tools';
 
 const S = '11111111-1111-4111-8111-111111111111';
@@ -323,4 +324,143 @@ describe('reorder_rule_set / reorder_rule_delete', () => {
     ).rejects.toThrow();
     expect(m.createRule).not.toHaveBeenCalled();
   });
+});
+
+// ---- every tool: role + plan-feature gates at preview and at apply ---------------------------------------------------------------------------
+const writes = () => [
+  m.adjust,
+  m.setInv,
+  m.updateThreshold,
+  m.bulkThreshold,
+  m.createRule,
+  m.updateRule,
+  m.deleteRule,
+];
+const CASES: Array<[string, Record<string, unknown>, string[], boolean]> = [
+  ['inventory_adjust', { productId: 'p1', delta: 1 }, ['customer'], true],
+  ['inventory_set_threshold', { productIds: ['p1'], threshold: 2 }, ['customer'], true],
+  [
+    'reorder_rule_set',
+    { productId: 'p1', minQty: 5, reorderQty: 20 },
+    ['customer', 'staff'],
+    false,
+  ],
+];
+describe.each(CASES)('%s gates', (name, args, denied, hasFeature) => {
+  it.each(denied)('%s is refused at PREVIEW (no card)', async role => {
+    await expect(preview(name, args, role)).rejects.toThrow(/FORBIDDEN/);
+  });
+  it.each(denied)(
+    '%s is refused at APPLY with ToolForbidden and nothing is written',
+    async role => {
+      const t = tool(name);
+      const a = parse(name, args);
+      const draft = await t.preview!(ctx(), a);
+      await expect(t.apply!(ctx(role), a, draft)).rejects.toBeInstanceOf(ToolForbidden);
+      for (const fn of writes()) expect(fn).not.toHaveBeenCalled();
+      expect(m.insertAuditLog).not.toHaveBeenCalled();
+    }
+  );
+  if (hasFeature)
+    it('a plan without the feature is refused at preview and at apply', async () => {
+      const t = tool(name);
+      const a = parse(name, args);
+      const draft = await t.preview!(ctx(), a);
+      m.featureEnabled.mockResolvedValue(false);
+      await expect(t.preview!(ctx(), a)).rejects.toThrow(/feature/);
+      await expect(t.apply!(ctx(), a, draft)).rejects.toBeInstanceOf(ToolForbidden);
+      for (const fn of writes()) expect(fn).not.toHaveBeenCalled();
+      expect(m.featureEnabled).toHaveBeenCalledWith(
+        S,
+        name === 'inventory_adjust' ? 'inventory.basic' : 'inventory.stock_alerts'
+      );
+    });
+});
+it('reorder_rule_delete: role gate at preview and apply', async () => {
+  RULES.push({
+    id: 'r9',
+    productId: 'p1',
+    variantId: null,
+    minQty: 2,
+    reorderQty: 10,
+    leadTimeDays: 3,
+    safetyStockDays: 1,
+    isActive: true,
+  });
+  await expect(preview('reorder_rule_delete', { productId: 'p1' }, 'staff')).rejects.toThrow(
+    /FORBIDDEN/
+  );
+  const t = tool('reorder_rule_delete');
+  const a = parse('reorder_rule_delete', { productId: 'p1' });
+  const draft = await t.preview!(ctx(), a);
+  await expect(t.apply!(ctx('staff'), a, draft)).rejects.toBeInstanceOf(ToolForbidden);
+  expect(m.deleteRule).not.toHaveBeenCalled();
+});
+
+// ---- engine-level undo ----------------------------------------------------------------------------------------------------------------------
+describe('undo round trips through the engine', () => {
+  const all = () => inventoryTools();
+  it('reorder_rule_set (create): undo is the confirm card of the delete, built from the rule that was created', async () => {
+    m.createRule.mockImplementation(async () => {
+      RULES.push({
+        id: 'r1',
+        productId: 'p1',
+        variantId: null,
+        minQty: 5,
+        reorderQty: 20,
+        leadTimeDays: 0,
+        safetyStockDays: 0,
+        isActive: true,
+      });
+      return { id: 'r1' };
+    });
+    const r = await applyThenUndo(
+      all(),
+      tool('reorder_rule_set'),
+      parse('reorder_rule_set', { productId: 'p1', minQty: 5, reorderQty: 20 })
+    );
+    expect(r).toMatchObject({ applied: 'applied', undo: 'needs_confirm' });
+    expect(r.card).toBeTruthy();
+  });
+  it('reorder_rule_set (update): undone, and its restore carries no null', async () => {
+    RULES.push({
+      id: 'r9',
+      productId: 'p1',
+      variantId: null,
+      minQty: 2,
+      reorderQty: 10,
+      leadTimeDays: null,
+      safetyStockDays: 1,
+      isActive: true,
+    });
+    const t = tool('reorder_rule_set');
+    const a = parse('reorder_rule_set', { productId: 'p1', minQty: 8 });
+    const draft = await t.preview!(ctx(), a);
+    const restore = (draft.payload as { restore: Record<string, unknown> }).restore;
+    expect(Object.values(restore)).not.toContain(null);
+    expect(t.inverse!(ctx(), a, draft, { ok: true, etagAfter: 'x' })!.args).toEqual({
+      productId: 'p1',
+      ...restore,
+    });
+    expect((await applyThenUndo(all(), t, a)).undo).toBe('undone');
+  });
+  it('inventory_adjust and inventory_set_threshold: undone, undo args valid', async () => {
+    for (const [name, args] of [
+      ['inventory_adjust', { productId: 'p1', delta: -3 }],
+      ['inventory_adjust', { productId: 'p1', setTo: 4 }],
+      ['inventory_set_threshold', { productIds: ['p1', 'p2'], threshold: 1 }],
+    ] as Array<[string, Record<string, unknown>]>) {
+      const t = tool(name);
+      const a = parse(name, args);
+      const draft = await t.preview!(ctx(), a);
+      expect(
+        t.args.safeParse(t.inverse!(ctx(), a, draft, { ok: true, etagAfter: 'x' })!.args).success
+      ).toBe(true);
+      expect((await applyThenUndo(all(), t, a)).undo).toBe('undone');
+    }
+  });
+});
+
+it('a tool whose undo is a different tool declares compensating, never reversible', () => {
+  for (const n of ['reorder_rule_set']) expect(tool(n).undo).toBe('compensating');
 });
