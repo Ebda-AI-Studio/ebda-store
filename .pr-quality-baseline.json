@@ -1210,7 +1210,6 @@
     "unused-export|apps/api/src/mcp/tools/admin-read-customers-marketing.tools.ts|couponState",
     "unused-export|apps/api/src/mcp/tools/admin-read-customers-marketing.tools.ts|customerRefOf",
     "unused-export|apps/api/src/mcp/tools/admin-read.tools.ts|DELIVERY_FIELDS_NOTE",
-    "unused-export|apps/api/src/mcp/tools/cart.tools.ts|cartView",
     "unused-export|apps/api/src/mcp/tools/catalog.tools.ts|commerceDetail",
     "unused-export|apps/api/src/middleware/auth.ts|LiveIdentityMemo",
     "unused-export|apps/api/src/middleware/auth.ts|SUPER_ADMIN_MAX_AUTH_AGE_SECONDS",
