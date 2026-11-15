@@ -1,0 +1,41 @@
+{
+  "id": "product.recommendations",
+  "status": "live",
+  "area": "marketing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "المنتجات المقترحة",
+  "titleEn": "Product recommendations: curated related/upsell/cross-sell",
+  "screens": ["/stores/[id]/products/[productId]/recommendations"],
+  "api": [
+    "GET/PUT/POST /stores/:storeId/products/:productId/relations",
+    "DELETE .../relations/:relationId",
+    "POST /stores/:storeId/recommendations/recalculate",
+    "GET /stores/:storeId/recommendations",
+    "GET .../recommendations/stats"
+  ],
+  "mcpTool": null,
+  "planGate": "upsell_crosssell",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "coupons-bundles-and-recommendations",
+  "questions": {
+    "ar": ["ازاي اظهر منتجات مقترحة؟", "اللي اشتروا ده اشتروا ده"],
+    "en": ["Show related products"]
+  },
+  "steps": ["Product > Recommendations."],
+  "edgeCases": [
+    "Automatic similar/bought-together is OPEN-PR #742",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Automatic recommendations not merged (#742)"]
+}

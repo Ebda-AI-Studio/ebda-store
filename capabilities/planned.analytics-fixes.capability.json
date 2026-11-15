@@ -1,0 +1,31 @@
+{
+  "id": "planned.analytics-fixes",
+  "status": "in-pr",
+  "pr": "ebda-store#752",
+  "area": "analytics",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تصحيح احصائيات المشاهدات",
+  "titleEn": "Product views and QR scans recorded on DO stores; abandoned tile fix",
+  "screens": ["/stores/[id]/analytics"],
+  "api": ["(PR)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["مشاهدات المنتجات صفر ليه؟"],
+    "en": ["Why are product views zero?"]
+  },
+  "steps": ["Known issue; fix in review."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
+  ],
+  "gaps": ["P0 analytics bug live until merge"]
+}

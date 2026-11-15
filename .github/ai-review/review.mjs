@@ -172,6 +172,7 @@ if (willFix) {
   }
 }
 
+if (GITHUB_OUTPUT) appendFileSync(GITHUB_OUTPUT, 'verdict=critical\n');
 console.error(
   `${critical.length} critical finding(s) — blocking (auto-fix disabled or already attempted on this HEAD).`
 );

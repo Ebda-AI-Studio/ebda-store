@@ -60,6 +60,8 @@ type Feature =
   | 'builder-patch'
   // Self-service provider activation: a plain sentence about a FAILED connection test (extract/explain only).
   | 'provider-check'
+  // Smart Layer assistant turns (the Ebda assistant side panel): usage is labelled so the meter and the per-feature cost views can tell it apart.
+  | 'assistant'
   // Accounting smart layer — called through accounting/gemini-ai.service.ts,
   // which records through `recordUsage` below so these rows carry model +
   // cost like every other AI call (#1037).
