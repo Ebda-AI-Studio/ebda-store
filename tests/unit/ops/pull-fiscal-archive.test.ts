@@ -1,6 +1,6 @@
 // Ruling FISCAL-ARCHIVE-1: the Mac pull keeps an independent, verified, never-rotated second copy of the fiscal archive.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -25,37 +25,84 @@ function bucket(ids: string[], tamper: string[] = [], missing: string[] = []) {
   };
 }
 const tmp = () => mkdtempSync(path.join(tmpdir(), 'fa-pull-'));
-const dataPath = (root: string, id: string) =>
-  path.join(root, 'fiscal-archive/v1/data', `${id}.ndjson.gz`);
+const encPath = (root: string, id: string) =>
+  path.join(root, 'fiscal-archive/v1/data', `${id}.ndjson.gz.age`);
+const indexOf = (root: string) =>
+  JSON.parse(readFileSync(path.join(root, 'fiscal-archive/v1/index.json'), 'utf8'));
+// stand-in for `age -r <public recipient>`: output is not the plaintext
+const encryptFile = (plain: string, out: string) =>
+  writeFileSync(out, Buffer.concat([Buffer.from('AGE:'), readFileSync(plain).reverse()]));
+const allFiles = (d: string): string[] =>
+  readdirSync(d, { withFileTypes: true }).flatMap(e =>
+    e.isDirectory() ? allFiles(path.join(d, e.name)) : [path.join(d, e.name)]
+  );
+const plainTemps = () => readdirSync(tmpdir()).filter(f => f.startsWith('fa-plain-'));
 
 describe('pullFiscalArchive', () => {
-  it('downloads every store archive after verifying its sha256 against its manifest; a second run downloads nothing', async () => {
+  it('stores ONLY an age file + an index with both checksums; no plaintext anywhere; second run downloads nothing', async () => {
     const root = tmp();
     const b = bucket(['a1', 'b2']);
-    expect(await pullFiscalArchive({ ...b, root })).toMatchObject({
+    expect(await pullFiscalArchive({ ...b, root, encryptFile })).toMatchObject({
       stores: 2,
       downloaded: 2,
       bad: [],
     });
-    expect(readFileSync(dataPath(root, 'a1'), 'utf8')).toBe('DATA-a1');
-    expect(await pullFiscalArchive({ ...b, root })).toMatchObject({ downloaded: 0, bad: [] });
+    const enc = readFileSync(encPath(root, 'a1'));
+    expect(enc.toString()).not.toContain('DATA-a1');
+    const idx = indexOf(root);
+    expect(idx.a1).toMatchObject({ plainSha256: sha(Buffer.from('DATA-a1')), encSha256: sha(enc) });
+    for (const f of allFiles(root)) expect(readFileSync(f).toString()).not.toContain('DATA-a1');
+    expect(allFiles(root).some(f => f.endsWith('.ndjson.gz'))).toBe(false);
+    expect(plainTemps()).toEqual([]);
+    expect(await pullFiscalArchive({ ...b, root, encryptFile })).toMatchObject({
+      downloaded: 0,
+      bad: [],
+    });
   });
 
-  it('a checksum mismatch or a missing data object is reported (P1 by the caller) and never written or overwriting a good copy', async () => {
+  it('a failing encryptor leaves no plaintext temp file and no stored data (finally cleanup)', async () => {
     const root = tmp();
-    await pullFiscalArchive({ ...bucket(['a1']), root });
+    await expect(
+      pullFiscalArchive({
+        ...bucket(['x1']),
+        root,
+        encryptFile: () => {
+          throw new Error('age boom');
+        },
+      })
+    ).rejects.toThrow('age boom');
+    expect(plainTemps()).toEqual([]);
+    expect(existsSync(encPath(root, 'x1'))).toBe(false);
+  });
+
+  it('refuses to run with no recipient (never a plaintext copy)', async () => {
+    await expect(pullFiscalArchive({ ...bucket(['a1']), root: tmp() })).rejects.toThrow(
+      /no age recipient/
+    );
+  });
+
+  it('a tampered .age is detected on the next run', async () => {
+    const root = tmp();
+    const b = bucket(['a1']);
+    await pullFiscalArchive({ ...b, root, encryptFile });
+    writeFileSync(encPath(root, 'a1'), 'tampered');
+    const r = await pullFiscalArchive({ ...b, root, encryptFile });
+    expect(r.bad.join(' ')).toMatch(/a1.*tampered or corrupt/);
+  });
+
+  it('an R2 checksum mismatch or a missing data object is reported and never stored', async () => {
+    const root = tmp();
     const r = await pullFiscalArchive({
-      ...bucket(['a1', 'bad', 'gone'], ['a1', 'bad'], ['gone']),
+      ...bucket(['bad', 'gone'], ['bad'], ['gone']),
       root,
+      encryptFile,
     });
-    expect(r.bad).toHaveLength(3 - 1 + 0); // 'a1' still good locally (skipped), 'bad' + 'gone' reported
     expect(r.bad.join(' ')).toMatch(/bad.*differs/);
     expect(r.bad.join(' ')).toMatch(/gone.*missing/);
-    expect(existsSync(dataPath(root, 'bad'))).toBe(false);
-    expect(readFileSync(dataPath(root, 'a1'), 'utf8')).toBe('DATA-a1');
+    expect(existsSync(encPath(root, 'bad'))).toBe(false);
   });
 
-  it('is never pruned: the rotation code only touches days/ and objects/, and this copy lives under fiscal-archive/', () => {
+  it('keep-forever: the rotation never touches it and the function cannot delete a stored copy', () => {
     const src = readFileSync(
       path.join(__dirname, '../../../scripts/ops/pull-cf-backups.mjs'),
       'utf8'
@@ -66,6 +113,6 @@ describe('pullFiscalArchive', () => {
       src.indexOf('export async function pullFiscalArchive'),
       src.indexOf('const keychain')
     );
-    expect(fn).not.toMatch(/rmSync|unlinkSync/);
+    expect(fn.replace(/rmSync\(tmp[^)]*\)/, '')).not.toMatch(/rmSync|unlinkSync/);
   });
 });

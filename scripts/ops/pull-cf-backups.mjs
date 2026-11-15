@@ -8,8 +8,9 @@
 //   ROOT/days/<YYYY-MM-DD>/<name>.<ext>.gz.age    hard links into objects/ + manifest.json; the newest KEEP (30) days are kept
 //   ROOT/media/<backupKey> + media/manifest.json  append-only mirror of media/ (never pruned: an image deleted in production stays)
 //   ROOT/fiscal-archive/v1/{manifests,data}/      SECOND COPY of the fiscal archive of deleted stores (R2 ebda-private, Ruling
-//                                                 FISCAL-ARCHIVE-1): each data object sha256-checked against its manifest; NEVER
-//                                                 pruned by the 30-day rotation (legal retention is 7 years); a mismatch is a P1 alert
+//                                                 FISCAL-ARCHIVE-1): sha256-checked against its manifest, then age-encrypted to the
+//                                                 PUBLIC recipient (EBDA_BACKUP_AGE_PUBLIC_KEY or Keychain `ebda-backup-age-public`;
+//                                                 no private key here), only .age + index.json kept; NEVER pruned (7-year retention)
 //
 // Every file is sha256-checked against the backup manifest before it is linked; the newest backup must be <= 2 days old.
 // Nothing is decrypted here: the age private key stays in the Keychain, and decryptability is what the restore drill proves.
@@ -25,13 +26,14 @@ import {
   existsSync,
   linkSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -188,17 +190,33 @@ export function restList({
   };
 }
 
+/** age-encrypt FILE to the public recipient (no private key on this Mac). The default encryptor of the fiscal second copy. */
+const ageFileEncryptor = recipient => (plainPath, outPath) => {
+  const r = spawnSync('age', ['-r', recipient, '-o', outPath, plainPath], { encoding: 'utf8' });
+  if (r.error) throw r.error;
+  if (r.status !== 0) throw new Error(`age encrypt failed: ${r.stderr}`);
+};
+
 /**
- * Second copy of the fiscal archive (Ruling FISCAL-ARCHIVE-1). Every data object is sha256-checked against ITS manifest before it
- * is written; a mismatch or a missing data object is collected (never overwrites a good local copy) and returned as `bad`, so the
- * caller raises a P1 alert. Nothing here prunes: these files are kept for the 7-year legal retention (keep-forever; a
- * retain_until-based prune would be a separate, explicit job).
+ * Second copy of the fiscal archive (Ruling FISCAL-ARCHIVE-1), ENCRYPTED like every other file in this folder. Per store:
+ * download -> sha256 against its manifest -> age-encrypt to the same PUBLIC recipient as the other CF backups -> keep ONLY
+ * `fiscal-archive/v1/data/<id>.ndjson.gz.age` plus `fiscal-archive/v1/index.json` (plaintext sha from the manifest + ciphertext sha).
+ * Later runs verify the ciphertext checksum; a changed .age is reported (never silently replaced). Plaintext exists only in a private
+ * 0600 temp file that is removed in `finally` (error paths included). Nothing is decrypted here. A mismatch / missing object is
+ * collected as `bad` (the caller raises a P1). Nothing prunes: kept for the 7-year legal retention (keep-forever).
  */
-export async function pullFiscalArchive({ list, get, root, log = () => {} }) {
-  const dirM = path.join(root, 'fiscal-archive', 'v1', 'manifests');
-  const dirD = path.join(root, 'fiscal-archive', 'v1', 'data');
+export async function pullFiscalArchive({ list, get, root, encryptFile, log = () => {} }) {
+  if (!encryptFile)
+    throw new Error(
+      'fiscal archive: no age recipient configured, refusing to store a plaintext copy'
+    );
+  const base = path.join(root, 'fiscal-archive', 'v1');
+  const dirM = path.join(base, 'manifests');
+  const dirD = path.join(base, 'data');
   mkdirSync(dirM, { recursive: true });
   mkdirSync(dirD, { recursive: true });
+  const indexFile = path.join(base, 'index.json');
+  const index = existsSync(indexFile) ? JSON.parse(readFileSync(indexFile, 'utf8')) : {};
   const bad = [];
   let stores = 0;
   let downloaded = 0;
@@ -215,8 +233,15 @@ export async function pullFiscalArchive({ list, get, root, log = () => {} }) {
     }
     const m = JSON.parse(mBuf.toString('utf8'));
     const id = name.slice(0, -5);
-    const dataFile = path.join(dirD, `${id}.ndjson.gz`);
-    if (existsSync(dataFile) && sha256(readFileSync(dataFile)) === m.sha256) {
+    const encFile = path.join(dirD, `${id}.ndjson.gz.age`);
+    const have = index[id];
+    if (have && have.plainSha256 === m.sha256 && existsSync(encFile)) {
+      if (sha256(readFileSync(encFile)) !== have.encSha256) {
+        bad.push(
+          `${id}: local .age differs from its recorded ciphertext checksum (tampered or corrupt)`
+        );
+        continue;
+      }
       writeFileSync(path.join(dirM, name), mBuf, { mode: 0o600 });
       stores++;
       continue;
@@ -230,11 +255,27 @@ export async function pullFiscalArchive({ list, get, root, log = () => {} }) {
       bad.push(`${id}: data sha256 differs from its manifest`);
       continue;
     }
-    writeFileSync(dataFile, d, { mode: 0o600 });
+    const tmp = mkdtempSync(path.join(tmpdir(), 'fa-plain-'));
+    try {
+      const plain = path.join(tmp, 'plain');
+      writeFileSync(plain, d, { mode: 0o600 });
+      const out = path.join(tmp, 'out.age');
+      encryptFile(plain, out);
+      const enc = readFileSync(out);
+      writeFileSync(encFile, enc, { mode: 0o600 });
+      index[id] = {
+        plainSha256: m.sha256,
+        encSha256: sha256(enc),
+        file: `data/${id}.ndjson.gz.age`,
+      };
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
     writeFileSync(path.join(dirM, name), mBuf, { mode: 0o600 });
     downloaded++;
     stores++;
   }
+  writeFileSync(indexFile, JSON.stringify(index, null, 2), { mode: 0o600 });
   log(
     `fiscal-archive: ${stores} store archive(s) verified, ${downloaded} downloaded, ${bad.length} bad`
   );
@@ -289,10 +330,12 @@ async function main() {
       log: stamp,
     });
     const acct = process.env.EBDA_CF_ACCOUNT_ID || DEFAULT_ACCOUNT_ID;
+    const recipient = process.env.EBDA_BACKUP_AGE_PUBLIC_KEY || keychain('ebda-backup-age-public');
     const fa = await pullFiscalArchive({
       list: restList({ accountId: acct, token }),
       get: restGet({ accountId: acct, token, bucket: PRIVATE_BUCKET }),
       root,
+      encryptFile: recipient ? ageFileEncryptor(recipient) : undefined,
       log: stamp,
     });
     if (fa.bad.length) {
