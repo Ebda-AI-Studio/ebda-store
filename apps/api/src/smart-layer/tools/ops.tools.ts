@@ -7,7 +7,6 @@ import { opsInventoryTools } from './ops-inventory.tools';
 import { opsOrdersTools } from './ops-orders.tools';
 import { opsPeopleTools } from './ops-people.tools';
 
-// pq-allow(unused-export): wired into changeTools() by the controller after phase E
 export function opsTools(): ToolSpec[] {
   return [...opsOrdersTools(), ...opsInventoryTools(), ...opsPeopleTools()];
 }

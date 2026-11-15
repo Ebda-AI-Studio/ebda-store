@@ -952,7 +952,6 @@
     "unused-export|apps/api/src/lib/inngest/functions/search-product-index.ts|REINDEX_EVENT",
     "unused-export|apps/api/src/lib/inngest/functions/search-product-index.ts|handleSearchIndexBackstop",
     "unused-export|apps/api/src/lib/inngest/functions/search-product-index.ts|handleSearchProductIndex",
-    "unused-export|apps/api/src/lib/inngest/functions/shipment-create.ts|bookShipment",
     "unused-export|apps/api/src/lib/inngest/functions/shipment-create.ts|handleShipmentCreateFailure",
     "unused-export|apps/api/src/lib/inngest/functions/store-usage-snapshot.ts|collectDoStoreUsage",
     "unused-export|apps/api/src/lib/inngest/functions/store-usage-snapshot.ts|toJsonSafeRows",

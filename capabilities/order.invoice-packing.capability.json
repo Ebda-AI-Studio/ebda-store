@@ -21,7 +21,7 @@
   "mcpTool": null,
   "planGate": "accounting.invoicing (email invoice)",
   "roles": ["owner", "staff", "super_admin"],
-  "policy": "preview",
+  "policy": "confirm",
   "undo": {
     "class": "irreversible",
     "note": "an invoice e-mail cannot be recalled; printing is read-only"
