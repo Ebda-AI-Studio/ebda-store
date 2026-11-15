@@ -1,6 +1,12 @@
 /** Notification assistant tool (plan 4 C2): per-event SMS / phone-push switches. */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { ToolForbidden, type TurnCtx, type ToolSpec } from '@ebda/shared/smart-layer';
+import {
+  ToolForbidden,
+  effectivePolicy,
+  type TurnCtx,
+  type ToolSpec,
+} from '@ebda/shared/smart-layer';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 
 const m = vi.hoisted(() => ({
   events: {} as Record<string, unknown>,
@@ -52,7 +58,8 @@ beforeEach(() => {
 describe('notification_settings', () => {
   it('is a reversible preview tool with no store id or credential', () => {
     expect(t.name).toBe('notification_settings');
-    expect(t.policy).toBe('preview');
+    expect(t.policy).toBe('confirm');
+    expect(t.messagesCustomers).toBe(true);
     expect(t.undo).toBe('reversible');
     expect(JSON.stringify(t.jsonSchema)).not.toMatch(/store_?id|password|apiKey|secret|token/i);
     expect(
@@ -103,9 +110,59 @@ describe('notification_settings', () => {
     });
     expect(() => t.args.parse(inv!.args)).not.toThrow();
   });
-  it('an event with no row shows the defaults (push on, sms off)', async () => {
+  it('an event with no row shows the dispatcher default (sms on, push on)', async () => {
     m.events = {};
     const d = await t.preview!(ctx(), t.args.parse(args));
-    expect(d.rows.map(r => r.before)).toEqual([false, true]);
+    expect(d.rows.map(r => r.before)).toEqual([true, true]);
+  });
+  it('is a confirm card that says SMS goes to customers and is charged to the merchant, per event', async () => {
+    const a = t.args.parse({
+      events: [
+        { event: 'order_shipped', sms: true },
+        { event: 'back_in_stock', sms: true, push: true },
+      ],
+    });
+    const d = await t.preview!(ctx(), a);
+    expect(effectivePolicy(t, d).reasons).toContain('customer_message');
+    expect(effectivePolicy(t, d).policy).toBe('confirm');
+    const smsRows = d.rows.filter(r => /SMS/.test(r.label.en));
+    expect(smsRows).toHaveLength(2);
+    for (const r of smsRows) {
+      expect(r.label.en).toMatch(/your customer's phone, each message is charged to you/);
+      expect(r.label.ar).toMatch(/للعميل.*بتتحاسب عليك/);
+    }
+    expect(smsRows[1]!.label.en).toMatch(/consent/);
+    expect(smsRows[0]!.label.en).not.toMatch(/consent/);
+    expect(d.summary.en).toMatch(/SMS goes to your customers and each message is charged to you/);
+    expect(t.description).toMatch(/CUSTOMERS/);
+    expect(t.description).not.toMatch(/notify the merchant/);
+  });
+  it('only the dispatcher events are accepted', () => {
+    for (const ev of [
+      'order_confirmed',
+      'payment_success',
+      'order_shipped',
+      'order_delivered',
+      'order_cancelled',
+      'refund_processed',
+      'cart_abandoned_step1',
+      'cart_abandoned_step2',
+      'cart_abandoned_step3',
+      'back_in_stock',
+    ])
+      expect(t.args.safeParse({ events: [{ event: ev, sms: true }] }).success).toBe(true);
+    for (const ev of ['payment_failed', 'order_refunded'])
+      expect(t.args.safeParse({ events: [{ event: ev, sms: true }] }).success).toBe(false);
+  });
+  it('staff is refused at preview (no card) and at apply; mutation: the role gate', async () => {
+    const a = t.args.parse(args);
+    await expect(t.preview!(ctx('staff'), a)).rejects.toThrow(/FORBIDDEN/);
+    const d = await t.preview!(ctx(), a);
+    await expect(t.apply!(ctx('staff'), a, d)).rejects.toBeInstanceOf(ToolForbidden);
+  });
+  it('undo through the engine restores the previous switches', async () => {
+    const r = await applyThenUndo([t], t, args);
+    expect(r.applied).toBe('applied');
+    expect(r.undo).toBe('undone');
   });
 });

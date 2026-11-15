@@ -282,7 +282,7 @@ const setRule = change<RuleArgs>({
     },
     ['productId']
   ),
-  undo: 'reversible',
+  undo: 'compensating', // a created rule is undone by deleting it (another tool); an update is restored field by field
   // reorder-rules.routes.ts POST/PATCH /:storeId/stock/reorder-rules: authorize('store_admin', 'super_admin') + requireMfaEnrolled (the route also needs an MFA-enrolled owner; runAsMerchant cannot see MFA, see the report).
   gate: { roles: ['store_admin'] },
   audit: {
@@ -313,7 +313,11 @@ const setRule = change<RuleArgs>({
       ),
       affectedCount: 1,
       // an existing rule is restored field by field; a new one is deleted by the inverse (which needs the run result: the rule exists only after apply)
-      restore: rule ? Object.fromEntries(RULE_KEYS.map(k => [k, rule[k] ?? null])) : null,
+      restore: rule
+        ? Object.fromEntries(
+            RULE_KEYS.filter(k => rule[k] !== null && rule[k] !== undefined).map(k => [k, rule[k]])
+          )
+        : null, // a null column is left out: the schema forbids null, so the undo must not carry one
     };
   },
   run: async (ctx, a, state) => {

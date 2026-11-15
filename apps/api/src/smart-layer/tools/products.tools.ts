@@ -183,35 +183,46 @@ const updateFields = change<UpdateArgs>({
     const keys = touchedKeys(a);
     if (keys.length === 0)
       throw new Error('product_update_fields: nothing to change; send at least one field.');
-    updateProductSchema.parse(toChanges(a)); // the route's own validation: the same normalisation and limits
+    // the route's own validation AND normalisation (a name typed in Arabic moves to the Arabic field ...): the card shows what the service will receive
+    const norm = updateProductSchema.parse(toChanges(a)) as Obj;
+    const normKeys = Object.keys(norm).filter(k => k in EDIT);
     const restore: Obj = {};
-    for (const k of keys)
-      restore[k] = EDIT[k]!.money
-        ? fromPiasters(before[EDIT[k]!.col])
-        : (before[EDIT[k]!.col] ?? null);
+    for (const k of normKeys) {
+      const d = EDIT[k]!;
+      const was = before[d.col];
+      restore[k] = d.money
+        ? fromPiasters(was)
+        : was === null || was === undefined
+          ? d.field.js.type === 'boolean'
+            ? false // a column that cannot be null in the schema is never restored as null
+            : null
+          : was;
+    }
     // the name pair is resolved together by the service, so a restore of one restores both
     if ('name' in restore || 'nameAr' in restore) {
-      restore.name = before.name ?? null;
+      restore.name = before.name ?? '';
       restore.nameAr = before.nameAr ?? null;
     }
-    const rows: PreviewRow[] = keys.map(k =>
+    const rows: PreviewRow[] = normKeys.map(k =>
       row(
         EDIT[k]!.label[0],
         EDIT[k]!.label[1],
         showMoney(k, before[EDIT[k]!.col]),
-        EDIT[k]!.money ? a[k] : a[k]
+        showMoney(k, norm[k])
       )
     );
     const nm = String(before.name ?? '');
     return {
       summary: pair(
-        `هعدّل ${keys.length} حقل في المنتج «${nm}».`,
-        `Update ${keys.length} field(s) on "${nm}".`
+        `هعدّل ${normKeys.length} حقل في المنتج «${nm}».`,
+        `Update ${normKeys.length} field(s) on "${nm}".`
       ),
       rows,
       affectedCount: 1,
       restore,
-      ...(keys.includes('price') || keys.includes('compareAtPrice') ? { changesPrice: true } : {}),
+      ...(normKeys.includes('price') || normKeys.includes('compareAtPrice')
+        ? { changesPrice: true }
+        : {}),
     } satisfies Described;
   },
   run: (ctx, a) =>
@@ -679,7 +690,7 @@ const updateVariant = change<VarArgs>({
       price: v.price ?? null,
       compareAtPrice: v.compareAtPrice ?? null,
       sku: v.sku ?? null,
-      isActive: v.isActive ?? null,
+      isActive: v.isActive !== false, // a boolean: the undo must pass the tool's own (non-null) validation
     };
   },
   describe: (_ctx, a, state) => {
@@ -748,7 +759,7 @@ const createProduct = change<CreateArgs>({
     },
     ['price']
   ),
-  undo: 'reversible',
+  undo: 'compensating', // the inverse archives the product (a different tool), it does not delete it
   // product.routes.ts POST /: requirePermission('products:write'); the same ProductService.create (plan limit maxProducts inside).
   gate: { permission: 'products:write' },
   audit: { action: 'product.created', resourceType: 'product' },
