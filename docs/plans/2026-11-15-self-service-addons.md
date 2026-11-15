@@ -130,6 +130,10 @@ Ruling ADDON-SS-4 - InstaPay is IN, with manual super-admin approval per payment
 Ruling ADDON-SS-6 - InstaPay terms never renew, refund or poll the card gateway. Cost if wrong: a free extension or a wrong-gateway refund; closed by tests.
 Ruling ADDON-SS-5 - self-service refund is out of scope; refunds stay a super-admin money-out action. Cost if wrong: a merchant who bought by mistake files a request.
 
+## 10b. Model change (Ahmad 2026-11-15 ~21:20Z, binding)
+
+Business contains EVERY feature (separate branch feat/business-all-features changes the baselines; this work never edits `plan-baselines.ts` or feature tiers). Business is never shown a feature lock or purchase offer. Basic and Growth stores may buy ONE Business feature monthly without upgrading. Sellable set = (Business baseline) minus (the store's own plan baseline), COMPUTED in `packages/shared/src/addon-sellable.ts` (`addonFeatureKeys`, `canBuyFeatureOnPlan`), never hand-listed; Free picks a plan first; never sold: `whatsapp` (Ebda Chat plans) and `agent_checkout_open_writes`. The catalogue derives one sku per such feature (name/description from the registry), so the earlier 6-feature list is gone. AI top-ups stay for EVERY plan including Business, presented as "raise your AI quota" (monthly, ledger-backed, NEVER-stale expiry), with the usage-vs-quota meter. Gate copy on a lower plan: "Available on the {plan} plan - upgrade, or add just this feature for EGP X a month" (ar + en). WhatsApp is not sold here.
+
 ## 11. Decisions (Ahmad 2026-11-15)
 
 D1 Prices: HELD. Most add-on-tier features are to be FREE by default; proposed paid set = WhatsApp messages (usage), SMS (usage), AI credit packs (usage, base free), Remove branding; agent_checkout, agent_checkout_open_writes, merchant_mcp(\_write) hidden. Awaiting his approved list; `features.ts` tiers and the catalogue are not changed yet; the page reads whatever is sellable.
