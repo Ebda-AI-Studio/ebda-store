@@ -372,6 +372,16 @@ describe('A10 super-admin decision', () => {
     await send('store_admin', { token });
   };
 
+  it('a malformed queue row without requestedAt does not break the list and sorts first', async () => {
+    await pending();
+    m.settings.set('tax.change.22222222-2222-4222-8222-222222222222', { id: 'odd', precheck: {} });
+    const list = await request(app)
+      .get('/admin/tax-verification/change-requests')
+      .set('x-role', 'super_admin');
+    expect(list.status).toBe(200);
+    expect(list.body.data.requests[0].id).toBe('odd');
+  });
+
   it('store_admin cannot list, view the evidence of, or decide a change request', async () => {
     await pending();
     expect(

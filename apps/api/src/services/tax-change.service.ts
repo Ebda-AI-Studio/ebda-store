@@ -369,13 +369,19 @@ export async function listTaxChangesForReview(adminId: string) {
       take: 500,
     })
   );
-  return rows
-    .map(r => {
-      const rest: Partial<StoredChange> = { ...(r.value as unknown as StoredChange) };
-      delete rest.storageKey; // the private object key never leaves the server
-      return { storeId: r.key.slice(TAX_CHANGE_SETTING_PREFIX.length), ...rest };
-    })
-    .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+  return (
+    rows
+      .map(r => {
+        const rest: Omit<StoredChange, 'storageKey'> & { storageKey?: string } = {
+          ...(r.value as unknown as StoredChange),
+        };
+        delete rest.storageKey; // the private object key never leaves the server
+        return { storeId: r.key.slice(TAX_CHANGE_SETTING_PREFIX.length), ...rest };
+      })
+      // Oldest first. A malformed row without `requestedAt` (never written by requestTaxChange) sorts FIRST so a reviewer sees it
+      // instead of it throwing the whole queue.
+      .sort((a, b) => (a.requestedAt ?? '').localeCompare(b.requestedAt ?? ''))
+  );
 }
 
 export async function readTaxChangeEvidence(
