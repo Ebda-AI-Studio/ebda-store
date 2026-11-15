@@ -151,59 +151,79 @@ const ETA = {
   qrSvg: '<svg data-qr="1"></svg>',
 };
 
-describe('allocateLineVat (post-discount bases)', () => {
-  const sum = (o: Array<{ vatAmount: number }>) => o.reduce((n, x) => n + x.vatAmount, 0);
+describe('allocateLineVat (post-discount bases, order VAT is law)', () => {
+  const run = (...a: Parameters<typeof allocateLineVat>) => {
+    const r = allocateLineVat(...a);
+    const v = r.shares.map(x => x.vatAmount);
+    expect(v.every(n => n >= 0)).toBe(true);
+    expect(v.reduce((n, x) => n + x, 0)).toBe(a[2]);
+    return { v, fallback: r.fallback };
+  };
   const goods = (amount: number) => ({ kind: 'item' as const, amount });
   const ship = (amount: number) => ({ kind: 'shipping' as const, amount });
+  const cod = (amount: number) => ({ kind: 'cod_fee' as const, amount });
+  const extra = (amount: number) => ({ kind: 'extra' as const, amount });
 
-  it('product-only discount (tax-excluded): the discount lowers goods VAT, shipping VAT stays its own', () => {
-    // goods 10000 − 2000 discount = 8000, shipping 1000; VAT 14% of 9000 = 1260
-    const out = allocateLineVat([goods(10000), ship(1000)], 2000, 1260, 1400, false);
-    expect(out.map(o => o.vatAmount)).toEqual([1120, 140]);
-    expect(sum(out)).toBe(1260);
+  it('product-only discount: the discount lowers goods VAT, shipping VAT stays its own', () => {
+    expect(run([goods(10000), ship(1000)], 2000, 1260, 1400, false)).toEqual({
+      v: [1120, 140],
+      fallback: false,
+    });
   });
 
-  it('shipping-only (free) shipping has no discount to allocate: goods keep their full base', () => {
-    // free shipping is stored as shipping 0, so only goods carry VAT
-    const out = allocateLineVat([goods(10000), ship(0)], 0, 1400, 1400, false);
-    expect(out.map(o => o.vatAmount)).toEqual([1400, 0]);
+  it('free shipping (stored as 0) has no VAT and no discount to allocate', () => {
+    expect(run([goods(10000), ship(0)], 0, 1400, 1400, false).v).toEqual([1400, 0]);
   });
 
-  it('mixed: discount shared across goods lines by amount, fee lines untouched, sums exactly', () => {
-    // goods 6000 + 4000, discount 1000 → 5400 + 3600; shipping 500; base 9500 → VAT 1330
-    const out = allocateLineVat([goods(6000), goods(4000), ship(500)], 1000, 1330, 1400, false);
-    expect(out.map(o => o.vatAmount)).toEqual([756, 504, 70]);
-    expect(sum(out)).toBe(1330);
+  it('mixed discount across goods lines, fee lines untouched', () => {
+    expect(run([goods(6000), goods(4000), ship(500)], 1000, 1330, 1400, false).v).toEqual([
+      756, 504, 70,
+    ]);
   });
 
-  it('tax-included: VAT is the inside-price share of each post-discount base', () => {
-    // goods 11400 incl. VAT − 1140 discount = 10260 → VAT 1260; shipping 1140 → 140; order VAT 1400
-    const out = allocateLineVat([goods(11400), ship(1140)], 1140, 1400, 1400, true);
-    expect(out.map(o => o.vatAmount)).toEqual([1260, 140]);
-    expect(sum(out)).toBe(1400);
+  it('tax-included: inside-price share of each post-discount base', () => {
+    expect(run([goods(11400), ship(1140)], 1140, 1400, 1400, true).v).toEqual([1260, 140]);
   });
 
-  it('rounding remainder lands on the last non-zero line and the total never moves', () => {
-    const out = allocateLineVat(
-      [goods(3333), goods(3333), goods(3334), ship(0)],
-      0,
-      1400,
-      1400,
-      false
-    );
-    expect(sum(out)).toBe(1400);
-    expect(out[3].vatAmount).toBe(0);
+  it('an EXTRA charge carries 0 VAT (it is outside the order VAT base) and nothing shifts onto other lines', () => {
+    // goods 10000, ship 500, cod 500, extra 3000; order VAT on 11000 = 1540
+    const r = run([goods(10000), ship(500), cod(500), extra(3000)], 0, 1540, 1400, false);
+    expect(r.v).toEqual([1400, 70, 70, 0]);
+    expect(r.fallback).toBe(false);
+  });
+
+  it('fees OUTSIDE the order VAT (legacy: goods-only base) fall back to a proportional, non-negative split', () => {
+    // order VAT only on goods 10000 = 1400, but shipping 500 + cod 500 are billed too
+    const r = run([goods(10000), ship(500), cod(500)], 0, 1400, 1400, false);
+    expect(r.fallback).toBe(true);
+    expect(r.v).toEqual([1273, 63, 64]);
+  });
+
+  it('legacy order without a stored taxable amount (VAT lower than line figures) never goes negative', () => {
+    const r = run([goods(10000), extra(2000), ship(500)], 0, 1000, 1400, false);
+    expect(r.fallback).toBe(true);
+    expect(Math.min(...r.v)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('rounding remainder lands on the last taxed line within tolerance', () => {
+    const r = run([goods(3333), goods(3333), goods(3334), ship(0)], 0, 1400, 1400, false);
+    expect(r.fallback).toBe(false);
+    expect(r.v[3]).toBe(0);
   });
 
   it('a discount larger than a line cannot push its base below zero', () => {
-    const out = allocateLineVat([goods(100), goods(9000)], 9100, 0, 1400, false);
-    expect(sum(out)).toBe(0);
+    expect(run([goods(100), goods(9000)], 9100, 0, 1400, false).v).toEqual([0, 0]);
   });
 
-  it('is all zero without VAT', () => {
-    expect(allocateLineVat([goods(100)], 0, 0, null, false)).toEqual([
-      { vatRateBps: null, vatAmount: 0 },
-    ]);
+  it('only an extra line with VAT stored still sums to the order VAT, non-negative', () => {
+    run([extra(500)], 0, 70, 1400, false);
+  });
+
+  it('no VAT: all zero, no fallback', () => {
+    expect(allocateLineVat([goods(100)], 0, 0, null, false)).toEqual({
+      shares: [{ vatRateBps: null, vatAmount: 0 }],
+      fallback: false,
+    });
   });
 });
 

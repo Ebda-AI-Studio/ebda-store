@@ -282,15 +282,21 @@ export function documentBalance(input: {
 function withLineTax(
   lines: FiscalLine[],
   tax_: { discount: number; vat: number; vatRateBps: number | null; taxIncludedInPrice: boolean },
-  etaItemCode: string | null
+  etaItemCode: string | null,
+  ids: { storeId: string; orderId: string }
 ): FiscalLine[] {
-  const tax = allocateLineVat(
+  const { shares: tax, fallback } = allocateLineVat(
     lines,
     tax_.discount,
     tax_.vat,
     tax_.vatRateBps,
     tax_.taxIncludedInPrice
   );
+  if (fallback)
+    logger.warn(
+      { storeId: ids.storeId, orderId: ids.orderId },
+      '[FISCAL] line VAT split fell back to proportional (line figures disagree with the order VAT)'
+    );
   return lines.map((l, i) => ({
     ...l,
     vatRateBps: tax[i].vatRateBps,
@@ -406,7 +412,8 @@ export class FiscalDocumentService {
         vatRateBps: order.taxRateBps,
         taxIncludedInPrice: order.taxIncludedInPrice,
       },
-      eta?.defaultItemCode ?? null
+      eta?.defaultItemCode ?? null,
+      { storeId, orderId }
     );
     const off = documentBalance({
       lines,
