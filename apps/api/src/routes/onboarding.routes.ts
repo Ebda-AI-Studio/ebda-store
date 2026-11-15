@@ -86,6 +86,7 @@ router.post(
           input.evidence,
         ].filter(l => l !== ''),
         replyTo: user.email,
+        ref: { requestId: row.id, kind: 'slug_claim' },
       });
       res.status(201).json({ success: true, data: { id: row.id } });
     } catch (error) {
@@ -120,6 +121,7 @@ router.post(
           input.message,
         ].filter(l => l !== ''),
         replyTo: user.email,
+        ref: { requestId: row.id, kind: 'store_cap' },
       });
       res.status(201).json({ success: true, data: { id: row.id } });
     } catch (error) {

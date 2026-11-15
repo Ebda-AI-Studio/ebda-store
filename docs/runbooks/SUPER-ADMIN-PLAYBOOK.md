@@ -96,7 +96,9 @@ Suspension is for missed renewals + AUP violations. **The decision is super-admi
 
 ## Appeals
 
-A merchant of a suspended store sees the reason in a banner and can send ONE appeal (`POST /stores/:storeId/suspension/appeal`, 1000 characters). It reaches the support inbox by email and is stored (`kind = suspension_appeal`, `status = open`). A billing suspension (`billingSuspendedReason` set) cannot be appealed: the banner tells them to settle the invoice. You decide: reply to the merchant by email, then reactivate (below) to accept. Rejecting is a reply by email; the appeal stays `open` so the merchant cannot file a second one, so mark it `rejected` in `trust_requests` once you have replied.
+A merchant of a suspended store sees the reason in a banner and can send ONE appeal (`POST /stores/:storeId/suspension/appeal`, 1000 characters). It reaches the support inbox by email and is stored (`kind = suspension_appeal`, `status = open`). A billing suspension (`billingSuspendedReason` set) cannot be appealed: the banner tells them to settle the invoice. You decide: reply to the merchant by email, then reactivate (below) to accept. Rejecting is a reply by email; the appeal stays `open` so the merchant cannot file a second one, so mark it `rejected` in `trust_requests` once you have replied, and set `updated_at = now()` in the same statement: the merchant can send a new appeal 24 hours after that time (a rejected appeal cannot be re-filed sooner, API answer `APPEAL_COOLDOWN`).
+
+Staff notices (support request, appeal, address claim, store-limit request): the full text and the merchant's e-mail reach you ONLY in the support inbox e-mail. The alert channel gets an `info` notice with ids only (store id, request id, kind, topic), never the message. A merchant can have at most 3 address claims open at once, and 5 support requests a day per store.
 
 ## How to reactivate
 

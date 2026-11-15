@@ -21,9 +21,23 @@ import { emailQueue } from './email-queue.service';
 
 /** Support requests per store per rolling 24 h. */
 const SUPPORT_REQUESTS_PER_DAY = 5;
+/** A rejected appeal cannot be re-filed for this long (staff replied; no hammering). */
+const APPEAL_COOLDOWN_MS = 24 * 3600_000;
+/** Open protected-address claims one user may hold at once. */
+const MAX_OPEN_SLUG_CLAIMS = 3;
+
+/**
+ * Transaction-scoped advisory lock: serialises count-then-insert per key (same pattern as return.service
+ * lockOrderReturns). Released when the request transaction ends; a no-op outside one.
+ */
+async function lockKey(db: TrustDb, key: string): Promise<void> {
+  await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+}
 
 /** The slice of the Prisma client these functions use (the tenant tx, `prisma`, or `withUser`'s tx). */
 export interface TrustDb {
+  /** Tagged-template raw exec (the tenant tx / `prisma`); used only for the transaction-scoped advisory lock. */
+  $executeRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>;
   trustRequest: {
     create(args: { data: Record<string, unknown> }): Promise<TrustRow>;
     findFirst(args: Record<string, unknown>): Promise<TrustRow | null>;
@@ -59,12 +73,18 @@ function esc(s: string): string {
   return s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 }
 
-/** Email the support inbox + P1 alert. Called AFTER the request transaction committed. */
+/**
+ * Email the support inbox + an info alert. Called AFTER the request transaction committed.
+ * The FULL text (merchant e-mail, free-text message: may hold customer names/phones) goes ONLY in the e-mail.
+ * The alert is routine and non-paging (level info) and carries ids + kind/topic only (Telegram/brain mirror = no PII).
+ */
 export async function notifyStaff(args: {
   subject: string;
   lines: string[];
   replyTo?: string;
   storeId?: string;
+  /** Ids-only alert payload: request id, kind (support, suspension_appeal, slug_claim, store_cap), topic if any. */
+  ref: { requestId: string; kind: string; topic?: string };
 }): Promise<{ emailQueued: boolean }> {
   let emailQueued = false;
   try {
@@ -80,12 +100,19 @@ export async function notifyStaff(args: {
     logger.error({ err, subject: args.subject }, '[TRUST] could not queue the staff email');
   }
   void sendAlert({
-    level: 'p1',
+    level: 'info',
     scope: args.storeId ? 'store' : 'platform',
     ...(args.storeId ? { store: { id: args.storeId, name: args.storeId } } : {}),
     source: 'trust-requests',
-    title: args.subject,
-    body: args.lines.join('\n'),
+    title: `Trust request: ${args.ref.kind}`,
+    body: [
+      args.storeId ? `store=${args.storeId}` : '',
+      `request=${args.ref.requestId}`,
+      `kind=${args.ref.kind}`,
+      args.ref.topic ? `topic=${args.ref.topic}` : '',
+    ]
+      .filter(l => l !== '')
+      .join('\n'),
   } as Parameters<typeof sendAlert>[0]).catch(() => undefined);
   return { emailQueued };
 }
@@ -100,6 +127,8 @@ export async function createSupportRequest(
   who: Requester,
   input: { topic: SupportTopic; message: string; pageUrl?: string }
 ): Promise<TrustRow> {
+  // the lock makes count+insert atomic: a burst of N parallel requests cannot all read "4 so far"
+  await lockKey(db, `trust-support:${storeId}`);
   const since = new Date(Date.now() - 24 * 3600_000);
   const today = await db.trustRequest.count({
     where: { storeId, kind: 'support', createdAt: { gte: since } },
@@ -214,6 +243,20 @@ export async function fileAppeal(
   });
   if (open)
     throw new AppError(409, 'APPEAL_ALREADY_OPEN', 'You already have an appeal under review');
+  const rejected = await db.trustRequest.findFirst({
+    where: {
+      storeId,
+      kind: 'suspension_appeal',
+      status: 'rejected',
+      updatedAt: { gte: new Date(Date.now() - APPEAL_COOLDOWN_MS) },
+    },
+  });
+  if (rejected)
+    throw new AppError(
+      429,
+      'APPEAL_COOLDOWN',
+      'Your last appeal was declined. You can send another one in 24 hours.'
+    );
   try {
     // the partial UNIQUE (one open appeal per store) settles a double click that passes the check above
     return await withSavepoint(() =>
@@ -245,10 +288,21 @@ export async function fileSlugClaim(
   if (check.code !== 'SLUG_PROTECTED') {
     throw new AppError(400, check.code, check.message);
   }
+  // one lock per user: the per-slug duplicate check and the per-user cap below stay consistent under a burst
+  await lockKey(db, `trust-slug-claim:${who.userId}`);
   const open = await db.trustRequest.findFirst({
     where: { userId: who.userId, kind: 'slug_claim', slug, status: 'open' },
   });
   if (open) throw new AppError(409, 'CLAIM_ALREADY_OPEN', 'You already claimed this address');
+  const openClaims = await db.trustRequest.count({
+    where: { userId: who.userId, kind: 'slug_claim', status: 'open' },
+  });
+  if (openClaims >= MAX_OPEN_SLUG_CLAIMS)
+    throw new AppError(
+      429,
+      'TOO_MANY_OPEN_CLAIMS',
+      `You can have ${MAX_OPEN_SLUG_CLAIMS} address claims under review at once. Wait for a decision first.`
+    );
   try {
     return await withSavepoint(() =>
       db.trustRequest.create({

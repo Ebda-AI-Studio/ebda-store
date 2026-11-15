@@ -83,6 +83,7 @@ router.post(
           ].filter(l => l !== ''),
           replyTo: user.email,
           storeId,
+          ref: { requestId: row.id, kind: 'support', topic: input.topic },
         });
       });
       // Activation signal (Ruling ACT-1): the merchant asked for help. Ids only, never the message; advisory.
@@ -137,6 +138,7 @@ router.post(
           ),
           replyTo: user.email,
           storeId,
+          ref: { requestId: row.id, kind: 'suspension_appeal' },
         });
       });
       res.status(201).json({ success: true, data: { id: row.id } });

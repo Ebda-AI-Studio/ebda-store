@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
+import { SUPPORT_TOPICS } from '@ebda/shared';
 
 type Row = Record<string, any>;
 const m = vi.hoisted(() => ({
@@ -15,6 +16,8 @@ const m = vi.hoisted(() => ({
   help: vi.fn(),
   audit: vi.fn(),
   seq: 0,
+  alert: vi.fn(),
+  calls: [] as string[],
 }));
 
 const matches = (r: Row, where: Row = {}): boolean =>
@@ -49,7 +52,10 @@ const trustRequest = {
     const hit = m.rows.filter(r => matches(r, where));
     return (orderBy ? [...hit].reverse() : hit)[0] ?? null;
   },
-  count: async ({ where }: { where?: Row }) => m.rows.filter(r => matches(r, where)).length,
+  count: async ({ where }: { where?: Row }) => (
+    m.calls.push('count'),
+    m.rows.filter(r => matches(r, where)).length
+  ),
   updateMany: async ({ where, data }: { where?: Row; data: Row }) => {
     const hit = m.rows.filter(r => matches(r, where));
     hit.forEach(r => Object.assign(r, data));
@@ -57,6 +63,7 @@ const trustRequest = {
   },
 };
 const fakePrisma = {
+  $executeRaw: async () => (m.calls.push('lock'), 0),
   trustRequest,
   store: { findUnique: async () => m.store },
 };
@@ -108,7 +115,7 @@ vi.mock('@api/lib/after-tenant-commit', () => ({
 }));
 vi.mock('@api/services/email-queue.service', () => ({ emailQueue: { enqueue: m.enqueue } }));
 vi.mock('@api/lib/ci/emit', () => ({ sendOnboardingHelpToCi: m.help }));
-vi.mock('@api/services/alerts.service', () => ({ sendAlert: async () => undefined }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: m.alert }));
 
 let app: Express;
 beforeAll(async () => {
@@ -124,6 +131,8 @@ beforeAll(async () => {
 beforeEach(() => {
   m.rows.length = 0;
   m.seq = 0;
+  m.calls.length = 0;
+  m.alert.mockReset().mockResolvedValue(undefined);
   m.store = { status: 'suspended', billingSuspendedReason: null };
   m.enqueue.mockReset().mockResolvedValue(undefined);
   m.audit.mockReset().mockResolvedValue(undefined);
@@ -353,5 +362,100 @@ describe('staff side of A13 (the decision stays with the super admin)', () => {
     const merchant = fs.readFileSync('apps/api/src/routes/support.routes.ts', 'utf8');
     expect(merchant).not.toContain('closeAppealsOnReactivation');
     expect(merchant).not.toMatch(/status:\s*'resolved'/);
+  });
+});
+
+describe('review fixes: alert carries ids only, cooldown, atomic cap, claim cap', () => {
+  const seedReason = () =>
+    m.rows.push({
+      kind: 'suspension',
+      storeId: 'store-a',
+      message: 'policy',
+      createdAt: new Date(),
+    });
+  const secret = 'call Mona on 01012345678';
+
+  it('support request: full text only in the e-mail; alert is info with ids + topic only', async () => {
+    const res = await request(app)
+      .post('/stores/store-a/support-requests')
+      .send({ topic: SUPPORT_TOPICS[0], message: secret });
+    expect(res.status).toBe(201);
+    expect(m.enqueue.mock.calls[0][1].text).toContain(secret);
+    expect(m.alert).toHaveBeenCalledTimes(1);
+    const a = m.alert.mock.calls[0][0];
+    expect(a.level).toBe('info');
+    expect(JSON.stringify(a)).not.toContain(secret);
+    expect(JSON.stringify(a)).not.toContain('owner@example.com');
+    expect(a.body).toContain(`request=${res.body.data.id}`);
+    expect(a.body).toContain(`topic=${SUPPORT_TOPICS[0]}`);
+    expect(a.body).toContain('store=store-a');
+  });
+
+  it('appeal, slug claim and store-cap alerts are info and carry no message or e-mail', async () => {
+    seedReason();
+    await request(app).post('/stores/store-a/suspension/appeal').send({ message: secret });
+    await request(app).post('/onboarding/slug-claims').send({ slug: 'google', evidence: secret });
+    await request(app).post('/onboarding/store-cap-requests').send({ message: secret });
+    expect(m.alert).toHaveBeenCalledTimes(3);
+    for (const [a] of m.alert.mock.calls) {
+      expect(a.level).toBe('info');
+      expect(JSON.stringify(a)).not.toContain(secret);
+      expect(JSON.stringify(a)).not.toContain('owner@example.com');
+    }
+  });
+
+  it('a rejected appeal cannot be re-filed for 24 h, then can', async () => {
+    seedReason();
+    m.rows.push({
+      id: 'old',
+      kind: 'suspension_appeal',
+      storeId: 'store-a',
+      status: 'rejected',
+      createdAt: new Date(Date.now() - 72 * 3600_000),
+      updatedAt: new Date(Date.now() - 3600_000),
+    });
+    const blocked = await request(app)
+      .post('/stores/store-a/suspension/appeal')
+      .send({ message: 'please reconsider' });
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error.code).toBe('APPEAL_COOLDOWN');
+    expect(m.rows.filter(r => r.kind === 'suspension_appeal')).toHaveLength(1);
+    m.rows[m.rows.length - 1].updatedAt = new Date(Date.now() - 25 * 3600_000);
+    expect(
+      (await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'again' }))
+        .status
+    ).toBe(201);
+  });
+
+  it('support cap: the advisory lock is taken before the count (count+insert is serialised)', async () => {
+    await request(app)
+      .post('/stores/store-a/support-requests')
+      .send({ topic: SUPPORT_TOPICS[0], message: 'hi' });
+    expect(m.calls.slice(0, 2)).toEqual(['lock', 'count']);
+  });
+
+  it('slug claims: at most 3 open per user, a 4th is 429; another user is unaffected', async () => {
+    for (const slug of ['google', 'apple', 'amazon'])
+      expect(
+        (
+          await request(app)
+            .post('/onboarding/slug-claims')
+            .send({ slug, evidence: 'We own this brand, registration attached.' })
+        ).status
+      ).toBe(201);
+    const fourth = await request(app)
+      .post('/onboarding/slug-claims')
+      .send({ slug: 'facebook', evidence: 'We own this brand, registration attached.' });
+    expect(fourth.status).toBe(429);
+    expect(fourth.body.error.code).toBe('TOO_MANY_OPEN_CLAIMS');
+    expect(m.rows.filter(r => r.kind === 'slug_claim')).toHaveLength(3);
+    expect(
+      (
+        await request(app)
+          .post('/onboarding/slug-claims')
+          .set('x-user', 'u2')
+          .send({ slug: 'facebook', evidence: 'We own this brand, registration attached.' })
+      ).status
+    ).toBe(201);
   });
 });
