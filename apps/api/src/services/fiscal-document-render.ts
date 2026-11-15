@@ -291,7 +291,7 @@ export function renderFiscalDocumentHtml(
           }</td>
             <td class="n">${esc(ln.quantity)}</td>
             <td class="n">${ln.unitPrice == null ? '—' : `${ln.listPrice != null ? `<s style="opacity:.6">${money(ln.listPrice)}</s> ` : ''}${money(ln.unitPrice)}`}</td>
-            <td class="n">${v2 ? esc(pct(ln.vatRateBps)) : na}</td>
+            <td class="n">${v2 && ln.vatAmount != null ? esc(pct(ln.vatRateBps)) : na}</td>
             <td class="n">${v2 && ln.vatAmount != null ? money(ln.vatAmount) : na}</td>
             <td class="n">${money(ln.amount)}</td></tr>`;
         })

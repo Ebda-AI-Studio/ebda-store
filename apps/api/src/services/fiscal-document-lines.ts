@@ -15,14 +15,23 @@ import type { FiscalLine } from './fiscal-document.service';
  * stored taxable amount), or any drift — the order's VAT is split proportionally to the bases with the
  * largest-remainder rule instead: never negative, always summing to the order VAT, `fallback: true` so the
  * caller can log the order id.
+ *
+ * A breach of the invariant (a negative line, lines not summing to the order VAT, or VAT > 0 with every base 0)
+ * must NEVER abort the order or refund that is issuing the document: `shares` is then null and the caller
+ * issues the document WITHOUT per-line VAT (the viewer prints "not recorded at issue"). `strict` (tests only)
+ * throws instead.
  */
 export function allocateLineVat(
   lines: Array<Pick<FiscalLine, 'amount' | 'kind'>>,
   discount: number,
   vat: number,
   vatRateBps: number | null,
-  taxIncludedInPrice: boolean
-): { shares: Array<{ vatRateBps: number | null; vatAmount: number }>; fallback: boolean } {
+  taxIncludedInPrice: boolean,
+  strict = false
+): {
+  shares: Array<{ vatRateBps: number | null; vatAmount: number }> | null;
+  fallback: boolean;
+} {
   const amounts = new Array<number>(lines.length).fill(0);
   const shares = lines.map(() => ({ vatRateBps, vatAmount: 0 }));
   if (vat <= 0) return { shares, fallback: false };
@@ -63,8 +72,9 @@ export function allocateLineVat(
     // Largest-remainder split of the order VAT over the bases (all of it on the last line when nothing has a base).
     const weight = base.reduce((n, b) => n + b, 0);
     if (weight <= 0) {
-      const target = lines.reduce((acc, l, i) => (l.kind === 'extra' ? acc : i), -1);
-      amounts[target >= 0 ? target : lines.length - 1] = vat;
+      // VAT with nothing to carry it: no honest per-line split exists.
+      if (strict) throw new Error('line VAT allocation broke its invariant');
+      return { shares: null, fallback: true };
     } else {
       const floors = base.map(b => Math.floor((vat * b) / weight));
       let left = vat - floors.reduce((n, v) => n + v, 0);
@@ -79,7 +89,9 @@ export function allocateLineVat(
 
   amounts.forEach((v, i) => (shares[i].vatAmount = v));
   // Invariant of an issued, immutable document: no negative line, lines sum to the order VAT.
-  if (amounts.some(v => v < 0) || amounts.reduce((n, v) => n + v, 0) !== vat)
-    throw new Error('line VAT allocation broke its invariant');
+  if (amounts.some(v => v < 0) || amounts.reduce((n, v) => n + v, 0) !== vat) {
+    if (strict) throw new Error('line VAT allocation broke its invariant');
+    return { shares: null, fallback: true };
+  }
   return { shares, fallback };
 }

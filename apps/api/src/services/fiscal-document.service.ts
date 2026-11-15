@@ -4,6 +4,7 @@ import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { sendAlert } from './alerts.service';
 import { storeDb } from '../lib/repo-factory';
 import { allocateLineVat } from './fiscal-document-lines';
 import { listFiscalDocuments, type FiscalListFilters } from './fiscal-document-list';
@@ -292,15 +293,28 @@ function withLineTax(
     tax_.vatRateBps,
     tax_.taxIncludedInPrice
   );
-  if (fallback)
+  if (!tax) {
+    // Never abort the order / refund that is issuing this document: ids only in the log, a p1 alert, and the
+    // document is issued WITHOUT per-line VAT (the viewer prints "not recorded at issue").
+    logger.error(
+      { storeId: ids.storeId, orderId: ids.orderId },
+      '[FISCAL] line VAT invariant breached - issuing the document without per-line VAT'
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'fiscal.line_vat_breach',
+      title: 'Fiscal document issued without per-line VAT',
+      body: `store ${ids.storeId} order ${ids.orderId}: line VAT split broke its invariant`,
+    }).catch(() => undefined);
+  } else if (fallback)
     logger.warn(
       { storeId: ids.storeId, orderId: ids.orderId },
       '[FISCAL] line VAT split fell back to proportional (line figures disagree with the order VAT)'
     );
   return lines.map((l, i) => ({
     ...l,
-    vatRateBps: tax[i].vatRateBps,
-    vatAmount: tax[i].vatAmount,
+    ...(tax ? { vatRateBps: tax[i].vatRateBps, vatAmount: tax[i].vatAmount } : {}),
     internalCode: l.sku ?? null,
     etaItemType:
       etaItemCode && (l.kind === 'item' || l.kind === 'bundle') ? ('EGS' as const) : null,

@@ -19,7 +19,7 @@ const h = vi.hoisted(() => {
     storeTaxProfile: { findFirst: vi.fn() },
     etaConnection: { findFirst: vi.fn() },
   };
-  return { db, eta: vi.fn() };
+  return { db, eta: vi.fn(), alert: vi.fn(async () => 'sent') };
 });
 
 vi.mock('@api/middleware/auth', () => ({
@@ -51,6 +51,7 @@ vi.mock('@ebda/database', () => ({
   prisma: {},
   withUser: (_u: string, fn: () => unknown) => fn(),
 }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.alert }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -154,7 +155,7 @@ const ETA = {
 describe('allocateLineVat (post-discount bases, order VAT is law)', () => {
   const run = (...a: Parameters<typeof allocateLineVat>) => {
     const r = allocateLineVat(...a);
-    const v = r.shares.map(x => x.vatAmount);
+    const v = r.shares!.map(x => x.vatAmount);
     expect(v.every(n => n >= 0)).toBe(true);
     expect(v.reduce((n, x) => n + x, 0)).toBe(a[2]);
     return { v, fallback: r.fallback };
@@ -215,8 +216,10 @@ describe('allocateLineVat (post-discount bases, order VAT is law)', () => {
     expect(run([goods(100), goods(9000)], 9100, 0, 1400, false).v).toEqual([0, 0]);
   });
 
-  it('only an extra line with VAT stored still sums to the order VAT, non-negative', () => {
-    run([extra(500)], 0, 70, 1400, false);
+  it('VAT > 0 with every base 0 is a breach: no per-line split (never [0, 10]); strict mode throws', () => {
+    const lines = [extra(500), goods(0)];
+    expect(allocateLineVat(lines, 0, 70, 1400, false)).toEqual({ shares: null, fallback: true });
+    expect(() => allocateLineVat(lines, 0, 70, 1400, false, true)).toThrow(/invariant/);
   });
 
   it('no VAT: all zero, no fallback', () => {
@@ -646,5 +649,65 @@ describe('issuing a v2 sale document', () => {
       vatRateBps: 1400,
     });
     expect(p.lines[1].etaItemCode).toBeNull(); // shipping line has no item code
+  });
+});
+
+describe('issuing when the line VAT split cannot be honest', () => {
+  it('still issues the document, without per-line VAT, and raises a p1 alert (ids only)', async () => {
+    const { FiscalDocumentService } = await import('@api/services/fiscal-document.service');
+    const order = {
+      id: ORDER,
+      orderNumber: 'ORD-6',
+      createdAt: new Date('2026-11-01T00:00:00Z'),
+      currency: 'EGP',
+      sellerTaxRegistrationNumber: '123456789',
+      sellerTaxLegalName: 'Pecan Bee LLC',
+      subtotal: 0,
+      discount: 0,
+      couponDiscount: 0,
+      couponCode: null,
+      promotionDiscount: 0,
+      loyaltyDiscount: 0,
+      loyaltyPointsRedeemed: null,
+      shipping: 0,
+      codFee: 0,
+      extraAmount: 500,
+      extraAmountNote: null,
+      appliedPromotion: null,
+      tax: 70,
+      taxRateBps: 1400,
+      taxIncludedInPrice: false,
+      taxableAmount: 500,
+      total: 570,
+      paymentStatus: 'unpaid',
+      shippingAddress: {},
+      billingAddress: null,
+      payments: [{ provider: 'cod', method: null }],
+      items: [],
+    };
+    let created: any;
+    const tx: any = {
+      fiscalDocument: { findFirst: async () => null, create: async (a: any) => (created = a.data) },
+      order: { findFirst: async () => order },
+      store: { findUnique: async () => ({ name: 'S', address: null, phone: null, email: null }) },
+      $queryRaw: async () => [{ last_serial: 1 }],
+    };
+    h.db.etaConnection.findFirst.mockResolvedValue(null);
+    h.alert.mockClear();
+    await expect(FiscalDocumentService.issueSaleDocument(tx, STORE, ORDER)).resolves.toBeDefined();
+    expect(created.payload.version).toBe(2);
+    for (const l of created.payload.lines) {
+      expect(l.vatAmount).toBeUndefined();
+      expect(l.vatRateBps).toBeUndefined();
+    }
+    expect(created.vatAmount).toBe(70); // the document's own VAT is untouched
+    expect(h.alert).toHaveBeenCalledTimes(1);
+    const a: any = h.alert.mock.calls[0][0];
+    expect(a.level).toBe('p1');
+    expect(a.body).toContain(ORDER);
+    expect(a.body).not.toContain('Pecan');
+    // and the viewer degrades to "not recorded at issue" for the per-line columns
+    const html = renderFiscalDocumentHtml(doc(created.payload) as any, 'en');
+    expect(html).toContain('data-not-recorded');
   });
 });
