@@ -305,6 +305,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'إرسال رسائل قصيرة للمعاملات (تأكيد الطلب، الشحن، التسليم، الإلغاء، الاسترداد) عبر Unifonic. العملاء الذين يوافقون على استقبال الرسائل عند الدفع يتلقون أيضاً رسائل ترويجية (تذكير بالسلة، إشعار توفر المنتج).',
     category: 'marketing',
     tier: 'addon',
+    // Ahmad 2026-11-15: everything messaging is on Ebda Chat; Unifonic was inherited from the Force AI codebase and was never
+    // chosen for Ebda. Hidden = no plan, gate or marketing copy offers it. The send path and stored credentials are untouched.
+    hidden: true,
   },
   push_notifications: {
     key: 'push_notifications',

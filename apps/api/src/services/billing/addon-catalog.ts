@@ -1,7 +1,7 @@
 /**
  * What a merchant can buy outside the plan (SELF-SERVICE A8 + A9). One catalog, integer piastres.
  *
- * Ruling ADDON-1 - prices are placeholders pending Ahmad's number: EGP 99 per add-on per 30 days, AI packs EGP 49 / 149.
+ * Ruling ADDON-1 - feature prices are the list Ahmad approved 2026-11-15 (`addon-prices.ts` in @ebda/shared); a feature without an approved price, and the AI packs (EGP 49 / 149), stay placeholders until he approves them.
  * Change them HERE only (the preview, the ledger row and the screen all read this file). Cost if wrong: a merchant is
  * quoted and charged the wrong amount; the quote is shown and confirmed before any charge, so the damage is bounded
  * to one wrong-price purchase that can be refunded from the ledger.
@@ -11,7 +11,12 @@
  * the D1 split, erasure and tenant-guard snapshots. The prefix keeps every plan reader safe: `plans` has no such code,
  * so each of them fails closed on it.
  */
-import { FEATURE_REGISTRY, addonFeatureKeys, type FeatureKey } from '@ebda/shared';
+import {
+  FEATURE_REGISTRY,
+  addonFeatureKeys,
+  addonFeaturePriceMinor,
+  type FeatureKey,
+} from '@ebda/shared';
 
 export const ADDON_TERM_DAYS = 30;
 export const ADDON_PLAN_PREFIX = 'addon:';
@@ -37,11 +42,10 @@ export interface AddonItem {
   previewImage?: string;
 }
 
-const FEATURE_PRICE_MINOR = 9900;
 /**
  * One add-on per feature Business holds (`addonFeatureKeys`, computed from the plan baselines, never hand-listed). Name and
  * description come from the feature registry (en + ar). Whether a given STORE may buy it is decided per store at quote time
- * (`canBuyFeatureOnPlan`). The flat placeholder price is replaced per feature once Ahmad approves a price list.
+ * (`canBuyFeatureOnPlan`). Prices come from `addon-prices.ts` (approved list; a not-yet-priced feature keeps the placeholder).
  */
 const featureItems = (): AddonItem[] =>
   addonFeatureKeys().map(key => {
@@ -50,7 +54,7 @@ const featureItems = (): AddonItem[] =>
       sku: `feature:${key}`,
       kind: 'feature' as const,
       featureKey: key,
-      priceMinor: FEATURE_PRICE_MINOR,
+      priceMinor: addonFeaturePriceMinor(key),
       nameEn: def.name,
       nameAr: def.nameAr,
       descEn: def.description,

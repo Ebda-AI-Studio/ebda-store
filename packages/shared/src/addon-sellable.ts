@@ -17,10 +17,10 @@ const TOP_PLAN: StorePlan = 'enterprise';
 const BUYER_PLANS: readonly StorePlan[] = ['starter', 'professional'];
 
 /**
- * Never sold as a monthly feature: `whatsapp` is the Ebda Chat product (its own plans, own repo); the agent-checkout
- * open-writes switch is a security escape hatch only a super admin may flip.
+ * Never sold as a monthly feature: `whatsapp` and `sms` are messaging, which lives in the Ebda Chat product (its own plans,
+ * own repo; Ahmad 2026-11-15); the agent-checkout open-writes switch is a security escape hatch only a super admin may flip.
  */
-const NEVER_SOLD: ReadonlySet<string> = new Set(['whatsapp', 'agent_checkout_open_writes']);
+const NEVER_SOLD: ReadonlySet<string> = new Set(['whatsapp', 'sms', 'agent_checkout_open_writes']);
 
 /** Every feature Business holds that is a real, visible, sellable product (the catalogue of possible add-ons). */
 export function addonFeatureKeys(): FeatureKey[] {

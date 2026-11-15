@@ -55,3 +55,37 @@ describe('computed sellable set', () => {
     expect(addonSkuForFeature('agent_checkout_open_writes')).toBeNull();
   });
 });
+
+describe('approved prices and messaging', () => {
+  it('sms and whatsapp are never sold, and sms is hidden from every plan, gate and marketing surface', () => {
+    expect(sold).not.toContain('sms');
+    expect(sold).not.toContain('whatsapp');
+    expect(addonSkuForFeature('sms')).toBeNull();
+    for (const plan of ['starter', 'professional', 'enterprise', 'free']) {
+      expect(canBuyFeatureOnPlan(plan, 'sms')).toBe(false);
+    }
+    expect(FEATURE_REGISTRY.sms.hidden).toBe(true);
+    expect(Object.values(ADDON_CATALOG).some(i => i.featureKey === 'sms')).toBe(false);
+  });
+
+  it('every approved price belongs to a feature that is actually sellable (no stale price), and the catalogue uses it', async () => {
+    const { ADDON_FEATURE_PRICE_MINOR, addonFeaturePriceMinor } = await import('@ebda/shared');
+    for (const [k, v] of Object.entries(ADDON_FEATURE_PRICE_MINOR)) {
+      expect(sold).toContain(k as FeatureKey);
+      expect(Number.isSafeInteger(v) && (v as number) > 0).toBe(true);
+      expect(ADDON_CATALOG[`feature:${k}`].priceMinor).toBe(v);
+    }
+    expect(ADDON_CATALOG['feature:loyalty'].priceMinor).toBe(24900);
+    expect(ADDON_CATALOG['feature:floating_widget'].priceMinor).toBe(7900);
+    expect(addonFeaturePriceMinor('loyalty')).toBe(24900);
+  });
+
+  it('a sellable feature with no approved price keeps the placeholder, never a guessed price', async () => {
+    const { ADDON_FEATURE_PRICE_MINOR, ADDON_PLACEHOLDER_PRICE_MINOR } =
+      await import('@ebda/shared');
+    for (const k of sold) {
+      if (!(k in ADDON_FEATURE_PRICE_MINOR))
+        expect(ADDON_CATALOG[`feature:${k}`].priceMinor).toBe(ADDON_PLACEHOLDER_PRICE_MINOR);
+    }
+  });
+});
