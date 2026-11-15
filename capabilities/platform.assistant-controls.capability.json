@@ -10,6 +10,7 @@
   "api": [
     "GET /admin/assistant/flags",
     "PUT /admin/assistant/flags",
+    "GET /admin/assistant/stores/:storeId/mode",
     "PUT /admin/assistant/stores/:storeId/mode"
   ],
   "mcpTool": null,
@@ -34,7 +35,12 @@
     ],
     "en": ["Why can I not turn the assistant on myself?"]
   },
-  "steps": ["Super admin API: set the platform kill switches and a store's assistant mode"],
+  "steps": [
+    "Super admin API: set the platform kill switches",
+    "Super admin: open the store page and set the Ebda assistant mode"
+  ],
   "edgeCases": ["A merchant can never raise the mode above the platform cap"],
-  "gaps": ["No admin screen yet: set through the API"]
+  "gaps": [
+    "The platform kill switches have no admin screen yet: set through the API (the per-store mode has one, on the store page)"
+  ]
 }
