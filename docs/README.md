@@ -133,6 +133,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## ebda - Ebda program: plans, research, brand, templates
 
+- [ebda-assistant-rollout.md](ebda-assistant-rollout.md) - Ebda Store assistant: rollout stages and safety gate
 - [ebda/ads-tracking.md](ebda/ads-tracking.md) - Ebda Store acquisition tracking (own Meta ads + PostHog funnel)
 - [ebda/brand/ebda-brief-v2.html](ebda/brand/ebda-brief-v2.html) - ebda brief v2
 - [ebda/brand/operator.md](ebda/brand/operator.md) - Operator of Ebda
