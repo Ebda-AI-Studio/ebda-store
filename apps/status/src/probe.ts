@@ -1,4 +1,4 @@
-import { DEFAULT_TIMEOUT_MS } from './config';
+import { DEFAULT_TIMEOUT_MS, SLOW_THRESHOLD_MS } from './config';
 import type { ComponentConfig, ProbeResult } from './types';
 
 export type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
@@ -15,7 +15,8 @@ const MAX_BODY_BYTES = 64 * 1024;
 export async function probe(
   c: ComponentConfig,
   fetcher: Fetcher = (u, i) => fetch(u, i),
-  timeoutMs: number = c.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  timeoutMs: number = c.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  slowMs: number = SLOW_THRESHOLD_MS
 ): Promise<ProbeResult> {
   const started = Date.now();
   const ctrl = new AbortController();
@@ -56,7 +57,8 @@ export async function probe(
       } else {
         void res.body?.cancel().catch(() => undefined);
       }
-      return result({ ok: true, status: res.status, error: null });
+      const ms = Date.now() - started;
+      return result({ ok: true, status: res.status, error: null, slow: ms > slowMs });
     } catch (e) {
       const name = e instanceof Error ? e.name : 'Error';
       return result({ ok: false, status: null, error: `fetch failed (${name})` });
@@ -74,9 +76,10 @@ export async function probe(
 export function probeAll(
   components: readonly ComponentConfig[],
   fetcher?: Fetcher,
-  timeoutMs?: number
+  timeoutMs?: number,
+  slowMs?: number
 ): Promise<ProbeResult[]> {
-  return Promise.all(components.map(c => probe(c, fetcher, timeoutMs)));
+  return Promise.all(components.map(c => probe(c, fetcher, timeoutMs, slowMs)));
 }
 
 /**

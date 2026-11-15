@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   STORE_EDGE_FRESH_S,
+  STORE_EDGE_STALE_S,
   bumpEpochs,
   epochKeysForTag,
   parseAllowlist,
@@ -198,7 +199,7 @@ describe('windows', () => {
     expect(renders).toBe(2); // background refresh
     clock += 1_000;
     expect((await get()).body).toBe('v2');
-    clock += 700_000;
+    clock += (STORE_EDGE_STALE_S + 100) * 1000;
     expect((await get()).state).toBe('MISS');
   });
   it('a stale copy older than a purge is not served', async () => {
