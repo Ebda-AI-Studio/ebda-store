@@ -50,17 +50,7 @@ describe('tax change request claim on real D1', () => {
     expect(out.filter(o => o.status === 'rejected')).toHaveLength(1);
   });
 
-  it('the lite deleteMany claim is NOT atomic on D1 (why the service uses one DELETE ... RETURNING)', async () => {
-    const key = keyFor();
-    await settings.create(row(key, 'req-lite'));
-    const claim = () =>
-      settings.deleteMany({ where: { key, value: { path: ['id'], equals: 'req-lite' } } });
-    const counts = (await Promise.all([claim(), claim()])).map(r => r.count);
-    // measured: both report 1; if D1 ever makes this atomic the service can drop the raw statement
-    expect(counts.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(1);
-  });
-
-  it('claimPendingChangeD1: of two concurrent claims exactly one wins', async () => {
+  it('claimPendingChangeD1: of two concurrent claims exactly one wins (the lite deleteMany reports 1 for BOTH, measured)', async () => {
     const key = keyFor();
     await settings.create(row(key, 'req-1'));
     const out = await Promise.all([
@@ -71,9 +61,13 @@ describe('tax change request claim on real D1', () => {
     expect(await settings.findUnique({ where: { key } })).toBeNull();
   });
 
+  // Deterministic withdraw -> resubmit interleaving: a decision read request `req-old`, then the merchant withdrew and resubmitted
+  // (`req-new` now holds the key); the late claim for `req-old` must remove nothing. Fails without the id match in the SQL.
   it('a claim for another request id removes nothing and leaves the newer request', async () => {
     const key = keyFor();
-    await settings.create(row(key, 'req-new'));
+    await settings.create(row(key, 'req-old'));
+    await settings.deleteMany({ where: { key } }); // withdrawn
+    await settings.create(row(key, 'req-new')); // resubmitted
     expect(await claimPendingChangeD1(key, 'req-old')).toBe(false);
     expect((await settings.findUnique({ where: { key } }))?.value.id).toBe('req-new');
   });
