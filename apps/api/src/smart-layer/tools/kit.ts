@@ -166,6 +166,11 @@ export const row = (ar: string, en: string, before: unknown, after: unknown): Pr
   after,
 });
 
+const gates = new WeakMap<object, (ctx: TurnCtx) => Promise<void>>();
+/** The merchant's own RBAC + plan gate of a change tool, runnable without building a preview (the confirm route re-checks it so a role downgrade between preview and press is logged as `rejected:permission`). */
+export const gateOf = (tool: ToolSpec): ((ctx: TurnCtx) => Promise<void>) | undefined =>
+  gates.get(tool);
+
 export function change<A>(d: ChangeDef<A>): ToolSpec {
   const gate = (ctx: TurnCtx) => ({
     ...d.gate,
@@ -231,6 +236,7 @@ export function change<A>(d: ChangeDef<A>): ToolSpec {
         }
       : {}),
   };
+  gates.set(spec, ctx => assertMerchantMay(gate(ctx)));
   return spec as unknown as ToolSpec;
 }
 

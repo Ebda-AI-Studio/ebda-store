@@ -14,9 +14,12 @@ import {
   buildSystemPrompt,
   checkAdapterContract,
   computeReleaseId,
+  confirmApproval,
   issueApproval,
+  rejectApproval,
   runTurn,
   undoApplied,
+  UNDO_WINDOW_MS,
   type ApprovalToken,
   type PreviewCard,
   type SmartLayerAdapter,
@@ -28,6 +31,8 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
 import { storeSmartLayer } from '../lib/repo-factory';
+import { MerchantForbidden } from '../mcp/run-as-merchant';
+import { gateOf } from '../smart-layer/tools/kit';
 import { getAuthUser } from '../utils/store-helpers';
 import { StoreService } from '../services/store.service';
 import { storeAdapter, type StoreAdapterDeps } from '../smart-layer/adapter';
@@ -142,6 +147,10 @@ const ACTION_HTTP: Record<string, [number, string]> = {
   expired: [410, 'EXPIRED'],
   needs_confirm: [409, 'NEEDS_CONFIRM'],
   irreversible: [409, 'IRREVERSIBLE'],
+  used: [409, 'APPROVAL_USED'],
+  mismatch: [409, 'APPROVAL_MISMATCH'],
+  missing: [404, 'NOT_FOUND'],
+  not_pending: [409, 'NOT_PENDING'],
 };
 const actionError = (status: string): AppError => {
   const [code, name] = ACTION_HTTP[status] ?? [500, 'ACTION_FAILED'];
@@ -357,6 +366,106 @@ assistantRoutes.post(
           },
         });
       throw actionError(out.status);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+const confirmBody = z
+  .object({ token: z.string().min(20).max(200), locale: z.enum(['ar', 'en']).default('ar') })
+  .strict();
+const rejectBody = z
+  .object({ reason: z.string().max(200).optional(), locale: z.enum(['ar', 'en']).default('ar') })
+  .strict();
+
+// The ONLY door a confirm-class change goes through: the merchant presses the button in the UI and it calls this route with the one-time token it was
+// handed out of band. No tool, no model text and no typed "yes" can reach it. Single use, bound to the exact previewed payload, 15 minutes.
+assistantRoutes.post(
+  '/approvals/:approvalId/confirm',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const approvalId = z.string().uuid().parse(req.params.approvalId);
+      const body = confirmBody.parse(req.body);
+      const storeId = req.params.storeId!;
+      await assertOn(storeId);
+      const { adapter, ctx } = await engineFor(
+        req,
+        body.locale,
+        ownConversation(getAuthUser(req).userId, 'action')
+      );
+      // Re-check the merchant's own permission NOW (a role can change between the card and the press): a refusal burns the approval and is logged.
+      const appr = await adapter.storage.getApproval(storeId, approvalId);
+      const pv = appr ? await adapter.storage.getPreview(storeId, appr.previewId) : null;
+      const tool = pv ? adapter.tools().find(t => t.name === pv.tool) : undefined;
+      const gate = tool ? gateOf(tool) : undefined;
+      if (appr && pv && gate && appr.userId === ctx.userId) {
+        try {
+          await gate(ctx);
+        } catch (err) {
+          if (!(err instanceof MerchantForbidden)) throw err;
+          await adapter.storage.closeApproval(storeId, approvalId, 'rejected');
+          await adapter.storage.recordDecision({
+            approvalId,
+            storeId,
+            decider: ctx.userId,
+            decision: 'rejected:permission',
+            reason: 'role no longer allows this change',
+            at: ctx.now,
+          });
+          throw actionError('forbidden');
+        }
+      }
+      const tokens: ApprovalToken[] = [];
+      const out = await confirmApproval(adapter, ctx, approvalId, body.token, {
+        onApprovalToken: t => tokens.push(t),
+      });
+      res.setHeader('Cache-Control', 'private, no-store');
+      if (out.status === 'applied')
+        return void res.json({
+          success: true,
+          data: {
+            status: 'applied',
+            appliedId: out.appliedId,
+            undoUntil: ctx.now + UNDO_WINDOW_MS,
+          },
+        });
+      if (out.status === 'stale')
+        return void res.json({
+          success: true,
+          data: { status: 'stale', card: out.card, approvals: approvalsOut(tokens) },
+        });
+      throw out.status === 'expired' ? actionError('expired') : actionError(out.status);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+assistantRoutes.post(
+  '/approvals/:approvalId/reject',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const approvalId = z.string().uuid().parse(req.params.approvalId);
+      const body = rejectBody.parse(req.body ?? {});
+      await assertOn(req.params.storeId!);
+      const { adapter, ctx } = await engineFor(
+        req,
+        body.locale,
+        ownConversation(getAuthUser(req).userId, 'action')
+      );
+      const out = await rejectApproval(adapter, ctx, approvalId, body.reason);
+      if (out.status !== 'rejected')
+        throw actionError(
+          out.status === 'missing'
+            ? 'missing'
+            : out.status === 'forbidden'
+              ? 'forbidden'
+              : 'not_pending'
+        );
+      res.json({ success: true, data: { status: 'rejected' } });
     } catch (err) {
       next(err);
     }
