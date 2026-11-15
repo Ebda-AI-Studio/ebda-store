@@ -8,7 +8,8 @@
  * Only a sha256 of the address is stored, never the address.
  */
 import crypto from 'node:crypto';
-import { prisma, withUser } from '@ebda/database';
+import { withUser } from '@ebda/database';
+import { platformDb } from '../../lib/platform-db';
 import logger from '../../lib/logger';
 import { getAccountState } from '../../lib/identity-client';
 import { onAccessD1 } from '../platform/access-d1';
@@ -21,7 +22,11 @@ function trialUsedKey(email: string): string {
 
 /** True when a signup trial was already started for this owner (any store, live or deleted). */
 export async function ownerHasUsedTrial(email: string): Promise<boolean> {
-  const row = await prisma.systemSetting.findUnique({
+  // SystemSetting is a D1 model (model-split.json): read through the platform D1 client. No binding (Node / unit tests)
+  // = no marker store, so no block.
+  const db = await platformDb();
+  if (!db) return false;
+  const row = await db.systemSetting.findUnique({
     where: { key: trialUsedKey(email) },
     select: { id: true },
   });
@@ -34,7 +39,9 @@ export async function ownerHasUsedTrial(email: string): Promise<boolean> {
  */
 export async function markOwnerTrialUsed(email: string, storeId: string): Promise<void> {
   try {
-    await prisma.systemSetting.upsert({
+    const db = await platformDb();
+    if (!db) return;
+    await db.systemSetting.upsert({
       where: { key: trialUsedKey(email) },
       create: {
         key: trialUsedKey(email),

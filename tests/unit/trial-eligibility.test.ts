@@ -5,8 +5,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const db = vi.hoisted(() => ({ rows: new Map<string, unknown>(), fail: false }));
-vi.mock('@ebda/database', () => ({
-  prisma: {
+vi.mock('@ebda/database', () => ({ withUser: vi.fn() }));
+vi.mock('@api/lib/platform-db', () => ({
+  platformDb: async () => ({
     systemSetting: {
       findUnique: async ({ where }: { where: { key: string } }) =>
         db.rows.has(where.key) ? { id: 'x' } : null,
@@ -15,7 +16,7 @@ vi.mock('@ebda/database', () => ({
         if (!db.rows.has(where.key)) db.rows.set(where.key, create);
       },
     },
-  },
+  }),
 }));
 vi.mock('@api/lib/logger', () => ({ default: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
