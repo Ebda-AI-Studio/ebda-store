@@ -640,7 +640,7 @@ const barcodeCountSet = change<CountArgs>({
   name: 'barcode_count_set',
   capabilityId: 'inventory.barcode-scan-count',
   description:
-    'Run a stock count without a scanner: say the counted quantity of up to 25 simple products. It opens a count session, records each line, closes it and reconciles, so stock becomes the counted numbers (the difference is posted as a cycle-count adjustment). Undo counts the old numbers back. Use for "I counted 12 of this", "جرد المخزن", "الجرد طلع ٣ بدل ٥".',
+    'Run a stock count without a scanner: say the counted quantity of up to 25 simple products. It opens a count session, records each line, closes it and reconciles, so stock becomes the counted numbers (the difference is posted as a cycle-count adjustment). Undo counts the old numbers back. Use for "I counted 12 of this", "جرد المخزن", "الجرد طلع 3 بدل 5".',
   schema: shape(
     {
       note: f.str('Note on the count session.', { max: 300 }),
