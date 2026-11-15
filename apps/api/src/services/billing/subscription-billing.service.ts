@@ -1968,6 +1968,55 @@ async function confirmAndApplyWebhook(
 
 // ───────────────────────────── refunds ────────────────────────────────────
 
+/**
+ * R-REFUND-PERIOD-1: the card twin of the InstaPay void in `recordManualRefundInner`. A FULL refund of the
+ * latest paid charge (checkout / renewal / upgrade) that bought the CURRENT period moves `currentPeriodEnd`
+ * back to that period's start, so the merchant does not keep a month they got their money back for.
+ * An overdue end lands the store in `past_due` with the first dunning attempt already counted (the retry
+ * key then differs from the refunded charge's), so the normal dunning path collects again or downgrades.
+ * `keepAccess` (goodwill refund) skips it. A partial refund never changes the period.
+ */
+async function rollBackPeriodForRefund(
+  tx: Tx,
+  charge: { id: string; storeId: string; type: string; createdAt: Date },
+  keepAccess: boolean,
+  now: Date
+): Promise<void> {
+  if (keepAccess || !['checkout', 'renewal', 'upgrade'].includes(charge.type)) return;
+  const { storeId } = charge;
+  const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
+  if (!sub || sub.status !== 'active' || !sub.currentPeriodStart || !sub.currentPeriodEnd) return;
+  // only the NEWEST paid charge can own the current period: an older one bought a period already used up
+  const newer = await tx.billingEvent.findFirst({
+    where: {
+      storeId,
+      id: { not: charge.id },
+      type: { in: ['checkout', 'renewal', 'upgrade'] },
+      status: { in: ['succeeded', 'refunded'] },
+      createdAt: { gt: charge.createdAt },
+    },
+    select: { id: true },
+  });
+  if (newer) return;
+  const target = sub.currentPeriodStart;
+  // the free months this payment earned go too, before the period is read (FOUNDING-3)
+  await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
+  const overdue = target.getTime() <= now.getTime();
+  await tx.storeSubscription.update({
+    where: { storeId },
+    data: overdue
+      ? {
+          currentPeriodEnd: target,
+          status: 'past_due',
+          dunningAttempts: 1,
+          nextRetryAt: new Date(
+            Math.max(now.getTime(), addDays(target, DUNNING_RETRY_DAYS[0]).getTime())
+          ),
+        }
+      : { currentPeriodEnd: target },
+  });
+}
+
 async function settleRefundInTx(
   tx: Tx,
   storeId: string,
@@ -1997,6 +2046,11 @@ async function settleRefundInTx(
       where: { id: charge.id, storeId, status: 'succeeded' },
       data: { status: 'refunded' },
     });
+    // R-REFUND-PERIOD-1: a full refund of the charge that paid the current period takes the period back.
+    if (flipped.count === 1) {
+      const keep = (refund.raw as { keepAccess?: unknown } | null)?.keepAccess === true;
+      await rollBackPeriodForRefund(tx, charge, keep, new Date());
+    }
     // FOUNDING-3: the payment behind any free month is gone, so the free months go too (own store inline; a
     // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
     if (flipped.count === 1) {
@@ -2006,12 +2060,15 @@ async function settleRefundInTx(
 }
 
 /**
- * Refund (part of) a succeeded charge. Super-admin only (route). Does NOT
- * change the subscription — plan changes are separate decisions.
+ * Refund (part of) a succeeded charge. Super-admin only (route). A FULL refund of the charge that paid the
+ * current period also rolls that period back unless `keepAccess` (R-REFUND-PERIOD-1); a partial refund never
+ * touches the subscription — plan changes are separate decisions.
  */
 export async function refundCharge(args: {
   eventId: string;
   amountMinor?: number;
+  /** Goodwill refund: money goes back, the paid period stays (R-REFUND-PERIOD-1). */
+  keepAccess?: boolean;
   provider?: BillingProvider;
 }): Promise<{ refundEventId: string; status: 'succeeded' | 'failed' | 'pending' }> {
   const provider = args.provider ?? getBillingProvider();
@@ -2074,7 +2131,13 @@ export async function refundCharge(args: {
     await withStore(charge.storeId, async tx => {
       await tx.billingEvent.updateMany({
         where: { id: refundId, storeId: charge.storeId, status: 'pending' },
-        data: { providerRef: res.refundId ?? undefined, raw: res.raw as Prisma.InputJsonValue },
+        data: {
+          providerRef: res.refundId ?? undefined,
+          raw: {
+            ...((res.raw ?? {}) as object),
+            keepAccess: args.keepAccess === true,
+          } as Prisma.InputJsonValue,
+        },
       });
       if (res.status !== 'pending') {
         await settleRefundInTx(

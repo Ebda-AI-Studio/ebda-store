@@ -864,16 +864,23 @@ router.post(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { amountMinor } = z
-        .object({ amountMinor: z.number().int().positive().optional() })
+      const { amountMinor, keepAccess } = z
+        .object({
+          amountMinor: z.number().int().positive().optional(),
+          keepAccess: z.boolean().optional(),
+        })
         .parse(req.body ?? {});
-      const out = await refundCharge({ eventId: req.params.id, amountMinor });
+      const out = await refundCharge({ eventId: req.params.id, amountMinor, keepAccess });
       await auditLog({
         action: 'billing.refund',
         userId: req.user!.userId,
         resourceType: 'billing_event',
         resourceId: req.params.id,
-        details: { amountMinor: amountMinor ?? null, status: out.status },
+        details: {
+          amountMinor: amountMinor ?? null,
+          keepAccess: keepAccess === true,
+          status: out.status,
+        },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
