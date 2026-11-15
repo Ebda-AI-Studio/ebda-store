@@ -102,10 +102,25 @@ function nameFromPayload(payload: unknown): string | null {
   return p.buyer?.name?.trim() || p.buyerName?.trim() || null;
 }
 
+/** Opaque keyset cursor: the position (issued_at, id) of the last row served, not a reference to that row. */
+function encodeCursor(r: { issuedAt: Date; id: string }): string {
+  return `${r.issuedAt.toISOString()}_${r.id}`;
+}
+function decodeCursor(c: string | undefined): { at: Date; id: string } | null {
+  const m = c ? /^(.+Z)_([0-9a-f-]{36})$/i.exec(c) : null;
+  const at = m ? new Date(m[1]) : null;
+  return m && at && !Number.isNaN(at.getTime()) ? { at, id: m[2] } : null;
+}
+
 export function listWhere(storeId: string, f: FiscalListFilters, orderIdsForQ: string[]) {
   const q = f.q?.toUpperCase();
+  const cur = decodeCursor(f.cursor);
   return {
     storeId,
+    // Continue strictly after the cursor position in (issued_at desc, id desc): works whether or not that row still exists.
+    ...(cur
+      ? { AND: [{ OR: [{ issuedAt: { lt: cur.at } }, { issuedAt: cur.at, id: { lt: cur.id } }] }] }
+      : {}),
     ...(f.docType ? { docType: f.docType as FiscalDocType } : {}),
     ...(f.from || f.to
       ? { issuedAt: { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lte: f.to } : {}) } }
@@ -238,14 +253,13 @@ export async function listFiscalDocuments(storeId: string, f: FiscalListFilters 
     where: listWhere(storeId, f, orderIds),
     orderBy: [{ issuedAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
-    ...(f.cursor ? { cursor: { id: f.cursor }, skip: 1 } : {}),
     select: LIST_SELECT,
   });
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
   return {
     documents: await enrichFiscalRows(storeId, page),
-    nextCursor: hasMore ? page[page.length - 1]!.id : null,
+    nextCursor: hasMore ? encodeCursor(page[page.length - 1]!) : null,
   };
 }
 
@@ -275,11 +289,19 @@ export async function pageFiscalRows(
       );
     })
     .sort((a, b) => b.issuedAt.getTime() - a.issuedAt.getTime() || (a.id < b.id ? 1 : -1));
-  const start = f.cursor ? sorted.findIndex(r => r.id === f.cursor) + 1 : 0;
-  const page = sorted.slice(start, start + limit);
+  // Keyset: continue after the cursor's POSITION, so a vanished cursor row cannot restart the list.
+  const cur = decodeCursor(f.cursor);
+  const rest = cur
+    ? sorted.filter(
+        r =>
+          r.issuedAt.getTime() < cur.at.getTime() ||
+          (r.issuedAt.getTime() === cur.at.getTime() && r.id < cur.id)
+      )
+    : sorted;
+  const page = rest.slice(0, limit);
   return {
     documents: await enrichFiscalRows(storeId, page),
-    nextCursor: start + limit < sorted.length ? page[page.length - 1]!.id : null,
+    nextCursor: rest.length > limit ? encodeCursor(page[page.length - 1]!) : null,
   };
 }
 

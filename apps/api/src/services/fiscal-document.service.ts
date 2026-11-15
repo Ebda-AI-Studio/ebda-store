@@ -278,14 +278,19 @@ export function documentBalance(input: {
   return computed - input.total;
 }
 
-/** v2 line identity + VAT. Goods lines use the SKU as the internal code; fee lines have none of their own. */
+/** v2 line identity + VAT (post-discount bases, see `allocateLineVat`). Goods lines use the SKU as the internal code; fee lines have none of their own. */
 function withLineTax(
   lines: FiscalLine[],
-  vat: number,
-  vatRateBps: number | null,
+  tax_: { discount: number; vat: number; vatRateBps: number | null; taxIncludedInPrice: boolean },
   etaItemCode: string | null
 ): FiscalLine[] {
-  const tax = allocateLineVat(lines, vat, vatRateBps);
+  const tax = allocateLineVat(
+    lines,
+    tax_.discount,
+    tax_.vat,
+    tax_.vatRateBps,
+    tax_.taxIncludedInPrice
+  );
   return lines.map((l, i) => ({
     ...l,
     vatRateBps: tax[i].vatRateBps,
@@ -393,7 +398,16 @@ export class FiscalDocumentService {
     const isTaxInvoice = !!order.sellerTaxRegistrationNumber;
     const docType = isTaxInvoice ? 'tax_invoice' : 'receipt';
     const { lines: baseLines, discounts } = buildSaleLines(order);
-    const lines = withLineTax(baseLines, order.tax, order.taxRateBps, eta?.defaultItemCode ?? null);
+    const lines = withLineTax(
+      baseLines,
+      {
+        discount: order.discount,
+        vat: order.tax,
+        vatRateBps: order.taxRateBps,
+        taxIncludedInPrice: order.taxIncludedInPrice,
+      },
+      eta?.defaultItemCode ?? null
+    );
     const off = documentBalance({
       lines,
       discounts,

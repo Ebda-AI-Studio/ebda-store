@@ -49,7 +49,12 @@ const DOC_TYPES = [
 ] as const;
 
 const listQuery = z.object({
-  cursor: z.string().uuid().optional(),
+  /** Opaque keyset cursor `<issued_at ISO>_<id>` from a previous page's `nextCursor`. */
+  cursor: z
+    .string()
+    .regex(/^.+Z_[0-9a-f-]{36}$/i)
+    .max(80)
+    .optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   docType: z.enum(DOC_TYPES).optional(),
   /** Search by document number (INV-000042) or the number of the document a credit note reverses. */

@@ -151,18 +151,57 @@ const ETA = {
   qrSvg: '<svg data-qr="1"></svg>',
 };
 
-describe('allocateLineVat', () => {
-  it('shares sum to the order VAT exactly, remainder on the last non-zero line', () => {
+describe('allocateLineVat (post-discount bases)', () => {
+  const sum = (o: Array<{ vatAmount: number }>) => o.reduce((n, x) => n + x.vatAmount, 0);
+  const goods = (amount: number) => ({ kind: 'item' as const, amount });
+  const ship = (amount: number) => ({ kind: 'shipping' as const, amount });
+
+  it('product-only discount (tax-excluded): the discount lowers goods VAT, shipping VAT stays its own', () => {
+    // goods 10000 − 2000 discount = 8000, shipping 1000; VAT 14% of 9000 = 1260
+    const out = allocateLineVat([goods(10000), ship(1000)], 2000, 1260, 1400, false);
+    expect(out.map(o => o.vatAmount)).toEqual([1120, 140]);
+    expect(sum(out)).toBe(1260);
+  });
+
+  it('shipping-only (free) shipping has no discount to allocate: goods keep their full base', () => {
+    // free shipping is stored as shipping 0, so only goods carry VAT
+    const out = allocateLineVat([goods(10000), ship(0)], 0, 1400, 1400, false);
+    expect(out.map(o => o.vatAmount)).toEqual([1400, 0]);
+  });
+
+  it('mixed: discount shared across goods lines by amount, fee lines untouched, sums exactly', () => {
+    // goods 6000 + 4000, discount 1000 → 5400 + 3600; shipping 500; base 9500 → VAT 1330
+    const out = allocateLineVat([goods(6000), goods(4000), ship(500)], 1000, 1330, 1400, false);
+    expect(out.map(o => o.vatAmount)).toEqual([756, 504, 70]);
+    expect(sum(out)).toBe(1330);
+  });
+
+  it('tax-included: VAT is the inside-price share of each post-discount base', () => {
+    // goods 11400 incl. VAT − 1140 discount = 10260 → VAT 1260; shipping 1140 → 140; order VAT 1400
+    const out = allocateLineVat([goods(11400), ship(1140)], 1140, 1400, 1400, true);
+    expect(out.map(o => o.vatAmount)).toEqual([1260, 140]);
+    expect(sum(out)).toBe(1400);
+  });
+
+  it('rounding remainder lands on the last non-zero line and the total never moves', () => {
     const out = allocateLineVat(
-      [{ amount: 3333 }, { amount: 3333 }, { amount: 3334 }, { amount: 0 }],
+      [goods(3333), goods(3333), goods(3334), ship(0)],
+      0,
       1400,
-      1400
+      1400,
+      false
     );
-    expect(out.map(o => o.vatAmount).reduce((a, b) => a + b, 0)).toBe(1400);
+    expect(sum(out)).toBe(1400);
     expect(out[3].vatAmount).toBe(0);
   });
+
+  it('a discount larger than a line cannot push its base below zero', () => {
+    const out = allocateLineVat([goods(100), goods(9000)], 9100, 0, 1400, false);
+    expect(sum(out)).toBe(0);
+  });
+
   it('is all zero without VAT', () => {
-    expect(allocateLineVat([{ amount: 100 }], 0, null)).toEqual([
+    expect(allocateLineVat([goods(100)], 0, 0, null, false)).toEqual([
       { vatRateBps: null, vatAmount: 0 },
     ]);
   });
@@ -297,7 +336,7 @@ describe('list helpers', () => {
     h.db.order.findMany.mockResolvedValue([]);
     h.db.etaReceipt.findMany.mockResolvedValue([]);
     const mk = (i: number, docType = 'receipt') => ({
-      id: `id-${i}`,
+      id: `00000000-0000-4000-8000-00000000000${i}`,
       orderId: null,
       docType,
       number: `RCT-00000${i}`,
@@ -313,18 +352,33 @@ describe('list helpers', () => {
     });
     const all = [mk(1), mk(2), mk(3, 'credit_note'), mk(4), mk(5)];
     const p1 = await pageFiscalRows(STORE, all, { limit: 2 });
-    expect(p1.documents.map(d => d.id)).toEqual(['id-5', 'id-4']);
+    expect(p1.documents.map(d => d.id)).toEqual([
+      '00000000-0000-4000-8000-000000000005',
+      '00000000-0000-4000-8000-000000000004',
+    ]);
     const p2 = await pageFiscalRows(STORE, all, { limit: 2, cursor: p1.nextCursor! });
-    expect(p2.documents.map(d => d.id)).toEqual(['id-3', 'id-2']);
+    expect(p2.documents.map(d => d.id)).toEqual([
+      '00000000-0000-4000-8000-000000000003',
+      '00000000-0000-4000-8000-000000000002',
+    ]);
+    // the row the cursor points at is gone (e.g. retention purge): the list continues from its POSITION, not page one
+    const without = all.filter(r => r.id !== p1.documents[1].id);
+    const p2b = await pageFiscalRows(STORE, without, { limit: 2, cursor: p1.nextCursor! });
+    expect(p2b.documents.map(d => d.id)).toEqual(p2.documents.map(d => d.id));
+    expect(p2b.documents.map(d => d.id)).not.toContain(p1.documents[0].id);
     const only = await pageFiscalRows(STORE, all, { docType: 'credit_note' });
-    expect(only.documents.map(d => d.id)).toEqual(['id-3']);
+    expect(only.documents.map(d => d.id)).toEqual(['00000000-0000-4000-8000-000000000003']);
     const range = await pageFiscalRows(STORE, all, {
       from: new Date(Date.UTC(2026, 10, 2)),
       to: new Date(Date.UTC(2026, 10, 4)),
     });
-    expect(range.documents.map(d => d.id)).toEqual(['id-4', 'id-3', 'id-2']);
+    expect(range.documents.map(d => d.id)).toEqual([
+      '00000000-0000-4000-8000-000000000004',
+      '00000000-0000-4000-8000-000000000003',
+      '00000000-0000-4000-8000-000000000002',
+    ]);
     const byOrder = await pageFiscalRows(STORE, all, { q: 'ord-4' });
-    expect(byOrder.documents.map(d => d.id)).toEqual(['id-4']);
+    expect(byOrder.documents.map(d => d.id)).toEqual(['00000000-0000-4000-8000-000000000004']);
   });
 });
 
@@ -385,12 +439,12 @@ describe('super-admin archive endpoints', () => {
     }));
     h.db.fiscalDocument.findMany.mockResolvedValue(rows);
     const res = await request(app).get(
-      `/admin/fiscal-archive/${STORE}?limit=2&docType=receipt&q=rct-7&from=2026-11-01T00:00:00.000Z&to=2026-11-30T23:59:59.999Z&cursor=44444444-4444-4444-8444-444444444444`
+      `/admin/fiscal-archive/${STORE}?limit=2&docType=receipt&q=rct-7&from=2026-11-01T00:00:00.000Z&to=2026-11-30T23:59:59.999Z&cursor=2026-11-02T09:00:00.000Z_44444444-4444-4444-8444-444444444444`
     );
     expect(res.status).toBe(200);
     const d = res.body.data;
     expect(d.documents).toHaveLength(2);
-    expect(d.nextCursor).toBe(rows[1].id);
+    expect(d.nextCursor).toBe(`2026-11-02T09:00:00.000Z_${rows[1].id}`);
     expect(d.documents[0]).toMatchObject({
       customerName: 'Mona Adel',
       contactMasked: '•••••678',
@@ -406,8 +460,16 @@ describe('super-admin archive endpoints', () => {
     expect(body).not.toContain('mona@example.test');
     const args = h.db.fiscalDocument.findMany.mock.calls[0][0];
     expect(args.take).toBe(3);
-    expect(args.cursor).toEqual({ id: '44444444-4444-4444-8444-444444444444' });
-    expect(args.skip).toBe(1);
+    // keyset position, not a row reference: no Prisma cursor, no skip
+    expect('cursor' in args).toBe(false);
+    expect('skip' in args).toBe(false);
+    expect(args.where.AND[0].OR).toEqual([
+      { issuedAt: { lt: new Date('2026-11-02T09:00:00.000Z') } },
+      {
+        issuedAt: new Date('2026-11-02T09:00:00.000Z'),
+        id: { lt: '44444444-4444-4444-8444-444444444444' },
+      },
+    ]);
     expect(args.orderBy).toEqual([{ issuedAt: 'desc' }, { id: 'desc' }]);
     expect(args.where.docType).toBe('receipt');
     expect(args.where.issuedAt.gte).toBeInstanceOf(Date);
