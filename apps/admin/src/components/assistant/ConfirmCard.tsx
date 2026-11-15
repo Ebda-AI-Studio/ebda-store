@@ -49,9 +49,11 @@ export function ConfirmCard({
   onConfirm: (
     approvalId: string,
     token: string
-  ) => Promise<{ data?: ConfirmData; error?: { code: string } }>;
-  onReject: (approvalId: string) => Promise<{ error?: { code: string } }>;
-  onUndo: (appliedId: string) => Promise<{ data?: UndoData; error?: { code: string } }>;
+  ) => Promise<{ data?: ConfirmData | null; error?: { code: string } | null }>;
+  onReject: (approvalId: string) => Promise<{ error?: { code: string } | null }>;
+  onUndo: (
+    appliedId: string
+  ) => Promise<{ data?: UndoData | null; error?: { code: string } | null }>;
   /** A changed-since card brings its own approval token. */
   onFresh?: (approvalId: string, token: string) => void;
   now?: () => number;
@@ -91,8 +93,9 @@ export function ConfirmCard({
     const r = await onConfirm(card.approvalId, token);
     if (r.error || !r.data) return fail(r.error?.code);
     if (r.data.status === 'stale') {
-      const grant = r.data.approvals?.find(a => a.approvalId === r.data!.card.approvalId);
-      setCard(r.data.card);
+      const fresh = r.data.card;
+      const grant = r.data.approvals?.find(a => a.approvalId === fresh.approvalId);
+      setCard(fresh);
       setToken(grant?.token);
       if (grant) onFresh?.(grant.approvalId, grant.token);
       setStale(true);

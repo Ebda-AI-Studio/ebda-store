@@ -9,12 +9,14 @@
   "screens": ["/stores/[id]"],
   "api": [
     "POST /stores/:storeId/assistant/previews/:previewId/apply",
-    "POST /stores/:storeId/assistant/applied/:appliedId/undo"
+    "POST /stores/:storeId/assistant/applied/:appliedId/undo",
+    "POST /stores/:storeId/assistant/approvals/:approvalId/confirm",
+    "POST /stores/:storeId/assistant/approvals/:approvalId/reject"
   ],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff"],
-  "policy": "preview",
+  "policy": "confirm",
   "undo": {
     "class": "reversible",
     "note": "the engine journals the inverse of every applied change for 24 hours"
@@ -36,13 +38,14 @@
   "steps": [
     "The assistant shows a preview card with the old and new value",
     "In act mode press Apply change; it runs with your own permissions",
-    "Press Undo within 24 hours to put it back; if you edited it by hand since, you see the new situation instead"
+    "Press Undo within 24 hours to put it back; if you edited it by hand since, you see the new situation instead",
+    "For money, deleting, messages to customers, more than 20 items, price or checkout changes the card shows why it needs a yes; press 'Yes, do it' (single use, 15 minutes) or 'No'"
   ],
   "edgeCases": [
     "Apply in suggestion mode is refused: the card says so",
     "Changed since the preview: the card is replaced by the fresh one, nothing is written",
     "Money, deletion, customer messages, more than 20 items and checkout-visible changes never apply here: they need the confirmation step",
-    "A double press applies once",
+    "Money, deletion, customer messages, more than 20 items and checkout-visible changes never apply from the Apply button: the card asks for an explicit yes and only that button applies it",
     "Suspended store is read-only: writes fail and the assistant explains"
   ],
   "gaps": []

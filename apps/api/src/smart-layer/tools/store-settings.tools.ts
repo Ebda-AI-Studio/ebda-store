@@ -41,7 +41,7 @@ export const safeUrl = (description: string, max = 500): Field =>
   );
 
 /** Reads exactly the listed columns of THIS store (ctx.storeId, never an argument). Runs inside `readInStoreContext` (kit) so RLS sees the store. */
-async function readStoreRow(ctx: TurnCtx, select: Record<string, true>): Promise<Rec> {
+export async function readStoreRow(ctx: TurnCtx, select: Record<string, true>): Promise<Rec> {
   const r = await (
     await storeDb(ctx.storeId)
   ).store.findUnique({ where: { id: ctx.storeId }, select: select as { id: true } });
