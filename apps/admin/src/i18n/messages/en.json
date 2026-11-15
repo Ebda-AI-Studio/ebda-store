@@ -8240,7 +8240,11 @@
       "topQueriesTitle": "Top queries (latest day)",
       "noTopQueries": "No query data yet.",
       "notConnectedTitle": "Google Search Console not connected",
-      "notConnectedBody": "Once Ebda Store's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
+      "notConnectedBody": "Once Ebda Store's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end.",
+      "verifyingTitle": "Verifying your domain with Google",
+      "verifyingBody": "We're verifying your domain with Google Search Console automatically. This usually finishes within a day; your search data will appear here after that. No action needed.",
+      "awaitingDataTitle": "Waiting for first search data",
+      "awaitingDataBody": "Your store is connected to Google Search Console. Data appears here a few days after it starts coming in."
     }
   },
   "lifecycleEmails": {
