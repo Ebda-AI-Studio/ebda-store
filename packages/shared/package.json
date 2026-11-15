@@ -30,6 +30,7 @@
     },
     "./smart-layer": {
       "types": "./src/smart-layer-kit.ts",
+      "require": "./dist/smart-layer-kit.js",
       "default": "./src/smart-layer-kit.ts"
     },
     "./brand": {
