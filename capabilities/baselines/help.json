@@ -2,11 +2,9 @@
   "ids": [
     "help-missing|account.export-erase-close",
     "help-missing|account.legal-notices",
-    "help-missing|account.multi-store",
     "help-missing|account.sms-consent",
     "help-missing|account.staff-accept-invite",
     "help-missing|analytics.dashboard",
-    "help-missing|billing.addons",
     "help-missing|builder.edit-page",
     "help-missing|customers.erase-block",
     "help-missing|customers.list-detail",
@@ -20,15 +18,7 @@
     "help-missing|inventory.stock-adjustments",
     "help-missing|inventory.suppliers-po",
     "help-missing|inventory.warehouses",
-    "help-missing|marketing.affiliates",
-    "help-missing|marketing.campaigns",
-    "help-missing|marketing.lifecycle-emails",
-    "help-missing|marketing.loyalty",
-    "help-missing|marketing.newsletter",
-    "help-missing|marketing.pixels",
-    "help-missing|marketing.push-web",
     "help-missing|marketing.wholesale",
-    "help-missing|notify.whatsapp-link",
     "help-missing|onboarding.setup-guide",
     "help-missing|order.export",
     "help-missing|payment.abandonments",
@@ -42,7 +32,6 @@
     "help-missing|store.slug-redirects",
     "help-missing|storefront.contact-enquiry",
     "help-missing|storefront.customer-account",
-    "help-missing|storefront.testimonials-trust",
-    "help-missing|team.staff"
+    "help-missing|storefront.testimonials-trust"
   ]
 }

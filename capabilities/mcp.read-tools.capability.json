@@ -18,8 +18,8 @@
   },
   "helpArticle": "merchant-mcp-write-tools",
   "questions": {
-    "ar": ["اقدر اسأل Claude عن مبيعاتي؟"],
-    "en": ["Can Claude read my store data?"]
+    "ar": ["اقدر اسأل Claude عن مبيعاتي؟", "مين مربوط بمتجري من Claude؟", "ايه مفاتيح MCP عندي؟"],
+    "en": ["Can Claude read my store data?", "Which MCP keys exist on my store?"]
   },
   "steps": ["Mint key then connect an MCP client."],
   "edgeCases": [
