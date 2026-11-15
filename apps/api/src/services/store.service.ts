@@ -18,6 +18,7 @@ import {
   storeUpdateOnDo,
   storePatchOnDo,
   closeDoIfNoMoney,
+  storeSetSettingKeyIfOnDo,
   reopenDoAfterFailedDelete,
   storeWritesToDo,
 } from '../lib/repo-factory';
@@ -1803,9 +1804,8 @@ export class StoreService {
 
   /**
    * STORE-LIFECYCLE-1: compare-and-set of the deletion request. Writes `to` only while the stored request still has `from.id` and
-   * `from.state` (a cancel and the executor's claim cannot both win). Postgres: ONE conditional UPDATE. Durable Object store: the
-   * settings patch has no condition, so it is read, checked, patched and read back (the DO is single threaded per call, the window
-   * is two calls; the executor's claim + the cancel's refusal of `executing` narrow it further, Ruling STORE-LIFECYCLE-1).
+   * `from.state` (a cancel and the executor's claim cannot both win). Postgres: ONE conditional UPDATE. Durable Object store: ONE
+   * conditional DO call (`patchSettingsIf`, check + write in the DO's single synchronous transaction). Ruling STORE-LIFECYCLE-1 (h).
    */
   static async compareAndSetDeletionRequest(
     storeId: string,
@@ -1814,18 +1814,10 @@ export class StoreService {
   ): Promise<boolean> {
     const store = await this.getById(storeId);
     if (await storeWritesToDo(storeId)) {
-      const live = ((await this.getById(storeId)).settings ?? {}) as {
-        deletionRequest?: { id?: string; state?: string };
-      };
-      const cur = live.deletionRequest;
-      if (!cur || cur.id !== from.id || cur.state !== from.state) return false;
-      await storePatchOnDo(storeId, { json: { settings: { set: { deletionRequest: to } } } });
-      const after = ((await this.getById(storeId)).settings ?? {}) as {
-        deletionRequest?: { id?: string; state?: string };
-      };
-      const ok = after.deletionRequest?.state === (to as { state?: string }).state;
-      if (ok) await this.afterDeletionRequestWrite(store, storeId);
-      return ok;
+      // ONE conditional DO call: the DO checks {id,state} and writes in its single synchronous transaction (no read-after-write).
+      const applied = await storeSetSettingKeyIfOnDo(storeId, 'deletionRequest', to, from);
+      if (applied) await this.afterDeletionRequestWrite(store, storeId);
+      return applied;
     }
     const rows = await withStore(
       storeId,

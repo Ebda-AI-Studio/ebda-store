@@ -2144,6 +2144,36 @@ export async function storePatchOnDo(
   return readStoreRowOnDo(storeId, args);
 }
 
+/**
+ * Conditional write of ONE top-level `settings` key on a DO store (STORE-LIFECYCLE-1 h): the DO checks that `settings[key]` still
+ * has `expect.id` + `expect.state` and writes `value` in the same synchronous transaction (StoreDO `patchSettingsIf`).
+ * Returns false when the condition no longer held (nothing written). Settings JSON lives only in the DO, so there is no D1 leg.
+ */
+export async function storeSetSettingKeyIfOnDo(
+  storeId: string,
+  key: string,
+  value: unknown,
+  expect: { id: string; state: string }
+): Promise<boolean> {
+  const stub = storeDo(storeId) as unknown as {
+    patchSettingsIf(
+      storeId: string,
+      inputJson: string,
+      expectJson: string
+    ): Promise<
+      { ok: true; data: { applied: boolean } } | { ok: false; code: string; status: number }
+    >;
+  };
+  const { encodeRpc } = await import('@ebda-src/repo');
+  const r = await stub.patchSettingsIf(
+    storeId,
+    encodeRpc({ json: { settings: { set: { [key]: value } } } }),
+    encodeRpc({ key, ...expect })
+  );
+  if (!r.ok) throw new AppError(502, 'SETTINGS_COPY_FAILED', `settings patch refused: ${r.code}`);
+  return r.data.applied;
+}
+
 async function readStoreRowOnDo(
   storeId: string,
   args: { select?: unknown; include?: { owner?: unknown } }

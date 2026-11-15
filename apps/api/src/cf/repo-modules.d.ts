@@ -293,6 +293,16 @@ declare module '@ebda-src/repo' {
     storeId: string,
     input: { fields?: Record<string, unknown>; json?: Record<string, JsonKeyPatch> }
   ): { profile: string[]; config: string[]; directoryOnly: string[] };
+  export function patchStoreSettingsIf(
+    sql: SqlRunner,
+    meta: Meta,
+    storeId: string,
+    input: {
+      fields?: Record<string, unknown>;
+      json?: Record<string, JsonKeyPatch>;
+      expect: { key: string; id: string; state: string };
+    }
+  ): { applied: boolean };
   export function bootstrapStoreRows(
     sql: SqlRunner,
     meta: Meta,

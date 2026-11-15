@@ -164,6 +164,37 @@ describe('StoreDO.mutate procedures and the settings copy (PR D1b)', () => {
       code: 'STORE_MISMATCH',
     });
   });
+  it('patchSettingsIf (STORE-LIFECYCLE-1 h): two concurrent claims of a pending deletion apply exactly once', async () => {
+    const stub = stubFor('mut-cas');
+    await stub.mutate('mut-cas', { ops: [{ model: 'StorePage', op: 'count' }] });
+    await runInDurableObject(stub, async d => {
+      d.ctx.storage.sql.exec(
+        "INSERT INTO store_profile (store_id, name, slug, owner_id) VALUES ('mut-cas', 'S', 's', 'u')"
+      );
+    });
+    const { encodeRpc } = await import('@ebda-src/repo');
+    await stub.applySettings(
+      'mut-cas',
+      encodeRpc({ settings: { base: 1, deletionRequest: { id: 'r1', state: 'pending' } } })
+    );
+    const to = (state: string) =>
+      encodeRpc({ json: { settings: { set: { deletionRequest: { id: 'r1', state } } } } });
+    const expectPending = encodeRpc({ key: 'deletionRequest', id: 'r1', state: 'pending' });
+    const [a, b] = await Promise.all([
+      stub.patchSettingsIf('mut-cas', to('executing'), expectPending),
+      stub.patchSettingsIf('mut-cas', to('cancelled'), expectPending),
+    ]);
+    expect(a.ok && b.ok).toBe(true);
+    expect([a, b].filter(r => r.ok && r.data.applied)).toHaveLength(1);
+    const stored = await runInDurableObject(stub, async d =>
+      JSON.parse(
+        d.ctx.storage.sql.exec("SELECT settings FROM store_config WHERE store_id = 'mut-cas'").one()
+          .settings as string
+      )
+    );
+    expect(stored.base).toBe(1);
+    expect(['executing', 'cancelled']).toContain(stored.deletionRequest.state);
+  });
   it('patchSettings (BE:F-2/F-3) merges only the sent keys in ONE DO transaction and rolls a refused part back', async () => {
     const stub = stubFor('mut-patch');
     await stub.mutate('mut-patch', { ops: [{ model: 'StorePage', op: 'count' }] }); // binds the instance

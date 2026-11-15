@@ -103,36 +103,79 @@ export function patchStoreSettings(
   storeId: string,
   input: { fields?: Record<string, unknown>; json?: Record<string, JsonKeyPatch> }
 ): { profile: string[]; config: string[]; directoryOnly: string[] } {
-  const jsonNames = Object.keys(input.json ?? {});
-  for (const n of jsonNames)
+  assertPatchable(input);
+  const run = () => patchInTransaction(sql, meta, storeId, input);
+  return sql.transactionSync ? sql.transactionSync(run) : run();
+}
+
+/**
+ * The CONDITIONAL settings patch (STORE-LIFECYCLE-1 h): applies `input` only while `settings[expect.key]` still has `expect.id` and
+ * `expect.state`. The check and the write share ONE synchronous DO transaction, and the DO runs one call at a time, so of two
+ * concurrent claims exactly one is applied; the other gets `{ applied: false }` and writes nothing.
+ */
+export function patchStoreSettingsIf(
+  sql: SqlRunner,
+  meta: Meta,
+  storeId: string,
+  input: {
+    fields?: Record<string, unknown>;
+    json?: Record<string, JsonKeyPatch>;
+    expect: { key: string; id: string; state: string };
+  }
+): { applied: boolean } {
+  assertPatchable(input);
+  const { expect: want, ...patch } = input;
+  const run = (): { applied: boolean } => {
+    const rec = readStoreRecord(sql, meta, storeId, ['settings']);
+    const cur = (rec?.record.settings as Record<string, unknown> | null | undefined)?.[want.key] as
+      | { id?: unknown; state?: unknown }
+      | undefined;
+    if (!cur || typeof cur !== 'object' || cur.id !== want.id || cur.state !== want.state) {
+      return { applied: false };
+    }
+    patchInTransaction(sql, meta, storeId, patch);
+    return { applied: true };
+  };
+  return sql.transactionSync ? sql.transactionSync(run) : run();
+}
+
+function assertPatchable(input: { json?: Record<string, JsonKeyPatch> }): void {
+  for (const n of Object.keys(input.json ?? {}))
     if (!(PATCHABLE_JSON_FIELDS as readonly string[]).includes(n))
       throw Object.assign(new Error(`Store.${n} is not a patchable JSON field`), {
         code: 'PATCH_FIELD_REFUSED',
       });
-  const run = () => {
-    const fields: Record<string, unknown> = { ...(input.fields ?? {}) };
-    if (jsonNames.length) {
-      const rec = readStoreRecord(sql, meta, storeId, jsonNames);
-      if (!rec)
-        throw Object.assign(new Error('store_profile row is missing (import it first)'), {
-          code: 'STORE_PROFILE_MISSING',
-        });
-      for (const n of jsonNames) {
-        const patch = (input.json as Record<string, JsonKeyPatch>)[n];
-        const cur = rec.record[n];
-        const next: Record<string, unknown> = {
-          ...(cur && typeof cur === 'object' && !Array.isArray(cur)
-            ? (cur as Record<string, unknown>)
-            : {}),
-          ...(patch.set ?? {}),
-        };
-        for (const k of patch.remove ?? []) delete next[k];
-        fields[n] = next;
-      }
+}
+
+/** The body of the patch, for a caller that already holds the DO's synchronous transaction. */
+function patchInTransaction(
+  sql: SqlRunner,
+  meta: Meta,
+  storeId: string,
+  input: { fields?: Record<string, unknown>; json?: Record<string, JsonKeyPatch> }
+): { profile: string[]; config: string[]; directoryOnly: string[] } {
+  const jsonNames = Object.keys(input.json ?? {});
+  const fields: Record<string, unknown> = { ...(input.fields ?? {}) };
+  if (jsonNames.length) {
+    const rec = readStoreRecord(sql, meta, storeId, jsonNames);
+    if (!rec)
+      throw Object.assign(new Error('store_profile row is missing (import it first)'), {
+        code: 'STORE_PROFILE_MISSING',
+      });
+    for (const n of jsonNames) {
+      const patch = (input.json as Record<string, JsonKeyPatch>)[n];
+      const cur = rec.record[n];
+      const next: Record<string, unknown> = {
+        ...(cur && typeof cur === 'object' && !Array.isArray(cur)
+          ? (cur as Record<string, unknown>)
+          : {}),
+        ...(patch.set ?? {}),
+      };
+      for (const k of patch.remove ?? []) delete next[k];
+      fields[n] = next;
     }
-    return applyStoreSettings(sql, meta, storeId, fields, { inTransaction: true });
-  };
-  return sql.transactionSync ? sql.transactionSync(run) : run();
+  }
+  return applyStoreSettings(sql, meta, storeId, fields, { inTransaction: true });
 }
 
 /**

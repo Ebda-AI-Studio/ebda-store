@@ -42,6 +42,7 @@ import {
   type MoneyAnswer,
   applyStoreSettings,
   patchStoreSettings,
+  patchStoreSettingsIf,
   bootstrapStoreRows,
   readStoreRecord,
   encodeRpc,
@@ -635,6 +636,38 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       return {
         ok: true,
         data: patchStoreSettings(doSqlRunner(this.ctx.storage), meta, storeId, input),
+      };
+    } catch (e) {
+      if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
+      const err = e as { code?: string };
+      return { ok: false, code: err.code ?? 'SETTINGS_REFUSED', status: 409 };
+    }
+  }
+
+  /**
+   * The CONDITIONAL settings patch (STORE-LIFECYCLE-1 h): check `settings[expect.key]` is still `{id, state}` and write, in the same
+   * synchronous transaction. `applied: false` = the condition no longer held, nothing was written.
+   */
+  async patchSettingsIf(
+    storeId: string,
+    inputJson: string,
+    expectJson: string
+  ): Promise<Result<{ applied: boolean }>> {
+    try {
+      this.bind(storeId);
+      if (isStoreClosed(this.sync)) return { ok: false, code: 'STORE_CLOSED', status: 410 };
+      const meta = (await import('@ebda-src/prisma-meta')).default as unknown as Meta;
+      const input = decodeRpc<{
+        fields?: Record<string, unknown>;
+        json?: Record<string, { set?: Record<string, unknown>; remove?: string[] }>;
+      }>(inputJson);
+      const expect = decodeRpc<{ key: string; id: string; state: string }>(expectJson);
+      return {
+        ok: true,
+        data: patchStoreSettingsIf(doSqlRunner(this.ctx.storage), meta, storeId, {
+          ...input,
+          expect,
+        }),
       };
     } catch (e) {
       if (e instanceof StoreMismatch) return { ok: false, code: 'STORE_MISMATCH', status: 403 };
