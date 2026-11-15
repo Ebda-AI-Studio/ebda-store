@@ -7817,7 +7817,8 @@
     "contactCta": "تواصل معنا",
     "requiresFeature": "يحتاج ميزة «{feature}».",
     "alsoIncluded": "موجود كمان في الباقة دي",
-    "getAddonCta": "خدها كإضافة"
+    "getAddonCta": "خدها كإضافة",
+    "orAddFeature": "أو ضيف الميزة دي بس بـ {price} في الشهر."
   },
   "aiTools": {
     "title": "أدوات الذكاء الاصطناعي",

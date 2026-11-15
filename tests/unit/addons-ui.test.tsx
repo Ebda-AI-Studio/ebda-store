@@ -110,6 +110,7 @@ beforeEach(() => {
   api.get.mockReset();
   api.post.mockReset();
   api.request.mockReset();
+  api.get.mockResolvedValue({}); // the locked-screen price lookup finds nothing unless a test says otherwise
   let n = 0;
   Object.defineProperty(globalThis, 'crypto', {
     value: { randomUUID: vi.fn(() => `key-${++n}`) },
@@ -354,8 +355,20 @@ describe('locked screens offer the buy path', () => {
     expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
   });
 
+  it('FeatureUpgradeGate: shows the one-feature monthly price next to the upgrade (ar + en copy keys)', async () => {
+    api.get.mockResolvedValue({
+      data: { addons: [{ sku: 'feature:loyalty', priceMinor: 9900 }] },
+    });
+    render(<FeatureUpgradeGate featureKey="loyalty" storeId="s1" />);
+    const line = await screen.findByTestId('addon-price-line');
+    expect(line.textContent).toBe('orAddFeature');
+    const en = (await import('../../apps/admin/src/i18n/messages/en.json')).default as any;
+    const ar = (await import('../../apps/admin/src/i18n/messages/ar.json')).default as any;
+    for (const m of [en, ar]) expect(m.featureUpgrade.orAddFeature).toContain('{price}');
+  });
+
   it('FeatureUpgradeGate: a plan-only feature keeps the plan upsell and contact link', () => {
-    render(<FeatureUpgradeGate featureKey="inventory.backorder" storeId="s1" />);
+    render(<FeatureUpgradeGate featureKey="whatsapp" storeId="s1" />);
     expect(screen.queryByTestId('get-addon-cta')).toBeNull();
     expect(document.querySelector('a[href^="mailto:"]')).not.toBeNull();
   });
@@ -373,7 +386,7 @@ describe('locked screens offer the buy path', () => {
     cleanup();
     render(
       <PlanLockedCard
-        info={{ status: 403, code: 'FEATURE_DISABLED', details: { feature: 'coupons' } }}
+        info={{ status: 403, code: 'FEATURE_DISABLED', details: { feature: 'whatsapp' } }}
         message=""
       />
     );

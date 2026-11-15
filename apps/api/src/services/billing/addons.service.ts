@@ -37,6 +37,7 @@ import {
 import { activeAddons, appendRenewalMarker } from './addon-grant';
 import { deriveAddonState, type AttemptRow } from './addon-state';
 import { instapayHandle } from './manual-config';
+import { canBuyFeatureOnPlan } from '@ebda/shared';
 
 const RECENT_ATTEMPTS = 100;
 
@@ -99,7 +100,12 @@ export async function quoteAddon(
     withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true, owner: { select: { email: true, firstName: true } } },
+        select: {
+          name: true,
+          plan: true,
+          settings: true,
+          owner: { select: { email: true, firstName: true } },
+        },
       })
     ),
     withStore(storeId, tx => tx.storeSubscription.findUnique({ where: { storeId } })),
@@ -110,6 +116,17 @@ export async function quoteAddon(
     throw new AppError(409, 'NO_BILLING_EMAIL', 'The store owner has no email address');
   if (sub?.status === 'comped')
     throw new AppError(409, 'STORE_COMPED', 'Comped stores are not billed');
+  if (item.kind === 'feature' && !canBuyFeatureOnPlan(String(store.plan), item.featureKey!)) {
+    // Business holds every feature; Free picks a plan first; Basic/Growth only buy what their own plan lacks.
+    const topPlan = store.plan === 'enterprise';
+    throw new AppError(
+      409,
+      topPlan ? 'ALREADY_INCLUDED' : 'ADDON_NOT_FOR_PLAN',
+      topPlan
+        ? 'Your plan already includes this feature'
+        : 'This feature cannot be added to your current plan. Choose a plan first.'
+    );
+  }
   if (item.kind === 'feature') {
     // A super-admin "off" (abuse, dispute) is never sold around: the owner contacts support instead.
     const off = await withStore(storeId, tx =>
@@ -324,7 +341,7 @@ async function addonClaims(storeId: string, take: number) {
 
 export async function listAddons(storeId: string) {
   const now = new Date();
-  const [running, features, withoutAddons, overrides, rows, claims, ai, aiByFeature] =
+  const [running, features, withoutAddons, overrides, rows, claims, ai, aiByFeature, planRow] =
     await Promise.all([
       withStore(storeId, tx => activeAddons(tx, storeId, now)),
       featureService.getStoreFeatures(storeId),
@@ -339,6 +356,9 @@ export async function listAddons(storeId: string) {
       addonClaims(storeId, RECENT_ATTEMPTS),
       storeAiAllowance(storeId),
       storeAiUsageByFeature(storeId),
+      withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+      ),
     ]);
   const overrideOn = new Set(overrides.map(o => o.featureKey));
   let cardAvailable = true;
@@ -351,7 +371,7 @@ export async function listAddons(storeId: string) {
     cardAvailable,
     instapayAvailable: instapayHandle() !== null,
     termDays: ADDON_TERM_DAYS,
-    addons: Object.values(ADDON_CATALOG).map(i => {
+    addons: Object.values(ADDON_CATALOG).flatMap(i => {
       const mine = running
         .filter(r => r.sku === i.sku)
         .sort((x, y) => y.endsAt.getTime() - x.endsAt.getTime());
@@ -376,25 +396,37 @@ export async function listAddons(storeId: string) {
         claim: claims.find(c => skuOfPlanCode(c.planCode) === i.sku) ?? null,
         now,
       });
-      return {
-        sku: i.sku,
-        kind: i.kind,
-        featureKey: i.featureKey ?? null,
-        nameEn: i.nameEn,
-        nameAr: i.nameAr,
-        descEn: i.descEn,
-        descAr: i.descAr,
-        previewImage: i.previewImage ?? null,
-        priceMinor: i.priceMinor,
-        aiExtraRequests: i.aiExtraRequests ?? null,
-        state,
-        includedInPlan: state === 'included' || state === 'granted',
-        // `features` already contains the paid term; kept so a reader can see the live gate answer too.
-        enabled: isFeature ? features[i.featureKey!] === true : null,
-        active: mine[0]
-          ? { endsAt: mine[0].endsAt, cancelAtPeriodEnd: mine[0].cancelAtPeriodEnd }
-          : null,
-      };
+      // Sellable set = Business baseline minus the store's own plan (computed): a feature this store cannot buy is not
+      // offered at all, unless it is already running or waiting (so a downgrade never hides a paid term).
+      const waiting = state === 'waiting_confirmation' || state === 'pending_payment';
+      if (
+        isFeature &&
+        !canBuyFeatureOnPlan(String(planRow?.plan), i.featureKey!) &&
+        !mine[0] &&
+        !waiting
+      )
+        return [];
+      return [
+        {
+          sku: i.sku,
+          kind: i.kind,
+          featureKey: i.featureKey ?? null,
+          nameEn: i.nameEn,
+          nameAr: i.nameAr,
+          descEn: i.descEn,
+          descAr: i.descAr,
+          previewImage: i.previewImage ?? null,
+          priceMinor: i.priceMinor,
+          aiExtraRequests: i.aiExtraRequests ?? null,
+          state,
+          includedInPlan: state === 'included' || state === 'granted',
+          // `features` already contains the paid term; kept so a reader can see the live gate answer too.
+          enabled: isFeature ? features[i.featureKey!] === true : null,
+          active: mine[0]
+            ? { endsAt: mine[0].endsAt, cancelAtPeriodEnd: mine[0].cancelAtPeriodEnd }
+            : null,
+        },
+      ];
     }),
     ai: {
       ...ai,

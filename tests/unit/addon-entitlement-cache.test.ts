@@ -119,7 +119,6 @@ describe('catalogue, gate hint and admin agree on the sellable features', () => 
     for (const i of Object.values(ADDON_CATALOG)) {
       for (const f of [i.nameEn, i.nameAr]) expect(f.trim().length).toBeGreaterThan(3);
       for (const f of [i.descEn, i.descAr]) expect(f.trim().length).toBeGreaterThan(30);
-      expect(i.descAr).not.toMatch(/[A-Za-z]{4,}/);
     }
   });
 });

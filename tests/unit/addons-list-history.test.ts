@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   created: [] as Array<Record<string, any>>,
   claims: [] as Array<Record<string, any>>,
   aiByFeature: [] as Array<{ feature: string; count: number }>,
+  plan: 'starter' as string,
 }));
 
 vi.mock('@api/services/feature.service', () => ({
@@ -65,6 +66,7 @@ const tx = {
       return data;
     },
   },
+  store: { findUnique: async () => ({ plan: h.plan }) },
   storeFeature: { findMany: async () => h.overrides },
   manualPaymentClaim: {
     findMany: async ({ where }: any) =>
@@ -109,6 +111,7 @@ beforeEach(() => {
   h.created = [];
   h.claims = [];
   h.aiByFeature = [];
+  h.plan = 'starter';
   h.overrides = [];
   h.withoutAddons = {};
   h.allFeatures = {};

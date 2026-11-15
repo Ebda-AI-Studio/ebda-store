@@ -150,6 +150,7 @@ function fakeTx() {
     store: {
       findUnique: async () => ({
         name: 'Shop',
+        plan: 'starter',
         settings: {},
         owner: { email: 'm@x.test', firstName: 'M' },
       }),

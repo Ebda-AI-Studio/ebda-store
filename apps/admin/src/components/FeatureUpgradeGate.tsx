@@ -17,6 +17,7 @@
  *   to UPGRADE_CONTACT_WHATSAPP below. Ahmad can swap the number in one place.
  */
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
@@ -27,8 +28,10 @@ import {
   lowestPlanForFeature,
   publicPlanLabelForFeature,
   addonSkuForFeature,
+  formatMoney,
   type FeatureKey,
 } from '@ebda/shared';
+import { apiGet } from '../lib/api';
 
 // ─── Contact constant ─────────────────────────────────────────────────────────
 
@@ -75,6 +78,21 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
   const upgradeLink = buildUpgradeMailto(storeId, featureName);
   // A feature the owner can buy outside the plan: the primary path is the Add-ons page, never "contact support".
   const addonSku = addonSkuForFeature(featureKey);
+  const [addonPrice, setAddonPrice] = useState<number | null>(null);
+  useEffect(() => {
+    // The owner's own price for this one feature ("add just this feature for EGP X a month"); no price, no promise.
+    if (!addonSku) return;
+    let live = true;
+    void apiGet<{ addons: Array<{ sku: string; priceMinor: number }> }>(
+      `/api/v1/stores/${storeId}/billing/addons`
+    ).then(r => {
+      const hit = r.data?.addons.find(a => a.sku === addonSku);
+      if (live && hit) setAddonPrice(hit.priceMinor);
+    });
+    return () => {
+      live = false;
+    };
+  }, [addonSku, storeId]);
   const addonLink = addonSku
     ? `/stores/${encodeURIComponent(storeId)}/billing/addons?sku=${encodeURIComponent(addonSku)}`
     : null;
@@ -164,6 +182,18 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
                   dir={isAr ? 'rtl' : 'ltr'}
                 >
                   {t('availableOn', { plan: planLabel })}
+                </p>
+              )}
+
+              {addonLink && addonPrice !== null && (
+                <p
+                  className="text-sm text-foreground/80 mb-6"
+                  dir={isAr ? 'rtl' : 'ltr'}
+                  data-testid="addon-price-line"
+                >
+                  {t('orAddFeature', {
+                    price: formatMoney(addonPrice, isAr ? 'ar' : 'en', { fixedDecimals: true }),
+                  })}
                 </p>
               )}
 

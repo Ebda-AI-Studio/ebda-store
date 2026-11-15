@@ -39,7 +39,7 @@ describe('requireFeature add-on hint', () => {
     expect(r.body.error.details.addonSku).toBe('feature:loyalty');
   });
   it('plan-only feature: no addon hint', async () => {
-    const r = await run('inventory.backorder');
+    const r = await run('whatsapp');
     expect(r.status).toBe(403);
     expect(r.body.error.details.addonSku).toBeUndefined();
   });

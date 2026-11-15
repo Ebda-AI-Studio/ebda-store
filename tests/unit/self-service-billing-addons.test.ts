@@ -14,7 +14,12 @@ const h = vi.hoisted(() => ({
   chargeFor: vi.fn(),
   createCheckout: vi.fn(),
   events: [] as Array<Record<string, any>>,
-  storeRow: { name: 'Shop', settings: {}, owner: { email: 'm@x.test', firstName: 'M' } } as any,
+  storeRow: {
+    name: 'Shop',
+    plan: 'starter',
+    settings: {},
+    owner: { email: 'm@x.test', firstName: 'M' },
+  } as any,
   sub: null as any,
   features: {} as Record<string, boolean>,
   countAiUsage: vi.fn(),
@@ -148,14 +153,14 @@ beforeEach(() => {
 });
 
 describe('catalog', () => {
-  it('feature add-ons are real, visible add-on-tier registry keys with integer positive prices', async () => {
+  it('feature add-ons are real, visible Business-baseline registry keys with integer positive prices', async () => {
     const { ADDON_CATALOG } = await import('@api/services/billing/addon-catalog');
-    const { FEATURE_REGISTRY } = await import('@ebda/shared');
+    const { FEATURE_REGISTRY, PLAN_BASELINE } = await import('@ebda/shared');
     for (const a of Object.values(ADDON_CATALOG)) {
       expect(Number.isSafeInteger(a.priceMinor) && a.priceMinor > 0).toBe(true);
       if (a.kind === 'feature') {
         const def = (FEATURE_REGISTRY as any)[a.featureKey!];
-        expect(def?.tier).toBe('addon');
+        expect(PLAN_BASELINE.enterprise).toContain(a.featureKey);
         expect(def?.hidden).not.toBe(true);
       }
     }

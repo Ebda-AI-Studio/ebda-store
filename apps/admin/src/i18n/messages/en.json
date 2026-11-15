@@ -7817,7 +7817,8 @@
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
     "alsoIncluded": "Also included in this plan",
-    "getAddonCta": "Get this add-on"
+    "getAddonCta": "Get this add-on",
+    "orAddFeature": "Or add just this feature for {price} a month."
   },
   "aiTools": {
     "title": "AI Tools",

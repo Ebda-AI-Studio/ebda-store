@@ -20,6 +20,7 @@ export * from './utils';
 export * from './csv-utils';
 export * from './features';
 export * from './plan-baselines';
+export * from './addon-sellable';
 export * from './notifications';
 export * from './schemas/location';
 export * from './schemas/plan-limits';

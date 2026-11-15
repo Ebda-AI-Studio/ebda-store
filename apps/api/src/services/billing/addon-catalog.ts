@@ -11,7 +11,7 @@
  * the D1 split, erasure and tenant-guard snapshots. The prefix keeps every plan reader safe: `plans` has no such code,
  * so each of them fails closed on it.
  */
-import type { FeatureKey } from '@ebda/shared';
+import { FEATURE_REGISTRY, addonFeatureKeys, type FeatureKey } from '@ebda/shared';
 
 export const ADDON_TERM_DAYS = 30;
 export const ADDON_PLAN_PREFIX = 'addon:';
@@ -38,66 +38,28 @@ export interface AddonItem {
 }
 
 const FEATURE_PRICE_MINOR = 9900;
-const feature = (
-  key: FeatureKey,
-  nameEn: string,
-  nameAr: string,
-  descEn: string,
-  descAr: string
-): AddonItem => ({
-  sku: `feature:${key}`,
-  kind: 'feature',
-  featureKey: key,
-  priceMinor: FEATURE_PRICE_MINOR,
-  nameEn,
-  nameAr,
-  descEn,
-  descAr,
-});
+/**
+ * One add-on per feature Business holds (`addonFeatureKeys`, computed from the plan baselines, never hand-listed). Name and
+ * description come from the feature registry (en + ar). Whether a given STORE may buy it is decided per store at quote time
+ * (`canBuyFeatureOnPlan`). The flat placeholder price is replaced per feature once Ahmad approves a price list.
+ */
+const featureItems = (): AddonItem[] =>
+  addonFeatureKeys().map(key => {
+    const def = FEATURE_REGISTRY[key];
+    return {
+      sku: `feature:${key}`,
+      kind: 'feature' as const,
+      featureKey: key,
+      priceMinor: FEATURE_PRICE_MINOR,
+      nameEn: def.name,
+      nameAr: def.nameAr,
+      descEn: def.description,
+      descAr: def.descriptionAr,
+    };
+  });
 
 const ITEMS: AddonItem[] = [
-  feature(
-    'floating_widget',
-    'Floating Widget',
-    'الزر العائم',
-    'A button that floats on every page of your store so shoppers can reach WhatsApp, a call or a link in one tap.',
-    'زر بيطفو على كل صفحات متجرك، فالعميل يوصلك على واتساب أو يكلمك أو يفتح لينك بضغطة واحدة.'
-  ),
-  feature(
-    'customer_wallet_checkout',
-    'Pay with Wallet at Checkout',
-    'الدفع من المحفظة عند الشراء',
-    'Customers spend the balance in their wallet when they check out, so refunds and credits turn into repeat orders.',
-    'العميل يدفع من رصيد محفظته وهو بيكمل الطلب، فالمبالغ المرجّعة والرصيد بيرجعوا لك طلبات تانية.'
-  ),
-  feature(
-    'loyalty',
-    'Loyalty Program',
-    'برنامج الولاء',
-    'Customers earn points on every order and redeem them for discounts, which brings them back to buy again.',
-    'العميل بيكسب نقاط على كل طلب ويستبدلها بخصم، فبيرجع يشتري تاني.'
-  ),
-  feature(
-    'upsell_crosssell',
-    'Upsell & Cross-sell',
-    'البيع الإضافي',
-    'Suggest related products on the product page and in the cart to raise the value of each order.',
-    'اقترح منتجات مكمّلة في صفحة المنتج وفي السلة عشان قيمة كل طلب تزيد.'
-  ),
-  feature(
-    'push_notifications',
-    'Push Notifications',
-    'الإشعارات',
-    'Send a notification to the phones and browsers of shoppers who allowed it, for offers and order updates.',
-    'ابعت إشعار على موبايلات ومتصفحات العملاء اللي وافقوا عليه، للعروض وتحديثات الطلبات.'
-  ),
-  feature(
-    'affiliate',
-    'Affiliate Program',
-    'برنامج التسويق بالعمولة',
-    'Let partners promote your store with their own link and earn a commission on the orders they bring.',
-    'خلّي شركاءك يسوّقوا لمتجرك بلينك خاص بيهم ويكسبوا عمولة على الطلبات اللي بيجيبوها.'
-  ),
+  ...featureItems(),
   {
     sku: 'ai:topup_300',
     kind: 'ai_topup',
