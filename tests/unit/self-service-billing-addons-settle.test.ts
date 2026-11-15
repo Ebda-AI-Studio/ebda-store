@@ -177,6 +177,18 @@ describe('refund of an add-on payment', () => {
     await refundCharge({ eventId: 'c1', provider });
     expect(inv.invalidate).toHaveBeenCalledWith('s1');
   });
+  it('an InstaPay add-on payment is never sent to the card gateway for a refund (push-only: staff refund outside it)', async () => {
+    const refund = vi.fn(async () => ({ status: 'succeeded', refundId: 'r1' }));
+    refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
+      where.id === 'c1'
+        ? { ...charge('addon:feature:loyalty'), provider: 'instapay', providerRef: 'TXN123' }
+        : { id: where.id, relatedEventId: 'c1', storeId: 's1' }
+    );
+    await expect(
+      refundCharge({ eventId: 'c1', provider: { name: 'kashier', refund } as any })
+    ).rejects.toMatchObject({ code: 'NOT_REFUNDABLE' });
+    expect(refund).not.toHaveBeenCalled();
+  });
   it('a plan refund does not touch the feature cache from this path', async () => {
     refundTx.billingEvent.findUnique.mockImplementation(async ({ where }: any) =>
       where.id === 'c1' ? charge('growth') : { id: where.id, relatedEventId: 'c1', storeId: 's1' }

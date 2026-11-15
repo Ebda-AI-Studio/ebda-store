@@ -71,7 +71,14 @@ export async function renewDueAddons(now: Date, providerArg?: BillingProvider): 
           planCode: { startsWith: `${ADDON_PLAN_PREFIX}feature:` },
           forPeriodEnd: { gte: addDays(now, -LAPSE_DAYS), lte: addDays(now, NOTICE_AHEAD_DAYS) },
         },
-        select: { id: true, storeId: true, planCode: true, forPeriodEnd: true, amountMinor: true },
+        select: {
+          id: true,
+          storeId: true,
+          planCode: true,
+          forPeriodEnd: true,
+          amountMinor: true,
+          provider: true,
+        },
       }),
     {
       onStoreError: (storeId, err) =>
@@ -109,6 +116,14 @@ export async function renewDueAddons(now: Date, providerArg?: BillingProvider): 
       const running = await withStore(c.storeId, tx => activeAddons(tx, c.storeId, now));
       if (running.some(r => r.sku === sku && r.endsAt.getTime() > end.getTime())) continue;
       if (!(await isBillableStoreId(c.storeId))) continue;
+
+      // An InstaPay (or other manual) term can NEVER be renewed by us: nothing can be charged, and settling a row would
+      // record a payment that did not happen (Ruling ADDON-SS-6). The owner is told once before it ends and renews by
+      // paying again, which opens a NEW approval-queue claim.
+      if (c.provider === 'instapay' || c.provider === 'manual') {
+        if (end.getTime() > now.getTime()) await notice('renew_via_instapay');
+        continue;
+      }
 
       // Would the charge surprise the owner? Then no charge and a notice; they buy again to consent anew.
       const off = await withStore(c.storeId, tx =>

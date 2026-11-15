@@ -253,6 +253,7 @@ export default function AddonsPage() {
   const row = (a: AddonRow) => {
     const canBuy =
       a.kind === 'ai_topup' ||
+      a.state === 'active' || // an InstaPay term does not renew: paying again extends it
       a.state === 'available' ||
       a.state === 'failed' ||
       a.state === 'rejected' ||

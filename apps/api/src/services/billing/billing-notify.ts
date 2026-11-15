@@ -39,7 +39,8 @@ export type BillingEffect =
         | 'now_included'
         | 'disabled'
         | 'renewal_declined'
-        | 'no_card';
+        | 'no_card'
+        | 'renew_via_instapay';
       endsAt: Date;
       amountMinor: number;
     }
@@ -143,6 +144,10 @@ function addonNoticeCopy(
       `${v.name} was not renewed: no saved card`,
       `There is no saved card on your store, so ${v.name} ends on ${v.date}. Save a card in Billing and buy it again from Add-ons.`,
     ],
+    renew_via_instapay: [
+      `${v.name} ends on ${v.date}`,
+      `You paid for ${v.name} by InstaPay, which cannot renew by itself. To keep it, open Add-ons before ${v.date} and pay by InstaPay again. Ebda Store confirms the new transfer and the days are added after your current term.`,
+    ],
   } as const;
   const ar = {
     renewal_upcoming: [
@@ -169,6 +174,10 @@ function addonNoticeCopy(
       `${v.name} ماتجددتش: مفيش كارت محفوظ`,
       `مفيش كارت محفوظ على متجرك، فـ ${v.name} هتخلص يوم ${v.date}. احفظ كارت من الفوترة واشتريها تاني من الإضافات.`,
     ],
+    renew_via_instapay: [
+      `${v.name} هتخلص يوم ${v.date}`,
+      `دفعت ثمن ${v.name} بإنستاباي، وإنستاباي مبيتجددش لوحده. عشان تكمّل، افتح الإضافات قبل ${v.date} وادفع بإنستاباي تاني. ابدأ ستور بيأكد التحويل الجديد والأيام بتتضاف بعد المدة الحالية.`,
+    ],
   } as const;
   const [title, body] = (lang === 'ar' ? ar : en)[reason];
   return { title, body };
@@ -191,7 +200,16 @@ async function runOne(effect: BillingEffect): Promise<void> {
     }).catch(() => undefined);
     // Lazy import: subscription-billing imports this module.
     const { refundCharge } = await import('./subscription-billing.service.js');
-    await refundCharge({ eventId: effect.billingEventId });
+    try {
+      await refundCharge({ eventId: effect.billingEventId });
+    } catch (err) {
+      // An InstaPay payment cannot be refunded through the card gateway: staff hand the money back outside it.
+      void sendAlert({
+        level: 'p1',
+        title: 'Add-on paid but not deliverable: refund by hand',
+        body: `billing_events ${effect.billingEventId} (store ${effect.storeId}) could not be refunded automatically (${(err as Error).message}). If it was paid by InstaPay, send the money back outside the gateway.`,
+      }).catch(() => undefined);
+    }
     return;
   }
   const ctx = await storeContext(effect.storeId);

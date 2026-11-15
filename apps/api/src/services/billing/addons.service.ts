@@ -366,7 +366,8 @@ export async function listAddons(storeId: string) {
       const isFeature = i.kind === 'feature';
       const on = isFeature && withoutAddons[i.featureKey!] === true;
       const state = deriveAddonState({
-        renews: renewsEachTerm(i),
+        // An InstaPay term cannot renew by itself (ADDON-SS-6): it shows as active until its end date.
+        renews: renewsEachTerm(i) && mine[0]?.provider !== 'instapay',
         isFeature,
         running: mine[0] ?? null,
         onWithoutAddon: on,

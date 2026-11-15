@@ -1310,6 +1310,7 @@ export async function sweepStuckCharges(
           storeId: true,
           idempotencyKey: true,
           providerRef: true,
+          provider: true,
           createdAt: true,
         },
       }),
@@ -1317,7 +1318,9 @@ export async function sweepStuckCharges(
       onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] stuck scan failed'),
     }
   );
-  const rows = parts.flatMap(p => p.value);
+  // An InstaPay add-on row is pending only between the claim and a super admin's approval retry: the card gateway has
+  // never heard of it, so asking it would answer "never taken" and fail a payment that was made.
+  const rows = parts.flatMap(p => p.value).filter(r => r.provider !== 'instapay');
   let active: BillingProvider | null = provider ?? null;
   if (!active && rows.length > 0) {
     try {
@@ -2085,6 +2088,10 @@ export async function refundCharge(args: {
   if (charge.type === 'manual_payment' || charge.type === 'card_setup') {
     // A manual payment was never taken by the gateway; a card setup took nothing.
     throw new AppError(409, 'NOT_REFUNDABLE', 'Refund manual payments outside the gateway');
+  }
+  if (charge.provider === 'instapay') {
+    // InstaPay is push-only: its providerRef is the payer's transfer id, which the card gateway cannot refund.
+    throw new AppError(409, 'NOT_REFUNDABLE', 'Refund InstaPay payments outside the gateway');
   }
   if (charge.status !== 'succeeded' || !charge.providerRef) {
     throw new AppError(409, 'NOT_REFUNDABLE', 'Only a succeeded charge can be refunded');
