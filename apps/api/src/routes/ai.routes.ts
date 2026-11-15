@@ -23,6 +23,8 @@ import {
 import { proposeBuilderPatch } from '../services/builder-ai-patch.service';
 import { BUILDER_PAGE_KEYS } from '../services/page-builder.service';
 import { AppError } from '../middleware/error-handler';
+import { getAiQuotaRemaining } from '../lib/ai-quota';
+import { estimateBulkAiRequests, isBulkAiKind } from '../lib/ai-bulk-estimate';
 import { inngest } from '../lib/inngest/client';
 import { generateProductFaqs } from '../lib/ai/product-faq-generator';
 import { generateProductMetaAeo } from '../lib/ai/product-meta-aeo-generator';
@@ -627,6 +629,27 @@ router.get('/bulk', async (req: Request, res: Response, next: NextFunction) => {
       },
     });
     res.json({ success: true, data: { jobs } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Read-only cost estimate for a bulk sweep (G18): the AI requests the run can use (upper bound, smart-skip lowers it)
+// against what the store may still spend today. Registered BEFORE `/bulk/:jobId` so `estimate` is not read as a job id.
+router.get('/bulk/estimate', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const { kind } = z.object({ kind: z.string().max(40) }).parse(req.query);
+    if (!isBulkAiKind(kind)) throw new AppError(400, 'VALIDATION_ERROR', 'Unknown bulk AI kind');
+    const products = await (
+      await storeDb(currentStoreId())
+    ).product.count({ where: { storeId, status: 'active', deletedAt: null } });
+    const requests = estimateBulkAiRequests(kind, products);
+    const quota = await getAiQuotaRemaining(storeId);
+    res.json({
+      success: true,
+      data: { kind, products, requests, ...quota, allowed: requests <= quota.remaining },
+    });
   } catch (error) {
     next(error);
   }

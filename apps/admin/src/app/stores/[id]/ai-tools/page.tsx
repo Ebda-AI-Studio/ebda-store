@@ -203,8 +203,54 @@ export default function AiToolsPage() {
     return () => clearInterval(interval);
   }, [activeMaster, fetchMasterJobs, fetchJobs]);
 
+  type BulkEstimate = {
+    products: number;
+    requests: number;
+    remaining: number;
+    limitedBy: 'store_daily' | 'global_daily' | 'monthly';
+    allowed: boolean;
+  };
+
+  /**
+   * G18: before any bulk run, show what it can cost against the store's remaining AI quota, and refuse when it
+   * cannot fit. Read-only endpoint; the server still enforces the cap per call, so a failed estimate never blocks.
+   * Returns true when the run may go ahead.
+   */
+  async function confirmEstimate(kind: string): Promise<boolean> {
+    const { data } = await apiGet<BulkEstimate>(
+      `/api/v1/stores/${storeId}/ai/bulk/estimate?kind=${encodeURIComponent(kind)}`
+    );
+    if (!data || data.requests === 0) return true;
+    const limitKey = {
+      store_daily: 'estimateLimitStoreDaily',
+      global_daily: 'estimateLimitGlobalDaily',
+      monthly: 'estimateLimitMonthly',
+    }[data.limitedBy] as 'estimateLimitStoreDaily';
+    if (!data.allowed) {
+      setError(
+        t('estimateBlocked', {
+          requests: data.requests,
+          remaining: data.remaining,
+          limit: t(limitKey),
+        })
+      );
+      return false;
+    }
+    return askConfirm({
+      object: t('estimateObject'),
+      consequence: t('estimateConsequence', {
+        requests: data.requests,
+        products: data.products,
+        remaining: data.remaining,
+      }),
+      confirmLabel: t('estimateAction'),
+      tone: 'default',
+    });
+  }
+
   async function startTranslate(direction: 'to_ar' | 'to_en') {
     setError(null);
+    if (!(await confirmEstimate('translate'))) return;
     setStarting(direction === 'to_ar' ? 'translate-ar' : 'translate-en');
     try {
       const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
@@ -228,6 +274,8 @@ export default function AiToolsPage() {
 
   /** Shared single-job starter. Handles smart-skip (default) and force paths. */
   async function start(endpoint: string, key: StartingKey, body: object = {}, force = false) {
+    setError(null);
+    if (!(await confirmEstimate(endpoint.replace(/^\/bulk\//, '')))) return;
     if (force) {
       const ok = await askConfirm({
         object: t('replaceObject'),

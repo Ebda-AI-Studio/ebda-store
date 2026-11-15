@@ -8111,7 +8111,14 @@
     "replaceAction": "Replace content",
     "cancelObject": "The running sweep",
     "cancelConsequence": "It stops. Items already processed keep their changes.",
-    "cancelAction": "Stop sweep"
+    "cancelAction": "Stop sweep",
+    "estimateObject": "This AI run",
+    "estimateConsequence": "It uses up to {requests} of your AI requests ({products} products). You have {remaining} left today; products that are already filled are skipped, so it usually uses fewer.",
+    "estimateAction": "Start the run",
+    "estimateBlocked": "This run needs up to {requests} AI requests but you only have {remaining} left ({limit}). Try again after the reset, or run it on fewer products.",
+    "estimateLimitStoreDaily": "your store's daily limit, resets at 00:00 UTC",
+    "estimateLimitGlobalDaily": "the platform's daily AI limit, resets at 00:00 UTC",
+    "estimateLimitMonthly": "the monthly AI limit, resets next month"
   },
   "account": {
     "security": {

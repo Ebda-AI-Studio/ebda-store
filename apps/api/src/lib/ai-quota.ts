@@ -78,29 +78,22 @@ const DEFAULT_MONTHLY_REQUEST_CAP = 20000;
 // AI_STORE_DAILY_REQUEST_CAP.
 const DEFAULT_STORE_DAILY_REQUEST_CAP = 150;
 
-/**
- * Enforce the platform AI request caps BEFORE spending a Gemini call.
- *
- * Layers (checked in order):
- *  1. per-store daily slice — `storeId` callers are bounded to their own
- *     share so a single tenant cannot exhaust the platform budget;
- *  2. global daily cap — KEPT: it protects the real Google project ceiling
- *     (~500 req/day free tier). `bulk: true` callers (background sweeps)
- *     stop an interactive-reserve below it (AI_DAILY_INTERACTIVE_RESERVE,
- *     default 20% of the daily cap) so a sweep can never zero out the
- *     interactive features (translate button, palette, answer-engine) for
- *     the whole platform;
- *  3. global monthly cap.
- *
- * Callers SHOULD pass their storeId; a no-arg call still enforces the
- * global caps (backward compatible).
- */
-export async function assertAiQuota(
-  opts: { storeId?: string; bulk?: boolean } = {}
-): Promise<void> {
-  // The merchant's own switch comes first: off means no AI spend at all for this store.
-  if (opts.storeId) await assertStoreAiEnabled(opts.storeId);
+type AiQuotaWindow = {
+  today: number;
+  thisMonth: number;
+  storeToday: number;
+  dailyCap: number;
+  monthlyCap: number;
+  storeDailyCap: number;
+  interactiveReserve: number;
+  effectiveDailyCap: number;
+};
 
+/** The usage counts and resolved caps shared by the enforcing check and the read-only remaining-quota estimate. */
+async function readAiQuotaWindow(opts: {
+  storeId?: string;
+  bulk?: boolean;
+}): Promise<AiQuotaWindow> {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const startOfMonth = new Date();
@@ -148,6 +141,51 @@ export async function assertAiQuota(
     10
   );
 
+  // Interactive headroom: bulk sweeps hit their ceiling before the global
+  // cap so live single-call features keep working after a sweep saturates.
+  const reserveEnv = parseInt(process.env.AI_DAILY_INTERACTIVE_RESERVE ?? '', 10);
+  const interactiveReserve = Number.isFinite(reserveEnv) ? reserveEnv : Math.ceil(dailyCap * 0.2);
+  const effectiveDailyCap = opts.bulk ? Math.max(0, dailyCap - interactiveReserve) : dailyCap;
+
+  return {
+    today,
+    thisMonth,
+    storeToday,
+    dailyCap,
+    monthlyCap,
+    storeDailyCap,
+    interactiveReserve,
+    effectiveDailyCap,
+  };
+}
+
+/**
+ * Enforce the platform AI request caps BEFORE spending a Gemini call.
+ *
+ * Layers (checked in order):
+ *  1. per-store daily slice — `storeId` callers are bounded to their own
+ *     share so a single tenant cannot exhaust the platform budget;
+ *  2. global daily cap — KEPT: it protects the real Google project ceiling
+ *     (~500 req/day free tier). `bulk: true` callers (background sweeps)
+ *     stop an interactive-reserve below it (AI_DAILY_INTERACTIVE_RESERVE,
+ *     default 20% of the daily cap) so a sweep can never zero out the
+ *     interactive features (translate button, palette, answer-engine) for
+ *     the whole platform;
+ *  3. global monthly cap.
+ *
+ * Callers SHOULD pass their storeId; a no-arg call still enforces the
+ * global caps (backward compatible).
+ */
+export async function assertAiQuota(
+  opts: { storeId?: string; bulk?: boolean } = {}
+): Promise<void> {
+  // The merchant's own switch comes first: off means no AI spend at all for this store.
+  if (opts.storeId) await assertStoreAiEnabled(opts.storeId);
+
+  const w = await readAiQuotaWindow(opts);
+  const { today, thisMonth, storeToday, dailyCap, monthlyCap, storeDailyCap } = w;
+  const { interactiveReserve, effectiveDailyCap } = w;
+
   if (opts.storeId && storeToday >= storeDailyCap) {
     throw new AppError(
       429,
@@ -155,12 +193,6 @@ export async function assertAiQuota(
       `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC.`
     );
   }
-
-  // Interactive headroom: bulk sweeps hit their ceiling before the global
-  // cap so live single-call features keep working after a sweep saturates.
-  const reserveEnv = parseInt(process.env.AI_DAILY_INTERACTIVE_RESERVE ?? '', 10);
-  const interactiveReserve = Number.isFinite(reserveEnv) ? reserveEnv : Math.ceil(dailyCap * 0.2);
-  const effectiveDailyCap = opts.bulk ? Math.max(0, dailyCap - interactiveReserve) : dailyCap;
 
   if (today >= effectiveDailyCap) {
     throw new AppError(
@@ -178,4 +210,37 @@ export async function assertAiQuota(
       `Monthly AI request cap reached (${thisMonth}/${monthlyCap}). Resets next month.`
     );
   }
+}
+
+type AiQuotaRemaining = {
+  /** Requests a bulk run may still make right now: the tightest of the store slice, the global bulk ceiling and the month. */
+  remaining: number;
+  /** Which limit is the tightest. */
+  limitedBy: 'store_daily' | 'global_daily' | 'monthly';
+  storeDaily: { used: number; cap: number };
+  globalDaily: { used: number; cap: number };
+  monthly: { used: number; cap: number };
+};
+
+/**
+ * Read-only: how many more AI requests a bulk sweep for this store can make before `assertAiQuota` would refuse it
+ * (G18). Same counts and caps as the enforcing check, so the estimate shown before a run never disagrees with it.
+ */
+export async function getAiQuotaRemaining(storeId: string): Promise<AiQuotaRemaining> {
+  const w = await readAiQuotaWindow({ storeId, bulk: true });
+  const left = {
+    store_daily: Math.max(0, w.storeDailyCap - w.storeToday),
+    global_daily: Math.max(0, w.effectiveDailyCap - w.today),
+    monthly: Math.max(0, w.monthlyCap - w.thisMonth),
+  } as const;
+  const limitedBy = (Object.keys(left) as Array<keyof typeof left>).reduce((a, b) =>
+    left[b] < left[a] ? b : a
+  );
+  return {
+    remaining: left[limitedBy],
+    limitedBy,
+    storeDaily: { used: w.storeToday, cap: w.storeDailyCap },
+    globalDaily: { used: w.today, cap: w.effectiveDailyCap },
+    monthly: { used: w.thisMonth, cap: w.monthlyCap },
+  };
 }

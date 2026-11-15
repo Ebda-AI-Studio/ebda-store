@@ -8111,7 +8111,14 @@
     "replaceAction": "استبدل المحتوى",
     "cancelObject": "المسح الشغّال دلوقتي",
     "cancelConsequence": "هيقف. اللي اتعالج قبل كده بيحتفظ بتعديلاته.",
-    "cancelAction": "وقّف المسح"
+    "cancelAction": "وقّف المسح",
+    "estimateObject": "تشغيل الذكاء الاصطناعي ده",
+    "estimateConsequence": "هيستهلك لحد {requests} طلب من طلبات الذكاء الاصطناعي بتاعتك ({products} منتج). فاضلك {remaining} طلب النهارده، والمنتجات اللي اتعبّت قبل كده بتتخطى، فغالبًا هيستهلك أقل.",
+    "estimateAction": "ابدأ التشغيل",
+    "estimateBlocked": "التشغيل ده محتاج لحد {requests} طلب ذكاء اصطناعي، وفاضلك {remaining} بس ({limit}). جرّب بعد التجديد، أو شغّله على منتجات أقل.",
+    "estimateLimitStoreDaily": "الحد اليومي لمتجرك، بيتجدد 00:00 بتوقيت UTC",
+    "estimateLimitGlobalDaily": "الحد اليومي للذكاء الاصطناعي على المنصة، بيتجدد 00:00 بتوقيت UTC",
+    "estimateLimitMonthly": "الحد الشهري للذكاء الاصطناعي، بيتجدد الشهر الجاي"
   },
   "account": {
     "security": {
