@@ -128,6 +128,46 @@ describe('add-on grant on the platform D1: once per payment, never overlapping',
     expect(await endOf(b.id)).toBe(NOW.getTime() + 60 * DAY);
   });
 
+  it('a payment that ended permanently FAILED after its marker was written stops anchoring: the next term starts from the last successful term', async () => {
+    const s = await store();
+    const p0 = await paid(s);
+    await applyAddonGrant(tx, p0, NOW, [] as never);
+    const a = await paid(s, 'pending');
+    await applyAddonGrant(tx, a, NOW, [] as never); // marker + end written, then the payment is declared failed
+    await e.PLATFORM_DB.prepare("UPDATE billing_events SET status = 'failed' WHERE id = ?1")
+      .bind(a.id)
+      .run();
+    const b = await paid(s);
+    await applyAddonGrant(tx, b, NOW, [] as never);
+    expect(await endOf(b.id)).toBe(NOW.getTime() + 60 * DAY); // after P0 (30d), not after the failed A (60d)
+  });
+
+  it('a lone failed anchor: the next term starts now', async () => {
+    const s = await store();
+    const a = await paid(s, 'pending');
+    await applyAddonGrant(tx, a, NOW, [] as never);
+    await e.PLATFORM_DB.prepare("UPDATE billing_events SET status = 'failed' WHERE id = ?1")
+      .bind(a.id)
+      .run();
+    const b = await paid(s);
+    await applyAddonGrant(tx, b, NOW, [] as never);
+    expect(await endOf(b.id)).toBe(NOW.getTime() + 30 * DAY);
+  });
+
+  it('a failed payment that is being settled right now (lease held) still anchors: no overlap with its late success', async () => {
+    const s = await store();
+    const a = await paid(s, 'pending');
+    await applyAddonGrant(tx, a, NOW, [] as never);
+    await e.PLATFORM_DB.prepare(
+      "UPDATE billing_events SET status = 'failed', failure_reason = 'settling', updated_at = ?2 WHERE id = ?1"
+    )
+      .bind(a.id, NOW.getTime() - 1000)
+      .run();
+    const b = await paid(s);
+    await applyAddonGrant(tx, b, NOW, [] as never);
+    expect(await endOf(b.id)).toBe(NOW.getTime() + 60 * DAY);
+  });
+
   it('refunding the EARLIER of two chained terms leaves the later one in place and a new payment still stacks after it', async () => {
     const s = await store();
     const a = await paid(s);

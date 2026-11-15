@@ -11,6 +11,7 @@
 import crypto from 'crypto';
 import type { Prisma } from '@ebda/database';
 import { sendAlert } from '../alerts.service';
+import { SETTLE_LEASE, SETTLE_LEASE_MS } from './settle-lease';
 import { claimAddonMarkerD1, onD1, setTermEndOnceD1 } from '../platform/billing-d1';
 import { addDays } from './period';
 import {
@@ -118,6 +119,25 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
 }
 
 const GRANT_PREFIX = 'addon-grant:';
+
+/**
+ * A payment whose term must NOT anchor later terms (ADDON-CHAIN-2/3): `refunded`, or `failed` for good. Access is
+ * checked by end date only, so a dead payment that kept anchoring would hand the next buyer free days. A `failed` row
+ * that holds a fresh settle lease is a late success being applied right now, not dead; `pending` may still settle.
+ */
+function isDeadAnchor(
+  p: { status: string; failureReason: string | null; updatedAt: Date | null } | null | undefined,
+  now: Date
+): boolean {
+  if (!p) return false;
+  if (p.status === 'refunded') return true;
+  if (p.status !== 'failed') return false;
+  const leased =
+    p.failureReason === SETTLE_LEASE &&
+    p.updatedAt !== null &&
+    p.updatedAt.getTime() > now.getTime() - SETTLE_LEASE_MS;
+  return !leased;
+}
 const CHAIN_TRIES = 6;
 
 /**
@@ -221,9 +241,9 @@ async function grantTerm(
     // the grant), and adopting those is what keeps racing payments from overlapping.
     const heldPayment = await tx.billingEvent.findFirst({
       where: { id: held.relatedEventId, storeId: row.storeId },
-      select: { status: true },
+      select: { status: true, failureReason: true, updatedAt: true },
     });
-    if (heldPayment?.status === 'refunded') {
+    if (isDeadAnchor(heldPayment, now)) {
       gen++;
       continue;
     }

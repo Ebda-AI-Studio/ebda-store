@@ -92,6 +92,7 @@ import {
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
 import { applyAddonGrant } from './addon-grant';
 import { ADDON_MARKER_PREFIX, ADDON_PLAN_PREFIX } from './addon-catalog';
+import { SETTLE_LEASE, SETTLE_LEASE_MS } from './settle-lease';
 import { renewDueAddons } from './addon-renewal';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
@@ -512,9 +513,7 @@ const WEBHOOK_PROCESSING = 'processing';
 const WEBHOOK_DEFERRED = 'deferred';
 const WEBHOOK_CLAIM_STALE_MS = 120_000;
 
-/** D1 settle lease marker (stored in `failure_reason` while a success is being applied) and how long it holds. */
-const SETTLE_LEASE = 'settling';
-const SETTLE_LEASE_MS = 120_000;
+/** The D1 settle lease marker and how long it holds: see settle-lease.ts. */
 
 /**
  * Repeat the idempotent parts of a success whose subscription write already committed: the tier on `stores` and the
