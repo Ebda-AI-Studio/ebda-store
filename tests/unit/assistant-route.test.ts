@@ -23,6 +23,14 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@api/middleware/auth', () => ({
+  rejectImpersonated: (
+    req: { user?: { impersonatedBy?: string } },
+    res: { status(n: number): { json(b: unknown): void } },
+    next: () => void
+  ) =>
+    req.user?.impersonatedBy
+      ? res.status(403).json({ success: false, error: { code: 'IMPERSONATION_FORBIDDEN' } })
+      : next(),
   authenticate: (
     req: { user?: unknown; headers: Record<string, string | undefined> },
     res: { status(n: number): { json(b: unknown): void } },
@@ -104,7 +112,7 @@ import {
   configureAssistant,
 } from '@api/routes/assistant.routes';
 import { errorHandler } from '@api/middleware/error-handler';
-import { authenticate } from '@api/middleware/auth';
+import { authenticate, rejectImpersonated } from '@api/middleware/auth';
 import { requireStoreAccess } from '@api/middleware/store-access';
 import { requireMfaEnrolled } from '@api/middleware/require-mfa';
 
@@ -246,11 +254,12 @@ describe('assistant route: access', () => {
 
   it('every route sits behind authenticate then requireStoreAccess (structure pin)', () => {
     const handles = (assistantRoutes as unknown as { stack: Array<{ handle: unknown }> }).stack
-      .slice(0, 3)
+      .slice(0, 4)
       .map(l => l.handle);
     expect(handles[0]).toBe(authenticate);
-    expect(handles[2]).toBe(requireStoreAccess);
-    expect(handles).toHaveLength(3); // authenticate, the merchant-role gate, membership
+    expect(handles[1]).toBe(rejectImpersonated); // support "act as merchant" sessions are closed out of the whole assistant (ruling FP-3)
+    expect(handles[3]).toBe(requireStoreAccess);
+    expect(handles).toHaveLength(4); // authenticate, impersonation refusal, the merchant-role gate, membership
   });
 });
 
