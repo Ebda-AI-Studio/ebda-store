@@ -2466,7 +2466,6 @@
     "unused-export|packages/shared/src/abuse/protected-slugs.ts|normalizeSlugForMatch",
     "unused-export|packages/shared/src/address-format.ts|AddressLines",
     "unused-export|packages/shared/src/address-format.ts|AddressLocale",
-    "unused-export|packages/shared/src/address-format.ts|orderAddressParts",
     "unused-export|packages/shared/src/auth/jwt-claims.ts|JWT_WA_CART_AUDIENCE",
     "unused-export|packages/shared/src/auth/jwt-claims.ts|JWT_WA_CART_AUDIENCES_ACCEPTED",
     "unused-export|packages/shared/src/auth/jwt-claims.ts|LEGACY_JWT_REMOVE_AFTER",
