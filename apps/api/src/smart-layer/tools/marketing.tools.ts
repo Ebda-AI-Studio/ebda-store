@@ -79,6 +79,15 @@ const COUPON_LABELS: Record<string, [string, string]> = {
   expiresAt: ['ينتهي في', 'Expires at'],
 };
 const PRICE_KEYS = ['type', 'value', 'minOrderEgp', 'maxDiscountEgp'];
+/** Everything a shopper can hit at checkout: the discount, its limits, its validity window and its code. Only the names/descriptions are harmless. */
+const CHECKOUT_KEYS = [
+  ...PRICE_KEYS,
+  'code',
+  'usageLimit',
+  'usageLimitPerUser',
+  'startsAt',
+  'expiresAt',
+];
 
 type CouponInput = {
   code?: string;
@@ -224,6 +233,8 @@ const couponToggle = change<CouponToggleArgs>({
       rows: [row('شغّال', 'Active', s.isActive, a.active)],
       affectedCount: changes ? 1 : 0,
       restore: { active: s.isActive },
+      // Activation decides whether shoppers can use the code (or free shipping) at checkout: always a checkout change; the discount changes unless it is free shipping.
+      ...(changes ? { touchesCheckout: true } : {}),
       ...(changes && s.type !== 'free_shipping' ? { changesPrice: true } : {}),
     };
   },
@@ -270,6 +281,7 @@ const couponUpdate = change<CouponUpdateArgs>({
     if (a.value !== undefined) assertCouponValid(type, a.value);
     couponData(a, type); // validates the dates now
     const after = Object.fromEntries(touched.map(k => [k, (fields as Record<string, unknown>)[k]]));
+    if (typeof after.code === 'string') after.code = after.code.toUpperCase(); // as run() will store it
     return {
       summary: pair(
         `هعدّل الكوبون ${String(s.view.code)}.`,
@@ -279,6 +291,7 @@ const couponUpdate = change<CouponUpdateArgs>({
       affectedCount: 1,
       restore: pick(s.view, touched),
       ...(touched.some(k => PRICE_KEYS.includes(k)) ? { changesPrice: true } : {}),
+      ...(touched.some(k => CHECKOUT_KEYS.includes(k)) ? { touchesCheckout: true } : {}),
     };
   },
   run: async (ctx, a, st) => {
@@ -549,17 +562,19 @@ const recommendationsSet = change<RecArgs>({
 // ---- abandoned-cart reminder settings ---------------------------------------------------------------------------------------------------------
 // routes/abandoned-cart.routes.ts PUT /:storeId/abandoned-carts/config: authorize(store_admin, super_admin) + requireFeature('abandoned_cart').
 // Only the SETTINGS change here; the recovery job (not this tool) sends the emails, when a shopper has consented.
-type CartArgs = {
+type CartCouponArgs = {
+  autoCouponEnabled?: boolean;
+  couponDiscountPercent?: number;
+  couponMaxDiscountEgp?: number | null;
+  couponExpiryHours?: number;
+};
+type CartEmailArgs = {
   step1Enabled?: boolean;
   step1DelayMinutes?: number;
   step2Enabled?: boolean;
   step2DelayMinutes?: number;
   step3Enabled?: boolean;
   step3DelayMinutes?: number;
-  autoCouponEnabled?: boolean;
-  couponDiscountPercent?: number;
-  couponMaxDiscountEgp?: number | null;
-  couponExpiryHours?: number;
   emailEnabled?: boolean;
   emailDelayMinutes?: number;
 };
@@ -582,85 +597,118 @@ const cartView = (c: CartConfig): Record<string, unknown> => {
   const { couponMaxDiscount, ...rest } = c;
   return { ...rest, couponMaxDiscountEgp: fromMinor(couponMaxDiscount) };
 };
-const abandonedCartSettings = change<CartArgs>({
+const cartState = async (ctx: TurnCtx) =>
+  cartView((await abandonedCartService.getConfig(ctx.storeId)) as unknown as CartConfig);
+const cartRun = async (ctx: TurnCtx, a: CartCouponArgs & CartEmailArgs) => {
+  const { couponMaxDiscountEgp, ...rest } = a;
+  const data: Record<string, unknown> = { ...rest };
+  if (couponMaxDiscountEgp !== undefined)
+    data.couponMaxDiscount = couponMaxDiscountEgp === null ? null : toMinor(couponMaxDiscountEgp);
+  await abandonedCartService.upsertConfig(ctx.storeId, data as never);
+  return { updated: Object.keys(data) };
+};
+const COUPON_CART_KEYS = [
+  'autoCouponEnabled',
+  'couponDiscountPercent',
+  'couponMaxDiscountEgp',
+  'couponExpiryHours',
+];
+const CART_GATE = { roles: ['store_admin'], feature: 'abandoned_cart' } as const;
+
+// The automatic recovery COUPON (a discount) is a preview-class setting. Nothing here switches a customer e-mail on or changes when one goes out:
+// those keys are not in this tool's schema (strict) and live in abandoned_cart_emails_set (confirm-class).
+const abandonedCartSettings = change<CartCouponArgs>({
   name: 'abandoned_cart_settings',
   capabilityId: 'marketing.abandoned-carts',
   description:
-    'Change the abandoned-cart recovery SETTINGS (reminder steps on/off and delays in minutes, the automatic recovery coupon, the customer e-mail and its delay 60-1440 minutes). Send only what changes. Turning a reminder or the customer e-mail on makes the store e-mail shoppers who left a cart, on a schedule. Coupon cap in EGP.',
-  schema: shape<CartArgs>({
-    step1Enabled: f.bool(),
-    step1DelayMinutes: f.int('minutes', { min: 1 }),
-    step2Enabled: f.bool(),
-    step2DelayMinutes: f.int('minutes', { min: 1 }),
-    step3Enabled: f.bool(),
-    step3DelayMinutes: f.int('minutes', { min: 1 }),
+    'Change the abandoned-cart automatic recovery COUPON settings (on/off, percent, EGP cap, validity hours). Send only what changes. It does NOT switch customer e-mails or reminders on or off, nor change their timing: use abandoned_cart_emails_set for that.',
+  schema: shape<CartCouponArgs>({
     autoCouponEnabled: f.bool('Automatic recovery coupon (a discount)'),
     couponDiscountPercent: f.num('0-100', { max: 100 }),
     couponMaxDiscountEgp: f.nullable(f.num('EGP cap; null = no cap')),
     couponExpiryHours: f.int('hours', { min: 1 }),
-    emailEnabled: f.bool('Customer recovery e-mail'),
-    emailDelayMinutes: f.int('minutes, 60 to 1440', { min: 60, max: 1440 }),
   }),
   undo: 'reversible',
-  gate: { roles: ['store_admin'], feature: 'abandoned_cart' },
+  gate: CART_GATE,
   audit: { action: 'abandoned_cart.config_updated', resourceType: 'abandoned_cart_config' },
-  state: async ctx =>
-    cartView((await abandonedCartService.getConfig(ctx.storeId)) as unknown as CartConfig),
+  state: cartState,
   describe: (_ctx, a, st): Described => {
     const before = st as Record<string, unknown>;
     const touched = defined(a);
     if (touched.length === 0) throw new Error('Nothing to change: send at least one setting.');
-    const rows = diffRows(
-      CART_LABELS,
-      before,
-      Object.fromEntries(touched.map(k => [k, (a as Record<string, unknown>)[k]]))
-    );
-    const emails =
-      a.emailEnabled === true ||
-      a.step1Enabled === true ||
-      a.step2Enabled === true ||
-      a.step3Enabled === true;
-    const sending = emails
-      ? [
-          row(
-            'إيميلات العملاء',
-            'Customer emails',
-            before.emailEnabled,
-            `${(a.emailEnabled ?? before.emailEnabled) ? `شغّالة، هتتبعت لأي عميل ساب سلة بعد ${a.emailDelayMinutes ?? before.emailDelayMinutes} دقيقة` : 'حسب إعدادات التذكير'} | on a schedule to shoppers who left a cart`
-          ),
-        ]
-      : [];
+    const emailKey = touched.find(k => !COUPON_CART_KEYS.includes(k));
+    if (emailKey)
+      throw new Error(
+        `${emailKey} is a customer e-mail setting: use abandoned_cart_emails_set (it needs confirmation).`
+      );
     return {
       summary: pair(
-        emails
-          ? 'هغيّر إعدادات استرجاع السلة المتروكة، وده هيبعت إيميلات للعملاء بشكل تلقائي.'
-          : 'هغيّر إعدادات استرجاع السلة المتروكة.',
-        emails
-          ? 'I will change the abandoned-cart settings; this makes the store e-mail shoppers automatically.'
-          : 'I will change the abandoned-cart settings.'
+        'هغيّر إعدادات كوبون استرجاع السلة المتروكة.',
+        'I will change the abandoned-cart recovery coupon settings.'
       ),
-      rows: [
-        ...rows.filter(r => r.label.en !== 'Customer emails' || sending.length === 0),
-        ...sending,
-      ],
+      rows: diffRows(
+        CART_LABELS,
+        before,
+        Object.fromEntries(touched.map(k => [k, (a as Record<string, unknown>)[k]]))
+      ),
       affectedCount: 1,
       restore: pick(before, touched),
-      ...(touched.some(k =>
-        ['autoCouponEnabled', 'couponDiscountPercent', 'couponMaxDiscountEgp'].includes(k)
-      )
-        ? { changesPrice: true }
-        : {}),
+      changesPrice: true, // every key here is the recovery coupon's discount
     };
   },
-  run: async (ctx, a) => {
-    const { couponMaxDiscountEgp, ...rest } = a;
-    const data: Record<string, unknown> = { ...rest };
-    if (couponMaxDiscountEgp !== undefined)
-      data.couponMaxDiscount = couponMaxDiscountEgp === null ? null : toMinor(couponMaxDiscountEgp);
-    await abandonedCartService.upsertConfig(ctx.storeId, data as never);
-    return { updated: Object.keys(data) };
-  },
+  run: cartRun,
   inverse: (_a, restore) => ({ tool: 'abandoned_cart_settings', args: restore }),
+});
+
+// The e-mail switches and their timing: turning one on makes the store e-mail shoppers who left a cart, on a schedule, with no further click.
+const abandonedCartEmailsSet = change<CartEmailArgs>({
+  name: 'abandoned_cart_emails_set',
+  capabilityId: 'marketing.abandoned-carts',
+  description:
+    'Switch the abandoned-cart reminder steps (step1/2/3Enabled) and the customer recovery e-mail (emailEnabled, delay 60-1440 minutes) on or off, or change their delays in minutes. Turning one ON makes the store e-mail shoppers who left a cart, automatically, on that schedule; e-mails already sent cannot be recalled. Send only what changes.',
+  schema: shape<CartEmailArgs>({
+    step1Enabled: f.bool('Reminder 1 on/off'),
+    step1DelayMinutes: f.int('minutes', { min: 1 }),
+    step2Enabled: f.bool('Reminder 2 on/off'),
+    step2DelayMinutes: f.int('minutes', { min: 1 }),
+    step3Enabled: f.bool('Reminder 3 on/off'),
+    step3DelayMinutes: f.int('minutes', { min: 1 }),
+    emailEnabled: f.bool('Customer recovery e-mail on/off'),
+    emailDelayMinutes: f.int('minutes, 60 to 1440', { min: 60, max: 1440 }),
+  }),
+  policy: 'confirm',
+  messagesCustomers: true,
+  undo: 'reversible', // the SETTING is restored; messages already sent are not recalled (the card says so)
+  gate: CART_GATE,
+  audit: { action: 'abandoned_cart.emails_updated', resourceType: 'abandoned_cart_config' },
+  state: cartState,
+  describe: (_ctx, a, st): Described => {
+    const before = st as Record<string, unknown>;
+    const touched = defined(a);
+    if (touched.length === 0) throw new Error('Nothing to change: send at least one setting.');
+    const turnsOn = ['step1Enabled', 'step2Enabled', 'step3Enabled', 'emailEnabled'].filter(
+      k => (a as Record<string, unknown>)[k] === true && before[k] !== true
+    );
+    return {
+      summary: pair(
+        turnsOn.length
+          ? 'هشغّل تذكيرات استرجاع السلة، والمتجر هيبعت إيميلات للعملاء اللي سابوا سلة بشكل تلقائي حسب المواعيد دي. الإيميلات اللي اتبعتت مش بتتسحب.'
+          : 'هغيّر تذكيرات وإيميلات استرجاع السلة المتروكة.',
+        turnsOn.length
+          ? 'I will switch on abandoned-cart reminders: the store will e-mail shoppers who left a cart, automatically, on this schedule. E-mails already sent cannot be recalled.'
+          : 'I will change the abandoned-cart reminders and e-mails.'
+      ),
+      rows: diffRows(
+        CART_LABELS,
+        before,
+        Object.fromEntries(touched.map(k => [k, (a as Record<string, unknown>)[k]]))
+      ),
+      affectedCount: 1,
+      restore: pick(before, touched),
+    };
+  },
+  run: cartRun,
+  inverse: (_a, restore) => ({ tool: 'abandoned_cart_emails_set', args: restore }),
 });
 
 export function marketingTools(): ToolSpec[] {
@@ -672,5 +720,6 @@ export function marketingTools(): ToolSpec[] {
     bundleSetActive,
     recommendationsSet,
     abandonedCartSettings,
+    abandonedCartEmailsSet,
   ];
 }

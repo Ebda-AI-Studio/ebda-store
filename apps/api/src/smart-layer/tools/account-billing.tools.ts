@@ -7,6 +7,11 @@
  *   - my_features (billing.addons): GET /stores/:storeId/my-features (`authenticate` + store membership only, no role list, so none here either).
  *   - list_my_stores (account.multi-store): GET /stores (`StoreService.list` as the owner).
  *   - merchant_mcp_status (mcp.read-tools): GET .../integrations/merchant-keys + write-switch, METADATA ONLY (no key hash, no plaintext: it is never stored).
+ * Ruling E1-PLAN-1 - `plan_change` never charges the saved card from chat. A downgrade (or a change that charges nothing) is a confirm card that calls
+ *   `changePlan`; an UPGRADE (new price above the current one) previews the exact amounts (net, VAT, total from `chargeFor`'s math under the current platform VAT) and
+ *   its apply only returns the billing screen link where the merchant confirms the charge. Card payments are deep links only, like the Chat assistant. The VAT state is
+ *   part of the card's state fingerprint, so turning VAT on between the card and the press refreshes the card. Cost if wrong: an upgrade needs one extra tap on the
+ *   billing screen; the opposite mistake would charge a card on a model's say-so with a figure that can omit VAT.
  * Changes (routes/billing.routes.ts, routes/onboarding.routes.ts, routes/staff.routes.ts, routes/merchant-key.routes.ts; all `authorize('store_admin', ...)`):
  *   - plan_change / subscription_cancel / subscription_resume (billing.change-plan): money. The price shown is the plan catalogue's (`planService`), never a model number.
  *   - instapay_plan_choose (billing.pay-instapay): `chooseInstapayPlan` picks the plan the next InstaPay payment buys and returns the reference + the billing screen
@@ -22,6 +27,11 @@ import { assertVerifiedEmail } from '../../middleware/require-verified-email';
 import { featureService } from '../../services/feature.service';
 import { getUsageSummary } from '../../services/plan-limit.service';
 import { planService } from '../../services/plan.service';
+import {
+  resolvePlatformVat,
+  subscriptionChargeAmount,
+  type PlatformVat,
+} from '../../services/billing/charge-amount';
 import { StoreService } from '../../services/store.service';
 import { OnboardingService } from '../../services/onboarding.service';
 import { chooseInstapayPlan } from '../../services/billing/account.service';
@@ -185,12 +195,14 @@ const priceOf = (p: Plan | undefined, interval: Interval): number | null =>
 
 /** The store's subscription as the billing screen shows it (the same readers), plus the catalogue plan the call targets. Depends on ids only. */
 async function billingState(storeId: string, planCode?: string) {
-  const [{ entitlements: e }, b, plans] = await Promise.all([
+  const [{ entitlements: e }, b, plans, vat] = await Promise.all([
     getUsageSummary(storeId),
     getSubscriptionBillingState(storeId),
     planService.listPlans({ publicOnly: true }),
+    resolvePlatformVat(),
   ]);
-  const cur = plans.find(p => p.code === e.planCode);
+  // the store's CURRENT plan, from the plan record itself (a hidden or legacy plan is not in the public list)
+  const cur = await planService.getPlan(e.planCode).catch(() => undefined);
   return {
     planCode: e.planCode,
     planName: { ar: e.planNameAr, en: e.planNameEn },
@@ -201,6 +213,8 @@ async function billingState(storeId: string, planCode?: string) {
     pendingPlanCode: b.pendingPlanCode,
     hasPaymentMethod: b.hasPaymentMethod,
     limits: (e.limits ?? {}) as Rec,
+    /** Ebda Store's platform VAT right now: part of the fingerprint, so a change refreshes the card. */
+    vat: { enabled: vat.enabled, rateBps: vat.rateBps, mode: vat.mode },
     currentPriceMinor: priceOf(cur, b.billingInterval === 'yearly' ? 'yearly' : 'monthly'),
     target: planCode
       ? ((): unknown => {
@@ -233,6 +247,21 @@ const targetOf = (st: BState, planCode: string): Target => {
 };
 const targetPrice = (t: Target, interval: Interval) =>
   interval === 'yearly' ? t.yearlyMinor : t.monthlyMinor;
+/** The amounts a payment of `price` would be, under the VAT captured in the card's state (same math as `chargeFor`). */
+const amountOf = (price: number | null, st: BState) =>
+  price === null ? null : subscriptionChargeAmount(price, st.vat as PlatformVat);
+const isUpgrade = (st: BState, price: number | null) =>
+  price !== null && (st.currentPriceMinor ?? 0) < price;
+const amountRows = (price: number | null, st: BState) => {
+  const c = amountOf(price, st);
+  return c
+    ? [
+        row('السعر قبل الضريبة بالجنيه', 'Price before VAT in EGP', null, egp(c.netMinor)),
+        row('الضريبة بالجنيه', 'VAT in EGP', null, egp(c.vatMinor)),
+        row('الإجمالي بالجنيه', 'Total in EGP', null, egp(c.totalMinor)),
+      ]
+    : [];
+};
 
 /** The plan limits that differ between the current and the new plan: the "what changes for me" list. */
 function limitRows(cur: Rec, next: Rec) {
@@ -263,19 +292,16 @@ const planChange = change<{ planCode: string }>({
     const st = state as BState;
     const t = targetOf(st, a.planCode);
     const price = targetPrice(t, st.interval);
-    const upgrade = price !== null && (st.currentPriceMinor ?? 0) < price;
+    const upgrade = isUpgrade(st, price);
+    const total = amountOf(price, st)?.totalMinor ?? null;
     return {
       summary: pair(
-        `تغيير باقتك من ${st.planName.ar} إلى ${t.name.ar}. ${
-          upgrade
-            ? `هيتخصم ${egp(price)} جنيه من الكارت دلوقتي (${st.interval === 'yearly' ? 'سنوي' : 'شهري'}) والباقة الجديدة بتبدأ فورًا.`
-            : 'الباقة الجديدة هتبدأ في آخر الفترة المدفوعة.'
-        } التغيير ده مش بيترجع بضغطة.`,
-        `Change your plan from ${st.planName.en} to ${t.name.en}. ${
-          upgrade
-            ? `${egp(price)} EGP is charged to your card now (${st.interval}) and the new plan starts at once.`
-            : 'The new plan starts at the end of the paid period.'
-        } This cannot be undone with one press.`
+        upgrade
+          ? `الترقية من ${st.planName.ar} إلى ${t.name.ar} بتتأكد من شاشة الدفع: افتح شاشة الدفع عشان تأكد خصم ${egp(total)} جنيه شامل الضريبة (${st.interval === 'yearly' ? 'سنوي' : 'شهري'}). المساعد مش بيخصم من الكارت بنفسه.`
+          : `تغيير باقتك من ${st.planName.ar} إلى ${t.name.ar}. الباقة الجديدة هتبدأ في آخر الفترة المدفوعة ومفيش خصم دلوقتي. التغيير ده مش بيترجع بضغطة.`,
+        upgrade
+          ? `Upgrading from ${st.planName.en} to ${t.name.en} is confirmed on the payment screen: open it to confirm the charge of ${egp(total)} EGP including VAT (${st.interval}). The assistant never charges your card itself.`
+          : `Change your plan from ${st.planName.en} to ${t.name.en}. The new plan starts at the end of the paid period and nothing is charged now. This cannot be undone with one press.`
       ),
       rows: [
         row('الباقة', 'Plan', st.planCode, t.code),
@@ -285,18 +311,33 @@ const planChange = change<{ planCode: string }>({
           egp(st.currentPriceMinor),
           egp(price)
         ),
+        ...(upgrade ? amountRows(price, st) : []),
         row(
           'متى يبدأ',
           'When it starts',
           null,
-          upgrade ? pair('فورًا', 'now') : pair('آخر الفترة المدفوعة', 'end of the paid period')
+          upgrade
+            ? pair('بعد تأكيد الدفع من الشاشة', 'after you confirm the payment on the screen')
+            : pair('آخر الفترة المدفوعة', 'end of the paid period')
         ),
         ...limitRows(st.limits, t.limits),
       ],
       affectedCount: 1,
     };
   },
-  run: (ctx, a) => changePlan({ storeId: ctx.storeId, planCode: a.planCode }),
+  run: (ctx, a, state) => {
+    const st = state as BState;
+    const t = targetOf(st, a.planCode);
+    if (isUpgrade(st, targetPrice(t, st.interval))) {
+      // Ruling E1-PLAN-1: an upgrade charges the saved card, so it is never done from chat: the link is the answer
+      return Promise.resolve({
+        charged: false,
+        paymentScreen: `/stores/${ctx.storeId}/billing`,
+        planCode: a.planCode,
+      });
+    }
+    return changePlan({ storeId: ctx.storeId, planCode: a.planCode });
+  },
 });
 
 const subscriptionCancel = change<Record<string, never>>({
@@ -391,13 +432,13 @@ const instapayPlanChoose = change<{ planCode: string; interval: Interval }>({
     const price = targetPrice(t, a.interval);
     return {
       summary: pair(
-        `الدفع بانستاباي لباقة ${t.name.ar} (${a.interval === 'yearly' ? 'سنوي' : 'شهري'}) بسعر ${egp(price)} جنيه قبل الضريبة. مفيش حاجة هتتخصم دلوقتي، وهتحول وترفع صورة الإيصال من شاشة الاشتراك.`,
-        `Pay for ${t.name.en} (${a.interval}) by InstaPay at ${egp(price)} EGP before VAT. Nothing is charged now; you transfer and upload the receipt on the billing screen.`
+        `الدفع بانستاباي لباقة ${t.name.ar} (${a.interval === 'yearly' ? 'سنوي' : 'شهري'}): المطلوب تحويله ${egp(amountOf(price, st)?.totalMinor ?? null)} جنيه شامل الضريبة. مفيش حاجة هتتخصم دلوقتي، وهتحول وترفع صورة الإيصال من شاشة الاشتراك.`,
+        `Pay for ${t.name.en} (${a.interval}) by InstaPay: the transfer is ${egp(amountOf(price, st)?.totalMinor ?? null)} EGP including VAT. Nothing is charged now; you transfer and upload the receipt on the billing screen.`
       ),
       rows: [
         row('الباقة', 'Plan', st.pendingPlanCode ?? st.planCode, t.code),
         row('الدورة', 'Period', st.interval, a.interval),
-        row('السعر بالجنيه (قبل الضريبة)', 'Price in EGP (before VAT)', null, egp(price)),
+        ...amountRows(price, st),
       ],
       affectedCount: 1,
     };
@@ -424,6 +465,8 @@ const storeGoLive = change<Record<string, never>>({
   gate: { roles: OWNER }, // POST /onboarding/stores/:storeId/go-live: authorize('store_admin', ...) + requireVerifiedEmail
   audit: { action: 'store.went_live', resourceType: 'store' },
   state: async ctx => {
+    // the route's second gate (`requireVerifiedEmail`), checked at preview AND apply (state runs at both): refuse early
+    await assertVerifiedEmail({ userId: ctx.userId, role: ctx.role });
     const db = await storeDb(ctx.storeId);
     const store = await db.store.findUnique({
       where: { id: ctx.storeId },
@@ -450,11 +493,7 @@ const storeGoLive = change<Record<string, never>>({
       touchesCheckout: true,
     };
   },
-  run: async ctx => {
-    // the route's second gate: a verified e-mail, read from the account, never from the token
-    await assertVerifiedEmail({ userId: ctx.userId, role: ctx.role });
-    return OnboardingService.goLive(ctx.storeId);
-  },
+  run: ctx => OnboardingService.goLive(ctx.storeId),
 });
 
 // ---- integrations ---------------------------------------------------------------------------------------------------------------------------

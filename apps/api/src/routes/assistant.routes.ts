@@ -25,7 +25,7 @@ import {
   type SmartLayerAdapter,
   type TurnCtx,
 } from '@ebda/shared/smart-layer';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -160,8 +160,13 @@ const actionBody = z.object({ locale: z.enum(['ar', 'en']).default('ar') }).stri
 
 export const assistantRoutes = Router({ mergeParams: true });
 // Merchant roles only (a shopper's token never reaches this surface), then membership of THIS store.
+// An impersonated (support "act as merchant") session is refused on EVERY assistant route, exactly like the admin routes it stands in for (ruling FP-3):
+// the impersonation token carries the merchant's role, so the super-admin refusal in `assertMerchantMay` never fires for it, and the assistant can
+// otherwise confirm refunds, plan changes, deletions and customer messages on the merchant's behalf. Looking is allowed on the admin screens; the assistant
+// is a way to ACT, so it is closed to those sessions entirely (status included: the panel simply does not appear).
 assistantRoutes.use(
   authenticate,
+  rejectImpersonated,
   authorize('store_admin', 'staff', 'super_admin'),
   requireStoreAccess
 );
@@ -465,6 +470,7 @@ assistantRoutes.post(
               ? 'forbidden'
               : 'not_pending'
         );
+      res.setHeader('Cache-Control', 'private, no-store');
       res.json({ success: true, data: { status: 'rejected' } });
     } catch (err) {
       next(err);

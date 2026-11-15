@@ -40,6 +40,8 @@ async function readOrder(ctx: TurnCtx, orderId: string) {
     paymentStatus: String(o.paymentStatus),
     total: o.total as number,
     isCod: !!cod,
+    /** What OrderService.markCodPaid books: the COD payment row's amount, not the order total. */
+    codAmount: (cod?.amount ?? null) as number | null,
     updatedAt: o.updatedAt ? new Date(o.updatedAt).toISOString() : null,
   };
 }
@@ -83,18 +85,12 @@ const setStatus = change<{ orderId: string; status: string }>({
   },
 });
 
-const cancel = change<{ orderId: string; restoreInventory: boolean }>({
+const cancel = change<{ orderId: string }>({
   name: 'order_cancel',
   capabilityId: 'order.cancel',
   description:
-    'Cancel an order, optionally putting its stock back. It cannot be undone and it does not refund money (refunds go through the returns tools). The customer may be notified.',
-  schema: shape(
-    {
-      orderId: f.id('The order id.'),
-      restoreInventory: f.bool("Put the cancelled order's stock back on the shelf."),
-    },
-    ['orderId', 'restoreInventory']
-  ),
+    'Cancel an unpaid order and put its stock back. It cannot be undone and the customer may be notified. It refuses an order that is already paid: a paid order must go through the refund or returns flow, because cancelling it would tell the customer a refund was issued while no money moves.',
+  schema: shape({ orderId: f.id('The order id.') }, ['orderId']),
   policy: 'confirm',
   undo: 'irreversible',
   messagesCustomers: true,
@@ -102,28 +98,40 @@ const cancel = change<{ orderId: string; restoreInventory: boolean }>({
   audit: { action: 'order.cancelled', resourceType: 'order', resourceId: a => a.orderId },
   refs: orderRefs,
   state: (ctx, a) => readOrder(ctx, a.orderId),
-  describe: (_ctx, a, st) => {
+  describe: (_ctx, _a, st) => {
     const s = st as OrderState;
+    // A cancel runs the refund effects and sends the "refund issued" notice; on a paid order that would be a lie (no money moves).
+    if (s.paymentStatus === 'paid' || s.paymentStatus === 'disputed')
+      throw new AppError(
+        409,
+        'ORDER_PAID_USE_REFUND',
+        `Order ${s.orderNumber} is already paid. Cancelling it would tell the customer a refund was issued while no money moves. Use the refund or returns flow instead.`
+      );
     assertValidTransition(s.status as never, 'cancelled');
     return {
       summary: pair(
-        `هلغي الأوردر ${s.orderNumber} (${egp(s.total)} ج.م). مش هيتعمل استرداد فلوس، والإلغاء مينفعش يترجع.`,
-        `Cancel order ${s.orderNumber} (${egp(s.total)} EGP). No money is refunded and a cancel cannot be undone.`
+        `هلغي الأوردر ${s.orderNumber} (${egp(s.total)} ج.م) وأرجّع المخزون. العميل ممكن يوصله إشعار بإلغاء الأوردر، والإلغاء مينفعش يترجع.`,
+        `Cancel order ${s.orderNumber} (${egp(s.total)} EGP) and put its stock back. The customer may get a cancellation notice; a cancel cannot be undone.`
       ),
       rows: [
         row('رقم الأوردر', 'Order', s.orderNumber, s.orderNumber),
         row('الحالة', 'Status', s.status, 'cancelled'),
         row('إجمالي الأوردر (ج.م)', 'Order total (EGP)', egp(s.total), egp(s.total)),
         row('حالة الدفع', 'Payment', s.paymentStatus, s.paymentStatus),
-        row('رجوع المخزون', 'Stock goes back', null, a.restoreInventory),
+        row('رجوع المخزون', 'Stock goes back', null, true),
+        row(
+          'إشعار للعميل',
+          'Customer notice',
+          null,
+          'إشعار إلغاء الأوردر / order cancelled notice'
+        ),
       ],
       affectedCount: 1,
     };
   },
+  // The route (PUT /:id/status) passes no options: stock always goes back.
   run: async (ctx, a) => {
-    const o = await OrderService.updateStatus(ctx.storeId, a.orderId, 'cancelled', {
-      restoreInventory: a.restoreInventory,
-    });
+    const o = await OrderService.updateStatus(ctx.storeId, a.orderId, 'cancelled');
     return { orderId: o.id, orderNumber: o.orderNumber, status: o.status };
   },
 });
@@ -132,7 +140,7 @@ const markPaid = change<{ orderId: string }>({
   name: 'order_mark_paid',
   capabilityId: 'order.mark-paid',
   description:
-    'Record that a cash-on-delivery order was paid (the courier or you collected the cash). It books the sale and cannot be undone. The amount is the order total.',
+    'Record that a cash-on-delivery order was paid (the courier or you collected the cash). It books the sale and cannot be undone. The amount is the cash-on-delivery amount recorded on the order.',
   schema: shape({ orderId: f.id('The cash-on-delivery order id.') }, ['orderId']),
   policy: 'confirm',
   undo: 'irreversible',
@@ -155,13 +163,13 @@ const markPaid = change<{ orderId: string }>({
       );
     return {
       summary: pair(
-        `هسجّل إن الأوردر ${s.orderNumber} اتدفع كاش بمبلغ ${egp(s.total)} ج.م. ده بيتسجل كبيعة ومينفعش يترجع.`,
-        `Record order ${s.orderNumber} as paid in cash: ${egp(s.total)} EGP. This books the sale and cannot be undone.`
+        `هسجّل إن الأوردر ${s.orderNumber} اتدفع كاش بمبلغ ${egp(s.codAmount)} ج.م. ده بيتسجل كبيعة ومينفعش يترجع.`,
+        `Record order ${s.orderNumber} as paid in cash: ${egp(s.codAmount)} EGP. This books the sale and cannot be undone.`
       ),
       rows: [
         row('رقم الأوردر', 'Order', s.orderNumber, s.orderNumber),
         row('حالة الدفع', 'Payment', s.paymentStatus, 'paid'),
-        row('المبلغ المحصّل (ج.م)', 'Amount collected (EGP)', null, egp(s.total)),
+        row('المبلغ المحصّل (ج.م)', 'Amount collected (EGP)', null, egp(s.codAmount)),
       ],
       affectedCount: 1,
     };
@@ -279,7 +287,7 @@ const phoneOrder = change<PhoneArgs>({
   },
   inverse: (_a, _restore, result) => {
     const id = (result as { orderId?: string } | undefined)?.orderId;
-    return id ? { tool: 'order_cancel', args: { orderId: id, restoreInventory: true } } : null;
+    return id ? { tool: 'order_cancel', args: { orderId: id } } : null;
   },
 });
 

@@ -346,7 +346,7 @@ const carrierSettings = change<CarrierArgs>({
   name: 'carrier_settings',
   capabilityId: 'shipping.carriers',
   description:
-    'Turn an already connected shipping company on or off and choose the default one (Bosta, ShipBlu, Mylerz, Aramex, manual delivery). It never takes or shows a login, API key or secret: credentials are entered by the merchant on the secure shipping-companies screen, and a carrier that is not connected and tested there cannot be turned on.',
+    "Turn an already connected shipping company on or off and choose the default one (Bosta, ShipBlu, Mylerz, Aramex, manual delivery). It never takes or shows a login, API key or secret: credentials are entered by the merchant on the secure shipping-companies screen, and a carrier that is not connected and tested there cannot be turned on. The default carrier is the one every Ship press books with, and the courier fees are charged by the carrier to the merchant's own carrier account (not by Ebda Store).",
   schema: carrierSchema,
   undo: 'reversible',
   gate: { roles: STORE_ROLES, feature: 'shipping_carriers' },
