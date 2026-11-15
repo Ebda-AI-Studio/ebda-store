@@ -33,7 +33,7 @@ describe('ai-review classifier (fail closed: only docs, markdown and NEWLY ADDED
   });
   it('the workflow: base checkout, 400 KB fails, name-status, fork-gate red until labelled', () => {
     const wf = readFileSync('.github/workflows/ai-review.yml', 'utf8');
-    expect((wf.match(/ref: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/g) ?? []).length).toBe(2);
+    expect((wf.match(/ref: \$\{\{ github\.base_ref \}\}/g) ?? []).length).toBe(2);
     expect(wf).not.toMatch(/head -c/);
     expect(wf).toMatch(/-ge 400000/);
     expect(wf).toMatch(/git diff --name-status --no-renames/);

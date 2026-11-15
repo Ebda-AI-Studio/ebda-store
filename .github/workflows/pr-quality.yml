@@ -60,7 +60,7 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          git -C base fetch --no-tags --depth=1 origin "+refs/pull/$PR/head:refs/pr/head"
+          git -C base fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
           [ "$(git -C base rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
           # checkout-index from a throwaway index, not `git archive`: archive honours the PR's own export-ignore attributes,
           # which would let a PR hide files from the scan. Files are written as plain data; no hook or filter runs.
