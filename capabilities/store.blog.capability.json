@@ -13,8 +13,8 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "irreversible",
-    "note": "assistant creates drafts only (never publishes); removing a post is a delete, wave 2"
+    "class": "compensating",
+    "note": "assistant creates drafts only (never publishes); undo discards the draft through blog_post_discard_draft (confirm-class)"
   },
   "helpArticle": "store-content-faqs-pages-blog",
   "questions": {

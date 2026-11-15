@@ -10,7 +10,6 @@ import { SizeChartService } from '../../services/size-chart.service';
 import { PagesService } from '../../services/pages.service';
 import { BlogService } from '../../services/blog.service';
 import { change, diffRows, f, pair, pick, row, shape, type Described } from './kit';
-import { withRunResultInverse } from './marketing.tools';
 
 const iso = (d: Date | string | null | undefined): string | null =>
   d === null || d === undefined ? null : new Date(d).toISOString();
@@ -48,38 +47,36 @@ const faqShape = {
 };
 
 type FaqCreateArgs = FaqFields & { question: string; answer: string };
-const faqCreate = withRunResultInverse(
-  change<FaqCreateArgs>({
-    name: 'faq_create',
-    capabilityId: 'store.faqs-howtos',
-    description:
-      'Add one question and answer to the store FAQ (shown on the store and to AI engines). Arabic text is optional.',
-    schema: shape<FaqCreateArgs>(faqShape, ['question', 'answer']),
-    undo: 'compensating', // undo hides the new FAQ (isActive=false); deleting is wave 2
-    gate: FAQ_GATE,
-    audit: { action: 'store.faq_created', resourceType: 'store_faq' },
-    state: async () => null,
-    describe: (_ctx, a): Described => ({
-      summary: pair(
-        `هضيف سؤال جديد للأسئلة الشائعة: "${a.question}".`,
-        `I will add a new FAQ: "${a.question}".`
-      ),
-      rows: defined(a).map(k =>
-        row(FAQ_LABELS[k]![0], FAQ_LABELS[k]![1], null, (a as Record<string, unknown>)[k])
-      ),
-      affectedCount: 1,
-      restore: null,
-    }),
-    run: async (ctx, a) => {
-      const c = await StoreFaqService.create(ctx.storeId, a as never);
-      return { faqId: (c as { id: string }).id };
-    },
+const faqCreate = change<FaqCreateArgs>({
+  name: 'faq_create',
+  capabilityId: 'store.faqs-howtos',
+  description:
+    'Add one question and answer to the store FAQ (shown on the store and to AI engines). Arabic text is optional.',
+  schema: shape<FaqCreateArgs>(faqShape, ['question', 'answer']),
+  undo: 'compensating', // undo hides the new FAQ (isActive=false); deleting is wave 2
+  gate: FAQ_GATE,
+  audit: { action: 'store.faq_created', resourceType: 'store_faq' },
+  state: async () => null,
+  describe: (_ctx, a): Described => ({
+    summary: pair(
+      `هضيف سؤال جديد للأسئلة الشائعة: "${a.question}".`,
+      `I will add a new FAQ: "${a.question}".`
+    ),
+    rows: defined(a).map(k =>
+      row(FAQ_LABELS[k]![0], FAQ_LABELS[k]![1], null, (a as Record<string, unknown>)[k])
+    ),
+    affectedCount: 1,
+    restore: null,
   }),
-  (_a, result) => {
+  run: async (ctx, a) => {
+    const c = await StoreFaqService.create(ctx.storeId, a as never);
+    return { faqId: (c as { id: string }).id };
+  },
+  inverse: (_a, _restore, result) => {
     const id = (result as { faqId?: string } | undefined)?.faqId;
     return id ? { tool: 'faq_update', args: { faqId: id, isActive: false } } : null;
-  }
-);
+  },
+});
 
 type FaqUpdateArgs = FaqFields & { faqId: string };
 const faqUpdate = change<FaqUpdateArgs>({
@@ -385,7 +382,7 @@ const blogPostDraft = change<BlogArgs>({
     },
     ['slug', 'title', 'content']
   ),
-  undo: 'irreversible', // removing a post is a delete (wave 2); a draft is never visible to shoppers meanwhile
+  undo: 'compensating', // undo discards the draft through blog_post_discard_draft (confirm-class: it deletes)
   gate: { roles: ['store_admin', 'staff'] },
   audit: { action: 'blog.draft_created', resourceType: 'blog_post' },
   state: async () => null,
@@ -412,8 +409,67 @@ const blogPostDraft = change<BlogArgs>({
     const p = await BlogService.create(ctx.storeId, { ...a, isPublished: false } as never);
     return { postId: (p as { id: string }).id };
   },
+  inverse: (_a, _restore, result) => {
+    const id = (result as { postId?: string } | undefined)?.postId;
+    return id ? { tool: 'blog_post_discard_draft', args: { postId: id } } : null;
+  },
+});
+
+type DiscardArgs = { postId: string };
+const blogPostDiscardDraft = change<DiscardArgs>({
+  name: 'blog_post_discard_draft',
+  capabilityId: 'store.blog',
+  description:
+    'Delete ONE blog post that is still a DRAFT (never a published post). Used to undo blog_post_draft; the merchant can also ask for it.',
+  schema: shape<DiscardArgs>({ postId: f.id('The draft post id') }, ['postId']),
+  policy: 'confirm',
+  undo: 'irreversible',
+  deletes: true,
+  // routes/blog.routes.ts DELETE /stores/:storeId/blog/:postId: authorize(store_admin, super_admin, staff). Logic = BlogService.remove.
+  gate: { roles: ['store_admin', 'staff'] },
+  audit: { action: 'blog.draft_discarded', resourceType: 'blog_post', resourceId: a => a.postId },
+  state: async (ctx, a) => {
+    // 404s a post that is not this store's.
+    const p = (await BlogService.getById(ctx.storeId, a.postId)) as unknown as Record<
+      string,
+      unknown
+    >;
+    return {
+      id: p.id,
+      title: p.title,
+      isPublished: p.isPublished,
+      updatedAt: iso(p.updatedAt as Date),
+    };
+  },
+  describe: (_ctx, _a, st): Described => {
+    const p = st as { title: string; isPublished: boolean };
+    if (p.isPublished) throw new Error('Only a draft can be discarded; this post is published.');
+    return {
+      summary: pair(
+        `همسح مسودة المقال "${p.title}".`,
+        `I will delete the draft post "${p.title}".`
+      ),
+      rows: [row('المسودة', 'Draft', p.title, null)],
+      affectedCount: 1,
+      restore: null,
+    };
+  },
+  run: async (ctx, a, st) => {
+    if ((st as { isPublished: boolean }).isPublished)
+      throw new Error('Only a draft can be discarded.');
+    await BlogService.remove(ctx.storeId, a.postId);
+    return { postId: a.postId };
+  },
 });
 
 export function contentTools(): ToolSpec[] {
-  return [faqCreate, faqUpdate, sizeChartCreate, sizeChartUpdate, legalPageUpdate, blogPostDraft];
+  return [
+    faqCreate,
+    faqUpdate,
+    sizeChartCreate,
+    sizeChartUpdate,
+    legalPageUpdate,
+    blogPostDraft,
+    blogPostDiscardDraft,
+  ];
 }

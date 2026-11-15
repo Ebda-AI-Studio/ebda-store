@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   auditLog: vi.fn(),
   coupon: { getById: vi.fn(), create: vi.fn(), update: vi.fn(), toggleActive: vi.fn() },
   createBundle: vi.fn(),
+  updateBundle: vi.fn(),
   storeDb: vi.fn(),
   rec: { getRelations: vi.fn(), setProductRelations: vi.fn() },
   cart: { getConfig: vi.fn(), upsertConfig: vi.fn() },
@@ -32,6 +33,8 @@ vi.mock('@api/lib/repo-factory', () => ({ storeDb: m.storeDb }));
 vi.mock('@api/routes/bundle.routes', () => ({
   createBundle: m.createBundle,
   createSchema: { parse: (x: unknown) => x },
+  updateBundle: m.updateBundle,
+  updateSchema: { parse: (x: unknown) => x },
 }));
 vi.mock('@api/services/recommendation.service', () => ({ recommendationService: m.rec }));
 vi.mock('@api/services/abandoned-cart.service', () => ({ abandonedCartService: m.cart }));
@@ -78,6 +81,7 @@ describe('every marketing tool', () => {
       [
         'abandoned_cart_settings',
         'bundle_create',
+        'bundle_set_active',
         'coupon_create',
         'coupon_toggle',
         'coupon_update',
@@ -245,15 +249,20 @@ describe('bundle_create', () => {
       { kind: 'product', id: pid(2) },
     ]);
   });
-  it('applies through createBundle in piasters with the assistant audit; irreversible', async () => {
+  it('applies through createBundle in piasters with the assistant audit; undo switches it off', async () => {
     const t = T('bundle_create');
-    expect(t.undo).toBe('irreversible');
+    expect(t.undo).toBe('compensating');
     await applyOf(t, args);
     expect(m.createBundle).toHaveBeenCalledWith(
       's1',
       expect.objectContaining({ pricingType: 'fixed_price', pricingValue: 15000 })
     );
     expect(m.insertAuditLog.mock.calls[0]![0].details.actor).toBe('assistant');
+    const { draft, applied } = await applyOf(t, args);
+    expect(t.inverse!(ctxOf(), args as never, draft, applied)).toEqual({
+      tool: 'bundle_set_active',
+      args: { bundleId: 'b-1', active: false },
+    });
   });
   it('a product of another store never reaches run', async () => {
     m.storeDb.mockResolvedValue({ product: { findMany: vi.fn(async () => []) } });
@@ -263,6 +272,37 @@ describe('bundle_create', () => {
   it('staff refused', async () => {
     await expect(applyOf(T('bundle_create'), args, 'staff')).rejects.toBeInstanceOf(ToolForbidden);
     expect(m.createBundle).not.toHaveBeenCalled();
+  });
+});
+
+describe('bundle_set_active', () => {
+  const found = { id: 'b-1', name: 'Set', isActive: true, updatedAt: new Date(0) };
+  const dbWith = (row: unknown) =>
+    m.storeDb.mockResolvedValue({ bundle: { findFirst: vi.fn(async () => row) } });
+  it('switches off via updateBundle, flags price, and undo switches it back on', async () => {
+    dbWith(found);
+    const t = T('bundle_set_active');
+    const args = { bundleId: 'b-1', active: false };
+    const { draft } = await applyOf(t, args);
+    expect(draft.rows[0]).toMatchObject({ before: true, after: false });
+    expect(draft.changesPrice).toBe(true);
+    expect(m.updateBundle).toHaveBeenCalledWith('s1', 'b-1', { isActive: false });
+    expect(m.insertAuditLog.mock.calls[0]![0].details.actor).toBe('assistant');
+    expect(t.inverse!(ctxOf(), args as never, draft, { ok: true, etagAfter: 'x' })).toEqual({
+      tool: 'bundle_set_active',
+      args: { bundleId: 'b-1', active: true },
+    });
+  });
+  it('a foreign bundle never reaches run; staff refused', async () => {
+    dbWith(null);
+    await expect(
+      applyOf(T('bundle_set_active'), { bundleId: 'x', active: false })
+    ).rejects.toThrow();
+    expect(m.updateBundle).not.toHaveBeenCalled();
+    dbWith(found);
+    await expect(
+      applyOf(T('bundle_set_active'), { bundleId: 'b-1', active: false }, 'staff')
+    ).rejects.toBeInstanceOf(ToolForbidden);
   });
 });
 

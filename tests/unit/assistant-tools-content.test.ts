@@ -11,7 +11,7 @@ const m = vi.hoisted(() => ({
   faq: { get: vi.fn(), create: vi.fn(), update: vi.fn() },
   chart: { get: vi.fn(), create: vi.fn(), update: vi.fn() },
   pages: { get: vi.fn(), upsert: vi.fn() },
-  blog: { create: vi.fn() },
+  blog: { create: vi.fn(), getById: vi.fn(), remove: vi.fn() },
 }));
 vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -88,12 +88,19 @@ beforeEach(() => {
   });
   m.pages.upsert.mockResolvedValue({});
   m.blog.create.mockResolvedValue({ id: 'b1' });
+  m.blog.getById.mockResolvedValue({
+    id: 'b1',
+    title: 'T',
+    isPublished: false,
+    updatedAt: new Date(0),
+  });
 });
 
 describe('every content tool', () => {
   it('is declared with preview policy and no store id argument', () => {
     expect(tools.map(t => t.name).sort()).toEqual(
       [
+        'blog_post_discard_draft',
         'blog_post_draft',
         'faq_create',
         'faq_update',
@@ -103,7 +110,7 @@ describe('every content tool', () => {
       ].sort()
     );
     for (const t of tools) {
-      expect(t.policy).toBe('preview');
+      expect(t.policy).toBe(t.name === 'blog_post_discard_draft' ? 'confirm' : 'preview');
       expect(JSON.stringify(t.jsonSchema)).not.toMatch(/store_?id/i);
     }
   });
@@ -253,11 +260,54 @@ describe('blog_post_draft', () => {
     expect(draft.rows.some(r => r.after === false)).toBe(true);
     expect(t.jsonSchema).not.toMatchObject({ properties: { isPublished: expect.anything() } });
   });
-  it('is irreversible (no delete tool in this wave); staff may draft', async () => {
-    expect(T('blog_post_draft').undo).toBe('irreversible');
-    await applyOf(T('blog_post_draft'), args, 'staff');
+  it('is compensating: undo discards the draft; staff may draft', async () => {
+    const t = T('blog_post_draft');
+    expect(t.undo).toBe('compensating');
+    const { draft } = await applyOf(t, args, 'staff');
+    expect(undoArgs(t, args, draft as never, { postId: 'b1' })).toEqual({
+      tool: 'blog_post_discard_draft',
+      args: { postId: 'b1' },
+    });
     expect(m.blog.create).toHaveBeenCalled();
     await expect(applyOf(T('blog_post_draft'), args, 'customer')).rejects.toBeInstanceOf(
+      ToolForbidden
+    );
+  });
+});
+
+describe('blog_post_discard_draft', () => {
+  const args = { postId: 'b1' };
+  it('is confirm-class and flagged as a delete', () => {
+    const t = T('blog_post_discard_draft');
+    expect(t.policy).toBe('confirm');
+    expect(t.deletes).toBe(true);
+  });
+  it('removes a draft through BlogService with the assistant audit', async () => {
+    await applyOf(T('blog_post_discard_draft'), args);
+    expect(m.blog.remove).toHaveBeenCalledWith('s1', 'b1');
+    expect(m.insertAuditLog.mock.calls[0]![0].details.actor).toBe('assistant');
+  });
+  it('never deletes a published post', async () => {
+    m.blog.getById.mockResolvedValue({
+      id: 'b1',
+      title: 'T',
+      isPublished: true,
+      updatedAt: new Date(0),
+    });
+    await expect(applyOf(T('blog_post_discard_draft'), args)).rejects.toThrow(/draft/);
+    expect(m.blog.remove).not.toHaveBeenCalled();
+  });
+  it('a foreign post never reaches run; customers refused', async () => {
+    m.blog.getById.mockRejectedValue(notFound());
+    await expect(applyOf(T('blog_post_discard_draft'), args)).rejects.toThrow();
+    expect(m.blog.remove).not.toHaveBeenCalled();
+    m.blog.getById.mockResolvedValue({
+      id: 'b1',
+      title: 'T',
+      isPublished: false,
+      updatedAt: new Date(0),
+    });
+    await expect(applyOf(T('blog_post_discard_draft'), args, 'customer')).rejects.toBeInstanceOf(
       ToolForbidden
     );
   });

@@ -13,8 +13,8 @@
   "roles": ["owner", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "irreversible",
-    "note": "assistant can create only; delete/edit are not assistant tools yet, so a created bundle is not undoable"
+    "class": "reversible",
+    "note": "bundle_set_active restores the before state; create: compensating (undo switches the new bundle off); delete = confirm, not an assistant tool"
   },
   "helpArticle": "coupons-bundles-and-recommendations",
   "questions": {

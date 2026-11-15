@@ -601,6 +601,145 @@ router.post(
   }
 );
 
+/**
+ * Updates a bundle: the one write path of PUT /:storeId/bundles/:id, also called by the Ebda Store assistant (`bundle_set_active`).
+ * Re-validates the price against the CURRENT component prices, writes the patch, then busts the product caches.
+ */
+export async function updateBundle(
+  storeId: string,
+  id: string,
+  data: z.infer<typeof updateSchema>
+) {
+  const existing = await (
+    await bundleWriter(storeId)
+  ).bundle.findFirst({
+    where: { id, storeId },
+    include: { items: true },
+  });
+  if (!existing) {
+    throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
+  }
+
+  // Revalidate against the CURRENT pricingType/pricingValue (merged with
+  // whatever the request changed) and the CURRENT component prices —
+  // even an update that only touches `name` re-checks allocatability,
+  // because a component's price can drift after creation (same live
+  // pricing `resolveBundle` reads at every request) and silently make a
+  // previously-valid bundle price un-allocatable.
+  const pricingType = (data.pricingType ?? existing.pricingType) as BundlePricingType;
+  const pricingValue = data.pricingValue ?? existing.pricingValue;
+  assertPricingValueInRange(pricingType, pricingValue);
+  const itemInputs: BundleItemInput[] =
+    data.items ??
+    existing.items.map(i => ({
+      productId: i.productId,
+      variantId: i.variantId,
+      quantity: i.quantity,
+    }));
+
+  const { lines, componentSum } = await resolveBundleLines(storeId, itemInputs);
+  assertPriceWithinComponentSum(pricingType, pricingValue, componentSum);
+  const price = computeBundlePrice(componentSum, pricingType, pricingValue);
+
+  // See RULING T9-a in the POST handler above — same standard-envelope
+  // AppError, same `details.suggested` shape.
+  if (!isAllocatable(lines, price)) {
+    throw new AppError(
+      422,
+      'PRICE_NOT_ALLOCATABLE',
+      "This price can't be split exactly across the bundle's components.",
+      { suggested: nearestAllocatablePrice(lines, price, componentSum) }
+    );
+  }
+
+  const scalarPatch = {
+    ...(data.name !== undefined && { name: data.name }),
+    ...(data.nameAr !== undefined && { nameAr: data.nameAr }),
+    ...(data.slug !== undefined && { slug: data.slug }),
+    ...(data.description !== undefined && { description: data.description }),
+    ...(data.descriptionAr !== undefined && { descriptionAr: data.descriptionAr }),
+    ...(data.image !== undefined && { image: data.image }),
+    ...(data.pricingType !== undefined && { pricingType: data.pricingType }),
+    ...(data.pricingValue !== undefined && { pricingValue: data.pricingValue }),
+    ...(data.isActive !== undefined && { isActive: data.isActive }),
+    ...(data.startsAt !== undefined && { startsAt: data.startsAt }),
+    ...(data.expiresAt !== undefined && { expiresAt: data.expiresAt }),
+  };
+  if (await bundlesOnDo(storeId)) {
+    // Durable Object: no nested relation writes, so the component wipe + rewrite and the update are ONE atomic batch.
+    const dw = await storeWriter(storeId);
+    await dw.$transaction([
+      ...(data.items ? [dw.bundleItem.deleteMany({ where: { bundleId: id } })] : []),
+      dw.bundle.update({ where: { id, storeId }, data: scalarPatch as never }),
+      ...(data.items
+        ? [
+            dw.bundleItem.createMany({
+              data: data.items.map(item => ({
+                bundleId: id,
+                productId: item.productId,
+                variantId: item.variantId ?? null,
+                quantity: item.quantity,
+              })) as never,
+            }),
+          ]
+        : []),
+    ]);
+  } else
+    await (
+      await bundleWriter(storeId)
+    ).bundle.update({
+      where: { id, storeId },
+      data: {
+        ...scalarPatch,
+        // Full replace — simplest correct semantics for a small,
+        // merchant-edited component list (avoids reconciling adds/removes/
+        // quantity-changes against existing BundleItem rows).
+        //
+        // The wipe is NESTED in this update, never a standalone
+        // `prisma.bundleItem.deleteMany` run ahead of it, so the wipe and the
+        // rewrite fail together by construction.
+        //
+        // Accuracy note, because the original justification for this shape was
+        // wrong and is worth not re-deriving: the ambient tenant transaction
+        // (`middleware/tenant-context.ts:75`) does commit on every status <500
+        // and roll back only on 5xx — but on THIS route no 4xx is reachable
+        // between the wipe and the update. Every 4xx-throwing check
+        // (`resolveBundleLines`, `assertPriceWithinComponentSum`, the
+        // allocatable guard) runs earlier, and a raw Prisma error here is not
+        // mapped (`throwIfBundleFkViolation` is never called in this file), so
+        // P2002/P2003 reach `next(error)` as a 500 and DO roll back. The
+        // standalone form was therefore correct — but correct only by
+        // statement ordering. This nested form is correct structurally, so
+        // adding a 4xx mapping to this route later cannot silently open a
+        // data-loss window. Do NOT split them back out, and do NOT wrap this
+        // in `prisma.$transaction` — see the file header.
+        //
+        // Prisma runs the nested deleteMany before the nested create, which
+        // matters here: BundleItem is @@unique([bundleId, productId,
+        // variantId]), so re-sending an unchanged component would otherwise
+        // collide with its own surviving row.
+        ...(data.items && {
+          items: {
+            deleteMany: {},
+            create: data.items.map(item => ({
+              productId: item.productId,
+              variantId: item.variantId ?? null,
+              quantity: item.quantity,
+            })),
+          },
+        }),
+      },
+    });
+
+  const bundle = await resolveBundle(await bundleDb(storeId), storeId, id);
+  // See the POST handler above — the same feed-cache invalidation gap.
+  // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
+  // in the SAME outbound request — a separate bundles-only purge
+  // here was a second purge POST per write (issue 2202).
+  await invalidateStoreProductCaches(storeId);
+  return bundle;
+}
+
 // PUT /:storeId/bundles/:id - update (admin)
 router.put(
   '/:storeId/bundles/:id',
@@ -610,133 +749,7 @@ router.put(
       const { storeId, id } = req.params;
       const data = updateSchema.parse(req.body);
 
-      const existing = await (
-        await bundleWriter(storeId)
-      ).bundle.findFirst({
-        where: { id, storeId },
-        include: { items: true },
-      });
-      if (!existing) {
-        throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
-      }
-
-      // Revalidate against the CURRENT pricingType/pricingValue (merged with
-      // whatever the request changed) and the CURRENT component prices —
-      // even an update that only touches `name` re-checks allocatability,
-      // because a component's price can drift after creation (same live
-      // pricing `resolveBundle` reads at every request) and silently make a
-      // previously-valid bundle price un-allocatable.
-      const pricingType = (data.pricingType ?? existing.pricingType) as BundlePricingType;
-      const pricingValue = data.pricingValue ?? existing.pricingValue;
-      assertPricingValueInRange(pricingType, pricingValue);
-      const itemInputs: BundleItemInput[] =
-        data.items ??
-        existing.items.map(i => ({
-          productId: i.productId,
-          variantId: i.variantId,
-          quantity: i.quantity,
-        }));
-
-      const { lines, componentSum } = await resolveBundleLines(storeId, itemInputs);
-      assertPriceWithinComponentSum(pricingType, pricingValue, componentSum);
-      const price = computeBundlePrice(componentSum, pricingType, pricingValue);
-
-      // See RULING T9-a in the POST handler above — same standard-envelope
-      // AppError, same `details.suggested` shape.
-      if (!isAllocatable(lines, price)) {
-        throw new AppError(
-          422,
-          'PRICE_NOT_ALLOCATABLE',
-          "This price can't be split exactly across the bundle's components.",
-          { suggested: nearestAllocatablePrice(lines, price, componentSum) }
-        );
-      }
-
-      const scalarPatch = {
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.nameAr !== undefined && { nameAr: data.nameAr }),
-        ...(data.slug !== undefined && { slug: data.slug }),
-        ...(data.description !== undefined && { description: data.description }),
-        ...(data.descriptionAr !== undefined && { descriptionAr: data.descriptionAr }),
-        ...(data.image !== undefined && { image: data.image }),
-        ...(data.pricingType !== undefined && { pricingType: data.pricingType }),
-        ...(data.pricingValue !== undefined && { pricingValue: data.pricingValue }),
-        ...(data.isActive !== undefined && { isActive: data.isActive }),
-        ...(data.startsAt !== undefined && { startsAt: data.startsAt }),
-        ...(data.expiresAt !== undefined && { expiresAt: data.expiresAt }),
-      };
-      if (await bundlesOnDo(storeId)) {
-        // Durable Object: no nested relation writes, so the component wipe + rewrite and the update are ONE atomic batch.
-        const dw = await storeWriter(storeId);
-        await dw.$transaction([
-          ...(data.items ? [dw.bundleItem.deleteMany({ where: { bundleId: id } })] : []),
-          dw.bundle.update({ where: { id, storeId }, data: scalarPatch as never }),
-          ...(data.items
-            ? [
-                dw.bundleItem.createMany({
-                  data: data.items.map(item => ({
-                    bundleId: id,
-                    productId: item.productId,
-                    variantId: item.variantId ?? null,
-                    quantity: item.quantity,
-                  })) as never,
-                }),
-              ]
-            : []),
-        ]);
-      } else
-        await (
-          await bundleWriter(storeId)
-        ).bundle.update({
-          where: { id, storeId },
-          data: {
-            ...scalarPatch,
-            // Full replace — simplest correct semantics for a small,
-            // merchant-edited component list (avoids reconciling adds/removes/
-            // quantity-changes against existing BundleItem rows).
-            //
-            // The wipe is NESTED in this update, never a standalone
-            // `prisma.bundleItem.deleteMany` run ahead of it, so the wipe and the
-            // rewrite fail together by construction.
-            //
-            // Accuracy note, because the original justification for this shape was
-            // wrong and is worth not re-deriving: the ambient tenant transaction
-            // (`middleware/tenant-context.ts:75`) does commit on every status <500
-            // and roll back only on 5xx — but on THIS route no 4xx is reachable
-            // between the wipe and the update. Every 4xx-throwing check
-            // (`resolveBundleLines`, `assertPriceWithinComponentSum`, the
-            // allocatable guard) runs earlier, and a raw Prisma error here is not
-            // mapped (`throwIfBundleFkViolation` is never called in this file), so
-            // P2002/P2003 reach `next(error)` as a 500 and DO roll back. The
-            // standalone form was therefore correct — but correct only by
-            // statement ordering. This nested form is correct structurally, so
-            // adding a 4xx mapping to this route later cannot silently open a
-            // data-loss window. Do NOT split them back out, and do NOT wrap this
-            // in `prisma.$transaction` — see the file header.
-            //
-            // Prisma runs the nested deleteMany before the nested create, which
-            // matters here: BundleItem is @@unique([bundleId, productId,
-            // variantId]), so re-sending an unchanged component would otherwise
-            // collide with its own surviving row.
-            ...(data.items && {
-              items: {
-                deleteMany: {},
-                create: data.items.map(item => ({
-                  productId: item.productId,
-                  variantId: item.variantId ?? null,
-                  quantity: item.quantity,
-                })),
-              },
-            }),
-          },
-        });
-
-      const bundle = await resolveBundle(await bundleDb(storeId), storeId, id);
-      // See the POST handler above — the same feed-cache invalidation gap.
-      // Also clears the bundle-list Redis key and purges `bundles:<storeId>`
-      // in the SAME outbound request — a separate bundles-only purge
-      // here was a second purge POST per write (issue 2202).
-      await invalidateStoreProductCaches(storeId);
+      const bundle = await updateBundle(storeId, id, data);
       res.json({ success: true, data: { bundle } });
     } catch (error) {
       next(error);

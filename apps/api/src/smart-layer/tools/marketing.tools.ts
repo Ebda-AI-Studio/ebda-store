@@ -3,13 +3,7 @@
  * (cited at each tool), each `run` calls the SAME service the route calls. Money in tool arguments is EGP (a decimal number); the tools convert to
  * integer piasters with Math.round(x * 100) before they reach a service. Deleting a coupon / bundle is NOT here (wave 2, confirm).
  */
-import type {
-  AppliedResult,
-  InverseOp,
-  PreviewDraft,
-  ToolSpec,
-  TurnCtx,
-} from '@ebda/shared/smart-layer';
+import type { ToolSpec, TurnCtx } from '@ebda/shared/smart-layer';
 import { AppError } from '../../middleware/error-handler';
 import { assertCouponValue } from '../../lib/sellable-price';
 import { storeDb } from '../../lib/repo-factory';
@@ -33,21 +27,6 @@ const toDate = (s: string | null | undefined): Date | null | undefined => {
 };
 const defined = (o: Record<string, unknown>): string[] =>
   Object.keys(o).filter(k => o[k] !== undefined);
-
-/**
- * `change()`'s inverse wrapper does not forward the applied result to the tool's inverse (kit.ts `inverse: (_ctx, a, draft) => ...`), so a create
- * tool that undoes through the NEW row's id re-declares `inverse` here, reading `applied.result`. Reduces to the kit's own when it is fixed.
- */
-export function withRunResultInverse(
-  spec: ToolSpec,
-  inverse: (a: unknown, result: unknown) => InverseOp | null
-): ToolSpec {
-  return {
-    ...spec,
-    inverse: (_ctx: TurnCtx, a: unknown, _draft: PreviewDraft, applied: AppliedResult) =>
-      inverse(a, applied.result),
-  } as unknown as ToolSpec;
-}
 
 // ---- coupons ----------------------------------------------------------------------------------------------------------------------------------
 // routes/coupon.routes.ts: authorize(store_admin, super_admin) + requireFeature('coupons'); the assistant never acts as super_admin.
@@ -164,46 +143,44 @@ type CouponCreateArgs = CouponInput & {
   type: 'percentage' | 'fixed';
   value: number;
 };
-const couponCreate = withRunResultInverse(
-  change<CouponCreateArgs>({
-    name: 'coupon_create',
-    capabilityId: 'marketing.coupons',
-    description:
-      'Create a discount coupon (a code shoppers type at checkout). type percentage = whole percent 1-100; type fixed = amount off, value/min order/max discount in EGP (decimal). It starts active.',
-    schema: shape<CouponCreateArgs>(
-      { code: f.str('Coupon code, e.g. EID10', { max: 50 }), ...couponFields },
-      ['code', 'name', 'type', 'value']
-    ),
-    undo: 'compensating',
-    gate: COUPON_GATE,
-    audit: { action: 'coupon.created', resourceType: 'coupon' },
-    state: async () => null,
-    describe: (_ctx, a): Described => {
-      assertCouponValid(a.type, a.value);
-      couponData(a, a.type); // validates the dates now, not at apply
-      const after = { ...a, code: a.code.toUpperCase() } as Record<string, unknown>;
-      const shown = defined(after).filter(k => k in COUPON_LABELS);
-      return {
-        summary: pair(
-          `هعمل كوبون ${after.code} بخصم ${a.value}${a.type === 'percentage' ? '%' : ' جنيه'} وهيبقى شغّال علطول.`,
-          `I will create coupon ${after.code}: ${a.value}${a.type === 'percentage' ? '%' : ' EGP'} off, active right away.`
-        ),
-        rows: shown.map(k => row(COUPON_LABELS[k]![0], COUPON_LABELS[k]![1], null, after[k])),
-        affectedCount: 1,
-        changesPrice: true,
-        restore: null,
-      };
-    },
-    run: async (ctx, a) => {
-      const c = await CouponService.create(ctx.storeId, couponData(a, a.type) as never);
-      return { couponId: (c as { id: string }).id, code: (c as { code: string }).code };
-    },
-  }),
-  (_a, result) => {
+const couponCreate = change<CouponCreateArgs>({
+  name: 'coupon_create',
+  capabilityId: 'marketing.coupons',
+  description:
+    'Create a discount coupon (a code shoppers type at checkout). type percentage = whole percent 1-100; type fixed = amount off, value/min order/max discount in EGP (decimal). It starts active.',
+  schema: shape<CouponCreateArgs>(
+    { code: f.str('Coupon code, e.g. EID10', { max: 50 }), ...couponFields },
+    ['code', 'name', 'type', 'value']
+  ),
+  undo: 'compensating',
+  gate: COUPON_GATE,
+  audit: { action: 'coupon.created', resourceType: 'coupon' },
+  state: async () => null,
+  describe: (_ctx, a): Described => {
+    assertCouponValid(a.type, a.value);
+    couponData(a, a.type); // validates the dates now, not at apply
+    const after = { ...a, code: a.code.toUpperCase() } as Record<string, unknown>;
+    const shown = defined(after).filter(k => k in COUPON_LABELS);
+    return {
+      summary: pair(
+        `هعمل كوبون ${after.code} بخصم ${a.value}${a.type === 'percentage' ? '%' : ' جنيه'} وهيبقى شغّال علطول.`,
+        `I will create coupon ${after.code}: ${a.value}${a.type === 'percentage' ? '%' : ' EGP'} off, active right away.`
+      ),
+      rows: shown.map(k => row(COUPON_LABELS[k]![0], COUPON_LABELS[k]![1], null, after[k])),
+      affectedCount: 1,
+      changesPrice: true,
+      restore: null,
+    };
+  },
+  run: async (ctx, a) => {
+    const c = await CouponService.create(ctx.storeId, couponData(a, a.type) as never);
+    return { couponId: (c as { id: string }).id, code: (c as { code: string }).code };
+  },
+  inverse: (_a, _restore, result) => {
     const id = (result as { couponId?: string } | undefined)?.couponId;
     return id ? { tool: 'coupon_toggle', args: { couponId: id, active: false } } : null;
-  }
-);
+  },
+});
 
 type CouponToggleArgs = { couponId: string; active: boolean };
 async function readCoupon(ctx: TurnCtx, id: string): Promise<CouponRow> {
@@ -359,7 +336,7 @@ const bundleCreate = change<BundleCreateArgs>({
     },
     ['name', 'slug', 'pricingType', 'pricingValue', 'items']
   ),
-  undo: 'irreversible', // the delete tool is wave 2 (confirm); until then a created bundle is removed by the merchant on the Bundles screen
+  undo: 'compensating', // undo switches the new bundle off (bundle_set_active); there is no delete tool
   gate: BUNDLE_GATE,
   audit: { action: 'bundle.created', resourceType: 'bundle' },
   refs: a => a.items.map(i => ({ kind: 'product', id: i.productId })),
@@ -418,6 +395,65 @@ const bundleCreate = change<BundleCreateArgs>({
     const b = await createBundle(ctx.storeId, data);
     return { bundleId: (b as { id: string }).id };
   },
+  inverse: (_a, _restore, result) => {
+    const id = (result as { bundleId?: string } | undefined)?.bundleId;
+    return id ? { tool: 'bundle_set_active', args: { bundleId: id, active: false } } : null;
+  },
+});
+
+type BundleActiveArgs = { bundleId: string; active: boolean };
+const bundleSetActive = change<BundleActiveArgs>({
+  name: 'bundle_set_active',
+  capabilityId: 'marketing.bundles',
+  description:
+    'Switch one product bundle on (active=true) or off (active=false). Off = shoppers can no longer buy it; the bundle is kept and can be switched back on.',
+  schema: shape<BundleActiveArgs>(
+    { bundleId: f.id('The bundle id'), active: f.bool('true = on, false = off') },
+    ['bundleId', 'active']
+  ),
+  undo: 'reversible',
+  gate: BUNDLE_GATE,
+  audit: { action: 'bundle.updated', resourceType: 'bundle', resourceId: a => a.bundleId },
+  state: async (ctx, a) => {
+    // The store-scoped read 404s a bundle that is not this store's.
+    const b = await (
+      await storeDb(ctx.storeId)
+    ).bundle.findFirst({
+      where: { id: a.bundleId, storeId: ctx.storeId },
+      select: { id: true, name: true, isActive: true, updatedAt: true },
+    });
+    if (!b) throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
+    return { id: b.id, name: b.name, isActive: b.isActive, updatedAt: iso(b.updatedAt) };
+  },
+  describe: (_ctx, a, st): Described => {
+    const s = st as { name: string; isActive: boolean };
+    const changes = s.isActive !== a.active;
+    return {
+      summary: pair(
+        changes
+          ? `هـ${a.active ? 'شغّل' : 'وقّف'} الباقة "${s.name}".`
+          : `الباقة "${s.name}" أصلاً ${a.active ? 'شغّالة' : 'موقوفة'}.`,
+        changes
+          ? `I will switch the bundle "${s.name}" ${a.active ? 'on' : 'off'}.`
+          : `The bundle "${s.name}" is already ${a.active ? 'on' : 'off'}.`
+      ),
+      rows: [row('شغّالة', 'Active', s.isActive, a.active)],
+      affectedCount: changes ? 1 : 0,
+      restore: { active: s.isActive },
+      ...(changes ? { changesPrice: true } : {}),
+    };
+  },
+  run: async (ctx, a, st) => {
+    if ((st as { isActive: boolean }).isActive === a.active)
+      return { bundleId: a.bundleId, unchanged: true };
+    const { updateBundle, updateSchema } = await import('../../routes/bundle.routes.js');
+    await updateBundle(ctx.storeId, a.bundleId, updateSchema.parse({ isActive: a.active }));
+    return { bundleId: a.bundleId, isActive: a.active };
+  },
+  inverse: (a, restore) => ({
+    tool: 'bundle_set_active',
+    args: { bundleId: a.bundleId, active: (restore as { active: boolean }).active },
+  }),
 });
 
 // ---- product recommendations ------------------------------------------------------------------------------------------------------------------
@@ -633,6 +669,7 @@ export function marketingTools(): ToolSpec[] {
     couponToggle,
     couponUpdate,
     bundleCreate,
+    bundleSetActive,
     recommendationsSet,
     abandonedCartSettings,
   ];
