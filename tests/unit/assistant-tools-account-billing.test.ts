@@ -354,12 +354,11 @@ describe('account + billing tools', () => {
       await run('list_my_stores');
       expect(m.storeList).toHaveBeenCalledWith({ ownerId: 'u1', page: 1, limit: 10 });
     });
-    it('merchant_mcp_status never selects the key hash', async () => {
-      m.keysFind.mockResolvedValue([{ id: 'k1', name: 'laptop', prefix: 'mk_ab' }]);
-      const r = (await run('merchant_mcp_status')) as { writeEnabled: boolean };
+    it('merchant_mcp_status reports the write switch and never lists or returns a key', async () => {
+      const r = (await run('merchant_mcp_status')) as Record<string, unknown>;
       expect(r.writeEnabled).toBe(true);
-      expect(m.keysFind.mock.calls[0][0].select.keyHash).toBeUndefined();
-      expect(m.keysFind.mock.calls[0][0].where).toEqual({ storeId: 'S1' });
+      expect(JSON.stringify(r)).not.toMatch(/keyHash|prefix|ebdam_/);
+      expect(m.keysFind).not.toHaveBeenCalled();
     });
   });
 });

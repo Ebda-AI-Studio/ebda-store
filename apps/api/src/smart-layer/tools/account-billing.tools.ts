@@ -16,7 +16,7 @@
  *   - staff_remove (team.staff): `removeStaffFromStore` (extracted from the route, behaviour unchanged).
  */
 import type { ToolSpec, TurnCtx } from '@ebda/shared/smart-layer';
-import { prisma, withUser } from '@ebda/database';
+import { withUser } from '@ebda/database';
 import { hasPermission, type Role } from '../../middleware/rbac';
 import { assertVerifiedEmail } from '../../middleware/require-verified-email';
 import { featureService } from '../../services/feature.service';
@@ -109,7 +109,7 @@ const billingOverview = readTool(
 const billingInvoices = readTool(
   'billing_invoices',
   'billing.platform-fee-vat',
-  'My Ebda Store subscription charges and invoices (date, plan, amount, VAT, status). Say: "show my invoices", "what did Ebda charge me", "فواتير الاشتراك", "الضريبة على الفاتورة".',
+  'My Ebda Store subscription charges and invoices (date, plan, amount, VAT, status). Say: "show my invoices", "what did Ebda Store charge me", "فواتير الاشتراك", "الضريبة على الفاتورة".',
   async ctx => {
     ownerOnly(ctx);
     return compact(await readInStoreContext(ctx.storeId, () => listStoreCharges(ctx.storeId, 10)));
@@ -119,7 +119,7 @@ const billingInvoices = readTool(
 const myFeatures = readTool(
   'my_features',
   'billing.addons',
-  'Which features are on or off for my store and why a feature is locked (plan or switched off by Ebda). It cannot turn a feature on: that is the Ebda team or a plan upgrade. Say: "why is this feature locked", "what features do I have", "الميزة دي مقفولة ليه", "عايز افعل الزر العائم".',
+  'Which features are on or off for my store and why a feature is locked (plan or switched off by Ebda Store). It cannot turn a feature on: that is the Ebda Store team or a plan upgrade. Say: "why is this feature locked", "what features do I have", "الميزة دي مقفولة ليه", "عايز افعل الزر العائم".',
   async ctx => {
     const features = await readInStoreContext(ctx.storeId, () =>
       featureService.getStoreFeatures(ctx.storeId)
@@ -128,7 +128,7 @@ const myFeatures = readTool(
     return {
       enabled: keys.filter(k => (features as Record<string, boolean>)[k]),
       disabled: keys.filter(k => !(features as Record<string, boolean>)[k]),
-      note: 'A disabled feature is turned on by upgrading the plan or by the Ebda team; the assistant cannot enable it.',
+      note: 'A disabled feature is turned on by upgrading the plan or by the Ebda Store team; the assistant cannot enable it.',
     };
   }
 );
@@ -158,32 +158,20 @@ const listMyStores = readTool(
 const merchantMcpStatus = readTool(
   'merchant_mcp_status',
   'mcp.read-tools',
-  'My Merchant MCP connection (Claude or another AI app reading my store): which keys exist (name, scopes, last used, expiry, revoked), and whether AI write tools are switched on. It never shows a key. Say: "who can read my store from Claude", "MCP keys", "مفاتيح MCP".',
+  'My Merchant MCP connection (Claude or another AI app reading my store): and whether AI write tools are switched on. It never shows a key and does not list them: the keys are on the Merchant MCP screen. Say: "who can read my store from Claude", "MCP keys", "مفاتيح MCP".',
   async ctx => {
     ownerOnly(ctx);
     if (!(await featureService.isFeatureEnabled(ctx.storeId, 'merchant_mcp'))) {
       throw new ReadForbidden('merchant_mcp');
     }
     return readInStoreContext(ctx.storeId, async () => {
-      // `keyHash` is never selected (it is what a request is looked up by).
-      const keys = await prisma.merchantApiKey.findMany({
-        where: { storeId: ctx.storeId },
-        select: {
-          id: true,
-          name: true,
-          prefix: true,
-          scopes: true,
-          lastUsedAt: true,
-          expiresAt: true,
-          revokedAt: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      });
       const settings =
         ((await StoreService.getById(ctx.storeId)).settings as Rec | null) ?? ({} as Rec);
-      return compact({ writeEnabled: settings.mcpWriteEnabled !== false, keys });
+      // The key list itself (names, scopes, last used) stays on the Merchant MCP screen: its rows live in the platform key store, not in the store's own data.
+      return compact({
+        writeEnabled: settings.mcpWriteEnabled !== false,
+        keysScreen: '/stores/[id]/settings/integrations',
+      });
     });
   },
   'store-data'
@@ -383,7 +371,7 @@ const subscriptionResume = change<Record<string, never>>({
 const instapayPlanChoose = change<{ planCode: string; interval: Interval }>({
   name: 'instapay_plan_choose',
   capabilityId: 'billing.pay-instapay',
-  description: `Start paying for a plan by InstaPay: picks the plan and billing period the next InstaPay transfer buys and returns the payment reference to write on the transfer and the billing screen where I upload the receipt screenshot (the upload itself stays on that screen). Nothing is charged and the plan does not change until the Ebda team approves the payment. ${MONEY_WORDS}"I want to pay by InstaPay", "ادفع انستاباي", "عايز ادفع اشتراك Growth بانستاباي". The price comes from the plan catalogue.`,
+  description: `Start paying for a plan by InstaPay: picks the plan and billing period the next InstaPay transfer buys and returns the payment reference to write on the transfer and the billing screen where I upload the receipt screenshot (the upload itself stays on that screen). Nothing is charged and the plan does not change until the Ebda Store team approves the payment. ${MONEY_WORDS}"I want to pay by InstaPay", "ادفع انستاباي", "عايز ادفع اشتراك Growth بانستاباي". The price comes from the plan catalogue.`,
   schema: shape<{ planCode: string; interval: Interval }>(
     {
       planCode: f.id('The plan code, as quote_plan returns it.'),
@@ -393,7 +381,7 @@ const instapayPlanChoose = change<{ planCode: string; interval: Interval }>({
   ),
   policy: 'confirm',
   money: true,
-  undo: 'irreversible', // choosing again overwrites it, but a reference is issued and the payment claim is Ebda's to review
+  undo: 'irreversible', // choosing again overwrites it, but a reference is issued and the payment claim is Ebda Store's to review
   gate: BILLING_GATE,
   audit: { action: 'billing.instapay_plan_chosen', resourceType: 'store_subscription' },
   state: (ctx, a) => billingState(ctx.storeId, a.planCode),
