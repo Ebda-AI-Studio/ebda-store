@@ -51,6 +51,7 @@ describe('assistant tools vs the capability registry', () => {
 
   it('a write tool is backed by a capability the registry marks preview or confirm', () => {
     const bad = changeTools()
+      .filter(t => t.preview) // a free read tool belongs on a free capability; only a WRITE tool must sit on a preview or confirm one
       .filter(t =>
         ['free', 'forbidden'].includes(registry.caps.get(t.capabilityId)?.policy ?? 'forbidden')
       )

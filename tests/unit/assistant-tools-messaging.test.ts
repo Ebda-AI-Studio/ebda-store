@@ -361,15 +361,15 @@ describe('loyalty', () => {
       applyOf(T('loyalty_award_points'), { customerIds: ['a'], points: 5 }, 'staff')
     ).rejects.toBeInstanceOf(ToolForbidden);
   });
-  it('settings: only passed keys change and undo restores them', async () => {
+  it('settings: only passed keys change; the tool is irreversible like its capability, so it declares no inverse', async () => {
     const t = T('loyalty_settings_set');
     const args = { signupBonus: 300 };
     const { draft, applied } = await applyOf(t, args);
     expect(m.loy.updateSettings).toHaveBeenCalledWith('s1', { settings: { signupBonus: 300 } });
-    expect(t.inverse!(ctxOf(), args as never, draft, applied)).toEqual({
-      tool: 'loyalty_settings_set',
-      args: { signupBonus: 100 },
-    });
+    expect(t.undo).toBe('irreversible');
+    expect(t.inverse).toBeUndefined();
+    expect(draft.payload).toMatchObject({ restore: { signupBonus: 100 } }); // the before value is still on the card
+    void applied;
   });
 });
 
