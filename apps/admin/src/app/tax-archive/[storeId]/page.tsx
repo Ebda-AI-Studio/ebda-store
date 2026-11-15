@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { Button } from '../../../components/ui/Button';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../../components/RequireSuperAdmin';
 import { FiscalDocumentsTable } from '../../../components/fiscal/FiscalDocumentsTable';
@@ -73,13 +74,9 @@ function StoreArchiveInner({ storeId }: { storeId: string }) {
         />
       )}
       {nextCursor && (
-        <button
-          type="button"
-          className="text-sm text-primary hover:underline"
-          onClick={() => void load(nextCursor, () => false)}
-        >
+        <Button variant="outline" size="sm" onClick={() => void load(nextCursor, () => false)}>
           {t('loadMore')}
-        </button>
+        </Button>
       )}
     </div>
   );
