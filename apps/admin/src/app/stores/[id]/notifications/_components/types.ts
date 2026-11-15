@@ -112,3 +112,40 @@ export const DEFAULT_EVENTS: EventConfig[] = [
     push_notifications: false,
   },
 ];
+
+/**
+ * The events endpoint answers `{ events: { [event]: { sms, push } } }` (a map of the rows the store saved); an older
+ * shape was an array. Accept both and lay the saved switches over DEFAULT_EVENTS, so a saved config always shows.
+ * Returns null when nothing usable came back (the defaults stay).
+ */
+export function mergeEventConfigs(raw: unknown): EventConfig[] | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const saved = new Map<string, { sms?: boolean; push?: boolean }>();
+  if (Array.isArray(raw)) {
+    for (const r of raw as Array<{
+      event?: string;
+      sms?: boolean;
+      push?: boolean;
+      push_notifications?: boolean;
+    }>) {
+      if (r?.event) saved.set(r.event, { sms: r.sms, push: r.push ?? r.push_notifications });
+    }
+  } else {
+    for (const [event, v] of Object.entries(
+      raw as Record<string, { sms?: boolean; push?: boolean }>
+    )) {
+      saved.set(event, { sms: v?.sms, push: v?.push });
+    }
+  }
+  if (saved.size === 0) return null;
+  return DEFAULT_EVENTS.map(d => {
+    const s = saved.get(d.event);
+    return s
+      ? {
+          ...d,
+          sms: s.sms ?? d.sms,
+          push_notifications: s.push ?? d.push_notifications,
+        }
+      : d;
+  });
+}

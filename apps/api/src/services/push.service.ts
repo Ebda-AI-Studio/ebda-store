@@ -6,7 +6,7 @@
  * (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT).
  */
 
-import { analyticsWrite } from '../lib/analytics-backend';
+import { analyticsRead, analyticsWrite } from '../lib/analytics-backend';
 import webpush from 'web-push';
 import { currentStoreId, prisma, withStore, runInTenantContext } from '@ebda/database';
 import logger from '../lib/logger';
@@ -48,7 +48,36 @@ if (config.vapidPublicKey && config.vapidPrivateKey) {
 // Push Service
 // ==========================================
 
+interface PushSendResult {
+  /** Why nothing was sent, when nothing was: platform keys missing, the store's push switch off, or no subscribers. */
+  skipped?: 'not_configured' | 'channel_disabled' | 'no_subscribers';
+  recipients: number;
+  delivered: number;
+  failed: number;
+}
+
+interface PushSendOptions {
+  /** NotificationLog event name (default `push_send`). */
+  logEvent?: string;
+  /** Only devices of this audience (default: every device of the store, as before). */
+  audience?: PushAudience;
+}
+
+interface PushBroadcastSummary {
+  id: string;
+  title: string;
+  recipients: number;
+  delivered: number;
+  failed: number;
+  sentAt: number;
+}
+
 class PushService {
+  /** True when the platform Web Push (VAPID) keys are set on this deployment. */
+  isConfigured(): boolean {
+    return vapidConfigured;
+  }
+
   /**
    * Send a web-push notification to all subscribed devices for a store.
    * Cleans up expired (410 Gone / 404) subscriptions automatically.
@@ -58,15 +87,16 @@ class PushService {
     storeId: string,
     title: string,
     body: string,
-    data?: Record<string, unknown>
-  ): Promise<void> {
+    data?: Record<string, unknown>,
+    options: PushSendOptions = {}
+  ): Promise<PushSendResult> {
     // 1. VAPID must be configured platform-wide
     if (!vapidConfigured) {
       if (!vapidWarnLogged) {
         logger.warn('[PushService] VAPID keys not configured, skipping push send');
         vapidWarnLogged = true;
       }
-      return;
+      return { skipped: 'not_configured', recipients: 0, delivered: 0, failed: 0 };
     }
 
     // 2. Check the store's push channel is enabled (ignore credentials — VAPID is platform-wide)
@@ -76,7 +106,7 @@ class PushService {
         { storeId },
         '[PushService] Push channel not found or disabled, skipping sendToStore'
       );
-      return;
+      return { skipped: 'channel_disabled', recipients: 0, delivered: 0, failed: 0 };
     }
 
     // 3. Get all push subscriptions for this store.
@@ -91,14 +121,14 @@ class PushService {
     // proxy threw PostgresRemovedError there on the Worker, so every dispatched push failed (Ruling NZ-D23).
     const subscriptions = await withStoreRw(storeId, tx =>
       tx.pushSubscription.findMany({
-        where: { storeId },
+        where: { storeId, ...(options.audience ? { audience: options.audience } : {}) },
         select: { id: true, endpoint: true, p256dh: true, auth: true },
       })
     );
 
     if (subscriptions.length === 0) {
       logger.debug({ storeId }, '[PushService] No push subscriptions for store, skipping');
-      return;
+      return { skipped: 'no_subscribers', recipients: 0, delivered: 0, failed: 0 };
     }
 
     // 4. Build payload
@@ -168,7 +198,7 @@ class PushService {
     const pushLog = {
       storeId,
       channel: 'push',
-      event: 'push_send',
+      event: options.logEvent ?? 'push_send',
       status,
       metadata: { title, tokenCount: subscriptions.length, successCount, failureCount },
     };
@@ -182,6 +212,11 @@ class PushService {
       { storeId, successCount, failureCount, title },
       '[PushService] Web push notification sent'
     );
+    return {
+      recipients: subscriptions.length,
+      delivered: successCount,
+      failed: failureCount,
+    };
   }
 
   /**
@@ -370,6 +405,60 @@ class PushService {
       where: { endpoint, storeId: currentStoreId() },
     });
     logger.info({ endpoint }, '[PushService] Push subscription removed');
+  }
+
+  /**
+   * Merchant broadcast: one push to every storefront device subscribed for THIS store. The ar + en copy rides in
+   * `data.i18n`; the storefront worker shows the one matching the shopper's browser language (Arabic is the default).
+   */
+  async broadcastToStore(
+    storeId: string,
+    input: { titleEn: string; titleAr: string; bodyEn: string; bodyAr: string; url?: string }
+  ): Promise<PushSendResult> {
+    return this.sendToStore(
+      storeId,
+      input.titleAr,
+      input.bodyAr,
+      {
+        url: input.url,
+        i18n: {
+          en: { title: input.titleEn, body: input.bodyEn },
+          ar: { title: input.titleAr, body: input.bodyAr },
+        },
+      },
+      { logEvent: 'push_broadcast', audience: 'storefront' }
+    );
+  }
+
+  /** The last `limit` broadcasts of a store (delivered / failed per send), newest first. */
+  async listRecentBroadcasts(storeId: string, limit: number): Promise<PushBroadcastSummary[]> {
+    const args = {
+      where: { storeId, channel: 'push', event: 'push_broadcast' },
+      orderBy: { createdAt: 'desc' as const },
+      take: limit,
+      select: { id: true, metadata: true, createdAt: true },
+    };
+    const rows = await analyticsRead(
+      storeId,
+      r => r.notificationLog.findMany(args),
+      () => prisma.notificationLog.findMany(args)
+    );
+    return rows.map(row => {
+      const m = (row.metadata ?? {}) as {
+        title?: string;
+        tokenCount?: number;
+        successCount?: number;
+        failureCount?: number;
+      };
+      return {
+        id: row.id,
+        title: m.title ?? '',
+        recipients: m.tokenCount ?? 0,
+        delivered: m.successCount ?? 0,
+        failed: m.failureCount ?? 0,
+        sentAt: new Date(row.createdAt).getTime(),
+      };
+    });
   }
 
   /**

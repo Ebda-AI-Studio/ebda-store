@@ -3,17 +3,13 @@
 /**
  * Storefront broadcast composer.
  *
- * Lets a store admin send a OneSignal push to every storefront subscriber
- * whose device is tagged with this storeId. The actual filter is enforced
- * server-side in `OneSignalService.broadcastToStore`; the UI here only
- * collects the title/body/url payload.
+ * Lets a store admin send a native Web Push to every storefront subscriber of this store. The store filter is enforced
+ * server-side (`pushService.broadcastToStore`); the UI only collects the title/body/url payload.
  *
- * Three render paths:
- *  1. Loading/idle: render the composer form.
- *  2. 503 PUSH_NOT_CONFIGURED on send: surface a yellow config note. The
- *     same note is rendered preemptively if a parent passes
- *     `notConfigured` based on the channel config probe.
- *  3. Submit success: toast + reset form.
+ * Render paths:
+ *  1. Push ready: the composer form.
+ *  2. Push not available yet (platform side, never a merchant task): a plain note and the form disabled.
+ *  3. Send: 409 = the store's push switch is off (friendly toast); success = toast + reset form.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -22,6 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { withNumerals } from '@ebda/shared';
+import { usePushStatus } from './usePushStatus';
 
 interface BroadcastFormState {
   titleEn: string;
@@ -41,15 +38,11 @@ const EMPTY: BroadcastFormState = {
 
 interface BroadcastSummary {
   id: string;
-  headings?: { en?: string; ar?: string };
-  contents?: { en?: string; ar?: string };
-  url?: string;
-  successful?: number;
-  converted?: number;
-  failed?: number;
-  remaining?: number;
-  queued_at?: number;
-  completed_at?: number;
+  title: string;
+  recipients: number;
+  delivered: number;
+  failed: number;
+  sentAt: number;
 }
 
 export function BroadcastComposerCard({ storeId }: { storeId: string }) {
@@ -60,8 +53,9 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
 
   const [form, setForm] = useState<BroadcastFormState>(EMPTY);
   const [sending, setSending] = useState(false);
-  // null = unknown, true = env vars missing on server, false = ready
-  const [notConfigured, setNotConfigured] = useState<boolean | null>(null);
+  // Push not set up on our side yet: the form stays off and says so in plain words (null = still checking).
+  const pushStatus = usePushStatus(storeId);
+  const notConfigured = pushStatus.available === false;
   const [recent, setRecent] = useState<BroadcastSummary[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
 
@@ -71,15 +65,11 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
       const { data, error } = await apiGet<{ broadcasts: BroadcastSummary[] }>(
         `/api/v1/admin/stores/${storeId}/push/broadcasts`
       );
-      if (error?.code === 'PUSH_NOT_CONFIGURED') {
-        setNotConfigured(true);
+      if (error) {
         setRecent([]);
         return;
       }
-      if (data?.broadcasts) {
-        setRecent(data.broadcasts);
-        setNotConfigured(false);
-      }
+      if (data?.broadcasts) setRecent(data.broadcasts);
     } catch {
       // Non-fatal — the composer is still usable without history
     } finally {
@@ -121,8 +111,11 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
 
       if (error) {
         if (error.code === 'PUSH_NOT_CONFIGURED') {
-          setNotConfigured(true);
           showError(t('notConfiguredTitle'), t('notConfiguredDescription'));
+          return;
+        }
+        if (error.code === 'PUSH_CHANNEL_DISABLED') {
+          showError(t('channelOffTitle'), t('channelOffDescription'));
           return;
         }
         showError(tToast('errorTitle'), error.message || t('sendFailed'));
@@ -179,12 +172,6 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
         >
           <p className="font-medium mb-1">{t('notConfiguredTitle')}</p>
           <p className="text-muted-foreground">{t('notConfiguredDescription')}</p>
-          <p className="text-muted-foreground mt-2">
-            {/* i18n-gate-allow: environment variable name */}
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">ONESIGNAL_APP_ID</code>{' '}
-            {t('and')} {/* i18n-gate-allow: environment variable name */}
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">ONESIGNAL_REST_API_KEY</code>
-          </p>
         </div>
       )}
 
@@ -199,7 +186,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             onChange={e => update('titleEn', e.target.value)}
             placeholder={t('placeholders.titleEn')}
             maxLength={200}
-            disabled={sending}
+            disabled={sending || notConfigured}
             className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
         </div>
@@ -213,7 +200,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             onChange={e => update('titleAr', e.target.value)}
             placeholder={t('placeholders.titleAr')}
             maxLength={200}
-            disabled={sending}
+            disabled={sending || notConfigured}
             dir="rtl"
             className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
@@ -228,7 +215,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             placeholder={t('placeholders.bodyEn')}
             maxLength={2000}
             rows={3}
-            disabled={sending}
+            disabled={sending || notConfigured}
             className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
         </div>
@@ -242,7 +229,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             placeholder={t('placeholders.bodyAr')}
             maxLength={2000}
             rows={3}
-            disabled={sending}
+            disabled={sending || notConfigured}
             dir="rtl"
             className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
@@ -257,7 +244,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
             onChange={e => update('url', e.target.value)}
             placeholder={t('placeholders.url')}
             maxLength={2000}
-            disabled={sending}
+            disabled={sending || notConfigured}
             className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('urlHelp')}</p>
@@ -267,7 +254,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
       <div className="flex items-center gap-3">
         <Button
           onClick={handleSend}
-          disabled={!formValid || sending || notConfigured === true}
+          disabled={!formValid || sending || pushStatus.available !== true}
           size="sm"
         >
           {sending && (
@@ -298,10 +285,10 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
         ) : (
           <ul className="space-y-2">
             {recent.map(b => {
-              const heading = b.headings?.en || b.headings?.ar || t('untitled');
-              const sent = (b.successful ?? 0) + (b.failed ?? 0);
-              const ts = b.completed_at || b.queued_at;
-              const when = ts ? new Date(ts * 1000).toLocaleString(undefined, withNumerals()) : '';
+              const heading = b.title || t('untitled');
+              const when = b.sentAt
+                ? new Date(b.sentAt).toLocaleString(undefined, withNumerals())
+                : '';
               return (
                 <li
                   key={b.id}
@@ -313,9 +300,9 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
                   </div>
                   <div className="text-xs text-muted-foreground whitespace-nowrap text-end">
                     <div>
-                      {t('deliveredCount', { count: b.successful ?? 0 })} / {sent}
+                      {t('deliveredCount', { count: b.delivered })} / {b.recipients}
                     </div>
-                    <div>{t('clickedCount', { count: b.converted ?? 0 })}</div>
+                    {b.failed > 0 && <div>{t('failedCount', { count: b.failed })}</div>}
                   </div>
                 </li>
               );

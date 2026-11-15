@@ -8,9 +8,8 @@
  * client-side at subscription time (apps/admin) and re-asserted server-side
  * when a subscription record is created so the two sources of truth agree.
  *
- * Storefront broadcast scoping uses the SAME tag mechanism but a different
- * key: storefront devices are tagged with `storeId` (the customer's store)
- * at consent time so `broadcastToStore` can target only that tenant.
+ * Merchant broadcasts to shoppers do NOT go through OneSignal: they use native Web Push
+ * (push.service.ts, `pushService.broadcastToStore`). OneSignal here is only for staff alerts (admin + Orders PWA).
  */
 
 import { withStore, withUser } from '@ebda/database';
@@ -80,59 +79,6 @@ interface NotifyOrdersAppInput {
   locale?: 'en' | 'ar';
 }
 
-export interface BroadcastInput {
-  storeId: string;
-  titleEn: string;
-  titleAr: string;
-  bodyEn: string;
-  bodyAr: string;
-  url?: string;
-}
-
-export interface BroadcastResult {
-  id: string;
-  recipients: number;
-}
-
-export interface BroadcastSummary {
-  id: string;
-  headings?: { en?: string; ar?: string };
-  contents?: { en?: string; ar?: string };
-  url?: string;
-  successful?: number;
-  converted?: number;
-  failed?: number;
-  remaining?: number;
-  queued_at?: number;
-  send_after?: number;
-  completed_at?: number;
-}
-
-export class OneSignalNotConfiguredError extends Error {
-  code = 'PUSH_NOT_CONFIGURED' as const;
-  constructor() {
-    super('OneSignal credentials are not configured on the server.');
-    this.name = 'OneSignalNotConfiguredError';
-  }
-}
-
-export class OneSignalRequestError extends Error {
-  status: number;
-  body: string;
-  constructor(status: number, body: string) {
-    super(`OneSignal request failed with status ${status}`);
-    this.name = 'OneSignalRequestError';
-    this.status = status;
-    this.body = body;
-  }
-}
-
-/** Storefront app — used by `broadcastToStore` (customer-facing pushes
- *  from merchants). Origin: https://ebda.app. */
-function isStorefrontConfigured(): boolean {
-  return !!(config.onesignalAppId && config.onesignalRestApiKey);
-}
-
 /** Admin app — used by `notifyAdminsOfOrder` (new-order pings to store
  *  owners). Origin: https://store.ebda.app. Distinct from the
  *  storefront app because OneSignal locks each app to a single origin. */
@@ -147,11 +93,6 @@ function isAdminConfigured(): boolean {
  *  skip the send silently (see `notifyOrdersAppOfOrder`). */
 function isOrdersConfigured(): boolean {
   return !!(config.onesignalOrdersAppId && config.onesignalOrdersRestApiKey);
-}
-
-// Backwards-compat alias for code paths not yet split into admin vs storefront.
-function isConfigured(): boolean {
-  return isStorefrontConfigured();
 }
 
 function adminOrderUrl(storeId: string, orderId: string): string {
@@ -1069,138 +1010,5 @@ export class OneSignalService {
       // not-found is fine — the user may have already removed it elsewhere
       if (err?.code !== 'P2025') throw err;
     });
-  }
-
-  /**
-   * Public surface for "is the OneSignal integration usable right now".
-   * Routes use this to short-circuit with a 503 PUSH_NOT_CONFIGURED rather
-   * than calling OneSignal with empty credentials and confusing the merchant
-   * with a generic 500.
-   */
-  static isConfigured(): boolean {
-    return isConfigured();
-  }
-
-  /**
-   * Send a tenant-scoped broadcast to every storefront device that has
-   * tagged itself with `storeId = <input.storeId>`. The filter is enforced
-   * server-side here — never trust a tag claim from a client. Other tenants'
-   * subscribers will not receive this notification because their tag value
-   * differs.
-   *
-   * Throws `OneSignalNotConfiguredError` (503 PUSH_NOT_CONFIGURED) when env
-   * vars are missing, and `OneSignalRequestError` for non-2xx responses so
-   * the route handler can surface a real error to the admin UI.
-   */
-  static async broadcastToStore(input: BroadcastInput): Promise<BroadcastResult> {
-    if (!isConfigured()) {
-      throw new OneSignalNotConfiguredError();
-    }
-
-    const body: Record<string, unknown> = {
-      app_id: config.onesignalAppId,
-      headings: { en: input.titleEn, ar: input.titleAr },
-      contents: { en: input.bodyEn, ar: input.bodyAr },
-      // Per-store filter — DO NOT remove. This is what prevents a broadcast
-      // for tenant A from leaking to tenant B's subscribers.
-      filters: [{ field: 'tag', key: 'storeId', relation: '=', value: input.storeId }],
-    };
-    if (input.url) {
-      body.url = input.url;
-    }
-
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Match `notifyAdminsOfOrder`'s auth scheme — `Key <REST>` is the
-        // current OneSignal v2 form and what the existing helper uses.
-        Authorization: `Key ${config.onesignalRestApiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '');
-      logger.error({ status: res.status, body: errBody }, 'OneSignal broadcast failed');
-      throw new OneSignalRequestError(res.status, errBody);
-    }
-
-    const json = (await res.json().catch(() => ({}))) as {
-      id?: string;
-      recipients?: number;
-      errors?: unknown;
-    };
-    return {
-      id: json.id || '',
-      recipients: typeof json.recipients === 'number' ? json.recipients : 0,
-    };
-  }
-
-  /**
-   * Pull the last N notifications from OneSignal and filter to ones whose
-   * `filters` array references this store. OneSignal doesn't support
-   * server-side tag filtering on the list endpoint, so we fetch a generous
-   * window and filter locally. We rely on the `filters` array we wrote in
-   * `broadcastToStore` to identify the tenant — that's the same source of
-   * truth used for delivery scoping, so it's already authoritative.
-   */
-  static async listRecentBroadcasts(storeId: string, limit = 10): Promise<BroadcastSummary[]> {
-    if (!isConfigured()) {
-      throw new OneSignalNotConfiguredError();
-    }
-
-    // Pull a wider window so cross-tenant chatter doesn't crowd this store
-    // out of the list. 50 is plenty for a small/mid platform; bump if it
-    // ever stops returning enough rows for an active tenant.
-    const fetchLimit = Math.max(50, limit * 5);
-    const url = `${ENDPOINT}?app_id=${encodeURIComponent(
-      config.onesignalAppId
-    )}&limit=${fetchLimit}&kind=0`;
-
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Key ${config.onesignalRestApiKey}`,
-      },
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '');
-      logger.error({ status: res.status, body: errBody }, 'OneSignal list broadcasts failed');
-      throw new OneSignalRequestError(res.status, errBody);
-    }
-
-    const json = (await res.json().catch(() => ({}))) as {
-      notifications?: Array<Record<string, unknown>>;
-    };
-
-    const notifications = Array.isArray(json.notifications) ? json.notifications : [];
-    const matches: BroadcastSummary[] = [];
-
-    for (const n of notifications) {
-      const filters = (n.filters as Array<Record<string, unknown>> | undefined) || [];
-      const matchesStore = filters.some(
-        f => f && f.field === 'tag' && f.key === 'storeId' && f.value === storeId
-      );
-      if (!matchesStore) continue;
-
-      matches.push({
-        id: String(n.id || ''),
-        headings: (n.headings as { en?: string; ar?: string } | undefined) || undefined,
-        contents: (n.contents as { en?: string; ar?: string } | undefined) || undefined,
-        url: typeof n.url === 'string' ? (n.url as string) : undefined,
-        successful: typeof n.successful === 'number' ? (n.successful as number) : undefined,
-        converted: typeof n.converted === 'number' ? (n.converted as number) : undefined,
-        failed: typeof n.failed === 'number' ? (n.failed as number) : undefined,
-        remaining: typeof n.remaining === 'number' ? (n.remaining as number) : undefined,
-        queued_at: typeof n.queued_at === 'number' ? (n.queued_at as number) : undefined,
-        send_after: typeof n.send_after === 'number' ? (n.send_after as number) : undefined,
-        completed_at: typeof n.completed_at === 'number' ? (n.completed_at as number) : undefined,
-      });
-      if (matches.length >= limit) break;
-    }
-
-    return matches;
   }
 }

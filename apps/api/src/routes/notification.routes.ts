@@ -78,7 +78,9 @@ const upsertConfigSchema = z.object({
 const eventConfigShape = z
   .object({
     event: z.string().min(1),
-    whatsapp: z.boolean(),
+    // WhatsApp is the separate Ebda Chat product and has no switch on this page: the admin never sends it, so it is
+    // optional (an omitted value leaves the stored one alone). It used to be required, which 400'd every save.
+    whatsapp: z.boolean().optional(),
     sms: z.boolean(),
     push: z.boolean().optional(),
     push_notifications: z.boolean().optional(),
@@ -95,7 +97,8 @@ const eventConfigShape = z
 // Single-event payload (legacy). Bulk payload `{ events: [...] }` is
 // preferred — see the route below — and is what the admin actually sends.
 const upsertEventConfigSchema = eventConfigShape;
-const bulkEventConfigSchema = z.object({
+// pq-allow(unused-export): imported by tests/unit/notification-events-contract.test.ts (the admin/API contract)
+export const bulkEventConfigSchema = z.object({
   events: z.array(eventConfigShape).min(1).max(50),
 });
 

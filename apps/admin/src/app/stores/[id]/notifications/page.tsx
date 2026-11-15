@@ -20,6 +20,7 @@ import Link from 'next/link';
 import {
   DEFAULT_CONFIGS,
   DEFAULT_EVENTS,
+  mergeEventConfigs,
   type ChannelConfig,
   type ChannelKey,
   type EventConfig,
@@ -93,12 +94,11 @@ export default function NotificationsPage() {
   }, [storeId]);
 
   const fetchEvents = useCallback(async () => {
-    const { data } = await apiGet<{ events: EventConfig[] }>(
+    const { data } = await apiGet<{ events: unknown }>(
       `/api/v1/stores/${storeId}/notifications/events`
     );
-    if (data?.events && data.events.length > 0) {
-      setEvents(data.events);
-    }
+    const merged = mergeEventConfigs(data?.events);
+    if (merged) setEvents(merged);
   }, [storeId]);
 
   const fetchLogs = useCallback(async () => {
@@ -312,6 +312,7 @@ export default function NotificationsPage() {
 
               {pushEnabled && (
                 <PushChannelCard
+                  storeId={storeId}
                   config={configs.push_notifications}
                   saving={savingChannel === 'push_notifications'}
                   testing={testingChannel === 'push_notifications'}
