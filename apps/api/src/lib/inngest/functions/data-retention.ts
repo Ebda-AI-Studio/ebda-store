@@ -139,7 +139,10 @@ export const searchLogPurge: JobDef = inngest.createFunction(
     const replace = await step.run('purge-ai-replace-backups', () =>
       purgeReplaceBackupsAcrossStores()
     );
-    logger.info(replace, 'ai-replace-backups-purge: completed');
+    logger.info(
+      { purged: replace.purged, failedStores: replace.failedStores },
+      'ai-replace-backups-purge: completed'
+    );
     // Loud, after every other store was purged: the run fails, so the failure watch sees it.
     if (failedStores > 0 || replace.failedStores > 0) {
       throw new Error(
