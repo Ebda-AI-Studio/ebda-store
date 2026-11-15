@@ -116,7 +116,8 @@ const journalShape = shape<JournalArgs>(
   ['lines']
 );
 
-const journalEntrySuggest = change<JournalArgs>({
+// pq-allow(unused-export): imported by tests/unit/assistant-tools-finance-suggest.test.ts (built and tested, deliberately not offered: Ruling SL-E4-1)
+export const journalEntrySuggest = change<JournalArgs>({
   name: 'journal_entry_suggest',
   capabilityId: 'finance.journal-accounts',
   description:
@@ -490,7 +491,7 @@ const vatSubmit = change<Record<string, never>>({
   name: 'vat_registration_submit',
   capabilityId: 'finance.tax-vat',
   description:
-    "Submit the merchant's VAT registration (تسجيل ضريبة القيمة المضافة) for review: sends the saved tax registration number, legal name and uploaded documents to Ebda for verification. It cannot be withdrawn from the assistant; VAT is only charged after approval.",
+    "Submit the merchant's VAT registration (تسجيل ضريبة القيمة المضافة) for review: sends the saved tax registration number, legal name and uploaded documents to Ebda Store for verification. It cannot be withdrawn from the assistant; VAT is only charged after approval.",
   schema: shape<Record<string, never>>({}),
   policy: 'confirm',
   undo: 'irreversible',
@@ -876,10 +877,12 @@ const invoiceGet = readTool<{ documentId: string }>({
     docRow((await FiscalDocumentService.getById(ctx.storeId, a.documentId)) as unknown as Rec),
 });
 
-// pq-allow(unused-export): wired into change-tools.ts by the controller (phase E wiring); tests/unit/assistant-tools-finance-suggest.test.ts imports it
 export function financeSuggestTools(): ToolSpec[] {
   return [
-    journalEntrySuggest,
+    // Ruling SL-E4-1: `journalEntrySuggest` is NOT offered. The route is super_admin only ("store admins post via service helpers, not raw GL, in v1"), so a
+    // merchant could not post a raw journal entry themselves and the assistant may not either (it never does more than the merchant could). It stays
+    // built and tested; offering it is one line here once the route allows owners. Cost if wrong: the assistant cannot post a raw entry, only suggest the
+    // matched/booked ones the screens allow.
     accountAdd,
     bankMatch,
     fxRateSet,

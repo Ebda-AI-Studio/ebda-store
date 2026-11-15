@@ -1584,7 +1584,6 @@
     "unused-export|apps/api/src/services/eta-receipt.service.ts|EtaConnectionView",
     "unused-export|apps/api/src/services/fiscal-document-render.ts|RenderableDocument",
     "unused-export|apps/api/src/services/fiscal-document.service.ts|FISCAL_NUMBER_PREFIX",
-    "unused-export|apps/api/src/services/fiscal-document.service.ts|FiscalDocTypeValue",
     "unused-export|apps/api/src/services/gmail-alert-poller.service.ts|PollResult",
     "unused-export|apps/api/src/services/gold-rate/feed/adapter.ts|CROSS_CHECK_BPS",
     "unused-export|apps/api/src/services/gold-rate/feed/adapter.ts|FeedDeps",

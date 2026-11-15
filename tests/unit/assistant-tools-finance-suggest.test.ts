@@ -77,7 +77,10 @@ vi.mock('@api/services/tax-profile.service', () => ({
   TaxProfileService: { get: m.getProfile, submit: m.submit },
 }));
 
-import { financeSuggestTools } from '@api/smart-layer/tools/finance-suggest.tools';
+import {
+  financeSuggestTools,
+  journalEntrySuggest,
+} from '@api/smart-layer/tools/finance-suggest.tools';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
   product: 'store',
@@ -89,7 +92,8 @@ const ctx = (role = 'store_admin'): TurnCtx => ({
   conversationId: 'c1',
   releaseId: 'r',
 });
-const t = (name: string): ToolSpec => financeSuggestTools().find(x => x.name === name)!;
+const t = (name: string): ToolSpec =>
+  [...financeSuggestTools(), journalEntrySuggest].find(x => x.name === name)!;
 const node = (id: string, code: string, type: string, isActive = true) => ({
   id,
   code,
@@ -320,5 +324,12 @@ describe('every tool', () => {
       expect(JSON.stringify(x.jsonSchema)).not.toMatch(/store_?id/i);
     expect(t('finance_overview').policy).toBe('free');
     expect(t('invoices_list').policy).toBe('free');
+  });
+});
+
+describe('Ruling SL-E4-1', () => {
+  it('the raw journal entry tool is built but never offered (the route is super_admin only)', () => {
+    expect(financeSuggestTools().some(x => x.name === 'journal_entry_suggest')).toBe(false);
+    expect(journalEntrySuggest.name).toBe('journal_entry_suggest');
   });
 });
