@@ -163,9 +163,7 @@ function merchantView(c: StoredChange) {
   };
 }
 
-function validate(file: TaxChangeFile): {
-  mime: NonNullable<ReturnType<typeof sniffTaxDocumentMime>>;
-} {
+function validate(file: TaxChangeFile): 'application/pdf' | 'image/jpeg' | 'image/png' {
   if (file.buffer.length === 0 || file.buffer.length > TAX_DOCUMENT_MAX_BYTES)
     throw new AppError(400, 'FILE_TOO_LARGE', 'Document must be between 1 byte and 10 MB');
   const mime = sniffTaxDocumentMime(file.buffer);
@@ -175,7 +173,7 @@ function validate(file: TaxChangeFile): {
       'INVALID_FILE_TYPE',
       'Upload a PDF, JPG or PNG. / ارفع ملف PDF أو JPG أو PNG.'
     );
-  return { mime };
+  return mime;
 }
 
 async function assertChangeable(storeId: string): Promise<void> {
@@ -224,7 +222,7 @@ export async function requestTaxChange(
   file: TaxChangeFile,
   confirmToken: string | undefined
 ): Promise<SubmitResult> {
-  const { mime } = validate(file);
+  const mime = validate(file);
   await assertChangeable(storeId);
   const sha256 = createHash('sha256').update(file.buffer).digest('hex');
   const subject = subjectFor(storeId, actor, input, sha256);
@@ -241,13 +239,7 @@ export async function requestTaxChange(
       'CONFIRMATION_INVALID',
       'The confirmation does not match what you are sending. Review and confirm again. / التأكيد مش مطابق للي بتبعته. راجع وأكّد تاني.'
     );
-  if (!(await consumeConfirmToken(confirmToken)))
-    throw new AppError(
-      409,
-      'CONFIRMATION_USED',
-      'This confirmation was already used. Review and confirm again. / التأكيد ده اتستخدم قبل كده. راجع وأكّد تاني.'
-    );
-
+  // Slow work FIRST (AI read, private upload): a failure here, or in the row write below, never burns the token.
   const extracted = await readTaxDocument({ storeId, image: file.buffer, mimeType: mime });
   const { key } = await StorageService.putPrivate(file.buffer, {
     storeId,
@@ -269,22 +261,45 @@ export async function requestTaxChange(
     requestedAt: new Date().toISOString(),
     precheck: precheck(input, extracted),
   };
+  // A new request clears the last answer. Before the create so a failure here also leaves the token alone.
+  await settings()
+    .deleteMany({ where: { key: resultKeyOf(storeId) } })
+    .catch(err => {
+      void dropEvidence(change, storeId);
+      throw err;
+    });
   try {
-    // create-only: a second request that raced past assertChangeable loses to the unique key
+    // The atomic step: the unique key admits ONE request; of two concurrent confirms the loser gets a clear 409.
     await settings().create({
       data: { key: keyOf(storeId), value: change as never, category: 'tax', isPublic: false },
     });
   } catch (err) {
-    await dropEvidence(change, storeId); // compensate: no orphaned object
-    if (await readStored(storeId))
+    await dropEvidence(change, storeId); // compensate: no orphaned object, token untouched
+    if (await readStored(storeId).catch(() => null))
       throw new AppError(
         409,
         'TAX_CHANGE_PENDING',
-        'A change request is already waiting for review.'
+        'A change request is already waiting for review. / عندك طلب تغيير في انتظار المراجعة.'
       );
     throw err;
   }
-  await settings().deleteMany({ where: { key: resultKeyOf(storeId) } }); // a new request clears the last answer
+  // Only now spend the single-use token. A replay (token already used) rolls the row and the object back.
+  let used = false;
+  try {
+    used = await consumeConfirmToken(confirmToken);
+  } finally {
+    if (!used) {
+      await deleteStored(storeId).catch(() => undefined);
+      await dropEvidence(change, storeId);
+    }
+  }
+  if (!used)
+    throw new AppError(
+      409,
+      'CONFIRMATION_USED',
+      'This confirmation was already used. Review and confirm again. / التأكيد ده اتستخدم قبل كده. راجع وأكّد تاني.'
+    );
+  // The request exists and the token is spent: follow-ups must not turn this into a failure.
   await auditLog({
     action: 'tax_profile.change_requested',
     userId: actor.userId,
@@ -299,9 +314,13 @@ export async function requestTaxChange(
     },
     ip: actor.ip,
     userAgent: actor.userAgent,
-  });
+  }).catch(err => logger.error({ err, storeId }, '[tax-change] audit row could not be written'));
+  // p1 only for a real signal (a different number or name, an edited-looking image); a PDF or AI off is routine.
+  const signal = change.precheck.flags.some(f =>
+    ['trn_mismatch', 'name_mismatch', 'looks_edited'].includes(f)
+  );
   void sendAlert({
-    level: change.precheck.status === 'flagged' ? 'p1' : 'info',
+    level: signal ? 'p1' : 'info',
     scope: 'store',
     store: { id: storeId, name: storeId },
     source: 'tax-change.requested',
@@ -351,11 +370,11 @@ export async function listTaxChangesForReview(adminId: string) {
     })
   );
   return rows
-    .map(r => ({
-      storeId: r.key.slice(TAX_CHANGE_SETTING_PREFIX.length),
-      ...(r.value as unknown as StoredChange),
-      storageKey: undefined,
-    }))
+    .map(r => {
+      const rest: Partial<StoredChange> = { ...(r.value as unknown as StoredChange) };
+      delete rest.storageKey; // the private object key never leaves the server
+      return { storeId: r.key.slice(TAX_CHANGE_SETTING_PREFIX.length), ...rest };
+    })
     .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
 }
 
@@ -430,10 +449,20 @@ export async function decideTaxChange(
 }
 
 /** A revoke, a store deletion or a fresh verification makes a pending change meaningless: drop it, its last answer and its evidence (reusable by store deletion). */
-export async function discardTaxChange(storeId: string): Promise<void> {
+export async function discardTaxChange(storeId: string, actor?: Actor): Promise<void> {
   await settings().deleteMany({ where: { key: resultKeyOf(storeId) } });
   const c = await readStored(storeId);
   if (!c) return;
   await deleteStored(storeId);
   await dropEvidence(c, storeId);
+  await auditLog({
+    action: 'tax_profile.change_discarded',
+    userId: actor?.userId,
+    storeId,
+    resourceType: 'store_tax_profile',
+    resourceId: c.id,
+    details: { precheck: c.precheck.status, sha256: c.sha256 },
+    ip: actor?.ip,
+    userAgent: actor?.userAgent,
+  }).catch(err => logger.error({ err, storeId }, '[tax-change] discard audit row failed'));
 }

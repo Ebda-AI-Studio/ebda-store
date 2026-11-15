@@ -10082,7 +10082,7 @@
       "title": "Change requests from verified merchants ({count})",
       "subtitle": "The merchant stays verified until you decide. The automatic read of the document only helps you spot differences; you approve or reject.",
       "precheck": {
-        "clean": "Pre-check: matches",
+        "clean": "Pre-check: no differences found",
         "flagged": "Pre-check: needs a look"
       },
       "flags": {

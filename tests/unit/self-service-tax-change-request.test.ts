@@ -20,6 +20,10 @@ const m = vi.hoisted(() => ({
   deletePrivate: vi.fn(),
   audit: vi.fn(),
   loseClaim: false,
+  createFail: null as null | Error,
+  alert: vi.fn(),
+  keyN: 0,
+  settingsDown: false,
 }));
 
 vi.mock('@api/middleware/auth', async () => {
@@ -50,7 +54,12 @@ vi.mock('@api/lib/platform-scope', () => ({
   withPlatformUser: (_id: string, fn: () => unknown) => fn(),
   platformHubOnD1: async () => false,
 }));
-vi.mock('@api/services/alerts.service', () => ({ sendAlert: () => Promise.resolve({}) }));
+vi.mock('@api/services/alerts.service', () => ({
+  sendAlert: (o: any) => {
+    m.alert(o);
+    return Promise.resolve({});
+  },
+}));
 vi.mock('@api/services/storage.service', () => ({
   StorageService: {
     putPrivate: m.putPrivate,
@@ -74,20 +83,27 @@ vi.mock('@api/services/tax-profile.service', () => ({
 vi.mock('@ebda/database', () => ({
   prisma: {
     systemSetting: {
-      findUnique: async ({ where }: any) =>
-        m.settings.has(where.key) ? { value: m.settings.get(where.key) } : null,
+      findUnique: async ({ where }: any) => {
+        if (m.settingsDown) throw new Error('d1 down');
+        return m.settings.has(where.key) ? { value: m.settings.get(where.key) } : null;
+      },
       findMany: async ({ where }: any) =>
         [...m.settings]
           .filter(([k]) => k.startsWith(where.key.startsWith))
           .map(([key, value]) => ({ key, value })),
       create: async ({ data }: any) => {
+        await Promise.resolve();
+        if (m.createFail) throw m.createFail;
         if (m.settings.has(data.key)) throw new Error('unique');
         m.settings.set(data.key, data.value);
       },
       upsert: async ({ where, create }: any) => void m.settings.set(where.key, create.value),
-      deleteMany: async ({ where }: any) => ({
-        count: m.loseClaim ? 0 : m.settings.delete(where.key) ? 1 : 0,
-      }),
+      deleteMany: async ({ where }: any) => {
+        if (m.settingsDown) throw new Error('d1 down');
+        return {
+          count: m.loseClaim ? 0 : m.settings.delete(where.key) ? 1 : 0,
+        };
+      },
     },
   },
   withUser: (_id: string, fn: () => unknown) => fn(),
@@ -107,10 +123,14 @@ beforeAll(async () => {
 beforeEach(() => {
   m.settings.clear();
   m.loseClaim = false;
+  m.settingsDown = false;
+  m.createFail = null;
+  m.alert.mockReset();
+  m.keyN = 0;
   for (const f of [m.getProfile, m.apply, m.review, m.read, m.putPrivate, m.deletePrivate, m.audit])
     f.mockReset();
   m.getProfile.mockResolvedValue({ status: 'verified' });
-  m.putPrivate.mockResolvedValue({ key: 'stores/s/tax-documents/x.pdf' });
+  m.putPrivate.mockImplementation(async () => ({ key: `stores/s/tax-documents/x${m.keyN++}.pdf` }));
   m.read.mockResolvedValue({
     taxRegistrationNumber: '123-456-789',
     legalName: 'شركه النور',
@@ -119,6 +139,7 @@ beforeEach(() => {
   });
   m.apply.mockResolvedValue(undefined);
   m.deletePrivate.mockResolvedValue(undefined);
+  m.audit.mockResolvedValue(undefined);
 });
 
 const send = (role: string, over: Record<string, string> = {}, file = PDF) => {
@@ -272,16 +293,76 @@ describe('A10 change request on a verified registration', () => {
       .set('x-role', 'store_admin');
     expect(res.status).toBe(200);
     expect(m.settings.has(`tax.change.${STORE}`)).toBe(false);
-    expect(m.deletePrivate).toHaveBeenCalledWith('stores/s/tax-documents/x.pdf');
+    expect(m.deletePrivate).toHaveBeenCalledWith('stores/s/tax-documents/x0.pdf');
   });
 
-  it('compensates: a failed row write removes the stored evidence object', async () => {
+  it('a failed R2 upload does not burn the confirm token', async () => {
     const token = await preview();
-    m.settings.set(`tax.change.${STORE}`, { raced: true }); // another request won the unique key
-    // pending already: assertChangeable refuses before storing anything
-    const res = await send('store_admin', { token });
-    expect(res.body.error.code).toBe('TAX_CHANGE_PENDING');
-    expect(m.putPrivate).not.toHaveBeenCalled();
+    m.putPrivate.mockRejectedValueOnce(new Error('r2 down'));
+    expect((await send('store_admin', { token })).status).toBe(500);
+    expect(m.settings.size).toBe(0);
+    expect((await send('store_admin', { token })).status).toBe(201);
+  });
+
+  it('a failed row write does not burn the token and leaves no orphaned upload', async () => {
+    const token = await preview();
+    m.createFail = new Error('d1 down');
+    expect((await send('store_admin', { token })).status).toBe(500);
+    expect(m.deletePrivate).toHaveBeenCalledWith('stores/s/tax-documents/x0.pdf');
+    m.createFail = null;
+    expect((await send('store_admin', { token })).status).toBe(201);
+  });
+
+  it('two concurrent confirms make exactly one request; the other is a clear 409 and its upload is removed', async () => {
+    const t1 = await preview();
+    // a slow upload keeps both requests past the pending check before either writes its row
+    m.putPrivate.mockImplementation(async () => {
+      await new Promise(r => setTimeout(r, 30));
+      return { key: `stores/s/tax-documents/x${m.keyN++}.pdf` };
+    });
+    const [a, b] = await Promise.all([
+      send('store_admin', { token: t1 }),
+      send('store_admin', { token: t1 }),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([201, 409]);
+    const loser = a.status === 409 ? a : b;
+    expect(loser.body.error.code).toBe('TAX_CHANGE_PENDING');
+    expect([...m.settings.keys()].filter(k => k.startsWith('tax.change.'))).toHaveLength(1);
+    expect(m.deletePrivate).toHaveBeenCalledTimes(1);
+    expect(m.putPrivate).toHaveBeenCalledTimes(2);
+  });
+
+  it('a replay after withdraw is refused and leaves no row or object behind', async () => {
+    const token = await preview();
+    await send('store_admin', { token });
+    await request(app).delete(`/stores/${STORE}/tax/change-request`).set('x-role', 'store_admin');
+    m.deletePrivate.mockClear();
+    const again = await send('store_admin', { token });
+    expect(again.body.error.code).toBe('CONFIRMATION_USED');
+    expect(m.settings.has(`tax.change.${STORE}`)).toBe(false);
+    expect(m.deletePrivate).toHaveBeenCalledTimes(1);
+  });
+
+  it('an audit failure after the row exists does not turn the request into a 500', async () => {
+    const token = await preview();
+    m.audit.mockRejectedValueOnce(new Error('audit down'));
+    expect((await send('store_admin', { token })).status).toBe(201);
+    expect(m.settings.has(`tax.change.${STORE}`)).toBe(true);
+  });
+
+  it('only a real signal pages at p1; a missing pre-check is info', async () => {
+    m.read.mockResolvedValue(null);
+    await send('store_admin', { token: await preview() });
+    expect(m.alert.mock.calls[0][0].level).toBe('info');
+    await request(app).delete(`/stores/${STORE}/tax/change-request`).set('x-role', 'store_admin');
+    m.read.mockResolvedValue({
+      taxRegistrationNumber: '999999999',
+      legalName: 'x',
+      looksEdited: false,
+      confidence: 0.9,
+    });
+    await send('store_admin', { token: await preview() });
+    expect(m.alert.mock.calls[1][0].level).toBe('p1');
   });
 });
 
@@ -383,6 +464,18 @@ describe('A10 super-admin decision', () => {
     const mine = await request(app).get(`/stores/${STORE}/tax/change-request`);
     expect(mine.body.data.request).toBeNull();
     expect(mine.body.data.lastRejection.reason).toBe('name differs from the card');
+  });
+
+  it('a failing discard does not turn a committed revoke into a 500', async () => {
+    await pending();
+    m.review.mockResolvedValue({ status: 'revoked' });
+    m.settingsDown = true; // the discard cannot reach system_settings
+    m.deletePrivate.mockRejectedValue(new Error('r2 down'));
+    const res = await request(app)
+      .post(`/admin/tax-verification/${STORE}/decision`)
+      .set('x-role', 'super_admin')
+      .send({ decision: 'revoke', reason: 'no longer registered' });
+    expect(res.status).toBe(200);
   });
 
   it('revoking the verified registration drops a pending request', async () => {

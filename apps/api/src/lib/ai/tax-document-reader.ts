@@ -15,7 +15,8 @@ import { recordUsage } from '../../services/ai.service';
 import { unwrapWorkersAiAnswer } from './instapay-receipt-reader';
 import logger from '../logger';
 
-const TIMEOUT_MS = 25_000;
+// Short on purpose: this runs inside the merchant's request (tenant transaction), so it must stay well under its 30 s.
+const TIMEOUT_MS = 10_000;
 const MODEL_DEFAULT = '@cf/mistralai/mistral-small-3.1-24b-instruct';
 
 export interface TaxDocumentExtraction {

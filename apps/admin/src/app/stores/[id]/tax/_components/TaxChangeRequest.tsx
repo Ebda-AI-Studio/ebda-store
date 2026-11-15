@@ -127,10 +127,15 @@ export function TaxChangeRequest({ storeId }: { storeId: string }) {
   };
 
   const pickFile = (f: File | null) => {
-    if (f && !(TAX_DOCUMENT_MIME_TYPES as readonly string[]).includes(f.type))
+    // a rejected pick also clears the previous one, so Send never submits a different file than the one shown
+    if (f && !(TAX_DOCUMENT_MIME_TYPES as readonly string[]).includes(f.type)) {
+      setFile(null);
       return setMessage({ tone: 'error', text: t('documents.invalidType') });
-    if (f && f.size > TAX_DOCUMENT_MAX_BYTES)
+    }
+    if (f && f.size > TAX_DOCUMENT_MAX_BYTES) {
+      setFile(null);
       return setMessage({ tone: 'error', text: t('documents.tooLarge') });
+    }
     setMessage(null);
     setFile(f);
   };
