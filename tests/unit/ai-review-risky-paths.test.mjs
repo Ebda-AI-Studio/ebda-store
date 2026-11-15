@@ -42,4 +42,20 @@ describe('ai-review classifier (fail closed: only docs, markdown and NEWLY ADDED
     expect(fork).toMatch(/exit 1/);
     expect(fork).not.toMatch(/CLAUDE_CODE_OAUTH_TOKEN/);
   });
+  it('Ruling AI-REVIEW-LABEL-1: only a real critical verdict may remove ai-review-passed; refusal/infra paths leave labels alone', () => {
+    const wf = readFileSync('.github/workflows/ai-review.yml', 'utf8');
+    const removals = [...wf.matchAll(/--remove-label ai-review-passed/g)].map((m) => m.index);
+    const classify = wf.slice(wf.indexOf('  classify:'), wf.indexOf('  review:'));
+    const sizeStep = wf.slice(wf.indexOf('- name: Build the diff'), wf.indexOf('- name: Review the diff'));
+    expect(classify).not.toMatch(/remove-label ai-review-passed/);
+    expect(sizeStep).not.toMatch(/--remove-label|--add-label|gh pr edit/);
+    const review = wf.slice(wf.indexOf('  review:'), wf.indexOf('  manual-pass:'));
+    // the review job's single removal is gated on the verdict output
+    const step = review.slice(review.indexOf('- name: Drop ai-review-passed'), review.indexOf('- name: Label ai-review-passed'));
+    expect(step).toMatch(/if: always\(\) && steps\.gate\.outputs\.verdict == 'critical'/);
+    expect(step).toMatch(/--remove-label ai-review-passed/);
+    // the only other removal is the fork-gate (fork PRs never get a bot review)
+    expect(removals.length).toBe(2);
+    expect(readFileSync('.github/ai-review/review.mjs', 'utf8')).toMatch(/verdict=critical/);
+  });
 });
