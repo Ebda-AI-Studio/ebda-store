@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "store-hero-and-menu",
   "questions": {
     "ar": ["ازاي اغير القايمة اللي فوق؟", "ضيف رابط في الفوتر"],
     "en": ["Edit my menu and footer links"]
@@ -30,5 +30,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article; editor also reachable in builder (inferred)"]
+  "gaps": []
 }

@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "store-hero-and-menu",
   "questions": {
     "ar": ["ازاي اغير صورة البانر؟", "ضيف سلايد"],
     "en": ["Change the hero banner"]
@@ -30,5 +30,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Overlaps with the editor; verify page redirects to editor", "No help article"]
+  "gaps": ["Overlaps with the editor; verify page redirects to editor"]
 }

@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes (fill-only; reset-field)"
   },
-  "helpArticle": null,
+  "helpArticle": "answer-engine-aeo",
   "questions": {
     "ar": ["ازاي المتجر يظهر في ChatGPT؟", "ايه هو AEO؟", "هل ChatGPT بيذكر متجري؟"],
     "en": ["How do I show up in ChatGPT answers?"]
@@ -35,5 +35,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article (smart-hints and 3 AI articles exist but not AEO)"]
+  "gaps": []
 }
