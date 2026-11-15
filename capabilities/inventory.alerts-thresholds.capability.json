@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "stock-alerts-and-reorder-rules",
   "questions": {
     "ar": ["نبهني لما المنتج يقل", "حد التنبيه"],
     "en": ["Alert me when stock is low"]
@@ -36,5 +36,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Run-now scans are super-admin (audit gap 15)", "No help article"]
+  "gaps": ["Run-now scans are super-admin (audit gap 15)"]
 }
