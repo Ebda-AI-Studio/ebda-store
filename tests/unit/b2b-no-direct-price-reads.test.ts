@@ -283,6 +283,17 @@ const ALLOW: Record<string, AllowEntry> = {
       b2bPublicFields: 3, // product price + variant.price ?? product.price: hides a stale variant tier (final review minor 2)
     },
   },
+  'smart-layer/tools/products.tools.ts': {
+    category: 'admin-display',
+    reason:
+      'merchant-facing assistant card: the list price the merchant is changing, shown before and after',
+    reads: { state: 1, createInput: 1, describe: 1 },
+  },
+  'smart-layer/tools/marketing.tools.ts': {
+    category: 'admin-display',
+    reason: 'merchant-facing assistant card: the list price a bundle or coupon is computed against',
+    reads: { state: 2 },
+  },
   'mcp/tools/admin-read.tools.ts': {
     category: 'admin-display',
     reason: 'merchant read of list price',

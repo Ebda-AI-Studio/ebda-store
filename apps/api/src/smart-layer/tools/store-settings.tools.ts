@@ -3,7 +3,7 @@
  * (routes/store.routes.ts). The gate of each is the route's own `authorize('store_admin', ...)` (+ `requireFeature` where the route has one).
  *
  * What is deliberately NOT here (never reachable by the assistant): slug, domain, currency, plan, status, timezone, `settings` keys that are server-owned
- * (`packages/shared/src/server-owned-settings.ts`: ebdaWhatsApp, goldAllowDeferredPayment, mcpWriteEnabled, assistantMode, autoRecommendationsEnabled),
+ * (`packages/shared/src/server-owned-settings.ts`: the Ebda Chat link flag, goldAllowDeferredPayment, mcpWriteEnabled, assistantMode, autoRecommendationsEnabled),
  * payment secrets, uploads (logo / favicon / hero image need a file), the layout hero slides (inline in store-layout.routes.ts) and fonts (read-only route,
  * the builder publish is the only typography writer, Ruling TYPO-WRITER-1).
  */
