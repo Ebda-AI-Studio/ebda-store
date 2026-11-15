@@ -238,7 +238,7 @@ async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown
 async function downgradeToFree(
   tx: Tx,
   storeId: string,
-  reason: 'dunning' | 'canceled' | 'no_payment_method' | 'trial_ended',
+  reason: 'dunning' | 'canceled' | 'no_payment_method' | 'trial_ended' | 'payment_reversed',
   effects: BillingEffect[]
 ): Promise<void> {
   const free = await tx.plan.findUnique({ where: { code: FREE_PLAN_CODE } });
@@ -1401,6 +1401,10 @@ export async function runBillingCycle(
     await sweepStuckCharges(now, provider).catch(err =>
       logger.error({ err }, '[billing] stuck-charge sweep failed')
     );
+    // #837: refunds / chargebacks made outside Ebda that no webhook reported.
+    await reconcileGatewayReversals(now, provider).catch(err =>
+      logger.error({ err }, '[billing] reversal reconcile failed')
+    );
   }
   const ids = await findDueSubscriptionIds(now, only);
   for (const id of ids) {
@@ -1588,6 +1592,11 @@ export async function applyWebhookEvent(
     webhookStoreId = event.providerRef
       ? await getBillingRefundStoreId(providerName, event.providerRef)
       : null;
+    // A refund Ebda did not start (gateway dashboard, reversal) has no pending refund row to find the store by: the
+    // charge it reverses does, through the merchant order id the gateway echoes (#837).
+    if (!webhookStoreId && event.merchantOrderId && UUID_RE.test(event.merchantOrderId)) {
+      webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
+    }
   } else if (
     event.kind !== 'ignored' &&
     event.merchantOrderId &&
@@ -1596,6 +1605,8 @@ export async function applyWebhookEvent(
     webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
   }
   const scopedStoreId = webhookStoreId;
+  const reversals: ReversalOutcome[] = [];
+  let unmatchedReversal = false;
   const applyInner = async (tx: Tx): Promise<WebhookResult> => {
     const ignore = async (detail: string): Promise<WebhookResult> => {
       await tx.billingWebhookEvent.updateMany({
@@ -1621,7 +1632,34 @@ export async function applyWebhookEvent(
               },
             })
           : null;
-      if (!refundRow) return ignore('unknown_refund');
+      if (!refundRow) {
+        if (event.kind !== 'refund.succeeded' || !event.providerRef)
+          return ignore('unknown_refund');
+        // A confirmed refund Ebda did not start (#837): book it against the charge it reverses. Never dropped: a
+        // reversal that matches no charge pages a person below.
+        const charge = scopedStoreId
+          ? await findReversedCharge(tx, scopedStoreId, providerName, event)
+          : null;
+        if (!charge) {
+          unmatchedReversal = true;
+          return ignore('unknown_refund');
+        }
+        const out = await applyOutOfBandReversalInTx(
+          tx,
+          charge,
+          {
+            provider: providerName,
+            ref: event.providerRef,
+            amountMinor: event.amountMinor,
+            operation: 'refund',
+            source: 'webhook',
+          },
+          now,
+          effects
+        );
+        if (out) reversals.push(out);
+        return { duplicate: false, outcome: 'processed', detail: 'out_of_band_reversal' };
+      }
       await settleRefundInTx(
         tx,
         refundRow.storeId,
@@ -1771,7 +1809,303 @@ export async function applyWebhookEvent(
     ? await withStore(webhookStoreId, apply)
     : await apply(prisma as unknown as Tx);
   await runBillingEffects(effects);
+  for (const r of reversals) alertReversal(r);
+  if (unmatchedReversal) {
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: a gateway refund matches no Ebda charge',
+      body: `${providerName} confirmed a refund (transaction ${event.providerRef}, order ${event.merchantOrderId ?? 'none'}, amount ${event.amountMinor ?? 'not stated'} piastres) that Ebda did not start and that matches no charge. Nothing was revoked. Find the store in the gateway dashboard and record it by hand.`,
+    }).catch(() => undefined);
+  }
   return result;
+}
+
+// ───────────────────── refunds / chargebacks made outside Ebda (#837) ─────────────────────
+
+/** Ledger rows that took money by card for a plan: what a gateway reversal can take back. */
+const CARD_MONEY_IN_TYPES = ['checkout', 'upgrade', 'renewal'];
+/** A full `billing_events` row (the module's LedgerRow carries only the settle fields). */
+type BillingEventRow = NonNullable<Awaited<ReturnType<Tx['billingEvent']['findFirst']>>>;
+
+interface ReversalFact {
+  provider: string;
+  /** The gateway's own id for the reversal transaction (the idempotency key: one ledger row per reversal). */
+  ref: string;
+  /** As the gateway states it; null = not stated (treated as the whole remainder, and a person is paged). */
+  amountMinor: number | null;
+  operation: string;
+  source: 'webhook' | 'reconcile';
+}
+
+interface ReversalOutcome {
+  storeId: string;
+  chargeId: string;
+  refundEventId: string;
+  provider: string;
+  operation: string;
+  source: ReversalFact['source'];
+  /** What the gateway said (null = not stated). */
+  reportedMinor: number | null;
+  /** What the ledger books: never more than the charge still holds. */
+  bookedMinor: number;
+  /** Reported above what the charge still held: recorded in `raw`, paged, never refused. */
+  excessMinor: number;
+  fullReversal: boolean;
+  revokedPlan: boolean;
+}
+
+async function findReversedCharge(
+  tx: Tx,
+  storeId: string,
+  provider: string,
+  event: BillingWebhookEvent
+): Promise<BillingEventRow | null> {
+  const where = {
+    storeId,
+    provider,
+    type: { in: CARD_MONEY_IN_TYPES },
+    status: { in: ['succeeded', 'refunded'] },
+  };
+  if (event.merchantOrderId && UUID_RE.test(event.merchantOrderId)) {
+    const byOrder = await tx.billingEvent.findFirst({
+      where: { ...where, id: event.merchantOrderId },
+    });
+    if (byOrder) return byOrder;
+  }
+  return event.providerRef
+    ? tx.billingEvent.findFirst({ where: { ...where, providerRef: event.providerRef } })
+    : null;
+}
+
+/**
+ * Book a refund or chargeback the gateway made OUTSIDE Ebda against the charge it reverses. Global rule: an external
+ * money fact is never refused. It is recorded in full (the reported amount stays in `raw`), the ledger amount is
+ * clamped to what the charge still holds, and the excess is paged. Idempotent on the gateway's reversal id.
+ *
+ * Once the charge is FULLY reversed: the charge flips to `refunded`, the free months it earned are revoked, and if it
+ * is the payment behind the CURRENT plan (the latest money-in row of the store) the plan is revoked at once
+ * (`downgradeToFree(..., 'payment_reversed')`, which drops every cache layer through the `downgraded` effect). The
+ * plan is not put back into dunning: retrying a card whose holder disputed the charge would charge them again. A
+ * partial reversal changes no plan; the P1 asks a person to decide.
+ */
+async function applyOutOfBandReversalInTx(
+  tx: Tx,
+  charge: BillingEventRow,
+  fact: ReversalFact,
+  now: Date,
+  effects: BillingEffect[]
+): Promise<ReversalOutcome | null> {
+  const storeId = charge.storeId;
+  const key = `oob-reversal:${fact.provider}:${fact.ref}`;
+  const seen = await tx.billingEvent.findUnique({ where: { idempotencyKey: key, storeId } });
+  if (seen) return null;
+  const prior = await tx.billingEvent.aggregate({
+    where: { storeId, relatedEventId: charge.id, type: 'refund', status: 'succeeded' },
+    _sum: { amountMinor: true },
+  });
+  const priorMinor = prior._sum.amountMinor ?? 0;
+  const remaining = Math.max(0, charge.amountMinor - priorMinor);
+  const reported =
+    fact.amountMinor !== null && Number.isSafeInteger(fact.amountMinor) && fact.amountMinor > 0
+      ? fact.amountMinor
+      : null;
+  const booked = Math.min(reported ?? remaining, remaining);
+  const excess = reported !== null ? reported - booked : 0;
+  const refundEventId = crypto.randomUUID();
+  await tx.billingEvent.create({
+    data: {
+      id: refundEventId,
+      storeId,
+      subscriptionId: charge.subscriptionId,
+      type: 'refund',
+      planCode: charge.planCode,
+      billingInterval: charge.billingInterval,
+      amountMinor: booked,
+      currency: charge.currency,
+      provider: fact.provider,
+      providerRef: fact.ref,
+      idempotencyKey: key,
+      status: 'succeeded',
+      relatedEventId: charge.id,
+      vatMinor: charge.vatMinor ? Math.round((charge.vatMinor * booked) / charge.amountMinor) : 0,
+      raw: {
+        outOfBand: true,
+        operation: fact.operation,
+        source: fact.source,
+        reportedAmountMinor: fact.amountMinor,
+        excessMinor: excess,
+        recordedAt: now.toISOString(),
+      },
+    },
+  });
+  const fullReversal = priorMinor + booked >= charge.amountMinor;
+  let revokedPlan = false;
+  if (fullReversal) {
+    const flipped = await tx.billingEvent.updateMany({
+      where: { id: charge.id, storeId, status: 'succeeded' },
+      data: { status: 'refunded' },
+    });
+    if (flipped.count > 0) {
+      await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
+    }
+    const latest = await tx.billingEvent.findFirst({
+      where: {
+        storeId,
+        type: { in: [...CARD_MONEY_IN_TYPES, 'manual_payment'] },
+        status: { in: ['succeeded', 'refunded'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
+    if (
+      latest?.id === charge.id &&
+      sub &&
+      ['active', 'trialing', 'past_due'].includes(sub.status) &&
+      sub.planCode !== FREE_PLAN_CODE &&
+      !isGrantedPlan(sub.planCode)
+    ) {
+      await downgradeToFree(tx, storeId, 'payment_reversed', effects);
+      revokedPlan = true;
+    }
+  }
+  return {
+    storeId,
+    chargeId: charge.id,
+    refundEventId,
+    provider: fact.provider,
+    operation: fact.operation,
+    source: fact.source,
+    reportedMinor: fact.amountMinor,
+    bookedMinor: booked,
+    excessMinor: excess,
+    fullReversal,
+    revokedPlan,
+  };
+}
+
+function alertReversal(r: ReversalOutcome): void {
+  const what = r.operation === 'chargeback' || r.operation === 'dispute' ? 'chargeback' : 'refund';
+  void sendAlert({
+    level: 'p1',
+    title: `Billing: a ${what} was made outside Ebda (${r.provider})`,
+    body:
+      `Store ${r.storeId}, charge ${r.chargeId}: ${r.provider} reports a ${r.operation} of ` +
+      `${r.reportedMinor ?? 'an unstated amount (booked as the whole remainder)'} piastres (via ${r.source}). ` +
+      `Booked ${r.bookedMinor} as refund ${r.refundEventId}.` +
+      (r.excessMinor > 0
+        ? ` ${r.excessMinor} piastres MORE than the charge still held: recorded, not booked. Check the gateway.`
+        : '') +
+      (r.revokedPlan
+        ? ' It paid the current plan: the store is now on free (canceled).'
+        : r.fullReversal
+          ? ' Fully reversed; it was not the payment behind the current plan, so the plan is unchanged.'
+          : ' Partial: the plan is unchanged. Decide whether access should change.'),
+  }).catch(() => undefined);
+}
+
+/**
+ * Daily reversal reconcile (#837). Kashier's webhook docs list no chargeback / dispute event, so a webhook alone
+ * cannot be trusted to report every take-back. Once a day, every card charge from the last
+ * `REVERSAL_LOOKBACK_DAYS` that still counts as paid is checked against the gateway's own record
+ * (`provider.listReversals`), and any reversal the ledger does not have yet is booked through the same path as the
+ * webhook (idempotent on the gateway's reversal id). Skip-if-unchanged by construction: no card provider (production
+ * is InstaPay-only today, `BILLING_PROVIDER=none`) or no charge in the window = no gateway call. A gateway that
+ * cannot answer, or an operation this code does not know, pages a person; it is never read as "nothing happened".
+ */
+const REVERSAL_LOOKBACK_DAYS = 120;
+
+// pq-allow(unused-export): runBillingCycle (same file) is the runtime caller; exported for the D1 money test
+export async function reconcileGatewayReversals(
+  now: Date,
+  provider?: BillingProvider
+): Promise<{ checked: number; booked: number; failed: number }> {
+  const out = { checked: 0, booked: 0, failed: 0 };
+  let active: BillingProvider | null = provider ?? null;
+  if (!active) {
+    try {
+      active = getBillingProvider();
+    } catch {
+      return out; // card billing is off (InstaPay only): no gateway to ask
+    }
+  }
+  if (!active.listReversals) return out;
+  const since = new Date(now.getTime() - REVERSAL_LOOKBACK_DAYS * 86_400_000);
+  const parts = await acrossBilling(
+    storeId =>
+      prisma.billingEvent.findMany({
+        where: {
+          ...(storeId ? { storeId } : {}),
+          provider: active!.name,
+          type: { in: CARD_MONEY_IN_TYPES },
+          status: 'succeeded',
+          providerRef: { not: null },
+          createdAt: { gte: since },
+        },
+        select: { id: true, storeId: true, providerRef: true },
+      }),
+    {
+      onStoreError: (storeId, err) =>
+        logger.error({ err, storeId }, '[billing] reversal reconcile scan failed'),
+    }
+  );
+  const failures: string[] = [];
+  const unknown: string[] = [];
+  for (const c of parts.flatMap(p => p.value)) {
+    out.checked++;
+    try {
+      const res = await active.listReversals({ chargeId: c.providerRef!, merchantOrderId: c.id });
+      if (res.unknownOperations.length) unknown.push(`${c.id}: ${res.unknownOperations.join('/')}`);
+      for (const rev of res.reversals) {
+        const effects: BillingEffect[] = [];
+        const outcome = await withStore(c.storeId, async tx => {
+          const charge = await tx.billingEvent.findUnique({
+            where: { id: c.id, storeId: c.storeId },
+          });
+          if (!charge) return null;
+          return applyOutOfBandReversalInTx(
+            tx,
+            charge,
+            {
+              provider: active!.name,
+              ref: rev.ref,
+              amountMinor: rev.amountMinor,
+              operation: rev.operation,
+              source: 'reconcile',
+            },
+            now,
+            effects
+          );
+        });
+        await runBillingEffects(effects);
+        if (outcome) {
+          out.booked++;
+          alertReversal(outcome);
+        }
+      }
+    } catch (err) {
+      out.failed++;
+      failures.push(c.id);
+      logger.warn(
+        { err, eventId: c.id },
+        '[billing] reversal reconcile could not read the gateway'
+      );
+    }
+  }
+  if (failures.length || unknown.length) {
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: the daily refund/chargeback check could not read every charge',
+      body:
+        (failures.length
+          ? `${failures.length} charge(s) the gateway did not answer for (retried tomorrow): ${failures.slice(0, 10).join(', ')}. `
+          : '') +
+        (unknown.length
+          ? `Operations this code does not know (could be a chargeback): ${unknown.slice(0, 10).join('; ')}. Check them in the gateway dashboard.`
+          : ''),
+    }).catch(() => undefined);
+  }
+  return out;
 }
 
 /**

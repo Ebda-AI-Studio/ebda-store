@@ -479,3 +479,61 @@ describe('period helpers', () => {
     expect(DUNNING_RETRY_DAYS).toEqual([3, 7]);
   });
 });
+
+describe('Kashier listReversals (#837 daily refund/chargeback reconcile)', () => {
+  const mk = (status: number, json: unknown) =>
+    new KashierBillingProvider({
+      baseUrl: 'https://kashier.test/',
+      merchantId: 'MID-1',
+      secretKey: 'sk',
+      apiKey: API_KEY,
+      fetchImpl: (async () =>
+        new Response(JSON.stringify(json), { status })) as unknown as typeof fetch,
+    });
+  const body = (transactions: unknown[], over: Record<string, unknown> = {}) => ({
+    body: { transactionId: 'TX-1', merchantOrderId: ORDER, transactions, ...over },
+  });
+
+  it('lists successful refund-family and chargeback operations; skips the payment and failed ones', async () => {
+    const r = await mk(
+      200,
+      body([
+        { transactionId: 'TX-1', operation: 'pay', status: 'SUCCESS', amount: 100 },
+        { transactionId: 'RF-1', operation: 'refund', status: 'SUCCESS', amount: 40 },
+        { transactionId: 'RF-2', operation: 'partial_refund', status: 'FAILURE', amount: 10 },
+        { transactionId: 'CB-1', operation: 'chargeback', status: 'SUCCESS' },
+      ])
+    ).listReversals({ chargeId: 'TX-1', merchantOrderId: ORDER });
+    expect(r.reversals).toEqual([
+      { ref: 'RF-1', operation: 'refund', amountMinor: 4000 },
+      { ref: 'CB-1', operation: 'chargeback', amountMinor: null },
+    ]);
+    expect(r.unknownOperations).toEqual([]);
+  });
+
+  it('an operation it does not know is reported, never dropped', async () => {
+    const r = await mk(
+      200,
+      body([{ transactionId: 'X-1', operation: 'retrieval_request', status: 'SUCCESS' }])
+    ).listReversals({ chargeId: 'TX-1', merchantOrderId: ORDER });
+    expect(r.unknownOperations).toEqual(['retrieval_request']);
+  });
+
+  it('throws (never "no reversals") on an error, another transaction or another order', async () => {
+    await expect(
+      mk(500, {}).listReversals({ chargeId: 'TX-1', merchantOrderId: ORDER })
+    ).rejects.toThrow();
+    await expect(
+      mk(200, body([], { transactionId: 'TX-2' })).listReversals({
+        chargeId: 'TX-1',
+        merchantOrderId: ORDER,
+      })
+    ).rejects.toThrow();
+    await expect(
+      mk(200, body([], { merchantOrderId: 'other' })).listReversals({
+        chargeId: 'TX-1',
+        merchantOrderId: ORDER,
+      })
+    ).rejects.toThrow();
+  });
+});
