@@ -583,6 +583,33 @@ describe('super-admin archive endpoints', () => {
       expect(r.body.data.documents.map((d: any) => d.number)).toEqual(['RCT-000001']);
     });
 
+    it('empty-live store: page 1, page 2 and a filter all keep reading the retained copy', async () => {
+      h.db.fiscalDocument.findMany.mockResolvedValue([]); // live answers, but empty - no throw
+      vi.mocked(fiscalArchive).mockResolvedValue([
+        mk(1),
+        mk(2),
+        mk(3, 'credit_note'),
+        mk(4),
+      ] as any);
+      const p1 = await request(app).get(`/admin/fiscal-archive/${STORE}?limit=2`);
+      expect(p1.body.data.documents.map((d: any) => d.number)).toEqual([
+        'RCT-000004',
+        'RCT-000003',
+      ]);
+      expect(p1.body.data.nextCursor).toMatch(/^r:/);
+      h.db.fiscalDocument.findMany.mockClear();
+      const p2 = await request(app).get(
+        `/admin/fiscal-archive/${STORE}?limit=2&cursor=${encodeURIComponent(p1.body.data.nextCursor)}`
+      );
+      expect(p2.body.data.documents.map((d: any) => d.number)).toEqual([
+        'RCT-000002',
+        'RCT-000001',
+      ]);
+      expect(h.db.fiscalDocument.findMany).not.toHaveBeenCalled(); // page 2 never touches the live tables
+      const f = await request(app).get(`/admin/fiscal-archive/${STORE}?docType=credit_note`);
+      expect(f.body.data.documents.map((d: any) => d.number)).toEqual(['RCT-000003']);
+    });
+
     it('answers 200 with unavailable when neither source can be read', async () => {
       h.db.fiscalDocument.findMany.mockRejectedValue(gone());
       vi.mocked(fiscalArchive).mockRejectedValue(new Error('no retained copy'));

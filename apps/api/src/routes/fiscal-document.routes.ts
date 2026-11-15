@@ -49,10 +49,10 @@ const DOC_TYPES = [
 ] as const;
 
 const listQuery = z.object({
-  /** Opaque keyset cursor `<issued_at ISO>_<id>` from a previous page's `nextCursor`. */
+  /** Opaque keyset cursor `[r:]<issued_at ISO>_<id>` from a previous page's `nextCursor` (`r:` = served from the retained copy). */
   cursor: z
     .string()
-    .regex(/^.+Z_[0-9a-f-]{36}$/i)
+    .regex(/^(r:)?.+Z_[0-9a-f-]{36}$/i)
     .max(80)
     .optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -204,16 +204,29 @@ fiscalArchiveRoutes.get(
       // Live store = keyset query on its own tables. A store that no longer has live tables (deleted: the 7-year
       // retention case) is read from the retained Postgres copy through the definer, paged in memory. If neither
       // source answers, say so (`unavailable`) instead of failing the page.
+      // The source is part of the cursor (`r:` prefix = retained copy), so once a store is served from the retained
+      // copy every later page of it reads the same source.
       const userId = req.user!.userId;
-      const retained = async () =>
-        pageFiscalRows(storeId, await archiveRowsViaDefiner(userId, storeId), f);
+      const onHub = await hubOnD1();
+      const inRetained = !!f.cursor?.startsWith('r:');
+      const fl = inRetained ? { ...f, cursor: f.cursor!.slice(2) } : f;
+      const retained = async (tag: boolean) => {
+        const r = await pageFiscalRows(storeId, await archiveRowsViaDefiner(userId, storeId), fl);
+        return { ...r, nextCursor: tag && r.nextCursor ? `r:${r.nextCursor}` : r.nextCursor };
+      };
+      const unavailable = (err: unknown) => {
+        logger.warn({ err, storeId }, '[FISCAL] retained archive unavailable');
+        return { documents: [], nextCursor: null, unavailable: true as const };
+      };
       let result: Awaited<ReturnType<typeof listFiscalDocuments>> & { unavailable?: true };
-      if (await hubOnD1()) {
-        const unfiltered = !f.cursor && !f.docType && !f.q && !f.from && !f.to;
+      if (!onHub) result = await retained(false);
+      else if (inRetained) result = await retained(true).catch(unavailable);
+      else {
         try {
           result = await listFiscalDocuments(storeId, f);
-          if (unfiltered && result.documents.length === 0) {
-            const kept = await retained().catch(() => null);
+          // Empty live first page (any filter): a store with no live tables may still hold retained documents.
+          if (!f.cursor && result.documents.length === 0) {
+            const kept = await retained(true).catch(() => null);
             if (kept && kept.documents.length) result = kept;
           }
         } catch (liveErr) {
@@ -221,13 +234,8 @@ fiscalArchiveRoutes.get(
             { err: liveErr, storeId },
             '[FISCAL] live archive unavailable, trying retained copy'
           );
-          result = await retained().catch(err => {
-            logger.warn({ err, storeId }, '[FISCAL] retained archive unavailable');
-            return { documents: [], nextCursor: null, unavailable: true as const };
-          });
+          result = await retained(true).catch(unavailable);
         }
-      } else {
-        result = await retained();
       }
       // The store card (current month); null for a store that no longer exists.
       const summary = withSummary
