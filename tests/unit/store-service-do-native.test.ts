@@ -25,6 +25,7 @@ const h = vi.hoisted(() => ({
   anonymised: [] as string[],
   paymentsScrubbed: [] as string[],
   pgProbes: 0,
+  trialUsed: new Set<string>(),
 }));
 
 vi.mock('@ebda/database', () => {
@@ -109,6 +110,12 @@ vi.mock('../../apps/api/src/lib/identity-client', () => ({
   deleteStoreClients: async (id: string) => void h.clientsDeleted.push(id),
   isIdentityManagedUser: async () => false,
 }));
+// R-TRIAL-ONCE-1: the durable used-trial marker (system_settings in prod) as an in-memory set keyed by owner email
+vi.mock('../../apps/api/src/services/billing/trial-eligibility', () => ({
+  ownerEmailOf: async (id: string) => `${id}@x.co`,
+  ownerHasUsedTrial: async (email: string) => h.trialUsed.has(email),
+  markOwnerTrialUsed: async (email: string) => void h.trialUsed.add(email),
+}));
 vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: { delete: vi.fn(), get: vi.fn(), set: vi.fn(), acquireLock: vi.fn() },
 }));
@@ -147,6 +154,7 @@ const fakeD1 = () => ({
 });
 
 beforeEach(() => {
+  h.trialUsed.clear();
   sqlite = new DatabaseSync(':memory:');
   sqlite.exec(
     ['0001_init.sql', '0002_invariants.sql']
@@ -198,6 +206,34 @@ describe('StoreService.create on D1 + DO', () => {
     expect(sqlite.prepare('SELECT slug FROM stores WHERE id=?').get(again.id)).toEqual({
       slug: 'nour-shop-1',
     });
+  });
+});
+
+describe('R-TRIAL-ONCE-1: one signup trial per owner on the DO create path', () => {
+  const sub = (id: string) =>
+    sqlite
+      .prepare('SELECT plan_code, status FROM store_subscriptions WHERE store_id=?')
+      .get(id) as { plan_code: string; status: string };
+
+  it('the first store marks the owner trial as used (the DO branch returns early, the marker is still written)', async () => {
+    expect(h.trialUsed.size).toBe(0);
+    await StoreService.create('owner-1', { name: 'First Shop' } as never);
+    expect([...h.trialUsed]).toEqual(['owner-1@x.co']);
+  });
+
+  it('delete + recreate: no trial AND no paid tier (not trialing, not Growth/Business, not Professional/Enterprise)', async () => {
+    const first = (await StoreService.create('owner-1', { name: 'Again Shop' } as never)) as Record<
+      string,
+      any
+    >;
+    await StoreService.delete(first.id);
+    const second = (await StoreService.create('owner-1', {
+      name: 'Again Shop 2',
+    } as never)) as Record<string, any>;
+    expect(second.plan).toBe('starter');
+    const s = sub(second.id);
+    expect(s.status).not.toBe('trialing');
+    expect(['growth', 'business']).not.toContain(s.plan_code);
   });
 });
 

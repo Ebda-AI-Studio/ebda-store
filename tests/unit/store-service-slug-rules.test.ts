@@ -44,6 +44,12 @@ vi.mock('@ebda/database', () => ({
 }));
 // `stores` is under RLS (R-EBDA-005): slug / domain uniqueness probes are the
 // `ebda_store_id_by_slug` / `ebda_store_id_by_domain` definers (an id, or null when free).
+// R-TRIAL-ONCE-1: the used-trial marker lives in system_settings, not under test here
+vi.mock('@api/services/billing/trial-eligibility', () => ({
+  ownerEmailOf: async () => 'o@x.com',
+  ownerHasUsedTrial: async () => false,
+  markOwnerTrialUsed: async () => undefined,
+}));
 vi.mock('@api/lib/definer', async orig => ({
   ...(await orig<typeof import('@api/lib/definer')>()),
   storeIdBySlug: vi.fn(async (slug: string) => (taken.has(slug) ? 'existing' : null)),

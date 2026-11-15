@@ -97,7 +97,7 @@ import {
 import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial } from './billing/trial';
-import { markOwnerTrialUsed, ownerHasUsedTrial } from './billing/trial-eligibility';
+import { markOwnerTrialUsed, ownerEmailOf, ownerHasUsedTrial } from './billing/trial-eligibility';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -659,20 +659,32 @@ export class StoreService {
     // N-18 (Ruling NZ-D11): a store created on D1 + its Durable Object has no Postgres row.
     const onDo = storeCreateOnDo();
     // R-TRIAL-ONCE-1: the FIRST store of an owner who never had a signup trial (deleted stores included).
-    const ownerEmail = !opts.platformOperator
-      ? (
-          await withUser(ownerId, tx =>
-            tx.user.findUnique({ where: { id: ownerId }, select: { email: true } })
-          )
-        )?.email
-      : undefined;
+    const ownerEmail = !opts.platformOperator ? await ownerEmailOf(ownerId) : undefined;
+    // `isFirst` (no live store) and `trialEligible` (isFirst AND no earlier trial) are SEPARATE facts: a trial-used owner
+    // who recreates is still a first store but must get neither the trial nor a paid tier (R-TRIAL-ONCE-1).
     const merchantCreate = !opts.platformOperator
-      ? {
-          firstStore:
+      ? await (async () => {
+          const isFirst =
             (await countOwnerStores(ownerId, () =>
               withUser(ownerId, tx => tx.store.count({ where: { ownerId, deletedAt: null } }))
-            )) === 0 && !(ownerEmail && (await ownerHasUsedTrial(ownerEmail))),
-        }
+            )) === 0;
+          const trialEligible = isFirst && !(ownerEmail && (await ownerHasUsedTrial(ownerEmail)));
+          return { isFirst, trialEligible };
+        })()
+      : null;
+    // The ONE writer of the used-trial marker: every create branch below calls it after its store committed.
+    const recordTrial = async (storeId: string) => {
+      if (merchantCreate?.trialEligible && ownerEmail)
+        await markOwnerTrialUsed(ownerEmail, storeId);
+    };
+    // Legacy tier of a merchant-created store: trial -> Growth; first store without a trial -> `starter` (unpaid, go-live
+    // needs payment); an additional store -> Business (only reachable when the owner's plan allows it, covered by the parent).
+    const merchantPlan = merchantCreate
+      ? merchantCreate.trialEligible
+        ? ('professional' as const)
+        : merchantCreate.isFirst
+          ? ('starter' as const)
+          : ('enterprise' as const)
       : null;
 
     // Same class as the product-slug defect: an empty slugify result made the
@@ -728,11 +740,7 @@ export class StoreService {
     const newTheme = { frameChromeDedup: true, oosRibbonColor: '#6b7280' };
 
     if (onDo) {
-      const plan = merchantCreate
-        ? merchantCreate.firstStore
-          ? ('professional' as const)
-          : ('enterprise' as const)
-        : NEW_STORE_LEGACY_PLAN;
+      const plan = merchantPlan ?? NEW_STORE_LEGACY_PLAN;
       const id = await insertDoStore({
         name: data.name,
         slug,
@@ -744,7 +752,7 @@ export class StoreService {
         theme: newTheme,
         layoutSettings: NEW_STORE_LAYOUT_SETTINGS as Record<string, unknown>,
         vatRateHundredths: REGION.defaultVatBps,
-        trial: merchantCreate?.firstStore ? {} : undefined,
+        trial: merchantCreate?.trialEligible ? {} : undefined,
         // atomic plan gate, fails closed (the Redis creation lock fails open): the insert itself refuses past the allowance
         maxOwnedStores: opts.platformOperator
           ? null
@@ -754,6 +762,7 @@ export class StoreService {
         slug,
         domain: data.domain ?? null,
       });
+      await recordTrial(id);
       // The owner row is identity (Postgres until the identity track moves it): not read on this path.
       return { ...created, owner: { id: ownerId } } as typeof created & { owner: { id: string } };
     }
@@ -777,9 +786,7 @@ export class StoreService {
           ...(merchantCreate
             ? {
                 status: 'inactive' as const,
-                plan: merchantCreate.firstStore
-                  ? ('professional' as const)
-                  : ('enterprise' as const),
+                plan: merchantPlan!,
               }
             : {}),
           settings: newSettings,
@@ -808,7 +815,7 @@ export class StoreService {
     // verifies its VAT registration; the charge is gated on that verification.
     await withStore(store.id, async tx => {
       await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
-      if (merchantCreate?.firstStore) await startSignupTrial(tx, store.id);
+      if (merchantCreate?.trialEligible) await startSignupTrial(tx, store.id);
       await tx.taxRate.create({
         data: {
           storeId: store.id,
@@ -820,7 +827,7 @@ export class StoreService {
       });
     });
 
-    if (merchantCreate?.firstStore && ownerEmail) await markOwnerTrialUsed(ownerEmail, store.id);
+    await recordTrial(store.id);
 
     // Seed Chart of Accounts (Egypt retail template, 27 system accounts).
     // Idempotent — safe if accountingEnabled is later toggled.

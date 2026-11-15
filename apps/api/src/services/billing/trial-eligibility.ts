@@ -8,8 +8,10 @@
  * Only a sha256 of the address is stored, never the address.
  */
 import crypto from 'node:crypto';
-import { prisma } from '@ebda/database';
+import { prisma, withUser } from '@ebda/database';
 import logger from '../../lib/logger';
+import { getAccountState } from '../../lib/identity-client';
+import { onAccessD1 } from '../platform/access-d1';
 
 const PREFIX = 'ebda.trial-used:';
 
@@ -44,5 +46,23 @@ export async function markOwnerTrialUsed(email: string, storeId: string): Promis
     });
   } catch (err) {
     logger.error({ err, storeId }, '[trial] could not record the used signup trial');
+  }
+}
+
+/**
+ * The owner's email, from the identity service once `access` is on D1 (there is no Postgres `users` read then), else Postgres.
+ * Fails OPEN (undefined = no marker lookup): an unreadable account must not block creating a store, and the trial it could
+ * wrongly grant is the pre-fix behaviour.
+ */
+export async function ownerEmailOf(ownerId: string): Promise<string | undefined> {
+  try {
+    if (await onAccessD1()) return (await getAccountState(ownerId))?.email ?? undefined;
+    const u = await withUser(ownerId, tx =>
+      tx.user.findUnique({ where: { id: ownerId }, select: { email: true } })
+    );
+    return u?.email;
+  } catch (err) {
+    logger.warn({ err, ownerId }, '[trial] owner email unreadable; trial check skipped');
+    return undefined;
   }
 }
