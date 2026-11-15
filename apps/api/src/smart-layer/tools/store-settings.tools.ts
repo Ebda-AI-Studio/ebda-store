@@ -3,7 +3,7 @@
  * (routes/store.routes.ts). The gate of each is the route's own `authorize('store_admin', ...)` (+ `requireFeature` where the route has one).
  *
  * What is deliberately NOT here (never reachable by the assistant): slug, domain, currency, plan, status, timezone, `settings` keys that are server-owned
- * (`packages/shared/src/server-owned-settings.ts`: ebdaWhatsApp, goldAllowDeferredPayment, mcpWriteEnabled, assistantMode, autoRecommendationsEnabled),
+ * (`packages/shared/src/server-owned-settings.ts`: the Ebda Chat link flag, goldAllowDeferredPayment, mcpWriteEnabled, assistantMode, autoRecommendationsEnabled),
  * payment secrets, uploads (logo / favicon / hero image need a file), the layout hero slides (inline in store-layout.routes.ts) and fonts (read-only route,
  * the builder publish is the only typography writer, Ruling TYPO-WRITER-1).
  */
@@ -41,7 +41,7 @@ export const safeUrl = (description: string, max = 500): Field =>
   );
 
 /** Reads exactly the listed columns of THIS store (ctx.storeId, never an argument). Runs inside `readInStoreContext` (kit) so RLS sees the store. */
-export async function readStoreRow(ctx: TurnCtx, select: Record<string, true>): Promise<Rec> {
+async function readStoreRow(ctx: TurnCtx, select: Record<string, true>): Promise<Rec> {
   const r = await (
     await storeDb(ctx.storeId)
   ).store.findUnique({ where: { id: ctx.storeId }, select: select as { id: true } });

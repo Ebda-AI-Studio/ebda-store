@@ -31,7 +31,7 @@ export interface PreviewCardData {
   costCredits?: number;
   approvalId?: string;
 }
-export interface ApprovalGrant {
+interface ApprovalGrant {
   approvalId: string;
   token: string;
 }

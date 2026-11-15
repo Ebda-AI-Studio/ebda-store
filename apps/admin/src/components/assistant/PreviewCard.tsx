@@ -40,15 +40,19 @@ export function PreviewCard({
 }: {
   card: PreviewCardData;
   mode: 'answer-only' | 'suggest' | 'act';
-  onApply: (previewId: string) => Promise<{ data?: ApplyData; error?: { code: string } }>;
-  onUndo: (appliedId: string) => Promise<{ data?: UndoData; error?: { code: string } }>;
+  onApply: (
+    previewId: string
+  ) => Promise<{ data?: ApplyData | null; error?: { code: string } | null }>;
+  onUndo: (
+    appliedId: string
+  ) => Promise<{ data?: UndoData | null; error?: { code: string } | null }>;
   now?: () => number;
 }) {
   const t = useT('assistant');
   const lang = useLocale() === 'en' ? 'en' : 'ar';
   const [card, setCard] = useState(first);
   const [phase, setPhase] = useState<Phase>({ k: 'idle' });
-  const [notice, setNotice] = useState<'stale' | null>(null);
+  const [stale, setStale] = useState(false);
   const [tick, setTick] = useState(now());
 
   useEffect(() => {
@@ -76,10 +80,10 @@ export function PreviewCard({
     if (r.error || !r.data) return failWith(r.error?.code);
     if (r.data.status === 'stale') {
       setCard(r.data.card);
-      setNotice('stale');
+      setStale(true);
       return setPhase({ k: 'idle' });
     }
-    setNotice(null);
+    setStale(false);
     setPhase({ k: 'applied', appliedId: r.data.appliedId, until: r.data.undoUntil });
     setTick(now());
   };
@@ -95,7 +99,7 @@ export function PreviewCard({
     if (r.data.status === 'undone') return setPhase({ k: 'undone' });
     // changed by hand since (or needs its own confirmation): show what undo would do as a fresh card, nothing was written
     setCard(r.data.card);
-    setNotice('stale');
+    setStale(true);
     setPhase({ k: 'idle' });
   };
 
@@ -117,7 +121,7 @@ export function PreviewCard({
       <p className="font-medium" dir="auto">
         {card.summary[lang]}
       </p>
-      {notice === 'stale' && (
+      {stale && (
         <p role="status" className="text-xs text-muted-foreground">
           {t('card.stale')}
         </p>

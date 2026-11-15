@@ -132,7 +132,7 @@ export type Described = {
   costCredits?: number;
 };
 
-export type ChangeDef<A> = {
+type ChangeDef<A> = {
   name: string;
   capabilityId: string;
   description: string;

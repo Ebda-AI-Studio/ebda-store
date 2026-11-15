@@ -19,10 +19,10 @@
   "roles": ["owner", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "dismiss yes"
+    "class": "reversible",
+    "note": "rule update: restore the previous values; a created rule is undone by deleting it (a confirm-class action); dismiss yes"
   },
-  "helpArticle": null,
+  "helpArticle": "stock-alerts-and-reorder-rules",
   "questions": {
     "ar": ["اشتري كام من المنتج ده؟", "ايه البضاعة الراكدة؟"],
     "en": ["What should I reorder?"]
@@ -37,5 +37,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

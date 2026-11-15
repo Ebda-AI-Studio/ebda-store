@@ -74,9 +74,9 @@ describe('adapter contract', () => {
   it('the tool list agrees with the capability registry (no weaker policy, every capability live, no forbidden tool)', () => {
     expect(checkAdapterContract(adapter())).toEqual([]);
   });
-  it('Phase A registers only free tools, all on live capabilities', () => {
+  it('every read tool is free, and every tool (read or write) sits on a live capability', () => {
     const a = adapter();
-    expect(a.tools().filter(t => t.policy !== 'free')).toEqual([]);
+    expect(a.tools().filter(t => !t.preview && t.policy !== 'free')).toEqual([]);
     for (const t of a.tools())
       expect(a.registry().caps.get(t.capabilityId)?.status, t.name).toBe('live');
   });
@@ -86,7 +86,10 @@ describe('adapter contract', () => {
         (t.jsonSchema as { properties?: Record<string, unknown> }).properties ?? {}
       );
       expect(
-        props.filter(p => /store|workspace|path|url/i.test(p)),
+        // A write tool may carry merchant CONTENT such as a link the merchant wants shown (googleMapsUrl); it may never name which store to act on.
+        props.filter(p =>
+          (t.preview ? /^(store|workspace)(id)?$|path/i : /store|workspace|path|url/i).test(p)
+        ),
         t.name
       ).toEqual([]);
     }
