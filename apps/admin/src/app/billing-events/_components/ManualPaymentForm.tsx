@@ -87,6 +87,10 @@ export function ManualPaymentForm({
   );
   const [editPeriod, setEditPeriod] = useState(false);
   const [replacesVoided, setReplacesVoided] = useState('');
+  // Shown only after the server answered AMOUNT_BELOW_PRICE: approving an underpayment needs a written reason.
+  const [underpayAsked, setUnderpayAsked] = useState(false);
+  const [allowUnderpay, setAllowUnderpay] = useState(false);
+  const [underpayReason, setUnderpayReason] = useState('');
   const [periodStart, setPeriodStart] = useState(today);
   const [periodEnd, setPeriodEnd] = useState(addPeriod(today, prefill.interval));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -126,6 +130,8 @@ export function ManualPaymentForm({
     if (amountMinor === null || amountMinor <= 0) found.amount = t('amountInvalid');
     if (!reference.trim()) found.reference = t('referenceRequired');
     if (!paidAt) found.paidAt = t('dateRequired');
+    if (allowUnderpay && underpayReason.trim().length < 3)
+      found.underpayReason = t('reasonRequired');
     if (editPeriod) {
       if (!periodStart) found.periodStart = t('dateRequired');
       if (!periodEnd) found.periodEnd = t('dateRequired');
@@ -149,16 +155,20 @@ export function ManualPaymentForm({
         ...(editPeriod ? { periodStart: toIso(periodStart), periodEnd: toIso(periodEnd) } : {}),
         ...(prefill.claimId ? { claimId: prefill.claimId } : {}),
         ...(replacesVoided.trim() ? { replacesVoidedEventId: replacesVoided.trim() } : {}),
+        ...(allowUnderpay ? { allowUnderpay: true, underpayReason: underpayReason.trim() } : {}),
       }
     );
     setSaving(false);
+    if (error?.code === 'AMOUNT_BELOW_PRICE') setUnderpayAsked(true);
     if (error || !data) {
       setFormError(
-        error?.code === 'REFERENCE_USED_ELSEWHERE'
-          ? t('referenceUsedElsewhere')
-          : error?.code === 'NOT_A_VOIDED_PAYMENT'
-            ? t('notAVoided')
-            : t('failed')
+        error?.code === 'AMOUNT_BELOW_PRICE'
+          ? t('amountBelowPrice')
+          : error?.code === 'REFERENCE_USED_ELSEWHERE'
+            ? t('referenceUsedElsewhere')
+            : error?.code === 'NOT_A_VOIDED_PAYMENT'
+              ? t('notAVoided')
+              : t('failed')
       );
       return;
     }
@@ -211,6 +221,27 @@ export function ManualPaymentForm({
           onChange={e => setAmount(e.target.value)}
           error={errors.amount}
         />
+        {underpayAsked && (
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowUnderpay}
+                onChange={e => setAllowUnderpay(e.target.checked)}
+              />
+              {t('allowUnderpay')}
+            </label>
+            {allowUnderpay && (
+              <Input
+                id="mp-underpay-reason"
+                label={t('underpayReason')}
+                value={underpayReason}
+                onChange={e => setUnderpayReason(e.target.value)}
+                error={errors.underpayReason}
+              />
+            )}
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <Select
             label={t('method')}

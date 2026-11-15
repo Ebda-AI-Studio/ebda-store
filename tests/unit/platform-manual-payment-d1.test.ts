@@ -13,10 +13,18 @@ vi.mock('../../apps/api/src/services/alerts.service', () => ({
 vi.mock('../../apps/api/src/services/billing/billing-notify', () => ({
   runBillingEffects: vi.fn(async () => undefined),
 }));
-vi.mock('../../apps/api/src/services/billing/charge-amount', async importOriginal => ({
-  ...(await importOriginal<object>()),
-  resolvePlatformVat: async () => ({ enabled: false, rateBps: 0, mode: 'inclusive' }),
+const vatBox = vi.hoisted(() => ({
+  vat: { enabled: false, rateBps: 0, mode: 'inclusive' } as Record<string, unknown>,
 }));
+vi.mock('../../apps/api/src/services/billing/charge-amount', async importOriginal => {
+  const real =
+    await importOriginal<typeof import('../../apps/api/src/services/billing/charge-amount')>();
+  return {
+    ...real,
+    resolvePlatformVat: async () => vatBox.vat as never,
+    chargeFor: async (price: number) => real.subscriptionChargeAmount(price, vatBox.vat as never),
+  };
+});
 const h = vi.hoisted(() => ({
   storeUpdate: vi.fn(async () => ({})),
   claimUpdateMany: vi.fn(async () => ({ count: 1 })),
@@ -137,6 +145,7 @@ beforeEach(() => {
   registerPlatformRouter();
   Object.values(h).forEach(f => f.mockClear());
   h.storeUpdate.mockResolvedValue({});
+  vatBox.vat = { enabled: false, rateBps: 0, mode: 'inclusive' };
 });
 
 describe('manual payment on D1 fails closed', () => {
@@ -235,5 +244,65 @@ describe('manual payment on D1 fails closed', () => {
     h.storeUpdate.mockClear();
     expect(await recordManualPayment(input(A))).toMatchObject({ duplicate: true });
     expect(h.storeUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VAT included)', () => {
+  const ledgerRows = (db: DatabaseSync) =>
+    db.prepare('SELECT COUNT(*) n FROM billing_events WHERE store_id = ?').get(A);
+
+  it('an amount below the plan price is refused: 409 AMOUNT_BELOW_PRICE, nothing written', async () => {
+    const db = world();
+    await expect(recordManualPayment(input(A, { amountMinor: 100 }))).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'AMOUNT_BELOW_PRICE',
+    });
+    expect(h.storeUpdate).not.toHaveBeenCalled();
+    expect(ledgerRows(db)).toEqual({ n: 0 });
+    expect(db.prepare('SELECT COUNT(*) n FROM store_subscriptions').get()).toEqual({ n: 0 });
+  });
+
+  it('allowUnderpay needs a written reason, then records it on the ledger row', async () => {
+    const db = world();
+    await expect(
+      recordManualPayment(input(A, { amountMinor: 100, allowUnderpay: true }))
+    ).rejects.toMatchObject({ statusCode: 400, code: 'REASON_REQUIRED' });
+    expect(ledgerRows(db)).toEqual({ n: 0 });
+    const out = await recordManualPayment(
+      input(A, { amountMinor: 100, allowUnderpay: true, underpayReason: 'agreed discount' })
+    );
+    expect(out.duplicate).toBe(false);
+    const row = db.prepare('SELECT amount_minor a, raw FROM billing_events').get() as {
+      a: number;
+      raw: string;
+    };
+    expect(row.a).toBe(100);
+    expect(JSON.parse(row.raw).underpay).toEqual({
+      expectedMinor: 5000,
+      reason: 'agreed discount',
+    });
+  });
+
+  it('the exact price and an overpayment are accepted without the flag', async () => {
+    const db = world();
+    await recordManualPayment(input(A));
+    await recordManualPayment(input(B, { amountMinor: 9000, reference: '99999999999' }));
+    expect(db.prepare('SELECT COUNT(*) n FROM billing_events').get()).toEqual({ n: 2 });
+  });
+
+  it('with Ebda VAT exclusive the price to cover is price + VAT', async () => {
+    const db = world();
+    vatBox.vat = {
+      enabled: true,
+      rateBps: 1400,
+      mode: 'exclusive',
+      trn: '100200300',
+      legalName: 'Ebda Studio',
+    };
+    await expect(recordManualPayment(input(A, { amountMinor: 5000 }))).rejects.toMatchObject({
+      code: 'AMOUNT_BELOW_PRICE',
+    });
+    await recordManualPayment(input(A, { amountMinor: 5700 }));
+    expect(ledgerRows(db)).toEqual({ n: 1 });
   });
 });

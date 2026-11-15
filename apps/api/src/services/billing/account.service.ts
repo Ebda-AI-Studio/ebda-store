@@ -904,6 +904,12 @@ export interface ManualPaymentInput {
    * voided manual payment with exactly this reference; it can be replaced once.
    */
   replacesVoidedEventId?: string | null;
+  /**
+   * An amount below the plan price (VAT included) is refused (AMOUNT_BELOW_PRICE) unless the operator
+   * says so here AND writes why in `underpayReason` (R-MANUAL-UNDERPAY-1). The route audit-logs both.
+   */
+  allowUnderpay?: boolean;
+  underpayReason?: string;
   now?: Date;
 }
 
@@ -944,7 +950,22 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   if (explicit && !(input.periodEnd!.getTime() > input.periodStart!.getTime())) {
     throw new AppError(400, 'INVALID_PERIOD', 'The period must end after it starts');
   }
-  const { plan } = await loadPayablePlan(input.planCode, input.interval);
+  const { plan, price } = await loadPayablePlan(input.planCode, input.interval);
+  // R-MANUAL-UNDERPAY-1: the money recorded must cover the plan price for the interval, VAT included
+  // (chargeFor = the amount a card would be charged today). Over-payment is fine; an underpayment needs a reason.
+  const expectedMinor = (await chargeFor(price)).totalMinor;
+  if (input.amountMinor < expectedMinor) {
+    if (!input.allowUnderpay) {
+      throw new AppError(
+        409,
+        'AMOUNT_BELOW_PRICE',
+        `The amount is below the plan price (${expectedMinor} piastres, VAT included)`
+      );
+    }
+    if ((input.underpayReason ?? '').trim().length < 3) {
+      throw new AppError(400, 'REASON_REQUIRED', 'Write why the underpayment is accepted');
+    }
+  }
   let key = manualPaymentKey(input.method, reference);
   if (input.replacesVoidedEventId) {
     const vStore = await getEntityStoreId('billing_event', input.replacesVoidedEventId);
@@ -1063,6 +1084,9 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
       previousStatus: sub?.status ?? null,
       recordedBy: input.actorId,
+      ...(input.amountMinor < expectedMinor
+        ? { underpay: { expectedMinor, reason: input.underpayReason!.trim().slice(0, 500) } }
+        : {}),
     };
     const hasCard = !!sub?.provider && !!sub?.providerPaymentMethodRef;
     const billingMethod = sub?.billingMethod === 'instapay' || !hasCard ? 'instapay' : 'card';

@@ -723,6 +723,8 @@ router.post(
           periodEnd: z.coerce.date().optional().nullable(),
           claimId: z.string().uuid().optional(),
           replacesVoidedEventId: z.string().uuid().optional().nullable(),
+          allowUnderpay: z.boolean().optional(),
+          underpayReason: z.string().trim().max(500).optional(),
         })
         .strict()
         .parse(req.body);
@@ -749,6 +751,8 @@ router.post(
           periodEnd: (out.periodEnd ?? input.periodEnd)?.toISOString() ?? null,
           periodOverride: !!input.periodStart,
           claimId: input.claimId ?? null,
+          allowUnderpay: input.allowUnderpay === true,
+          underpayReason: input.allowUnderpay ? (input.underpayReason ?? null) : null,
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
