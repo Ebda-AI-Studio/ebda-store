@@ -1,0 +1,39 @@
+{
+  "id": "marketing.loyalty",
+  "status": "live",
+  "area": "marketing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "برنامج الولاء",
+  "titleEn": "Loyalty points: settings, members, award points",
+  "screens": ["/stores/[id]/loyalty"],
+  "api": [
+    "GET/PUT .../loyalty/settings",
+    "GET .../loyalty/stats|members|transactions",
+    "POST .../loyalty/members/:customerId/award"
+  ],
+  "mcpTool": null,
+  "planGate": "loyalty",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "settings reversible; an award is treated as irreversible by the assistant"
+  },
+  "helpArticle": "loyalty-points",
+  "questions": {
+    "ar": ["ازاي اعمل نقاط ولاء؟", "اديله نقاط", "النقاط بتنتهي امتى؟"],
+    "en": ["Set up loyalty points"]
+  },
+  "steps": ["Loyalty page."],
+  "edgeCases": [
+    "Reversal clawback OPEN-PR #691",
+    "Growth plan+",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

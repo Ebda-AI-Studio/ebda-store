@@ -893,26 +893,17 @@ router.patch(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const db = await storeDb(storeId);
-      const w = await storeWriter(storeId);
       const data = updateAreaRateSchema.parse(req.body);
 
-      const rate = await w.shippingAreaRate.updateMany({
-        where: { id, storeId },
-        data,
-      });
+      const updated = await ShippingService.updateAreaRate(storeId, id, data);
 
-      if (rate.count === 0) {
+      if (!updated) {
         res.status(404).json({
           success: false,
           error: { code: 'NOT_FOUND', message: 'Area rate not found' },
         });
         return;
       }
-
-      const updated = await db.shippingAreaRate.findFirst({
-        where: { id, storeId },
-      });
 
       res.json({
         success: true,

@@ -1,0 +1,36 @@
+{
+  "id": "account.sms-consent",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "موافقتي على الرسايل القصيرة",
+  "titleEn": "SMS consent / unsubscribe (my own number)",
+  "screens": ["/account"],
+  "api": [
+    "GET /auth/me/sms-consent",
+    "PUT /auth/me/sms-consent",
+    "POST /auth/me/sms-consent/unsubscribe"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["وقف رسايل SMS عني"],
+    "en": ["Stop SMS to my number"]
+  },
+  "steps": ["Account settings."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}

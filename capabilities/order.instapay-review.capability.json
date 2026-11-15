@@ -1,0 +1,50 @@
+{
+  "id": "order.instapay-review",
+  "status": "live",
+  "area": "orders",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "راجع ايصالات انستاباي من العملاء",
+  "titleEn": "Review customer InstaPay receipts: confirm / reject / refund",
+  "screens": ["/stores/[id]/orders/[orderId]"],
+  "api": [
+    "GET .../orders/:orderId/instapay-receipts",
+    "GET .../receipts/:receiptId/image",
+    "POST .../orders/:orderId/confirm-instapay",
+    "POST .../receipts/:receiptId/reject",
+    "POST .../orders/:orderId/instapay-refund"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no"
+  },
+  "helpArticle": "instapay",
+  "questions": {
+    "ar": [
+      "العميل رفع ايصال انستاباي اتأكد منه ازاي؟",
+      "اقبل الايصال",
+      "ارفض الايصال",
+      "الايصال متكرر"
+    ],
+    "en": ["How do I confirm an InstaPay receipt?"]
+  },
+  "steps": ["Order > receipts > confirm/reject."],
+  "edgeCases": [
+    "Duplicate/forged receipts",
+    "Hold hours expire (payment.instapay-expiry)",
+    "Refund is manual transfer",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [
+    "No assistant receipt reader for merchant-side receipts (reader exists for Ebda's own InstaPay)"
+  ],
+  "assistantNote": "merchant decides; assistant may summarise receipt data but never confirm silently"
+}

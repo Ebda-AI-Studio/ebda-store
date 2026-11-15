@@ -1,0 +1,34 @@
+{
+  "id": "order.export",
+  "status": "live",
+  "area": "orders",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "صدّر الطلبات اكسيل",
+  "titleEn": "Export orders and customers to Excel",
+  "screens": ["/stores/[id]/orders"],
+  "api": ["GET .../orders/export.xlsx", "GET .../customers/export.xlsx"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["نزلي الطلبات في اكسيل"],
+    "en": ["Export my orders"]
+  },
+  "steps": ["Orders > Export."],
+  "edgeCases": [
+    "PII download: audit logged",
+    "Staff lack customers:export",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}
