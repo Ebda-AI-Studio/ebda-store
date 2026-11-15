@@ -23,5 +23,5 @@ Never skip a stage and never set a store above the platform cap. To stop everyth
 
 ## Known gaps (tracked, not hidden)
 
-- Ruling SL-C4-1: the vendored engine's keyword secrets rail does not catch a password introduced in Franco ("kelmet el sar ...") nor a Merchant MCP key (`ebdam_...`) introduced by an English or Franco keyword. The fix belongs in `ebda-foundation` (`rails/secrets.ts` + its vectors), then a re-vendor; the red-team test lists the rows (`KNOWN_LEAKS`) and fails the moment the gap closes. Until then those two shapes can sit unmasked for 90 days in that store's own journal.
+- Ruling SL-C4-1 (CLOSED by the foundation v0.3.2 re-vendor): the secrets rail now masks a Franco-introduced password ("kelmet el sar ...") and a Merchant MCP key (`ebdam_...`) on every path; `KNOWN_LEAKS` in the red-team test is empty and the shared vectors in `smart-layer-secrets.json` run in `foundation-parity.test.ts`.
 - Ruling SL-EVAL-PENDING-1: no real-model `last-run.json` exists yet, so stages 2 and 3 are closed.
