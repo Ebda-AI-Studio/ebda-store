@@ -26,7 +26,8 @@ const m = vi.hoisted(() => {
     },
     now: 1,
     ledgerFails: false,
-    writeDelay: 0,
+    gate: null as null | Promise<void>,
+    gateHits: 0,
     fixedAt: false,
     reads: 0,
     onAfterReads: 0,
@@ -134,7 +135,10 @@ vi.mock('@api/lib/repo-factory', () => ({
   storeWriter: async () => ({
     paymentConfig: {
       update: async ({ data }: any) => {
-        if (m.state.writeDelay) await new Promise(r => setTimeout(r, m.state.writeDelay));
+        if (m.state.gate) {
+          m.state.gateHits++;
+          await m.state.gate;
+        }
         m.state.row = { ...m.state.row!, ...data };
         return m.state.row;
       },
@@ -253,7 +257,8 @@ beforeEach(() => {
   s.result = { ok: true, code: 'ok', message: 'ok' };
   s.now = 1;
   s.ledgerFails = false;
-  s.writeDelay = 0;
+  s.gate = null;
+  s.gateHits = 0;
   s.fixedAt = false;
   s.reads = 0;
   s.onAfterReads = 0;
@@ -521,22 +526,30 @@ describe('a super-admin deactivate sticks (blocked by admin)', () => {
 });
 
 describe('two concurrent confirms (different tokens and keys) for the same store + provider', () => {
-  it('exactly one runs the enable -> ledger sequence; the loser never switches the provider off', async () => {
+  it('holds the first confirm mid-flight: the second is refused while the first is still enabling, the provider stays on', async () => {
     // Two previews whose test runs share one timestamp (ms resolution) mint two DIFFERENT valid tokens for the same payload
     // hash; normally a newer test run invalidates the older token, here it cannot.
     m.state.fixedAt = true;
     const t1 = (await preview()).body.data.confirmToken;
     const t2 = (await preview()).body.data.confirmToken;
-    m.state.writeDelay = 15; // the two confirms really overlap
-    const [a, b] = await Promise.all([
-      confirm(t1, 'attempt-race-0001'),
-      confirm(t2, 'attempt-race-0002'),
+    // Deterministic interleaving: the first confirm is HELD inside the enable write (inside the claim) until we release it.
+    let release!: () => void;
+    m.state.gate = new Promise<void>(r => (release = r));
+    const first = (async () => confirm(t1, 'attempt-race-0001'))();
+    await vi.waitFor(() => expect(m.state.gateHits).toBeGreaterThan(0));
+    const second = (async () => confirm(t2, 'attempt-race-0002'))();
+    const answered = await Promise.race([
+      second,
+      new Promise(r => setTimeout(() => r('blocked'), 400)),
     ]);
-    expect([a.status, b.status].sort()).toEqual([200, 409]);
-    const lost = a.status === 409 ? a : b;
-    expect(['ACTIVATION_IN_PROGRESS', 'ALREADY_ACTIVE', 'CONFIRMATION_INVALID']).toContain(
-      lost.body.error.code
+    // Without the claim the second runs the same enable sequence and blocks on the gate too: 'blocked'.
+    expect(answered).not.toBe('blocked');
+    expect((answered as { status: number }).status).toBe(409);
+    expect((answered as { body: { error: { code: string } } }).body.error.code).toBe(
+      'ACTIVATION_IN_PROGRESS'
     );
+    release();
+    expect((await first).status).toBe(200);
     expect(m.state.row!.isEnabled).toBe(true);
     expect(m.state.ledger.filter(l => l.op === 'activation.activated_self')).toHaveLength(1);
   });
