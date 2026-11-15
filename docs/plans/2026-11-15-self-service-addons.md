@@ -90,11 +90,11 @@ Guard test: a unit test enumerates every writer of `billing_events` with an `add
 - Plan interaction: if the plan baseline already includes the feature, state is `included`, Buy is hidden, `quote` returns ALREADY_INCLUDED. A merchant who bought and later upgrades to a plan that includes it keeps the paid term but renewal is skipped (exists: `resolveWithoutAddons` in renewal) - a notice is added to the card.
 - Super-admin grant: the override endpoint is untouched and still audited (`auditLog` actions in `feature.routes.ts`). The delta adds `source: 'plan' | 'grant' | 'purchase'` so the page can say "turned on for you by Ebda support" (G7), and a test asserts a grant never creates a ledger row and a purchase never writes `StoreFeature`.
 
-## 7. InstaPay (G6) - proposal, needs Ahmad
+## 7. InstaPay (G6) - DECIDED by Ahmad 2026-11-15: allowed now, manual approval
 
-Today InstaPay is a plan-claim flow: merchant uploads a receipt, `InstapayReceiptService.submit` raises FLAGS (never blocks), a super admin records the payment. Its claim table is shaped for a plan (`planCode`, `billingInterval`) and there is NO auto-confirm decision rule in the repo yet (the audit lists it as gap #4, a separate item; fdn#78 excludes InstaPay). An add-on bought by InstaPay would therefore wait for a human, which is exactly what this feature removes.
+Reuse of the existing plan path (no second flow): the merchant transfers the quoted total (VAT included) and uploads the receipt through the existing `POST /billing/receipts`; the add-on submit (`POST .../addons/:sku/instapay/receipts/:id/submit`) calls the same `submitSubscriptionReceipt` with the add-on code, which creates a `manual_payment_claims` row (planCode `addon:<sku>`). That claim IS the entry in the existing super-admin "Payment claims" queue. NOTHING turns on until a super admin approves (`POST /admin/billing/claims/:id/approve-addon`): the claim becomes a ledger row (key `addon-instapay:<claimId>`, provider `instapay`) settled by the same guarded pending -> succeeded transition as a card payment, so the grant is exactly once and a replay resumes the same row. The plan path (`recordManualPayment`) refuses an add-on claim (USE_ADDON_APPROVAL). Reject or silence: nothing active; a claim older than 7 days shows `available` again but stays in the queue. A pending claim blocks a second purchase of the same add-on (card or InstaPay). States added: `waiting_confirmation`, `rejected` (ar + en). When InstaPay auto-confirm ships it calls `approveAddonClaim` with the machine as actor.
 
-Decision taken for v1: **card only** (as #775). The page shows the InstaPay option disabled with an Egyptian-Arabic line, no promise of a date. When the InstaPay auto-confirm rule lands, the add-on joins it through the same rule: a confirmed receipt for the exact quoted total, reference never used before, receiver = our handle, amount within the claim window -> `settle` the same `pending` row (same grant path, same idempotency). Only a pending add-on row is ever settled by InstaPay, never a missing one. Cost if wrong: merchants without a card cannot self-buy until then.
+InstaPay terms are NON-RENEWING (Ruling ADDON-SS-6): `renewDueAddons` skips provider `instapay` and sends one "pay again by InstaPay" notice; `refundCharge` refuses provider `instapay` (staff refund outside the gateway, revoke with a super-admin feature override off); the stuck-charge sweep never asks the card gateway about an `instapay` row.
 
 ## 8. Delta build (second PR, stacked on #798 head)
 
@@ -126,15 +126,17 @@ No real charge in any test: provider is the stub / mocked `createCheckoutForSubs
 Ruling ADDON-SS-1 - no second purchase path: this work extends #775..#798 and merges after them. Cost if wrong: two billing flows to reconcile; mitigated by building nothing in parallel.
 Ruling ADDON-SS-2 - states are derived from the ledger, no new table/ledger type (ADDON-2 kept). Cost if wrong: history queries scan `billing_events` by planCode prefix; bounded by the 50/200 row limit and the existing index on store.
 Ruling ADDON-SS-3 - expiry is closed by a running-term-aware cache TTL, replacing the BOUNDED 5-minute residual of ADDON-3 with NEVER-stale. Cost if wrong: an expired add-on is served for as long as the cache clamp fails; the daily sweep caps that at 24 h and it errs in the merchant's favour.
-Ruling ADDON-SS-4 - InstaPay is out of v1 (section 7). Cost if wrong: card-less merchants wait.
+Ruling ADDON-SS-4 - InstaPay is IN, with manual super-admin approval per payment (section 7). Cost if wrong: approval latency; nothing is ever on before a human approves.
+Ruling ADDON-SS-6 - InstaPay terms never renew, refund or poll the card gateway. Cost if wrong: a free extension or a wrong-gateway refund; closed by tests.
 Ruling ADDON-SS-5 - self-service refund is out of scope; refunds stay a super-admin money-out action. Cost if wrong: a merchant who bought by mistake files a request.
 
-## 11. Open decisions only Ahmad can make
+## 11. Decisions (Ahmad 2026-11-15)
 
-D1 Real prices and which of the ~30 `addon`-tier features are sold (today: EGP 99 flat placeholder for 6, packs 49 / 149).
-D2 InstaPay for add-ons: wait for the auto-confirm rule (proposed) or accept human approval in the meantime.
-D3 Self-service refund window for add-ons (proposed: none, support refunds).
-D4 Preview images: OK to capture them from the QA store, or supply designed art.
+D1 Prices: HELD. Most add-on-tier features are to be FREE by default; proposed paid set = WhatsApp messages (usage), SMS (usage), AI credit packs (usage, base free), Remove branding; agent_checkout, agent_checkout_open_writes, merchant_mcp(\_write) hidden. Awaiting his approved list; `features.ts` tiers and the catalogue are not changed yet; the page reads whatever is sellable.
+D2 InstaPay: allowed now with manual approval (section 7).
+D3 Refunds: super admin only, no merchant self-refund.
+D4 Preview images: only for the paid items, captured from Amelia (Arabic). Not captured yet: none of the paid items is in the catalogue, and `remove_branding` is already on for Amelia so the branding is hidden there.
+Also added: AI credits meter (requests left today, what used them from `ai_usage`, packs with end dates).
 
 ## 12. Rollout and order
 
