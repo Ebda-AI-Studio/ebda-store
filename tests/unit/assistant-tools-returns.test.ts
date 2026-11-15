@@ -44,6 +44,7 @@ vi.mock('@api/services/return.service', async () => ({
 vi.mock('@api/services/store.service', () => ({ StoreService: m.store }));
 
 import { returnsTools } from '@api/smart-layer/tools/returns.tools';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
   product: 'store',
@@ -147,12 +148,22 @@ describe('return confirm tools', () => {
         expect(m.insertAuditLog).not.toHaveBeenCalled();
       });
 
-      it('a plan without the returns feature is refused', async () => {
-        m.featureEnabled.mockResolvedValue(false);
+      it('a plan without the returns feature is refused at preview and at apply', async () => {
         const t = tool(c.name);
         const args = parse(c.name, c.args);
+        const d = await t.preview!(ctx(), args);
+        m.featureEnabled.mockResolvedValue(false);
         await expect(t.preview!(ctx(), args)).rejects.toBeInstanceOf(Error);
+        await expect(t.apply!(ctx(), args, d)).rejects.toBeInstanceOf(ToolForbidden);
         expect(m.rs[c.svc]).not.toHaveBeenCalled();
+      });
+
+      it('a role without the permission never gets a card (refused at PREVIEW)', async () => {
+        const noPerm = c.name === 'return_complete_refund' ? 'staff' : 'customer';
+        await expect(
+          tool(c.name).preview!(ctx(noPerm), parse(c.name, c.args))
+        ).rejects.toBeInstanceOf(Error);
+        expect(m.rs.getById).not.toHaveBeenCalled();
       });
 
       it('a foreign return id never reaches run (the store-scoped service 404s)', async () => {
@@ -276,6 +287,27 @@ describe('returns_policy_set', () => {
     m.store.update.mockClear();
     await expect(t.apply!(ctx('staff'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
     expect(m.store.update).not.toHaveBeenCalled();
+  });
+
+  it('staff never gets a policy card (refused at PREVIEW)', async () => {
+    await expect(
+      tool('returns_policy_set').preview!(
+        ctx('staff'),
+        parse('returns_policy_set', { returnWindowDays: 30 })
+      )
+    ).rejects.toBeInstanceOf(Error);
+  });
+
+  it('the undo of a policy change passes its own validation and is undone by the engine', async () => {
+    const r = await applyThenUndo(returnsTools(), tool('returns_policy_set'), {
+      returnWindowDays: 30,
+    });
+    expect(r.undo).toBe('undone');
+    m.storeRow = { returnWindowDays: null, returnFeesPaidBy: null };
+    const r2 = await applyThenUndo(returnsTools(), tool('returns_policy_set'), {
+      returnWindowDays: 30,
+    });
+    expect(r2.undo).toBe('undone');
   });
 
   it('0 days means returns not accepted, null clears it, bad values are refused', () => {

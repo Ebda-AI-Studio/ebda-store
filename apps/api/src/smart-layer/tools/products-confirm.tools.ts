@@ -256,7 +256,7 @@ const bulkUpdate = change<BulkArgs>({
   policy: 'confirm',
   undo: 'compensating',
   // product.routes.ts POST /bulk-update: authorize('store_admin', 'super_admin'); the same ProductService.bulkUpdate (the plan gate bulk_operations is in the registry, not on the route).
-  gate: { roles: ['store_admin'] },
+  gate: { roles: ['store_admin'], feature: 'bulk_operations' }, // the admin Bulk screen is plan-gated by bulk_operations (useRequireFeature) and the registry's planGate says so; the route itself does not check it
   audit: { action: 'product.bulk_update', resourceType: 'store' },
   refs: a => [...(a.productIds ?? []), ...(a.exact ?? []).map(e => e.productId)].map(productRef),
   state: (ctx, a) => resolveItems(ctx.storeId, a),

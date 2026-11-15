@@ -53,10 +53,14 @@ vi.mock('@api/services/product-tags.service', () => ({
 }));
 // The real schemas live in the route file (it pulls in express); the passthrough keeps the shape the tool feeds the service.
 vi.mock('@api/routes/product.routes', () => ({
-  updateProductSchema: z.object({}).passthrough(),
+  updateProductSchema: z
+    .object({})
+    .passthrough()
+    .transform(d => (typeof d.sku === 'string' ? { ...d, sku: d.sku.toUpperCase() } : d)),
   createProductSchemaChecked: z.object({}).passthrough(),
 }));
 
+import { applyThenUndo } from './helpers/undo-roundtrip';
 import { productsTools } from '@api/smart-layer/tools/products.tools';
 
 const S = '11111111-1111-4111-8111-111111111111';
@@ -128,7 +132,10 @@ beforeEach(() => {
     return DB[id];
   });
   m.update.mockImplementation(async (_s: string, id: string) => DB[id]);
-  m.create.mockResolvedValue({ id: 'pNEW', name: 'New', status: 'draft' });
+  m.create.mockImplementation(async () => {
+    DB.pNEW = p('pNEW');
+    return { id: 'pNEW', name: 'New', status: 'draft' };
+  });
   m.getCategoriesByIds.mockImplementation(async (_s: string, ids: string[]) => {
     const known: Record<string, string> = { c1: 'Rings', c2: 'Chains' };
     return ids.map(id => {
@@ -191,7 +198,7 @@ describe('product_update_fields', () => {
     expect(d.affectedCount).toBe(1);
     const price = d.rows.find(r => r.label.en.toLowerCase().includes('price'))!;
     expect(price.before).toBe('250');
-    expect(price.after).toBe(300);
+    expect(price.after).toBe('300');
     expect((d.payload as { restore: Record<string, unknown> }).restore).toMatchObject({
       name: 'Ring p1',
       price: 250,
@@ -525,4 +532,133 @@ describe('product_create', () => {
     await expect(t.apply!(ctx('customer'), args, draft)).rejects.toBeInstanceOf(ToolForbidden);
     expect(m.create).not.toHaveBeenCalled();
   });
+});
+
+describe('the card shows what runs (normalised values)', () => {
+  it('rows and the service call carry the normalised sku', async () => {
+    const d = await preview('product_update_fields', { productId: 'p1', sku: 'ab-1' });
+    expect(d.rows.find(r => r.label.en === 'SKU')!.after).toBe('AB-1');
+    await apply('product_update_fields', { productId: 'p1', sku: 'ab-1' });
+    expect(m.update).toHaveBeenCalledWith(S, 'p1', { sku: 'AB-1' });
+  });
+});
+
+// ---- every tool: role gates at preview and at apply (the card of a merchant who may not do it is never built) -----------------------------
+const CASES: Array<[string, Record<string, unknown>, string[]]> = [
+  ['product_update_fields', { productId: 'p1', sku: 'X' }, ['customer']],
+  ['product_set_status', { productId: 'p1', status: 'active' }, ['customer']],
+  [
+    'product_set_categories',
+    { productIds: ['p1'], categoryIds: ['c2'], mode: 'add' },
+    ['customer'],
+  ],
+  ['product_set_tags', { productIds: ['p1'], tags: ['sale'], mode: 'add' }, ['customer', 'staff']],
+  ['product_add_faq', { productId: 'p1', question: 'Q?', answer: 'A.' }, ['customer']],
+  ['variant_update', { productId: 'p1', variantId: 'v1', sku: 'X' }, ['customer']],
+  ['product_create', { name: 'Ring', price: 10 }, ['customer']],
+];
+describe.each(CASES)('%s role gate', (name, args, denied) => {
+  it.each(denied)(
+    '%s is refused at PREVIEW: no card is built and nothing is read for it',
+    async role => {
+      await expect(preview(name, args, role)).rejects.toThrow(/FORBIDDEN/);
+    }
+  );
+  it.each(denied)(
+    '%s is refused at APPLY with ToolForbidden and nothing is written',
+    async role => {
+      const t = tool(name);
+      const a = parse(name, args);
+      const draft = await t.preview!(ctx(), a);
+      await expect(t.apply!(ctx(role), a, draft)).rejects.toBeInstanceOf(ToolForbidden);
+      for (const fn of [m.update, m.create, m.createFaq, m.deleteFaq, m.applyTags, m.updateVariant])
+        expect(fn).not.toHaveBeenCalled();
+      expect(m.insertAuditLog).not.toHaveBeenCalled();
+    }
+  );
+});
+it('product_delete_faq role gate: refused at preview and at apply', async () => {
+  m.listFaqs.mockResolvedValue([{ id: 'f1', question: 'Q', answer: 'A' }]);
+  const args = { productId: 'p1', faqId: 'f1' };
+  await expect(preview('product_delete_faq', args, 'customer')).rejects.toThrow(/FORBIDDEN/);
+  const t = tool('product_delete_faq');
+  const a = parse('product_delete_faq', args);
+  const draft = await t.preview!(ctx(), a);
+  await expect(t.apply!(ctx('customer'), a, draft)).rejects.toBeInstanceOf(ToolForbidden);
+  expect(m.deleteFaq).not.toHaveBeenCalled();
+});
+it('a platform super admin never acts through a product tool', async () => {
+  await expect(
+    preview('product_set_status', { productId: 'p1', status: 'draft' }, 'super_admin')
+  ).rejects.toThrow(/FORBIDDEN/);
+});
+
+// ---- engine-level undo: the REAL journal (preview -> apply -> undo) ---------------------------------------------------------------------
+describe('undo round trips through the engine', () => {
+  const all = () => productsTools();
+  it('product_create: undo archives the created product (not stale)', async () => {
+    m.create.mockImplementation(async () => {
+      DB.pNEW = p('pNEW');
+      return { id: 'pNEW', name: 'New', status: 'draft' };
+    });
+    const r = await applyThenUndo(
+      all(),
+      tool('product_create'),
+      parse('product_create', { name: 'Ring', price: 10 })
+    );
+    expect(r).toMatchObject({ applied: 'applied', undo: 'undone' });
+    expect(m.update).toHaveBeenCalledWith(S, 'pNEW', { status: 'archived' });
+  });
+  it('product_add_faq: undo needs the confirm card of the delete, for the faq that was created', async () => {
+    const faqs: Array<Record<string, unknown>> = [];
+    m.listFaqs.mockImplementation(async () => faqs);
+    m.createFaq.mockImplementation(async (_s: string, _p: string, b: Record<string, unknown>) => {
+      faqs.push({ id: 'f1', ...b });
+      return { id: 'f1' };
+    });
+    const r = await applyThenUndo(
+      all(),
+      tool('product_add_faq'),
+      parse('product_add_faq', { productId: 'p1', question: 'Q?', answer: 'A.' })
+    );
+    expect(r).toMatchObject({ applied: 'applied', undo: 'needs_confirm' });
+    expect(JSON.stringify(r.card)).toContain('Q?');
+  });
+  const UPDATES: Array<[string, Record<string, unknown>]> = [
+    [
+      'product_update_fields',
+      { productId: 'p1', price: 99, sku: 'n', isFeatured: true, description: 'd' },
+    ],
+    ['product_set_status', { productId: 'p1', status: 'active' }],
+    ['product_set_categories', { productIds: ['p1', 'p2'], categoryIds: ['c2'], mode: 'add' }],
+    ['product_set_tags', { productIds: ['p1'], tags: ['sale'], mode: 'add' }],
+    ['variant_update', { productId: 'p1', variantId: 'v1', price: 150, isActive: false }],
+  ];
+  it.each(UPDATES)(
+    '%s: undo is undone and its args pass the tool own validation',
+    async (name, args) => {
+      const t = tool(name);
+      const a = parse(name, args);
+      const draft = await t.preview!(ctx(), a);
+      const inv = t.inverse!(ctx(), a, draft, { ok: true, etagAfter: 'x' })!;
+      expect(t.args.safeParse(inv.args).success).toBe(true);
+      const r = await applyThenUndo(all(), t, a);
+      // a price change is confirm-class on the way in and back, the others apply directly
+      expect(['undone', 'needs_confirm']).toContain(r.undo);
+      expect(r.applied).toMatch(/applied/);
+    }
+  );
+  it('a variant whose isActive column is missing still undoes with a boolean', async () => {
+    m.getProductVariants.mockResolvedValue({
+      variants: [{ id: 'v1', sku: 'V1', price: 20000, compareAtPrice: null }],
+    });
+    const t = tool('variant_update');
+    const a = parse('variant_update', { productId: 'p1', variantId: 'v1', isActive: false });
+    const draft = await t.preview!(ctx(), a);
+    expect((draft.payload as { restore: Record<string, unknown> }).restore.isActive).toBe(true);
+  });
+});
+
+it('a tool whose undo is a different tool declares compensating, never reversible', () => {
+  for (const n of ['product_create', 'product_add_faq']) expect(tool(n).undo).toBe('compensating');
 });

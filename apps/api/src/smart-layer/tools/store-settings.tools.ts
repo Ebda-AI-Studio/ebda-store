@@ -22,7 +22,7 @@ const STORE_ROLES = ['store_admin'] as const; // the routes' `authorize('store_a
 export const fld = (zt: ZodTypeAny, js: Rec): Field => ({ z: zt, js });
 /** A text value: set it, or `null` to clear it. */
 export const txt = (description: string, max = 500): Field =>
-  f.nullable(f.str(description + ' null clears it.', { max }));
+  f.nullable(f.text(description + ' null clears it.', { max }));
 /** A link that is rendered into an `<a href>`: relative path or http(s)/mailto/tel only (the routes' `safeOptionalUrl`). `''` / null clears it. */
 export const safeUrl = (description: string, max = 500): Field =>
   f.nullable(
@@ -62,6 +62,8 @@ type KeyedDef = {
   feature?: 'seo' | 'floating_widget';
   audit: string;
   summary: { ar: string; en: string };
+  /** Extra card flags / words decided from the change (e.g. a switch that takes the store off Google). */
+  extra?: (a: Rec, st: Rec) => { touchesCheckout?: boolean; note?: { ar: string; en: string } };
   run: (ctx: TurnCtx, patch: Rec) => Promise<unknown>;
 };
 
@@ -83,11 +85,16 @@ export function keyedTool(d: KeyedDef): ToolSpec {
     state: async ctx => d.current(await readStoreRow(ctx, d.select)),
     describe: (_ctx, a, st) => {
       const keys = Object.keys(a);
+      const x = d.extra?.(a, st as Rec);
       return {
-        summary: pair(`${d.summary.ar} (${keys.length})`, `${d.summary.en} (${keys.length})`),
+        summary: pair(
+          `${d.summary.ar} (${keys.length})${x?.note ? ' - ' + x.note.ar : ''}`,
+          `${d.summary.en} (${keys.length})${x?.note ? ' - ' + x.note.en : ''}`
+        ),
         rows: diffRows(d.labels, st as Rec, a),
         affectedCount: 1,
         restore: pick(st as Rec, keys),
+        ...(x?.touchesCheckout ? { touchesCheckout: true } : {}),
       };
     },
     run: (ctx, a) => d.run(ctx, a),
@@ -251,19 +258,15 @@ const COLOURS = [
   'backgroundColor',
   'textColor',
 ] as const;
+// A colour the model sends is a hex value, but the stored one may be a theme token or hsl()/rgb(), and the undo must be able to put it back.
+const COLOUR_RE = /^(|#[0-9a-fA-F]{3,8}|token:[\w-]{1,40}|(?:hsl|rgb)a?\([\d\s.,%/-]{1,40}\))$/;
 const hex = (d: string): Field =>
   f.nullable(
-    fld(
-      z
-        .string()
-        .trim()
-        .regex(/^#[0-9a-fA-F]{6}$/),
-      {
-        type: 'string',
-        pattern: '^#[0-9a-fA-F]{6}$',
-        description: `${d} as a hex colour like #B08D57. null resets it to the look's own colour.`,
-      }
-    )
+    fld(z.string().trim().regex(COLOUR_RE), {
+      type: 'string',
+      pattern: COLOUR_RE.source,
+      description: `${d} as a hex colour like #B08D57. null resets it to the look's own colour.`,
+    })
   );
 const brandingUpdate = keyedTool({
   name: 'branding_update',
@@ -305,13 +308,13 @@ const announcementSet = keyedTool({
   description:
     'Set the announcement bar above the store (text in English and Arabic, link, colours, on/off, dismissible). Send only the fields to change; the rest of the bar is kept.',
   fields: {
-    enabled: f.bool('Show the bar.'),
+    enabled: f.nullable(f.bool('Show the bar. null = not set.')),
     text: f.nullable(f.text('Bar text in English.', { max: 500 })),
     textAr: f.nullable(f.text('Bar text in Arabic.', { max: 500 })),
     link: safeUrl('Where the bar links to.'),
     linkText: txt('Link label in English.', 200),
     linkTextAr: txt('Link label in Arabic.', 200),
-    dismissible: f.bool('Shoppers can close the bar.'),
+    dismissible: f.nullable(f.bool('Shoppers can close the bar. null = not set.')),
     bgColor: txt('Background colour.', 50),
     textColor: txt('Text colour.', 50),
   },
@@ -395,7 +398,12 @@ const navItem = f.obj(
   ['label', 'href']
 );
 const footerItem = f.obj(
-  { name: f.str('English label.', { max: 80 }), nameAr: f.str('Arabic label.', { max: 80 }), href },
+  {
+    name: f.str('English label.', { max: 80 }),
+    nameAr: f.str('Arabic label.', { max: 80 }),
+    href,
+    enabled: f.bool('false hides this link.'),
+  },
   ['name', 'href']
 );
 const FOOTER_COLS = ['footerShop', 'footerSupport', 'footerCompany'] as const;
