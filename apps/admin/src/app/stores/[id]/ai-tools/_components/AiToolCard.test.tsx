@@ -52,6 +52,11 @@ describe('AiToolCard states', () => {
     expect(onRun).toHaveBeenCalledWith(false);
   });
 
+  it('a fill-only tool says why there is no replace switch', () => {
+    render(<AiToolCard {...base} replace={undefined} fillOnlyNote="Never overwrites your text." />);
+    expect(screen.getByTestId('fill-only-note').textContent).toBe('Never overwrites your text.');
+  });
+
   it('loading: shows the starting label and blocks a second click', () => {
     render(<AiToolCard {...base} loading />);
     const b = screen.getByRole('button', { name: /Starting/ }) as HTMLButtonElement;

@@ -25,6 +25,8 @@ interface AiToolCardProps {
   onRun: (force: boolean) => void;
   /** Present only when the server can overwrite existing content for this tool. */
   replace?: { label: string; hint: string; noUndo: string | null };
+  /** Shown instead of the replace switch when the tool must never overwrite (says why, in plain words). */
+  fillOnlyNote?: string;
   results?: { href: string; label: string };
   /** The undo tool: secondary button, so the one gold action per card stays the forward one. */
   isUndo?: boolean;
@@ -56,6 +58,7 @@ export function AiToolCard(props: AiToolCardProps) {
     blockedReason,
     onRun,
     replace,
+    fillOnlyNote,
     results,
     isUndo,
   } = props;
@@ -112,6 +115,12 @@ export function AiToolCard(props: AiToolCardProps) {
             </p>
           )}
         </div>
+      )}
+
+      {!replace && fillOnlyNote && (
+        <p className="mt-3 text-xs text-muted-foreground" data-testid="fill-only-note">
+          {fillOnlyNote}
+        </p>
       )}
 
       <div className="mt-auto pt-4">

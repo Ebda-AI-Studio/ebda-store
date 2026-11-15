@@ -274,6 +274,7 @@
     "geoResults": {
       "title": "What AI assistants can read",
       "notGenerated": "Not created yet. Run the matching tool above."
-    }
+    },
+    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote."
   }
 }

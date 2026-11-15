@@ -8167,7 +8167,8 @@
       "failedSummary": "This run failed. Nothing more was changed; see the details below.",
       "seeResults": "See what your store has now",
       "undoHint": "Not happy? Undo the language fix"
-    }
+    },
+    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote."
   },
   "account": {
     "security": {

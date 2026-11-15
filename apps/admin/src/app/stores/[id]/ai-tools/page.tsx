@@ -324,6 +324,7 @@ export default function AiToolsPage() {
               }
             : undefined
         }
+        fillOnlyNote={tool.canReplace ? undefined : t('fillOnlyNote')}
         results={
           tool.resultsPath
             ? { href: `/stores/${storeId}${tool.resultsPath}`, label: t(`${c}.resultsLabel`) }
