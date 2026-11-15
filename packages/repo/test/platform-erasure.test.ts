@@ -11,6 +11,7 @@ import {
   scrubUserFromStoreDo,
 } from '../src/platform-erasure';
 import { openSqlite } from './diff-harness';
+import { ensureSmartLayerSchema } from '../src/do/smart-layer';
 
 const CF = path.resolve(__dirname, '../../cf-schema');
 function platformDb() {
@@ -75,6 +76,33 @@ describe('actor-id erasure', () => {
       { id: 'h1', created_by: null },
       { id: 'h2', created_by: 'u2' },
     ]);
+  });
+
+  it('StoreDO: the assistant journal rows of the erased user go with them, other users keep theirs', () => {
+    const raw = openSqlite();
+    const db = nodeSyncSql(raw);
+    ensureSmartLayerSchema(db);
+    for (const u of ['u1', 'u2']) {
+      raw
+        .prepare(
+          "INSERT INTO sl_turns (id, store_id, thread_id, user_id, role, masked_text, at, release_id) VALUES (?, 's1', 'c', ?, 'merchant', 'x', 1, 'r')"
+        )
+        .run(`t-${u}`, u);
+      raw
+        .prepare(
+          "INSERT INTO sl_audit (id, store_id, user_id, at, json) VALUES (?, 's1', ?, 1, '{}')"
+        )
+        .run(`a-${u}`, u);
+      raw
+        .prepare(
+          "INSERT INTO sl_decisions (approval_id, store_id, decider, decision, at) VALUES ('ap', 's1', ?, 'confirmed', 1)"
+        )
+        .run(u);
+    }
+    scrubUserFromStoreDo(db, 'u1');
+    expect(raw.prepare('SELECT id FROM sl_turns').all()).toEqual([{ id: 't-u2' }]);
+    expect(raw.prepare('SELECT id FROM sl_audit').all()).toEqual([{ id: 'a-u2' }]);
+    expect(raw.prepare('SELECT decider FROM sl_decisions').all()).toEqual([{ decider: 'u2' }]);
   });
 
   it('the plan covers every classified actor column of both databases (no hand list to drift)', () => {

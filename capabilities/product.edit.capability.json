@@ -1,0 +1,36 @@
+{
+  "id": "product.edit",
+  "status": "live",
+  "area": "products",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "عدل منتج",
+  "titleEn": "Edit a product (price, description, status, SEO fields)",
+  "screens": ["/stores/[id]/products/[productId]/edit"],
+  "api": ["PUT /stores/:storeId/products/:id"],
+  "mcpTool": "admin_update_product",
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (re-edit; no per-product history except audit)"
+  },
+  "helpArticle": "products-and-csv-import",
+  "questions": {
+    "ar": ["غير سعر المنتج", "ازاي اخفي منتج؟", "عدل وصف المنتج", "اعمل خصم على المنتج"],
+    "en": ["Change a product's price", "Hide a product"]
+  },
+  "steps": ["Edit page or inline."],
+  "edgeCases": [
+    "Price changes affect carts (price acknowledgement prompt)",
+    "Concurrent edit overwrite",
+    "Fill-only AI writes never overwrite merchant text",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No product version history (audit log only)"]
+}

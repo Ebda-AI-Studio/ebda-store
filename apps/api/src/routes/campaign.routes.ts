@@ -1,9 +1,7 @@
-import { assertStoreOperational } from '../lib/store-operational';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
-import { prisma, Prisma, runInTenantContext } from '@ebda/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import {
-  CAMPAIGN_MAX_SCHEDULE_DAYS,
   CAMPAIGN_RECIPIENT_STATUSES,
   campaignAiDraftSchema,
   campaignDraftSchema,
@@ -19,15 +17,20 @@ import { storeScopeContext } from '../middleware/tenant-context';
 import { AppError } from '../middleware/error-handler';
 import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
-import { inngest } from '../lib/inngest/client';
-import logger from '../lib/logger';
 import { StoreMailer } from '../services/store-mailer.service';
 import { storeHidesPoweredBy } from '../services/email.service';
 import { AIService } from '../services/ai.service';
 import { requireAiEnabled } from '../lib/store-ai-switch';
 import {
+  CAMPAIGN_LIST_SELECT,
   CAMPAIGN_STORE_SELECT,
+  CampaignQueueUnreachable,
   audienceCount,
+  cancelCampaign,
+  createCampaignDraft,
+  draftData,
+  findCampaignOr404,
+  requestCampaignSend,
   storeCampaignDailyCap,
   pickCampaignContent,
   renderCampaignEmail,
@@ -71,54 +74,6 @@ const recipientsQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
   status: z.enum(CAMPAIGN_RECIPIENT_STATUSES).optional(),
 });
-
-const CAMPAIGN_LIST_SELECT = {
-  id: true,
-  name: true,
-  status: true,
-  scheduledAt: true,
-  sentAt: true,
-  recipientCount: true,
-  sentCount: true,
-  failedCount: true,
-  lastError: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
-
-const CAMPAIGN_DETAIL_SELECT = {
-  ...CAMPAIGN_LIST_SELECT,
-  subject: true,
-  subjectAr: true,
-  bodyHtml: true,
-  bodyHtmlAr: true,
-  localeStrategy: true,
-  audience: true,
-} as const;
-
-async function findCampaignOr404(storeId: string, campaignId: string) {
-  const campaign = await (
-    await storeDb(storeId)
-  ).campaign.findFirst({
-    where: { id: campaignId, storeId },
-    select: CAMPAIGN_DETAIL_SELECT,
-  });
-  if (!campaign) throw new AppError(404, 'NOT_FOUND', 'Campaign not found');
-  return campaign;
-}
-
-/** Sanitize both bodies on write — the stored row never holds active content. */
-function draftData(input: z.infer<typeof campaignDraftSchema>) {
-  return {
-    name: input.name,
-    subject: input.subject,
-    subjectAr: input.subjectAr?.trim() ? input.subjectAr.trim() : null,
-    bodyHtml: sanitizeNewsletterHtml(input.bodyHtml),
-    bodyHtmlAr: input.bodyHtmlAr?.trim() ? sanitizeNewsletterHtml(input.bodyHtmlAr) : null,
-    localeStrategy: input.localeStrategy,
-    audience: input.audience as Prisma.InputJsonValue,
-  };
-}
 
 // GET /stores/:storeId/campaigns — newest first, cursor-paginated.
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -174,12 +129,7 @@ router.post('/', writeLimiter, async (req: Request, res: Response, next: NextFun
   try {
     const { storeId } = req.params;
     const input = campaignDraftSchema.parse(req.body);
-    const campaign = await (
-      await storeWriter(storeId)
-    ).campaign.create({
-      data: { storeId, ...draftData(input) },
-      select: CAMPAIGN_DETAIL_SELECT,
-    });
+    const campaign = await createCampaignDraft(storeId, input);
     await auditLog({
       action: 'campaign.created',
       userId: req.user?.userId,
@@ -365,89 +315,11 @@ router.post(
       const { storeId } = req.params;
       const { campaignId } = idParam.parse(req.params);
       const body = campaignSendSchema.parse(req.body ?? {});
-      // Ruling SUSPEND-OUT-1: a campaign to customers is refused (423) for a store that is not `active`.
-      await assertStoreOperational(storeId);
-      const campaign = await findCampaignOr404(storeId, campaignId);
-      if (campaign.status !== 'draft') {
-        throw new AppError(409, 'CAMPAIGN_NOT_DRAFT', 'This campaign has already been sent');
-      }
-      if (!isCampaignSendable(campaign)) {
-        throw new AppError(
-          422,
-          'CAMPAIGN_INCOMPLETE',
-          'Add a subject and a body in at least one language first'
-        );
-      }
-
-      const now = Date.now();
-      let scheduledAt = new Date(now);
-      if (body.scheduledAt) {
-        scheduledAt = new Date(body.scheduledAt);
-        const maxAhead = CAMPAIGN_MAX_SCHEDULE_DAYS * 24 * 60 * 60 * 1000;
-        if (scheduledAt.getTime() <= now || scheduledAt.getTime() - now > maxAhead) {
-          throw new AppError(
-            422,
-            'INVALID_SCHEDULE',
-            `Schedule must be in the future and within ${CAMPAIGN_MAX_SCHEDULE_DAYS} days`
-          );
-        }
-      }
-
-      // #1953: count-only — this pre-check never used the actual rows either
-      // (the real materialization happens in the Inngest job, which still
-      // calls buildCampaignAudience for the full rows it needs to send to).
-      const [audienceSize, sent24h, dailyCap] = await Promise.all([
-        audienceCount(storeId),
-        sentInLast24h(storeId),
-        storeCampaignDailyCap(storeId),
-      ]);
-      if (audienceSize === 0) {
-        throw new AppError(422, 'EMPTY_AUDIENCE', 'No subscribers have opted in yet');
-      }
-      const remaining = Math.max(0, dailyCap - sent24h);
-      // Checked here for immediate feedback on a send-now; the job re-checks
-      // at send time, which is what governs a scheduled campaign.
-      if (!body.scheduledAt && audienceSize > remaining) {
-        throw new AppError(
-          422,
-          'DAILY_CAP_EXCEEDED',
-          `This campaign would reach ${audienceSize} people but only ${remaining} more can be sent in the next 24 hours`
-        );
-      }
-
-      const flipped = await (
-        await storeWriter(storeId)
-      ).campaign.updateMany({
-        where: { id: campaignId, storeId, status: 'draft' },
-        data: { status: 'scheduled', scheduledAt, recipientCount: audienceSize },
-      });
-      if (flipped.count === 0) {
-        throw new AppError(409, 'CAMPAIGN_NOT_DRAFT', 'This campaign has already been sent');
-      }
-
-      // Queue-then-send fails fast. If the enqueue throws we answer 503, and
-      // a 5xx ROLLS BACK this request's transaction (request-transaction.ts),
-      // so the flip above is undone: the campaign is back to `draft`, never
-      // `scheduled` with no job behind it (Ruling EC-3).
+      let sent;
       try {
-        await inngest.send({
-          name: 'campaign/send-requested',
-          data: { campaignId, storeId, scheduledAt: scheduledAt.toISOString() },
-        });
+        sent = await requestCampaignSend(storeId, campaignId, body.scheduledAt);
       } catch (err) {
-        logger.error(
-          { campaignId, storeId, err: err instanceof Error ? err.message : 'unknown' },
-          '[CAMPAIGN] enqueue failed'
-        );
-        // A store on its Durable Object is not in this request's Postgres transaction, so the 5xx below cannot undo the
-        // flip: put the campaign back to `draft` here, only if it is still THIS request's `scheduled` row (Ruling CF-R6A-2).
-        if ((await storeRepo(storeId)).backend === 'do')
-          await (
-            await storeWriter(storeId)
-          ).campaign.updateMany({
-            where: { id: campaignId, storeId, status: 'scheduled', scheduledAt },
-            data: { status: 'draft', scheduledAt: null, recipientCount: campaign.recipientCount },
-          });
+        if (!(err instanceof CampaignQueueUnreachable)) throw err;
         res.status(503).json({
           success: false,
           error: {
@@ -457,6 +329,7 @@ router.post(
         });
         return;
       }
+      const { audience: audienceSize, scheduledAt } = sent;
 
       await auditLog({
         action: 'campaign.send_requested',
@@ -487,20 +360,7 @@ router.post(
     try {
       const { storeId } = req.params;
       const { campaignId } = idParam.parse(req.params);
-      const cancelled = await (
-        await storeWriter(storeId)
-      ).campaign.updateMany({
-        where: { id: campaignId, storeId, status: { in: ['scheduled', 'sending'] } },
-        data: { status: 'cancelled' },
-      });
-      if (cancelled.count === 0) {
-        await findCampaignOr404(storeId, campaignId);
-        throw new AppError(
-          409,
-          'CAMPAIGN_NOT_CANCELLABLE',
-          'Only a scheduled or sending campaign can be cancelled'
-        );
-      }
+      await cancelCampaign(storeId, campaignId);
       await auditLog({
         action: 'campaign.cancelled',
         userId: req.user?.userId,

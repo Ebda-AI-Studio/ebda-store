@@ -1,0 +1,26 @@
+---
+title: Phone orders
+description: Create an order for a customer who ordered by phone, then collect cash on delivery or send a payment link.
+section: Selling
+order: 4
+appPath: /stores
+keywords: phone order manual order create order for customer call whatsapp cod
+capabilities:
+  - order.create-phone@1
+---
+
+A phone order is an order you create yourself for a customer who called or messaged you instead of using the checkout.
+
+## Create a phone order
+
+1. Open **Orders** and press **New order**. The page is called **New order (phone order)**.
+2. In **Customer**, pick **Existing customer**, or **New / Guest** and fill in the first name and the phone. Both are required.
+3. In **Shipping address** fill the address, the **Governorate** and the **Area**. The page shows the calculated shipping fee. You can type a **Shipping fee override** if you agreed a different price.
+4. In **Products**, search by name or SKU and add each item. Choose a variant when the product has one.
+5. Check the subtotal and the shipping line, then save the order.
+
+The order starts as pending and unpaid. You can then issue a payment link from the order page, or collect cash on delivery and press **Mark paid** later.
+
+## Ask the assistant
+
+Tell the assistant the customer name, phone, address and what they ordered. It shows a preview with the items and the total of the items, and the shipping and tax the store will add. Nothing is sent to the customer. After you apply it, the assistant offers **Undo** for 24 hours; undo cancels the new order and asks you to confirm the cancel first.

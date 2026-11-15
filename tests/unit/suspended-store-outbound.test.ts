@@ -208,9 +208,12 @@ describe('Ebda Chat events (WhatsApp order status, cart reminders)', () => {
 describe('guard presence at the wired entry points', () => {
   const root = join(__dirname, '../../apps/api/src');
   const cases: Array<[string, RegExp]> = [
-    ['routes/campaign.routes.ts', /await assertStoreOperational\(storeId\)/],
-    ['routes/newsletter.routes.ts', /await assertStoreOperational\(storeId\)/],
-    ['routes/order.routes.ts', /await assertStoreOperational\(storeId\)/],
+    ['services/campaign.service.ts', /await assertStoreOperational\(storeId\)/],
+    ['services/newsletter-broadcast.service.ts', /await assertStoreOperational\(storeId\)/],
+    [
+      'services/order-invoice-email.service.ts',
+      /isPaidForReceipt\(order\.paymentStatus\)\) await assertStoreOperational/,
+    ],
     ['lib/inngest/functions/invoice-email.ts', /!toMerchant[\s\S]*storeOperational\(storeId\)/],
     ['lib/inngest/functions/order-created.ts', /await storeOperational\(storeId\)/],
     ['lib/inngest/functions/order-status-changed.ts', /storeOperational\(storeId\)/],

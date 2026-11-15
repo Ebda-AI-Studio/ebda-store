@@ -1,0 +1,49 @@
+{
+  "id": "account.mfa",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "فعل التحقق بخطوتين",
+  "titleEn": "Turn on / off two-step verification (authenticator app)",
+  "screens": ["/account/security"],
+  "api": [
+    "POST /auth/mfa/enroll/begin",
+    "POST /auth/mfa/enroll/verify",
+    "POST /auth/mfa/verify",
+    "POST /auth/mfa/disable",
+    "POST accounts:/mfa/enroll"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (disable needs step-up)"
+  },
+  "helpArticle": "account-security",
+  "questions": {
+    "ar": [
+      "ازاي افعل التحقق بخطوتين؟",
+      "فقدت الموبايل بتاع authenticator",
+      "MFA بيطلب كود وانا مش معايا",
+      "owner لازم يفعل MFA ليه؟"
+    ],
+    "en": ["How do I enable two-step verification?", "I lost my authenticator phone"]
+  },
+  "steps": [
+    "Account > Security > Enable authenticator, scan QR, enter the code. Store settings pages require MFA enrolment (requireMfaEnrolled)."
+  ],
+  "edgeCases": [
+    "Many owner routes (settings, finance, staff, pages) refuse until MFA is enrolled",
+    "Lost device: recovery is a staff script (mfa-reset, runbook mfa-recovery) - lockout path",
+    "Time drift on phone makes codes fail",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No self-serve MFA recovery codes (audit gap 22)"],
+  "assistantNote": "deep-link only; step-up must be satisfied by the human"
+}
