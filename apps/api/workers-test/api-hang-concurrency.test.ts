@@ -147,6 +147,7 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
       results.filter(r => r.ms > budgetFor(r.timeouts)),
       summary
     ).toEqual([]);
+    // eslint-disable-next-line no-console -- CI shows the measured p50/p95/max on success (Ahmad/coordinator 2026-11-16)
     console.info(`API-HANG-1 cold reads: ${summary}`);
   }, 120_000);
   // The `x-dev-authstate-*` headers are honoured only with DEV_STATS=1 (this test config; never production): see
