@@ -3,7 +3,7 @@
  *
  * Read-only view of the store's `audit_logs` rows: who did what, when. The STORE OWNER only (role store_admin AND
  * `store.ownerId === caller`, checked again here after `requireStoreAccess`); staff carry role 'staff' (the identity profile
- * decides, see accountsUser) and are refused by `authorize`; a store_admin of another store is refused 403 by
+ * decides, see the token-to-user mapping in middleware/auth.ts) and are refused by `authorize`; a store_admin of another store is refused 403 by
  * `requireStoreAccess` (404 when the store does not exist). A super admin keeps the override (platform support may read any
  * store's log) and every such read leaves an audit row (STORE_ACTIVITY_VIEWED). Newest first, cursor pagination on (createdAt, id), explicit select. Output never carries
  * the raw IP (network prefix only), the user agent, or an actor e-mail; `details` is flattened to short scalars with
