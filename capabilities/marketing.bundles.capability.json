@@ -13,10 +13,10 @@
   "roles": ["owner", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "delete = confirm"
+    "class": "reversible",
+    "note": "bundle_set_active restores the before state; create: compensating (undo switches the new bundle off); delete = confirm, not an assistant tool"
   },
-  "helpArticle": null,
+  "helpArticle": "coupons-bundles-and-recommendations",
   "questions": {
     "ar": ["اعمل باقة منتجات بسعر مخفض"],
     "en": ["Create a bundle"]
@@ -30,5 +30,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Enablement super-admin only (gap 6)", "No help article"]
+  "gaps": ["Enablement super-admin only (gap 6)"]
 }

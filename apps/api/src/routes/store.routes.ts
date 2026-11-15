@@ -49,6 +49,7 @@ import { preserveMaskedPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
 import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
+import { StoreFaqService } from '../services/store-faq.service';
 
 const router = Router();
 
@@ -1676,21 +1677,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.parse(req.body);
-      const faq = await (
-        await storeWriter(currentStoreId())
-      ).storeFaq.create({
-        data: {
-          storeId: req.params.id,
-          question: body.question,
-          questionAr: body.questionAr ?? null,
-          answer: body.answer,
-          answerAr: body.answerAr ?? null,
-          orderIndex: body.orderIndex ?? 0,
-          isActive: body.isActive ?? true,
-          aiDrafted: false,
-          manuallyEdited: true,
-        },
-      });
+      const faq = await StoreFaqService.create(req.params.id, body);
       res.status(201).json({ success: true, data: faq });
     } catch (error) {
       next(error);
@@ -1712,28 +1699,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.partial().parse(req.body);
-      const faq = await (
-        await storeWriter(currentStoreId())
-      ).storeFaq.updateMany({
-        where: { id: req.params.faqId, storeId: req.params.id },
-        data: {
-          ...(body.question !== undefined && { question: body.question }),
-          ...(body.questionAr !== undefined && { questionAr: body.questionAr }),
-          ...(body.answer !== undefined && { answer: body.answer }),
-          ...(body.answerAr !== undefined && { answerAr: body.answerAr }),
-          ...(body.orderIndex !== undefined && { orderIndex: body.orderIndex }),
-          ...(body.isActive !== undefined && { isActive: body.isActive }),
-          manuallyEdited: true,
-        },
-      });
-      if (faq.count === 0) {
-        throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
-      }
-      const updated = await (
-        await storeDb(currentStoreId())
-      ).storeFaq.findUnique({
-        where: { id: req.params.faqId, storeId: req.params.id },
-      });
+      const updated = await StoreFaqService.update(req.params.id, req.params.faqId, body);
       res.json({ success: true, data: updated });
     } catch (error) {
       next(error);
