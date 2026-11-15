@@ -6,7 +6,7 @@ import { storeDb, storeWriter } from '../lib/repo-factory';
  * Store assistant (`faq_create` / `faq_update`) call ONE write path. Behaviour is the route's, unchanged: a manual write marks the row
  * `manuallyEdited` so the AI bulk sweep never overwrites it (NEVER-OVERWRITE-1).
  */
-export interface StoreFaqInput {
+interface StoreFaqInput {
   question: string;
   questionAr?: string | null;
   answer: string;

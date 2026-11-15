@@ -4,12 +4,7 @@
  * calls, money args are EGP decimals converted with Math.round(x * 100) (the services hold integer piasters), and the inverse restores the
  * BEFORE values captured in the preview.
  */
-import {
-  type InverseOp,
-  type PreviewRow,
-  type ToolSpec,
-  type TurnCtx,
-} from '@ebda/shared/smart-layer';
+import { type PreviewRow, type ToolSpec, type TurnCtx } from '@ebda/shared/smart-layer';
 import { ProductService } from '../../services/product.service';
 import { VariantService } from '../../services/variant.service';
 import {
@@ -38,22 +33,6 @@ const piasters = (egpValue: number) => Math.round(egpValue * 100);
 const fromPiasters = (v: unknown): number | null => (typeof v === 'number' ? v / 100 : null);
 const productRef = (id: string) => ({ kind: 'product', id });
 const uniq = <T>(xs: T[]) => [...new Set(xs)];
-
-/** Replaces the kit's inverse wrapper for tools whose undo needs the run result (a created id): the kit passes `restore` only. */
-function withResultInverse(
-  spec: ToolSpec,
-  inverse: (args: never, restore: unknown, result: unknown) => InverseOp | null
-): ToolSpec {
-  return {
-    ...spec,
-    inverse: (_ctx, a, draft, applied) =>
-      inverse(
-        a as never,
-        (draft.payload as { restore: unknown }).restore,
-        (applied as { result?: unknown }).result
-      ),
-  };
-}
 
 // ---- product_update_fields --------------------------------------------------------------------------------------------------------------------
 type FieldDef = {
@@ -555,56 +534,54 @@ const faqState = async (ctx: TurnCtx, productId: string) => {
     })),
   };
 };
-const addFaq = withResultInverse(
-  change<FaqArgs>({
-    name: 'product_add_faq',
-    capabilityId: 'product.faqs',
-    description: 'Add one question and answer to a product page (FAQ). Arabic twins are optional.',
-    schema: shape<FaqArgs>(
-      {
-        productId: f.id('The product id'),
-        question: f.str('Question', { max: 500 }),
-        answer: f.str('Answer', { max: 5000 }),
-        questionAr: f.str('Arabic question', { max: 500 }),
-        answerAr: f.str('Arabic answer', { max: 5000 }),
-      },
-      ['productId', 'question', 'answer']
-    ),
-    undo: 'compensating',
-    // product.routes.ts POST /:id/faqs: authorize('store_admin', 'super_admin', 'staff').
-    gate: { roles: ['store_admin', 'staff'] },
-    audit: { action: 'product.faq_created', resourceType: 'product', resourceId: a => a.productId },
-    refs: a => [productRef(a.productId)],
-    state: (ctx, a) => faqState(ctx, a.productId),
-    describe: (_ctx, a) => ({
-      summary: pair(
-        'هضيف سؤال وإجابة على صفحة المنتج.',
-        'Add a question and answer to the product page.'
-      ),
-      rows: [
-        row('السؤال', 'Question', null, a.question),
-        row('الإجابة', 'Answer', null, a.answer),
-        ...(a.questionAr ? [row('السؤال بالعربي', 'Arabic question', null, a.questionAr)] : []),
-        ...(a.answerAr ? [row('الإجابة بالعربي', 'Arabic answer', null, a.answerAr)] : []),
-      ],
-      affectedCount: 1,
-      restore: null,
-    }),
-    run: async (ctx, a) => {
-      const faq = (await createProductFaq(ctx.storeId, a.productId, {
-        question: a.question,
-        answer: a.answer,
-        questionAr: a.questionAr ?? null,
-        answerAr: a.answerAr ?? null,
-      })) as { id: string };
-      return { faqId: faq.id };
+const addFaq = change<FaqArgs>({
+  name: 'product_add_faq',
+  capabilityId: 'product.faqs',
+  description: 'Add one question and answer to a product page (FAQ). Arabic twins are optional.',
+  schema: shape<FaqArgs>(
+    {
+      productId: f.id('The product id'),
+      question: f.str('Question', { max: 500 }),
+      answer: f.str('Answer', { max: 5000 }),
+      questionAr: f.str('Arabic question', { max: 500 }),
+      answerAr: f.str('Arabic answer', { max: 5000 }),
     },
+    ['productId', 'question', 'answer']
+  ),
+  undo: 'compensating',
+  // product.routes.ts POST /:id/faqs: authorize('store_admin', 'super_admin', 'staff').
+  gate: { roles: ['store_admin', 'staff'] },
+  audit: { action: 'product.faq_created', resourceType: 'product', resourceId: a => a.productId },
+  refs: a => [productRef(a.productId)],
+  state: (ctx, a) => faqState(ctx, a.productId),
+  describe: (_ctx, a) => ({
+    summary: pair(
+      'هضيف سؤال وإجابة على صفحة المنتج.',
+      'Add a question and answer to the product page.'
+    ),
+    rows: [
+      row('السؤال', 'Question', null, a.question),
+      row('الإجابة', 'Answer', null, a.answer),
+      ...(a.questionAr ? [row('السؤال بالعربي', 'Arabic question', null, a.questionAr)] : []),
+      ...(a.answerAr ? [row('الإجابة بالعربي', 'Arabic answer', null, a.answerAr)] : []),
+    ],
+    affectedCount: 1,
+    restore: null,
   }),
-  (a: FaqArgs, _restore, result) => {
+  run: async (ctx, a) => {
+    const faq = (await createProductFaq(ctx.storeId, a.productId, {
+      question: a.question,
+      answer: a.answer,
+      questionAr: a.questionAr ?? null,
+      answerAr: a.answerAr ?? null,
+    })) as { id: string };
+    return { faqId: faq.id };
+  },
+  inverse: (a: FaqArgs, _restore, result) => {
     const faqId = (result as { faqId?: string } | undefined)?.faqId;
     return faqId ? { tool: 'product_delete_faq', args: { productId: a.productId, faqId } } : null;
-  }
-);
+  },
+});
 
 type DelFaqArgs = { productId: string; faqId: string };
 const deleteFaq = change<DelFaqArgs>({
@@ -754,72 +731,70 @@ const createInput = (a: CreateArgs): Obj => ({
   status: a.status ?? 'draft',
   ...(a.categoryIds?.length ? { categories: a.categoryIds } : {}),
 });
-const createProduct = withResultInverse(
-  change<CreateArgs>({
-    name: 'product_create',
-    capabilityId: 'product.create',
-    description:
-      'Create a new product. Price is in EGP (a decimal such as 249.5). It starts as a draft (hidden) unless you ask for active. Give the name in Arabic, English or both.',
-    schema: shape<CreateArgs>(
-      {
-        name: f.str('English name', { max: 255 }),
-        nameAr: f.str('Arabic name', { max: 255 }),
-        price: f.num('Price in EGP'),
-        description: f.text('Description', { max: 5000 }),
-        descriptionAr: f.text('Arabic description', { max: 5000 }),
-        status: f.enum(['draft', 'active'], 'draft (default, hidden) or active (live)'),
-        categoryIds: f.list(f.id(), { max: 20, description: 'Category ids in this store' }),
-      },
-      ['price']
-    ),
-    undo: 'reversible',
-    // product.routes.ts POST /: requirePermission('products:write'); the same ProductService.create (plan limit maxProducts inside).
-    gate: { permission: 'products:write' },
-    audit: { action: 'product.created', resourceType: 'product' },
-    state: async () => null, // a create has no target yet
-    describe: async (ctx, a) => {
-      createProductSchemaChecked.parse(createInput(a)); // the route's own validation
-      const cats = a.categoryIds?.length
-        ? await ProductService.getCategoriesByIds(ctx.storeId, a.categoryIds)
-        : []; // 404 on a foreign category
-      const status = a.status ?? 'draft';
-      const nm = a.nameAr ?? a.name ?? '';
-      return {
-        summary: pair(
-          `هضيف منتج جديد «${nm}» (${status === 'draft' ? 'مسودة' : 'منشور'}).`,
-          `Create product "${a.name ?? a.nameAr}" as ${status}.`
-        ),
-        rows: [
-          row('الاسم', 'Name', null, a.name ?? a.nameAr ?? ''),
-          ...(a.nameAr && a.name ? [row('الاسم بالعربي', 'Arabic name', null, a.nameAr)] : []),
-          row('السعر (جنيه)', 'Price (EGP)', null, a.price),
-          row('الحالة', 'Status', null, status),
-          ...(cats.length
-            ? [row('التصنيفات', 'Categories', null, cats.map(c => c.name).join('، '))]
-            : []),
-        ],
-        affectedCount: 1,
-        restore: null,
-        // a draft shows no price to shoppers; a live product with a price is a price decision
-        ...(status === 'active' ? { changesPrice: true } : {}),
-      };
+const createProduct = change<CreateArgs>({
+  name: 'product_create',
+  capabilityId: 'product.create',
+  description:
+    'Create a new product. Price is in EGP (a decimal such as 249.5). It starts as a draft (hidden) unless you ask for active. Give the name in Arabic, English or both.',
+  schema: shape<CreateArgs>(
+    {
+      name: f.str('English name', { max: 255 }),
+      nameAr: f.str('Arabic name', { max: 255 }),
+      price: f.num('Price in EGP'),
+      description: f.text('Description', { max: 5000 }),
+      descriptionAr: f.text('Arabic description', { max: 5000 }),
+      status: f.enum(['draft', 'active'], 'draft (default, hidden) or active (live)'),
+      categoryIds: f.list(f.id(), { max: 20, description: 'Category ids in this store' }),
     },
-    run: async (ctx, a) => {
-      await ProductService.getCategoriesByIds(ctx.storeId, a.categoryIds ?? []);
-      const p = (await ProductService.create(
-        ctx.storeId,
-        createProductSchemaChecked.parse(createInput(a)) as never
-      )) as { id: string; name: string; status: string };
-      return { productId: p.id, name: p.name, status: p.status };
-    },
-  }),
-  (_a, _restore, result) => {
+    ['price']
+  ),
+  undo: 'reversible',
+  // product.routes.ts POST /: requirePermission('products:write'); the same ProductService.create (plan limit maxProducts inside).
+  gate: { permission: 'products:write' },
+  audit: { action: 'product.created', resourceType: 'product' },
+  state: async () => null, // a create has no target yet
+  describe: async (ctx, a) => {
+    createProductSchemaChecked.parse(createInput(a)); // the route's own validation
+    const cats = a.categoryIds?.length
+      ? await ProductService.getCategoriesByIds(ctx.storeId, a.categoryIds)
+      : []; // 404 on a foreign category
+    const status = a.status ?? 'draft';
+    const nm = a.nameAr ?? a.name ?? '';
+    return {
+      summary: pair(
+        `هضيف منتج جديد «${nm}» (${status === 'draft' ? 'مسودة' : 'منشور'}).`,
+        `Create product "${a.name ?? a.nameAr}" as ${status}.`
+      ),
+      rows: [
+        row('الاسم', 'Name', null, a.name ?? a.nameAr ?? ''),
+        ...(a.nameAr && a.name ? [row('الاسم بالعربي', 'Arabic name', null, a.nameAr)] : []),
+        row('السعر (جنيه)', 'Price (EGP)', null, a.price),
+        row('الحالة', 'Status', null, status),
+        ...(cats.length
+          ? [row('التصنيفات', 'Categories', null, cats.map(c => c.name).join('، '))]
+          : []),
+      ],
+      affectedCount: 1,
+      restore: null,
+      // a draft shows no price to shoppers; a live product with a price is a price decision
+      ...(status === 'active' ? { changesPrice: true } : {}),
+    };
+  },
+  run: async (ctx, a) => {
+    await ProductService.getCategoriesByIds(ctx.storeId, a.categoryIds ?? []);
+    const p = (await ProductService.create(
+      ctx.storeId,
+      createProductSchemaChecked.parse(createInput(a)) as never
+    )) as { id: string; name: string; status: string };
+    return { productId: p.id, name: p.name, status: p.status };
+  },
+  inverse: (_a, _restore, result) => {
     const productId = (result as { productId?: string } | undefined)?.productId;
     return productId
       ? { tool: 'product_set_status', args: { productId, status: 'archived' } }
       : null;
-  }
-);
+  },
+});
 
 export function productsTools(): ToolSpec[] {
   return [

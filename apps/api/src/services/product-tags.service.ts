@@ -9,7 +9,7 @@ import { invalidateStoreProductCaches } from '../lib/public-cache';
  * case-insensitively, missing ones are created, links are added/removed per product. Every id is store-scoped (404 otherwise).
  */
 export type TagMode = 'add' | 'remove' | 'set';
-export interface ProductTagChange {
+interface ProductTagChange {
   productId: string;
   tags: string[];
 }

@@ -132,14 +132,11 @@
     "undo-unclassified|integrations.merchant-mcp",
     "undo-unclassified|integrations.webhooks",
     "undo-unclassified|inventory.barcode-scan-count",
-    "undo-unclassified|inventory.reorder",
     "undo-unclassified|inventory.stock-adjustments",
     "undo-unclassified|inventory.suppliers-po",
     "undo-unclassified|inventory.warehouses",
     "undo-unclassified|marketing.affiliates",
-    "undo-unclassified|marketing.bundles",
     "undo-unclassified|marketing.campaigns",
-    "undo-unclassified|marketing.coupons",
     "undo-unclassified|marketing.loyalty",
     "undo-unclassified|marketing.newsletter",
     "undo-unclassified|marketing.promotions",
@@ -151,16 +148,11 @@
     "undo-unclassified|planned.ai-finance",
     "undo-unclassified|product.bulk-update",
     "undo-unclassified|product.csv-import-export",
-    "undo-unclassified|product.faqs",
     "undo-unclassified|product.reviews",
-    "undo-unclassified|product.variants",
     "undo-unclassified|self.addon-purchase",
     "undo-unclassified|self.chat-templates",
     "undo-unclassified|self.instapay-auto-confirm",
     "undo-unclassified|shipping.book-shipment",
-    "undo-unclassified|store.blog",
-    "undo-unclassified|store.faqs-howtos",
-    "undo-unclassified|store.gold-rates",
-    "undo-unclassified|store.size-charts"
+    "undo-unclassified|store.gold-rates"
   ]
 }

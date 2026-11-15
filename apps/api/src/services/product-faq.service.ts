@@ -7,7 +7,7 @@ import { AppError } from '../middleware/error-handler';
  * product-faq-tenant-scoping test guards). Extracted from the inline route handlers so the admin route and the Store
  * assistant call the same code.
  */
-export interface ProductFaqInput {
+interface ProductFaqInput {
   question: string;
   questionAr?: string | null;
   answer: string;

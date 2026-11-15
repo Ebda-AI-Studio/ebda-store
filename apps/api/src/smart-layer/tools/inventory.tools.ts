@@ -3,7 +3,7 @@
  * routes line for line (cited per tool); stock goes through InventoryService exactly like the Merchant MCP admin_adjust_inventory /
  * admin_set_inventory tools; reorder rules go through the accounting reorder-rule service the route calls.
  */
-import type { InverseOp, ToolSpec } from '@ebda/shared/smart-layer';
+import type { ToolSpec } from '@ebda/shared/smart-layer';
 import { ProductService } from '../../services/product.service';
 import { InventoryService } from '../../services/inventory.service';
 import { VariantService } from '../../services/variant.service';
@@ -24,20 +24,6 @@ async function mapChunked<T, R>(xs: T[], fn: (x: T) => Promise<R>): Promise<R[]>
   for (let i = 0; i < xs.length; i += CHUNK)
     out.push(...(await Promise.all(xs.slice(i, i + CHUNK).map(fn))));
   return out;
-}
-function withResultInverse(
-  spec: ToolSpec,
-  inverse: (args: never, restore: unknown, result: unknown) => InverseOp | null
-): ToolSpec {
-  return {
-    ...spec,
-    inverse: (_ctx, a, draft, applied) =>
-      inverse(
-        a as never,
-        (draft.payload as { restore: unknown }).restore,
-        (applied as { result?: unknown }).result
-      ),
-  };
 }
 
 // ---- inventory_adjust ------------------------------------------------------------------------------------------------------------------------
@@ -278,85 +264,83 @@ const ruleTarget = (a: RuleArgs) => ({
   ...(a.variantId ? { variantId: a.variantId } : {}),
 });
 
-const setRule = withResultInverse(
-  change<RuleArgs>({
-    name: 'reorder_rule_set',
-    capabilityId: 'inventory.reorder',
-    description:
-      'Create or update the reorder rule of a product (or one of its variants): the stock level that triggers a reorder, the quantity to order, lead time, safety days, on/off. ' +
-      'A new rule needs minQty and reorderQty.',
-    schema: shape<RuleArgs>(
-      {
-        productId: f.id('The product id'),
-        variantId: f.id('The variant id, when the rule is for one variant'),
-        minQty: f.int('Reorder when stock reaches this many units', { max: 1_000_000 }),
-        reorderQty: f.int('Units to order (1 or more)', { min: 1, max: 1_000_000 }),
-        leadTimeDays: f.int('Supplier lead time in days', { max: 365 }),
-        safetyStockDays: f.int('Safety stock in days', { max: 365 }),
-        isActive: f.bool('Whether the rule is on'),
-      },
-      ['productId']
-    ),
-    undo: 'reversible',
-    // reorder-rules.routes.ts POST/PATCH /:storeId/stock/reorder-rules: authorize('store_admin', 'super_admin') + requireMfaEnrolled (the route also needs an MFA-enrolled owner; runAsMerchant cannot see MFA, see the report).
-    gate: { roles: ['store_admin'] },
-    audit: {
-      action: 'reorder_rule.updated',
-      resourceType: 'reorder_rule',
-      resourceId: a => a.productId,
+const setRule = change<RuleArgs>({
+  name: 'reorder_rule_set',
+  capabilityId: 'inventory.reorder',
+  description:
+    'Create or update the reorder rule of a product (or one of its variants): the stock level that triggers a reorder, the quantity to order, lead time, safety days, on/off. ' +
+    'A new rule needs minQty and reorderQty.',
+  schema: shape<RuleArgs>(
+    {
+      productId: f.id('The product id'),
+      variantId: f.id('The variant id, when the rule is for one variant'),
+      minQty: f.int('Reorder when stock reaches this many units', { max: 1_000_000 }),
+      reorderQty: f.int('Units to order (1 or more)', { min: 1, max: 1_000_000 }),
+      leadTimeDays: f.int('Supplier lead time in days', { max: 365 }),
+      safetyStockDays: f.int('Safety stock in days', { max: 365 }),
+      isActive: f.bool('Whether the rule is on'),
     },
-    refs: a => [productRef(a.productId)],
-    state: (ctx, a) => ruleState(ctx.storeId, a),
-    describe: (_ctx, a, state) => {
-      const { productName, rule } = state as RuleState;
-      const keys = RULE_KEYS.filter(k => a[k] !== undefined);
-      if (!rule && (a.minQty === undefined || a.reorderQty === undefined))
-        throw new Error('A new reorder rule needs both minQty and reorderQty.');
-      if (rule && keys.length === 0)
-        throw new Error('reorder_rule_set: nothing to change; send at least one field.');
-      return {
-        summary: pair(
-          rule
-            ? `هعدّل قاعدة إعادة الطلب لـ«${productName}».`
-            : `هعمل قاعدة إعادة طلب لـ«${productName}».`,
-          rule
-            ? `Update the reorder rule of "${productName}".`
-            : `Create a reorder rule for "${productName}".`
-        ),
-        rows: keys.map(k =>
-          row(RULE_LABELS[k][0], RULE_LABELS[k][1], rule ? (rule[k] ?? null) : null, a[k])
-        ),
-        affectedCount: 1,
-        // an existing rule is restored field by field; a new one is deleted by the inverse (which needs the run result: the rule exists only after apply)
-        restore: rule ? Object.fromEntries(RULE_KEYS.map(k => [k, rule[k] ?? null])) : null,
-      };
-    },
-    run: async (ctx, a, state) => {
-      const { rule } = state as RuleState;
-      if (rule) {
-        const patch = Object.fromEntries(
-          RULE_KEYS.filter(k => a[k] !== undefined).map(k => [k, a[k]])
-        );
-        await updateReorderRule(ctx.storeId, rule.id, patch);
-        return { ruleId: rule.id, created: false };
-      }
-      const made = (await createReorderRule(ctx.storeId, {
-        productId: a.productId,
-        variantId: a.variantId ?? null,
-        minQty: a.minQty as number,
-        reorderQty: a.reorderQty as number,
-        ...(a.leadTimeDays !== undefined ? { leadTimeDays: a.leadTimeDays } : {}),
-        ...(a.safetyStockDays !== undefined ? { safetyStockDays: a.safetyStockDays } : {}),
-        ...(a.isActive !== undefined ? { isActive: a.isActive } : {}),
-      })) as { id: string };
-      return { ruleId: made.id, created: true };
-    },
-  }),
-  (a: RuleArgs, restore) =>
+    ['productId']
+  ),
+  undo: 'reversible',
+  // reorder-rules.routes.ts POST/PATCH /:storeId/stock/reorder-rules: authorize('store_admin', 'super_admin') + requireMfaEnrolled (the route also needs an MFA-enrolled owner; runAsMerchant cannot see MFA, see the report).
+  gate: { roles: ['store_admin'] },
+  audit: {
+    action: 'reorder_rule.updated',
+    resourceType: 'reorder_rule',
+    resourceId: a => a.productId,
+  },
+  refs: a => [productRef(a.productId)],
+  state: (ctx, a) => ruleState(ctx.storeId, a),
+  describe: (_ctx, a, state) => {
+    const { productName, rule } = state as RuleState;
+    const keys = RULE_KEYS.filter(k => a[k] !== undefined);
+    if (!rule && (a.minQty === undefined || a.reorderQty === undefined))
+      throw new Error('A new reorder rule needs both minQty and reorderQty.');
+    if (rule && keys.length === 0)
+      throw new Error('reorder_rule_set: nothing to change; send at least one field.');
+    return {
+      summary: pair(
+        rule
+          ? `هعدّل قاعدة إعادة الطلب لـ«${productName}».`
+          : `هعمل قاعدة إعادة طلب لـ«${productName}».`,
+        rule
+          ? `Update the reorder rule of "${productName}".`
+          : `Create a reorder rule for "${productName}".`
+      ),
+      rows: keys.map(k =>
+        row(RULE_LABELS[k][0], RULE_LABELS[k][1], rule ? (rule[k] ?? null) : null, a[k])
+      ),
+      affectedCount: 1,
+      // an existing rule is restored field by field; a new one is deleted by the inverse (which needs the run result: the rule exists only after apply)
+      restore: rule ? Object.fromEntries(RULE_KEYS.map(k => [k, rule[k] ?? null])) : null,
+    };
+  },
+  run: async (ctx, a, state) => {
+    const { rule } = state as RuleState;
+    if (rule) {
+      const patch = Object.fromEntries(
+        RULE_KEYS.filter(k => a[k] !== undefined).map(k => [k, a[k]])
+      );
+      await updateReorderRule(ctx.storeId, rule.id, patch);
+      return { ruleId: rule.id, created: false };
+    }
+    const made = (await createReorderRule(ctx.storeId, {
+      productId: a.productId,
+      variantId: a.variantId ?? null,
+      minQty: a.minQty as number,
+      reorderQty: a.reorderQty as number,
+      ...(a.leadTimeDays !== undefined ? { leadTimeDays: a.leadTimeDays } : {}),
+      ...(a.safetyStockDays !== undefined ? { safetyStockDays: a.safetyStockDays } : {}),
+      ...(a.isActive !== undefined ? { isActive: a.isActive } : {}),
+    })) as { id: string };
+    return { ruleId: made.id, created: true };
+  },
+  inverse: (a: RuleArgs, restore) =>
     restore
       ? { tool: 'reorder_rule_set', args: { ...ruleTarget(a), ...(restore as Obj) } }
-      : { tool: 'reorder_rule_delete', args: ruleTarget(a) }
-);
+      : { tool: 'reorder_rule_delete', args: ruleTarget(a) },
+});
 
 type RuleDelArgs = { productId: string; variantId?: string };
 const deleteRule = change<RuleDelArgs>({
