@@ -18,7 +18,7 @@
   "policy": "preview",
   "undo": {
     "class": "reversible",
-    "note": "toggle and edit: yes (assistant restores the before values); create: compensating (undo switches the new coupon off); delete = confirm, not an assistant tool yet"
+    "note": "toggle and edit: yes (before values restored); create: compensating (undo switches it off); delete: irreversible, confirm-class (coupon_delete)"
   },
   "helpArticle": "coupons-bundles-and-recommendations",
   "questions": {
