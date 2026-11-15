@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m venv "$RUNNER_TEMP/semgrep-venv"
-          "$RUNNER_TEMP/semgrep-venv/bin/pip" install --quiet --upgrade semgrep
+          "$RUNNER_TEMP/semgrep-venv/bin/pip" install --quiet semgrep==1.185.0
           "$RUNNER_TEMP/semgrep-venv/bin/semgrep" scan \
             --config p/default \
             --config p/owasp-top-ten \

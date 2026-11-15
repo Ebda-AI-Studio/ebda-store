@@ -1,0 +1,41 @@
+{
+  "id": "analytics.dashboard",
+  "status": "live",
+  "area": "analytics",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "احصائيات المتجر",
+  "titleEn": "Store analytics: sales, top products, orders by status, low stock, performance",
+  "screens": ["/stores/[id]/analytics", "/stores/[id] dashboard"],
+  "api": [
+    "GET .../analytics/dashboard|sales|top-products|top-categories|orders-by-status|customers|recent-orders|low-stock|payment-status|price-source|performance|cashflow|stock-snapshot"
+  ],
+  "mcpTool": "admin_get_analytics; admin_get_funnel",
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [
+      "مبيعات النهارده كام؟",
+      "ايه اكتر منتج مبيعا؟",
+      "مبيعات الشهر ده مقابل الشهر اللي فات",
+      "كام اوردر النهارده؟"
+    ],
+    "en": ["What are today's sales?", "Top products this month?"]
+  },
+  "steps": ["Analytics page / dashboard."],
+  "edgeCases": [
+    "Timezone Cairo day key",
+    "Abandoned tile summed backlog (#752)",
+    "performance/cashflow need accounting.basic",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["#752 open", "No help article"]
+}

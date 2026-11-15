@@ -58,6 +58,8 @@ type Feature =
   | 'store-categories'
   // Visual builder Phase 5: a structured, reviewable patch to the store's page document.
   | 'builder-patch'
+  // Smart Layer assistant turns (the Ebda assistant side panel): usage is labelled so the meter and the per-feature cost views can tell it apart.
+  | 'assistant'
   // Accounting smart layer — called through accounting/gemini-ai.service.ts,
   // which records through `recordUsage` below so these rows carry model +
   // cost like every other AI call (#1037).
