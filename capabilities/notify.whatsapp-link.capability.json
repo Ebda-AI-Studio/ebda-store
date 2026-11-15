@@ -16,9 +16,14 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "whatsapp-link-and-consent",
   "questions": {
-    "ar": ["ازاي اربط المتجر بواتساب؟", "ابدأ شات"],
+    "ar": [
+      "ازاي اربط المتجر بواتساب؟",
+      "ابدأ شات",
+      "وقف رسايل الواتساب للعميل ده",
+      "المتجر مربوط بالواتساب؟"
+    ],
     "en": ["Link my store to WhatsApp"]
   },
   "steps": ["Ebda Chat connect; see Chat help (connect-your-own-number)."],
@@ -32,7 +37,6 @@
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
   "gaps": [
-    "Chat templates screen NOT BUILT (audit gap 1, 2 blockers); whatsapp key super-admin-enabled",
-    "No help article"
+    "Chat templates screen NOT BUILT (audit gap 1, 2 blockers); whatsapp key super-admin-enabled"
   ]
 }

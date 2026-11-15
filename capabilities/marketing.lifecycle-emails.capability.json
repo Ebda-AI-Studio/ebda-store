@@ -16,9 +16,9 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "setup-lifecycle-emails",
   "questions": {
-    "ar": ["ايه الرسايل اللي بتتبعت للعميل؟"],
+    "ar": ["ايه الرسايل اللي بتتبعت للعميل؟", "ايه الايميلات التلقائية؟", "ليه جالي ايميل ترحيب"],
     "en": ["What automatic emails are sent?"]
   },
   "steps": ["View-only list."],
@@ -27,5 +27,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["View only; no per-email edit; no help article", "No help article"]
+  "gaps": ["View only; no per-email edit; no help article"]
 }

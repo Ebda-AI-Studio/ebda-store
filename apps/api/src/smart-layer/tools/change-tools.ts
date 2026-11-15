@@ -14,6 +14,9 @@ import { notificationsTools } from './notifications.tools';
 import { customersTools } from './customers.tools';
 import { financeTools } from './finance.tools';
 import { accountTools } from './account.tools';
+import { financeSuggestTools } from './finance-suggest.tools';
+import { messagingTools } from './messaging.tools';
+import { accountBillingTools } from './account-billing.tools';
 import { productsConfirmTools } from './products-confirm.tools';
 import { marketingConfirmTools } from './marketing-confirm.tools';
 
@@ -33,6 +36,9 @@ export function changeTools(): ToolSpec[] {
     ...customersTools(),
     ...financeTools(),
     ...accountTools(),
+    ...financeSuggestTools(),
+    ...messagingTools(),
+    ...accountBillingTools(),
     ...productsConfirmTools(),
     ...marketingConfirmTools(),
   ];

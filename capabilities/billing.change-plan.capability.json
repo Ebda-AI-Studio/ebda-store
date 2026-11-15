@@ -18,8 +18,8 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "resume before period end; downgrade effects not undoable instantly"
+    "class": "irreversible",
+    "note": "An upgrade charges the card at once and a downgrade starts at period end; both are confirmed on a card. Cancelling can be resumed with subscription_resume before the period ends."
   },
   "helpArticle": "plans-and-billing",
   "questions": {

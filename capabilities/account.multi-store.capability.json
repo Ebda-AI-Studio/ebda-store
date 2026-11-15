@@ -16,10 +16,15 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "multiple-stores",
   "questions": {
-    "ar": ["ينفع يبقى عندي اكتر من متجر؟", "اتنقل بين متاجري"],
-    "en": ["Can I run two stores?"]
+    "ar": [
+      "ينفع يبقى عندي اكتر من متجر؟",
+      "اتنقل بين متاجري",
+      "عندي كام متجر؟",
+      "عايز افتح متجر تاني"
+    ],
+    "en": ["Can I run two stores?", "How many stores do I have?"]
   },
   "steps": ["Stores list; new store limited by maxStores (Free/Basic/Growth 1, Business 3)."],
   "edgeCases": [
@@ -29,5 +34,5 @@
     "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Cross-store questions need explicit store pick", "No help article"]
+  "gaps": ["Cross-store questions need explicit store pick"]
 }
