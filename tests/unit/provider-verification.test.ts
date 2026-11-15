@@ -49,6 +49,7 @@ vi.mock('@api/services/alerts.service', () => ({
   }),
 }));
 
+import { prisma } from '@ebda/database';
 import {
   confirmProviderVerification,
   recordPaymentSettled,
@@ -269,5 +270,39 @@ describe('recordPaymentSettled (one evidence call for the confirm AND webhook pa
   it('is a no-op for a catalog-verified provider', async () => {
     await recordPaymentSettled({ storeId: 'store-7', provider: 'kashier', paymentId: 'p' });
     expect(h.events).toHaveLength(0);
+  });
+});
+
+// On the platform D1, prisma-lite updateMany is a SELECT of keys then a write per key, so two concurrent claims can BOTH
+// report count 1 (measured on Miniflare). The stand-in below reproduces that flaw; the claim lock must still let exactly
+// one caller through.
+describe('concurrent claims on a D1-style non-atomic updateMany', () => {
+  const nonAtomic = () =>
+    vi.mocked(prisma.providerVerification.updateMany).mockImplementation((async () => {
+      await new Promise(r => setTimeout(r, 5));
+      return { count: 1 };
+    }) as never);
+
+  it('two concurrent super-admin confirms: exactly one succeeds, the other is 409', async () => {
+    nonAtomic();
+    const results = await Promise.allSettled([
+      confirmProviderVerification('paymob', 'admin-1'),
+      confirmProviderVerification('paymob', 'admin-2'),
+    ]);
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    const lost = results.find(r => r.status === 'rejected') as PromiseRejectedResult;
+    expect(lost.reason).toMatchObject({ statusCode: 409, code: 'NOT_READY' });
+  });
+
+  it('two concurrent live successes reaching the threshold send ONE ready-to-verify alert', async () => {
+    nonAtomic();
+    h.storeGroups = stores(3);
+    h.prior = { id: 'e1' };
+    h.counters = { ...h.counters, readyAt: null };
+    await Promise.all([
+      recordProviderOperation(op({ storeId: 'store-8' })),
+      recordProviderOperation(op({ storeId: 'store-9' })),
+    ]);
+    expect(h.alerts.filter(a => a.source === 'provider.ready_to_verify')).toHaveLength(1);
   });
 });

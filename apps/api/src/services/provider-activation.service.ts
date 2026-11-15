@@ -53,6 +53,7 @@ import {
   CONFIRM_TOKEN_TTL_MS,
 } from '../mcp/merchant-confirm-token';
 import { withIdempotencyKey } from '../lib/money-idempotency';
+import { withClaimLock } from '../lib/claim-lock';
 import { emailQueue } from './email-queue.service';
 import { PaymentService } from './payment.service';
 import { shippingCarrierService } from './shipping-carrier.service';
@@ -772,119 +773,150 @@ export async function confirmSelfActivation(
           'Confirm again: this confirmation is expired or does not match what is being turned on'
         );
       }
-      let first: boolean;
-      try {
-        first = await consumeConfirmToken(input.confirmToken);
-      } catch {
-        throw new AppError(
-          503,
-          'CONFIRMATION_UNAVAILABLE',
-          'Try again shortly; nothing was changed'
-        );
-      }
-      if (!first) {
-        throw new AppError(409, 'CONFIRMATION_USED', 'This confirmation was already used');
-      }
-      const everBefore = (
-        await readLedger(
-          {
-            provider,
-            op: {
-              in: [
-                `${ACTIVATION_LEDGER_PREFIX}activated_self`,
-                `${ACTIVATION_LEDGER_PREFIX}activated_admin`,
-              ],
-            },
-          },
-          1
-        )
-      ).length;
-      let enabled = false;
-      let requestId: string | null = null;
-      try {
-        await setProviderEnabled(storeId, provider, entry.kind, true, actor);
-        enabled = true;
-        requestId = await withStore(storeId, async () => {
-          const open = await findOpenRequest(storeId, provider);
-          const data = {
-            status: 'activated',
-            decidedById: actor.userId,
-            decidedAt: new Date(),
-            note: null,
-          };
-          if (open) {
-            await decideRequest(open.id, storeId, data);
-            return open.id;
-          }
-          const row = await createRequest(storeId, {
-            provider,
-            requestedById: actor.userId,
-            ...data,
-          });
-          return row.id;
-        });
-        await appendActivationLedger({
-          storeId,
-          provider,
-          action: 'activated_self',
-          mode: last.mode,
-          ref: requestId,
-        });
-      } catch (err) {
-        // The request must not stay `activated` without its ledger row: mark it failed (status `rejected` + note,
-        // the table's check constraint has no `failed`), whatever step threw.
-        if (requestId) {
-          const failedId = requestId;
-          await withStore(storeId, () =>
-            decideRequest(failedId, storeId, {
-              status: 'rejected',
-              note: 'activation failed before it was recorded',
-              decidedAt: new Date(),
-            })
-          ).catch(e =>
-            logger.error({ e, storeId, provider }, '[ACTIVATION] could not mark the request failed')
+      // One consume -> enable -> ledger sequence per store + provider at a time (cheap checks above stay outside the claim, so
+      // a stale or junk confirm never blocks a valid one). Re-check "already on" inside it: two confirms whose test runs
+      // share a timestamp hold two valid tokens, and the loser's compensation would switch the provider off after the
+      // winner enabled it.
+      const locked = await withClaimLock(
+        `provider-activate:${storeId}:${provider}`,
+        60,
+        async () => {
+          const again = await withStore(storeId, () =>
+            loadConnection(storeId, provider, entry.kind)
           );
-        }
-        if (enabled) {
-          try {
-            await setProviderEnabled(storeId, provider, entry.kind, false, actor);
-          } catch (undoErr) {
-            compensationFailed = true;
-            logger.error(
-              { undoErr, storeId, provider },
-              '[ACTIVATION] could not switch off after a failed ledger write'
+          if (again && rowEnabled(again)) {
+            throw new AppError(
+              409,
+              'ALREADY_ACTIVE',
+              `${provider} is already turned on for this store`
             );
           }
+          let first: boolean;
+          try {
+            first = await consumeConfirmToken(input.confirmToken);
+          } catch {
+            throw new AppError(
+              503,
+              'CONFIRMATION_UNAVAILABLE',
+              'Try again shortly; nothing was changed'
+            );
+          }
+          if (!first) {
+            throw new AppError(409, 'CONFIRMATION_USED', 'This confirmation was already used');
+          }
+          const everBefore = (
+            await readLedger(
+              {
+                provider,
+                op: {
+                  in: [
+                    `${ACTIVATION_LEDGER_PREFIX}activated_self`,
+                    `${ACTIVATION_LEDGER_PREFIX}activated_admin`,
+                  ],
+                },
+              },
+              1
+            )
+          ).length;
+          let enabled = false;
+          let requestId: string | null = null;
+          try {
+            await setProviderEnabled(storeId, provider, entry.kind, true, actor);
+            enabled = true;
+            requestId = await withStore(storeId, async () => {
+              const open = await findOpenRequest(storeId, provider);
+              const data = {
+                status: 'activated',
+                decidedById: actor.userId,
+                decidedAt: new Date(),
+                note: null,
+              };
+              if (open) {
+                await decideRequest(open.id, storeId, data);
+                return open.id;
+              }
+              const row = await createRequest(storeId, {
+                provider,
+                requestedById: actor.userId,
+                ...data,
+              });
+              return row.id;
+            });
+            await appendActivationLedger({
+              storeId,
+              provider,
+              action: 'activated_self',
+              mode: last.mode,
+              ref: requestId,
+            });
+          } catch (err) {
+            // The request must not stay `activated` without its ledger row: mark it failed (status `rejected` + note,
+            // the table's check constraint has no `failed`), whatever step threw.
+            if (requestId) {
+              const failedId = requestId;
+              await withStore(storeId, () =>
+                decideRequest(failedId, storeId, {
+                  status: 'rejected',
+                  note: 'activation failed before it was recorded',
+                  decidedAt: new Date(),
+                })
+              ).catch(e =>
+                logger.error(
+                  { e, storeId, provider },
+                  '[ACTIVATION] could not mark the request failed'
+                )
+              );
+            }
+            if (enabled) {
+              try {
+                await setProviderEnabled(storeId, provider, entry.kind, false, actor);
+              } catch (undoErr) {
+                compensationFailed = true;
+                logger.error(
+                  { undoErr, storeId, provider },
+                  '[ACTIVATION] could not switch off after a failed ledger write'
+                );
+              }
+            }
+            throw err;
+          }
+          await auditLog({
+            action: 'provider_activation.self_activated',
+            storeId,
+            userId: actor.userId,
+            resourceType: 'provider_activation_request',
+            resourceId: requestId ?? provider,
+            details: { storeId, provider, mode: last.mode, testAt: last.at },
+            ip: actor.ip,
+            userAgent: actor.userAgent,
+          });
+          // Decision PROVIDERS-3: the first connection of a provider nobody has verified yet pages ops (P1).
+          void (async () => {
+            if (await isProviderVerified(provider)) return;
+            await sendAlert({
+              level: 'p1',
+              scope: 'store',
+              store,
+              source: 'provider.activation.first_connection',
+              title:
+                everBefore === 0
+                  ? `First connection of ${provider}`
+                  : `Unverified provider turned on: ${provider}`,
+              body: `${store.name} turned on ${provider} (${last.mode}) after its own passing connection test. ${everBefore === 0 ? 'No store had connected this provider before. ' : ''}Watch its first real order.`,
+              context: { provider, mode: last.mode, storeId, first: everBefore === 0 },
+            });
+          })().catch(() => undefined);
+          return { activated: true as const, provider, mode: last.mode };
         }
-        throw err;
+      );
+      if (!locked.acquired) {
+        throw new AppError(
+          409,
+          'ACTIVATION_IN_PROGRESS',
+          `${provider} is being turned on for this store right now; check the settings before trying again`
+        );
       }
-      await auditLog({
-        action: 'provider_activation.self_activated',
-        storeId,
-        userId: actor.userId,
-        resourceType: 'provider_activation_request',
-        resourceId: requestId ?? provider,
-        details: { storeId, provider, mode: last.mode, testAt: last.at },
-        ip: actor.ip,
-        userAgent: actor.userAgent,
-      });
-      // Decision PROVIDERS-3: the first connection of a provider nobody has verified yet pages ops (P1).
-      void (async () => {
-        if (await isProviderVerified(provider)) return;
-        await sendAlert({
-          level: 'p1',
-          scope: 'store',
-          store,
-          source: 'provider.activation.first_connection',
-          title:
-            everBefore === 0
-              ? `First connection of ${provider}`
-              : `Unverified provider turned on: ${provider}`,
-          body: `${store.name} turned on ${provider} (${last.mode}) after its own passing connection test. ${everBefore === 0 ? 'No store had connected this provider before. ' : ''}Watch its first real order.`,
-          context: { provider, mode: last.mode, storeId, first: everBefore === 0 },
-        });
-      })().catch(() => undefined);
-      return { activated: true as const, provider, mode: last.mode };
+      return locked.value;
     },
     () => compensationFailed,
     { required: true }

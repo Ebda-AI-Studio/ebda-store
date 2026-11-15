@@ -30,6 +30,7 @@ import logger from '../lib/logger';
 import { AppError } from '../middleware/error-handler';
 import { sendAlert } from './alerts.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { withClaimLock } from '../lib/claim-lock';
 
 export type ProviderOp = 'create_payment' | 'payment_confirmed' | 'create_shipment';
 
@@ -187,19 +188,28 @@ export async function recordProviderOperation(input: ProviderOperation): Promise
         where: { provider: input.provider, counted: true },
       });
       if (stores.length >= autoVerifyAfter()) {
-        const flipped = await prisma.providerVerification.updateMany({
-          where: { provider: input.provider, readyAt: null },
-          data: { readyAt: new Date() },
-        });
-        if (flipped.count === 1) {
-          await sendAlert({
-            level: 'info',
-            source: 'provider.ready_to_verify',
-            title: `Provider ready to verify: ${input.provider}`,
-            body: `${stores.length} distinct stores settled real LIVE operations on ${input.provider}. Review the evidence on /provider-activation and confirm to mark it verified (until then first-use and failure alerts keep firing).`,
-            context: { provider: input.provider, kind: entry.kind, stores: stores.length },
-          });
-        }
+        // On D1 an updateMany count is not atomic (SELECT keys, then a write per key): serialise the flip so only one
+        // caller sees count 1 and sends the alert. Someone else holding the claim is flipping it: skip.
+        await withClaimLock(
+          `provider-ready:${input.provider}`,
+          30,
+          async () => {
+            const flipped = await prisma.providerVerification.updateMany({
+              where: { provider: input.provider, readyAt: null },
+              data: { readyAt: new Date() },
+            });
+            if (flipped.count === 1) {
+              await sendAlert({
+                level: 'info',
+                source: 'provider.ready_to_verify',
+                title: `Provider ready to verify: ${input.provider}`,
+                body: `${stores.length} distinct stores settled real LIVE operations on ${input.provider}. Review the evidence on /provider-activation and confirm to mark it verified (until then first-use and failure alerts keep firing).`,
+                context: { provider: input.provider, kind: entry.kind, stores: stores.length },
+              });
+            }
+          },
+          { failOpen: true }
+        );
       }
     }
   } catch (err) {
@@ -246,11 +256,14 @@ export async function confirmProviderVerification(
     throw new AppError(409, 'ALREADY_VERIFIED', `${provider} is already verified in the catalog`);
   }
   const now = new Date();
-  const res = await prisma.providerVerification.updateMany({
-    where: { provider, readyAt: { not: null }, verifiedAt: null },
-    data: { verifiedAt: now, verifiedById: actorUserId },
-  });
-  if (res.count !== 1) {
+  // Serialised (D1 updateMany counts are not atomic): exactly one confirm wins, the rest answer 409, fail closed.
+  const claim = await withClaimLock(`provider-confirm:${provider}`, 30, () =>
+    prisma.providerVerification.updateMany({
+      where: { provider, readyAt: { not: null }, verifiedAt: null },
+      data: { verifiedAt: now, verifiedById: actorUserId },
+    })
+  );
+  if (!claim.acquired || claim.value.count !== 1) {
     throw new AppError(
       409,
       'NOT_READY',

@@ -26,6 +26,10 @@ const m = vi.hoisted(() => {
     },
     now: 1,
     ledgerFails: false,
+    writeDelay: 0,
+    fixedAt: false,
+    reads: 0,
+    onAfterReads: 0,
     kv: new Map<string, string>(),
   };
   return {
@@ -115,12 +119,22 @@ vi.mock('@api/services/redis.service', () => {
 });
 vi.mock('@api/lib/repo-factory', () => ({
   storeDb: async () => ({
-    paymentConfig: { findFirst: async () => (m.state.row ? { ...m.state.row } : null) },
+    paymentConfig: {
+      findFirst: async () => {
+        m.state.reads++;
+        // a competing confirm finished between this one's pre-check and its claim
+        if (m.state.onAfterReads && m.state.reads > m.state.onAfterReads && m.state.row) {
+          m.state.row.isEnabled = true;
+        }
+        return m.state.row ? { ...m.state.row } : null;
+      },
+    },
     shippingCarrierConfig: { findUnique: async () => null },
   }),
   storeWriter: async () => ({
     paymentConfig: {
       update: async ({ data }: any) => {
+        if (m.state.writeDelay) await new Promise(r => setTimeout(r, m.state.writeDelay));
         m.state.row = { ...m.state.row!, ...data };
         return m.state.row;
       },
@@ -135,7 +149,7 @@ vi.mock('@api/services/payment-providers/provider-connection.service', async () 
   return {
     ...real,
     runConnectionTest: async () => {
-      const at = `t${m.state.now++}`;
+      const at = m.state.fixedAt ? 'same-instant' : `t${m.state.now++}`;
       return {
         result: m.state.result,
         stored: {
@@ -239,6 +253,10 @@ beforeEach(() => {
   s.result = { ok: true, code: 'ok', message: 'ok' };
   s.now = 1;
   s.ledgerFails = false;
+  s.writeDelay = 0;
+  s.fixedAt = false;
+  s.reads = 0;
+  s.onAfterReads = 0;
   s.kv.clear();
   m.sendAlert.mockClear();
   m.auditLog.mockClear();
@@ -499,6 +517,40 @@ describe('a super-admin deactivate sticks (blocked by admin)', () => {
     expect((await unblock()).status).toBe(200);
     expect((await preview()).body.data.outcome).toBe('ready');
     expect(m.state.ledger.map(l => l.op)).toContain('activation.unblocked');
+  });
+});
+
+describe('two concurrent confirms (different tokens and keys) for the same store + provider', () => {
+  it('exactly one runs the enable -> ledger sequence; the loser never switches the provider off', async () => {
+    // Two previews whose test runs share one timestamp (ms resolution) mint two DIFFERENT valid tokens for the same payload
+    // hash; normally a newer test run invalidates the older token, here it cannot.
+    m.state.fixedAt = true;
+    const t1 = (await preview()).body.data.confirmToken;
+    const t2 = (await preview()).body.data.confirmToken;
+    m.state.writeDelay = 15; // the two confirms really overlap
+    const [a, b] = await Promise.all([
+      confirm(t1, 'attempt-race-0001'),
+      confirm(t2, 'attempt-race-0002'),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    const lost = a.status === 409 ? a : b;
+    expect(['ACTIVATION_IN_PROGRESS', 'ALREADY_ACTIVE', 'CONFIRMATION_INVALID']).toContain(
+      lost.body.error.code
+    );
+    expect(m.state.row!.isEnabled).toBe(true);
+    expect(m.state.ledger.filter(l => l.op === 'activation.activated_self')).toHaveLength(1);
+  });
+});
+
+describe('a confirm that lost the race after its pre-check', () => {
+  it('re-checks "already on" inside the claim: no second enable, no second ledger row', async () => {
+    const token = (await preview()).body.data.confirmToken;
+    m.state.reads = 0;
+    m.state.onAfterReads = 1; // the pre-check read sees "off"; every later read sees "on"
+    const res = await confirm(token);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('ALREADY_ACTIVE');
+    expect(m.state.ledger).toHaveLength(0);
   });
 });
 

@@ -484,4 +484,43 @@ describe.skipIf(!hasDb)('provider activation on request', () => {
       expect(await asApp(() => isProviderUsableForStore('bosta', b.id))).toBe(true);
     });
   });
+
+  it('two concurrent confirms (different tokens and keys): one enables + writes the ledger, the loser changes nothing', async () => {
+    await asProduction(async () => {
+      const s = await readyStore('race');
+      const root = `/api/v1/provider-activation/store/${s.id}/kashier/activate`;
+      const tokens = [];
+      for (let i = 0; i < 2; i++) {
+        const pv = await call('post', s, `${root}/preview`);
+        expect(pv.body.data.outcome).toBe('ready');
+        tokens.push(pv.body.data.confirmToken as string);
+      }
+      const confirmWith = (confirmToken: string, attempt: string) =>
+        asApp(async () =>
+          request(app)
+            .post(`${root}/confirm`)
+            .set('Authorization', `Bearer ${s.jwt}`)
+            .set('Idempotency-Key', attempt)
+            .send({ confirmToken })
+        );
+      const [a, b] = await Promise.all([
+        confirmWith(tokens[0], `race-${crypto.randomUUID()}`),
+        confirmWith(tokens[1], `race-${crypto.randomUUID()}`),
+      ]);
+      expect([a.status, b.status].sort()).toEqual([200, 409]);
+      expect(
+        (
+          await owner.paymentConfig.findFirstOrThrow({
+            where: { storeId: s.id, provider: 'kashier' },
+          })
+        ).isEnabled
+      ).toBe(true);
+      expect(
+        await owner.providerVerificationEvent.count({
+          where: { sourceStoreId: s.id, provider: 'kashier', op: 'activation.activated_self' },
+        })
+      ).toBe(1);
+      expect((await rows(s)).map(r => r.status)).toEqual(['activated']);
+    });
+  });
 });
