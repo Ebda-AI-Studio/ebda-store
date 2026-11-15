@@ -68,6 +68,7 @@ const wholeToken = (term: string): RegExp =>
     'iu'
   );
 const one = (db: SyncSql, sql: string, p: unknown[]): Row | undefined => db.all(sql, p)[0];
+// d1-exact-ok: claim helper - exactly one row must flip for the caller to win; 0 means another writer already claimed it
 const won = (db: SyncSql, sql: string, p: unknown[]): boolean => db.run(sql, p).changes === 1;
 const str = (v: unknown, name: string): string => {
   if (typeof v !== 'string' || v.length < 1 || v.length > 400)

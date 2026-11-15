@@ -376,7 +376,11 @@ export class FiscalDocumentService {
     });
     if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
 
-    const eta = await tx.etaConnection.findFirst({
+    // etaConnection lives on the store's own database (a Durable Object for moved stores), so it is read through
+    // storeDb, not this transaction. It is configuration, not money: nothing here needs it atomic with the sale.
+    const eta = await (
+      await storeDb(storeId)
+    ).etaConnection.findFirst({
       where: { storeId },
       select: {
         branchCode: true,

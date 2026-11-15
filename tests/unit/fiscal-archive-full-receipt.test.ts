@@ -536,17 +536,16 @@ describe('issuing a v2 sale document', () => {
       store: {
         findUnique: async () => ({ name: 'Pecan Bee', address: 'Cairo', phone: null, email: null }),
       },
-      etaConnection: {
-        findFirst: async () => ({
-          branchCode: 'BR-0',
-          activityCode: '4719',
-          posSerial: 'POS-77',
-          defaultItemCode: 'EG-1-HONEY',
-          address: { governate: 'Cairo' },
-        }),
-      },
       $queryRaw: async () => [{ last_serial: 1 }],
     };
+    // etaConnection is read through storeDb (it is DO-writable config), not through the money transaction.
+    h.db.etaConnection.findFirst.mockResolvedValue({
+      branchCode: 'BR-0',
+      activityCode: '4719',
+      posSerial: 'POS-77',
+      defaultItemCode: 'EG-1-HONEY',
+      address: { governate: 'Cairo' },
+    });
     await FiscalDocumentService.issueSaleDocument(tx, STORE, ORDER);
     const p = created.payload;
     expect(p.version).toBe(2);
