@@ -6446,20 +6446,25 @@
     },
     "colorField": {
       "tokens": {
-        "primary": "العلامة: اللون الأساسي",
-        "secondary": "العلامة: اللون الثانوي",
-        "accent": "العلامة: اللون المميّز",
-        "card": "السطح: خلفية البطاقة",
-        "muted": "السطح: لون خافت",
-        "foreground": "النص: اللون الافتراضي",
-        "border": "لون الحدود"
+        "primary": "اللون الأساسي",
+        "secondary": "خلفية هادية",
+        "accent": "لون التمييز",
+        "card": "خلفية الكروت",
+        "muted": "خلفية خافتة",
+        "foreground": "لون النص",
+        "border": "الخطوط والحدود"
       },
-      "customHex": "لون مخصص…",
-      "themeDefault": "— افتراضي القالب —",
-      "inheritedLabel": "العلامة: {token} ({hex})",
-      "colorPickerAriaLabel": "منتقي اللون",
-      "hexValueAriaLabel": "قيمة اللون السداسية",
-      "clear": "مسح"
+      "themeDefault": "زي القالب",
+      "themeDefaultShort": "لون القالب",
+      "inheritedLabel": "زي {token}",
+      "brandColours": "ألوان براندك",
+      "anyColour": "أي لون تاني",
+      "notAColour": "ده مش لون لسه. جرّب حاجة زي #B08D57.",
+      "alphaIgnored": "الشفافية مش مدعومة فاتجاهلناها.",
+      "recent": "استخدمته قريب",
+      "done": "تمام",
+      "colorPickerAriaLabel": "اختار لون",
+      "hexValueAriaLabel": "كود اللون"
     },
     "bottomSheet": {
       "close": "إغلاق"
@@ -6473,14 +6478,25 @@
       "samplePrice": "50.00 ج.م"
     },
     "colorContrastPreview": {
-      "backgroundLabel": "الخلفية: {label}",
-      "roles": {
+      "preview": {
         "heading": "العنوان",
-        "subtitle": "العنوان الفرعي",
-        "bodyCta": "النص / زر الإجراء"
+        "subtitle": "سطر تحت العنوان",
+        "body": "النص هيظهر كده.",
+        "button": "زرار"
       },
-      "autoFixedLabel": "تصحيح تلقائي:",
-      "pickedTextWarning": "النص المختار {ratio} : 1 — تحتاج AA إلى {min} : 1"
+      "verdict": {
+        "easy": "سهل في القراءة",
+        "large": "مناسب للخط الكبير بس",
+        "hard": "صعب في القراءة"
+      },
+      "cannotCheck": "مش قادرين نقيس اللون ده لسه. اختار لون عشان تشوف النص هيظهر إزاي عليه.",
+      "details": "التفاصيل",
+      "colourName": "اللون",
+      "background": "الخلفية",
+      "text": "النص",
+      "ratioLabel": "التباين",
+      "ratio": "{ratio} لـ 1",
+      "pickedTextWarning": "لون النص بتاعك صعب يتقرأ هنا"
     },
     "guestCheckout": {
       "notTracked": "غير متتبَّع للدفع كضيف",

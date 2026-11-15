@@ -6446,20 +6446,25 @@
     },
     "colorField": {
       "tokens": {
-        "primary": "Brand: Primary",
-        "secondary": "Brand: Secondary",
-        "accent": "Brand: Accent",
-        "card": "Surface: Card",
-        "muted": "Surface: Muted",
-        "foreground": "Text: Foreground",
-        "border": "Border"
+        "primary": "Main colour",
+        "secondary": "Soft background",
+        "accent": "Highlight",
+        "card": "Card background",
+        "muted": "Quiet background",
+        "foreground": "Main text",
+        "border": "Lines and borders"
       },
-      "customHex": "Custom hex…",
-      "themeDefault": "— Theme default —",
-      "inheritedLabel": "Brand: {token} ({hex})",
-      "colorPickerAriaLabel": "Color picker",
-      "hexValueAriaLabel": "Hex color value",
-      "clear": "Clear"
+      "themeDefault": "Same as the template",
+      "themeDefaultShort": "Template colour",
+      "inheritedLabel": "Same as {token}",
+      "brandColours": "Your brand colours",
+      "anyColour": "Any other colour",
+      "notAColour": "That is not a colour yet. Try something like #B08D57.",
+      "alphaIgnored": "Transparency is not supported, so it was ignored.",
+      "recent": "Recently used",
+      "done": "Done",
+      "colorPickerAriaLabel": "Pick a colour",
+      "hexValueAriaLabel": "Colour code"
     },
     "bottomSheet": {
       "close": "Close"
@@ -6473,14 +6478,25 @@
       "samplePrice": "50.00 EGP"
     },
     "colorContrastPreview": {
-      "backgroundLabel": "Background: {label}",
-      "roles": {
+      "preview": {
         "heading": "Heading",
-        "subtitle": "Subtitle",
-        "bodyCta": "Body / CTA"
+        "subtitle": "A line under the heading",
+        "body": "Body text looks like this.",
+        "button": "Button"
       },
-      "autoFixedLabel": "Auto-fixed:",
-      "pickedTextWarning": "Picked text {ratio} : 1 — AA needs {min} : 1"
+      "verdict": {
+        "easy": "Easy to read",
+        "large": "Fine for big text only",
+        "hard": "Hard to read"
+      },
+      "cannotCheck": "We can't check this colour yet. Pick a colour to see how text reads on it.",
+      "details": "Details",
+      "colourName": "Colour",
+      "background": "Background",
+      "text": "Text",
+      "ratioLabel": "Contrast",
+      "ratio": "{ratio} to 1",
+      "pickedTextWarning": "your text colour is hard to read here"
     },
     "guestCheckout": {
       "notTracked": "Not tracked for guest checkout",
