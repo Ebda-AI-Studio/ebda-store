@@ -31,8 +31,15 @@ The canonical source is `packages/shared/src/plan-baselines.ts` — when the tab
 ```
 isFeatureEnabled(storeId, key) =
   StoreFeature row exists?  → row.enabled       (override wins)
-  else                       → PLAN_BASELINE[store.plan].includes(key)
+  else                       → PLAN_BASELINE[entitled tier].includes(key)
 ```
+
+The **entitled tier** is the feature tier of the plan the subscription entitles (`getEntitlements`): the named plan's
+`featureTier`, or **`free` when the subscription is `canceled`**. `stores.plan` is only a directory mirror; it decides
+only for a store with no subscription row at all. Before #835 a canceled Growth store whose `stores.plan` still said
+`professional` kept the whole Growth baseline. The daily `reconcilePlanTiers` (D1) repairs `stores.plan` to the
+entitled tier (so a canceled paid row is repaired to `free`) and raises one P1. Assigning `status: canceled` from the
+Billing page writes `stores.plan = free`.
 
 **Plan changes never touch StoreFeature rows.** Every override is preserved across upgrade AND downgrade. Super-admin manually clears overrides if a clean slate is wanted after a plan change.
 
