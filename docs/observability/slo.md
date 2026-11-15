@@ -2,8 +2,8 @@
 
 _Last updated: 2026-11-10 (rewritten for the Cloudflare stack, Iceberg audit #25). Review cadence: quarterly and after any P0._
 
-Monitoring stack: **status.ebda.app** (Worker `ebda-status`: external probes once a minute, 8 s timeout, incident after
-3 consecutive failures, Telegram on open/resolve) · **Sentry** (errors, api/web/admin/orders) · **Workers Logs +
+Monitoring stack: **status.ebda.app** (Worker `ebda-status`: external probes every 5 min, 8 s timeout, incident after
+2 consecutive failures = detection in 5-10 min, Telegram on open/resolve) · **Sentry** (errors, api/web/admin/orders) · **Workers Logs +
 Logpush** to R2 `ebda-logs` (30 days) · **Cloudflare Web Analytics** (page speed, no cookies) · **API alert bridge →
 Telegram** (`apps/api/src/services/alerts.service.ts`). Neon, Railway, Axiom and UptimeRobot are retired.
 
