@@ -23,6 +23,7 @@ const count = (n: number) => n.toLocaleString('en-US');
 
 /* ---------- period switch ---------- */
 
+// pq-allow(unused-export): test seam, imported by StorePulse.test.tsx
 export function PeriodSwitch({
   value,
   onChange,
@@ -145,6 +146,7 @@ function SliceError({ message, onRetry }: { message: string; onRetry: () => void
 
 /* ---------- sales hero ---------- */
 
+// pq-allow(unused-export): test seam, imported by StorePulse.test.tsx
 export function SalesHero({
   stats,
   sales,
@@ -250,6 +252,7 @@ function Kpi({
   );
 }
 
+// pq-allow(unused-export): test seam, imported by StorePulse.test.tsx
 export function KpiRow({
   stats,
   unpaid,

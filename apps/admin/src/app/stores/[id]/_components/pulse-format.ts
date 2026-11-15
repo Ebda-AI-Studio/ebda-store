@@ -1,6 +1,6 @@
 /** Pure helpers for the dashboard's period numbers (tested in pulse-format.test.ts). */
 
-export type DeltaTone = 'up' | 'down' | 'flat';
+type DeltaTone = 'up' | 'down' | 'flat';
 
 export interface Delta {
   tone: DeltaTone;
