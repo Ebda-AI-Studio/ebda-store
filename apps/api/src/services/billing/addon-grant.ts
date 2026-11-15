@@ -10,6 +10,7 @@
  */
 import crypto from 'crypto';
 import type { Prisma } from '@ebda/database';
+import { sendAlert } from '../alerts.service';
 import { claimAddonMarkerD1, onD1, setTermEndOnceD1 } from '../platform/billing-d1';
 import { addDays } from './period';
 import {
@@ -215,6 +216,12 @@ async function grantTerm(
     predId = held.relatedEventId;
     predEnd = held.forPeriodEnd;
   }
+  // Money is in and there is no term: loud, with the billing event, then throw so the settlement is retried.
+  void sendAlert({
+    level: 'p1',
+    title: 'Add-on paid but no term could be placed',
+    body: `billing_events ${row.id} (store ${row.storeId}, ${sku}): the term chain lost ${CHAIN_TRIES} slots in a row. The payment stays unsettled until the gateway redelivers; check it if it does not clear.`,
+  }).catch(() => undefined);
   throw new Error(
     'ADDON_GRANT_CHAIN_CONTENDED: could not place the term, the settlement will be retried'
   );

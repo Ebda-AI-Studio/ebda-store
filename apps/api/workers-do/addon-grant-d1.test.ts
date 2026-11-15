@@ -3,7 +3,11 @@ import { env, applyD1Migrations } from 'cloudflare:test';
 import { setCfBindings, type CfBindings } from '../src/cf/bindings';
 import { requirePlatformDb } from '../src/lib/platform-db';
 import { applyAddonGrant } from '../src/services/billing/addon-grant';
-import { setTermEndOnceD1 } from '../src/services/platform/billing-d1';
+import {
+  claimAddonMarkerD1,
+  claimBillingEventD1,
+  setTermEndOnceD1,
+} from '../src/services/platform/billing-d1';
 
 // Follow-up to #775 (D1 review): on the platform D1 the prisma-lite `updateMany` / `createMany` are NOT atomic claims (SELECT
 // then write per key), so the add-on grant must not count on them. These run the REAL grant against the REAL platform schema
@@ -147,5 +151,57 @@ describe('renewal claim on the platform D1 (claimEvent = createMany + skipDuplic
     ).n;
     expect(rows).toBe(1);
     expect(counts.filter((c: { count: number }) => c.count === 1).length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('the ledger claim on the platform D1 (claimBillingEventD1): exactly one winner, always', () => {
+  it('eight racers on one idempotency key: exactly one true, one row, vat kept', async () => {
+    const s = await store();
+    const key = uid('claim');
+    const row = (id: string) => ({
+      id,
+      storeId: s,
+      subscriptionId: null,
+      type: 'upgrade',
+      planCode: PLAN,
+      billingInterval: null,
+      forPeriodEnd: null,
+      attempt: 0,
+      amountMinor: 11286,
+      provider: 'kashier',
+      idempotencyKey: key,
+      relatedEventId: null,
+      vatMinor: 1386,
+      vat: { netMinor: 9900, vatMinor: 1386, rateBps: 1400 },
+    });
+    const won = await Promise.all(
+      Array.from({ length: 8 }, () => claimBillingEventD1(row(crypto.randomUUID())))
+    );
+    expect(won.filter(Boolean)).toHaveLength(1);
+    const r = (await e.PLATFORM_DB.prepare(
+      'SELECT COUNT(*) AS n, MAX(vat_minor) AS v, MAX(vat) AS vat, MAX(status) AS st FROM billing_events WHERE idempotency_key = ?1'
+    )
+      .bind(key)
+      .first()) as { n: number; v: number; vat: string; st: string };
+    expect(r.n).toBe(1);
+    expect(r.v).toBe(1386);
+    expect(JSON.parse(r.vat).netMinor).toBe(9900);
+    expect(r.st).toBe('pending');
+  });
+});
+
+describe('D1 `meta.changes` counts the AFTER INSERT tax triggers: a claim wins on changes > 0, not === 1', () => {
+  it('the marker claim: the first caller wins, the second is refused (no race needed)', async () => {
+    const s = await store();
+    const m = (relatedEventId: string) => ({
+      id: crypto.randomUUID(),
+      storeId: s,
+      planCode: 'addon-grant:feature:floating_widget',
+      relatedEventId,
+      endMs: NOW.getTime() + 30 * DAY,
+      key: `k-${s}`,
+    });
+    expect(await claimAddonMarkerD1(m('a'))).toBe(true);
+    expect(await claimAddonMarkerD1(m('b'))).toBe(false);
   });
 });

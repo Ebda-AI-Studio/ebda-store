@@ -168,6 +168,50 @@ export async function insertCappedGrant(
 }
 
 /**
+ * The ledger claim (`claimEvent`) as ONE native statement. prisma-lite's createMany + skipDuplicates is a SELECT then a
+ * write on D1, so racers can end with ZERO winners (a claimed row nobody charges: no charge, no retry, no notice).
+ * `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING`: `changes` is 1 for exactly one racer. true = THIS caller owns it.
+ */
+export async function claimBillingEventD1(r: {
+  id: string;
+  storeId: string;
+  subscriptionId: string | null;
+  type: string;
+  planCode: string | null;
+  billingInterval: string | null;
+  forPeriodEnd: Date | null;
+  attempt: number;
+  amountMinor: number;
+  provider: string;
+  idempotencyKey: string;
+  relatedEventId: string | null;
+  vatMinor: number;
+  vat: unknown | null;
+}): Promise<boolean> {
+  const changes = await d1Run(
+    `INSERT INTO billing_events (id, store_id, subscription_id, type, plan_code, billing_interval, for_period_end, attempt, amount_minor, currency, provider, idempotency_key, status, related_event_id, vat_minor, vat)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'EGP', ?10, ?11, 'pending', ?12, ?13, ?14)
+     ON CONFLICT (idempotency_key) DO NOTHING`,
+    r.id,
+    r.storeId,
+    r.subscriptionId,
+    r.type,
+    r.planCode,
+    r.billingInterval,
+    r.forPeriodEnd ? r.forPeriodEnd.getTime() : null,
+    r.attempt,
+    r.amountMinor,
+    r.provider,
+    r.idempotencyKey,
+    r.relatedEventId,
+    r.vatMinor,
+    r.vat === null || r.vat === undefined ? null : JSON.stringify(r.vat)
+  );
+  // `changes` includes the AFTER INSERT tax triggers' own writes (2 for one real insert, 0 for a skipped one)
+  return changes > 0;
+}
+
+/**
  * Add-on grant markers (SELF-SERVICE A8). prisma-lite's `createMany` / `updateMany` on D1 are a SELECT then a write per
  * key, so a count from them is not a claim; these two are single SQLite statements whose `changes` IS one.
  * Insert the zero-amount marker row; `ON CONFLICT (idempotency_key) DO NOTHING`. true = THIS caller inserted it.
@@ -191,7 +235,8 @@ export async function claimAddonMarkerD1(m: {
     m.key,
     m.relatedEventId
   );
-  return changes === 1;
+  // `changes` includes the AFTER INSERT tax triggers' own writes (2 for one real insert, 0 for a skipped one)
+  return changes > 0;
 }
 
 /** Set a paid add-on row's term end ONCE (`for_period_end IS NULL`). true = THIS caller set it. */
@@ -207,7 +252,7 @@ export async function setTermEndOnceD1(
     storeId,
     endMs
   );
-  return changes === 1;
+  return changes > 0;
 }
 
 /** `UPDATE billing_grants SET status = 'revoked' ... RETURNING id, beneficiary_id` (pending|applied -> revoked, once). */

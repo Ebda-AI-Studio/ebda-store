@@ -41,6 +41,7 @@ import { isStoreGoneError } from '../../lib/jobs/store-gone';
 import { sendAlert } from '../alerts.service';
 import {
   acrossBilling,
+  claimBillingEventD1,
   deferBillingWebhookD1,
   listDeferredBillingWebhooksD1,
   onD1,
@@ -193,6 +194,27 @@ function vatColumns(charge: ChargeAmount | undefined) {
  */
 export async function claimEvent(input: ClaimInput): Promise<string | null> {
   const id = crypto.randomUUID();
+  if (await onD1()) {
+    // D1: one native statement, never a prisma-lite write count (see claimBillingEventD1).
+    const { vatMinor, vat } = input.charge ? ledgerVat(input.charge) : { vatMinor: 0, vat: null };
+    const won = await claimBillingEventD1({
+      id,
+      storeId: input.storeId,
+      subscriptionId: input.subscriptionId ?? null,
+      type: input.type,
+      planCode: input.planCode ?? null,
+      billingInterval: input.billingInterval ?? null,
+      forPeriodEnd: input.forPeriodEnd ?? null,
+      attempt: input.attempt ?? 0,
+      amountMinor: input.amountMinor,
+      provider: input.provider,
+      idempotencyKey: input.idempotencyKey,
+      relatedEventId: input.relatedEventId ?? null,
+      vatMinor,
+      vat,
+    });
+    return won ? id : null;
+  }
   const { count } = await withStore(input.storeId, tx =>
     tx.billingEvent.createMany({
       data: [
