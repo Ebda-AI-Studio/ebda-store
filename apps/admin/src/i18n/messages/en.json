@@ -11735,7 +11735,7 @@
       "expiredHint": "This add-on has ended. Buy it again to turn it back on.",
       "refundedHint": "This payment was refunded and the add-on is off.",
       "includedHint": "Included in your plan, nothing to buy.",
-      "grantedHint": "Ebda support turned this on for your store, nothing to buy."
+      "grantedHint": "Ebda Store support turned this on for your store, nothing to buy."
     }
   }
 }

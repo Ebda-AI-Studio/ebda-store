@@ -9,7 +9,7 @@
  * `?sku=` (from a locked screen's "Get this add-on") scrolls to that card.
  */
 import { useParams, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
 import { formatMoney } from '@ebda/shared';
@@ -129,13 +129,13 @@ export default function AddonsPage() {
   }, [load]);
 
   // Back from the card page: ask the server (never assume) until nothing is pending, for at most 90 s.
-  const startedAt = useRef(Date.now());
   useEffect(() => {
     if (!polling) return;
+    const startedAt = Date.now();
     const id = setInterval(async () => {
       const d = await load();
       const pending = d?.addons.some(a => a.state === 'pending_payment');
-      if (!pending || Date.now() - startedAt.current > POLL_MAX_MS) setPolling(false);
+      if (!pending || Date.now() - startedAt > POLL_MAX_MS) setPolling(false);
     }, POLL_MS);
     return () => clearInterval(id);
   }, [polling, load]);
