@@ -18,8 +18,13 @@
   },
   "helpArticle": "plans-and-billing",
   "questions": {
-    "ar": ["عايز فاتورة ضريبية باشتراك ابدأ", "فين الفاتورة بتاعت الشهر؟"],
-    "en": ["Where do I download my subscription invoice?"]
+    "ar": [
+      "عايز فاتورة ضريبية باشتراك ابدأ",
+      "فين الفاتورة بتاعت الشهر؟",
+      "فواتير اشتراك ابدأ فين؟",
+      "الضريبة على الاشتراك كام؟"
+    ],
+    "en": ["Where do I download my subscription invoice?", "Where are my Ebda invoices?"]
   },
   "steps": ["Billing > invoices."],
   "edgeCases": [

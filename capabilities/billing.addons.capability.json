@@ -16,10 +16,13 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "my-features-and-add-ons",
   "questions": {
     "ar": ["عايز افعل الزر العائم", "ازاي افعل محفظة العميل؟", "الميزة دي مقفولة ليه؟"],
-    "en": ["How do I enable a feature that says super admin must enable?"]
+    "en": [
+      "How do I enable a feature that says super admin must enable?",
+      "Why is a feature locked on my store?"
+    ]
   },
   "steps": ["Features page lists what is on; locked items say a super admin must enable."],
   "edgeCases": [
@@ -27,9 +30,6 @@
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": [
-    "No add-on purchase flow; super-admin enables only (audit gap 6, High)",
-    "No help article"
-  ],
+  "gaps": ["No add-on purchase flow; super-admin enables only (audit gap 6, High)"],
   "assistantNote": "assistant says plan/override cause and links billing; cannot enable"
 }

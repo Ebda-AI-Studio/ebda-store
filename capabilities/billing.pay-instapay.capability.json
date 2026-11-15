@@ -19,8 +19,8 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "withdraw claim not documented"
+    "class": "irreversible",
+    "note": "Choosing the plan writes a payment reference and is reviewed by the Ebda team; choosing again overwrites it, nothing is charged and the receipt upload stays on the billing screen."
   },
   "helpArticle": "pay-ebda-with-instapay",
   "questions": {
