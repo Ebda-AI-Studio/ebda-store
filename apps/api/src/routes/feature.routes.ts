@@ -165,15 +165,17 @@ router.put(
         return;
       }
 
-      // The override is replaced as a whole: an omitted `expiresAt` / `reason` means "never expires" / "no reason"
-      // (Ruling SF-EXPIRY-1). A past `expiresAt` is refused: it would be a no-op override (use DELETE to clear one).
+      // PATCH semantics (Ruling SF-EXPIRY-1): an omitted `expiresAt` / `reason` KEEPS the stored value, an explicit
+      // `null` clears it. A plain toggle must never silently turn a time-boxed grant permanent. A past `expiresAt`
+      // is refused: it would be a no-op override (use DELETE to clear one).
       const bodySchema = z.object({
         enabled: z.boolean(),
         expiresAt: z.coerce
           .date()
           .refine(d => d.getTime() > Date.now(), 'expiresAt must be in the future')
-          .nullish(),
-        reason: z.string().trim().max(200).nullish(),
+          .nullable()
+          .optional(),
+        reason: z.string().trim().max(200).nullable().optional(),
       });
       const bodyParsed = bodySchema.safeParse(req.body);
       if (!bodyParsed.success) {
@@ -186,10 +188,10 @@ router.put(
         });
         return;
       }
-      const meta = {
-        expiresAt: bodyParsed.data.expiresAt ?? null,
-        reason: bodyParsed.data.reason || null,
-      };
+      const meta: { expiresAt?: Date | null; reason?: string | null } = {};
+      if (bodyParsed.data.expiresAt !== undefined) meta.expiresAt = bodyParsed.data.expiresAt;
+      if (bodyParsed.data.reason !== undefined)
+        meta.reason = bodyParsed.data.reason?.trim() || null;
 
       const features = await featureService.setFeature(
         id,

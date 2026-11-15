@@ -353,10 +353,10 @@ class FeatureService {
     updates: Partial<Record<FeatureKey, boolean>>,
     userId: string,
     /**
-     * Expiry + reason for the overrides written by this call (Ruling SF-EXPIRY-1). Present: both are SET on every key
-     * (`null` = never expires / no reason). Absent: an existing row keeps its own, a new row gets none.
+     * Expiry + reason for the overrides written by this call (Ruling SF-EXPIRY-1). PATCH semantics per field: a key that is present is SET
+     * (`null` clears it), a key that is absent leaves an existing row's value alone; a new row gets none.
      */
-    meta?: { expiresAt: Date | null; reason: string | null }
+    meta?: { expiresAt?: Date | null; reason?: string | null }
   ): Promise<Record<FeatureKey, boolean>> {
     const now = new Date();
 
@@ -383,7 +383,8 @@ class FeatureService {
               enabled: enabled as boolean,
               enabledAt: enabled ? now : null,
               enabledBy: userId,
-              ...(meta ? { expiresAt: meta.expiresAt, reason: meta.reason } : {}),
+              ...(meta?.expiresAt !== undefined ? { expiresAt: meta.expiresAt } : {}),
+              ...(meta?.reason !== undefined ? { reason: meta.reason } : {}),
             },
           });
         }
@@ -421,7 +422,7 @@ class FeatureService {
     featureKey: FeatureKey,
     enabled: boolean,
     userId: string,
-    meta?: { expiresAt: Date | null; reason: string | null }
+    meta?: { expiresAt?: Date | null; reason?: string | null }
   ): Promise<Record<FeatureKey, boolean>> {
     return this.updateStoreFeatures(storeId, { [featureKey]: enabled }, userId, meta);
   }

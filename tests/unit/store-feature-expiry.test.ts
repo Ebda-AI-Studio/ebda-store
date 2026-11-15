@@ -152,8 +152,18 @@ describe('super-admin route', () => {
     expect(u.update.reason).toBe('bundles, paid to 2026-12-16');
   });
 
-  it('PUT with no expiry replaces the override as "never expires"', async () => {
-    const res = await request(app).put(`${base}/bundles`).send({ enabled: true });
+  it('PUT with only `enabled` (a toggle) KEEPS the stored expiry and reason', async () => {
+    const res = await request(app).put(`${base}/bundles`).send({ enabled: false });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(h.upserts[0].update).not.toHaveProperty('expiresAt');
+    expect(h.upserts[0].update).not.toHaveProperty('reason');
+    expect(h.upserts[0].create).toMatchObject({ expiresAt: null, reason: null });
+  });
+
+  it('PUT with an explicit null CLEARS the expiry and reason', async () => {
+    const res = await request(app)
+      .put(`${base}/bundles`)
+      .send({ enabled: true, expiresAt: null, reason: null });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(h.upserts[0].update).toMatchObject({ expiresAt: null, reason: null });
   });
