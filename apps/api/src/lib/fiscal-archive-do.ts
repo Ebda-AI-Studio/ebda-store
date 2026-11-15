@@ -33,6 +33,7 @@ export const archiveBucket = (): R2ArchiveBucket | undefined =>
   cfBindings()?.STORE_BACKUPS as R2ArchiveBucket | undefined;
 
 /** Ebda's own subscription VAT ledger row -> the archive's `billing` line (mirrors store-closure `archiveBillingEventsFromD1`). */
+// pq-allow(unused-export): pure mapper pinned by tests/unit/fiscal-archive-do.test.ts
 export function billingLine(b: Row): Row {
   const vat = (() => {
     try {
@@ -72,7 +73,7 @@ export function billingLine(b: Row): Row {
   };
 }
 
-export function realSource(storeId: string, d1: D1Like | undefined): FiscalExportSource {
+function realSource(storeId: string, d1: D1Like | undefined): FiscalExportSource {
   const stub = storeDo(storeId) as unknown as {
     fiscalExportPage(
       id: string,

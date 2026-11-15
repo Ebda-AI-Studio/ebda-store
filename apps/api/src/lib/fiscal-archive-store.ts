@@ -17,12 +17,14 @@
  */
 import { createHash } from 'node:crypto';
 
+// pq-allow(unused-export): asserted outside every purge prefix by tests/unit/fiscal-archive-do.test.ts
 export const FISCAL_ARCHIVE_PREFIX = 'fiscal-archive/v1/';
 export const dataKey = (storeId: string) => `${FISCAL_ARCHIVE_PREFIX}data/${storeId}.ndjson.gz`;
+// pq-allow(unused-export): the failure test asserts no manifest exists (workers-do/fiscal-archive.test.ts)
 export const manifestKey = (storeId: string) => `${FISCAL_ARCHIVE_PREFIX}manifests/${storeId}.json`;
 const MANIFEST_PREFIX = `${FISCAL_ARCHIVE_PREFIX}manifests/`;
 /** Mirrors apps/api/src/config/retention.ts (kept literal so this module loads on workerd without the config chain). */
-export const ARCHIVE_RETENTION_YEARS = 7;
+const ARCHIVE_RETENTION_YEARS = 7;
 
 export interface R2ArchiveBucket {
   put(key: string, value: string | ArrayBuffer | Uint8Array): Promise<unknown>;
@@ -195,7 +197,7 @@ export async function exportFiscalToArchive(
 
 // ---------------------------------------------------------------------------------------------------- reads (super-admin)
 
-export interface ArchivedStore {
+interface ArchivedStore {
   storeId: string;
   storeName: string | null;
   documentCount: number;
@@ -228,7 +230,7 @@ export async function listArchivedStores(
 }
 
 /** The shape the existing viewers and `renderFiscalDocumentHtml` take (definer.ts FiscalArchiveRow). */
-export interface ArchivedDocument {
+interface ArchivedDocument {
   id: string;
   storeId: string;
   orderId: string | null;
@@ -339,7 +341,7 @@ export async function loadArchive(
   };
 }
 
-export interface ArchiveListQuery {
+interface ArchiveListQuery {
   /** Keyset cursor `<issuedAtMs>:<id>` from the previous page (newest first). */
   cursor?: string;
   limit?: number;

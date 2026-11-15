@@ -66,7 +66,7 @@ const ETA_COLUMNS = [
   'updated_at',
 ];
 
-export const MAX_FISCAL_PAGE = 500;
+const MAX_FISCAL_PAGE = 500;
 
 export function exportFiscalPage(
   sql: SqlExec,
