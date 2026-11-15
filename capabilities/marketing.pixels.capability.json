@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "marketing-pixels",
   "questions": {
     "ar": ["ازاي احط بكسل فيسبوك؟", "Meta pixel مش بيسجل", "تيك توك pixel", "CAPI يعني ايه"],
     "en": ["How do I add my Meta pixel?"]
@@ -34,5 +34,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article; No Meta/TikTok account health check"]
+  "gaps": []
 }

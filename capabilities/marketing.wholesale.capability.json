@@ -17,12 +17,12 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "revoke yes (re-approve)"
+    "class": "irreversible",
+    "note": "an approve/reject emails the applicant; a revoked buyer must apply again after the cooldown"
   },
-  "helpArticle": null,
+  "helpArticle": "wholesale-buyers",
   "questions": {
-    "ar": ["ازاي ابيع جملة؟", "اقبل طلب تاجر جملة"],
+    "ar": ["ازاي ابيع جملة؟", "اقبل طلب تاجر جملة", "اقبل تاجر الجملة ده", "الغي تاجر جملة"],
     "en": ["How do I sell wholesale?"]
   },
   "steps": ["Wholesale page (Business plan)."],
@@ -35,5 +35,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

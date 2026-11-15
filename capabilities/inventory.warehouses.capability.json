@@ -20,12 +20,17 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "delete = confirm"
+    "class": "reversible",
+    "note": "warehouse edits and stock adjustments are undone with the opposite change; the soft delete is a switch-off"
   },
-  "helpArticle": null,
+  "helpArticle": "warehouses-and-stock-by-warehouse",
   "questions": {
-    "ar": ["عندي اكتر من مخزن", "انقل مخزون بين المخازن"],
+    "ar": [
+      "عندي اكتر من مخزن",
+      "انقل مخزون بين المخازن",
+      "ضيف مخزن جديد",
+      "زوّد 20 قطعة في مخزن القاهرة"
+    ],
     "en": ["I have two warehouses"]
   },
   "steps": ["Warehouses page."],
@@ -39,5 +44,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article; routing PR open"]
+  "gaps": ["routing PR open"]
 }

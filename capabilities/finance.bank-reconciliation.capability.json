@@ -19,12 +19,17 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "delete statement no"
+    "class": "reversible",
+    "note": "a match, unmatch or ignore is flipped back with the same tool; deleting a statement is not an assistant tool"
   },
-  "helpArticle": null,
+  "helpArticle": "finance-books-and-reports",
   "questions": {
-    "ar": ["ازاي اطابق كشف البنك؟", "ارفع كشف حساب CSV"],
+    "ar": [
+      "ازاي اطابق كشف البنك؟",
+      "ارفع كشف حساب CSV",
+      "طابق البند ده مع القيد",
+      "تجاهل بند البنك ده"
+    ],
     "en": ["Reconcile my bank statement"]
   },
   "steps": ["Import CSV, auto-match, resolve."],
@@ -37,5 +42,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["AI recon not built", "No help article"]
+  "gaps": ["AI recon not built"]
 }
