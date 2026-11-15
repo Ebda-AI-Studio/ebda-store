@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes (unsubscribe)"
   },
-  "helpArticle": null,
+  "helpArticle": "notifications-and-order-alerts",
   "questions": {
     "ar": ["ازاي يرن الموبايل لما ييجي اوردر؟", "تطبيق ادارة الطلبات"],
     "en": ["How do I get a sound alert for new orders?"]
@@ -34,5 +34,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }
