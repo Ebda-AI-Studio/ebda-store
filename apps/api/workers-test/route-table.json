@@ -203,6 +203,7 @@
   "GET /stores/:storeId/affiliates/stats",
   "GET /stores/:storeId/ai/bulk",
   "GET /stores/:storeId/ai/bulk/:jobId",
+  "GET /stores/:storeId/ai/bulk/estimate",
   "GET /stores/:storeId/ai/results/categorize",
   "GET /stores/:storeId/ai/results/excerpt",
   "GET /stores/:storeId/ai/results/faqs",

@@ -12,6 +12,7 @@
     ".../ai/seo",
     ".../ai/bulk/translate|seo|categorize|image-alt|excerpt|tags|product-faqs|recommendations|llms-txt|aeo-sweep-all|...",
     "GET .../ai/bulk/:jobId",
+    "GET /stores/:storeId/ai/bulk/estimate",
     "POST .../ai/jobs/:jobId/cancel",
     "POST .../ai/products/:productId/ai/reset-field",
     "balance-description/revert-balance"
