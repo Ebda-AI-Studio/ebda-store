@@ -97,6 +97,7 @@ import {
 import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial } from './billing/trial';
+import { markOwnerTrialUsed, ownerHasUsedTrial } from './billing/trial-eligibility';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -657,12 +658,20 @@ export class StoreService {
     // The platform operator keeps the old behaviour (active, default plan).
     // N-18 (Ruling NZ-D11): a store created on D1 + its Durable Object has no Postgres row.
     const onDo = storeCreateOnDo();
+    // R-TRIAL-ONCE-1: the FIRST store of an owner who never had a signup trial (deleted stores included).
+    const ownerEmail = !opts.platformOperator
+      ? (
+          await withUser(ownerId, tx =>
+            tx.user.findUnique({ where: { id: ownerId }, select: { email: true } })
+          )
+        )?.email
+      : undefined;
     const merchantCreate = !opts.platformOperator
       ? {
           firstStore:
             (await countOwnerStores(ownerId, () =>
               withUser(ownerId, tx => tx.store.count({ where: { ownerId, deletedAt: null } }))
-            )) === 0,
+            )) === 0 && !(ownerEmail && (await ownerHasUsedTrial(ownerEmail))),
         }
       : null;
 
@@ -810,6 +819,8 @@ export class StoreService {
         },
       });
     });
+
+    if (merchantCreate?.firstStore && ownerEmail) await markOwnerTrialUsed(ownerEmail, store.id);
 
     // Seed Chart of Accounts (Egypt retail template, 27 system accounts).
     // Idempotent — safe if accountingEnabled is later toggled.

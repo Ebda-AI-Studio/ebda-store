@@ -13,6 +13,8 @@ const m = vi.hoisted(() => ({
   provision: vi.fn(),
   gate: vi.fn(),
   budget: vi.fn(),
+  used: vi.fn(),
+  mark: vi.fn(),
   order: [] as string[],
 }));
 
@@ -50,6 +52,11 @@ vi.mock('@api/services/billing/subscription-billing.service', () => ({
   })),
   getSubscriptionBillingState: vi.fn(),
 }));
+// R-TRIAL-ONCE-1: the durable "this owner already had a signup trial" marker (survives a hard store delete).
+vi.mock('@api/services/billing/trial-eligibility', () => ({
+  ownerHasUsedTrial: m.used,
+  markOwnerTrialUsed: m.mark,
+}));
 vi.mock('@api/services/billing/go-live-gate', () => ({ assertStoreMayGoLive: vi.fn() }));
 vi.mock('@api/services/store-creation-limit', () => ({
   assertStoreCreationBudget: m.budget,
@@ -64,7 +71,9 @@ import { OnboardingService } from '@api/services/onboarding.service';
 const input = { name: 'Shop', slug: 'my-shop' };
 
 beforeEach(() => {
-  for (const f of [m.count, m.findUnique, m.provision, m.gate, m.budget]) f.mockReset();
+  for (const f of [m.count, m.findUnique, m.provision, m.gate, m.budget, m.used, m.mark])
+    f.mockReset();
+  m.used.mockResolvedValue(false);
   m.order.length = 0;
   m.findUnique.mockResolvedValue(null);
   m.provision.mockResolvedValue({ store: { id: 'new' } });
@@ -83,6 +92,23 @@ describe('OnboardingService.createStore — locked pricing', () => {
         trialChoice: { planCode: 'growth', interval: 'monthly' },
       })
     );
+  });
+
+  it('first store records the owner trial as used', async () => {
+    m.count.mockResolvedValue(0);
+    await OnboardingService.createStore({ userId: 'u1' }, input);
+    expect(m.used).toHaveBeenCalledWith('o@x.com');
+    expect(m.mark).toHaveBeenCalledWith('o@x.com', 'new');
+  });
+
+  it('delete + recreate: an owner with 0 live stores who already had a trial gets NO second trial', async () => {
+    m.count.mockResolvedValue(0);
+    m.used.mockResolvedValue(true);
+    await OnboardingService.createStore({ userId: 'u1' }, input);
+    expect(m.provision).toHaveBeenCalledWith(
+      expect.objectContaining({ plan: 'starter', growthTrial: false, status: 'inactive' })
+    );
+    expect(m.mark).not.toHaveBeenCalled();
   });
 
   it('second store (owner already allowed by the gate): Business tier, NO second trial', async () => {

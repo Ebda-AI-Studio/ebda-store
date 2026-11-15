@@ -38,6 +38,7 @@ import { readInStoreContext } from '../lib/store-scoped-read';
 import { storeIdBySlug } from '../lib/definer';
 import { assertOwnerMayCreateStore, ownerStoreAllowance } from './plan-limit.service';
 import { countOwnerStores, storeCreateOnDo } from '../lib/store-create-do';
+import { markOwnerTrialUsed, ownerHasUsedTrial } from './billing/trial-eligibility';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 import { assertStoreMayGoLive } from './billing/go-live-gate';
 import {
@@ -300,6 +301,8 @@ export class OnboardingService {
           tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
         )
       );
+      // R-TRIAL-ONCE-1: one signup trial per owner, even after their earlier store was deleted.
+      const trialEligible = ownedNow === 0 && !(await ownerHasUsedTrial(user.email));
       try {
         const result = await ProvisioningService.provisionStore({
           storeName: input.name,
@@ -308,7 +311,7 @@ export class OnboardingService {
           // The first store starts the 14-day Growth trial. An additional store
           // (only reachable on a plan that allows it) is covered by the owner's
           // Business plan and starts on it, with no second trial.
-          plan: ownedNow > 0 ? 'enterprise' : 'professional',
+          plan: ownedNow > 0 ? 'enterprise' : trialEligible ? 'professional' : 'starter',
           maxOwnedStores:
             owner.isSuperAdmin || !storeCreateOnDo()
               ? null
@@ -317,7 +320,7 @@ export class OnboardingService {
                   (await ownerStoreAllowance(owner.userId)).allowance ??
                     MAX_SELF_SERVE_STORES_PER_OWNER
                 ),
-          growthTrial: ownedNow === 0,
+          growthTrial: trialEligible,
           trialChoice,
           status: 'inactive',
           template: look.skin as SelfServeTemplate,
@@ -325,6 +328,7 @@ export class OnboardingService {
           ownerName: `${user.firstName} ${user.lastName}`.trim() || user.email,
           settings: { defaultLanguage: input.language ?? 'ar' },
         });
+        if (trialEligible) await markOwnerTrialUsed(user.email, result.store.id);
         // Ebda's own ads funnel: the browser fires StoreCreated with the same id. Fail-open.
         if (!owner.isSuperAdmin) {
           await emitEbdaConversion({
