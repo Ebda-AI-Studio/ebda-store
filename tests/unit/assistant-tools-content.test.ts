@@ -33,12 +33,13 @@ vi.mock('@api/services/blog.service', () => ({ BlogService: m.blog }));
 import { ToolForbidden } from '@ebda/shared/smart-layer';
 import { contentTools } from '@api/smart-layer/tools/content.tools';
 import { applyOf, ctxOf, previewOf, toolNamed } from './helpers/assistant-tool-harness';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 
 const tools = contentTools();
 const T = (n: string) => toolNamed(tools, n);
 const notFound = () => Object.assign(new Error('not found'), { statusCode: 404 });
-const undoArgs = (t: ReturnType<typeof T>, a: unknown, draft: never, result?: unknown) =>
-  t.inverse!(ctxOf(), a as never, draft, { ok: true, etagAfter: 'x', result });
+const undoArgs = (t: ReturnType<typeof T>, a: unknown, draft: never, applied: never) =>
+  t.inverse!(ctxOf(), a as never, draft, applied);
 
 const faq = {
   id: 'f1',
@@ -120,12 +121,12 @@ describe('faq_update', () => {
   const args = { faqId: 'f1', answer: 'New answer' };
   it('shows the merchant before/after text and restores it on undo', async () => {
     const t = T('faq_update');
-    const { draft } = await applyOf(t, args);
+    const { draft, applied } = await applyOf(t, args);
     expect(draft.etag).toMatch(/^[0-9a-f]{32}$/);
     expect(draft.rows).toEqual([expect.objectContaining({ before: 'A', after: 'New answer' })]);
     expect(m.faq.update).toHaveBeenCalledWith('s1', 'f1', { answer: 'New answer' });
     expect(m.insertAuditLog.mock.calls[0]![0].details.actor).toBe('assistant');
-    expect(undoArgs(t, args, draft as never)).toEqual({
+    expect(undoArgs(t, args, draft as never, applied as never)).toEqual({
       tool: 'faq_update',
       args: { faqId: 'f1', answer: 'A' },
     });
@@ -150,9 +151,9 @@ describe('faq_create', () => {
   it('is compensating: undo hides the new FAQ', async () => {
     const t = T('faq_create');
     expect(t.undo).toBe('compensating');
-    const { draft } = await applyOf(t, args);
+    const { draft, applied } = await applyOf(t, args);
     expect(m.faq.create).toHaveBeenCalledWith('s1', expect.objectContaining(args));
-    expect(undoArgs(t, args, draft as never, { faqId: 'f-new' })).toEqual({
+    expect(undoArgs(t, args, draft as never, applied as never)).toEqual({
       tool: 'faq_update',
       args: { faqId: 'f-new', isActive: false },
     });
@@ -190,7 +191,7 @@ describe('size charts', () => {
         ['M', '95'],
       ],
     };
-    const { draft } = await applyOf(t, args);
+    const { draft, applied } = await applyOf(t, args);
     expect(m.chart.update).toHaveBeenCalledWith(
       's1',
       'sc1',
@@ -199,7 +200,7 @@ describe('size charts', () => {
     expect(draft.rows).toEqual([
       expect.objectContaining({ before: [['S', '90']], after: args.rows }),
     ]);
-    expect(undoArgs(t, args, draft as never)).toEqual({
+    expect(undoArgs(t, args, draft as never, applied as never)).toEqual({
       tool: 'size_chart_update',
       args: { chartId: 'sc1', rows: [['S', '90']] },
     });
@@ -221,7 +222,7 @@ describe('legal_page_update', () => {
   const args = { slug: 'privacy', contentBlocks: [{ type: 'paragraph', text: 'new policy' }] };
   it('shows the old and new text, writes through PagesService and restores the old blocks', async () => {
     const t = T('legal_page_update');
-    const { draft } = await applyOf(t, args);
+    const { draft, applied } = await applyOf(t, args);
     expect(m.pages.upsert).toHaveBeenCalledWith('s1', 'privacy', {
       contentBlocks: args.contentBlocks,
     });
@@ -229,7 +230,7 @@ describe('legal_page_update', () => {
       before: [{ type: 'paragraph', text: 'old' }],
       after: args.contentBlocks,
     });
-    expect(undoArgs(t, args, draft as never)).toEqual({
+    expect(undoArgs(t, args, draft as never, applied as never)).toEqual({
       tool: 'legal_page_update',
       args: { slug: 'privacy', contentBlocks: [{ type: 'paragraph', text: 'old' }] },
     });
@@ -252,7 +253,10 @@ describe('blog_post_draft', () => {
   const args = { slug: 'eid-gifts', title: 'Eid gifts', content: 'Ideas...' };
   it('always creates a DRAFT, never publishes, and says so', async () => {
     const t = T('blog_post_draft');
-    const { draft } = await applyOf({ ...t } as never, { ...args, isPublished: true } as never);
+    const { draft, applied } = await applyOf(
+      { ...t } as never,
+      { ...args, isPublished: true } as never
+    );
     expect(m.blog.create).toHaveBeenCalledWith(
       's1',
       expect.objectContaining({ slug: 'eid-gifts', isPublished: false })
@@ -263,8 +267,8 @@ describe('blog_post_draft', () => {
   it('is compensating: undo discards the draft; staff may draft', async () => {
     const t = T('blog_post_draft');
     expect(t.undo).toBe('compensating');
-    const { draft } = await applyOf(t, args, 'staff');
-    expect(undoArgs(t, args, draft as never, { postId: 'b1' })).toEqual({
+    const { draft, applied } = await applyOf(t, args, 'staff');
+    expect(undoArgs(t, args, draft as never, applied as never)).toEqual({
       tool: 'blog_post_discard_draft',
       args: { postId: 'b1' },
     });
@@ -310,5 +314,230 @@ describe('blog_post_discard_draft', () => {
     await expect(applyOf(T('blog_post_discard_draft'), args, 'customer')).rejects.toBeInstanceOf(
       ToolForbidden
     );
+  });
+});
+
+describe('undo args pass their own tool validation (no database null into a non-null field)', () => {
+  it('legal_page_update on a page that does not exist yet: the undo restores "published, empty" (same as no page)', async () => {
+    m.pages.get.mockResolvedValue(null);
+    const t = T('legal_page_update');
+    const a = {
+      slug: 'terms',
+      contentBlocks: [{ type: 'paragraph', text: 'x' }],
+      isPublished: false,
+    };
+    const { draft, applied } = await applyOf(t, a);
+    const inv = t.inverse!(ctxOf(), a as never, draft, applied)!;
+    expect(inv.args).toEqual({
+      slug: 'terms',
+      contentBlocks: null,
+      isPublished: true,
+    });
+    expect(t.args.safeParse(inv.args).success).toBe(true);
+  });
+  it('legal_page_update keeps image and button blocks restorable and drops unknown keys', async () => {
+    m.pages.get.mockResolvedValue({
+      slug: 'privacy',
+      title: null,
+      titleAr: null,
+      contentBlocks: [
+        { type: 'image', url: 'https://x/y.png', alt: 'a', junk: 1 },
+        { type: 'button', label: 'Go', url: '/shop' },
+        { type: 'bullets', items: ['a'] },
+      ],
+      contentBlocksAr: null,
+      isPublished: true,
+      updatedAt: new Date(0),
+    });
+    const t = T('legal_page_update');
+    const a = { slug: 'privacy', contentBlocks: [{ type: 'paragraph', text: 'new' }] };
+    const { draft, applied } = await applyOf(t, a);
+    const inv = t.inverse!(ctxOf(), a as never, draft, applied)!;
+    expect(inv.args).toEqual({
+      slug: 'privacy',
+      contentBlocks: [
+        { type: 'image', url: 'https://x/y.png', alt: 'a' },
+        { type: 'button', label: 'Go', url: '/shop' },
+        { type: 'bullets', items: ['a'] },
+      ],
+    });
+    expect(t.args.safeParse(inv.args).success).toBe(true);
+  });
+  it('size_chart_update restores nulls the database holds as empty strings', async () => {
+    m.chart.get.mockResolvedValue({
+      ...chart,
+      nameAr: null,
+      note: null,
+      noteAr: null,
+      columns: [{ label: 'Size', labelAr: null }, { label: 'Chest' }],
+    });
+    const t = T('size_chart_update');
+    const a = {
+      chartId: 'sc1',
+      nameAr: 'عربي',
+      note: 'n',
+      columns: [{ label: 'A' }, { label: 'B' }],
+      rows: [['1', '2']],
+    };
+    const { draft, applied } = await applyOf(t, a);
+    const inv = t.inverse!(ctxOf(), a as never, draft, applied)!;
+    expect(inv.args).toMatchObject({ chartId: 'sc1', nameAr: '', note: '' });
+    expect(t.args.safeParse(inv.args).success).toBe(true);
+  });
+  it('faq_update restores a null Arabic answer (nullable field)', async () => {
+    const t = T('faq_update');
+    const a = { faqId: 'f1', answerAr: 'جديد', questionAr: 'س' };
+    const { draft, applied } = await applyOf(t, a);
+    const inv = t.inverse!(ctxOf(), a as never, draft, applied)!;
+    expect(inv.args).toEqual({ faqId: 'f1', answerAr: null, questionAr: null });
+    expect(t.args.safeParse(inv.args).success).toBe(true);
+  });
+});
+
+describe('applyThenUndo: every create tool of this slice, through the real engine', () => {
+  it('faq_create: the undo (hide it) is undone', async () => {
+    const r = await applyThenUndo(tools, T('faq_create'), { question: 'Q?', answer: 'A' });
+    expect(r).toMatchObject({ applied: 'applied', undo: 'undone' });
+  });
+  it('blog_post_draft: the undo (discard the draft) needs its own confirm card', async () => {
+    const r = await applyThenUndo(tools, T('blog_post_draft'), {
+      slug: 'a-b',
+      title: 'T',
+      content: 'C',
+    });
+    expect(r.applied).toBe('applied');
+    expect(r.undo).toBe('needs_confirm');
+    expect(r.card).toBeTruthy();
+  });
+  it('size_chart_create is irreversible: applied, and the undo says so', async () => {
+    const r = await applyThenUndo(tools, T('size_chart_create'), {
+      name: 'T',
+      columns: [{ label: 'a' }, { label: 'b' }],
+      rows: [['1', '2']],
+    });
+    expect(r).toMatchObject({ applied: 'applied', undo: 'irreversible' });
+  });
+  it('legal_page_update on a missing page is undone (restored to published-empty)', async () => {
+    m.pages.get.mockResolvedValue(null);
+    const r = await applyThenUndo(tools, T('legal_page_update'), {
+      slug: 'terms',
+      contentBlocks: [{ type: 'paragraph', text: 'x' }],
+    });
+    expect(r).toMatchObject({ applied: 'applied', undo: 'undone' });
+  });
+  it('faq_update and size_chart_update are undone', async () => {
+    expect(await applyThenUndo(tools, T('faq_update'), { faqId: 'f1', answer: 'N' })).toMatchObject(
+      { undo: 'undone' }
+    );
+    expect(
+      await applyThenUndo(tools, T('size_chart_update'), { chartId: 'sc1', note: 'n' })
+    ).toMatchObject({ undo: 'undone' });
+  });
+});
+
+describe('every content tool: role, plan feature and impersonation gates', () => {
+  type Case = {
+    tool: string;
+    args: unknown;
+    feature: boolean;
+    staffMay: boolean;
+    run: () => ReturnType<typeof vi.fn>;
+    read: () => ReturnType<typeof vi.fn> | null;
+  };
+  const cases: Case[] = [
+    {
+      tool: 'faq_create',
+      args: { question: 'Q', answer: 'A' },
+      feature: true,
+      staffMay: false,
+      run: () => m.faq.create,
+      read: () => null,
+    },
+    {
+      tool: 'faq_update',
+      args: { faqId: 'f1', answer: 'N' },
+      feature: true,
+      staffMay: false,
+      run: () => m.faq.update,
+      read: () => m.faq.get,
+    },
+    {
+      tool: 'size_chart_create',
+      args: { name: 'T', columns: [{ label: 'a' }, { label: 'b' }], rows: [['1', '2']] },
+      feature: false,
+      staffMay: true,
+      run: () => m.chart.create,
+      read: () => null,
+    },
+    {
+      tool: 'size_chart_update',
+      args: { chartId: 'sc1', note: 'n' },
+      feature: false,
+      staffMay: true,
+      run: () => m.chart.update,
+      read: () => m.chart.get,
+    },
+    {
+      tool: 'legal_page_update',
+      args: { slug: 'terms', title: 'T' },
+      feature: false,
+      staffMay: false,
+      run: () => m.pages.upsert,
+      read: () => m.pages.get,
+    },
+    {
+      tool: 'blog_post_draft',
+      args: { slug: 'a', title: 'T', content: 'C' },
+      feature: false,
+      staffMay: true,
+      run: () => m.blog.create,
+      read: () => null,
+    },
+    {
+      tool: 'blog_post_discard_draft',
+      args: { postId: 'b1' },
+      feature: false,
+      staffMay: true,
+      run: () => m.blog.remove,
+      read: () => m.blog.getById,
+    },
+  ];
+  const untouched = (c: Case) => {
+    expect(c.run()).not.toHaveBeenCalled();
+    expect(m.insertAuditLog).not.toHaveBeenCalled();
+  };
+  describe.each(cases)('$tool', c => {
+    it('a role without the route permission is refused at PREVIEW (no card, nothing read)', async () => {
+      const roles = c.staffMay ? ['customer'] : ['staff', 'customer'];
+      for (const role of roles) {
+        await expect(previewOf(T(c.tool), c.args, role)).rejects.toThrow(/FORBIDDEN/);
+        if (c.read()) expect(c.read()).not.toHaveBeenCalled();
+      }
+      untouched(c);
+    });
+    it('and at APPLY with ToolForbidden', async () => {
+      await expect(
+        applyOf(T(c.tool), c.args, c.staffMay ? 'customer' : 'staff')
+      ).rejects.toBeInstanceOf(ToolForbidden);
+      untouched(c);
+    });
+    it('a super admin (impersonation) is refused at preview and apply', async () => {
+      await expect(previewOf(T(c.tool), c.args, 'super_admin')).rejects.toThrow(/FORBIDDEN/);
+      await expect(applyOf(T(c.tool), c.args, 'super_admin')).rejects.toBeInstanceOf(ToolForbidden);
+      untouched(c);
+    });
+    if (c.feature)
+      it('plan feature off: refused at preview and, if it flips after the card, at apply', async () => {
+        m.featureEnabled.mockResolvedValue(false);
+        await expect(previewOf(T(c.tool), c.args)).rejects.toThrow(/feature/);
+        m.featureEnabled.mockResolvedValue(true);
+        const t = T(c.tool);
+        const draft = await previewOf(t, c.args);
+        m.featureEnabled.mockResolvedValue(false);
+        await expect(t.apply!(ctxOf(), c.args as never, draft)).rejects.toBeInstanceOf(
+          ToolForbidden
+        );
+        untouched(c);
+      });
   });
 });

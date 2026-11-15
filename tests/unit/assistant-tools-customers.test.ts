@@ -1,4 +1,4 @@
-/** Customers assistant tools (plan 4 C2): customer_group_upsert + review_moderate. */
+/** Customers assistant tools (plan 4 C2): customer_group_create / customer_group_update + review_moderate. */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   ToolForbidden,
@@ -50,6 +50,8 @@ vi.mock('@api/lib/b2b-invalidate', async () => ({
 }));
 
 import { customersTools } from '@api/smart-layer/tools/customers.tools';
+import { MerchantForbidden } from '@api/mcp/run-as-merchant';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
   product: 'store',
@@ -63,10 +65,24 @@ const ctx = (role = 'store_admin'): TurnCtx => ({
 });
 const tool = (n: string): ToolSpec => customersTools().find(t => t.name === n)!;
 const parse = (n: string, a: unknown) => tool(n).args.parse(a) as never;
-const G1 = { id: 'G1', name: 'VIP', nameAr: null, isActive: true, discountBps: 0, updatedAt: 'x' };
+const G1 = {
+  id: 'G1',
+  name: 'VIP',
+  nameAr: null,
+  isActive: true,
+  pricingMode: 'none',
+  discountBps: 0,
+  isWholesale: false,
+  customerCount: 1,
+  updatedAt: 'x',
+};
+let group1: Record<string, unknown> = G1;
+let g9: Record<string, unknown> = { ...G1, id: 'G9' };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  group1 = G1;
+  g9 = { ...G1, id: 'G9' };
   m.featureEnabled.mockResolvedValue(true);
   m.insertAuditLog.mockResolvedValue(undefined);
   m.customers = [
@@ -74,8 +90,9 @@ beforeEach(() => {
     { id: 'C2', groupId: null },
   ];
   m.groupSvc.get.mockImplementation(async (_s: string, id: string) => {
-    if (id === 'G1') return G1;
-    if (id === 'G9') return { ...G1, id: 'G9' };
+    if (id === 'G1') return group1;
+    if (id === 'G9') return g9;
+    if (id === 'NEW') return { ...G1, id: 'NEW', name: 'Fresh', customerCount: 0 };
     throw Object.assign(new Error('Customer group not found'), { statusCode: 404 });
   });
   m.groupSvc.create.mockResolvedValue({ id: 'NEW' });
@@ -95,7 +112,11 @@ beforeEach(() => {
 describe('customers tools', () => {
   it('exposes the planned tools, preview class, reversible, none taking a store id', () => {
     const ts = customersTools();
-    expect(ts.map(t => t.name).sort()).toEqual(['customer_group_upsert', 'review_moderate']);
+    expect(ts.map(t => t.name).sort()).toEqual([
+      'customer_group_create',
+      'customer_group_update',
+      'review_moderate',
+    ]);
     for (const t of ts) {
       expect(t.policy).toBe('preview');
       expect(t.undo).toBe('reversible');
@@ -103,12 +124,13 @@ describe('customers tools', () => {
     }
   });
 
-  describe('customer_group_upsert', () => {
-    const name = 'customer_group_upsert';
+  describe('customer_group_update / create', () => {
+    const name = 'customer_group_update';
+    const create = 'customer_group_create';
     it('preview lists before/after rows, an etag and the BEFORE values', async () => {
       const args = parse(name, { groupId: 'G1', name: 'Gold', discountBps: 500 });
       const d = await tool(name).preview!(ctx(), args);
-      expect(d.rows.map(r => r.after)).toEqual(['Gold', 500]);
+      expect(d.rows.map(r => r.after).slice(0, 2)).toEqual(['Gold', 500]);
       expect(d.rows[0].before).toBe('VIP');
       expect(d.etag).toMatch(/^[0-9a-f]{32}$/);
       expect((d.payload as { restore: { group: unknown } }).restore.group).toEqual({
@@ -192,8 +214,8 @@ describe('customers tools', () => {
     });
 
     it('the inverse of a create switches the new group off (there is no delete tool)', async () => {
-      const args = parse(name, { name: 'Fresh' });
-      const t = tool(name);
+      const args = parse(create, { name: 'Fresh' });
+      const t = tool(create);
       const d = await t.preview!(ctx(), args);
       const inv = t.inverse!(ctx(), args, d, {
         ok: true,
@@ -201,6 +223,7 @@ describe('customers tools', () => {
         result: { groupId: 'NEW' },
       });
       expect(inv).toEqual({ tool: name, args: { groupId: 'NEW', isActive: false } });
+      expect(tool(create).args.safeParse({ groupId: 'x', name: 'y' }).success).toBe(false);
     });
 
     it('a foreign group or customer id never reaches run', async () => {
@@ -228,6 +251,7 @@ describe('customers tools', () => {
       ]);
       expect(t.args.safeParse({}).success).toBe(false);
       expect(t.args.safeParse({ groupId: 'G1' }).success).toBe(false);
+      expect(tool(create).args.safeParse({}).success).toBe(false);
       expect(t.args.safeParse({ isDefault: true, groupId: 'G1', name: 'x' }).success).toBe(false);
     });
   });
@@ -282,5 +306,127 @@ describe('customers tools', () => {
       ).rejects.toThrow();
       expect(m.moderate).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('customers tools: price escalation, gates and undo (fix round)', () => {
+  const GROUP = 'customer_group_update';
+  const CREATE = 'customer_group_create';
+  const REVIEW = 'review_moderate';
+
+  it('a discount change on a 25-member group is confirm with the price, checkout and bulk reasons', async () => {
+    group1 = { ...G1, customerCount: 25 };
+    const d = await tool(GROUP).preview!(ctx(), parse(GROUP, { groupId: 'G1', discountBps: 9000 }));
+    expect(d.changesPrice).toBe(true);
+    expect(d.touchesCheckout).toBe(true);
+    expect(d.affectedCount).toBe(25);
+    const e = effectivePolicy(tool(GROUP), d);
+    expect(e.policy).toBe('confirm');
+    expect(e.reasons).toEqual(expect.arrayContaining(['price', 'checkout', 'bulk']));
+  });
+
+  it('a pricing mode change, and switching a priced group off, change prices too', async () => {
+    const a = await tool(GROUP).preview!(
+      ctx(),
+      parse(GROUP, { groupId: 'G1', pricingMode: 'percent_off' })
+    );
+    expect(a.changesPrice).toBe(true);
+    group1 = { ...G1, pricingMode: 'percent_off', discountBps: 500 };
+    const b = await tool(GROUP).preview!(ctx(), parse(GROUP, { groupId: 'G1', isActive: false }));
+    expect(b.changesPrice).toBe(true);
+  });
+
+  it('creating a group with a discount changes prices; a plain new group does not', async () => {
+    const priced = await tool(CREATE).preview!(
+      ctx(),
+      parse(CREATE, { name: 'Wholesale', discountBps: 1000 })
+    );
+    expect(priced.changesPrice).toBe(true);
+    const plain = await tool(CREATE).preview!(ctx(), parse(CREATE, { name: 'Friends' }));
+    expect(plain.changesPrice).toBeUndefined();
+  });
+
+  it('a rename of a 1-member group stays a preview', async () => {
+    const d = await tool(GROUP).preview!(ctx(), parse(GROUP, { groupId: 'G1', name: 'Gold' }));
+    expect(d.changesPrice).toBeUndefined();
+    expect(d.touchesCheckout).toBeUndefined();
+    expect(d.affectedCount).toBe(1);
+    expect(effectivePolicy(tool(GROUP), d)).toEqual({ policy: 'preview', reasons: [] });
+  });
+
+  it('moving customers into, or out of, a priced group changes prices; into an unpriced one does not', async () => {
+    const into = await tool(GROUP).preview!(
+      ctx(),
+      parse(GROUP, { groupId: 'G1', customerIds: ['C2'] })
+    );
+    expect(into.changesPrice).toBeUndefined();
+    group1 = { ...G1, pricingMode: 'percent_off', discountBps: 500 };
+    const toPriced = await tool(GROUP).preview!(
+      ctx(),
+      parse(GROUP, { groupId: 'G1', customerIds: ['C2'] })
+    );
+    expect(toPriced.changesPrice).toBe(true);
+    group1 = G1;
+    g9 = { ...G1, id: 'G9', pricingMode: 'percent_off', discountBps: 300 };
+    const outOf = await tool(GROUP).preview!(
+      ctx(),
+      parse(GROUP, {
+        groupId: 'G1',
+        assignments: [
+          { customerId: 'C2', groupId: null },
+          { customerId: 'C1', groupId: null },
+        ],
+      })
+    );
+    expect(outOf.changesPrice).toBe(true); // C1 leaves G9, which is priced here (the mock serves one shape for G9)
+  });
+
+  it('every tool refuses staff at PREVIEW (no card) and at APPLY, and a feature that is off', async () => {
+    const cases: Array<[string, unknown]> = [
+      [GROUP, { groupId: 'G1', name: 'Gold' }],
+      [CREATE, { name: 'Fresh' }],
+      [REVIEW, { reviewId: 'R1', status: 'published' }],
+    ];
+    for (const [n, raw] of cases) {
+      const args = parse(n, raw);
+      const t = tool(n);
+      await expect(t.preview!(ctx('staff'), args)).rejects.toBeInstanceOf(MerchantForbidden);
+      await expect(t.preview!(ctx('super_admin'), args)).rejects.toBeInstanceOf(MerchantForbidden);
+      const d = await t.preview!(ctx(), args);
+      await expect(t.apply!(ctx('staff'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
+      await expect(t.apply!(ctx('super_admin'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
+    }
+    expect(m.groupSvc.update).not.toHaveBeenCalled();
+    expect(m.moderate).not.toHaveBeenCalled();
+    m.featureEnabled.mockResolvedValue(false);
+    const rv = parse(REVIEW, { reviewId: 'R1', status: 'published' });
+    await expect(tool(REVIEW).preview!(ctx(), rv)).rejects.toBeInstanceOf(MerchantForbidden);
+  });
+
+  it('approving a review tells the merchant Undo does not take back the loyalty points', async () => {
+    m.review = { ...m.review!, customerId: 'U1' };
+    const d = await tool(REVIEW).preview!(
+      ctx(),
+      parse(REVIEW, { reviewId: 'R1', status: 'published' })
+    );
+    expect(JSON.stringify(d.rows)).toContain('Undo does not take them back');
+    const h = await tool(REVIEW).preview!(
+      ctx(),
+      parse(REVIEW, { reviewId: 'R1', status: 'rejected' })
+    );
+    expect(JSON.stringify(h.rows)).not.toContain('Loyalty');
+  });
+
+  it('engine round trip: undoing an update, a create, a membership move and a review change is `undone`', async () => {
+    const all = customersTools();
+    for (const [n, raw] of [
+      [GROUP, { groupId: 'G1', name: 'Gold', customerIds: ['C1', 'C2'] }],
+      [CREATE, { name: 'Fresh' }],
+      [REVIEW, { reviewId: 'R1', status: 'rejected' }],
+    ] as Array<[string, unknown]>) {
+      const r = await applyThenUndo(all, tool(n), parse(n, raw));
+      expect(r.applied, n).toBe('applied');
+      expect(r.undo, `${n} ${JSON.stringify(raw)}`).toBe('undone');
+    }
   });
 });

@@ -54,6 +54,17 @@ const seoMetaUpdate = keyedTool({
   }),
   audit: 'store.seo.updated',
   summary: { ar: 'هعدّل ظهور المتجر في جوجل', en: 'Update how the store appears on Google' },
+  // Hiding the store removes it from Google in one click: a merchant confirms it (touchesCheckout makes the engine ask for confirm).
+  extra: (a, st) =>
+    a.hideFromSearchEngines === true && st.hideFromSearchEngines !== true
+      ? {
+          touchesCheckout: true,
+          note: {
+            ar: 'المتجر هيختفي من نتايج جوجل ومحركات البحث لحد ما ترجّعه',
+            en: 'the store disappears from Google and other search engines until you turn this back',
+          },
+        }
+      : {},
   // routes/store.routes.ts PUT /:id/seo
   run: (ctx, patch) => StoreService.updateSeo(ctx.storeId, patch as never),
 });

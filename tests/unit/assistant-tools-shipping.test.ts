@@ -48,6 +48,7 @@ vi.mock('@api/services/carriers/carrier-connection.service', () => ({
   assertMayConfigureCarrier: vi.fn(),
 }));
 
+import { applyThenUndo } from './helpers/undo-roundtrip';
 import { shippingTools } from '@api/smart-layer/tools/shipping.tools';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
@@ -268,4 +269,51 @@ describe('shipping tools', () => {
       expect(m.upsertCarrierConfig).not.toHaveBeenCalled();
     });
   });
+});
+
+describe('role and plan gates on every tool (mutation targets: roles gate, feature gate)', () => {
+  const cases: Array<{ name: string; args: unknown; feature?: boolean }> = [
+    { name: 'shipping_rate_set', args: { rates: [{ rateId: 'r1', deliveryFeeEgp: 60 }] } },
+    { name: 'checkout_delivery_set', args: { minimumOrderEgp: 250 } },
+    { name: 'carrier_settings', args: { carrier: 'bosta', enabled: false }, feature: true },
+  ];
+  for (const c of cases) {
+    it(`${c.name}: staff is refused at preview, the card is never built`, async () => {
+      await expect(tool(c.name).preview!(ctx('staff'), parse(c.name, c.args))).rejects.toThrow(
+        /FORBIDDEN/
+      );
+    });
+    it(`${c.name}: staff is refused at apply and nothing is written`, async () => {
+      const t = tool(c.name);
+      const a = parse(c.name, c.args);
+      const d = await t.preview!(ctx(), a);
+      await expect(t.apply!(ctx('staff'), a, d)).rejects.toBeInstanceOf(ToolForbidden);
+      expect(m.insertAuditLog).not.toHaveBeenCalled();
+    });
+    it(`${c.name}: a super admin never acts through it`, async () => {
+      await expect(
+        tool(c.name).preview!(ctx('super_admin'), parse(c.name, c.args))
+      ).rejects.toThrow(/FORBIDDEN/);
+    });
+    if (c.feature) {
+      it(`${c.name}: plan feature off is refused at preview and at apply`, async () => {
+        const t = tool(c.name);
+        const a = parse(c.name, c.args);
+        const d = await t.preview!(ctx(), a);
+        m.featureEnabled.mockResolvedValue(false);
+        await expect(t.preview!(ctx(), a)).rejects.toThrow(/FORBIDDEN/);
+        await expect(t.apply!(ctx(), a, d)).rejects.toBeInstanceOf(ToolForbidden);
+      });
+    }
+    it(`${c.name}: undo through the engine round trip is accepted and its args pass validation`, async () => {
+      const t = tool(c.name);
+      const r = await applyThenUndo(shippingTools(), t, c.args);
+      expect(r.applied).toBe('applied');
+      expect(['undone', 'needs_confirm']).toContain(r.undo);
+      const a = parse(c.name, c.args);
+      const d = await t.preview!(ctx(), a);
+      const inv = t.inverse!(ctx(), a, d, { ok: true, etagAfter: 'x' });
+      if (inv) expect(() => t.args.parse(inv.args)).not.toThrow();
+    });
+  }
 });
