@@ -1,0 +1,42 @@
+{
+  "id": "marketing.overview",
+  "status": "live",
+  "area": "marketing",
+  "version": 1,
+  "versionDate": "2026-11-15",
+  "titleAr": "نظرة على التسويق: الحملات والاشتراكات والولاء",
+  "titleEn": "Marketing overview: campaigns, subscribers, loyalty",
+  "screens": ["/stores/[id]/campaigns"],
+  "api": [],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "read only"
+  },
+  "helpArticle": "email-campaigns",
+  "questions": {
+    "ar": [
+      "الحملات اللي بعتها كانت عاملة ايه؟",
+      "كام مشترك في النشرة؟",
+      "كام عميل عنده نقط ولاء؟",
+      "رصيد محفظة العملاء كام؟"
+    ],
+    "en": [
+      "How did my campaigns do?",
+      "How many newsletter subscribers do I have?",
+      "How much store credit is outstanding?"
+    ]
+  },
+  "steps": [
+    "The assistant reads campaigns, newsletter subscribers (masked), recent push broadcasts, affiliates, loyalty and wallet totals with your own permissions"
+  ],
+  "edgeCases": [
+    "Team member lacking the permission gets no answer about that area: the assistant states who can do it (store owner)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage returns an error: the assistant reports it and does not claim a figure"
+  ],
+  "gaps": []
+}

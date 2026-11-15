@@ -418,3 +418,30 @@ Return STRICT JSON: { "explanationEn": "...", "explanationAr": "...", "likelyCau
   logger.info({ storeId, detected, p0Count }, 'profit-anomaly-scan completed');
   return { detected, p0Count };
 }
+
+/** One anomaly of this store (the store filter makes a foreign id simply absent). */
+export async function getProfitAnomaly(storeId: string, id: string) {
+  const db = await storeDb(storeId);
+  return db.profitAnomaly.findFirst({
+    where: { id, storeId },
+    select: {
+      id: true,
+      metric: true,
+      severity: true,
+      deltaPercent: true,
+      explanationEn: true,
+      explanationAr: true,
+      acknowledged: true,
+      detectedAt: true,
+    },
+  });
+}
+
+/** Marks one anomaly acknowledged (no-op when it already is). Shared by `POST /finance/anomalies/:id/acknowledge` and the assistant. */
+export async function acknowledgeProfitAnomaly(storeId: string, id: string, userId: string | null) {
+  const w = await storeWriter(storeId);
+  return w.profitAnomaly.updateMany({
+    where: { id, storeId, acknowledged: false },
+    data: { acknowledged: true, acknowledgedBy: userId, acknowledgedAt: new Date() },
+  });
+}

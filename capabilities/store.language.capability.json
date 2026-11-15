@@ -1,0 +1,34 @@
+{
+  "id": "store.language",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "لغة المتجر",
+  "titleEn": "Storefront languages and default language",
+  "screens": ["/stores/[id]/language"],
+  "api": ["PUT /stores/:storeId (languages)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "store-language-urls",
+  "questions": {
+    "ar": ["ازاي اخلي المتجر عربي وانجليزي؟", "اللغة الافتراضية ايه؟", "اشيل اللغة الانجليزي"],
+    "en": ["How do I make my store bilingual?"]
+  },
+  "steps": ["Language page: default language and enabled languages."],
+  "edgeCases": [
+    "Product missing a translation falls back to default (AI translate-missing button)",
+    "/en and /ar URL prefixes (LOCALE-PATHS-1 #647 open): cart/checkout/search still unprefixed on some stores",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["English prefixed cart/checkout is OPEN-PR #647"]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "planned.inventory-fixes",
+  "status": "in-pr",
+  "pr": "ebda-store#754",
+  "area": "inventory",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تصحيحات المخزون",
+  "titleEn": "Inventory correctness (stale writes, failed-payment hold release, COD-aware reorder)",
+  "screens": ["/stores/[id]/stock/*"],
+  "api": ["(PR)"],
+  "mcpTool": null,
+  "planGate": "inventory.*",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["المخزون بيتخصم ومابيرجعش لما الدفع يفشل"],
+    "en": ["Stock stays held after a failed payment"]
+  },
+  "steps": ["Known issue; fix in review."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
+  ],
+  "gaps": ["bug-class fixes not merged"]
+}

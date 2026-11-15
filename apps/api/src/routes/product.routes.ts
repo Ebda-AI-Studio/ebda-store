@@ -11,6 +11,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { invalidateCachedPrefix } from '../lib/public-cache';
+import { createProductFaq, deleteProductFaq } from '../services/product-faq.service';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { EXCERPT_MAX_LENGTH } from '../lib/ai/product-excerpt-generator';
 import {
@@ -988,25 +989,8 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const w = await storeWriter(req.params.storeId);
-      const product = await w.product.findFirst({
-        where: { id: req.params.id, storeId: req.params.storeId },
-        select: { id: true },
-      });
-      if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
-
       const body = productFaqSchema.parse(req.body);
-      const faq = await w.productFaq.create({
-        data: {
-          productId: req.params.id,
-          question: body.question,
-          questionAr: body.questionAr ?? null,
-          answer: body.answer,
-          answerAr: body.answerAr ?? null,
-          aiDrafted: false,
-          manuallyEdited: true,
-        },
-      });
+      const faq = await createProductFaq(req.params.storeId, req.params.id, body);
       res.status(201).json({ success: true, data: faq });
     } catch (error) {
       next(error);
@@ -1059,19 +1043,7 @@ router.delete(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const w = await storeWriter(req.params.storeId);
-      const product = await w.product.findFirst({
-        where: { id: req.params.id, storeId: req.params.storeId },
-        select: { id: true },
-      });
-      if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
-
-      const deleted = await w.productFaq.deleteMany({
-        where: { id: req.params.faqId, productId: req.params.id },
-      });
-      if (deleted.count === 0) {
-        throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
-      }
+      await deleteProductFaq(req.params.storeId, req.params.id, req.params.faqId);
       res.json({ success: true, data: { message: 'FAQ deleted' } });
     } catch (error) {
       next(error);
