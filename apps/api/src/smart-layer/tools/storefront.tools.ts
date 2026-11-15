@@ -157,40 +157,44 @@ const customerAccountStatus = freeRead({
 });
 
 // ---- store.domain ----------------------------------------------------------------------------------------------------------------------------
-type DomainArgs = { domain: string | null };
+// The route (routes/store.routes.ts PUT /:id/domain) is guarded by `rejectImpersonated` (handled at the router for the assistant) and
+// `requireMfaEnrolled`. That middleware only ENFORCES for super_admin (every other role passes through, require-mfa.ts), and `runAsMerchant`
+// refuses super_admin outright, so for every role that can reach this tool the route's MFA step-up is a no-op: the two paths are equivalent
+// (proved by tests/unit/assistant-tools-storefront.test.ts, which runs the real middleware for a store_admin without MFA).
+type DomainState = { domain: string | null; pendingDomain: string | null };
+type DomainArgs = { domain: string };
 const domainConnect = change<DomainArgs>({
   name: 'domain_connect',
   capabilityId: 'store.domain',
   description:
-    "Connect the merchant's own domain (for example mystore.com) to the store, or disconnect it with null. Connecting makes a pending claim: the card shows the DNS record to add at the registrar and the domain goes live only after DNS is verified (an unverified claim is released after 72 hours). Needs a plan with custom domains. Say: 'اربط الدومين بتاعي', 'connect my domain', 'فصل الدومين'.",
+    "Connect the merchant's own domain (for example mystore.com) to the store. This makes a pending claim: the card shows the DNS record to add at the registrar and the domain goes live only after DNS is verified (an unverified claim is released after 72 hours). Needs a plan with custom domains. To remove a domain use domain_disconnect. Say: 'اربط الدومين بتاعي', 'connect my domain'.",
   schema: shape<DomainArgs>(
-    {
-      domain: f.nullable(
-        f.str('The domain, e.g. mystore.com (no https://). null disconnects.', { max: 253 })
-      ),
-    },
+    { domain: f.str('The domain, e.g. mystore.com (no https://).', { max: 253 }) },
     ['domain']
   ),
   policy: 'confirm',
   undo: 'reversible',
-  // routes/store.routes.ts PUT /:id/domain (authorize store_admin; MFA is not re-checked here, see run-as-merchant.ts)
   gate: { roles: ROLES },
   audit: { action: 'store.domain.changed', resourceType: 'store', resourceId: () => undefined },
   state: ctx => readStoreDomainState(ctx.storeId),
   describe: (_ctx, a, st) => {
-    const now = st as { domain: string | null; pendingDomain: string | null };
-    const target = parseCustomDomain(a.domain); // throws the route's DOMAIN_INVALID message for an Ebda address or a malformed name
-    const before = now.domain ?? now.pendingDomain ?? null;
-    const records = target ? fallbackDnsRecords(target).filter(r => r.value) : [];
+    const now = st as DomainState;
+    const target = parseCustomDomain(a.domain) as string; // throws the route's DOMAIN_INVALID message for an Ebda address or a malformed name
+    const records = fallbackDnsRecords(target).filter(r => r.value);
     return {
-      summary: target
-        ? pair(
-            `هطلب ربط الدومين ${target} بالمتجر (بيبقى قيد التحقق لحد ما الـ DNS يتأكد)`,
-            `Claim ${target} for the store (pending until DNS is verified)`
-          )
-        : pair('هفصل الدومين الخاص عن المتجر', 'Disconnect the custom domain from the store'),
+      summary: pair(
+        `هطلب ربط الدومين ${target} بالمتجر (بيبقى قيد التحقق لحد ما الـ DNS يتأكد)`,
+        `Claim ${target} for the store (pending until DNS is verified)`
+      ),
       rows: [
-        row('الدومين الخاص', 'Custom domain', before, target),
+        // both are shown: a pending claim can exist next to the verified domain, and the old domain keeps serving until the new one is verified
+        row('الدومين المفعّل', 'Verified domain', now.domain, now.domain),
+        row(
+          'طلب الربط قيد التحقق',
+          'Pending claim',
+          now.pendingDomain,
+          target === now.domain ? null : target
+        ),
         ...records.map(r =>
           row(
             'سجل الـ DNS اللي هتضيفه عند مسجّل الدومين',
@@ -201,7 +205,7 @@ const domainConnect = change<DomainArgs>({
         ),
       ],
       affectedCount: 1,
-      restore: { domain: before },
+      restore: { domain: now.domain, pendingDomain: now.pendingDomain },
     };
   },
   run: async (ctx, a) => {
@@ -213,10 +217,53 @@ const domainConnect = change<DomainArgs>({
       dnsRecords: status?.dnsRecords ?? (r.domain ? fallbackDnsRecords(r.domain) : []),
     };
   },
-  inverse: (_a, restore) => ({
-    tool: 'domain_connect',
-    args: { domain: (restore as { domain: string | null }).domain },
-  }),
+  // Undo drops the new claim: re-saving the verified domain cancels any other pending claim and keeps the domain; with only an older
+  // claim it restores that claim; with nothing before, the undo is the confirm-class disconnect (its own card).
+  inverse: (_a, restore) => {
+    const r = restore as DomainState;
+    const keep = r.domain ?? r.pendingDomain;
+    return keep
+      ? { tool: 'domain_connect', args: { domain: keep } }
+      : { tool: 'domain_disconnect', args: {} };
+  },
+});
+
+const domainDisconnect = change<Rec>({
+  name: 'domain_disconnect',
+  capabilityId: 'store.domain',
+  description:
+    "Disconnect the store's custom domain and any pending claim. The storefront goes offline on that domain; to bring it back the merchant must connect it again and verify DNS again. Say: 'فصل الدومين', 'disconnect my domain', 'شيل الدومين'.",
+  schema: shape<Rec>({}, []),
+  policy: 'confirm',
+  undo: 'irreversible', // removing the provider hostname cannot be undone: a reconnect is a new claim that needs DNS verification again
+  // routes/store.routes.ts PUT /:id/domain with { domain: null } (same MFA note as domain_connect)
+  gate: { roles: ROLES },
+  audit: {
+    action: 'store.domain.disconnected',
+    resourceType: 'store',
+    resourceId: () => undefined,
+  },
+  state: ctx => readStoreDomainState(ctx.storeId),
+  describe: (_ctx, _a, st) => {
+    const now = st as DomainState;
+    if (!now.domain && !now.pendingDomain) throw new Error('no custom domain is connected');
+    const name = now.domain ?? now.pendingDomain;
+    return {
+      summary: pair(
+        `هفصل الدومين ${name}: المتجر مش هيفتح على الدومين ده (أوفلاين) ولو عايزه يرجع لازم تربطه من جديد وتتأكد من الـ DNS تاني`,
+        `Disconnect ${name}: the storefront goes offline on this domain; to bring it back you must connect it again and verify DNS again`
+      ),
+      rows: [
+        row('الدومين المفعّل', 'Verified domain', now.domain, null),
+        row('طلب الربط قيد التحقق', 'Pending claim', now.pendingDomain, null),
+      ],
+      affectedCount: 1,
+    };
+  },
+  run: async ctx => {
+    await setStoreDomain(ctx.storeId, null);
+    return { domain: null };
+  },
 });
 
 // ---- store.slug-redirects --------------------------------------------------------------------------------------------------------------------
@@ -237,7 +284,15 @@ const slugRedirectDelete = change<RedirectArgs>({
   gate: { roles: ROLES, feature: 'seo' },
   audit: { action: 'store.slug_redirect.deleted', resourceType: 'store' },
   state: async (ctx, a) => {
-    const { rows } = await listSlugRedirects(ctx.storeId, { q: a.fromSlug, limit: 50 });
+    // exact match: the service search is a substring match, so page through it (bounded) instead of trusting the first page
+    const rows: Awaited<ReturnType<typeof listSlugRedirects>>['rows'] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 20; page++) {
+      const r = await listSlugRedirects(ctx.storeId, { q: a.fromSlug, limit: 500, cursor });
+      rows.push(...r.rows);
+      if (!r.nextCursor) break;
+      cursor = r.nextCursor;
+    }
     const hits = rows
       .filter(r => r.fromSlug === a.fromSlug)
       .map(r => ({
@@ -281,13 +336,13 @@ type JobState = {
   products: number;
   categories: number;
 };
-/** The job row is created only if AI is on and none of this kind is already running; counts are read for the card (state is inside the store context). */
-async function jobState(ctx: TurnCtx, kind: BulkAiJobSpec['kind']): Promise<JobState> {
+/** The job row is created only if AI is on and no AI job is already queued or running; counts are read for the card (state is inside the store context). */
+async function jobState(ctx: TurnCtx): Promise<JobState> {
   const db = await storeDb(ctx.storeId);
   const [aiEnabled, active, products, categories] = await Promise.all([
     isStoreAiEnabled(ctx.storeId),
     db.bulkAiJob.findFirst({
-      where: { storeId: ctx.storeId, kind, status: { in: ['queued', 'running'] } },
+      where: { storeId: ctx.storeId, status: { in: ['queued', 'running'] } }, // ANY kind: one sweep at a time per store
       select: { id: true },
     }),
     db.product.count({ where: { storeId: ctx.storeId, deletedAt: null } }),
@@ -297,7 +352,8 @@ async function jobState(ctx: TurnCtx, kind: BulkAiJobSpec['kind']): Promise<JobS
 }
 function assertJobMayStart(st: JobState, bounded: boolean): void {
   if (!st.aiEnabled) throw new Error('AI is switched off for this store: turn it on first');
-  if (st.activeJobId) throw new Error('the same AI job is already running; wait for it to finish');
+  if (st.activeJobId)
+    throw new Error('an AI job is already running for this store; wait for it to finish');
   if (bounded && st.products > MAX_JOB_PRODUCTS)
     throw new Error(
       `this store has ${st.products} products; the assistant runs AI sweeps up to ${MAX_JOB_PRODUCTS}. Run it from the AI tools screen`
@@ -325,7 +381,7 @@ const llmsTxtGenerate = change<Rec>({
   // routes/ai.routes.ts POST /bulk/llms-txt (store_admin + requireFeature('bulk_operations') + requireAiEnabled)
   gate: { roles: ROLES, feature: 'bulk_operations' },
   audit: { action: 'store.ai.llms_txt.requested', resourceType: 'store' },
-  state: ctx => jobState(ctx, 'llms_txt'),
+  state: ctx => jobState(ctx),
   describe: (_ctx, _a, st) => {
     assertJobMayStart(st as JobState, false);
     return {
@@ -337,7 +393,10 @@ const llmsTxtGenerate = change<Rec>({
       affectedCount: 1,
     };
   },
-  run: ctx => startJob(ctx, { kind: 'llms_txt' }),
+  run: (ctx, _a, st) => {
+    assertJobMayStart(st as JobState, false); // re-checked at apply: a second card may have started a job since this preview
+    return startJob(ctx, { kind: 'llms_txt' });
+  },
 });
 
 type TranslateArgs = { direction: 'to_ar' | 'to_en' };
@@ -359,7 +418,7 @@ const aiBulkTranslate = change<TranslateArgs>({
   // routes/ai.routes.ts POST /bulk/translate (store_admin + requireFeature('bulk_operations') + requireAiEnabled)
   gate: { roles: ROLES, feature: 'bulk_operations' },
   audit: { action: 'store.ai.bulk_translate.requested', resourceType: 'store' },
-  state: ctx => jobState(ctx, 'translate'),
+  state: ctx => jobState(ctx),
   describe: (_ctx, a, st) => {
     const s = st as JobState;
     assertJobMayStart(s, true);
@@ -386,7 +445,10 @@ const aiBulkTranslate = change<TranslateArgs>({
       affectedCount: s.products,
     };
   },
-  run: (ctx, a) => startJob(ctx, { kind: 'translate', direction: a.direction }),
+  run: (ctx, a, st) => {
+    assertJobMayStart(st as JobState, true);
+    return startJob(ctx, { kind: 'translate', direction: a.direction });
+  },
 });
 
 const aiBulkSeo = change<Rec>({
@@ -399,7 +461,7 @@ const aiBulkSeo = change<Rec>({
   // routes/ai.routes.ts POST /bulk/seo (store_admin + requireFeature('bulk_operations') + requireAiEnabled)
   gate: { roles: ROLES, feature: 'bulk_operations' },
   audit: { action: 'store.ai.bulk_seo.requested', resourceType: 'store' },
-  state: ctx => jobState(ctx, 'seo'),
+  state: ctx => jobState(ctx),
   describe: (_ctx, _a, st) => {
     const s = st as JobState;
     assertJobMayStart(s, true);
@@ -417,7 +479,10 @@ const aiBulkSeo = change<Rec>({
       affectedCount: items,
     };
   },
-  run: ctx => startJob(ctx, { kind: 'seo' }),
+  run: (ctx, _a, st) => {
+    assertJobMayStart(st as JobState, true);
+    return startJob(ctx, { kind: 'seo' });
+  },
 });
 
 // ---- ai.switch-usage -------------------------------------------------------------------------------------------------------------------------
@@ -843,6 +908,7 @@ export function storefrontTools(): ToolSpec[] {
     shopperFeaturesStatus,
     customerAccountStatus,
     domainConnect,
+    domainDisconnect,
     slugRedirectDelete,
     llmsTxtGenerate,
     aiBulkTranslate,

@@ -105,6 +105,7 @@ import { checkAdapterContract, type SmartLayerAdapter } from '@ebda/shared/smart
 import { storeRegistry } from '@api/smart-layer/registry';
 import { storefrontTools } from '@api/smart-layer/tools/storefront.tools';
 import { applyOf, ctxOf, previewOf, toolNamed } from './helpers/assistant-tool-harness';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 
 const tools = storefrontTools();
 const T = (n: string) => toolNamed(tools, n);
@@ -213,7 +214,14 @@ describe('domain_connect', () => {
   it('is confirm-class, shows the DNS record and the before value, restores the old domain', async () => {
     const d = await previewOf(t(), { domain: 'WWW.Shop.com' });
     expect(t().policy).toBe('confirm');
-    expect(d.rows[0]).toMatchObject({ before: 'old.com', after: 'shop.com' });
+    expect(d.rows.find(r => r.label.en === 'Verified domain')).toMatchObject({
+      before: 'old.com',
+      after: 'old.com',
+    });
+    expect(d.rows.find(r => r.label.en === 'Pending claim')).toMatchObject({
+      before: null,
+      after: 'shop.com',
+    });
     expect(JSON.stringify(d.rows)).toContain('CNAME shop.com -> fallback.example');
     expect(d.etag).toMatch(/^[0-9a-f]{32}$/);
     expect(effectivePolicy(t(), d, { cap: cap('confirm', 'reversible') }).policy).toBe('confirm');
@@ -230,6 +238,7 @@ describe('domain_connect', () => {
       ToolForbidden
     );
     await expect(previewOf(t(), { domain: 'x.ebda.app' })).rejects.toThrow(/own domain/);
+    expect(t().args.safeParse({ domain: null }).success).toBe(false); // disconnecting is its own tool
   });
 });
 
@@ -400,6 +409,7 @@ describe('branches', () => {
   beforeEach(() => m.loc.list.mockResolvedValue([row]));
   it('location_add creates through the service; its inverse is the confirm-class location_delete of the new id', async () => {
     m.loc.create.mockResolvedValue({ id: 'l2' });
+    m.loc.list.mockResolvedValue([row, { ...row, id: 'l2' }]); // the new row exists once created (the kit reads the undo tool's state on it)
     const t = T('location_add');
     const { draft, applied } = await applyOf(t, {
       name: 'Zayed',
@@ -444,5 +454,228 @@ describe('branches', () => {
     await applyOf(t, { locationId: 'l1' });
     expect(m.loc.remove).toHaveBeenCalledWith('s1', 'l1');
     await expect(applyOf(t, { locationId: 'l1' }, 'staff')).rejects.toBeInstanceOf(ToolForbidden);
+  });
+});
+
+// ---- fix round for PR 803 ----------------------------------------------------------------------------------------------------------------------
+describe('domain_disconnect (finding 2)', () => {
+  const t = () => T('domain_disconnect');
+  beforeEach(() => {
+    m.domainState.mockResolvedValue({
+      domain: 'old.com',
+      pendingDomain: 'next.com',
+      domainStatus: 'active',
+    });
+    m.setDomain.mockResolvedValue({ claimState: null, domain: null, provider: {} });
+  });
+  it('is confirm-class, irreversible, has no inverse, and the card says the store goes offline and DNS must be redone', async () => {
+    expect(t().policy).toBe('confirm');
+    expect(t().undo).toBe('irreversible');
+    expect(t().inverse).toBeUndefined();
+    const d = await previewOf(t(), {});
+    const text = JSON.stringify([d.summary, d.rows]);
+    expect(text).toContain('old.com');
+    expect(text).toContain('next.com');
+    expect(d.summary.en).toMatch(/offline/i);
+    expect(d.summary.en).toMatch(/verify DNS again/i);
+    expect(d.summary.ar).toMatch(/أوفلاين|مش هيفتح/);
+    expect(effectivePolicy(t(), d, { cap: cap('confirm', 'reversible') }).reasons).toContain(
+      'irreversible'
+    );
+  });
+  it('disconnects through setStoreDomain(null) with the assistant audit; nothing connected never reaches run', async () => {
+    await applyOf(t(), {});
+    expect(m.setDomain).toHaveBeenCalledWith('s1', null);
+    expect(m.insertAuditLog.mock.calls[0]![0].details.actor).toBe('assistant');
+    m.setDomain.mockClear();
+    m.domainState.mockResolvedValue({ domain: null, pendingDomain: null, domainStatus: null });
+    await expect(applyOf(t(), {})).rejects.toThrow(/no custom domain/);
+    expect(m.setDomain).not.toHaveBeenCalled();
+  });
+});
+
+describe('domain_connect details (finding 3)', () => {
+  it('shows a pending claim next to the verified domain', async () => {
+    m.domainState.mockResolvedValue({
+      domain: 'old.com',
+      pendingDomain: 'half.com',
+      domainStatus: 'active',
+    });
+    const d = await previewOf(T('domain_connect'), { domain: 'new.com' });
+    expect(d.rows.find(r => r.label.en === 'Verified domain')).toMatchObject({ before: 'old.com' });
+    expect(d.rows.find(r => r.label.en === 'Pending claim')).toMatchObject({
+      before: 'half.com',
+      after: 'new.com',
+    });
+  });
+  it('undo of a first connect is a confirm-class disconnect card, undo of a replace re-saves the old domain', async () => {
+    m.domainState.mockResolvedValue({ domain: null, pendingDomain: null, domainStatus: null });
+    m.setDomain.mockImplementation(async () => {
+      // after the claim the store holds a pending domain (what the disconnect card will read)
+      m.domainState.mockResolvedValue({
+        domain: null,
+        pendingDomain: 'shop.com',
+        domainStatus: 'pending',
+      });
+      return {
+        claimState: 'pending',
+        domain: 'shop.com',
+        provider: { getDomain: async () => null },
+      };
+    });
+    const first = await applyThenUndo(tools, T('domain_connect'), { domain: 'shop.com' });
+    expect(first.applied).toBe('applied');
+    expect(first.undo).toBe('needs_confirm');
+    m.domainState.mockResolvedValue({
+      domain: 'old.com',
+      pendingDomain: null,
+      domainStatus: 'active',
+    });
+    const second = await applyThenUndo(tools, T('domain_connect'), { domain: 'shop.com' });
+    expect(['undone', 'needs_confirm']).toContain(second.undo);
+  });
+});
+
+describe('slug_redirect_delete exact lookup (finding 3)', () => {
+  it('pages past the first 500 matches until the exact slug is found', async () => {
+    const filler = Array.from({ length: 3 }, (_, i) => ({
+      id: `f${i}`,
+      entityType: 'PRODUCT',
+      fromSlug: `old-${i}`,
+      toSlug: 'x',
+    }));
+    m.listRedirects
+      .mockResolvedValueOnce({ rows: filler, nextCursor: 'f2' })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'hit', entityType: 'PRODUCT', fromSlug: 'old', toSlug: 'new' }],
+        nextCursor: null,
+      });
+    const d = await previewOf(T('slug_redirect_delete'), { fromSlug: 'old' });
+    expect(d.affectedCount).toBe(1);
+    expect(m.listRedirects.mock.calls[1]![1]).toMatchObject({ cursor: 'f2' });
+  });
+});
+
+describe('only one AI job at a time (finding 3)', () => {
+  it('any running job refuses a new one at preview AND at apply', async () => {
+    const t = T('ai_bulk_seo');
+    const draft = await previewOf(t, {}); // none running at preview
+    m.counts.active = { id: 'other-kind-job' };
+    await expect(previewOf(t, {})).rejects.toThrow(/already running/);
+    await expect(t.apply!(ctxOf(), {} as never, draft)).rejects.toThrow(/already running/);
+    expect(m.enqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe('location_add undo round trip (finding 3)', () => {
+  it('undoes to a confirm-class delete card', async () => {
+    const created = { id: 'l9', name: 'Z', country: 'Egypt', address: 'Hub', updatedAt: 1 };
+    m.loc.create.mockResolvedValue(created);
+    m.loc.list.mockResolvedValue([created]);
+    const r = await applyThenUndo(tools, T('location_add'), {
+      name: 'Z',
+      country: 'Egypt',
+      address: 'Hub',
+    });
+    expect(r.applied).toBe('applied');
+    expect(r.undo).toBe('needs_confirm');
+  });
+});
+
+describe('update tools: undo args pass their own validation', () => {
+  it('location_update, pwa_settings_update, qr_design_update, ai_switch_set all come back undone', async () => {
+    m.loc.list.mockResolvedValue([
+      { id: 'l1', name: 'M', country: 'Egypt', address: 'A', hours: '9-5', updatedAt: 1 },
+    ]);
+    m.loc.update.mockResolvedValue({ id: 'l1' });
+    m.pwaGet.mockResolvedValue({ pwaEnabled: false, settings: { appName: 'Old' } });
+    for (const [name, args] of [
+      ['location_update', { locationId: 'l1', hours: '10-6' }],
+      ['pwa_settings_update', { pwaEnabled: true, appName: 'New' }],
+      ['qr_design_update', { frame: 'badge', ctaText: 'امسح' }],
+      ['ai_switch_set', { enabled: false }],
+    ] as const) {
+      const r = await applyThenUndo(tools, T(name), args);
+      expect(r, name).toMatchObject({ applied: 'applied', undo: 'undone' });
+    }
+  });
+});
+
+// Every tool of the slice: the role gate at preview and at apply, and the plan-feature gate (finding 4).
+const GATED: Array<[string, unknown, string | undefined]> = [
+  ['domain_connect', { domain: 'shop.com' }, undefined],
+  ['domain_disconnect', {}, undefined],
+  ['slug_redirect_delete', { fromSlug: 'old' }, 'seo'],
+  ['llms_txt_generate', {}, 'bulk_operations'],
+  ['ai_bulk_translate', { direction: 'to_ar' }, 'bulk_operations'],
+  ['ai_bulk_seo', {}, 'bulk_operations'],
+  ['ai_switch_set', { enabled: false }, undefined],
+  ['pwa_settings_update', { appName: 'a' }, 'pwa'],
+  ['qr_design_update', { logo: true }, 'inventory.barcode'],
+  ['location_add', { name: 'n', country: 'Egypt', address: 'a' }, undefined],
+  ['location_update', { locationId: 'l1', hours: 'x' }, undefined],
+  ['location_delete', { locationId: 'l1' }, undefined],
+];
+describe.each(GATED)('gates of %s', (name, args, feature) => {
+  beforeEach(() => {
+    m.domainState.mockResolvedValue({
+      domain: 'old.com',
+      pendingDomain: null,
+      domainStatus: 'active',
+    });
+    m.listRedirects.mockResolvedValue({
+      rows: [{ id: 'r1', entityType: 'PRODUCT', fromSlug: 'old', toSlug: 'new' }],
+    });
+    m.loc.list.mockResolvedValue([
+      { id: 'l1', name: 'M', country: 'Egypt', address: 'A', hours: '9-5', updatedAt: 1 },
+    ]);
+    m.pwaGet.mockResolvedValue({ pwaEnabled: false, settings: {} });
+    m.enqueue.mockResolvedValue({ id: 'j' });
+    m.setDomain.mockResolvedValue({
+      claimState: 'pending',
+      domain: 'shop.com',
+      provider: { getDomain: async () => null },
+    });
+    m.loc.create.mockResolvedValue({ id: 'n1' });
+    m.loc.update.mockResolvedValue({ id: 'l1' });
+    m.loc.remove.mockResolvedValue(true);
+  });
+  const sideEffects = () =>
+    [
+      m.setDomain,
+      m.deleteRedirect,
+      m.enqueue,
+      m.setAi,
+      m.pwaUpdate,
+      m.qrUpdate,
+      m.loc.create,
+      m.loc.update,
+      m.loc.remove,
+    ].some(f => f.mock.calls.length > 0);
+  it('a staff member never gets a card (preview refused)', async () => {
+    await expect(previewOf(T(name), args, 'staff')).rejects.toThrow(/FORBIDDEN/);
+  });
+  it('a staff member pressing apply gets ToolForbidden and nothing runs', async () => {
+    const d = await previewOf(T(name), args);
+    await expect(T(name).apply!(ctxOf('staff'), args as never, d)).rejects.toBeInstanceOf(
+      ToolForbidden
+    );
+    expect(sideEffects()).toBe(false);
+  });
+  if (feature)
+    it(`the ${feature} plan feature is required at preview and at apply`, async () => {
+      const d = await previewOf(T(name), args);
+      m.featureEnabled.mockImplementation(async (_s: string, k: string) => k !== feature);
+      await expect(previewOf(T(name), args)).rejects.toThrow(/feature/);
+      await expect(T(name).apply!(ctxOf(), args as never, d)).rejects.toBeInstanceOf(ToolForbidden);
+      expect(m.featureEnabled).toHaveBeenCalledWith('s1', feature);
+      expect(sideEffects()).toBe(false);
+    });
+});
+
+describe('reads refuse staff where the route does', () => {
+  it('pages_list is store_admin only', async () => {
+    m.pages.mockResolvedValue([]);
+    await expect(T('pages_list').read!(ctxOf('staff'), {} as never)).rejects.toThrow(/forbidden/);
   });
 });
