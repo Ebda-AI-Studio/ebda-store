@@ -82,6 +82,7 @@ export class GscNoAccessError extends Error {
 }
 
 /** Anchored RE2 regex matching only pages served on exactly `host` (dots and other metacharacters escaped). */
+// pq-allow(unused-export): test seam, imported by __tests__/gsc-target.test.ts (cross-store leak proof)
 export function gscPageHostRegex(host: string): string {
   return `^https?://${host.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`;
 }
