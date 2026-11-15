@@ -48,6 +48,33 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     },
-    "introDo": "I tell you how to do something, show you the screen and prepare the change as a preview. You review and apply it, and you can undo it."
+    "introDo": "I tell you how to do something, show you the screen and prepare the change as a preview. You review and apply it, and you can undo it.",
+    "confirm": {
+      "label": "A change that needs your confirmation",
+      "why": "Why it needs a yes",
+      "reasons": {
+        "money": "Money",
+        "delete": "Deleting",
+        "customer_message": "Message to customers",
+        "bulk": "More than 20 items",
+        "checkout": "Visible at checkout",
+        "price": "Price change",
+        "irreversible": "Cannot be undone"
+      },
+      "cost": "Cost: {credits} AI credits.",
+      "irreversible": "You will not be able to undo this once it is done.",
+      "yes": "Yes, do it",
+      "no": "No",
+      "appliedFinal": "Done. This change cannot be undone.",
+      "rejected": "Okay, nothing was changed.",
+      "noToken": "This confirmation is no longer available (the page was refreshed or it timed out). Ask the assistant to prepare it again.",
+      "failed": {
+        "forbidden": "Your role no longer allows this change. Nothing was changed.",
+        "expired": "This confirmation expired (15 minutes). Ask the assistant to prepare it again.",
+        "used": "This confirmation was already used or is no longer valid. Nothing was changed.",
+        "killed": "The assistant is paused right now. Nothing was changed.",
+        "error": "I could not apply it. Nothing was changed, try again."
+      }
+    }
   }
 }

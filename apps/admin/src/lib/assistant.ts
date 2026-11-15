@@ -45,6 +45,9 @@ interface AssistantTurn {
 export type ApplyData =
   | { status: 'applied'; appliedId: string; undoUntil: number }
   | { status: 'stale'; card: PreviewCardData; approvals?: ApprovalGrant[] };
+export type ConfirmData =
+  | { status: 'applied'; appliedId: string; undoUntil: number }
+  | { status: 'stale'; card: PreviewCardData; approvals?: ApprovalGrant[] };
 export type UndoData =
   | { status: 'undone' }
   | { status: 'stale' | 'needs_confirm'; card: PreviewCardData; approvals?: ApprovalGrant[] };
@@ -63,6 +66,21 @@ export const applyPreview = (storeId: string, previewId: string, locale: 'ar' | 
   apiPost<ApplyData>(`${base(storeId)}/previews/${encodeURIComponent(previewId)}/apply`, {
     locale,
   });
+export const confirmApproval = (
+  storeId: string,
+  approvalId: string,
+  token: string,
+  locale: 'ar' | 'en'
+) =>
+  apiPost<ConfirmData>(`${base(storeId)}/approvals/${encodeURIComponent(approvalId)}/confirm`, {
+    token,
+    locale,
+  });
+export const rejectApproval = (storeId: string, approvalId: string, locale: 'ar' | 'en') =>
+  apiPost<{ status: 'rejected' }>(
+    `${base(storeId)}/approvals/${encodeURIComponent(approvalId)}/reject`,
+    { locale }
+  );
 export const undoApplied = (storeId: string, appliedId: string, locale: 'ar' | 'en') =>
   apiPost<UndoData>(`${base(storeId)}/applied/${encodeURIComponent(appliedId)}/undo`, { locale });
 export const postTurn = (

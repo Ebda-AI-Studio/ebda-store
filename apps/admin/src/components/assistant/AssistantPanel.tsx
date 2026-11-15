@@ -12,8 +12,10 @@ import {
   conversationIdFor,
   forgetConversation,
   applyPreview,
+  confirmApproval,
   getConversation,
   postTurn,
+  rejectApproval,
   sendFeedback,
   undoApplied,
   type AssistantMode,
@@ -23,6 +25,7 @@ import {
 } from '@/lib/assistant';
 import { Button } from '@/components/ui/Button';
 import { Segments } from './Citation';
+import { ConfirmCard } from './ConfirmCard';
 import { PreviewCard } from './PreviewCard';
 
 const MAX = 2000;
@@ -59,6 +62,8 @@ export function AssistantPanel({
   const [failed, setFailed] = useState<string | null>(null);
   const [off, setOff] = useState(false);
   const [rated, setRated] = useState<Record<string, 'up' | 'down'>>({});
+  // One-time confirmation tokens, in memory only: never stored, never in the URL, gone on reload (the card then asks to be prepared again).
+  const grants = useRef<Record<string, string>>({});
   const conv = useRef(conversationIdFor(storeId, userId));
   const panel = useRef<HTMLElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -129,6 +134,7 @@ export function AssistantPanel({
       setBusy(false);
       field.current?.focus();
       if (r.error || !r.data) return setFailed(clean);
+      for (const g of r.data.approvals ?? []) grants.current[g.approvalId] = g.token;
       if (r.data.status === 'off') {
         setOff(true);
         return onUnavailable();
@@ -249,15 +255,29 @@ export function AssistantPanel({
               <p className="whitespace-pre-wrap break-words leading-relaxed">
                 <Segments segments={m.segments} storeId={storeId} onNavigate={() => undefined} />
               </p>
-              {m.previews?.map(c => (
-                <PreviewCard
-                  key={c.previewId}
-                  card={c}
-                  mode={mode}
-                  onApply={id => applyPreview(storeId, id, locale)}
-                  onUndo={id => undoApplied(storeId, id, locale)}
-                />
-              ))}
+              {m.previews?.map(c =>
+                c.policy === 'confirm' ? (
+                  <ConfirmCard
+                    key={c.previewId}
+                    card={c}
+                    token={c.approvalId ? grants.current[c.approvalId] : undefined}
+                    onConfirm={(id, tok) => confirmApproval(storeId, id, tok, locale)}
+                    onReject={id => rejectApproval(storeId, id, locale)}
+                    onUndo={id => undoApplied(storeId, id, locale)}
+                    onFresh={(id, tok) => {
+                      grants.current[id] = tok;
+                    }}
+                  />
+                ) : (
+                  <PreviewCard
+                    key={c.previewId}
+                    card={c}
+                    mode={mode}
+                    onApply={id => applyPreview(storeId, id, locale)}
+                    onUndo={id => undoApplied(storeId, id, locale)}
+                  />
+                )
+              )}
               {m.turnId && m.status === 'answered' && (
                 <div
                   role="group"
