@@ -44,6 +44,11 @@ const m = vi.hoisted(() => ({
   setFeature: vi.fn(),
   setCiSharing: vi.fn(),
   orders: [] as unknown[],
+  adj: { create: vi.fn(), post: vi.fn() },
+  count: { open: vi.fn(), line: vi.fn(), close: vi.fn(), reconcile: vi.fn() },
+  eta: { list: vi.fn(), retry: vi.fn() },
+  invoice: { recipient: vi.fn(), queue: vi.fn() },
+  product: { inventory: 10, costPrice: 500, variants: [] as unknown[] },
 }));
 vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -88,7 +93,33 @@ vi.mock('@api/services/order.service', () => ({
   OrderService: { getById: async () => m.order },
 }));
 vi.mock('@api/services/product.service', () => ({
-  ProductService: { getById: async (_s: string, id: string) => ({ id, name: 'Ring' }) },
+  ProductService: {
+    getById: async (_s: string, id: string) => ({
+      id,
+      name: 'Ring',
+      inventory: m.product.inventory,
+      costPrice: m.product.costPrice,
+      variants: m.product.variants,
+    }),
+  },
+}));
+vi.mock('@api/services/accounting/stock-adjustment.service', () => ({
+  createAdjustment: m.adj.create,
+  postAdjustment: m.adj.post,
+}));
+vi.mock('@api/services/barcode-scan.service', () => ({
+  openCountSession: m.count.open,
+  submitCountLine: m.count.line,
+  closeCountSession: m.count.close,
+  reconcileCountSession: m.count.reconcile,
+}));
+vi.mock('@api/services/eta-receipt.service', () => ({
+  EtaReceiptService: { listForOrder: m.eta.list, retry: m.eta.retry },
+}));
+vi.mock('@api/services/order-invoice-email.service', () => ({
+  invoiceRecipient: m.invoice.recipient,
+  queueInvoiceEmail: m.invoice.queue,
+  invoiceEmailSubject: (n: string) => `Invoice ${n}`,
 }));
 vi.mock('@api/services/warehouse.service', () => ({ WarehouseService: m.wh }));
 vi.mock('@api/services/gold-rate/gold-rate.service', () => ({ GoldRateService: m.gold }));
@@ -240,6 +271,30 @@ beforeEach(() => {
   m.wholesale.reject.mockResolvedValue({ status: 'rejected' });
   m.wholesale.revoke.mockResolvedValue({ membership: 'removed' });
   m.orders = [];
+  m.product = { inventory: 10, costPrice: 500, variants: [] };
+  m.adj.create.mockResolvedValue({ id: 'ADJ1' });
+  m.adj.post.mockResolvedValue({ id: 'ADJ1' });
+  m.count.open.mockResolvedValue({ id: 'CS1' });
+  m.count.line.mockResolvedValue({});
+  m.count.close.mockResolvedValue({});
+  m.count.reconcile.mockResolvedValue({
+    adjustmentId: 'ADJ2',
+    linesReconciled: 1,
+    zeroVarianceLines: 0,
+  });
+  m.eta.list.mockResolvedValue([
+    {
+      id: 'E1',
+      kind: 'sale',
+      seq: 1,
+      status: 'failed',
+      errorMessage: 'bad key',
+      totalPiastres: 12500,
+    },
+  ]);
+  m.eta.retry.mockResolvedValue(true);
+  m.invoice.recipient.mockResolvedValue({ to: 'mona@example.com', orderNumber: 'ORD-1' });
+  m.invoice.queue.mockResolvedValue(undefined);
 });
 
 type Case = {
@@ -703,6 +758,96 @@ describe('free reads', () => {
     expect(e.policy).toBe('free');
     await expect(e.read!(ctx('customer'), { orderId: 'O1' })).rejects.toThrow();
     expect(e.refs!({ orderId: 'O1' } as never)).toEqual([{ kind: 'order', id: 'O1' }]);
+  });
+});
+
+describe('stock adjustment, count, invoice e-mail, ETA', () => {
+  it('stock_adjustment_create shows quantities and the cost impact read from state, posts the created draft', async () => {
+    const t = tool('stock_adjustment_create');
+    const args = parse('stock_adjustment_create', {
+      type: 'damage',
+      reason: 'broken',
+      items: [{ productId: 'P1', newQty: 7 }],
+    });
+    const d = await t.preview!(ctx(), args);
+    expect(d.rows.find(r => r.label.en === 'Cost impact (EGP)')!.after).toBe('-15');
+    expect(d.affectedCount).toBe(1);
+    await t.apply!(ctx(), args, d);
+    expect(m.adj.create.mock.calls[0][0]).toMatchObject({
+      storeId: 'S1',
+      type: 'damage',
+      createdBy: 'u1',
+    });
+    expect(m.adj.post).toHaveBeenCalledWith('S1', 'ADJ1', 'u1');
+  });
+  it('stock_adjustment_create refuses variant products and an adjustment that changes nothing', async () => {
+    const t = tool('stock_adjustment_create');
+    m.product.variants = [{}];
+    await expect(
+      t.preview!(
+        ctx(),
+        parse('stock_adjustment_create', { type: 'loss', items: [{ productId: 'P1', newQty: 1 }] })
+      )
+    ).rejects.toThrow(/has variants/);
+    m.product.variants = [];
+    await expect(
+      t.preview!(
+        ctx(),
+        parse('stock_adjustment_create', { type: 'loss', items: [{ productId: 'P1', newQty: 10 }] })
+      )
+    ).rejects.toThrow(/equals the current stock/);
+    expect(m.adj.create).not.toHaveBeenCalled();
+  });
+  it('barcode_count_set is a reversible preview: opens, counts, closes, reconciles; its inverse counts the old numbers', async () => {
+    const t = tool('barcode_count_set');
+    expect(t.policy).toBe('preview');
+    const args = parse('barcode_count_set', { lines: [{ productId: 'P1', countedQty: 12 }] });
+    const d = await t.preview!(ctx(), args);
+    expect(d.rows[0]).toMatchObject({ before: 10, after: 12 });
+    const r = await t.apply!(ctx(), args, d);
+    expect(m.count.open).toHaveBeenCalledWith('S1', 'u1', undefined);
+    expect(m.count.line).toHaveBeenCalledWith('S1', 'CS1', { productId: 'P1', countedQty: 12 });
+    expect(m.count.close).toHaveBeenCalledWith('S1', 'CS1');
+    expect(m.count.reconcile).toHaveBeenCalledWith('S1', 'CS1', 'u1');
+    expect(t.inverse!(ctx(), args, d, r)).toEqual({
+      tool: 'barcode_count_set',
+      args: { note: 'undo', lines: [{ productId: 'P1', countedQty: 10 }] },
+    });
+    await expect(t.apply!(ctx('staff'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
+  });
+  it('order_invoice_email puts the recipient and exact subject on the card and refuses an order with no e-mail', async () => {
+    const t = tool('order_invoice_email');
+    const d = await t.preview!(ctx(), parse('order_invoice_email', { orderId: 'O1' }));
+    expect(d.rows.some(r => r.after === 'mona@example.com')).toBe(true);
+    expect(d.rows.some(r => r.after === 'Invoice ORD-1')).toBe(true);
+    m.invoice.recipient.mockResolvedValue({ to: null, orderNumber: 'ORD-1' });
+    await expect(
+      t.preview!(ctx(), parse('order_invoice_email', { orderId: 'O1' }))
+    ).rejects.toThrow(/no customer email/);
+  });
+  it('eta_receipt_retry takes the amount from the receipt and only re-issues the latest failed or rejected one', async () => {
+    const t = tool('eta_receipt_retry');
+    const d = await t.preview!(
+      ctx(),
+      parse('eta_receipt_retry', { orderId: 'O1', receiptId: 'E1' })
+    );
+    expect(d.rows.find(r => r.label.en === 'Amount (EGP)')!.after).toBe('125');
+    await expect(
+      t.preview!(ctx(), parse('eta_receipt_retry', { orderId: 'O1', receiptId: 'NOPE' }))
+    ).rejects.toThrow(/not found/);
+    m.eta.list.mockResolvedValue([
+      { id: 'E1', kind: 'sale', seq: 1, status: 'failed', totalPiastres: 100 },
+      { id: 'E2', kind: 'sale', seq: 2, status: 'queued', totalPiastres: 100 },
+    ]);
+    await expect(
+      t.preview!(ctx(), parse('eta_receipt_retry', { orderId: 'O1', receiptId: 'E1' }))
+    ).rejects.toThrow(/latest/);
+    m.eta.list.mockResolvedValue([
+      { id: 'E1', kind: 'sale', seq: 1, status: 'accepted', totalPiastres: 100 },
+    ]);
+    await expect(
+      t.preview!(ctx(), parse('eta_receipt_retry', { orderId: 'O1', receiptId: 'E1' }))
+    ).rejects.toThrow(/failed or rejected/);
   });
 });
 

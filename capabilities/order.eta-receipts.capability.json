@@ -24,7 +24,12 @@
   },
   "helpArticle": "eta-e-receipts",
   "questions": {
-    "ar": ["ازاي اربط الايصال الالكتروني؟", "الايصال فشل يتبعت للضرايب", "ايه الـ ETA؟"],
+    "ar": [
+      "ازاي اربط الايصال الالكتروني؟",
+      "الايصال فشل يتبعت للضرايب",
+      "ايه الـ ETA؟",
+      "اعد ارسال ايصال الضرايب الفاشل"
+    ],
     "en": ["How do I connect ETA e-receipts?"]
   },
   "steps": ["Tax > ETA: credentials, check, retry."],

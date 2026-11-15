@@ -51,6 +51,7 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { prisma } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
+import { invoiceRecipient, queueInvoiceEmail } from '../services/order-invoice-email.service';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import {
@@ -863,9 +864,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      const order = await OrderService.getById(storeId, orderId);
-      const customerEmail =
-        order.customer?.email ?? (order.shippingAddress as Record<string, string> | null)?.email;
+      const { to: customerEmail } = await invoiceRecipient(storeId, orderId);
       if (!customerEmail) {
         res.status(400).json({
           success: false,
@@ -874,10 +873,7 @@ router.post(
         return;
       }
 
-      await inngest.send({
-        name: 'order/invoice.email-requested',
-        data: { orderId, storeId, to: customerEmail },
-      });
+      await queueInvoiceEmail(storeId, orderId, customerEmail);
 
       await auditLog({
         action: 'order.invoice.email-queued',

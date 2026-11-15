@@ -19,12 +19,17 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "count reconcile writes adjustments (inverse possible)"
+    "class": "reversible",
+    "note": "a count is undone by counting the old quantity back"
   },
   "helpArticle": "barcode-scan-pick-and-count",
   "questions": {
-    "ar": ["ازاي اجرد المخزن بالباركود؟", "اسكان الاوردر قبل الشحن"],
+    "ar": [
+      "ازاي اجرد المخزن بالباركود؟",
+      "اسكان الاوردر قبل الشحن",
+      "الجرد طلع ٣ بدل ٥",
+      "اجرد المنتج ده"
+    ],
     "en": ["How do I run a stock count with a scanner?"]
   },
   "steps": ["Scan page on phone camera or scanner."],
