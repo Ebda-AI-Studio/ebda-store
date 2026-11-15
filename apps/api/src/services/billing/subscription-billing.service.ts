@@ -1342,7 +1342,70 @@ export async function sweepStuckCharges(
       body: `${stuck.length} renewal/upgrade charge(s) pending for over an hour with no gateway answer: ${stuck.slice(0, 10).join(', ')}. Not retried (a retry could charge the customer twice). Check the gateway dashboard and /billing-events.`,
     }).catch(() => undefined);
   }
+  await sweepStuckRefunds(now, active).catch(err =>
+    logger.error({ err }, '[billing] stuck-refund sweep failed')
+  );
   return out;
+}
+
+/**
+ * Ebda Store refunds whose outcome never arrived (pending past the in-flight window, MONEY-REVERSAL-2): asked against
+ * the gateway's record of the CHARGE (`listReversals`). The refund's own ref listed as a successful reversal settles
+ * it `succeeded`. A refund with no ref, or one the gateway does not list (yet), stays pending and is paged; it is
+ * never failed blindly, because the money may already be back with the customer.
+ */
+async function sweepStuckRefunds(now: Date, provider: BillingProvider | null): Promise<void> {
+  const rows = await ledgerRowsAcrossStores(
+    {
+      type: 'refund',
+      status: 'pending',
+      createdAt: { lt: new Date(now.getTime() - REFUND_IN_FLIGHT_MS) },
+    },
+    'stuck refund scan'
+  );
+  if (rows.length === 0) return;
+  let active = provider;
+  if (!active) {
+    try {
+      active = getBillingProvider();
+    } catch {
+      active = null;
+    }
+  }
+  const unresolved: string[] = [];
+  for (const r of rows) {
+    try {
+      const settled = await withStore(r.storeId, async tx => {
+        const refund = await tx.billingEvent.findUnique({
+          where: { id: r.id, storeId: r.storeId },
+        });
+        const charge = refund?.relatedEventId
+          ? await tx.billingEvent.findUnique({
+              where: { id: refund.relatedEventId, storeId: r.storeId },
+            })
+          : null;
+        if (!refund?.providerRef || !charge?.providerRef || !active?.listReversals) return false;
+        const res = await active.listReversals({
+          chargeId: charge.providerRef,
+          merchantOrderId: charge.id,
+        });
+        if (!res.reversals.some(v => v.ref === refund.providerRef)) return false;
+        await settleRefundInTx(tx, r.storeId, refund.id, true);
+        return true;
+      });
+      if (!settled) unresolved.push(r.id);
+    } catch (err) {
+      logger.warn({ err, eventId: r.id }, '[billing] stuck refund lookup failed; left pending');
+      unresolved.push(r.id);
+    }
+  }
+  if (unresolved.length) {
+    void sendAlert({
+      level: 'p1',
+      title: 'Billing: refunds with an unknown outcome',
+      body: `${unresolved.length} Ebda Store refund(s) pending past the in-flight window that the gateway record does not settle: ${unresolved.slice(0, 10).join(', ')}. Left pending (the money may already be back). A reversal the gateway reports for that charge is booked on its own. Check the gateway dashboard and /billing-events.`,
+    }).catch(() => undefined);
+  }
 }
 
 export async function expireStaleCheckouts(now: Date): Promise<number> {
@@ -1659,11 +1722,12 @@ export async function applyWebhookEvent(
         }
         const known = await reversalIdentity(tx, charge, providerName, event.providerRef);
         if (known.kind === 'booked') return ignore('refund_already_booked');
-        if (known.kind === 'ebda_refund_pending') {
-          // Ebda started this refund and its API call has not returned yet (the row exists, its ref not yet written):
-          // the webhook belongs to THAT row. Same amount (or none stated) = attach and settle it; otherwise let the
-          // gateway redeliver once the API call has written the ref.
-          if (event.amountMinor === null || event.amountMinor === known.row.amountMinor) {
+        if (known.kind === 'ebda_refund_pending' && refundInFlight(known.row, now)) {
+          // Ebda Store started a refund on this charge minutes ago and its API call has not written the ref yet: the
+          // webhook can beat the response (Ruling MONEY-REVERSAL-2). The SAME amount = it is that refund: attach and
+          // settle it. No amount stated = cannot tell yet: the gateway redelivers, and only inside the window. A
+          // different amount = a different refund: booked below like any other (and paged).
+          if (event.amountMinor === known.row.amountMinor) {
             await tx.billingEvent.updateMany({
               where: { id: known.row.id, storeId: charge.storeId, status: 'pending' },
               data: { providerRef: event.providerRef },
@@ -1671,12 +1735,14 @@ export async function applyWebhookEvent(
             await settleRefundInTx(tx, charge.storeId, known.row.id, true);
             return { duplicate: false, outcome: 'processed', detail: 'attached_to_ebda_refund' };
           }
-          throw new AppError(
-            503,
-            'REFUND_NOT_YET_RECORDED',
-            'An Ebda Store refund for this charge is still being recorded; retry shortly',
-            { retryable: true }
-          );
+          if (event.amountMinor === null) {
+            throw new AppError(
+              503,
+              'REFUND_NOT_YET_RECORDED',
+              'An Ebda Store refund for this charge is still being recorded; retry shortly',
+              { retryable: true }
+            );
+          }
         }
         if (known.kind === 'ebda_refund_unreferenced') {
           ambiguousReversal = true;
@@ -1932,11 +1998,19 @@ async function reversalIdentity(
   return { kind: 'new' };
 }
 
+/**
+ * A pending Ebda Store refund counts as "its API call is still running" only this long (Ruling MONEY-REVERSAL-2).
+ * Past it, a reversal the gateway reports is booked, and the stuck sweep asks the gateway about the pending row.
+ */
+const REFUND_IN_FLIGHT_MS = 15 * 60_000;
+const refundInFlight = (row: { createdAt: Date }, now: Date) =>
+  now.getTime() - row.createdAt.getTime() < REFUND_IN_FLIGHT_MS;
+
 function alertAmbiguousReversal(provider: string, ref: string | null, chargeId?: string): void {
   void sendAlert({
     level: 'p1',
     title: 'Billing: a gateway refund may duplicate an Ebda Store refund',
-    body: `${provider} reports reversal ${ref ?? '(no id)'}${chargeId ? ` on charge ${chargeId}` : ''}, and that charge has an Ebda Store refund with no gateway id, so they cannot be told apart. Nothing was booked or revoked. Compare the gateway dashboard with /billing-events and record it by hand if it is a second refund.`,
+    body: `${provider} reports reversal ${ref ?? '(no id)'}${chargeId ? ` on charge ${chargeId}` : ''}, and that charge has an Ebda Store refund with no gateway id yet, so they cannot be told apart for sure. A pending refund past its in-flight window, or one of another amount, does not stop the booking (access fails closed); a succeeded one does. Compare the gateway dashboard with /billing-events.`,
   }).catch(() => undefined);
 }
 
@@ -1983,12 +2057,31 @@ async function applyOutOfBandReversalInTx(
 ): Promise<ReversalOutcome | null> {
   const storeId = charge.storeId;
   const key = `oob-reversal:${fact.provider}:${fact.ref}`;
-  // The webhook path settles the Ebda-started cases itself; here (both paths) anything not `new` books nothing.
+  // One identity (the gateway ref): booked = nothing to do. A succeeded Ebda refund with no ref cannot be told apart:
+  // paged, not booked. A PENDING Ebda refund is "in flight" only inside the window (MONEY-REVERSAL-2): the reconcile
+  // waits for it; past the window, or for a refund of another amount, the reversal is booked (fail closed on access,
+  // never lose the money fact) and a person is paged. A stale pending row of the same amount is closed as superseded
+  // so it can never settle a second time; the daily reconcile books the gateway's own record of it if it was real.
   const known = await reversalIdentity(tx, charge, fact.provider, fact.ref);
-  if (known.kind === 'ebda_refund_unreferenced' && fact.source === 'reconcile') {
-    alertAmbiguousReversal(fact.provider, fact.ref, charge.id);
+  if (known.kind === 'booked') return null;
+  if (known.kind === 'ebda_refund_unreferenced') {
+    if (fact.source === 'reconcile') alertAmbiguousReversal(fact.provider, fact.ref, charge.id);
+    return null;
   }
-  if (known.kind !== 'new') return null;
+  if (known.kind === 'ebda_refund_pending') {
+    const inFlight = refundInFlight(known.row, now);
+    if (inFlight && fact.source === 'reconcile') return null;
+    alertAmbiguousReversal(fact.provider, fact.ref, charge.id);
+    if (!inFlight && (fact.amountMinor === null || fact.amountMinor === known.row.amountMinor)) {
+      await tx.billingEvent.updateMany({
+        where: { id: known.row.id, storeId, status: 'pending' },
+        data: {
+          status: 'failed',
+          failureReason: `superseded_by_gateway_reversal:${fact.ref}`.slice(0, 200),
+        },
+      });
+    }
+  }
   const prior = await tx.billingEvent.aggregate({
     where: { storeId, relatedEventId: charge.id, type: 'refund', status: 'succeeded' },
     _sum: { amountMinor: true },
