@@ -5,37 +5,44 @@ const platformDb = vi.fn();
 vi.mock('../repo-factory', () => ({ storeRepo: (id: string) => storeRepo(id) }));
 vi.mock('../platform-db', () => ({ platformDb: () => platformDb() }));
 
-import { readStorePlan } from '../store-plan';
+import { reconcileDoPlan } from '../store-plan';
 
-const doDb = (plan: string) => ({ store: { findUnique: vi.fn().mockResolvedValue({ plan }) } });
+const d1 = (plan: string | null) => ({
+  store: { findUnique: vi.fn().mockResolvedValue(plan ? { plan } : null) },
+});
 
-describe('readStorePlan on a Durable Object store', () => {
+describe('reconcileDoPlan (stale DO plan mirror self-heal)', () => {
   beforeEach(() => {
     storeRepo.mockReset();
     platformDb.mockReset();
   });
 
-  it('reads the authoritative D1 plan, not a stale DO mirror (Business store showed Business features locked)', async () => {
-    const stale = doDb('starter');
-    storeRepo.mockResolvedValue({ backend: 'do', db: stale });
-    platformDb.mockResolvedValue({
-      store: { findUnique: vi.fn().mockResolvedValue({ plan: 'enterprise' }) },
-    });
-    const r = await readStorePlan({} as never, 's1');
-    expect(r).toEqual({ plan: 'enterprise' });
-    expect(stale.store.findUnique).not.toHaveBeenCalled();
+  it('D1 says enterprise, the DO mirror still says starter: D1 wins and the mirror is re-synced', async () => {
+    storeRepo.mockResolvedValue({ backend: 'do' });
+    platformDb.mockResolvedValue(d1('enterprise'));
+    const onStale = vi.fn();
+    expect(await reconcileDoPlan('s1', 'starter', onStale)).toBe('enterprise');
+    expect(onStale).toHaveBeenCalledWith('s1');
   });
 
-  it('falls back to the DO row when the platform D1 is not bound', async () => {
-    storeRepo.mockResolvedValue({ backend: 'do', db: doDb('professional') });
-    platformDb.mockResolvedValue(undefined);
-    expect(await readStorePlan({} as never, 's1')).toEqual({ plan: 'professional' });
+  it('an in-sync mirror triggers no re-sync', async () => {
+    storeRepo.mockResolvedValue({ backend: 'do' });
+    platformDb.mockResolvedValue(d1('enterprise'));
+    const onStale = vi.fn();
+    expect(await reconcileDoPlan('s1', 'enterprise', onStale)).toBe('enterprise');
+    expect(onStale).not.toHaveBeenCalled();
   });
 
-  it('a pg store still reads its own client', async () => {
-    storeRepo.mockResolvedValue({ backend: 'pg', db: {} });
-    const pg = doDb('starter');
-    expect(await readStorePlan(pg as never, 's1')).toEqual({ plan: 'starter' });
+  it('a pg store, an unbound D1 or a missing D1 row keep the given plan and read nothing', async () => {
+    const onStale = vi.fn();
+    storeRepo.mockResolvedValue({ backend: 'pg' });
+    expect(await reconcileDoPlan('s1', 'starter', onStale)).toBe('starter');
     expect(platformDb).not.toHaveBeenCalled();
+    storeRepo.mockResolvedValue({ backend: 'do' });
+    platformDb.mockResolvedValue(undefined);
+    expect(await reconcileDoPlan('s1', 'starter', onStale)).toBe('starter');
+    platformDb.mockResolvedValue(d1(null));
+    expect(await reconcileDoPlan('s1', 'starter', onStale)).toBe('starter');
+    expect(onStale).not.toHaveBeenCalled();
   });
 });
