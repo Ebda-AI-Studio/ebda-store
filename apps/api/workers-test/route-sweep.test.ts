@@ -19,6 +19,7 @@ import { DEFAULT_PLAN_SEEDS, FEATURE_KEYS_ARRAY } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
 import ALL_ROUTES from './route-table.json';
 import ALL_CRONS from './cron-list.json';
+import { TEST_PASSWORD_HASH } from './fixtures/test-password-hash';
 
 const ROUTES: string[] = ALL_ROUTES as string[];
 
@@ -688,7 +689,7 @@ describe.skipIf(e.E2E_DB === '1')(
             id: 'sweep-verified',
             email: 'sweep-verified@exit-test.invalid',
             // bcrypt cost 4 of the password below (test fixture only)
-            passwordHash: '$2b$04$jYDlZaJj/X/kmBmzPXDwsOP4.aIZ2IBm.rDUDGyiC8iKKUZPb/Rzm',
+            passwordHash: TEST_PASSWORD_HASH,
             firstName: 'Sweep',
             lastName: 'Verified',
             verification: {

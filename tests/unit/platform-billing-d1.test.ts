@@ -339,6 +339,15 @@ describe('copy script: the set-aside file is encrypted', () => {
     expect(() => openLine(line)).toThrow();
     delete process.env.CUTOVER_STASH_KEY;
   });
+
+  it('rejects a line whose auth tag was truncated (GCM would accept a short tag without a pinned length)', async () => {
+    const { sealLine, openLine } = await import('../../scripts/cf/cutover-platform-family.mjs');
+    process.env.CUTOVER_STASH_KEY = 'k'.repeat(40);
+    const [iv, tag, enc] = sealLine({ a: 1 }).split('.');
+    const short = Buffer.from(tag, 'base64').subarray(0, 4).toString('base64');
+    expect(() => openLine([iv, short, enc].join('.'))).toThrow(/auth tag length/);
+    delete process.env.CUTOVER_STASH_KEY;
+  });
 });
 
 describe('cutover switch', () => {
