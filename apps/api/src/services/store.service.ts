@@ -1987,6 +1987,15 @@ export class StoreService {
   }
 
   /**
+   * The Smart Layer assistant's per-store rollout mode (`settings.assistantMode`, absent = off). Set ONLY by a super admin (routes/assistant.routes.ts):
+   * a merchant can never raise it. Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
+   */
+  static async setAssistantMode(storeId: string, mode: 'off' | 'answer-only' | 'suggest' | 'act') {
+    await this.setSettingsKey(storeId, 'assistantMode', mode);
+    return mode;
+  }
+
+  /**
    * Merchant's switch "allow COD / installments for gold" (`settings.goldAllowDeferredPayment`, absent =
    * OFF, Ruling SHARIA-GOLD-1). Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
    */

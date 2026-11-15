@@ -11665,6 +11665,84 @@
     "savedBody": "The return policy was updated.",
     "saveLabel": "Save shipping"
   },
+  "assistant": {
+    "title": "Assistant",
+    "open": "Open the assistant",
+    "close": "Close the assistant",
+    "newChat": "New chat",
+    "log": "Assistant conversation",
+    "emptyTitle": "Ask me anything about your store",
+    "intro": "I tell you how to do something and show you the screen. I only answer; I never change anything in your store.",
+    "suggestions": {
+      "s1": "How do I connect a domain to my store?",
+      "s2": "Where is the shipping page?",
+      "s3": "How do I add a new product?"
+    },
+    "placeholder": "Type your question here",
+    "send": "Send",
+    "hint": "Enter to send, Shift + Enter for a new line",
+    "tooLong": "The message is too long (over 2000 characters). Please shorten it.",
+    "thinking": "Looking for the answer…",
+    "error": "I could not answer just now. Please try again in a moment.",
+    "retry": "Try again",
+    "off": "The assistant is not turned on for your store right now. It appears by itself when it is.",
+    "showMe": "Show me where",
+    "source": "Source",
+    "you": "You",
+    "rateGroup": "Rate the answer",
+    "thumbUp": "This answer helped",
+    "thumbDown": "This answer did not help",
+    "thanks": "Thank you, we got your feedback.",
+    "card": {
+      "label": "Proposed change",
+      "before": "Before",
+      "after": "After",
+      "apply": "Apply change",
+      "applying": "Applying…",
+      "undo": "Undo ({hours}h left)",
+      "applied": "Done. You can undo it for 24 hours.",
+      "appliedNoUndo": "Done. The undo window has ended.",
+      "undone": "I put it back the way it was.",
+      "stale": "The data changed, this is the new version. Review it before you apply.",
+      "untrusted": "This text came from a customer or from a source outside your store.",
+      "suggestionMode": "The assistant is in suggestion mode: it prepares the preview but does not apply. Applying opens later.",
+      "needsConfirm": "This change needs your explicit confirmation before it is applied.",
+      "failed": {
+        "forbidden": "Your role does not allow this change. Ask the store owner.",
+        "expired": "This preview expired. Ask the assistant to prepare it again.",
+        "killed": "The assistant is paused right now. Nothing was changed.",
+        "error": "I could not apply it. Nothing was changed, try again."
+      }
+    },
+    "introDo": "I tell you how to do something, show you the screen and prepare the change as a preview. You review and apply it, and you can undo it.",
+    "confirm": {
+      "label": "A change that needs your confirmation",
+      "why": "Why it needs a yes",
+      "reasons": {
+        "money": "Money",
+        "delete": "Deleting",
+        "customer_message": "Message to customers",
+        "bulk": "More than 20 items",
+        "checkout": "Visible at checkout",
+        "price": "Price change",
+        "irreversible": "Cannot be undone"
+      },
+      "cost": "Cost: {credits} AI credits.",
+      "irreversible": "You will not be able to undo this once it is done.",
+      "yes": "Yes, do it",
+      "no": "No",
+      "appliedFinal": "Done. This change cannot be undone.",
+      "rejected": "Okay, nothing was changed.",
+      "noToken": "This confirmation is no longer available (the page was refreshed or it timed out). Ask the assistant to prepare it again.",
+      "failed": {
+        "forbidden": "Your role no longer allows this change. Nothing was changed.",
+        "expired": "This confirmation expired (15 minutes). Ask the assistant to prepare it again.",
+        "used": "This confirmation was already used or is no longer valid. Nothing was changed.",
+        "killed": "The assistant is paused right now. Nothing was changed.",
+        "error": "I could not apply it. Nothing was changed, try again."
+      }
+    }
+  },
   "storeLifecycle": {
     "title": "Your data and your store",
     "exportTitle": "Download all my data",

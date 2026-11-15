@@ -1,0 +1,31 @@
+{
+  "id": "ai.template-writer",
+  "status": "planned",
+  "plan": "self-service spec 6.7",
+  "area": "ai",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الاسيستنت يكتب قوالب واتساب",
+  "titleEn": "Assistant writes and submits WhatsApp templates on merchant WABA (Chat)",
+  "screens": ["(Ebda Chat) templates screen"],
+  "api": ["(planned) Chat /templates API"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "withdraw/edit resubmit (Meta supports edit)"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["اكتبلي رسالة الاوردر اتشحن", "ليه القالب اتقبل/اترفض"],
+    "en": ["Write a shipped-order template"]
+  },
+  "steps": ["Not available; Chat templates screen first."],
+  "edgeCases": [
+    "Needs Chat project 1",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
+  ],
+  "gaps": ["NOT BUILT Chat gaps 1,2,17"]
+}

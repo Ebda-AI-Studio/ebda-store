@@ -1,0 +1,47 @@
+{
+  "id": "store.gold-rates",
+  "status": "live",
+  "area": "commerce",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "سعر الدهب وتسعير المنتجات بالدهب",
+  "titleEn": "Gold rates and gold-priced products",
+  "screens": ["/stores/[id]/gold-rates"],
+  "api": [
+    "GET/PUT /stores/:storeId/gold-rates",
+    "PUT /stores/:storeId/gold-rates/settings",
+    "PUT /stores/:storeId/gold-rates/payment-policy",
+    "POST /stores/:storeId/gold-rates/bulk/pricing-mode",
+    "PUT /stores/:storeId/gold-rates/products/:productId/pricing",
+    "POST /stores/:storeId/gold-rates/:rateId/decision"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "compensating",
+    "note": "rate history is kept; undo sets the previous rates again (which reprices again)"
+  },
+  "helpArticle": "gold-rate-pricing",
+  "questions": {
+    "ar": [
+      "ازاي اسعر الدهب في المتجر؟",
+      "السعر بيتحدث لوحده؟",
+      "حدّث سعر جرام الدهب عيار 21",
+      "سعر الدهب النهارده بقى 4100"
+    ],
+    "en": ["How do I price products by gold rate?"]
+  },
+  "steps": ["Gold rates page."],
+  "edgeCases": [
+    "Rate change reprices catalogue instantly (money): confirm",
+    "Pending rate decision approve/reject",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["niche vertical (jewellers)"]
+}

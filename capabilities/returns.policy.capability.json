@@ -1,0 +1,33 @@
+{
+  "id": "returns.policy",
+  "status": "live",
+  "area": "returns",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "سياسة الارجاع",
+  "titleEn": "Return policy text and window",
+  "screens": ["/stores/[id]/shipping"],
+  "api": ["(settings shipping.return-policy)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "returns-and-refunds",
+  "questions": {
+    "ar": ["اكتب سياسة الاسترجاع"],
+    "en": ["Set my return policy"]
+  },
+  "steps": ["Shipping page > return policy."],
+  "edgeCases": [
+    "Must match legal page",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

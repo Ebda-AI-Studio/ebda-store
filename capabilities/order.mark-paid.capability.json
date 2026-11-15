@@ -1,0 +1,40 @@
+{
+  "id": "order.mark-paid",
+  "status": "live",
+  "area": "orders",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "علم الاوردر مدفوع",
+  "titleEn": "Mark an order paid (COD collected, bank transfer)",
+  "screens": ["/stores/[id]/orders/[orderId]"],
+  "api": [
+    "POST /stores/:storeId/orders/:orderId/mark-paid",
+    "POST .../orders/bulk-mark-paid",
+    "POST .../orders/:orderId/refresh-payment-status"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no (refund flow)"
+  },
+  "helpArticle": "orders-and-cod",
+  "questions": {
+    "ar": ["حصلت الفلوس من الكوريير", "علم كل الطلبات دي مدفوعة", "COD ما اتحصلش"],
+    "en": ["Mark COD orders as paid"]
+  },
+  "steps": ["Order > Mark paid or bulk."],
+  "edgeCases": [
+    "Courier statement can mark COD paid automatically OPEN-PR #735",
+    "Ledger posting when accounting enabled",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["#735 open"],
+  "assistantNote": "money record: confirm"
+}
