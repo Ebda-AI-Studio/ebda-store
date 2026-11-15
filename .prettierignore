@@ -66,3 +66,4 @@ apps/help/wa-source
 packages/shared/src/foundation
 foundation.lock.json
 tests/unit/foundation-parity.test.ts
+apps/api/src/smart-layer/*.generated.json

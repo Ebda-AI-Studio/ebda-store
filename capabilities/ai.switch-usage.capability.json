@@ -1,0 +1,35 @@
+{
+  "id": "ai.switch-usage",
+  "status": "live",
+  "area": "ai",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "شغل او اقفل الذكاء واستهلاكه",
+  "titleEn": "Turn AI on/off and see AI usage and daily cap",
+  "screens": ["/stores/[id]/ai-usage", "/stores/[id]/ai-tools"],
+  "api": ["GET/PUT .../ai/settings", "GET .../ai/usage/summary", "GET .../ai/usage/log"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "ai-switch-and-category-suggestions",
+  "questions": {
+    "ar": ["كام طلب ذكاء فاضل؟", "اقفل الذكاء", "الذكاء وصل الحد اليومي"],
+    "en": ["How much AI do I have left today?", "Turn AI off"]
+  },
+  "steps": ["AI usage page."],
+  "edgeCases": [
+    "Cap 150 req / 200k tokens per store/day",
+    "Platform cap 450/day + 20k/month",
+    "Quota hit message says contact support",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["AI quota raise / top-up has no self-service (audit gap 7, High)"]
+}
