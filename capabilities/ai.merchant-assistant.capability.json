@@ -33,7 +33,7 @@
   "steps": [
     "Open the assistant panel in the admin (button or Ctrl/Cmd+J) and ask how to do something",
     "It answers from the help guides and from your own data it may read; it links the screen with \"show me where\"",
-    "Off by default per store; a super admin turns it on (answer-only) and can switch it off at once",
+    "Off by default per store; a super admin turns it on (answer-only, then suggest, then act) and can switch it off at once",
     "It never asks for a password, key or code: it links the secure screen"
   ],
   "edgeCases": [
@@ -45,6 +45,6 @@
   "gaps": [],
   "readOnlyPost": {
     "routes": ["POST /stores/:storeId/assistant/turn", "POST /stores/:storeId/assistant/feedback"],
-    "reason": "Phase A answers questions and reads the merchant's own data through the admin read handlers; no write tool is registered. The only thing written is the assistant's own masked journal row."
+    "reason": "The turn route only answers and prepares preview cards; nothing in the store changes from it. The only thing written is the assistant's own masked journal rows. Changes are applied by the separate ai.assistant-actions routes."
   }
 }
