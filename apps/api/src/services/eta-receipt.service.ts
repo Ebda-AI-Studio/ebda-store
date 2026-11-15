@@ -801,6 +801,7 @@ export const EtaReceiptService = {
           id: true,
           kind: true,
           seq: true,
+          refundKey: true,
           status: true,
           uuid: true,
           longId: true,

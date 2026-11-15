@@ -9,6 +9,15 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { FiscalDocumentService } from '../services/fiscal-document.service';
 import { renderFiscalDocumentHtml } from '../services/fiscal-document-render';
 import { fiscalArchive, fiscalArchiveStores } from '../lib/definer';
+import {
+  defaultPeriod,
+  fiscalStoreSummary,
+  pageFiscalRows,
+  listFiscalDocuments,
+} from '../services/fiscal-document-list';
+import { etaForDocument } from '../services/fiscal-document-eta';
+import { hubFanout } from '../lib/platform-hub';
+import logger from '../lib/logger';
 import { parseInput } from '../lib/parse-input';
 import { AppError } from '../middleware/error-handler';
 
@@ -21,8 +30,9 @@ import { AppError } from '../middleware/error-handler';
  *   GET /:storeId/orders/:orderId/fiscal-documents      an order's documents
  *
  * Super-admin (mounted under `/admin`):
- *   GET /fiscal-archive                                 stores with archived documents
- *   GET /fiscal-archive/:storeId                        a store's archive (deleted ones too)
+ *   GET /fiscal-archive?from&to                         stores with archived documents + period totals / tax status
+ *   GET /fiscal-archive/:storeId?cursor&limit&docType&q&from&to[&summary=1]   a store's archive page (deleted ones too);
+ *                                                       `summary=1` adds the store card for the current month
  *   GET /fiscal-archive/:storeId/:docId/html            one archived document
  *
  * Read-only by construction: documents are written only by the sale / refund /
@@ -44,7 +54,12 @@ const listQuery = z.object({
   docType: z.enum(DOC_TYPES).optional(),
   /** Search by document number (INV-000042) or the number of the document a credit note reverses. */
   q: z.string().trim().min(1).max(64).optional(),
+  /** Issue-date range (ISO instants). */
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
 });
+const periodQuery = z.object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() });
+const archiveListQuery = listQuery.extend({ summary: z.enum(['1']).optional() });
 const localeQuery = z.object({ locale: z.enum(['ar', 'en']).optional() });
 const UUID = z.string().uuid();
 
@@ -89,7 +104,10 @@ fiscalDocumentRoutes.get(
         ((store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'en'
           ? 'en'
           : 'ar');
-      res.type('html').send(renderFiscalDocumentHtml(doc, lang, store?.timezone || 'Africa/Cairo'));
+      const eta = await etaForDocument(storeId, doc);
+      res
+        .type('html')
+        .send(renderFiscalDocumentHtml(doc, lang, store?.timezone || 'Africa/Cairo', eta));
     } catch (error) {
       next(error);
     }
@@ -115,15 +133,39 @@ const superAdmin = [authenticate, requireMfaEnrolled, authorize('super_admin')];
 
 export const fiscalArchiveRoutes = Router();
 
+async function archiveRows(userId: string, storeId: string) {
+  return (await hubOnD1())
+    ? await fiscalArchiveHub(storeId)
+    : await withUser(userId, () => fiscalArchive(storeId));
+}
+
 fiscalArchiveRoutes.get(
   '/fiscal-archive',
   ...superAdmin,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const stores = (await hubOnD1())
+      const q = parseInput(periodQuery, req.query);
+      const period = {
+        ...defaultPeriod(),
+        ...(q.from ? { from: q.from } : {}),
+        ...(q.to ? { to: q.to } : {}),
+      };
+      const base = (await hubOnD1())
         ? await fiscalArchiveStoresHub()
         : await withUser(req.user!.userId, () => fiscalArchiveStores());
-      res.json({ success: true, data: { stores } });
+      // Live stores get their period totals + tax / ETA status; a deleted store has no live tables, so null.
+      const live = base.filter(s => s.storeExists).map(s => s.storeId);
+      const summaries = new Map(
+        (
+          await hubFanout(
+            live,
+            id => fiscalStoreSummary(id, period),
+            (id, err) => logger.warn({ err, storeId: id }, '[FISCAL] archive summary failed')
+          )
+        ).map(r => [r.storeId, r.value])
+      );
+      const stores = base.map(s => ({ ...s, summary: summaries.get(s.storeId) ?? null }));
+      res.json({ success: true, data: { stores, period } });
     } catch (error) {
       next(error);
     }
@@ -136,15 +178,16 @@ fiscalArchiveRoutes.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = parseInput(UUID, req.params.storeId);
-      const rows = (await hubOnD1())
-        ? await fiscalArchiveHub(storeId)
-        : await withUser(req.user!.userId, () => fiscalArchive(storeId));
-      // The list omits the payload; the HTML route renders a document from it.
-      const documents = rows.map(({ payload, ...d }) => ({
-        ...d,
-        orderNumber: (payload as { orderNumber?: string } | null)?.orderNumber ?? null,
-      }));
-      res.json({ success: true, data: { documents } });
+      const { summary: withSummary, ...f } = parseInput(archiveListQuery, req.query);
+      // Live-database path = keyset query; the definer (retention) path pages the rows it returned.
+      const result = (await hubOnD1())
+        ? await listFiscalDocuments(storeId, f)
+        : await pageFiscalRows(storeId, await archiveRows(req.user!.userId, storeId), f);
+      // The store card (current month); null for a store that no longer exists.
+      const summary = withSummary
+        ? await fiscalStoreSummary(storeId, defaultPeriod()).catch(() => null)
+        : undefined;
+      res.json({ success: true, data: { ...result, ...(withSummary ? { summary } : {}) } });
     } catch (error) {
       next(error);
     }
@@ -159,12 +202,11 @@ fiscalArchiveRoutes.get(
       const storeId = parseInput(UUID, req.params.storeId);
       const docId = parseInput(UUID, req.params.docId);
       const { locale } = parseInput(localeQuery, req.query);
-      const rows = (await hubOnD1())
-        ? await fiscalArchiveHub(storeId)
-        : await withUser(req.user!.userId, () => fiscalArchive(storeId));
+      const rows = await archiveRows(req.user!.userId, storeId);
       const doc = rows.find(r => r.id === docId);
       if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-      res.type('html').send(renderFiscalDocumentHtml(doc, locale ?? 'ar'));
+      const eta = await etaForDocument(storeId, doc);
+      res.type('html').send(renderFiscalDocumentHtml(doc, locale ?? 'ar', 'Africa/Cairo', eta));
     } catch (error) {
       next(error);
     }

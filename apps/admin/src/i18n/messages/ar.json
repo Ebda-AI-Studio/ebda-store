@@ -9950,7 +9950,11 @@
       "net": "الصافي",
       "vat": "ضريبة القيمة المضافة",
       "total": "الإجمالي",
-      "actions": "الإجراءات"
+      "actions": "الإجراءات",
+      "customer": "العميل",
+      "payment": "الدفع",
+      "eta": "الإيصال الإلكتروني",
+      "currency": "العملة"
     },
     "types": {
       "tax_invoice": "فاتورة ضريبية",
@@ -9980,7 +9984,32 @@
       "loadFailed": "معرفناش نحمّل المستند.",
       "printFailed": "معرفناش نفتح نافذة الطباعة."
     },
-    "searchPlaceholder": "دوّر برقم المستند"
+    "searchPlaceholder": "دوّر برقم المستند",
+    "etaNone": "ما اتبعتش",
+    "etaStatuses": {
+      "queued": "في الانتظار",
+      "retrying": "بنعيد المحاولة",
+      "submitted": "اتبعت",
+      "accepted": "مقبول",
+      "rejected": "مرفوض",
+      "failed": "فشل",
+      "late": "متأخر",
+      "manual": "محتاج تدخل"
+    },
+    "paymentStatuses": {
+      "unpaid": "غير مدفوع",
+      "paid": "مدفوع",
+      "failed": "فشل",
+      "refunded": "مسترد",
+      "disputed": "متنازع عليه"
+    },
+    "paymentMethods": {
+      "cod": "الدفع عند الاستلام",
+      "instapay": "إنستاباي",
+      "paymob": "بطاقة (باي موب)",
+      "kashier": "بطاقة (كاشير)",
+      "fawry": "فوري"
+    }
   },
   "taxArchive": {
     "title": "الأرشيف الضريبي",
@@ -9991,7 +10020,9 @@
       "store": "المتجر",
       "documents": "المستندات",
       "lastIssued": "آخر إصدار",
-      "actions": "الإجراءات"
+      "actions": "الإجراءات",
+      "periodTotals": "إجماليات الفترة",
+      "taxStatus": "التسجيل الضريبي"
     },
     "deletedStore": "متجر محذوف",
     "viewDocuments": "عرض المستندات",
@@ -9999,7 +10030,34 @@
     "loadFailed": "معرفناش نحمّل الأرشيف. جرّب تاني.",
     "empty": "مفيش مستندات مؤرشفة لسه.",
     "emptyStore": "مفيش مستندات مؤرشفة للمتجر ده.",
-    "backToStores": "كل المتاجر"
+    "backToStores": "كل المتاجر",
+    "periodLabel": "إجماليات",
+    "periods": {
+      "thisMonth": "الشهر ده",
+      "lastMonth": "الشهر اللي فات",
+      "thisYear": "السنة دي"
+    },
+    "totalsNote": "الإجماليات بتحسب مستندات البيع الصادرة (الفواتير الضريبية والإيصالات) في الفترة؛ إشعارات الدائن وسجلات الأرشيف مش بتتخصم.",
+    "totals": {
+      "net": "الصافي",
+      "vat": "الضريبة",
+      "gross": "الإجمالي",
+      "count": "{count, plural, one {مستند واحد} two {مستندين} few {# مستندات} other {# مستند}}"
+    },
+    "trn": {
+      "present": "رقم التسجيل الضريبي موجود",
+      "missing": "مفيش رقم تسجيل ضريبي"
+    },
+    "eta": {
+      "connected": "الإيصال الإلكتروني متصل",
+      "connectedOff": "متصل بمصلحة الضرائب لكنه متوقف",
+      "notConnected": "مش متصل بمصلحة الضرائب"
+    },
+    "noLiveData": "مش متاح لأن المتجر اتحذف",
+    "summaryTitle": "ملخص المتجر",
+    "searchPlaceholder": "دوّر برقم المستند أو الطلب",
+    "dateFrom": "من",
+    "dateTo": "إلى"
   },
   "taxReview": {
     "title": "توثيق ضريبة القيمة المضافة",

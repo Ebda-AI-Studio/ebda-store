@@ -21,6 +21,8 @@ interface FiscalDocumentsTableProps {
   /** Where "Open" goes (the HTML viewer page). */
   openHref: (doc: FiscalDocument) => string;
   emptyState?: ReactNode;
+  /** Archive view: adds customer, payment, ETA and currency columns. */
+  extended?: boolean;
 }
 
 /** One table for the merchant Invoices page and the super-admin archive. */
@@ -30,6 +32,7 @@ export function FiscalDocumentsTable({
   orderHref,
   openHref,
   emptyState,
+  extended = false,
 }: FiscalDocumentsTableProps) {
   const t = useT('invoices');
   const locale = useLocale();
@@ -113,6 +116,7 @@ export function FiscalDocumentsTable({
         </span>
       ),
     },
+    ...(extended ? extendedColumns(t) : []),
     {
       header: t('columns.actions'),
       cell: d => (
@@ -132,4 +136,69 @@ export function FiscalDocumentsTable({
       emptyState={emptyState}
     />
   );
+}
+
+type Translate = ReturnType<typeof useT>;
+
+/** A translated enum value, or the raw value when the API sends one the admin has no label for yet. */
+function label(t: Translate, group: string, value: string): string {
+  const key = `${group}.${value}`;
+  return t.has(key) ? t(key) : value;
+}
+
+function extendedColumns(t: Translate): DataTableColumn<FiscalDocument>[] {
+  return [
+    {
+      header: t('columns.customer'),
+      hideOnMobile: true,
+      cell: d => (
+        <div>
+          <span>{d.customerName ?? '—'}</span>
+          {d.contactMasked && (
+            <p dir="ltr" className="text-xs text-muted-foreground">
+              {d.contactMasked}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: t('columns.payment'),
+      hideOnMobile: true,
+      cell: d => (
+        <div>
+          <span>{d.paymentMethod ? label(t, 'paymentMethods', d.paymentMethod) : '—'}</span>
+          {d.paymentStatus && (
+            <p className="text-xs text-muted-foreground">
+              {label(t, 'paymentStatuses', d.paymentStatus)}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: t('columns.eta'),
+      hideOnMobile: true,
+      cell: d =>
+        d.etaStatus ? (
+          <div>
+            <Badge variant={d.etaStatus === 'accepted' ? 'success' : 'secondary'}>
+              {label(t, 'etaStatuses', d.etaStatus)}
+            </Badge>
+            {d.etaUuid && (
+              <p dir="ltr" className="font-mono text-xs text-muted-foreground" title={d.etaUuid}>
+                {d.etaUuid.slice(0, 8)}…
+              </p>
+            )}
+          </div>
+        ) : (
+          <span className="text-muted-foreground">{t('etaNone')}</span>
+        ),
+    },
+    {
+      header: t('columns.currency'),
+      hideOnMobile: true,
+      cell: d => <span dir="ltr">{d.currency}</span>,
+    },
+  ];
 }

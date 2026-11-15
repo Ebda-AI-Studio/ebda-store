@@ -65,5 +65,6 @@ export async function fiscalArchiveHub(storeId: string): Promise<FiscalArchiveRo
     sellerTrn: r.sellerTrn,
     payload: r.payload,
     retainUntil: r.retainUntil,
+    refundRef: r.refundRef,
   }));
 }

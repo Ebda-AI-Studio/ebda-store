@@ -9950,7 +9950,11 @@
       "net": "Net",
       "vat": "VAT",
       "total": "Total",
-      "actions": "Actions"
+      "actions": "Actions",
+      "customer": "Customer",
+      "payment": "Payment",
+      "eta": "ETA e-receipt",
+      "currency": "Currency"
     },
     "types": {
       "tax_invoice": "Tax invoice",
@@ -9980,7 +9984,32 @@
       "loadFailed": "Could not load the document.",
       "printFailed": "Could not open the print dialog."
     },
-    "searchPlaceholder": "Search by document number"
+    "searchPlaceholder": "Search by document number",
+    "etaNone": "Not submitted",
+    "etaStatuses": {
+      "queued": "Queued",
+      "retrying": "Retrying",
+      "submitted": "Submitted",
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "failed": "Failed",
+      "late": "Late",
+      "manual": "Needs action"
+    },
+    "paymentStatuses": {
+      "unpaid": "Unpaid",
+      "paid": "Paid",
+      "failed": "Failed",
+      "refunded": "Refunded",
+      "disputed": "Disputed"
+    },
+    "paymentMethods": {
+      "cod": "Cash on delivery",
+      "instapay": "InstaPay",
+      "paymob": "Card (Paymob)",
+      "kashier": "Card (Kashier)",
+      "fawry": "Fawry"
+    }
   },
   "taxArchive": {
     "title": "Tax archive",
@@ -9991,7 +10020,9 @@
       "store": "Store",
       "documents": "Documents",
       "lastIssued": "Last issued",
-      "actions": "Actions"
+      "actions": "Actions",
+      "periodTotals": "Totals this period",
+      "taxStatus": "Tax registration"
     },
     "deletedStore": "Deleted store",
     "viewDocuments": "View documents",
@@ -9999,7 +10030,34 @@
     "loadFailed": "Could not load the archive. Please try again.",
     "empty": "No archived documents yet.",
     "emptyStore": "This store has no archived documents.",
-    "backToStores": "All stores"
+    "backToStores": "All stores",
+    "periodLabel": "Totals for",
+    "periods": {
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisYear": "This year"
+    },
+    "totalsNote": "Totals count issued sales documents (tax invoices and receipts) in the period; credit notes and archive records are not netted.",
+    "totals": {
+      "net": "Net",
+      "vat": "VAT",
+      "gross": "Gross",
+      "count": "{count, plural, one {# document} other {# documents}}"
+    },
+    "trn": {
+      "present": "Tax registration number on file",
+      "missing": "No tax registration number"
+    },
+    "eta": {
+      "connected": "ETA e-receipt connected",
+      "connectedOff": "ETA connected, switched off",
+      "notConnected": "ETA not connected"
+    },
+    "noLiveData": "Not available for a deleted store",
+    "summaryTitle": "Store summary",
+    "searchPlaceholder": "Search by document or order number",
+    "dateFrom": "From",
+    "dateTo": "To"
   },
   "taxReview": {
     "title": "VAT verification",
