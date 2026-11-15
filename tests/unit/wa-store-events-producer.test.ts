@@ -16,6 +16,9 @@ const h = vi.hoisted(() => ({
   owner: vi.fn(),
   consentRow: vi.fn(),
   store: vi.fn(),
+  linkRowDb: vi.fn(),
+  redisExists: vi.fn(),
+  redisSet: vi.fn(),
 }));
 const dbMock = vi.hoisted(() => ({
   order: { findUnique: h.order },
@@ -24,6 +27,10 @@ const dbMock = vi.hoisted(() => ({
   storeWhatsAppConsent: { findUnique: h.consentRow },
   product: { findMany: h.products },
   store: { findUnique: h.store },
+  storeWhatsAppLink: { findUnique: h.linkRowDb },
+}));
+vi.mock('@api/services/redis.service', () => ({
+  redis: { exists: h.redisExists, set: h.redisSet },
 }));
 vi.mock('@ebda/database', () => ({
   prisma: dbMock,
@@ -51,6 +58,7 @@ import { storeEventSchema } from '@api/contracts/wa-v1';
 import {
   contractPaymentMethod,
   emitStoreEventsFor,
+  announceLinkOrigin,
 } from '@api/lib/inngest/functions/wa-store-events';
 import { assertWhatsAppLinkConfig, suiteBuyerKeySecret } from '@api/lib/wa/config';
 import { deterministicEventId } from '@api/lib/wa/events';
@@ -73,6 +81,7 @@ const ORDER = {
 
 beforeEach(() => {
   process.env.SUITE_BUYER_KEY_SECRET = SECRET;
+  process.env.ORDER_STATUS_LINK_SECRET = 'producer-test-order-status-link-secret-0123456789';
   h.order.mockReset().mockResolvedValue(ORDER);
   h.linked.mockReset().mockResolvedValue(true);
   h.consent.mockReset().mockResolvedValue(true);
@@ -173,7 +182,7 @@ describe('order/created', () => {
     expect(cod.data).toMatchObject({
       storeName: 'سوق',
       itemCount: 3,
-      orderUrlSuffix: 'account/orders/o1',
+      orderUrlSuffix: expect.stringMatching(/^o\/[0-9a-f-]+\.o1\./),
       storefrontOrigin: 'https://souq.ebda.app',
     });
     expect(String(cod.data.shippingAddressLine)).toContain('النصر');
@@ -743,5 +752,44 @@ describe('order.created paymentMethod: instapay (WA-C5)', () => {
       expect(['cod', 'link', 'card', 'wallet', 'instapay']).toContain(contractPaymentMethod(raw));
     expect(contractPaymentMethod('instapay')).not.toBe('card');
     expect(contractPaymentMethod('InstaPay')).toBe('instapay');
+  });
+});
+
+describe('link origin announcement (COD v2 backfill, contract v1.6)', () => {
+  beforeEach(() => {
+    h.linkRowDb.mockReset().mockResolvedValue({ linked: true, ownerUserId: 'owner-1' });
+    h.store.mockReset().mockResolvedValue({ slug: 'souq', domain: null });
+    h.redisExists.mockReset().mockResolvedValue(0);
+    h.redisSet.mockReset().mockResolvedValue('OK');
+    h.send.mockClear();
+  });
+
+  it('sends a valid store.linked carrying the storefront origin, and flags it so the next run sends nothing', async () => {
+    expect(await announceLinkOrigin(STORE)).toBe(1);
+    const [e] = sent();
+    expect(storeEventSchema.safeParse(e).success).toBe(true);
+    expect(e).toMatchObject({
+      type: 'store.linked',
+      data: { ownerUserId: 'owner-1', storefrontOrigin: 'https://souq.ebda.app' },
+    });
+    expect(h.redisSet).toHaveBeenCalledWith(
+      expect.stringContaining(`${STORE}:https://souq.ebda.app`),
+      '1',
+      expect.any(Number)
+    );
+    h.redisExists.mockResolvedValue(1);
+    h.send.mockClear();
+    expect(await announceLinkOrigin(STORE)).toBe(0);
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it('is deterministic per (store, origin) and sends nothing for an unlinked store', async () => {
+    await announceLinkOrigin(STORE);
+    await announceLinkOrigin(STORE);
+    expect(sent()[0]!.id).toBe(sent()[1]!.id);
+    h.send.mockClear();
+    h.linkRowDb.mockResolvedValue({ linked: false, ownerUserId: 'owner-1' });
+    expect(await announceLinkOrigin(STORE)).toBe(0);
+    expect(h.send).not.toHaveBeenCalled();
   });
 });

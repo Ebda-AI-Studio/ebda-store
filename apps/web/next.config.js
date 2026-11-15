@@ -139,6 +139,15 @@ const nextConfig = {
           // builds it per request from src/lib/csp.ts (Ruling CSP-WEB-1). `headers()` is evaluated once at build time.
         ],
       },
+      // The guest order-status page (Ruling WA-COD-V2-2): never cached, never indexed, no referrer. Listed after the catch-all so it wins.
+      {
+        source: '/o/:token',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Cache-Control', value: 'private, no-store' },
+        ],
+      },
     ];
   },
 };

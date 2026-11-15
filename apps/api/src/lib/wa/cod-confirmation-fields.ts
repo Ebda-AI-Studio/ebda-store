@@ -7,12 +7,11 @@ import { orderAddressLines, storefrontOrigin } from '@ebda/shared';
  * PII: `shippingAddressLine` goes only to the customer who placed the order (the same phone the event is for).
  * Nothing here logs; callers must never put it in a log line.
  *
- * The order link is the storefront's customer order page, `account/orders/<orderId>`. It is safe to hand out:
- * the id is a v4 UUID (never a sequential number), the page needs the customer's own sign-in and the API
- * answers 403 for anyone else (public.routes GET /orders/:id), so the link alone reveals nothing. No view
- * token travels in a URL (SEC-15 keeps that out of history and referrers).
+ * The order link is `o/<token>`: a signed, expiring (14 days), single-order token (lib/order-status-link-token.ts)
+ * that opens a minimal read-only summary a guest can see: no phone, email or street, never cached or indexed. The
+ * guest view token (SEC-15) never travels in a URL.
  */
-export type CodConfirmationFields = {
+type CodConfirmationFields = {
   storeName?: string;
   shippingAddressLine?: string;
   itemCount?: number;
@@ -27,7 +26,8 @@ const MAX_ADDRESS = 300;
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 export function codConfirmationFields(input: {
-  orderId: string;
+  /** Path under the storefront origin that opens the guest-safe order summary, e.g. `o/<token>`. */
+  orderUrlSuffix: string;
   locale: string;
   shippingAddress: unknown;
   items: ReadonlyArray<{ quantity: number }> | null | undefined;
@@ -56,6 +56,6 @@ export function codConfirmationFields(input: {
     0
   );
   if (count > 0) out.itemCount = Math.min(count, 9999);
-  out.orderUrlSuffix = `account/orders/${input.orderId}`;
+  out.orderUrlSuffix = input.orderUrlSuffix;
   return out;
 }

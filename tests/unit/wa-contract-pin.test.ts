@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const FILE = path.resolve(__dirname, '../../apps/api/src/contracts/wa-v1.ts');
-const PINNED = '91120cfb64c7f25eb0170c4856828bf2f02ad04c452fdba7be5c3549ad4a6c1c';
+const PINNED = '06d0ab793063ebe27380b0d0d32ee270bfd646559781ee28043b0a7dc09356cf';
 
 describe('ebda-wa-v1 envelope', () => {
   it('is byte-identical to the Ebda Chat copy (sha256 pin)', () => {

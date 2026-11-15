@@ -4,6 +4,8 @@ import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import { acrossStoresDb, readStoreDb, withStoreDb } from '../../jobs/store-db';
 import { alarmStoreId } from '../../jobs/store-scope';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
+import { signOrderStatusLinkToken } from '../../order-status-link-token';
+import { storefrontOriginOf } from '../../wa/link-origin';
 import { codConfirmationFields } from '../../wa/cod-confirmation-fields';
 import { signCartRestoreToken } from '../../cart-restore-token';
 import { inngest } from '../client';
@@ -166,11 +168,12 @@ async function orderEvents(event: SourceEvent): Promise<Planned[]> {
           totalMinor: order.total,
           currency: order.currency,
           ...codConfirmationFields({
-            orderId,
             locale: loc,
             shippingAddress: order.shippingAddress,
             items: order.items,
             store,
+            // Guest-safe: a signed, expiring, single-order token (Ruling WA-COD-V2-2). Never the guest view token.
+            orderUrlSuffix: `o/${signOrderStatusLinkToken(storeId, orderId)}`,
           }),
         },
       },
@@ -413,6 +416,33 @@ const CONSENT_BACKFILL_KEY = 'wa:consent-backfill:v1.1';
  * Re-send the current consent state of this store's rows changed within `sinceMs` (0 = every row).
  * Used by the 12-hourly reconcile and for the one-time v1.1 backfill. Idempotent by envelope id.
  */
+/**
+ * Tells Ebda Chat where an ALREADY-linked store's customers shop (`store.linked` + `storefrontOrigin`, contract v1.6), once per
+ * (store, origin), so Chat submits the per-store COD v2 template. A new custom domain is a new origin, hence a new envelope.
+ * Idempotent: a flag per (store, origin) and a deterministic id; Chat's submission skips a template it already has.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-store-events-producer.test.ts
+export async function announceLinkOrigin(storeId: string): Promise<number> {
+  const link = await withStoreDb(storeId, db =>
+    db.storeWhatsAppLink.findUnique({
+      where: { storeId },
+      select: { linked: true, ownerUserId: true },
+    })
+  );
+  if (!link?.linked || !link.ownerUserId) return 0;
+  const { storefrontOrigin } = await storefrontOriginOf(storeId);
+  if (!storefrontOrigin) return 0;
+  const flag = `wa:link-origin:v1:${storeId}:${storefrontOrigin}`;
+  if (await redis.exists(flag)) return 0;
+  const event = await buildStoreEvent(
+    { type: 'store.linked', storeId, data: { ownerUserId: link.ownerUserId, storefrontOrigin } },
+    { seed: `link-origin:${storeId}:${storefrontOrigin}` }
+  );
+  await sendStoreEvents([event]);
+  await redis.set(flag, '1', 365 * 24 * 3600);
+  return 1;
+}
+
 export async function resendConsentFor(storeId: string, sinceMs: number): Promise<number> {
   const rows = await readStoreDb(storeId, db =>
     db.storeWhatsAppConsent.findMany({
@@ -543,6 +573,14 @@ export const waPlanSync: JobDef = inngest.createFunction(
       let n = 0;
       for (const storeId of linked) {
         n += await emitStoreEventsFor({ name: PLAN_CHANGED_EVENT, data: { storeId } });
+        // Once per (store, origin): the COD v2 template backfill for stores linked before it existed (Ruling WA-COD-V2-2).
+        n += await announceLinkOrigin(storeId).catch(err => {
+          logger.warn(
+            { storeId, err: err instanceof Error ? err.message : 'unknown' },
+            '[wa-events] link origin announce failed'
+          );
+          return 0;
+        });
         // Net under the consent observer too: re-send the consent state that changed recently (and,
         // ONCE, every row: the v1.1 backfill). Same state = same envelope id, so this is idempotent.
         n += await resendConsentFor(storeId, sinceMs);
