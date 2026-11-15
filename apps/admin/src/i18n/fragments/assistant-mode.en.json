@@ -2,7 +2,7 @@
   "stores": {
     "dashboard": {
       "assistantMode": {
-        "title": "Ebda assistant",
+        "title": "Store assistant",
         "subtitle": "Per-store rollout. Off by default; only a super admin can change it.",
         "modeLabel": "Assistant mode",
         "loading": "Loading…",

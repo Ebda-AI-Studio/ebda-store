@@ -2,7 +2,7 @@
 
 Plan 4 Task C4 (Store part). The assistant is OFF everywhere until a super admin switches a store on. Two switches decide the mode of a store, and the lower one wins:
 
-- Per store: `settings.assistantMode` (`off` default, `answer-only`, `suggest`, `act`), set only by a super admin: `PUT /admin/assistant/stores/:storeId/mode` (read with `GET` on the same path, which also returns the last `assistant.mode` audit row). The UI is the "Ebda assistant" card on the super-admin store page (`/stores/[id]`), with a confirm step above `off`. A merchant cannot raise it.
+- Per store: `settings.assistantMode` (`off` default, `answer-only`, `suggest`, `act`), set only by a super admin: `PUT /admin/assistant/stores/:storeId/mode` (read with `GET` on the same path, which also returns the last `assistant.mode` audit row). The UI is the "Store assistant" card on the super-admin store page (`/stores/[id]`), with a confirm step above `off`. A merchant cannot raise it.
 - Platform: D1 `system_settings` keys `sl.global` (`{ kill, mode, shadow }`), `sl.product.store` (`{ kill }`), `sl.tools` (killed tool names): `PUT /admin/assistant/flags`. `mode` caps every store; an unset cap means OFF. A kill switch is read on every turn and again at apply and confirm time, and an unreadable switch fails closed.
 
 ## Stages

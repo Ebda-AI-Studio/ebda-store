@@ -37,7 +37,7 @@
   },
   "steps": [
     "Super admin API: set the platform kill switches",
-    "Super admin: open the store page and set the Ebda assistant mode"
+    "Super admin: open the store page and set the store assistant mode"
   ],
   "edgeCases": ["A merchant can never raise the mode above the platform cap"],
   "gaps": [
