@@ -38,6 +38,7 @@ import { sanitizeReturnTo } from '../../../../../../lib/return-to';
 import { EditSidebar } from './_components/EditSidebar';
 import { ProductFaqSection, type ProductFaqSectionHandle } from './_components/ProductFaqSection';
 import { AiFieldBadge } from './_components/AiFieldBadge';
+import { ReplaceHistory } from '../../../../../../components/ai/ReplaceHistory';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
 import { FactsCard } from './_components/FactsCard';
 import { FulfilmentCard, LEAD_TIME_MAX } from './_components/FulfilmentCard';
@@ -1396,6 +1397,16 @@ export default function EditProductPage() {
                 /products/:id/faqs CRUD endpoints + AI draft endpoint. */}
             {product && (
               <ProductFaqSection ref={faqSectionRef} storeId={storeId} productId={product.id} />
+            )}
+
+            {/* What an AI "replace existing" run overwrote on this product, with Undo (AITOOLS-4). */}
+            {product && (
+              <ReplaceHistory
+                storeId={storeId}
+                mode="product"
+                productId={product.id}
+                onRestored={() => window.location.reload()}
+              />
             )}
           </div>
 

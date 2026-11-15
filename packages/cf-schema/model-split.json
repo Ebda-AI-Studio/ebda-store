@@ -367,6 +367,10 @@
     "target": "store-do",
     "reason": "storeId-scoped, read only in one store context"
   },
+  "AiReplaceBackup": {
+    "target": "store-do",
+    "reason": "AITOOLS-4: storeId-scoped undo history of AI replace runs, read only in one store context"
+  },
   "AiUsage": {
     "target": "d1",
     "reason": "Ruling NZ-AN-1: the AI quota counts usage across stores, so it is platform-wide on D1 (append-only, idempotent ids)"

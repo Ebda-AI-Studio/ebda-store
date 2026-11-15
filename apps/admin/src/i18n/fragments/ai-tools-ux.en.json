@@ -30,15 +30,17 @@
     "cards": {
       "fillMissingArabic": {
         "title": "Add missing Arabic text",
-        "outcome": "Arabic names and descriptions wherever only English exists.",
-        "body": "Checks every product, category and your store page. It only translates when the Arabic field is empty, so nothing you wrote is touched.",
-        "button": "Translate to Arabic"
+        "outcome": "Arabic names and descriptions wherever only English exists. Optionally redo the ones that already have Arabic.",
+        "body": "Checks every product, category and your store page. By default it only translates when the Arabic field is empty, so nothing you wrote is touched.",
+        "button": "Translate to Arabic",
+        "forceTooltip": "Translate the English again and replace the Arabic that is already there. The old Arabic is saved, so you can undo it from the undo history below."
       },
       "fillMissingEnglish": {
         "title": "Add missing English text",
-        "outcome": "English names and descriptions wherever only Arabic exists.",
-        "body": "Checks every product, category and your store page. Items that already have both languages are skipped.",
-        "button": "Translate to English"
+        "outcome": "English names and descriptions wherever only Arabic exists. Optionally redo the ones that already have English.",
+        "body": "Checks every product, category and your store page. By default items that already have both languages are skipped.",
+        "button": "Translate to English",
+        "forceTooltip": "Translate the Arabic again and replace the English that is already there. The old English is saved, so you can undo it from the undo history below."
       },
       "balanceDescriptions": {
         "title": "Match each field to its language",
@@ -122,15 +124,17 @@
       },
       "categorize": {
         "title": "Put products in categories",
-        "outcome": "A category on every product that has none.",
-        "body": "Picks the best match from your own categories and never creates a new one. Products that already have a category are left alone.",
-        "button": "Assign categories"
+        "outcome": "A category on every product that has none. Optionally re-pick for products that already have one.",
+        "body": "Picks the best match from your own categories and never creates a new one. By default products that already have a category are left alone.",
+        "button": "Assign categories",
+        "forceTooltip": "Re-pick the category for every product, even ones that already have one. The old categories are saved, so you can undo it from the undo history below."
       },
       "imageAlt": {
         "title": "Describe product images",
         "outcome": "A short description on each product image that has none. It helps Google and screen readers.",
-        "body": "Checks up to 4 images per product so your AI allowance goes further. Descriptions you already have are never changed.",
-        "button": "Describe images"
+        "body": "Checks up to 4 images per product so your AI allowance goes further. By default descriptions you already have are never changed.",
+        "button": "Describe images",
+        "forceTooltip": "Write a new description for images that already have one. The old description is saved, so you can undo it from the undo history below."
       },
       "excerpt": {
         "title": "Short product summaries",

@@ -2,7 +2,7 @@
   "generatedBy": "packages/cf-schema/scripts/generate.mjs",
   "databases": {
     "store-do": {
-      "tables": 131,
+      "tables": 132,
       "maxColumns": 62,
       "columnCounts": {
         "store_credentials": 4,
@@ -80,6 +80,7 @@
         "reviews": 21,
         "bulk_import_jobs": 17,
         "bulk_ai_jobs": 20,
+        "ai_replace_backups": 14,
         "store_faqs": 12,
         "store_howtos": 14,
         "product_faqs": 9,

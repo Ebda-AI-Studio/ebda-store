@@ -14,7 +14,10 @@
     "GET .../ai/bulk/:jobId",
     "POST .../ai/jobs/:jobId/cancel",
     "POST .../ai/products/:productId/ai/reset-field",
-    "balance-description/revert-balance"
+    "balance-description/revert-balance",
+    "GET /stores/:storeId/ai/replace-backups",
+    "GET /stores/:storeId/ai/replace-runs",
+    "POST /stores/:storeId/ai/replace-backups/undo"
   ],
   "mcpTool": null,
   "planGate": "bulk_operations (bulk)",
@@ -22,7 +25,7 @@
   "policy": "preview",
   "undo": {
     "class": "reversible",
-    "note": "yes (reset-field / revert-balance; fill-only never overwrites)"
+    "note": "yes: replace runs of translate, categorize and image alt are backed up and undone from the AI tools page (per run) or the product page (per product), refused for a field edited since (AITOOLS-4); reset-field / revert-balance as before"
   },
   "helpArticle": "ai-switch-and-category-suggestions",
   "questions": {
@@ -45,7 +48,8 @@
     "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
-    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success",
+    "Replace existing (translate, categorize, image alt): the old value is saved first; Undo restores it unless the merchant edited that field after the run, in which case it is left alone and the merchant is told"
   ],
   "gaps": []
 }

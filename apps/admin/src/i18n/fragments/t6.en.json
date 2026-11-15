@@ -138,7 +138,7 @@
   },
   "aiTools": {
     "replaceObject": "Replace existing content",
-    "replaceConsequence": "What is already there will be overwritten with new AI text. This can't be undone, except the language fix.",
+    "replaceConsequence": "What is already there will be overwritten with new AI text. Only translation, categories and image text are saved first, so only those can be undone.",
     "replaceAction": "Replace content",
     "cancelObject": "The running tool",
     "cancelConsequence": "It stops. Items already done keep their changes.",

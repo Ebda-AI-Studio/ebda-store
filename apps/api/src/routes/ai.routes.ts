@@ -35,6 +35,11 @@ import {
 } from '../services/ai-autofill.service';
 import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { BulkAiEnqueueError, enqueueBulkAiJob } from '../services/bulk-ai-job.service';
+import {
+  listBackups as listReplaceBackups,
+  listReplaceRuns,
+  undoBackups as undoReplaceBackups,
+} from '../services/catalogue-replace-backup.service';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 
 const router = Router({ mergeParams: true });
@@ -532,6 +537,8 @@ router.post(
 
 const bulkTranslateSchema = z.object({
   direction: z.enum(['to_ar', 'to_en']),
+  // Replace existing (AITOOLS-4): both sides filled -> regenerate the target side, previous value backed up (undoable).
+  force: z.boolean().optional(),
 });
 
 // Helper: when the job start fails (Cloudflare Workflows/Queues unreachable or unbound), the job
@@ -548,10 +555,14 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { direction } = bulkTranslateSchema.parse(req.body);
+      const { direction, force } = bulkTranslateSchema.parse(req.body);
       let job;
       try {
-        job = await enqueueBulkAiJob(storeId, req.user!.userId, { kind: 'translate', direction });
+        job = await enqueueBulkAiJob(storeId, req.user!.userId, {
+          kind: 'translate',
+          direction,
+          force: force === true,
+        });
       } catch (err) {
         if (!(err instanceof BulkAiEnqueueError)) throw err;
         res.status(503).json({
@@ -595,6 +606,64 @@ router.post(
       }
 
       res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
+// Replace history + undo (AITOOLS-4). What an AI "replace existing" run overwrote, per change / per bulk run / per product.
+// Undo refuses a field the merchant edited after the run (see services/catalogue-replace-backup.service.ts).
+// =====================================================================
+
+const replaceBackupsQuery = z.object({
+  productId: z.string().min(1).max(64).optional(),
+  jobId: z.string().min(1).max(64).optional(),
+  includeRestored: z.enum(['true', 'false']).optional(),
+});
+
+router.get('/replace-backups', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = replaceBackupsQuery.parse(req.query);
+    const data = await listReplaceBackups(req.params.storeId, {
+      productId: q.productId,
+      jobId: q.jobId,
+      includeRestored: q.includeRestored === 'true',
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/replace-runs', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await listReplaceRuns(req.params.storeId);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const undoReplaceSchema = z
+  .object({
+    ids: z.array(z.string().min(1).max(64)).min(1).max(500).optional(),
+    jobId: z.string().min(1).max(64).optional(),
+    productId: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+router.post(
+  '/replace-backups/undo',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const scope = undoReplaceSchema.parse(req.body);
+      const data = await undoReplaceBackups(req.params.storeId, req.user!.userId, scope);
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }
@@ -823,9 +892,8 @@ router.post(
 // See docs/plans/2026-07-03-ai-bulk-sweeps.md.
 // =====================================================================
 
-// Uncategorized-products-only category assignment. `force` is accepted for
-// wiring consistency but is a no-op in the Inngest function (never
-// re-categorizes a product that already has one — see bulk-ai-categorize.ts).
+// Category assignment. `force` = replace existing (AITOOLS-4): the AI's pick replaces a categorized product's set and the
+// previous set is backed up first (undo). Without it only uncategorized products are touched (bulk-ai-categorize.ts).
 router.post(
   '/bulk/categorize',
   requireFeature('bulk_operations'),
@@ -838,7 +906,7 @@ router.post(
       const job = await (
         await storeWriter(currentStoreId())
       ).bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'category_assign' },
+        data: { storeId, userId: req.user!.userId, kind: 'category_assign', force },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
@@ -866,9 +934,8 @@ router.post(
   }
 );
 
-// Gemini-Vision image alt-text sweep. `force` is accepted for wiring
-// consistency but is a no-op — an image that already has `alt` is never
-// overwritten (see bulk-ai-image-alt.ts).
+// Gemini-Vision image alt-text sweep. `force` = replace existing (AITOOLS-4): an image that has alt is regenerated with its
+// previous alt backed up (undo). Without it an image that already has `alt` is never overwritten (bulk-ai-image-alt.ts).
 router.post(
   '/bulk/image-alt',
   requireFeature('bulk_operations'),
@@ -881,7 +948,7 @@ router.post(
       const job = await (
         await storeWriter(currentStoreId())
       ).bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'image_alt' },
+        data: { storeId, userId: req.user!.userId, kind: 'image_alt', force },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 

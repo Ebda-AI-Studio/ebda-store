@@ -77,6 +77,8 @@ export const DO_WRITABLE_MODELS: ReadonlySet<string> = new Set([
   'EtaReceipt',
   // bulk AI job rows: the stuck-job watcher resumes or fails them (Ruling CF-JOBS-4B)
   'BulkAiJob',
+  // the undo history of an AI replace run: written by the sweeps (before they overwrite), restored by the undo route (AITOOLS-4)
+  'AiReplaceBackup',
   // dead-stock flags: the weekly scan writes them (Ruling CF-JOBS-4B)
   'DeadStockFlag',
   // merchant webhooks: endpoints and the delivery log (Ruling CF-JOBS-4B)

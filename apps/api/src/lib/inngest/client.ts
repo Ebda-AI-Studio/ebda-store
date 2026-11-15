@@ -58,6 +58,8 @@ type BulkAiTranslateEvent = EventPayload & {
     jobId: string;
     storeId: string;
     direction: 'to_ar' | 'to_en';
+    /** Replace existing (AITOOLS-4): off = fill-only. */
+    force?: boolean;
   };
 };
 

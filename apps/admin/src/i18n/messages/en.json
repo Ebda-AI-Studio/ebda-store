@@ -7856,15 +7856,17 @@
       },
       "fillMissingArabic": {
         "title": "Add missing Arabic text",
-        "body": "Checks every product, category and your store page. It only translates when the Arabic field is empty, so nothing you wrote is touched.",
+        "body": "Checks every product, category and your store page. By default it only translates when the Arabic field is empty, so nothing you wrote is touched.",
         "button": "Translate to Arabic",
-        "outcome": "Arabic names and descriptions wherever only English exists."
+        "outcome": "Arabic names and descriptions wherever only English exists. Optionally redo the ones that already have Arabic.",
+        "forceTooltip": "Translate the English again and replace the Arabic that is already there. The old Arabic is saved, so you can undo it from the undo history below."
       },
       "fillMissingEnglish": {
         "title": "Add missing English text",
-        "body": "Checks every product, category and your store page. Items that already have both languages are skipped.",
+        "body": "Checks every product, category and your store page. By default items that already have both languages are skipped.",
         "button": "Translate to English",
-        "outcome": "English names and descriptions wherever only Arabic exists."
+        "outcome": "English names and descriptions wherever only Arabic exists. Optionally redo the ones that already have English.",
+        "forceTooltip": "Translate the Arabic again and replace the English that is already there. The old English is saved, so you can undo it from the undo history below."
       },
       "seoMeta": {
         "title": "Google titles and descriptions",
@@ -7934,16 +7936,16 @@
       },
       "categorize": {
         "title": "Put products in categories",
-        "body": "Picks the best match from your own categories and never creates a new one. Products that already have a category are left alone.",
+        "body": "Picks the best match from your own categories and never creates a new one. By default products that already have a category are left alone.",
         "button": "Assign categories",
-        "forceTooltip": "Categories are never reassigned once set — this sweep only ever fills products with zero categories.",
-        "outcome": "A category on every product that has none."
+        "forceTooltip": "Re-pick the category for every product, even ones that already have one. The old categories are saved, so you can undo it from the undo history below.",
+        "outcome": "A category on every product that has none. Optionally re-pick for products that already have one."
       },
       "imageAlt": {
         "title": "Describe product images",
-        "body": "Checks up to 4 images per product so your AI allowance goes further. Descriptions you already have are never changed.",
+        "body": "Checks up to 4 images per product so your AI allowance goes further. By default descriptions you already have are never changed.",
         "button": "Describe images",
-        "forceTooltip": "Images that already have alt-text are never overwritten — this sweep only fills images missing one.",
+        "forceTooltip": "Write a new description for images that already have one. The old description is saved, so you can undo it from the undo history below.",
         "outcome": "A short description on each product image that has none. It helps Google and screen readers."
       },
       "excerpt": {
@@ -8126,7 +8128,7 @@
       }
     },
     "replaceObject": "Replace existing content",
-    "replaceConsequence": "What is already there will be overwritten with new AI text. This can't be undone, except the language fix.",
+    "replaceConsequence": "What is already there will be overwritten with new AI text. Only translation, categories and image text are saved first, so only those can be undone.",
     "replaceAction": "Replace content",
     "cancelObject": "The running tool",
     "cancelConsequence": "It stops. Items already done keep their changes.",
@@ -8168,7 +8170,46 @@
       "seeResults": "See what your store has now",
       "undoHint": "Not happy? Undo the language fix"
     },
-    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote."
+    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote.",
+    "replaceConsequenceUndo": "What is already there will be replaced with new AI text. The old value is saved first, so you can undo it from the undo history on this page.",
+    "undo": {
+      "title": "Undo history",
+      "intro": "Every change an AI tool made over something that was already there. Undo puts the old value back, unless you edited that field after the run.",
+      "productTitle": "AI changes you can undo",
+      "productIntro": "The AI replaced these values on this product. Undo puts the old one back, unless you edited the field since.",
+      "loading": "Loading…",
+      "empty": "Nothing to undo. When you tick “Replace what's already there” on a tool, the old values show up here.",
+      "errorLoad": "Could not load the undo history. Try again in a moment.",
+      "errorUndo": "Could not undo. Try again in a moment.",
+      "restored": "Restored {count} value(s).",
+      "refused": "{count} value(s) were left as they are because you changed them after the AI run.",
+      "you": "You",
+      "team": "Team member",
+      "storeItem": "Category",
+      "before": "Before",
+      "after": "After",
+      "undone": "Undone",
+      "undoChange": "Undo",
+      "undoRun": "Undo this run",
+      "undoProduct": "Undo all on this product",
+      "showChanges": "Show changes",
+      "hideChanges": "Hide changes",
+      "runCounts": "{changed} changed, {undone} undone",
+      "tools": {
+        "translate_ar": "Translate to Arabic",
+        "translate_en": "Translate to English",
+        "categorize": "Put products in categories",
+        "image_alt": "Describe product images"
+      },
+      "fields": {
+        "name": "Name (English)",
+        "nameAr": "Name (Arabic)",
+        "description": "Description (English)",
+        "descriptionAr": "Description (Arabic)",
+        "alt": "Image description",
+        "categories": "Categories"
+      }
+    }
   },
   "account": {
     "security": {

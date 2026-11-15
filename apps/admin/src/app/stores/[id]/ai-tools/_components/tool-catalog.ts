@@ -38,10 +38,10 @@ export interface ToolSpec {
   cost: CostClass;
   /**
    * Whether the server can overwrite existing content for this tool. `false` = it only ever fills blanks, so the page
-   * offers no "replace" switch (categorize and image-alt accept `force` but ignore it; translate never read it).
+   * offers no "replace" switch. Translate, categorize and image alt replace with a backup (Ruling AITOOLS-4).
    */
   canReplace: boolean;
-  /** A replace run can be rolled back from the page (language balance has a matching "Undo" tool). */
+  /** A replace run can be rolled back from the page (language balance: its own Undo tool; the AITOOLS-4 tools: the run history). */
   undoable?: boolean;
   /** The undo tool: styled as a secondary action, labelled as undo. */
   isUndo?: boolean;
@@ -74,7 +74,8 @@ export const TOOL_SECTIONS: ToolSection[] = [
         endpoint: '/bulk/translate',
         body: { direction: 'to_ar' },
         cost: 'perItem',
-        canReplace: false,
+        canReplace: true,
+        undoable: true,
       },
       {
         key: 'translate-en',
@@ -82,7 +83,8 @@ export const TOOL_SECTIONS: ToolSection[] = [
         endpoint: '/bulk/translate',
         body: { direction: 'to_en' },
         cost: 'perItem',
-        canReplace: false,
+        canReplace: true,
+        undoable: true,
       },
     ],
   },
@@ -200,14 +202,16 @@ export const TOOL_SECTIONS: ToolSection[] = [
         copy: 'categorize',
         endpoint: '/bulk/categorize',
         cost: 'perProduct',
-        canReplace: false,
+        canReplace: true,
+        undoable: true,
       },
       {
         key: 'image-alt',
         copy: 'imageAlt',
         endpoint: '/bulk/image-alt',
         cost: 'perImage',
-        canReplace: false,
+        canReplace: true,
+        undoable: true,
       },
       {
         key: 'excerpt',

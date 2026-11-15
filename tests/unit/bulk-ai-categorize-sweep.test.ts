@@ -28,6 +28,11 @@ vi.mock('../../apps/api/src/lib/inngest/ai-retry', () => ({
   callWithRetry: (fn: () => unknown) => fn(),
 }));
 
+const mockReplaceCategories = vi.fn();
+vi.mock('../../apps/api/src/services/catalogue-replace-backup.service', () => ({
+  replaceCategoriesWithBackup: (...args: unknown[]) => mockReplaceCategories(...args),
+}));
+
 const mockSuggestProductCategory = vi.fn();
 vi.mock('../../apps/api/src/lib/ai/product-category-suggester', () => ({
   suggestProductCategory: (...args: unknown[]) => mockSuggestProductCategory(...args),
@@ -72,6 +77,7 @@ beforeEach(async () => {
   process.env.AI_BULK_THROTTLE_MS = '0';
   mockAssertAiQuota.mockClear();
   mockSuggestProductCategory.mockReset();
+  mockReplaceCategories.mockReset();
   mockFindUniqueStore.mockReset();
   mockFindManyCategory.mockReset();
   mockFindManyProduct.mockReset();
@@ -108,7 +114,7 @@ describe('bulk-ai-categorize sweep', () => {
   it('assigns the top match returned by the generator', async () => {
     mockFindManyCategory.mockResolvedValue([{ id: 'cat-1', name: 'Clothing', nameAr: null }]);
     mockFindManyProduct.mockResolvedValue([
-      { id: 'p1', name: 'Cotton Tee', description: 'A soft cotton tee' },
+      { id: 'p1', name: 'Cotton Tee', description: 'A soft cotton tee', categories: [] },
     ]);
     mockSuggestProductCategory.mockResolvedValue([{ id: 'cat-1', confidence: 'high' }]);
 
@@ -124,7 +130,7 @@ describe('bulk-ai-categorize sweep', () => {
   it('skips (not fails) when the generator returns no confident match', async () => {
     mockFindManyCategory.mockResolvedValue([{ id: 'cat-1', name: 'Clothing', nameAr: null }]);
     mockFindManyProduct.mockResolvedValue([
-      { id: 'p1', name: 'Mystery Item', description: 'unclear' },
+      { id: 'p1', name: 'Mystery Item', description: 'unclear', categories: [] },
     ]);
     mockSuggestProductCategory.mockResolvedValue([]);
 
@@ -139,8 +145,8 @@ describe('bulk-ai-categorize sweep', () => {
   it('skips every product cleanly (no Gemini calls) when the store has zero categories', async () => {
     mockFindManyCategory.mockResolvedValue([]);
     mockFindManyProduct.mockResolvedValue([
-      { id: 'p1', name: 'Product 1', description: 'desc' },
-      { id: 'p2', name: 'Product 2', description: 'desc' },
+      { id: 'p1', name: 'Product 1', description: 'desc', categories: [] },
+      { id: 'p2', name: 'Product 2', description: 'desc', categories: [] },
     ]);
 
     await runSweep({ jobId: 'job-1', storeId: 'store-1' });
@@ -148,5 +154,38 @@ describe('bulk-ai-categorize sweep', () => {
     expect(mockSuggestProductCategory).not.toHaveBeenCalled();
     const finalCall = mockUpdateJob.mock.calls[mockUpdateJob.mock.calls.length - 1][0];
     expect(finalCall.data.skipped).toBe(2);
+  });
+
+  describe('replace existing (AITOOLS-4)', () => {
+    const categorized = [
+      { id: 'p1', name: 'Tee', description: 'd', categories: [{ categoryId: 'old-1' }] },
+    ];
+
+    it('without force never queries or touches a categorized product', async () => {
+      mockFindManyCategory.mockResolvedValue([{ id: 'cat-1', name: 'Clothing', nameAr: null }]);
+      mockFindManyProduct.mockResolvedValue([]);
+      await runSweep({ jobId: 'job-1', storeId: 'store-1' });
+      for (const [args] of mockFindManyProduct.mock.calls)
+        expect(args.where.categories).toEqual({ none: {} });
+      expect(mockReplaceCategories).not.toHaveBeenCalled();
+    });
+
+    it('with force replaces a categorized product through the backup service, never a bare write', async () => {
+      mockFindManyCategory.mockResolvedValue([{ id: 'cat-1', name: 'Clothing', nameAr: null }]);
+      mockFindManyProduct.mockResolvedValue(categorized);
+      mockSuggestProductCategory.mockResolvedValue([{ id: 'cat-1', confidence: 'high' }]);
+      mockReplaceCategories.mockResolvedValue('replaced');
+      mockFindUniqueJob.mockResolvedValue({ status: 'running', userId: 'u1' });
+
+      await runSweep({ jobId: 'job-1', storeId: 'store-1', force: true });
+
+      expect(mockReplaceCategories).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: 'job-1', userId: 'u1', tool: 'categorize' }),
+        { productId: 'p1', previousIds: ['old-1'], nextIds: ['cat-1'] }
+      );
+      expect(mockCreateProductCategory).not.toHaveBeenCalled();
+      const finalCall = mockUpdateJob.mock.calls[mockUpdateJob.mock.calls.length - 1][0];
+      expect(finalCall.data.filled).toBe(1);
+    });
   });
 });

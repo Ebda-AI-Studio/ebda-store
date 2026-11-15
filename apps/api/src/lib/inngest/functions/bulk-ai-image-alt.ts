@@ -1,5 +1,6 @@
 import type { JobDef } from '../../jobs/types';
 import { storeWriter } from '../../../lib/repo-factory';
+import { replaceTextWithBackup } from '../../../services/catalogue-replace-backup.service';
 import { lazyStoreDb, lazyStoreWriter } from '../../jobs/store-db';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
@@ -83,7 +84,11 @@ const bulkAiImageAltFn = inngest.createFunction(
     triggers: [{ event: 'bulk-ai/image-alt-requested' }],
   },
   async ({ event, step }) => {
-    const { jobId, storeId } = event.data as {
+    const {
+      jobId,
+      storeId,
+      force: forceFlag,
+    } = event.data as {
       jobId: string;
       storeId: string;
       force?: boolean;
@@ -93,6 +98,8 @@ const bulkAiImageAltFn = inngest.createFunction(
       logger.warn('bulk-ai/image-alt-requested fired without ids');
       return;
     }
+    // "Replace existing" (AITOOLS-4): off = fill-only, an image that has alt is never touched. On = regenerate it, backup first.
+    const force = forceFlag === true;
 
     return runInStoreScope(storeId, async () => {
       // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
@@ -139,7 +146,7 @@ const bulkAiImageAltFn = inngest.createFunction(
         const result: BatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await sdb.bulkAiJob.findUnique({
             where: { id: jobId, storeId },
-            select: { status: true },
+            select: { status: true, userId: true },
           });
           if (currentJob?.status === 'cancelled') {
             return {
@@ -187,7 +194,9 @@ const bulkAiImageAltFn = inngest.createFunction(
               continue;
             }
 
-            const missingAlt = product.images.filter(img => !img.alt?.trim());
+            const missingAlt = force
+              ? product.images
+              : product.images.filter(img => !img.alt?.trim());
             if (missingAlt.length === 0) {
               bSkipped++;
               bProcessed++;
@@ -215,13 +224,34 @@ const bulkAiImageAltFn = inngest.createFunction(
                   `image-alt:${image.id}`
                 );
 
-                await (
-                  await storeWriter(storeId)
-                ).productImage.update({
-                  where: { id: image.id },
-                  data: { alt },
-                });
-                productFilled++;
+                if (image.alt?.trim()) {
+                  // replace run: the previous alt is backed up in the same atomic write
+                  const out = await replaceTextWithBackup(
+                    {
+                      storeId,
+                      userId: currentJob?.userId ?? null,
+                      jobId,
+                      tool: 'image_alt',
+                    },
+                    {
+                      entityKind: 'product_image',
+                      entityId: image.id,
+                      productId: product.id,
+                      field: 'alt',
+                      previous: image.alt,
+                      next: alt,
+                    }
+                  );
+                  if (out === 'replaced') productFilled++;
+                } else {
+                  await (
+                    await storeWriter(storeId)
+                  ).productImage.update({
+                    where: { id: image.id },
+                    data: { alt },
+                  });
+                  productFilled++;
+                }
               } catch (err) {
                 if (isAiQuotaCapError(err)) {
                   logger.warn(

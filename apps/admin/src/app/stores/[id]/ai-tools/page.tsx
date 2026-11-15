@@ -8,6 +8,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { GeoResultsPanel } from './_components/GeoResultsPanel';
 import { AiSweepResultsPanels } from './_components/AiSweepResultsPanels';
+import { ReplaceHistory } from '../../../../components/ai/ReplaceHistory';
 import { AiToolCard } from './_components/AiToolCard';
 import {
   ActiveJobCard,
@@ -158,11 +159,17 @@ export default function AiToolsPage() {
   }, [runId]);
 
   /** Shared starter. Handles smart-skip (default) and force paths. */
-  async function start(endpoint: string, key: StartKey, body: object = {}, force = false) {
+  async function start(
+    endpoint: string,
+    key: StartKey,
+    body: object = {},
+    force = false,
+    undoable = false
+  ) {
     if (force) {
       const ok = await askConfirm({
         object: t('replaceObject'),
-        consequence: t('replaceConsequence'),
+        consequence: undoable ? t('replaceConsequenceUndo') : t('replaceConsequence'),
         confirmLabel: t('replaceAction'),
       });
       if (!ok) return;
@@ -313,7 +320,7 @@ export default function AiToolsPage() {
         startingLabel={t('starting')}
         loading={starting === tool.key}
         blockedReason={blockText}
-        onRun={force => start(tool.endpoint, tool.key, tool.body ?? {}, force)}
+        onRun={force => start(tool.endpoint, tool.key, tool.body ?? {}, force, !!tool.undoable)}
         isUndo={tool.isUndo}
         replace={
           tool.canReplace
@@ -489,6 +496,13 @@ export default function AiToolsPage() {
         <GeoResultsPanel storeId={storeId} refreshTrigger={jobs.length} />
         <AiSweepResultsPanels storeId={storeId} />
       </section>
+
+      {/* What the replace runs overwrote, with Undo per run and per change (AITOOLS-4). */}
+      <ReplaceHistory
+        storeId={storeId}
+        mode="runs"
+        refreshTrigger={jobs.filter(j => isTerminal(j.status)).length}
+      />
 
       {/* History: every run, newest first. */}
       <section className="mt-10" aria-labelledby="recent-runs-title">
