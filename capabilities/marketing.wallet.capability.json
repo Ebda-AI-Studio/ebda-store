@@ -17,8 +17,8 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "adjust reversible by opposite adjustment"
+    "class": "irreversible",
+    "note": "a credit or debit is money; a correction is a second adjustment"
   },
   "helpArticle": "customer-wallet",
   "questions": {
