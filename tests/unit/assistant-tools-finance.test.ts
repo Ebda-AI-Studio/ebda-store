@@ -35,6 +35,8 @@ vi.mock('@api/services/accounting/account.service', () => ({
   listAccountsTree: async () => m.tree,
 }));
 
+import { MerchantForbidden } from '@api/mcp/run-as-merchant';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 import { financeTools } from '@api/smart-layer/tools/finance.tools';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
@@ -161,5 +163,22 @@ describe('expense_add', () => {
     const a = await t().preview!(ctx(), parse(good));
     m.tree = { ...m.tree, expenses: [{ ...node('E1', '5100', 'expense'), nameAr: 'غيرتها' }] };
     expect((await t().preview!(ctx(), parse(good))).etag).not.toBe(a.etag);
+  });
+
+  it('staff and a platform super admin get NO card at preview, and a store without the feature gets none either', async () => {
+    const args = parse(good);
+    await expect(t().preview!(ctx('staff'), args)).rejects.toBeInstanceOf(MerchantForbidden);
+    await expect(t().preview!(ctx('super_admin'), args)).rejects.toBeInstanceOf(MerchantForbidden);
+    const d = await t().preview!(ctx(), args);
+    await expect(t().apply!(ctx('super_admin'), args, d)).rejects.toBeInstanceOf(ToolForbidden);
+    m.featureEnabled.mockResolvedValue(false);
+    await expect(t().preview!(ctx(), args)).rejects.toBeInstanceOf(MerchantForbidden);
+    expect(m.createExpense).not.toHaveBeenCalled();
+  });
+
+  it('engine round trip: a confirm card is applied after approval and the undo says irreversible', async () => {
+    const r = await applyThenUndo(financeTools(), t(), parse(good));
+    expect(r).toMatchObject({ applied: 'applied', undo: 'irreversible' });
+    expect(m.createExpense).toHaveBeenCalledTimes(1);
   });
 });

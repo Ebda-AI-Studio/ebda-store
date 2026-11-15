@@ -22,6 +22,7 @@ import { sha256Hex } from '@ebda/shared/smart-layer';
 import { featureService } from '../../services/feature.service';
 import { readInStoreContext } from '../../lib/store-scoped-read';
 import { storeDb } from '../../lib/repo-factory';
+import { CAMPAIGN_MAX_SCHEDULE_DAYS } from '@ebda/shared';
 import { maskEmail, maskPhone } from '../../lib/pii-mask';
 import {
   CAMPAIGN_LIST_SELECT,
@@ -48,7 +49,7 @@ import { WhatsAppConsentService } from '../../lib/wa/consent';
 import { whatsAppLinkState } from '../../lib/wa/link';
 import { StoreService } from '../../services/store.service';
 import { affiliateService } from '../../services/affiliate.service';
-import { LoyaltyService } from '../../services/loyalty.service';
+import { LoyaltyService, storeCustomerIdentities } from '../../services/loyalty.service';
 import { WalletService, WALLET_MAX_ENTRY_FILS } from '../../services/wallet.service';
 import { listLifecycleLog } from '../../services/lifecycle-emails.service';
 import { change, egp, f, pair, row, shape, type Described } from './kit';
@@ -71,6 +72,31 @@ const parseFuture = (s: string | null | undefined): string | null => {
     throw new Error(`Invalid date: ${s} (use ISO 8601, e.g. 2026-12-01T18:00:00Z)`);
   return d.toISOString();
 };
+/** The send route's own window (campaign.service requestCampaignSend), checked at PREVIEW so a bad time never leaves a draft behind. */
+const parseSchedule = (s: string | null | undefined): string | null => {
+  const iso = parseFuture(s);
+  if (iso === null) return null;
+  const ahead = new Date(iso).getTime() - Date.now();
+  if (ahead <= 0 || ahead > CAMPAIGN_MAX_SCHEDULE_DAYS * 24 * 60 * 60 * 1000)
+    throw new Error(
+      `Schedule must be in the future and within ${CAMPAIGN_MAX_SCHEDULE_DAYS} days.`
+    );
+  return iso;
+};
+/** Who a money card is for: name + masked e-mail, from the store's own customer directory. An id that matches nobody (a name, a fragment, another store's id) refuses. */
+async function customerLabels(storeId: string, ids: string[]): Promise<Map<string, string>> {
+  const found = await storeCustomerIdentities(storeId, ids);
+  const out = new Map<string, string>();
+  for (const id of ids) {
+    const c = found.get(id);
+    if (!c)
+      throw new Error(
+        `"${id}" is not a customer of this store. Customers can share a name, so pass the customer id from a customer lookup, or ask the merchant which one they mean.`
+      );
+    out.set(id, `${`${c.firstName} ${c.lastName}`.trim() || 'customer'} (${maskEmail(c.email)})`);
+  }
+  return out;
+}
 const uniq = (xs: string[]): string[] => [...new Set(xs)];
 
 // ---- campaigns ------------------------------------------------------------------------------------------------------------------------------
@@ -132,7 +158,7 @@ const campaignSend = change<CampaignSendArgs>({
       throw new Error('subject and bodyText go together.');
     if (Boolean(a.subjectAr?.trim()) !== Boolean(a.bodyTextAr?.trim()))
       throw new Error('subjectAr and bodyTextAr go together.');
-    const when = parseFuture(a.scheduledAt);
+    const when = parseSchedule(a.scheduledAt);
     const r = st as Reach;
     assertReachable(r, when);
     return {
@@ -230,7 +256,7 @@ const campaignSendDraft = change<CampaignIdArgs>({
       !(s.campaign.subjectAr?.trim() && s.campaign.bodyHtmlAr?.trim())
     )
       throw new Error('Add a subject and a body in at least one language first.');
-    const when = parseFuture(a.scheduledAt);
+    const when = parseSchedule(a.scheduledAt);
     assertReachable(s, when);
     return {
       summary: pair(
@@ -388,10 +414,10 @@ const pushBroadcast = change<PushArgs>({
       ),
       rows: [
         row(
-          'هيوصل لمين',
+          'هيوصل لمين (العدد مش معروف عندنا)',
           'Audience',
           null,
-          'every shopper who allowed notifications (the push provider knows the number)'
+          'every shopper who allowed notifications; audience size unknown to Ebda Store (only the push provider knows it)'
         ),
         row('العنوان بالإنجليزي', 'Title (English)', null, a.titleEn),
         row('العنوان بالعربي', 'Title (Arabic)', null, a.titleAr),
@@ -664,7 +690,24 @@ const affiliatePayout = change<PayoutArgs>({
 
 // ---- loyalty --------------------------------------------------------------------------------------------------------------------------------
 type AwardArgs = { customerIds: string[]; points: number; description?: string };
-type PointsState = Array<{ customerId: string; points: number }>;
+type PointsState = Array<{
+  customerId: string;
+  label: string;
+  points: number;
+  /** This very request (same merchant, conversation, day, customers, points, reason) already credited the customer. */
+  already: boolean;
+}>;
+/** Stable across a retry of the same request, different for another request: a half-done award that is re-previewed cannot credit anybody twice. */
+async function awardRef(ctx: TurnCtx, a: AwardArgs): Promise<string> {
+  const day = new Date(ctx.now).toISOString().slice(0, 10);
+  const ids = uniq(a.customerIds).sort().join(',');
+  return (
+    await sha256Hex(
+      `${ctx.storeId}:${ctx.userId}:${ctx.conversationId}:${day}:${ids}:${a.points}:${a.description ?? ''}`
+    )
+  ).slice(0, 12);
+}
+const refMark = (ref: string): string => `[ref ${ref}]`;
 const loyaltyAward = change<AwardArgs>({
   name: 'loyalty_award_points',
   capabilityId: 'marketing.loyalty',
@@ -689,48 +732,69 @@ const loyaltyAward = change<AwardArgs>({
   gate: { ...OWNER, feature: 'loyalty' },
   audit: { action: 'loyalty.points_awarded', resourceType: 'loyalty', resourceId: () => undefined },
   refs: a => uniq(a.customerIds).map(id => ({ kind: 'customer', id })),
-  state: async (ctx, a): Promise<PointsState> =>
-    Promise.all(
-      uniq(a.customerIds).map(async customerId => ({
-        customerId,
-        points: (await LoyaltyService.getCustomerPoints(ctx.storeId, customerId))?.points ?? 0,
-      }))
-    ),
+  state: async (ctx, a): Promise<PointsState> => {
+    const ids = uniq(a.customerIds);
+    const labels = await customerLabels(ctx.storeId, ids);
+    const mark = refMark(await awardRef(ctx, a));
+    return Promise.all(
+      ids.map(async customerId => {
+        const [info, hist] = await Promise.all([
+          LoyaltyService.getCustomerPoints(ctx.storeId, customerId),
+          LoyaltyService.getTransactionHistory(ctx.storeId, customerId, { limit: 50 }),
+        ]);
+        return {
+          customerId,
+          label: labels.get(customerId)!,
+          points: info?.points ?? 0,
+          already: hist.transactions.some(t => t.description?.includes(mark)),
+        };
+      })
+    );
+  },
   describe: (_ctx, a, st): Described => {
     if (a.points === 0) throw new Error('points must not be zero.');
-    const rows = st as PointsState;
+    const all = st as PointsState;
+    const rows = all.filter(r => !r.already);
+    if (rows.length === 0)
+      throw new Error(
+        'Every customer in this request was already credited; nothing is left to award.'
+      );
     const total = a.points * rows.length;
     return {
       summary: pair(
-        `هديّ ${a.points} نقطة لكل واحد من ${rows.length} عميل (الإجمالي ${total} نقطة). النقاط ليها قيمة في الدفع، ومينفعش أرجّعها من هنا.`,
-        `I will give ${a.points} points to each of ${rows.length} customer(s) (${total} in total). Points have checkout value and this cannot be undone from here.`
+        `هديّ ${a.points} نقطة لكل واحد من ${rows.length} عميل (الإجمالي ${total} نقطة)${all.length > rows.length ? `، وتخطيت ${all.length - rows.length} اتحسبلهم قبل كده` : ''}. النقاط ليها قيمة في الدفع، ومينفعش أرجّعها من هنا.`,
+        `I will give ${a.points} points to each of ${rows.length} customer(s) (${total} in total)${all.length > rows.length ? `, skipping ${all.length - rows.length} already credited by this request` : ''}. Points have checkout value and this cannot be undone from here.`
       ),
       rows: [
         row('عدد العملاء', 'Customers', null, rows.length),
         row('النقاط لكل عميل', 'Points each', null, a.points),
         row('إجمالي النقاط', 'Total points', null, total),
         row('السبب', 'Reason', null, a.description ?? null),
-        ...rows
+        ...all
           .slice(0, 20)
           .map(r =>
-            row(`رصيد ${r.customerId}`, `Balance of ${r.customerId}`, r.points, r.points + a.points)
+            r.already
+              ? row(`${r.label}`, `${r.label}`, r.points, 'already credited, skipped')
+              : row(`رصيد ${r.label}`, `Balance of ${r.label}`, r.points, r.points + a.points)
           ),
       ],
       affectedCount: rows.length,
       restore: null,
     };
   },
-  run: async (ctx, a) => {
+  run: async (ctx, a, st) => {
+    const mark = refMark(await awardRef(ctx, a));
     const done: Array<{ customerId: string; newBalance: number }> = [];
-    for (const customerId of uniq(a.customerIds)) {
+    for (const c of (st as PointsState).filter(r => !r.already)) {
+      // the marker rides in the ledger description: a retry of this request sees it (state.already) and skips the customer
       const r = await LoyaltyService.awardBonusPoints(
         ctx.storeId,
-        customerId,
+        c.customerId,
         a.points,
         a.points > 0 ? 'earn_manual' : 'adjust',
-        a.description
+        `${a.description ?? 'Assistant award'} ${mark}`
       );
-      done.push({ customerId, newBalance: r.newBalance });
+      done.push({ customerId: c.customerId, newBalance: r.newBalance });
     }
     return { awarded: done.length, customers: done };
   },
@@ -763,7 +827,7 @@ const loyaltySettings = change<LoyaltyArgs>({
   name: 'loyalty_settings_set',
   capabilityId: 'marketing.loyalty',
   description:
-    'Turn the loyalty program on or off and set how many points customers earn ("ازاي اعمل نقاط ولاء؟", "set up loyalty points", "give 100 points at signup"). Any of: loyaltyEnabled, pointsPerMajorUnit (points per 1 EGP, 1-100), signupBonus, referralBonus, reviewBonus, birthdayBonus (points, 0 or more). Only what you pass changes; Undo restores the old values.',
+    'Turn the loyalty program on or off and set how many points customers earn ("ازاي اعمل نقاط ولاء؟", "set up loyalty points", "give 100 points at signup"). Any of: loyaltyEnabled, pointsPerMajorUnit (points per 1 EGP, 1-100), signupBonus, referralBonus, reviewBonus, birthdayBonus (points, 0 or more). Only what you pass changes. It cannot be undone from here; change the values again to correct it.',
   schema: shape<LoyaltyArgs>({
     loyaltyEnabled: f.bool('Turn the program on or off'),
     pointsPerMajorUnit: f.num('Points per 1 EGP spent', { min: 1, max: 100 }),
@@ -796,8 +860,8 @@ const loyaltySettings = change<LoyaltyArgs>({
     for (const k of keys) restore[k] = before[k];
     return {
       summary: pair(
-        'هعدّل إعدادات برنامج الولاء زي ما في الجدول، والأرقام القديمة بتترجع بزرار التراجع.',
-        'I will change the loyalty settings as listed; Undo restores the old numbers.'
+        'هعدّل إعدادات برنامج الولاء زي ما في الجدول. مفيش تراجع من هنا، ولو غلطت تقدر تعدّلها تاني.',
+        'I will change the loyalty settings as listed. There is no undo here; change them again to correct a mistake.'
       ),
       rows: keys.map(k =>
         row(LOYALTY_LABELS[k]![0], LOYALTY_LABELS[k]![1], before[k] ?? null, a[k])
@@ -844,20 +908,24 @@ const walletAdjust = change<WalletArgs>({
     resourceId: a => a.customerId,
   },
   refs: a => [{ kind: 'customer', id: a.customerId }],
-  state: async (ctx, a) => ({ balance: await WalletService.getBalance(ctx.storeId, a.customerId) }),
+  state: async (ctx, a) => ({
+    customer: (await customerLabels(ctx.storeId, [a.customerId])).get(a.customerId)!,
+    balance: await WalletService.getBalance(ctx.storeId, a.customerId),
+  }),
   describe: (_ctx, a, st): Described => {
     const amount = piasters(a.amountEgp);
-    const balance = (st as { balance: number }).balance;
+    const { balance, customer } = st as { balance: number; customer: string };
     if (amount === 0) throw new Error('The amount must not be zero.');
     if (Math.abs(amount) > WALLET_MAX_ENTRY_FILS) throw new Error('That amount is too large.');
     if (balance + amount < 0)
       throw new Error(`The balance is EGP ${egp(balance)}; a debit cannot take it below zero.`);
     return {
       summary: pair(
-        `هعدّل رصيد محفظة العميل ${amount > 0 ? 'بزيادة' : 'بخصم'} ${egp(Math.abs(amount))} جنيه (من ${egp(balance)} إلى ${egp(balance + amount)}). مينفعش أرجّعها من هنا.`,
-        `I will ${amount > 0 ? 'credit' : 'debit'} the customer wallet by EGP ${egp(Math.abs(amount))} (from ${egp(balance)} to ${egp(balance + amount)}). It cannot be undone from here.`
+        `هعدّل رصيد محفظة ${customer} ${amount > 0 ? 'بزيادة' : 'بخصم'} ${egp(Math.abs(amount))} جنيه (من ${egp(balance)} إلى ${egp(balance + amount)}). مينفعش أرجّعها من هنا.`,
+        `I will ${amount > 0 ? 'credit' : 'debit'} the wallet of ${customer} by EGP ${egp(Math.abs(amount))} (from ${egp(balance)} to ${egp(balance + amount)}). It cannot be undone from here.`
       ),
       rows: [
+        row('العميل', 'Customer', null, customer),
         row('التعديل (جنيه)', 'Adjustment (EGP)', null, egp(amount)),
         row('الرصيد (جنيه)', 'Balance (EGP)', egp(balance), egp(balance + amount)),
         row('السبب', 'Note', null, a.note),

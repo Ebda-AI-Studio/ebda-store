@@ -25,6 +25,8 @@ vi.mock('@api/services/auth.service', () => ({
   AuthService: { getProfile: m.getProfile, updateProfile: m.updateProfile },
 }));
 
+import { MerchantForbidden } from '@api/mcp/run-as-merchant';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 import { accountTools } from '@api/smart-layer/tools/account.tools';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
@@ -113,5 +115,22 @@ describe('profile_update', () => {
     expect(
       t().inverse!(ctx(), parse({ phone: '0111' }), d2, { ok: true, etagAfter: 'x' })
     ).toBeNull();
+  });
+
+  it('engine round trip: undo of a profile change is `undone` and restores the before values', async () => {
+    const r = await applyThenUndo(
+      accountTools(),
+      t(),
+      parse({ firstName: 'Ahmed', phone: '0111' })
+    );
+    expect(r).toMatchObject({ applied: 'applied', undo: 'undone' });
+    expect(m.updateProfile).toHaveBeenCalledTimes(2);
+    expect(m.updateProfile.mock.calls[1][1]).toEqual({ firstName: 'Ahmad', phone: '0100' });
+  });
+
+  it('a platform super admin gets no card at preview (the only role this route refuses)', async () => {
+    await expect(t().preview!(ctx('super_admin'), parse({ lastName: 'x' }))).rejects.toBeInstanceOf(
+      MerchantForbidden
+    );
   });
 });

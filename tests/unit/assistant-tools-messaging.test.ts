@@ -18,7 +18,14 @@ const m = vi.hoisted(() => ({
   consent: vi.fn(),
   store: { getById: vi.fn(), updatePixels: vi.fn() },
   aff: { getById: vi.fn(), approve: vi.fn(), createPayout: vi.fn() },
-  loy: { points: vi.fn(), award: vi.fn(), getSettings: vi.fn(), updateSettings: vi.fn() },
+  loy: {
+    points: vi.fn(),
+    award: vi.fn(),
+    getSettings: vi.fn(),
+    updateSettings: vi.fn(),
+    history: vi.fn(),
+    identities: vi.fn(),
+  },
   wallet: { balance: vi.fn(), adjust: vi.fn() },
 }));
 vi.mock('@api/lib/logger', () => ({
@@ -68,8 +75,10 @@ vi.mock('@api/services/affiliate.service', () => ({
   },
 }));
 vi.mock('@api/services/loyalty.service', () => ({
+  storeCustomerIdentities: m.loy.identities,
   LoyaltyService: {
     getCustomerPoints: m.loy.points,
+    getTransactionHistory: m.loy.history,
     awardBonusPoints: m.loy.award,
     getSettings: m.loy.getSettings,
     updateSettings: m.loy.updateSettings,
@@ -84,6 +93,7 @@ vi.mock('@api/services/lifecycle-emails.service', () => ({ listLifecycleLog: vi.
 import { ToolForbidden, effectivePolicy, payloadHash } from '@ebda/shared/smart-layer';
 import { messagingTools } from '@api/smart-layer/tools/messaging.tools';
 import { applyOf, ctxOf, previewOf, toolNamed } from './helpers/assistant-tool-harness';
+import { applyThenUndo } from './helpers/undo-roundtrip';
 
 const tools = messagingTools();
 const T = (n: string) => toolNamed(tools, n);
@@ -112,6 +122,15 @@ beforeEach(() => {
     updatedAt: new Date(0),
   });
   m.loy.points.mockResolvedValue({ points: 10 });
+  m.loy.history.mockResolvedValue({ transactions: [] });
+  m.loy.identities.mockImplementation(
+    async (_s: string, ids: string[]) =>
+      new Map(
+        ids
+          .filter(id => id.startsWith('cu'))
+          .map(id => [id, { id, firstName: 'Mona', lastName: id, email: 'mona@example.com' }])
+      )
+  );
   m.loy.award.mockResolvedValue({ newBalance: 110 });
   m.loy.getSettings.mockResolvedValue({
     loyaltyEnabled: false,
@@ -354,11 +373,17 @@ describe('loyalty', () => {
     ]);
   });
   it('awards each customer once through the service; only the owner role', async () => {
-    await applyOf(T('loyalty_award_points'), { customerIds: ['a', 'a', 'b'], points: -5 });
+    await applyOf(T('loyalty_award_points'), { customerIds: ['cu-a', 'cu-a', 'cu-b'], points: -5 });
     expect(m.loy.award).toHaveBeenCalledTimes(2);
-    expect(m.loy.award).toHaveBeenCalledWith('s1', 'a', -5, 'adjust', undefined);
+    expect(m.loy.award).toHaveBeenCalledWith(
+      's1',
+      'cu-a',
+      -5,
+      'adjust',
+      expect.stringMatching(/^Assistant award \[ref [0-9a-f]{12}\]$/)
+    );
     await expect(
-      applyOf(T('loyalty_award_points'), { customerIds: ['a'], points: 5 }, 'staff')
+      applyOf(T('loyalty_award_points'), { customerIds: ['cu-a'], points: 5 }, 'staff')
     ).rejects.toBeInstanceOf(ToolForbidden);
   });
   it('settings: only passed keys change; the tool is irreversible like its capability, so it declares no inverse', async () => {
@@ -407,5 +432,244 @@ describe('reads', () => {
     await expect(t.read!(ctxOf('staff'), {} as never)).rejects.toThrow();
     m.featureEnabled.mockResolvedValue(false);
     await expect(t.read!(ctxOf(), {} as never)).rejects.toThrow(/feature/);
+  });
+});
+
+const soon = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+
+describe('review fix: money cards name the customer', () => {
+  const args = { customerId: 'cu1', amountEgp: 12.5, note: 'goodwill' };
+  it('wallet_adjust shows the name and a masked e-mail, never the full address', async () => {
+    const d = await previewOf(T('wallet_adjust'), args);
+    const who = String(d.rows.find(r => r.label.en === 'Customer')?.after);
+    expect(who).toContain('Mona cu1');
+    expect(who).toContain('m***@example.com');
+    expect(JSON.stringify(d)).not.toContain('mona@example.com');
+  });
+  it('the customer is part of the fingerprint: a renamed customer re-previews', async () => {
+    const e1 = (await previewOf(T('wallet_adjust'), args)).etag;
+    m.loy.identities.mockImplementation(
+      async (_s: string, ids: string[]) =>
+        new Map(ids.map(id => [id, { id, firstName: 'Someone', lastName: 'Else', email: 'x@y.z' }]))
+    );
+    expect((await previewOf(T('wallet_adjust'), args)).etag).not.toBe(e1);
+  });
+  it('a NAME or fragment given as the id matches nobody: refused, never guessed, nothing moves', async () => {
+    const bad = { ...args, customerId: 'Mona' };
+    await expect(previewOf(T('wallet_adjust'), bad)).rejects.toThrow(/customer id/);
+    await expect(applyOf(T('wallet_adjust'), bad)).rejects.toThrow();
+    expect(m.wallet.adjust).not.toHaveBeenCalled();
+    await expect(
+      previewOf(T('loyalty_award_points'), { customerIds: ['cu1', 'Mona'], points: 5 })
+    ).rejects.toThrow(/ask the merchant which one/);
+    expect(m.loy.award).not.toHaveBeenCalled();
+  });
+  it('loyalty_award_points rows name each customer, not a raw id alone', async () => {
+    const d = await previewOf(T('loyalty_award_points'), { customerIds: ['cu1'], points: 5 });
+    expect(d.rows.some(r => r.label.en.includes('Mona cu1 (m***@example.com)'))).toBe(true);
+  });
+});
+
+describe('review fix: loyalty_award_points never credits anybody twice', () => {
+  it('customer 3 of 5 fails; the retry credits only the ones not yet credited', async () => {
+    const ledger = new Map<string, string[]>();
+    const credited: string[] = [];
+    let failOnce = true;
+    m.loy.award.mockImplementation(
+      async (_s: string, id: string, _p: number, _t: string, desc: string) => {
+        if (id === 'cu3' && failOnce) {
+          failOnce = false;
+          throw new Error('db down');
+        }
+        credited.push(id);
+        ledger.set(id, [...(ledger.get(id) ?? []), desc]);
+        return { newBalance: 1 };
+      }
+    );
+    m.loy.history.mockImplementation(async (_s: string, id: string) => ({
+      transactions: (ledger.get(id) ?? []).map(description => ({ description })),
+    }));
+    const t = T('loyalty_award_points');
+    const args = {
+      customerIds: ['cu1', 'cu2', 'cu3', 'cu4', 'cu5'],
+      points: 10,
+      description: 'eid',
+    };
+    await expect(applyOf(t, args)).rejects.toThrow('db down');
+    expect(credited).toEqual(['cu1', 'cu2']);
+    const d = await previewOf(t, args); // the engine re-previews after a failed apply
+    expect(d.affectedCount).toBe(3);
+    await applyOf(t, args);
+    expect(credited.sort()).toEqual(['cu1', 'cu2', 'cu3', 'cu4', 'cu5']);
+    await expect(previewOf(t, args)).rejects.toThrow(/already credited/);
+  });
+  it('another request (different points) has another reference and credits again', async () => {
+    const ledger = new Map<string, string[]>();
+    m.loy.award.mockImplementation(
+      async (_s: string, id: string, _p: number, _t: string, desc: string) => {
+        ledger.set(id, [...(ledger.get(id) ?? []), desc]);
+        return { newBalance: 1 };
+      }
+    );
+    m.loy.history.mockImplementation(async (_s: string, id: string) => ({
+      transactions: (ledger.get(id) ?? []).map(description => ({ description })),
+    }));
+    await applyOf(T('loyalty_award_points'), { customerIds: ['cu1'], points: 10 });
+    await applyOf(T('loyalty_award_points'), { customerIds: ['cu1'], points: 20 });
+    expect(ledger.get('cu1')).toHaveLength(2);
+    expect(new Set(ledger.get('cu1')!.map(d => d.match(/\[ref (\w+)\]/)![1])).size).toBe(2);
+  });
+});
+
+describe('review fix: campaign schedule and push audience', () => {
+  const base = { subject: 'S', bodyText: 'B' };
+  it('a past or more-than-30-days schedule is refused at preview; no orphan draft', async () => {
+    await expect(previewOf(T('campaign_send'), { ...base, scheduledAt: soon(-1) })).rejects.toThrow(
+      /future/
+    );
+    await expect(previewOf(T('campaign_send'), { ...base, scheduledAt: soon(31) })).rejects.toThrow(
+      /30 days/
+    );
+    await expect(applyOf(T('campaign_send'), { ...base, scheduledAt: soon(31) })).rejects.toThrow();
+    expect(m.campaign.createCampaignDraft).not.toHaveBeenCalled();
+    const ok = await previewOf(T('campaign_send'), { ...base, scheduledAt: soon(2) });
+    expect(ok.affectedCount).toBe(120);
+  });
+  it('the same window guards sending a saved draft', async () => {
+    m.campaign.findCampaignOr404.mockResolvedValue({
+      id: 'c1',
+      status: 'draft',
+      subject: 'S',
+      subjectAr: null,
+      bodyHtml: '<p>x</p>',
+      bodyHtmlAr: null,
+      updatedAt: new Date(0),
+    });
+    await expect(
+      previewOf(T('campaign_send_draft'), { campaignId: 'c1', scheduledAt: soon(40) })
+    ).rejects.toThrow(/30 days/);
+  });
+  it('the push card says the audience size is unknown to Ebda Store', async () => {
+    const d = await previewOf(T('push_broadcast'), {
+      titleEn: 'T',
+      titleAr: 'ع',
+      bodyEn: 'B',
+      bodyAr: 'ن',
+    });
+    expect(String(d.rows[0]!.after)).toContain('audience size unknown to Ebda Store');
+  });
+});
+
+// ---- the gate of EVERY tool: staff at preview, staff at apply, plan feature off ---------------------------------------------------------------
+const draftRow = {
+  id: 'c1',
+  status: 'draft',
+  subject: 'S',
+  subjectAr: null,
+  bodyHtml: '<p>x</p>',
+  bodyHtmlAr: null,
+  updatedAt: new Date(0),
+  recipientCount: 0,
+  sentCount: 0,
+};
+const GATED: Array<{ tool: string; args: unknown; feature: boolean; setup?: () => void }> = [
+  { tool: 'campaign_send', args: { subject: 'S', bodyText: 'B' }, feature: true },
+  {
+    tool: 'campaign_send_draft',
+    args: { campaignId: 'c1' },
+    feature: true,
+    setup: () => m.campaign.findCampaignOr404.mockResolvedValue(draftRow),
+  },
+  {
+    tool: 'campaign_cancel',
+    args: { campaignId: 'c1' },
+    feature: true,
+    setup: () =>
+      m.campaign.findCampaignOr404.mockResolvedValue({ ...draftRow, status: 'scheduled' }),
+  },
+  { tool: 'newsletter_broadcast', args: { subject: 'S', message: 'M' }, feature: true },
+  {
+    tool: 'push_broadcast',
+    args: { titleEn: 'T', titleAr: 'ع', bodyEn: 'B', bodyAr: 'ن' },
+    feature: true,
+  },
+  {
+    tool: 'whatsapp_consent_revoke',
+    args: { phone: '+201012345678' },
+    feature: false,
+    setup: () => m.consent.mockResolvedValue({ granted: false }),
+  },
+  { tool: 'pixels_set', args: { platform: 'meta', enabled: true }, feature: true },
+  { tool: 'affiliate_review', args: { affiliateId: 'af1', decision: 'suspend' }, feature: true },
+  { tool: 'affiliate_payout', args: { affiliateId: 'af1' }, feature: true },
+  { tool: 'loyalty_award_points', args: { customerIds: ['cu1'], points: 5 }, feature: true },
+  { tool: 'loyalty_settings_set', args: { signupBonus: 5 }, feature: true },
+  { tool: 'wallet_adjust', args: { customerId: 'cu1', amountEgp: 5, note: 'n' }, feature: true },
+];
+describe.each(GATED)('gate of $tool', ({ tool, args, feature, setup }) => {
+  beforeEach(() => setup?.());
+  it('staff gets no card at preview', async () => {
+    await expect(previewOf(T(tool), args, 'staff')).rejects.toThrow(/FORBIDDEN/);
+  });
+  it('staff cannot apply a card the owner previewed (ToolForbidden)', async () => {
+    await expect(applyOf(T(tool), args, 'staff')).rejects.toBeInstanceOf(ToolForbidden);
+  });
+  it('a super admin is refused too', async () => {
+    await expect(previewOf(T(tool), args, 'super_admin')).rejects.toThrow(/FORBIDDEN/);
+  });
+  if (feature) {
+    it('plan feature off: no card, and a card previewed earlier cannot apply', async () => {
+      m.featureEnabled.mockResolvedValue(false);
+      await expect(previewOf(T(tool), args)).rejects.toThrow(/FORBIDDEN/);
+      m.featureEnabled.mockResolvedValue(true);
+      const draft = await previewOf(T(tool), args);
+      m.featureEnabled.mockResolvedValue(false);
+      await expect(T(tool).apply!(ctxOf(), args as never, draft)).rejects.toBeInstanceOf(
+        ToolForbidden
+      );
+    });
+  }
+});
+
+describe('the free reads keep their screen gates', () => {
+  const READS: Array<[string, string[], boolean]> = [
+    ['campaigns_overview', ['staff'], true],
+    ['newsletter_subscribers_summary', ['staff'], false],
+    ['push_recent_broadcasts', ['staff'], true],
+    ['whatsapp_link_status', ['staff'], false],
+    ['affiliates_overview', ['staff'], true],
+    ['loyalty_overview', ['staff'], true],
+    ['wallet_overview', ['staff'], true],
+  ];
+  it.each(READS)(
+    '%s refuses staff and, when the screen is plan-gated, a store without the plan',
+    async (name, roles, feature) => {
+      for (const r of roles) await expect(T(name).read!(ctxOf(r), {} as never)).rejects.toThrow();
+      if (feature) {
+        m.featureEnabled.mockResolvedValue(false);
+        await expect(T(name).read!(ctxOf(), {} as never)).rejects.toThrow(/feature/);
+      }
+    }
+  );
+});
+
+describe('undo round trip through the engine', () => {
+  it('pixels_set undoes back to the before values, including a pixel that had no id', async () => {
+    m.store.getById.mockResolvedValue({ marketingPixels: {} });
+    const r = await applyThenUndo(tools, T('pixels_set'), {
+      platform: 'tiktok',
+      enabled: true,
+      id: 'T1234',
+    });
+    expect(r).toMatchObject({ applied: 'applied', undo: 'undone' });
+    expect(m.store.updatePixels).toHaveBeenLastCalledWith(expect.any(String), {
+      tiktok: { enabled: false },
+    });
+  });
+  it('every other tool declares itself irreversible with no inverse (nothing to round-trip)', () => {
+    for (const t of tools.filter(x => x.policy === 'confirm')) {
+      expect(t.undo).toBe('irreversible');
+      expect(t.inverse).toBeUndefined();
+    }
   });
 });

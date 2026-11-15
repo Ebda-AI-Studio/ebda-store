@@ -34,7 +34,7 @@ import { OWNER, iso, notFound, toPiasters, type Rec } from './ops-shared';
 // ======================================================================================================================================
 // warehouse.routes.ts: authorize('store_admin','super_admin') + requireFeature('inventory.multi_warehouse') on every route.
 const WAREHOUSE_GATE = { roles: OWNER, feature: 'inventory.multi_warehouse' } as const;
-const WH_FIELDS = ['name', 'nameAr', 'priority', 'address', 'isActive', 'isDefault'] as const;
+const WH_FIELDS = ['name', 'nameAr', 'priority', 'address', 'isActive'] as const;
 const WH_LABELS: Record<string, [string, string]> = {
   name: ['اسم المخزن', 'Name'],
   nameAr: ['الاسم بالعربي', 'Arabic name'],
@@ -50,13 +50,12 @@ type WhArgs = {
   priority?: number;
   address?: string | null;
   isActive?: boolean;
-  isDefault?: boolean;
 };
 const warehouseUpdate = change<WhArgs>({
   name: 'warehouse_update',
   capabilityId: 'inventory.warehouses',
   description:
-    'Edit a warehouse: rename it, change its priority or address, make it the default, or switch it off (a soft switch-off, the stock stays). Send only what changes. Use for "rename the warehouse", "عدّل المخزن", "وقف المخزن ده".',
+    'Edit a warehouse: rename it, change its priority or address, or switch it off (a soft switch-off, the stock stays). Send only what changes. Use for "rename the warehouse", "عدّل المخزن", "وقف المخزن ده".',
   schema: shape(
     {
       warehouseId: f.id('The warehouse id.'),
@@ -65,7 +64,6 @@ const warehouseUpdate = change<WhArgs>({
       priority: f.int('Higher priority is picked first.', { max: 9999 }),
       address: f.nullable(f.str('Address (null clears).', { max: 500 })),
       isActive: f.bool('false switches the warehouse off.'),
-      isDefault: f.bool('true makes it the default warehouse.'),
     },
     ['warehouseId']
   ),
@@ -104,13 +102,65 @@ const warehouseUpdate = change<WhArgs>({
       : null,
 });
 
+// Making a warehouse the default makes WarehouseService.updateWarehouse clear the old default. Its undo gives the flag back to the old default, which is a
+// different warehouse: so the default is its own tool, and its state is the store's whole default picture (not one warehouse), so the etag taken after the apply
+// is the one the undo's preview takes.
+const warehouseSetDefault = change<{ warehouseId: string }>({
+  name: 'warehouse_set_default',
+  capabilityId: 'inventory.warehouses',
+  description:
+    'Make a warehouse the default one (new orders and stock go there first). The old default stops being the default; undo gives it back. Use for "make Cairo the main warehouse", "خلي مخزن القاهرة هو الافتراضي".',
+  schema: shape({ warehouseId: f.id('The warehouse id.') }, ['warehouseId']),
+  undo: 'reversible',
+  gate: WAREHOUSE_GATE,
+  audit: {
+    action: 'warehouse.default_changed',
+    resourceType: 'warehouse',
+    resourceId: a => a.warehouseId,
+  },
+  state: async (ctx, a) => {
+    await WarehouseService.getWarehouse(ctx.storeId, a.warehouseId); // 404 for another store's warehouse
+    const all = await WarehouseService.listWarehouses(ctx.storeId);
+    return {
+      defaultId: all.find(w => w.isDefault)?.id ?? null,
+      names: Object.fromEntries(all.map(w => [w.id, w.name])),
+    };
+  },
+  describe: (_ctx, a, st) => {
+    const s = st as { defaultId: string | null; names: Record<string, string> };
+    if (s.defaultId === a.warehouseId)
+      throw new AppError(409, 'ALREADY_DEFAULT', 'This warehouse is already the default.');
+    return {
+      summary: pair(
+        `هخلّي مخزن «${s.names[a.warehouseId] ?? a.warehouseId}» هو الافتراضي`,
+        `Make "${s.names[a.warehouseId] ?? a.warehouseId}" the default warehouse`
+      ),
+      rows: [
+        row(
+          'المخزن الافتراضي',
+          'Default warehouse',
+          s.defaultId ? (s.names[s.defaultId] ?? s.defaultId) : null,
+          s.names[a.warehouseId] ?? a.warehouseId
+        ),
+      ],
+      affectedCount: 1,
+      restore: { previousDefaultId: s.defaultId },
+    };
+  },
+  run: (ctx, a) =>
+    WarehouseService.updateWarehouse(ctx.storeId, a.warehouseId, { isDefault: true } as never),
+  inverse: (_a, restore) => {
+    const prev = (restore as { previousDefaultId: string | null } | null)?.previousDefaultId;
+    return prev ? { tool: 'warehouse_set_default', args: { warehouseId: prev } } : null;
+  },
+});
+
 const warehouseCreate = change<{
   name: string;
   nameAr?: string;
   code: string;
   priority?: number;
   address?: string;
-  isDefault?: boolean;
 }>({
   name: 'warehouse_create',
   capabilityId: 'inventory.warehouses',
@@ -123,7 +173,6 @@ const warehouseCreate = change<{
       code: f.str('Short code: letters, digits, - and _ only.', { max: 20 }),
       priority: f.int('Higher priority is picked first.', { max: 9999 }),
       address: f.str('Address.', { max: 500 }),
-      isDefault: f.bool('Make it the default warehouse.'),
     },
     ['name', 'code']
   ),
@@ -136,18 +185,14 @@ const warehouseCreate = change<{
   describe: (_ctx, a, st) => {
     if (!/^[A-Za-z0-9_-]+$/.test(a.code))
       throw new AppError(422, 'INVALID_CODE', 'Code must be alphanumeric (A-Z, 0-9, -, _).');
-    if ((st as { codes: string[] }).codes.includes(a.code))
+    if ((st as { codes: string[] }).codes.some(c => c.toUpperCase() === a.code.toUpperCase()))
       throw new AppError(409, 'CODE_TAKEN', `A warehouse with code ${a.code} already exists.`);
     return {
       summary: pair(
         `هضيف مخزن جديد «${a.name}» بكود ${a.code}`,
         `Add warehouse "${a.name}" with code ${a.code}`
       ),
-      rows: [
-        row('الاسم', 'Name', null, a.name),
-        row('الكود', 'Code', null, a.code),
-        ...(a.isDefault ? [row('افتراضي', 'Default', false, true)] : []),
-      ],
+      rows: [row('الاسم', 'Name', null, a.name), row('الكود', 'Code', null, a.code)],
       affectedCount: 1,
     };
   },
@@ -533,6 +578,11 @@ type StockAdjArgs = {
   reason?: string;
   items: Array<{ productId: string; newQty: number }>;
 };
+/** The same product twice would count or adjust it twice: refused. */
+function assertUniqueProducts(ids: string[]): void {
+  if (new Set(ids).size !== ids.length)
+    throw new AppError(422, 'DUPLICATE_PRODUCT', 'A product can appear only once in the list.');
+}
 async function readStockLines(ctx: TurnCtx, items: StockAdjArgs['items']) {
   return Promise.all(
     items.map(async i => {
@@ -583,6 +633,7 @@ const stockAdjustmentCreate = change<StockAdjArgs>({
   refs: a => a.items.map(i => ({ kind: 'product', id: i.productId })),
   state: (ctx, a) => readStockLines(ctx, a.items),
   describe: (_ctx, a, st) => {
+    assertUniqueProducts(a.items.map(i => i.productId));
     const lines = st as Awaited<ReturnType<typeof readStockLines>>;
     let impact = 0;
     let changed = 0;
@@ -640,7 +691,7 @@ const barcodeCountSet = change<CountArgs>({
   name: 'barcode_count_set',
   capabilityId: 'inventory.barcode-scan-count',
   description:
-    'Run a stock count without a scanner: say the counted quantity of up to 25 simple products. It opens a count session, records each line, closes it and reconciles, so stock becomes the counted numbers (the difference is posted as a cycle-count adjustment). Undo counts the old numbers back. Use for "I counted 12 of this", "جرد المخزن", "الجرد طلع 3 بدل 5".',
+    'Run a stock count without a scanner: say the counted quantity of up to 25 simple products. It opens a count session, records each line, closes it and reconciles, so stock becomes the counted numbers (the difference is posted to the accounts as a cycle-count adjustment). Undo counts the old numbers back and posts a second adjustment. Use for "I counted 12 of this", "جرد المخزن", "الجرد طلع 3 بدل 5".',
   schema: shape(
     {
       note: f.str('Note on the count session.', { max: 300 }),
@@ -657,7 +708,11 @@ const barcodeCountSet = change<CountArgs>({
     },
     ['lines']
   ),
-  undo: 'reversible',
+  policy: 'confirm',
+  // The reconcile posts a cycle-count adjustment to the accounts, like stock_adjustment_create. Undo recounts the old numbers, which posts a SECOND
+  // adjustment (the first one is not erased), so it is compensating and its own confirm card.
+  undo: 'compensating',
+  money: true,
   gate: { roles: OWNER, feature: 'inventory.barcode' },
   audit: { action: 'inventory.count_reconciled', resourceType: 'count_session' },
   refs: a => a.lines.map(l => ({ kind: 'product', id: l.productId })),
@@ -667,8 +722,10 @@ const barcodeCountSet = change<CountArgs>({
       a.lines.map(l => ({ productId: l.productId, newQty: l.countedQty }))
     ),
   describe: (_ctx, a, st) => {
+    assertUniqueProducts(a.lines.map(l => l.productId));
     const lines = st as Awaited<ReturnType<typeof readStockLines>>;
     let changed = 0;
+    let impact = 0;
     const rows = lines.map((l, n) => {
       if (l.hasVariants)
         throw new AppError(
@@ -678,16 +735,22 @@ const barcodeCountSet = change<CountArgs>({
         );
       const counted = a.lines[n]!.countedQty;
       if (counted !== l.inventory) changed += 1;
-      return row(l.name, l.name, l.inventory, counted);
+      impact += (counted - l.inventory) * l.costMinor;
+      return row(
+        l.name,
+        l.name,
+        l.inventory,
+        `${counted} (${counted >= l.inventory ? '+' : ''}${counted - l.inventory}, ${egp((counted - l.inventory) * l.costMinor)} EGP)`
+      );
     });
     if (changed === 0)
       throw new AppError(400, 'NOTHING_TO_CHANGE', 'Every count equals the current stock.');
     return {
       summary: pair(
-        `هسجّل جرد ${lines.length} منتج وأضبط المخزون على الأرقام المعدودة (${changed} فيهم مختلف).`,
-        `Record a count of ${lines.length} product(s) and set stock to the counted numbers (${changed} differ).`
+        `هسجّل جرد ${lines.length} منتج وأضبط المخزون على الأرقام المعدودة (${changed} فيهم مختلف). الفرق بيتسجل في الحسابات بقيمة ${egp(impact)} ج.م، والتراجع بيسجّل تسوية تانية.`,
+        `Record a count of ${lines.length} product(s) and set stock to the counted numbers (${changed} differ). The difference is posted to the accounts (${egp(impact)} EGP); undoing posts a second adjustment.`
       ),
-      rows,
+      rows: [...rows, row('الأثر على التكلفة (ج.م)', 'Cost impact (EGP)', null, egp(impact))],
       affectedCount: changed,
       restore: { lines: lines.map(l => ({ productId: l.productId, countedQty: l.inventory })) },
     };
@@ -707,6 +770,7 @@ const barcodeCountSet = change<CountArgs>({
 export function opsInventoryTools(): ToolSpec[] {
   return [
     warehouseUpdate,
+    warehouseSetDefault,
     warehouseCreate,
     warehouseStockAdjust,
     supplierCreate,

@@ -431,13 +431,15 @@ const decide = change<{ applicationId: string; decision: string; groupId?: strin
     name: 'wholesale_decide',
     capabilityId: 'marketing.wholesale',
     description:
-      'Approve or reject a wholesale (B2B) buyer application. Approve needs the wholesale customer group the buyer joins (it gives them that group\'s prices); the applicant is emailed either way, with your note as written, and it cannot be undone. Use for "accept the wholesale request", "اقبل طلب تاجر جملة", "ارفض طلب الجملة".',
+      'Approve or reject a wholesale (B2B) buyer application. Approve needs the wholesale customer group the buyer joins (it gives them that group\'s prices); the applicant is emailed either way (a rejection carries your note as written, an approval has no note), and it cannot be undone. Use for "accept the wholesale request", "اقبل طلب تاجر جملة", "ارفض طلب الجملة".',
     schema: shape(
       {
         applicationId: f.id('The wholesale application id.'),
         decision: f.enum(['approve', 'reject'], 'approve or reject.'),
         groupId: f.id('Wholesale customer group id (required to approve).'),
-        note: f.str('Note emailed to the applicant (optional).', { max: 500 }),
+        note: f.str('Note emailed to the applicant (a rejection only; an approval sends none).', {
+          max: 500,
+        }),
       },
       ['applicationId', 'decision']
     ),
@@ -455,6 +457,13 @@ const decide = change<{ applicationId: string; decision: string; groupId?: strin
       const s = st as AppState;
       if (s.status !== 'pending')
         throw new AppError(409, 'NOT_PENDING', 'This application was already decided.');
+      // WholesaleApplicationService.approve takes no note: a note on an approve would be shown on the card and never sent.
+      if (a.decision === 'approve' && a.note)
+        throw new AppError(
+          422,
+          'NOTE_NOT_SENT_ON_APPROVE',
+          'An approval sends no note; only a rejection can carry one.'
+        );
       let groupName: string | null = null;
       if (a.decision === 'approve') {
         if (!a.groupId)
@@ -482,7 +491,9 @@ const decide = change<{ applicationId: string; decision: string; groupId?: strin
           untrusted(row('التاجر', 'Applicant', s.businessName, s.businessName)),
           row('القرار', 'Decision', s.status, a.decision === 'approve' ? 'approved' : 'rejected'),
           ...(groupName ? [row('مجموعة الجملة', 'Wholesale group', null, groupName)] : []),
-          ...(a.note ? [row('ملاحظتك للتاجر', 'Your note to the applicant', null, a.note)] : []),
+          ...(a.decision === 'reject' && a.note
+            ? [row('ملاحظتك للتاجر', 'Your note to the applicant', null, a.note)]
+            : []),
         ],
         affectedCount: 1,
       };

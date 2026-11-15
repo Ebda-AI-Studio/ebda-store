@@ -351,6 +351,15 @@ async function readShipment(ctx: TurnCtx, orderId: string) {
     canBook: d.canBook,
     codMinor: d.codAmount as number,
     carriers: (d.carriers as Array<{ code: string }>).map(c => c.code),
+    // the carrier the service picks when none is named (getDefaultCarrierCode: the enabled default config)
+    defaultCarrier:
+      (
+        (await shippingCarrierService.getPublicCarrierConfigs(ctx.storeId)) as Array<{
+          carrier: string;
+          enabled: boolean;
+          isDefault: boolean;
+        }>
+      ).find(c => c.enabled && c.isDefault)?.carrier ?? null,
     shipmentId: shipment?.id ?? null,
     shipmentStatus: shipment?.status ?? null,
     shipmentCarrier: shipment?.carrier ?? null,
@@ -410,17 +419,18 @@ const bookShipment = change<{
         'CARRIER_NOT_AVAILABLE',
         `${a.carrier} is not connected for this store.`
       );
-    if (a.carrier === 'manual' && !(a.carrierName && a.trackingNumber))
+    const who = a.carrier ?? s.defaultCarrier;
+    if (!who) throw new AppError(409, 'NO_CARRIER', 'No default carrier configured for this store');
+    if (who === 'manual' && !(a.carrierName && a.trackingNumber))
       throw new AppError(
         422,
         'MANUAL_NEEDS_DETAILS',
         'A manual shipment needs the courier name and the tracking number.'
       );
-    const who = a.carrier ?? 'default';
     return {
       summary: pair(
-        `هحجز شحنة للأوردر ${s.orderNumber} مع ${who === 'default' ? 'شركة الشحن الافتراضية' : who}${s.codMinor ? `، والكوريير هيحصّل ${egp(s.codMinor)} ج.م` : ''}. الحجز بيتكلف رسوم شحن.`,
-        `Book a shipment for order ${s.orderNumber} with ${who === 'default' ? 'the default carrier' : who}${s.codMinor ? `; the courier collects ${egp(s.codMinor)} EGP` : ''}. Booking costs a shipping fee.`
+        `هحجز شحنة للأوردر ${s.orderNumber} مع ${who}${s.codMinor ? `، والكوريير هيحصّل ${egp(s.codMinor)} ج.م` : ''}. الحجز بيتكلف رسوم شحن.`,
+        `Book a shipment for order ${s.orderNumber} with ${who}${s.codMinor ? `; the courier collects ${egp(s.codMinor)} EGP` : ''}. Booking costs a shipping fee.`
       ),
       rows: [
         row('الأوردر', 'Order', s.orderNumber, s.orderNumber),
@@ -434,17 +444,20 @@ const bookShipment = change<{
             [s.city, s.street].filter(Boolean).join(' - ') || null
           )
         ),
-        ...(a.trackingNumber ? [row('رقم التتبع', 'Tracking number', null, a.trackingNumber)] : []),
+        ...(who === 'manual' && a.trackingNumber
+          ? [row('رقم التتبع', 'Tracking number', null, a.trackingNumber)]
+          : []),
       ],
       affectedCount: 1,
     };
   },
-  run: async (ctx, a) => {
+  run: async (ctx, a, st) => {
+    const carrier = a.carrier ?? (st as ShipState).defaultCarrier ?? undefined;
     const shipment = (await shippingCarrierService.createShipmentForOrder(
       ctx.storeId,
       a.orderId,
-      a.carrier as never,
-      a.carrier === 'manual' && a.carrierName && a.trackingNumber
+      carrier as never,
+      carrier === 'manual' && a.carrierName && a.trackingNumber
         ? { manual: { carrierName: a.carrierName, trackingNumber: a.trackingNumber } }
         : {}
     )) as { id: string; status: string };
