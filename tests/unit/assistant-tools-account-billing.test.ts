@@ -26,6 +26,8 @@ const m = vi.hoisted(() => ({
   storeList: vi.fn(),
   charges: vi.fn(),
   features: vi.fn(),
+  getPlan: vi.fn(),
+  vat: { enabled: false, rate: 0, mode: 'exclusive' } as Record<string, unknown>,
   plans: [] as Array<Record<string, unknown>>,
   ent: {} as Record<string, unknown>,
   billing: {} as Record<string, unknown>,
@@ -58,8 +60,9 @@ vi.mock('@api/smart-layer/merchant-read', () => ({
 }));
 vi.mock('@api/services/setup-guide.service', () => ({ SetupGuideService: {} }));
 vi.mock('@api/services/plan.service', () => ({
-  planService: { listPlans: async () => m.plans },
+  planService: { listPlans: async () => m.plans, getPlan: m.getPlan },
 }));
+vi.mock('@api/services/platform-vat.service', () => ({ getPlatformVat: async () => m.vat }));
 vi.mock('@api/services/plan-limit.service', () => ({
   getUsageSummary: async () => ({ entitlements: m.ent, usage: { maxStaff: 1 } }),
 }));
@@ -85,6 +88,7 @@ vi.mock('@api/services/staff-members.service', () => ({
   removeStaffFromStore: m.removeStaff,
 }));
 
+import { applyThenUndo, roundTripCtx } from './helpers/undo-roundtrip';
 import { accountBillingTools } from '@api/smart-layer/tools/account-billing.tools';
 
 const ctx = (role = 'store_admin'): TurnCtx => ({
@@ -139,6 +143,8 @@ beforeEach(() => {
     overdue: false,
     instapay: { available: true, reference: 'EB-1', amountMinor: 100, pendingClaims: 0 },
   };
+  m.vat = { enabled: false, rate: 0, mode: 'exclusive' };
+  m.getPlan.mockImplementation(async (code: string) => m.plans.find(p => p.code === code));
   m.getStore.mockResolvedValue({ settings: {} });
   m.storeFind.mockResolvedValue({ status: 'inactive', name: 'متجري', slug: 'mine' });
   m.methodCount.mockResolvedValue(1);
@@ -168,7 +174,7 @@ describe('account + billing tools', () => {
       expect(t.inverse).toBeUndefined();
       const args = parse('plan_change', { planCode: 'growth' });
       const d = await t.preview!(ctx(), args);
-      const price = d.rows.find(r => r.label.en.startsWith('Price'))!;
+      const price = d.rows.find(r => r.label.en.startsWith('Price ('))!;
       expect([price.before, price.after]).toEqual(['1490', '3490']);
       expect(d.rows.some(r => r.label.en === 'Limit: maxStaff')).toBe(true);
       expect(d.etag).toMatch(/^[0-9a-f]{32}$/);
@@ -182,18 +188,67 @@ describe('account + billing tools', () => {
         tool('plan_change').preview!(ctx(), parse('plan_change', { planCode: 'nope' }))
       ).rejects.toThrow(/no plan/i);
     });
-    it('apply runs as the assistant through changePlan; staff are refused', async () => {
+    it('E1-PLAN-1: an upgrade never calls the charging service; apply returns the payment screen link', async () => {
       const t = tool('plan_change');
       const args = parse('plan_change', { planCode: 'growth' });
-      m.changePlan.mockResolvedValue({ mode: 'upgraded' });
-      expect((await t.apply!(ctx(), args, await t.preview!(ctx(), args))).ok).toBe(true);
-      expect(m.changePlan).toHaveBeenCalledWith({ storeId: 'S1', planCode: 'growth' });
+      const d = await t.preview!(ctx(), args);
+      const r = await t.apply!(ctx(), args, d);
+      expect(r.ok).toBe(true);
+      expect(m.changePlan).not.toHaveBeenCalled();
+      expect(r.result).toMatchObject({ charged: false, paymentScreen: '/stores/S1/billing' });
       expect(m.insertAuditLog.mock.calls[0][0].details).toMatchObject({ actor: 'assistant' });
-      await expect(t.apply!(ctx('staff'), args, {} as never)).rejects.toBeInstanceOf(ToolForbidden);
-      await expect(t.apply!(ctx('super_admin'), args, {} as never)).rejects.toBeInstanceOf(
-        ToolForbidden
+    });
+    it('a downgrade stays a confirm card that calls changePlan and shows no charge', async () => {
+      m.ent = { ...m.ent, planCode: 'growth', planNameEn: 'Growth', planNameAr: 'جروث' };
+      const t = tool('plan_change');
+      const args = parse('plan_change', { planCode: 'basic' });
+      const d = await t.preview!(ctx(), args);
+      expect(d.rows.some(r => r.label.en === 'Total in EGP')).toBe(false);
+      m.changePlan.mockResolvedValue({ mode: 'scheduled' });
+      await t.apply!(ctx(), args, d);
+      expect(m.changePlan).toHaveBeenCalledWith({ storeId: 'S1', planCode: 'basic' });
+    });
+    it('the upgrade card shows net, VAT and total from the platform VAT (exclusive 14%)', async () => {
+      m.vat = { enabled: true, rate: 14, mode: 'exclusive' };
+      const d = await tool('plan_change').preview!(
+        ctx(),
+        parse('plan_change', { planCode: 'growth' })
       );
-      expect(m.changePlan).toHaveBeenCalledTimes(1);
+      const by = (en: string) => d.rows.find(r => r.label.en === en)!.after;
+      expect([by('Price before VAT in EGP'), by('VAT in EGP'), by('Total in EGP')]).toEqual([
+        '3490',
+        '488.6',
+        '3978.6',
+      ]);
+      expect(d.summary.en).toContain('3978.6');
+    });
+    it('turning VAT on between the card and the press changes the etag (state fingerprint)', async () => {
+      const args = parse('plan_change', { planCode: 'growth' });
+      const a = await tool('plan_change').preview!(ctx(), args);
+      m.vat = { enabled: true, rate: 14, mode: 'exclusive' };
+      const b = await tool('plan_change').preview!(ctx(), args);
+      expect(b.etag).not.toBe(a.etag);
+    });
+    it('the current plan price comes from the plan record, so a hidden plan is not 0', async () => {
+      m.ent = { ...m.ent, planCode: 'legacy' };
+      m.plans.push({
+        code: 'legacy',
+        nameAr: 'ق',
+        nameEn: 'Legacy',
+        priceMonthlyMinor: 500000,
+        priceYearlyMinor: 5000000,
+        limits: {},
+      });
+      const hidden = m.plans.pop()!;
+      m.getPlan.mockImplementation(async (code: string) =>
+        code === 'legacy' ? hidden : m.plans.find(p => p.code === code)
+      );
+      const d = await tool('plan_change').preview!(
+        ctx(),
+        parse('plan_change', { planCode: 'growth' })
+      );
+      expect(d.rows.find(r => r.label.en.startsWith('Price ('))!.before).toBe('5000');
+      expect(d.rows.some(r => r.label.en === 'Total in EGP')).toBe(false); // 3490 < 5000: a downgrade
     });
   });
 
@@ -251,16 +306,19 @@ describe('account + billing tools', () => {
       expect(m.assertVerified).toHaveBeenCalledWith({ userId: 'u1', role: 'store_admin' });
       expect(m.goLive).toHaveBeenCalledWith('S1');
     });
-    it('an unverified e-mail stops it before goLive', async () => {
+    it('an unverified e-mail is refused at PREVIEW, before any card', async () => {
       m.assertVerified.mockRejectedValueOnce(new Error('EMAIL_NOT_VERIFIED'));
-      const t = tool('store_go_live');
       await expect(
-        t.apply!(
-          ctx(),
-          parse('store_go_live', {}),
-          await t.preview!(ctx(), parse('store_go_live', {}))
-        )
+        tool('store_go_live').preview!(ctx(), parse('store_go_live', {}))
       ).rejects.toThrow(/EMAIL_NOT_VERIFIED/);
+    });
+    it('an unverified e-mail at APPLY (changed after the card) stops it before goLive', async () => {
+      const t = tool('store_go_live');
+      const draft = await t.preview!(ctx(), parse('store_go_live', {}));
+      m.assertVerified.mockRejectedValueOnce(new Error('EMAIL_NOT_VERIFIED'));
+      await expect(t.apply!(ctx(), parse('store_go_live', {}), draft)).rejects.toThrow(
+        /EMAIL_NOT_VERIFIED/
+      );
       expect(m.goLive).not.toHaveBeenCalled();
     });
   });
@@ -359,6 +417,87 @@ describe('account + billing tools', () => {
       expect(r.writeEnabled).toBe(true);
       expect(JSON.stringify(r)).not.toMatch(/keyHash|prefix|ebdam_/);
       expect(m.keysFind).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('gates on every tool (each fails when its gate is removed)', () => {
+    const argsFor: Record<string, unknown> = {
+      plan_change: { planCode: 'growth' },
+      subscription_cancel: {},
+      subscription_resume: {},
+      instapay_plan_choose: { planCode: 'growth', interval: 'monthly' },
+      store_go_live: {},
+      merchant_mcp_write_switch: { enabled: false },
+      staff_remove: { email: 'sara@x.com' },
+    };
+    for (const [n, a] of Object.entries(argsFor)) {
+      it(`${n}: staff is refused at PREVIEW (no card) and at APPLY (ToolForbidden); super admin too`, async () => {
+        const t = tool(n);
+        const args = parse(n, a);
+        const draft = await t.preview!(ctx(), args);
+        for (const role of ['staff', 'customer']) {
+          await expect(t.preview!(ctx(role), args)).rejects.toBeInstanceOf(Error);
+          await expect(t.apply!(ctx(role), args, draft)).rejects.toBeInstanceOf(ToolForbidden);
+        }
+        await expect(t.apply!(ctx('super_admin'), args, draft)).rejects.toBeInstanceOf(
+          ToolForbidden
+        );
+        expect(
+          m.changePlan.mock.calls.length + m.cancel.mock.calls.length + m.resume.mock.calls.length
+        ).toBe(0);
+        expect(m.chooseInstapayPlan).not.toHaveBeenCalled();
+        expect(m.goLive).not.toHaveBeenCalled();
+        expect(m.setMcp).not.toHaveBeenCalled();
+        expect(m.removeStaff).not.toHaveBeenCalled();
+      });
+    }
+    it('the plan feature gates: staff_accounts off refuses staff_remove, merchant_mcp off refuses the MCP switch (preview and apply)', async () => {
+      m.featureEnabled.mockImplementation(
+        async (_s: string, k: string) => k !== 'staff_accounts' && k !== 'merchant_mcp'
+      );
+      for (const [n, a] of [
+        ['staff_remove', { email: 'sara@x.com' }],
+        ['merchant_mcp_write_switch', { enabled: false }],
+      ] as const) {
+        const t = tool(n);
+        await expect(t.preview!(ctx(), parse(n, a))).rejects.toBeInstanceOf(Error);
+        await expect(t.apply!(ctx(), parse(n, a), {} as never)).rejects.toBeInstanceOf(
+          ToolForbidden
+        );
+      }
+      expect(m.removeStaff).not.toHaveBeenCalled();
+      expect(m.setMcp).not.toHaveBeenCalled();
+    });
+    it('merchant_mcp_status needs the merchant_mcp feature', async () => {
+      m.featureEnabled.mockResolvedValue(false);
+      await expect(
+        (
+          tool('merchant_mcp_status') as { read: (c: TurnCtx, a: unknown) => Promise<unknown> }
+        ).read(ctx(), {})
+      ).rejects.toThrow();
+      expect(m.keysFind).not.toHaveBeenCalled();
+    });
+    it('instapay_plan_choose shows the VAT amount from the platform VAT', async () => {
+      m.vat = { enabled: true, rate: 14, mode: 'exclusive' };
+      const d = await tool('instapay_plan_choose').preview!(
+        ctx(),
+        parse('instapay_plan_choose', { planCode: 'growth', interval: 'monthly' })
+      );
+      expect(d.rows.find(r => r.label.en === 'VAT in EGP')!.after).toBe('488.6');
+      expect(d.summary.en).toContain('3978.6');
+    });
+  });
+
+  describe('undo at the engine level', () => {
+    it('merchant_mcp_write_switch: undo args pass the tool own validation and the undo needs a confirm card', async () => {
+      const t = tool('merchant_mcp_write_switch');
+      const r = await applyThenUndo(accountBillingTools(), t, { enabled: false }, roundTripCtx());
+      expect(r.applied).toBe('applied');
+      expect(r.undo).toBe('undone');
+      const args = parse('merchant_mcp_write_switch', { enabled: false });
+      const d = await t.preview!(ctx(), args);
+      const inv = t.inverse!(ctx(), args, d, { ok: true, etagAfter: 'x' })!;
+      expect(t.args.safeParse(inv.args).success).toBe(true);
     });
   });
 });
