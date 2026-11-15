@@ -612,7 +612,10 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     expect(steps.some(s => s.run === 'bash scripts/ci/heavy-lock.sh acquire')).toBe(true);
     const rel = steps[steps.length - 1];
     expect(rel.run).toBe('bash scripts/ci/heavy-lock.sh release');
-    expect(rel.if).toBe('always()');
+    // PR-CI-CHEAP-1: released whenever the lock was taken (the scope step skips it for a PR that cannot move the API Worker)
+    expect(rel.if).toBe(
+      name === 'api-workerd-smoke' ? "always() && steps.scope.outputs.run == 'true'" : 'always()'
+    );
   });
   it('Chromium installs through scripts/ci/install-chromium.sh (no apt/--with-deps on the Mac)', () => {
     const code = ci
