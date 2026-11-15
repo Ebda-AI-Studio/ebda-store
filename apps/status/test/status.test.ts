@@ -155,25 +155,24 @@ describe('incident lifecycle (fail threshold 3, recover threshold 2)', () => {
 });
 
 describe('end to end: forced probe failure -> incident on the public page', () => {
-  it('opens an incident after 3 failed cron rounds and shows it in HTML (en + ar) and JSON; recovery resolves it', async () => {
-    expect(thresholdsFrom(env)).toEqual({ fail: 3, recover: 2 });
+  it('opens an incident after 2 failed 5-min cron rounds and shows it in HTML (en + ar) and JSON; recovery resolves it', async () => {
+    expect(thresholdsFrom(env)).toEqual({ fail: 2, recover: 1 });
     const now = Date.now();
 
-    // Two failed rounds: still no incident, page shows everything fine.
+    // One failed round: still no incident, page shows everything fine.
     await runProbes(env, { fetcher: apiDown, now });
-    await runProbes(env, { fetcher: apiDown, now: now + MIN });
     let html = await (await get('/en')).text();
     expect(has(html, 'All systems operational')).toBe(true);
     expect(has(html, 'API is not responding')).toBe(false);
 
-    // Third failed round: incident opens.
-    const out = await runProbes(env, { fetcher: apiDown, now: now + 2 * MIN });
+    // Second failed round (5 min later): incident opens.
+    const out = await runProbes(env, { fetcher: apiDown, now: now + 5 * MIN });
     expect(out.opened).toHaveLength(1);
 
     html = await (await get('/en')).text();
     expect(has(html, 'Some services are down')).toBe(true);
     expect(has(html, 'API is not responding')).toBe(true);
-    expect(has(html, '3 consecutive probes failed')).toBe(true);
+    expect(has(html, '2 consecutive probes failed')).toBe(true);
     const ar = await (await get('/')).text();
     expect(has(ar, 'فيه خدمات واقفة دلوقتي')).toBe(true);
     expect(has(ar, 'مفيش رد من واجهة البرمجة')).toBe(true);
@@ -188,9 +187,8 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     expect(snap.active).toHaveLength(1);
     expect(snap.components.find(c => c.id === 'marketing')!.status).toBe('operational');
 
-    // Recovery: two healthy rounds resolve it.
-    await runProbes(env, { fetcher: healthy, now: now + 3 * MIN });
-    await runProbes(env, { fetcher: healthy, now: now + 4 * MIN });
+    // Recovery: one healthy round resolves it.
+    await runProbes(env, { fetcher: healthy, now: now + 10 * MIN });
     html = await (await get('/en')).text();
     expect(has(html, 'All systems operational')).toBe(true);
     expect(has(html, 'Resolved')).toBe(true);
@@ -437,8 +435,8 @@ describe('thresholdsFrom', () => {
       recover: 1,
     });
     expect(thresholdsFrom({ ...env, FAIL_THRESHOLD: '0', RECOVER_THRESHOLD: 'x' })).toEqual({
-      fail: 3,
-      recover: 2,
+      fail: 2,
+      recover: 1,
     });
   });
 });
@@ -490,7 +488,7 @@ describe('human alerting (OPS-5)', () => {
     sent.length = 0;
     const t0 = Date.now();
     let outcome = { opened: [] as number[], resolved: [] as number[] };
-    for (let i = 0; i < 3; i++)
+    for (let i = 0; i < 2; i++)
       outcome = await runProbes(env, { fetcher: apiDown, now: t0 + i * MIN });
     expect(outcome.opened.length).toBe(1);
     expect(await alertOnOutcome(withSecrets, outcome, send)).toBe(true);
@@ -503,9 +501,9 @@ describe('human alerting (OPS-5)', () => {
   it('says RECOVERED when it resolves', async () => {
     sent.length = 0;
     const t0 = Date.now();
-    for (let i = 0; i < 3; i++) await runProbes(env, { fetcher: apiDown, now: t0 + i * MIN });
+    for (let i = 0; i < 2; i++) await runProbes(env, { fetcher: apiDown, now: t0 + i * MIN });
     let outcome = { opened: [] as number[], resolved: [] as number[] };
-    for (let i = 3; i < 5; i++)
+    for (let i = 2; i < 3; i++)
       outcome = await runProbes(env, { fetcher: healthy, now: t0 + i * MIN });
     expect(outcome.resolved.length).toBe(1);
     await alertOnOutcome(withSecrets, outcome, send);
