@@ -12,6 +12,7 @@ export const ADDON_PLACEHOLDER_PRICE_MINOR = 9900;
 
 const egp = (n: number) => n * 100;
 
+// pq-allow(unused-export): the price tests read the approved table directly, so a stale price cannot hide
 export const ADDON_FEATURE_PRICE_MINOR: Partial<Record<FeatureKey, number>> = {
   loyalty: egp(249),
   customer_wallet: egp(99),
