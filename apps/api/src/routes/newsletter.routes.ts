@@ -7,10 +7,10 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { writeLimiter } from '../middleware/security';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
-import { StoreMailer } from '../services/store-mailer.service';
-import { storeHidesPoweredBy } from '../services/email.service';
-import { buildBroadcastMessage } from '../lib/newsletter-broadcast';
-import logger from '../lib/logger';
+import {
+  BROADCAST_MAX_RECIPIENTS,
+  broadcastNewsletter,
+} from '../services/newsletter-broadcast.service';
 
 /**
  * Admin newsletter routes — list + CSV export of subscribers for a store.
@@ -19,9 +19,6 @@ import logger from '../lib/logger';
  * file is store-admin only and goes through the same auth chain as every
  * other admin route (authenticate → authorize → requireStoreAccess).
  */
-/** Each recipient is one `send()` in this request; stays well under the 1,000-subrequest cap. */
-const BROADCAST_MAX_RECIPIENTS = 400;
-
 /** BE:E-5: exports and the broadcast read are bounded (a tenant-sized list must never be loaded whole). */
 const EXPORT_MAX_ROWS = 50_000;
 
@@ -224,58 +221,15 @@ router.post(
       const { storeId } = req.params;
       const body = broadcastSchema.parse(req.body);
 
-      // Fetch the store context for the branded shell.
-      // `defaultLanguage` lives inside the `settings` JSON column, not a
-      // first-class column, so we read `settings` and extract it manually.
-      const store = await (
-        await storeDb(storeId)
-      ).store.findUnique({
-        where: { id: storeId },
-        select: {
-          name: true,
-          nameAr: true,
-          logo: true,
-          email: true,
-          phone: true,
-          address: true,
-          settings: true,
-          theme: true,
-          emailSenderLocalPart: true,
-          emailDomainStatus: true,
-          domain: true,
-          slug: true,
-          id: true,
-        },
-      });
+      const result = await broadcastNewsletter(storeId, body);
 
-      if (!store) {
+      if (result.kind === 'store_not_found') {
         res
           .status(404)
           .json({ success: false, error: { code: 'NOT_FOUND', message: 'Store not found' } });
         return;
       }
-
-      // Fetch all active subscribers (optionally filtered by language)
-      // 'cart_reminders' consent (checkout box) never receives a newsletter broadcast.
-      const where: Record<string, unknown> = {
-        storeId,
-        isActive: true,
-        consentScope: { not: 'cart_reminders' },
-      };
-      if (body.language) where.language = body.language;
-
-      const subscribers = await (
-        await storeDb(storeId)
-      ).newsletterSubscriber.findMany({
-        where,
-        select: { id: true, email: true, language: true },
-        // one past the cap is enough to refuse (BE:E-5): never load the whole list
-        take: BROADCAST_MAX_RECIPIENTS + 1,
-      });
-
-      // One provider call per subscriber inside this single request (Worker subrequest budget):
-      // big lists belong to Campaigns (paced, per-recipient, resumable).
-      if (subscribers.length > BROADCAST_MAX_RECIPIENTS) {
+      if (result.kind === 'too_large') {
         res.status(413).json({
           success: false,
           error: {
@@ -285,69 +239,16 @@ router.post(
         });
         return;
       }
-
-      if (subscribers.length === 0) {
+      if (result.kind === 'empty') {
         res.json({ success: true, data: { sent: 0, message: 'No active subscribers to send to' } });
         return;
       }
-
-      const hidePoweredBy = await storeHidesPoweredBy(storeId);
-      // Every broadcast email carries its OWN per-subscriber one-click
-      // unsubscribe link + RFC 8058 headers (Ruling NEWSLETTER-UNSUB-1), rendered
-      // inside the branded shell. The merchant HTML is sanitized inside
-      // `renderCampaignEmail` (strips <script>/<iframe>/on* handlers/javascript:
-      // URLs) so a careless or malicious admin can't relay active content
-      // through our sender reputation.
-      const messages = subscribers.map(sub =>
-        buildBroadcastMessage({
-          store,
-          subscriber: sub,
-          subject: body.subject,
-          html: body.html,
-          text: body.text,
-          hidePoweredBy,
-        })
-      );
-
-      // Send in chunks of 50. Each chunk is ONE Resend batch call carrying 50
-      // SEPARATE emails, one address each. It used to be one email with the
-      // whole chunk in its `to:` header, which showed every subscriber the
-      // other 49 addresses (fixed 2026-09-25 with D2 — Ruling EC-6).
-      const CHUNK = 50;
-      let sent = 0;
-      const errors: string[] = [];
-
-      for (let i = 0; i < messages.length; i += CHUNK) {
-        const chunk = messages.slice(i, i + CHUNK);
-        try {
-          const r = await StoreMailer.sendBrandedBatch(storeId, {
-            subject: chunk[0].subject,
-            messages: chunk.map(({ to, html, text, headers }) => ({ to, html, text, headers })),
-          });
-          sent += r.ids.length;
-          if (r.error) {
-            logger.error(
-              { storeId, code: r.error, chunk: i / CHUNK },
-              '[Newsletter] Chunk stopped'
-            );
-            errors.push(`send stopped (${r.error}) after ${r.ids.length} of ${chunk.length}`);
-            break; // later chunks would hit the same wall; the merchant sees the partial count
-          }
-        } catch (err: any) {
-          const msg = err?.message ?? 'send failed';
-          logger.error({ err, storeId, chunk: i / CHUNK }, '[Newsletter] Chunk send error');
-          errors.push(msg);
-        }
-      }
-
-      logger.info({ storeId, sent, errors: errors.length }, '[Newsletter] Broadcast complete');
-
       res.json({
         success: true,
         data: {
-          sent,
-          total: messages.length,
-          errors: errors.length > 0 ? errors : undefined,
+          sent: result.sent,
+          total: result.total,
+          errors: result.errors.length > 0 ? result.errors : undefined,
         },
       });
     } catch (error) {

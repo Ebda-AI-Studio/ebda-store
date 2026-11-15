@@ -1,0 +1,36 @@
+{
+  "id": "platform.store-delete",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "امسح المتجر",
+  "titleEn": "Delete a store",
+  "screens": ["/stores/[id]"],
+  "api": ["DELETE /stores/:id"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "operatorReason": {
+    "code": null,
+    "text": "irreversible data deletion; today because no safe self-flow",
+    "validUnderRule": false
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["عايز امسح متجري"],
+    "en": ["Delete my store"]
+  },
+  "steps": ["Super-admin console only."],
+  "edgeCases": [
+    "Assistant must refuse and offer a handoff request with context",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
+  ],
+  "gaps": ["No merchant path (gap 9)"]
+}

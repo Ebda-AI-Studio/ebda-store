@@ -10,14 +10,14 @@
   "api": ["POST /onboarding/store-cap-requests"],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
     "class": "irreversible"
   },
   "helpArticle": "protected-address-and-store-limit",
   "questions": {
-    "ar": ["وصلت لأقصى عدد متاجر"],
+    "ar": ["وصلت لأقصى عدد متاجر", "مش قادر أعمل متجر جديد", "عايز أعمل متاجر أكتر من 3"],
     "en": ["I hit the store limit"]
   },
   "steps": [

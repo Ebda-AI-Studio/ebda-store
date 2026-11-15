@@ -10,14 +10,14 @@
   "api": ["POST /stores/:storeId/support-requests"],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
     "class": "irreversible"
   },
   "helpArticle": "contact-ebda-store",
   "questions": {
-    "ar": ["ازاي اكلم الدعم؟", "عايز اتواصل مع ابدأ ستور"],
+    "ar": ["ازاي اكلم الدعم؟", "عايز اتواصل مع ابدأ ستور", "ازاي أكلم فريق ابدأ ستور؟"],
     "en": ["How do I contact support?"]
   },
   "steps": ["Press Contact Ebda Store in the sidebar, pick a topic, write the message, send"],

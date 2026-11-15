@@ -173,13 +173,15 @@ function stashKey() {
 }
 export const sealLine = obj => {
   const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv('aes-256-gcm', stashKey(), iv);
+  const c = crypto.createCipheriv('aes-256-gcm', stashKey(), iv, { authTagLength: 16 });
   const enc = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
   return [iv, c.getAuthTag(), enc].map(b => b.toString('base64')).join('.');
 };
 export const openLine = line => {
   const [iv, tag, enc] = line.split('.').map(x => Buffer.from(x, 'base64'));
-  const d = crypto.createDecipheriv('aes-256-gcm', stashKey(), iv);
+  // a short tag would be accepted by GCM as-is (forgery gets cheaper), so pin the length both ways
+  if (tag.length !== 16) throw new Error('stash line: bad auth tag length');
+  const d = crypto.createDecipheriv('aes-256-gcm', stashKey(), iv, { authTagLength: 16 });
   d.setAuthTag(tag);
   return JSON.parse(Buffer.concat([d.update(enc), d.final()]).toString('utf8'));
 };

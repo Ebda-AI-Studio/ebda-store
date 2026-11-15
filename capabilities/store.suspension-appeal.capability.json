@@ -10,14 +10,14 @@
   "api": ["GET /stores/:storeId/suspension", "POST /stores/:storeId/suspension/appeal"],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
     "class": "irreversible"
   },
   "helpArticle": "appeal-a-store-suspension",
   "questions": {
-    "ar": ["ليه متجري موقوف؟", "ازاي اعترض على الإيقاف؟"],
+    "ar": ["ليه متجري موقوف؟", "ازاي اعترض على الإيقاف؟", "ليه متجري اتوقف؟"],
     "en": ["Why is my store suspended?", "How do I appeal a suspension?"]
   },
   "steps": ["Open any store page, read the banner, press Appeal this decision, explain, send"],

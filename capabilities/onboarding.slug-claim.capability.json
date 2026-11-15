@@ -10,14 +10,18 @@
   "api": ["POST /onboarding/slug-claims"],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
     "class": "irreversible"
   },
   "helpArticle": "protected-address-and-store-limit",
   "questions": {
-    "ar": ["العنوان ده محمي ازاي اطلبه؟"],
+    "ar": [
+      "العنوان ده محمي ازاي اطلبه؟",
+      "العنوان اللي عايزه ظهر إنه محمي",
+      "ازاي أثبت إن الاسم ده علامتي التجارية؟"
+    ],
     "en": ["How do I claim a protected address?"]
   },
   "steps": [

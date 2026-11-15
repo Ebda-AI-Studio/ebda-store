@@ -11,6 +11,7 @@ import { useCurrentStore } from '../hooks/useCurrentStore';
 import { useFeatures } from '../hooks/useFeatures';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { AssistantDock } from './assistant/AssistantDock';
 import { mergeRegistryIntoPalette, registryPaletteItems } from '../lib/settings-search';
 import { SettingHighlight } from './SettingHighlight';
 import {
@@ -585,6 +586,8 @@ export function AdminLayout({
           md+ widths (its own internal `md:hidden`). When the merchant
           taps "More", we open the existing hamburger drawer rather
           than maintaining a parallel IA. */}
+      {/* The Ebda assistant: renders nothing until the server says it is on for this store (rollout switch, default off). */}
+      {navStoreId && mode === 'store_admin' && <AssistantDock storeId={navStoreId} />}
       {navStoreId && (
         <MobileBottomNav storeId={navStoreId} onOpenMore={() => setIsSidebarOpen(true)} />
       )}
