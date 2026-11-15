@@ -115,11 +115,13 @@ export async function storeAiUsageByFeature(
 ): Promise<Array<{ feature: string; count: number }>> {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
-  const rows = await prisma.aiUsage.findMany({
-    where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
-    select: { feature: true },
-    take: 5000,
-  });
+  const rows = await withStore(storeId, tx =>
+    tx.aiUsage.findMany({
+      where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
+      select: { feature: true },
+      take: 5000,
+    })
+  );
   const counts = new Map<string, number>();
   for (const r of rows) counts.set(r.feature, (counts.get(r.feature) ?? 0) + 1);
   return [...counts.entries()]
