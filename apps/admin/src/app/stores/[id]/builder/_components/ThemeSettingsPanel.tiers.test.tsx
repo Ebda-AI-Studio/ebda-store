@@ -70,7 +70,7 @@ describe('first screen', () => {
     expect(screen.getAllByTestId(/^preset-/)).toHaveLength(THEME_PRESETS.length);
     const quick = screen.getByTestId('theme-quick');
     // three colours, each the shared ColorField (repo rule: no raw native colour input in the panel)
-    expect(within(quick).getAllByRole('combobox')).toHaveLength(3);
+    expect(quick.querySelectorAll('button[aria-expanded][aria-controls]')).toHaveLength(3);
     for (const id of ['density', 'borderRadius', 'fontFamily'])
       expect(quick.querySelector(`[data-feel="${id}"]`), id).not.toBeNull();
   });

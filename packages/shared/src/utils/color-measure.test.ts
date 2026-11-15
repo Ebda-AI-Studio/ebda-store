@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { contrastRatioOrNull, readVerdict, resolveColorForMeasure } from './color-measure';
+import {
+  colorToHex,
+  contrastRatioOrNull,
+  readVerdict,
+  resolveColorForMeasure,
+} from './color-measure';
 import { contrastRatio } from './color';
 import type { StoreTheme } from '../types/store-theme';
 
@@ -48,5 +53,14 @@ describe('readVerdict', () => {
     expect(readVerdict(4.49)).toBe('large');
     expect(readVerdict(3)).toBe('large');
     expect(readVerdict(2.99)).toBe('hard');
+  });
+});
+
+describe('colorToHex', () => {
+  it('turns hsl and triplets into hex and refuses non-colours', () => {
+    expect(colorToHex('hsl(0 100% 50%)')).toBe('#ff0000');
+    expect(colorToHex('36 36% 52%')).toMatch(/^#[0-9a-f]{6}$/);
+    expect(colorToHex('#FFF')).toBe('#ffffff');
+    expect(colorToHex('hsl(var(--x))')).toBeNull();
   });
 });

@@ -228,7 +228,7 @@ export function ColorField({
                 autoComplete="off"
                 spellCheck={false}
                 value={raw}
-                placeholder="#B08D57"
+                placeholder={t('hexExample')}
                 aria-label={t('hexValueAriaLabel')}
                 aria-invalid={error || undefined}
                 className="font-mono uppercase"

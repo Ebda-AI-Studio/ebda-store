@@ -6470,7 +6470,8 @@
       "recent": "Recently used",
       "done": "Done",
       "colorPickerAriaLabel": "Pick a colour",
-      "hexValueAriaLabel": "Colour code"
+      "hexValueAriaLabel": "Colour code",
+      "hexExample": "e.g. B08D57"
     },
     "bottomSheet": {
       "close": "Close"

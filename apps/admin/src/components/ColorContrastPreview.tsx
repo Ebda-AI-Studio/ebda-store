@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  colorToHex,
   contrastRatioOrNull,
   pickReadableForeground,
   readVerdict,
@@ -84,11 +85,11 @@ export function ColorContrastPreview({ bg, theme, pickedFg, name }: ColorContras
           )}
           <dt>{t('background')}</dt>
           <dd dir="ltr" className="text-foreground">
-            {resolved}
+            {colorToHex(resolved)}
           </dd>
           <dt>{t('text')}</dt>
           <dd dir="ltr" className="text-foreground">
-            {fg}
+            {colorToHex(fg)}
           </dd>
           {ratio !== null && (
             <>

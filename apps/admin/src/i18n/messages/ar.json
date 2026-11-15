@@ -6470,7 +6470,8 @@
       "recent": "استخدمته قريب",
       "done": "تمام",
       "colorPickerAriaLabel": "اختار لون",
-      "hexValueAriaLabel": "كود اللون"
+      "hexValueAriaLabel": "كود اللون",
+      "hexExample": "مثال: B08D57"
     },
     "bottomSheet": {
       "close": "إغلاق"

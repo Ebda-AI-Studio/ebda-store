@@ -170,8 +170,6 @@
     "app/stores/[id]/webhooks/page.tsx": 1,
     "app/stores/_components/StoresSkeleton.tsx": 6,
     "app/users/page.tsx": 2,
-    "components/ColorContrastPreview.tsx": 1,
-    "components/ColorField.tsx": 3,
     "components/CommandPalette.tsx": 1,
     "components/FooterLinksEditor.tsx": 2,
     "components/NavMenuEditor.tsx": 1,

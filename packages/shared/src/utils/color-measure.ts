@@ -31,6 +31,17 @@ export function contrastRatioOrNull(a: string | undefined, b: string | undefined
   return contrastRatio(a as string, b as string);
 }
 
+/** '#rrggbb' for any parseable colour, so merchants never see an `hsl(...)` string; null when not a colour. */
+export function colorToHex(value: string | undefined): string | null {
+  const rgb = parseColorToRgb(value);
+  if (!rgb) return null;
+  const h = (n: number) =>
+    Math.max(0, Math.min(255, Math.round(n)))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`;
+}
+
 export type ReadVerdict = 'easy' | 'large' | 'hard';
 
 /** AA normal text 4.5, AA large text 3. */
