@@ -19,9 +19,10 @@ import logger from '../lib/logger';
  *  4. The change runs inside the store's tenant context.
  */
 
-export type MerchantActor = 'mcp' | 'assistant';
+type MerchantActor = 'mcp' | 'assistant';
 
 /** The refusal every gate raises. The message keeps the `FORBIDDEN:` prefix the MCP SDK turns into an error result; the assistant maps the class to `ToolForbidden`. */
+// pq-allow(unused-export): imported by the assistant tool kit (smart-layer/tools/kit.ts, next PR of the stack) and tests/unit/run-as-merchant.test.ts
 export class MerchantForbidden extends Error {
   constructor(message: string) {
     super(message);
@@ -30,12 +31,13 @@ export class MerchantForbidden extends Error {
 }
 
 /** The audit row's own shape plus who asked. */
-export type MerchantAuditSpec = {
+type MerchantAuditSpec = {
   action: string;
   resourceType: string;
   resourceId?: string;
 };
 
+// pq-allow(unused-export): imported by the assistant tool kit (smart-layer/tools/kit.ts, next PR of the stack) and tests/unit/run-as-merchant.test.ts
 export interface MerchantGate {
   storeId: string;
   userId: string;
@@ -71,7 +73,7 @@ export async function assertMerchantMay(g: MerchantGate): Promise<void> {
   }
 }
 
-export interface MerchantAuditCtx {
+interface MerchantAuditCtx {
   storeId: string;
   userId: string;
   tool: string;
@@ -117,11 +119,12 @@ export async function writeMerchantAudit(
   );
 }
 
-export interface RunAsMerchantOptions extends MerchantGate, Omit<MerchantAuditCtx, 'stamp'> {
+interface RunAsMerchantOptions extends MerchantGate, Omit<MerchantAuditCtx, 'stamp'> {
   actor: MerchantActor;
 }
 
 /** Gate + intent audit + tenant context + completed/failed audit around `fn`. `fn` MUST call the same service the admin route calls. */
+// pq-allow(unused-export): imported by the assistant tool kit (smart-layer/tools/kit.ts, next PR of the stack) and tests/unit/run-as-merchant.test.ts
 export async function runAsMerchant<T>(o: RunAsMerchantOptions, fn: () => Promise<T>): Promise<T> {
   await assertMerchantMay(o);
   try {
