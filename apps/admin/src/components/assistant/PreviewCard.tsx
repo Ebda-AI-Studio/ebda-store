@@ -40,8 +40,12 @@ export function PreviewCard({
 }: {
   card: PreviewCardData;
   mode: 'answer-only' | 'suggest' | 'act';
-  onApply: (previewId: string) => Promise<{ data?: ApplyData; error?: { code: string } }>;
-  onUndo: (appliedId: string) => Promise<{ data?: UndoData; error?: { code: string } }>;
+  onApply: (
+    previewId: string
+  ) => Promise<{ data?: ApplyData | null; error?: { code: string } | null }>;
+  onUndo: (
+    appliedId: string
+  ) => Promise<{ data?: UndoData | null; error?: { code: string } | null }>;
   now?: () => number;
 }) {
   const t = useT('assistant');
