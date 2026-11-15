@@ -18,7 +18,7 @@
   },
   "helpArticle": "invoices-and-credit-notes",
   "questions": {
-    "ar": ["فين فواتيري؟", "عايز اشعار دائن"],
+    "ar": ["فين فواتيري؟", "عايز اشعار دائن", "وريني اخر فاتورة", "دور على فاتورة رقم INV-000042"],
     "en": ["Where are my invoices?"]
   },
   "steps": ["Invoices page."],
