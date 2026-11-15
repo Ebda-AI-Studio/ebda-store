@@ -12,7 +12,11 @@ import { prisma } from '@ebda/database';
 import logger from './logger';
 import { inngest } from './inngest/client';
 import { withStoreDb } from './jobs/store-db';
-import { revalidateStorefront, type RevalidateOptions } from './revalidate-storefront';
+import {
+  revalidateStorefront,
+  revalidateStorefrontNow,
+  type RevalidateOptions,
+} from './revalidate-storefront';
 
 export const PURGE_RETRY_EVENT = 'storefront/purge.retry';
 export const BUNDLE_BOUNDARY_EVENT = 'storefront/bundle.boundary';
@@ -39,25 +43,32 @@ export async function enqueueStorefrontPurge(opts: RevalidateOptions): Promise<b
  * `expiresAt` of an active bundle, as epoch ms, or null. Buyability is computed per request from the clock
  * (bundle.routes.ts `withinSaleWindow`), so crossing one of these is not a write and purges nothing by itself.
  */
+// pq-allow(unused-export): imported by tests/unit/storefront-purge-durable.test.ts
 export async function nextBundleBoundary(storeId: string, now: number): Promise<number | null> {
   const at = new Date(now);
-  const rows = await withStoreDb(storeId, async db =>
-    (db as unknown as typeof prisma).bundle.findMany({
-      where: {
-        storeId,
-        isActive: true,
-        OR: [{ startsAt: { gt: at } }, { expiresAt: { gt: at } }],
-      },
-      select: { startsAt: true, expiresAt: true },
-      take: 500,
-    })
-  );
+  // The true earliest of each column (ORDER BY ... LIMIT 1), never "the first N rows": a store with many bundles must not
+  // miss its nearest boundary. The two columns are ordered separately because a bundle has two boundaries.
+  const [byStart, byEnd] = await withStoreDb(storeId, async db => {
+    const b = (db as unknown as typeof prisma).bundle;
+    return Promise.all([
+      b.findMany({
+        where: { storeId, isActive: true, startsAt: { gt: at } },
+        orderBy: { startsAt: 'asc' },
+        select: { startsAt: true, expiresAt: true },
+        take: 1,
+      }),
+      b.findMany({
+        where: { storeId, isActive: true, expiresAt: { gt: at } },
+        orderBy: { expiresAt: 'asc' },
+        select: { startsAt: true, expiresAt: true },
+        take: 1,
+      }),
+    ]);
+  });
   let next: number | null = null;
-  for (const r of rows) {
-    for (const d of [r.startsAt, r.expiresAt]) {
-      const t = d ? new Date(d).getTime() : NaN;
-      if (Number.isFinite(t) && t > now && (next === null || t < next)) next = t;
-    }
+  for (const d of [byStart[0]?.startsAt, byEnd[0]?.expiresAt]) {
+    const t = d ? new Date(d).getTime() : NaN;
+    if (Number.isFinite(t) && t > now && (next === null || t < next)) next = t;
   }
   return next;
 }
@@ -82,5 +93,55 @@ export async function scheduleBundleBoundary(storeId: string): Promise<void> {
 }
 
 /** The tag that tells the storefront Worker the store's next boundary (it caps cached pages there). */
+// pq-allow(unused-export): imported by tests/unit/storefront-purge-durable.test.ts
 export const bundleBoundaryTag = (storeId: string, at: number): string =>
   `bundle-boundary:${storeId}:${at}`;
+
+type PurgeData = { tags?: string[]; slug?: string | null; domain?: string | null };
+type BoundaryData = { storeId?: string; at?: number };
+type Step = {
+  sleepUntil(id: string, until: number): Promise<unknown>;
+  run<T>(id: string, fn: () => Promise<T>): Promise<T>;
+  sendEvent(id: string, payload: { name: string; data: Record<string, unknown> }): Promise<unknown>;
+};
+
+/** The body of `storefront-purge-retry`: throws unless the purge landed, so the jobs queue retries it. */
+export async function runPurgeRetry(data: PurgeData): Promise<{ outcome: string }> {
+  const outcome = await revalidateStorefrontNow({
+    tags: data.tags ?? [],
+    slug: data.slug ?? null,
+    domain: data.domain ?? null,
+  });
+  if (outcome === 'failed' || outcome === 'rejected')
+    throw new Error(`storefront purge ${outcome}`);
+  return { outcome };
+}
+
+/** Settle after the boundary so `now >= at` on every clock the per-request window check uses. */
+const BOUNDARY_SETTLE_MS = 2_000;
+
+/**
+ * The body of `storefront-bundle-boundary`. Each run publishes the FOLLOWING boundary (tag in its purge) and schedules the
+ * next run, so the web cache cutoff only ever knows the next boundary and later ones rely on this chain; a failed run
+ * raises the job layer's P1 alert.
+ */
+export async function runBundleBoundary(data: BoundaryData, step: Step) {
+  const { storeId, at } = data;
+  if (!storeId || typeof at !== 'number' || !Number.isFinite(at)) return { skipped: 'bad-event' };
+  await step.sleepUntil('wait-for-boundary', at + BOUNDARY_SETTLE_MS);
+  const next = await step.run('next-boundary', () => nextBundleBoundary(storeId, Date.now()));
+  await step.run('purge', async () => {
+    const tags = [`products:${storeId}`, `categories:${storeId}`, `bundles:${storeId}`];
+    if (next !== null) tags.push(bundleBoundaryTag(storeId, next));
+    const outcome = await revalidateStorefrontNow({ tags });
+    if (outcome === 'failed' || outcome === 'rejected')
+      throw new Error(`storefront purge ${outcome}`);
+    return { outcome };
+  });
+  if (next !== null)
+    await step.sendEvent('schedule-next', {
+      name: BUNDLE_BOUNDARY_EVENT,
+      data: { storeId, at: next, key: `${storeId}:${next}` },
+    });
+  return { purgedAt: at, next };
+}
