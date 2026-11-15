@@ -25,7 +25,11 @@
       "ينفع دومين من GoDaddy؟",
       "الدومين متحجوز على متجر تاني"
     ],
-    "en": ["How do I connect my domain?", "My domain is stuck on pending DNS verification"]
+    "en": [
+      "How do I connect my domain?",
+      "My domain is stuck on pending DNS verification",
+      "Disconnect my domain"
+    ]
   },
   "steps": [
     "Domain page: enter domain (claim), add DNS records at the registrar, wait for Verified; unverified claim auto-released after 72 h."

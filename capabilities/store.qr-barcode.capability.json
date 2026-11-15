@@ -24,8 +24,14 @@
   },
   "helpArticle": "qr-codes",
   "questions": {
-    "ar": ["ازاي اطبع QR للمتجر؟", "اطبع باركود للمنتجات", "QR بيوجه لفين؟"],
-    "en": ["How do I print a QR code for my store?"]
+    "ar": [
+      "ازاي اطبع QR للمتجر؟",
+      "اطبع باركود للمنتجات",
+      "QR بيوجه لفين؟",
+      "غير لون الـ QR",
+      "خلي كود المتجر بإطار دهبي"
+    ],
+    "en": ["How do I print a QR code for my store?", "Change my QR code colours"]
   },
   "steps": ["Codes page."],
   "edgeCases": [

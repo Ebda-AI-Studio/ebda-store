@@ -26,7 +26,13 @@
   },
   "helpArticle": "ai-switch-and-category-suggestions",
   "questions": {
-    "ar": ["ترجم كل منتجاتي للانجليزي", "اكتب وصف للمنتجات", "وصف الصور بالذكاء", "وقف الشغل ده"],
+    "ar": [
+      "ترجم كل منتجاتي للانجليزي",
+      "اكتب وصف للمنتجات",
+      "وصف الصور بالذكاء",
+      "وقف الشغل ده",
+      "اكتب وصف جوجل لكل المنتجات"
+    ],
     "en": ["Translate all my products to English", "Write meta descriptions for all products"]
   },
   "steps": ["AI tools page: pick job, run, review results."],
