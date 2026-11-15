@@ -290,7 +290,7 @@ function Inner() {
                   <input
                     type="number"
                     inputMode="numeric"
-                    min={4}
+                    min={3}
                     max={20}
                     step={1}
                     className={`${field} w-28`}

@@ -17,11 +17,7 @@ import { isP2002 } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 import { emailQueue } from './email-queue.service';
-import {
-  STORE_LIMIT_MAX,
-  grantedStoreLimit,
-  MAX_SELF_SERVE_STORES_PER_OWNER,
-} from './owner-store-limit';
+import { STORE_LIMIT_MAX, STORE_LIMIT_MIN } from './owner-store-limit';
 
 /** Support requests per store per UTC day (slots 1..N, each claimed by a unique insert). */
 const SUPPORT_REQUESTS_PER_DAY = 5;
@@ -475,8 +471,8 @@ export async function getTrustRequest(db: ReviewDb, id: string) {
 /**
  * Staff decision on ANY request kind: open -> resolved | rejected, once. Only an `open` row moves (a second click is
  * 409 TRUST_REQUEST_NOT_OPEN, never a silent overwrite). `rejected_at` is stamped on every rejection (it starts the
- * appeal cooldown). RESOLVING a store-limit request REQUIRES the new limit (`grantedLimit`: an integer above the
- * owner's current limit and at most STORE_LIMIT_MAX) and stores it in the same update that closes the request, so the
+ * appeal cooldown). RESOLVING a store-limit request REQUIRES the owner's limit (`grantedLimit`: an integer from
+ * STORE_LIMIT_MIN to STORE_LIMIT_MAX; the latest one wins) and stores it in the same update that closes the request, so the
  * grant and the closure are one step. The update names the row's own store / user so it stays tenant-scoped on D1.
  */
 export async function decideTrustRequest(
@@ -498,15 +494,13 @@ export async function decideTrustRequest(
   let grantedLimit: number | null = null;
   if (decision === 'resolved' && row.kind === 'store_cap') {
     const want = opts.grantedLimit;
-    const current = Math.max(
-      (row.userId ? await grantedStoreLimit(db as never, row.userId) : null) ?? 0,
-      MAX_SELF_SERVE_STORES_PER_OWNER
-    );
-    if (!Number.isInteger(want) || want! <= current || want! > STORE_LIMIT_MAX) {
+    // Any whole number in range: staff can raise OR lower a grant (the latest decision is the owner's cap). Lowering
+    // only blocks NEW stores; it never touches the stores the owner already has.
+    if (!Number.isInteger(want) || want! < STORE_LIMIT_MIN || want! > STORE_LIMIT_MAX) {
       throw new AppError(
         400,
         'INVALID_STORE_LIMIT',
-        `Give the new store limit: a whole number above ${current} and at most ${STORE_LIMIT_MAX}`
+        `Give the owner's store limit: a whole number from ${STORE_LIMIT_MIN} to ${STORE_LIMIT_MAX}`
       );
     }
     grantedLimit = want!;

@@ -297,8 +297,7 @@ describe('RESOLVE of a store-limit request grants the new limit in the same step
   });
   it.each([
     ['no limit', {}],
-    ['the current limit (3)', { limit: 3 }],
-    ['below it', { limit: 2 }],
+    ['below the minimum (2)', { limit: 2 }],
     ['above the maximum (21)', { limit: 21 }],
     ['a fraction', { limit: 4.5 }],
     ['a string', { limit: '5' }],
@@ -308,18 +307,29 @@ describe('RESOLVE of a store-limit request grants the new limit in the same step
     expect(h.rows.find(r => r.id === id(4))).toMatchObject({ status: 'open' });
     expect(h.audit).not.toHaveBeenCalled();
   });
-  it('a second grant must exceed the first (limit 5 granted, 5 again is refused, 6 passes)', async () => {
+  it('a grant can be revised: raise it, then lower it (3 allowed), each audited, the old rows untouched', async () => {
+    expect((await request(app).post(url).send({ limit: 12 })).status).toBe(200);
     h.rows.push({
       id: id(9),
       kind: 'store_cap',
-      status: 'resolved',
+      status: 'open',
       storeId: null,
       userId: U1,
-      grantedLimit: 5,
-      createdAt: new Date(Date.now() - 9000),
+      createdAt: new Date(),
     });
-    expect((await request(app).post(url).send({ limit: 5 })).status).toBe(400);
-    expect((await request(app).post(url).send({ limit: 6 })).status).toBe(200);
+    expect(
+      (
+        await request(app)
+          .post(`/admin/trust-requests/${id(9)}/resolve`)
+          .send({ limit: 3 })
+      ).status
+    ).toBe(200);
+    expect(h.rows.find(r => r.id === id(4))!.grantedLimit).toBe(12);
+    expect(h.rows.find(r => r.id === id(9))!.grantedLimit).toBe(3);
+    expect(h.audit).toHaveBeenCalledTimes(2);
+    expect(h.audit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ details: expect.objectContaining({ grantedLimit: 3 }) })
+    );
   });
   it('a limit on any other decision is refused; reject takes none', async () => {
     expect(

@@ -11775,7 +11775,7 @@
       "close": "Close",
       "decided": "This request was already decided.",
       "newLimit": "New store limit",
-      "newLimitHelp": "Whole number above the owner's current limit (3 by default), at most 20.",
+      "newLimitHelp": "Whole number from 3 to 20. It is the owner's cap on stores (the latest decision wins) and never goes above their paid plan.",
       "failed": "Could not save the decision. It may already be decided; reload the list."
     }
   },

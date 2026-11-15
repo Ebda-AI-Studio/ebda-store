@@ -296,21 +296,12 @@ export class OnboardingService {
       if (!owner.isSuperAdmin) await assertStoreCreationBudget(owner.userId);
       // Plan gate (locked pricing): a SECOND store needs a plan that allows it
       // (Business = 3). Also stops a Basic/Growth owner farming fresh Growth trials.
-      if (!owner.isSuperAdmin) await assertOwnerMayCreateStore(owner.userId, storeLimit);
+      if (!owner.isSuperAdmin) await assertOwnerMayCreateStore(owner.userId);
       const ownedNow = await countOwnerStores(owner.userId, () =>
         withUser(owner.userId, tx =>
           tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
         )
       );
-      // Cap the new store's row count on the DO: the staff-granted limit also lifts a lower plan allowance.
-      const maxOwned = async () => {
-        const plan = (await ownerStoreAllowance(owner.userId)).allowance;
-        const granted = storeLimit > MAX_SELF_SERVE_STORES_PER_OWNER;
-        return Math.min(
-          storeLimit,
-          plan === null ? storeLimit : granted ? Math.max(plan, storeLimit) : plan
-        );
-      };
       try {
         const result = await ProvisioningService.provisionStore({
           storeName: input.name,
@@ -320,7 +311,15 @@ export class OnboardingService {
           // (only reachable on a plan that allows it) is covered by the owner's
           // Business plan and starts on it, with no second trial.
           plan: ownedNow > 0 ? 'enterprise' : 'professional',
-          maxOwnedStores: owner.isSuperAdmin || !storeCreateOnDo() ? null : await maxOwned(),
+          // The effective cap is min(paid plan allowance or unlimited, the owner's abuse cap): a staff grant only raises the
+          // abuse cap and never the plan allowance (owner-store-limit.ts), so a 1-store plan still stops at 1.
+          maxOwnedStores:
+            owner.isSuperAdmin || !storeCreateOnDo()
+              ? null
+              : Math.min(
+                  storeLimit,
+                  (await ownerStoreAllowance(owner.userId)).allowance ?? storeLimit
+                ),
           growthTrial: ownedNow === 0,
           trialChoice,
           status: 'inactive',

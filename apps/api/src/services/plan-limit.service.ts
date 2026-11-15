@@ -237,19 +237,8 @@ export async function ownerStoreAllowance(ownerId: string): Promise<{
   };
 }
 
-/**
- * `staffGrantedLimit`: the owner's store limit when staff granted more through a store-limit request (> the default). It
- * lifts the PLAN allowance too (staff said yes explicitly); without a grant the plan allowance decides exactly as before.
- */
-export async function assertOwnerMayCreateStore(
-  ownerId: string,
-  staffGrantedLimit?: number
-): Promise<void> {
-  const { allowance: planAllowance, count, entitlements: e } = await ownerStoreAllowance(ownerId);
-  const allowance =
-    planAllowance === null || staffGrantedLimit === undefined
-      ? planAllowance
-      : Math.max(planAllowance, staffGrantedLimit);
+export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> {
+  const { allowance, count, entitlements: e } = await ownerStoreAllowance(ownerId);
   if (allowance === null || count === 0) return;
   if (count + 1 > allowance) {
     throw limitError(
