@@ -19,7 +19,7 @@
   "roles": ["owner", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "reversible",
+    "class": "compensating",
     "note": "rule update: restore the previous values; a created rule is undone by deleting it (a confirm-class action); dismiss yes"
   },
   "helpArticle": "stock-alerts-and-reorder-rules",
