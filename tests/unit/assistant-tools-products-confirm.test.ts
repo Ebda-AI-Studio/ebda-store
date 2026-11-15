@@ -34,6 +34,7 @@ vi.mock('@api/services/product.service', () => ({
   },
 }));
 
+import { applyThenUndo } from './helpers/undo-roundtrip';
 import { productsConfirmTools } from '@api/smart-layer/tools/products-confirm.tools';
 
 const S = '11111111-1111-4111-8111-111111111111';
@@ -257,5 +258,75 @@ describe('products_bulk_update', () => {
   it('no argument is a store id; pricePercent is bounded', () => {
     expect(JSON.stringify(t().jsonSchema)).not.toMatch(/store_?id/i);
     expect(() => t().args.parse({ productIds: ['p1'], pricePercent: -95 })).toThrow();
+  });
+});
+
+// ---- every tool: role + plan gates at preview and at apply; engine-level undo ------------------------------------------------------------------
+const writes = () => [m.del, m.bulkUpdate];
+const CASES: Array<[string, Record<string, unknown>, string[], string | null]> = [
+  ['product_delete', { productId: 'p1' }, ['customer', 'staff'], null],
+  [
+    'products_bulk_update',
+    { productIds: ['p1'], status: 'draft' },
+    ['customer', 'staff'],
+    'bulk_operations',
+  ],
+];
+describe.each(CASES)('%s gates', (name, args, denied, feature) => {
+  const t = () => tool(name);
+  it.each(denied)('%s is refused at PREVIEW (no card is built)', async role => {
+    await expect(t().preview!(ctx(role), parse(name, args))).rejects.toThrow(/FORBIDDEN/);
+  });
+  it.each(denied)(
+    '%s is refused at APPLY with ToolForbidden and nothing is written',
+    async role => {
+      const a = parse(name, args);
+      const draft = await t().preview!(ctx(), a);
+      await expect(t().apply!(ctx(role), a, draft)).rejects.toBeInstanceOf(ToolForbidden);
+      for (const fn of writes()) expect(fn).not.toHaveBeenCalled();
+      expect(m.insertAuditLog).not.toHaveBeenCalled();
+    }
+  );
+  it('a platform super admin never acts through it', async () => {
+    await expect(t().preview!(ctx('super_admin'), parse(name, args))).rejects.toThrow(/FORBIDDEN/);
+  });
+  if (feature)
+    it(`a plan without ${feature} is refused at preview and at apply`, async () => {
+      const a = parse(name, args);
+      const draft = await t().preview!(ctx(), a);
+      m.featureEnabled.mockResolvedValue(false);
+      await expect(t().preview!(ctx(), a)).rejects.toThrow(/feature/);
+      await expect(t().apply!(ctx(), a, draft)).rejects.toBeInstanceOf(ToolForbidden);
+      for (const fn of writes()) expect(fn).not.toHaveBeenCalled();
+      expect(m.featureEnabled).toHaveBeenCalledWith(S, feature);
+    });
+});
+describe('engine-level journal', () => {
+  it('product_delete: confirm then apply, and undo says irreversible (no inverse)', async () => {
+    const r = await applyThenUndo(
+      productsConfirmTools(),
+      tool('product_delete'),
+      parse('product_delete', { productId: 'p1' })
+    );
+    expect(r).toMatchObject({ applied: 'applied', undo: 'irreversible' });
+    expect(m.del).toHaveBeenCalledWith(S, 'p1');
+  });
+  it('products_bulk_update: confirm then apply; undo restores the before prices and its args pass validation', async () => {
+    const t = tool('products_bulk_update');
+    const a = parse('products_bulk_update', {
+      productIds: ['p1', 'p2'],
+      pricePercent: -10,
+      status: 'draft',
+    });
+    const draft = await t.preview!(ctx(), a);
+    const inv = t.inverse!(ctx(), a, draft, { ok: true, etagAfter: 'x' })!;
+    expect(t.args.safeParse(inv.args).success).toBe(true);
+    const r = await applyThenUndo(productsConfirmTools(), t, a);
+    expect(r).toMatchObject({ applied: 'applied' });
+    expect(['undone', 'needs_confirm']).toContain(r.undo);
+    expect(m.bulkUpdate).toHaveBeenCalledWith(S, ['p1', 'p2'], {
+      status: 'draft',
+      price: { mode: 'adjustPct', value: -10 },
+    });
   });
 });
