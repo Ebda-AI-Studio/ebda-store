@@ -108,9 +108,7 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
             role="status"
             dir={isAr ? 'rtl' : 'ltr'}
           >
-            <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
-              {pageTitle ?? featureName}
-            </h1>
+            <h1 className="mb-2 text-2xl font-bold text-foreground">{pageTitle ?? featureName}</h1>
             <p className="mb-6 text-base leading-relaxed text-muted-foreground">
               {t('businessOffBody', { feature: featureName })}
             </p>
