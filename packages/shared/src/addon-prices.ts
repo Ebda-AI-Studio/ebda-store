@@ -8,6 +8,7 @@
  */
 import type { FeatureKey } from './features';
 
+// pq-allow(unused-export): the price tests assert unpriced features keep this placeholder
 export const ADDON_PLACEHOLDER_PRICE_MINOR = 9900;
 
 const egp = (n: number) => n * 100;
