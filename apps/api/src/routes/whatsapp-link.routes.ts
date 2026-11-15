@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
+import { phoneSchema } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -100,7 +101,7 @@ router.post(
   ...guards,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { phone } = z.object({ phone: z.string().trim().min(5).max(32) }).parse(req.body);
+      const { phone } = z.object({ phone: phoneSchema }).parse(req.body);
       const result = await WhatsAppConsentService.record(req.params.storeId, phone, {
         consent: false,
         source: 'admin',

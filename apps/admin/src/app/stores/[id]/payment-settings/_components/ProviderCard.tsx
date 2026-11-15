@@ -312,6 +312,8 @@ function InstapayFields({
           </label>
           <input
             type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             dir="ltr"
             value={settingString(form, 'phone')}
             onChange={e => setSetting('phone', e.target.value)}

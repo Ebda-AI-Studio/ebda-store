@@ -85,6 +85,7 @@ import {
   normalizeArabicSearch,
   normalizeLegacyTemplate,
   deliveryLineFromNotes,
+  phoneOrBlankSchema,
 } from '@ebda/shared';
 import {
   assertScalarQuery,
@@ -242,7 +243,7 @@ export const shippingAddressSchema = z.object({
   floor: z.string().max(50).optional(),
   apartment: z.string().max(50).optional(),
   country: z.string().trim().min(2).max(60),
-  phone: z.string().max(40).optional(),
+  phone: phoneOrBlankSchema.optional(),
   // Email is optional. The form sends '' when the buyer leaves it blank;
   // z.string().email() rejects '' and .optional() only permits undefined, so a
   // blank email also 400'd the order. Treat '' (or whitespace) as "not given".
@@ -1433,7 +1434,7 @@ const quoteOrderSchema = z.object({
       city: z.string().max(120).optional(),
       state: z.string().max(120).optional(),
       country: z.string().max(60).optional(),
-      phone: z.string().max(40).optional(),
+      phone: phoneOrBlankSchema.optional(),
       email: z.string().max(255).optional(),
     })
     .default({}),

@@ -177,6 +177,8 @@ export default function ProfileClient() {
             <Input
               label={t('Phone', 'رقم الموبايل')}
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={profile.phone}
               onChange={e => setProfile({ ...profile, phone: e.target.value })}
               placeholder={REGION.phone.placeholderIntl}

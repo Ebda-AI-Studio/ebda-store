@@ -8,6 +8,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { storeDb } from '../lib/repo-factory';
 import { z } from 'zod/v3';
+import { phoneSchema } from '@ebda/shared';
 import {
   authenticate,
   authorize,
@@ -38,7 +39,7 @@ const applySchema = z
   .object({
     businessName: z.string().trim().min(2).max(160),
     commercialRegNo: z.string().trim().max(60).nullish(),
-    phone: z.string().trim().min(6).max(40),
+    phone: phoneSchema,
     notes: z.string().trim().max(1000).nullish(),
     // The form shows the data notice; the applicant must accept it and the server stamps `consent_at` (review M1).
     consent: z.literal(true),

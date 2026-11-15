@@ -1,4 +1,5 @@
 import { z } from 'zod/v3';
+import { phoneOrBlankSchema } from './phone';
 
 /**
  * Canonical Egypt address schema — shared across all three address Zod
@@ -44,7 +45,7 @@ export const egyptAddressSchema = z.object({
   floor: z.string().max(50).optional(),
   apartment: z.string().max(50).optional(),
   country: z.string().trim().min(2).max(60),
-  phone: z.string().max(40).optional(),
+  phone: phoneOrBlankSchema.optional(),
 });
 export type EgyptAddressInput = z.infer<typeof egyptAddressSchema>;
 
@@ -77,8 +78,8 @@ export const locationInputSchema = z.object({
   countryAr: z.string().trim().max(100).nullable().optional(),
   address: z.string().trim().min(1).max(500),
   addressAr: z.string().trim().max(500).nullable().optional(),
-  phone: z.string().trim().max(40).nullable().optional(),
-  whatsapp: z.string().trim().max(40).nullable().optional(),
+  phone: phoneOrBlankSchema.nullable().optional(),
+  whatsapp: phoneOrBlankSchema.nullable().optional(),
   mapsUrl: httpsUrl,
   mapsEmbedUrl: httpsUrl,
   hours: z.string().trim().max(200).nullable().optional(),

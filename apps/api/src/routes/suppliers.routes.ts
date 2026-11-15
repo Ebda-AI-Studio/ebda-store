@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod/v3';
+import { phoneOrBlankSchema } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -20,7 +21,7 @@ const createSchema = z.object({
   name: z.string().min(1).max(200),
   nameAr: z.string().max(200).optional(),
   contactName: z.string().max(200).optional(),
-  phone: z.string().max(50).optional(),
+  phone: phoneOrBlankSchema.optional(),
   email: z.string().email().optional(),
   address: z.record(z.string(), z.unknown()).optional(),
   paymentTerms: z.enum(['net0', 'net15', 'net30', 'net60', 'custom']).optional(),
@@ -39,7 +40,7 @@ const createSchema = z.object({
 export const updateSchema = createSchema.partial().extend({
   nameAr: z.string().max(200).nullable().optional(),
   contactName: z.string().max(200).nullable().optional(),
-  phone: z.string().max(50).nullable().optional(),
+  phone: phoneOrBlankSchema.nullable().optional(),
   email: z.string().email().nullable().optional(),
   notes: z.string().nullable().optional(),
   notesAr: z.string().nullable().optional(),

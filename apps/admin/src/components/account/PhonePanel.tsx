@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Input, useToast } from '@ebda/ui';
+import { isPlausiblePhone } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 import { AccountsError, accountsFetch, accountsToken } from '../../lib/accounts';
 import { useT } from '../../i18n/useT';
@@ -45,6 +46,11 @@ export function PhonePanel({ mfaEnabled }: { mfaEnabled: boolean }) {
   };
 
   const save = async () => {
+    // The input is type="tel", which never validates: an e-mail typed here used to reach the server (G12).
+    if (!isPlausiblePhone(phone)) {
+      setError(t('errorInvalid'));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -87,6 +93,7 @@ export function PhonePanel({ mfaEnabled }: { mfaEnabled: boolean }) {
           autoComplete="tel"
           placeholder={t('newPlaceholder')}
           value={phone}
+          aria-invalid={error === t('errorInvalid') ? true : undefined}
           onChange={e => setPhone(e.target.value)}
         />
         <label className="text-sm" htmlFor="phone-password">

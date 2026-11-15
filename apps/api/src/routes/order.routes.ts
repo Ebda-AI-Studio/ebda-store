@@ -34,6 +34,7 @@ import {
   excelMoneyFormat,
   BRAND,
   storefrontOrigin,
+  phoneOrBlankSchema,
 } from '@ebda/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 
@@ -519,7 +520,7 @@ const addressSchema = z.object({
   floor: z.string().max(50).optional(),
   apartment: z.string().max(50).optional(),
   country: z.string().trim().min(2).max(60),
-  phone: z.string().max(40).optional(),
+  phone: phoneOrBlankSchema.optional(),
   email: z.string().email().optional().or(z.literal('')),
 });
 

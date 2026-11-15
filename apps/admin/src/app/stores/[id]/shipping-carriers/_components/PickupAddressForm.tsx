@@ -45,6 +45,8 @@ export function PickupAddressForm({
             </label>
             <input
               type={field === 'phone' ? 'tel' : 'text'}
+              inputMode={field === 'phone' ? 'tel' : undefined}
+              autoComplete={field === 'phone' ? 'tel' : undefined}
               value={value[field]}
               onChange={e => onChange({ [field]: e.target.value })}
               placeholder={t(`placeholders.${field}`)}

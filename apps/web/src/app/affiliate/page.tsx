@@ -281,6 +281,8 @@ function AffiliatePageContent() {
                     id="phone"
                     name="phone"
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={form.phone}
                     onChange={handleChange}
                     placeholder={REGION.phone.placeholderIntl}

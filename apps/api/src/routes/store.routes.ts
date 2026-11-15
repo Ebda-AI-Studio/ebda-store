@@ -46,6 +46,7 @@ import {
   normalizeStoredBottomBar,
   reservedSettingsKeys,
   ECHOED_SERVER_OWNED_KEYS,
+  phoneSchema,
 } from '@ebda/shared';
 import { preserveMaskedPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
@@ -323,6 +324,9 @@ const lookPreviewBody = lookBody.omit({ revisionToken: true });
 // Helpers that coerce empty strings and nulls to undefined before validation
 const optionalStr = (maxLen: number) =>
   z.preprocess(v => (v === '' || v === null ? undefined : v), z.string().max(maxLen).optional());
+// A phone-shaped setting (G12): blank clears it, anything else must be a real phone number.
+const optionalPhone = () =>
+  z.preprocess(v => (v === '' || v === null ? undefined : v), phoneSchema.optional());
 
 // Merchants routinely paste the entire `<meta name="google-site-verification"
 // content="..." />` tag instead of just the content token. Extract the token
@@ -412,8 +416,8 @@ const optionalWhatsappNumber = z.preprocess(
 const contactSchema = z
   .object({
     email: optionalEmail,
-    phone: optionalStr(50),
-    phoneAr: optionalStr(50),
+    phone: optionalPhone(),
+    phoneAr: optionalPhone(),
     whatsapp: optionalWhatsappNumber,
     address: optionalStr(500),
     addressAr: optionalStr(500),
@@ -510,10 +514,10 @@ const floatingButtonSchema = z
     bgColor: optionalStr(50),
     iconColor: optionalStr(50),
     iconUrl: optionalStr(500),
-    whatsappPhone: optionalStr(50),
+    whatsappPhone: optionalPhone(),
     whatsappMessage: optionalStr(500),
     instagramHandle: optionalStr(100),
-    phoneNumber: optionalStr(50),
+    phoneNumber: optionalPhone(),
     emailAddress: optionalStr(255),
     emailSubject: optionalStr(200),
     musicUrl: optionalStr(500),
