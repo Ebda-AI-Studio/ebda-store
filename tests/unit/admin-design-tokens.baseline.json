@@ -57,8 +57,7 @@
     "app/users/[id]/page.tsx": 7,
     "components/OrderStatusBadge.tsx": 15,
     "components/admin-layout/SidebarHeader.tsx": 4,
-    "components/payment-events/PaymentEventsTimeline.tsx": 8,
-    "components/section-design/FontsCard.tsx": 4
+    "components/payment-events/PaymentEventsTimeline.tsx": 8
   },
   "G2": {
     "components/OrderAlertsModal.tsx": 3,
@@ -171,8 +170,6 @@
     "app/stores/[id]/webhooks/page.tsx": 1,
     "app/stores/_components/StoresSkeleton.tsx": 6,
     "app/users/page.tsx": 2,
-    "components/ColorContrastPreview.tsx": 1,
-    "components/ColorField.tsx": 3,
     "components/CommandPalette.tsx": 1,
     "components/FooterLinksEditor.tsx": 2,
     "components/NavMenuEditor.tsx": 1,
@@ -237,7 +234,6 @@
     "components/mobile/DataTable.tsx": 2,
     "components/order-timeline/OrderLifecycleTimeline.tsx": 1,
     "components/return-timeline/ReturnLifecycleTimeline.tsx": 1,
-    "components/section-design/FontsCard.tsx": 1,
     "components/section-design/SectionDividersBlock.tsx": 1,
     "components/section-design/SectionTypographyBlock.tsx": 1
   }

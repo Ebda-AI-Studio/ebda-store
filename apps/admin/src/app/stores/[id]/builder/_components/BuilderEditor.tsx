@@ -14,6 +14,9 @@
  * Below `lg` the side panes become toggleable drawers over the canvas.
  */
 import { Button } from '@/components/ui/Button';
+import { navItemClasses } from '@/components/ui/tokens';
+import { ResizablePane } from './ResizablePane';
+import { PANE_BOUNDS } from '../_lib/pane-width';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
@@ -673,7 +676,7 @@ export function BuilderEditor({
         role="tablist"
         aria-label={t('panes.start')}
         onKeyDown={e => rovingKeyDown(e, 'tab')}
-        className="flex border-b border-border text-xs"
+        className="flex overflow-x-auto border-b border-border px-1"
       >
         {(isHome
           ? (['sections', 'theme', 'ai', 'history'] as const)
@@ -688,7 +691,7 @@ export function BuilderEditor({
             aria-controls="builder-tabpanel"
             tabIndex={tab === k ? 0 : -1}
             onClick={() => setTab(k)}
-            className={`flex-1 px-2 py-2.5 ${tab === k ? 'border-b-2 border-primary font-semibold text-foreground' : 'text-muted-foreground'}`}
+            className={navItemClasses({ kind: 'tab', active: tab === k, className: 'my-1 flex-1' })}
           >
             {t(`tabs.${k}`)}
           </button>
@@ -1122,15 +1125,23 @@ export function BuilderEditor({
       )}
 
       <div className="relative flex min-h-0 flex-1">
-        <aside
-          ref={startRef}
+        <ResizablePane
+          side="start"
+          storageKey="start"
+          {...PANE_BOUNDS.start}
+          label={t('panes.resizeStart')}
+          asideRef={startRef}
           aria-label={t('panes.start')}
-          className={`${drawer === 'start' ? 'absolute inset-y-0 start-0 z-20 flex w-80 max-w-[85vw] shadow-2xl' : 'hidden'} flex-col border-e border-border bg-card lg:static lg:flex lg:w-72 lg:shadow-none`}
+          className={`${drawer === 'start' ? 'absolute inset-y-0 start-0 z-20 flex w-80 max-w-[85vw] shadow-xl' : 'hidden'} flex-col border-e border-border bg-card lg:relative lg:flex lg:shadow-none`}
         >
           {startPane}
-        </aside>
+        </ResizablePane>
         {/* the target of the admin shell's skip link ("skip to main content"): the preview */}
-        <main id="admin-main-content" tabIndex={-1} className="min-w-0 flex-1 outline-none">
+        <main
+          id="admin-main-content"
+          tabIndex={-1}
+          className="min-w-0 flex-1 outline-none lg:min-w-[400px]"
+        >
           <Canvas
             storefrontUrl={getStoreHref(store)}
             path={canvasPath}
@@ -1144,15 +1155,19 @@ export function BuilderEditor({
             onMessage={onCanvasMessage}
           />
         </main>
-        <aside
-          ref={endRef}
+        <ResizablePane
+          side="end"
+          storageKey="end"
+          {...PANE_BOUNDS.end}
+          label={t('panes.resizeEnd')}
+          asideRef={endRef}
           id="builder-settings"
           tabIndex={-1}
           aria-label={t('panes.end')}
-          className={`${drawer === 'end' ? 'absolute inset-y-0 end-0 z-20 flex w-80 max-w-[85vw] shadow-2xl' : 'hidden'} flex-col border-s border-border bg-card lg:static lg:flex lg:w-80 lg:shadow-none`}
+          className={`${drawer === 'end' ? 'absolute inset-y-0 end-0 z-20 flex w-80 max-w-[85vw] shadow-xl' : 'hidden'} flex-col border-s border-border bg-card lg:relative lg:flex lg:shadow-none`}
         >
           {endPane}
-        </aside>
+        </ResizablePane>
       </div>
 
       {pending && (

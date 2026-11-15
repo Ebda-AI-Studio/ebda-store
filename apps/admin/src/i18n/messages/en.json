@@ -1720,8 +1720,8 @@
         "fileLabel": "Font file (.woff2 / .woff / .ttf / .otf — max 5MB)",
         "uploading": "Uploading…",
         "uploadFont": "Upload font",
-        "addGoogleFont": "+ Add Google Font",
-        "uploadCustomFont": "↥ Upload custom font",
+        "addGoogleFont": "Add a Google font",
+        "uploadCustomFont": "Upload your own font",
         "uploadFailed": "Upload failed."
       },
       "paddingBlock": {
@@ -1762,7 +1762,13 @@
       },
       "fontFamilyExample": "e.g. Cairo, Inter, \"Open Sans\"",
       "fontNameExample": "e.g. \"My Brand Sans\"",
-      "uploadFileSize": "{name} ({kb} KB)"
+      "uploadFileSize": "{name} ({kb} KB)",
+      "zoneGroups": {
+        "top": "Top of the page",
+        "headings": "Section headings",
+        "products": "Products and categories",
+        "footer": "Footer"
+      }
     },
     "devices": {
       "title": "Notification devices",
@@ -6446,20 +6452,26 @@
     },
     "colorField": {
       "tokens": {
-        "primary": "Brand: Primary",
-        "secondary": "Brand: Secondary",
-        "accent": "Brand: Accent",
-        "card": "Surface: Card",
-        "muted": "Surface: Muted",
-        "foreground": "Text: Foreground",
-        "border": "Border"
+        "primary": "Main colour",
+        "secondary": "Soft background",
+        "accent": "Highlight",
+        "card": "Card background",
+        "muted": "Quiet background",
+        "foreground": "Main text",
+        "border": "Lines and borders"
       },
-      "customHex": "Custom hex…",
-      "themeDefault": "— Theme default —",
-      "inheritedLabel": "Brand: {token} ({hex})",
-      "colorPickerAriaLabel": "Color picker",
-      "hexValueAriaLabel": "Hex color value",
-      "clear": "Clear"
+      "themeDefault": "Same as the template",
+      "themeDefaultShort": "Template colour",
+      "inheritedLabel": "Same as {token}",
+      "brandColours": "Your brand colours",
+      "anyColour": "Any other colour",
+      "notAColour": "That is not a colour yet. Try something like #B08D57.",
+      "alphaIgnored": "Transparency is not supported, so it was ignored.",
+      "recent": "Recently used",
+      "done": "Done",
+      "colorPickerAriaLabel": "Pick a colour",
+      "hexValueAriaLabel": "Colour code",
+      "hexExample": "e.g. B08D57"
     },
     "bottomSheet": {
       "close": "Close"
@@ -6473,14 +6485,25 @@
       "samplePrice": "50.00 EGP"
     },
     "colorContrastPreview": {
-      "backgroundLabel": "Background: {label}",
-      "roles": {
+      "preview": {
         "heading": "Heading",
-        "subtitle": "Subtitle",
-        "bodyCta": "Body / CTA"
+        "subtitle": "A line under the heading",
+        "body": "Body text looks like this.",
+        "button": "Button"
       },
-      "autoFixedLabel": "Auto-fixed:",
-      "pickedTextWarning": "Picked text {ratio} : 1 — AA needs {min} : 1"
+      "verdict": {
+        "easy": "Easy to read",
+        "large": "Fine for big text only",
+        "hard": "Hard to read"
+      },
+      "cannotCheck": "We can't check this colour yet. Pick a colour to see how text reads on it.",
+      "details": "Details",
+      "colourName": "Colour",
+      "background": "Background",
+      "text": "Text",
+      "ratioLabel": "Contrast",
+      "ratio": "{ratio} to 1",
+      "pickedTextWarning": "your text colour is hard to read here"
     },
     "guestCheckout": {
       "notTracked": "Not tracked for guest checkout",
@@ -8839,7 +8862,46 @@
     "textAlignAriaLabel": "{label} — {title}",
     "textColorLabel": "Text color",
     "colorInheriting": "Inheriting: {value}",
-    "colorHint": "Leave empty to inherit from active theme."
+    "colorHint": "Leave empty to inherit from active theme.",
+    "same": "Same as site",
+    "specimen": "Aa Abc",
+    "moreOptions": "More options",
+    "sizeNames": {
+      "small": "Small",
+      "normal": "Normal",
+      "large": "Large",
+      "title": "Title"
+    },
+    "weightNames": {
+      "regular": "Regular",
+      "medium": "Medium",
+      "semibold": "Semibold",
+      "bold": "Bold"
+    },
+    "caseNames": {
+      "upper": "Capitals",
+      "lower": "Small letters",
+      "capitalize": "First letters",
+      "none": "None"
+    },
+    "decoNames": {
+      "none": "None",
+      "underline": "Underline",
+      "overline": "Overline",
+      "strikethrough": "Strikethrough"
+    },
+    "alignNames": {
+      "auto": "Same as site",
+      "start": "Start",
+      "center": "Centre",
+      "end": "End"
+    },
+    "exactSizeLabel": "Exact size",
+    "exactSizeHint": "Type a number like 16, or a size like 1.25rem.",
+    "fontBuiltinSans": "Clean sans",
+    "fontBuiltinSerif": "Classic serif",
+    "searchFonts": "Search fonts",
+    "noFontMatch": "No font matches that."
   },
   "answerEngineProviders": {
     "pageTitle": "Answer-engine providers",
@@ -10128,11 +10190,13 @@
     },
     "panes": {
       "start": "Structure",
-      "end": "Settings"
+      "end": "Settings",
+      "resizeStart": "Resize the left panel",
+      "resizeEnd": "Resize the right panel"
     },
     "tabs": {
       "sections": "Sections",
-      "theme": "Colours and fonts",
+      "theme": "Style",
       "history": "History",
       "ai": "Ask AI"
     },
