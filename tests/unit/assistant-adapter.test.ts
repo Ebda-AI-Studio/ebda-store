@@ -551,20 +551,20 @@ describe('help index', () => {
     expect(hits.map(h => h.text)).toEqual(['عربي']);
     expect(hits[0]).toMatchObject({ articleId: 'x', appPath: '/stores' });
   });
-  it('the bundled corpus covers Arabic and English, includes the Store guides and the new assistant guide, and states the 72-hour domain figure', () => {
-    const c = helpCorpus();
+  it('the bundled corpus covers Arabic and English, includes the Store guides and the new assistant guide, and states the 72-hour domain figure', async () => {
+    const c = await helpCorpus();
     expect(new Set(c.docs.map(d => d.locale))).toEqual(new Set(['ar', 'en']));
     expect(
       c.docs.some(
         d => d.articleId === 'ebda-assistant' && d.capabilityIds.includes('ai.merchant-assistant')
       )
     ).toBe(true);
-    expect(helpFigureSources(c).some(s => s.values.includes('72'))).toBe(true);
+    expect((await helpFigureSources(c)).some(s => s.values.includes('72'))).toBe(true);
   });
 });
 
 describe('bundled assets', () => {
-  it('registry.generated.json and help-corpus.generated.json are current (run node apps/api/scripts/build-help-corpus.mjs)', async () => {
+  it('registry.generated.json and cf/modules/help-corpus.mjs are current (run node apps/api/scripts/build-help-corpus.mjs)', async () => {
     // @ts-expect-error plain .mjs script
     const { buildAssets } = (await import('../../apps/api/scripts/build-help-corpus.mjs')) as {
       buildAssets(): Promise<{ registry: string; corpus: string }>;
@@ -572,7 +572,7 @@ describe('bundled assets', () => {
     const { registry, corpus } = await buildAssets();
     const dir = join(__dirname, '../../apps/api/src/smart-layer');
     expect(readFileSync(join(dir, 'registry.generated.json'), 'utf8') === registry).toBe(true);
-    expect(readFileSync(join(dir, 'help-corpus.generated.json'), 'utf8') === corpus).toBe(true);
+    expect(readFileSync(join(dir, '../cf/modules/help-corpus.mjs'), 'utf8') === corpus).toBe(true);
   });
   it('the assistant capability and the tools agree on the id the registry carries', () => {
     expect(storeRegistry().caps.get(ASSISTANT_CAPABILITY)?.status).toBe('live');

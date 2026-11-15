@@ -88,9 +88,9 @@ describe('structural golden set', () => {
     expect(golden.length).toBeGreaterThanOrEqual(60);
   });
 
-  it('every answer task points at a guide that exists in the bundled corpus, in Arabic and English', () => {
+  it('every answer task points at a guide that exists in the bundled corpus, in Arabic and English', async () => {
     const ids = new Map<string, Set<string>>();
-    for (const d of helpCorpus().docs)
+    for (const d of (await helpCorpus()).docs)
       ids.set(d.articleId, (ids.get(d.articleId) ?? new Set()).add(d.locale));
     for (const t of of('answer')) {
       const id = t.expect.facts?.[0] ?? '';
@@ -120,7 +120,7 @@ describe('structural golden set', () => {
   });
 
   it('the full pipeline answers an answer task from its guide with the guide cited (scripted model, real rails)', async () => {
-    const corpus = helpCorpus();
+    const corpus = await helpCorpus();
     for (const t of of('answer').slice(0, 5)) {
       const id = t.expect.facts![0]!;
       const doc = corpus.docs.find(d => d.articleId === id && d.locale === 'ar')!;

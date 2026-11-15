@@ -8,7 +8,6 @@
 import { foldArabic, maskForModel, type HelpHit, type Locale } from '@ebda/shared/smart-layer';
 import { cfBindings } from '../cf/bindings';
 import { getEmbeddingProvider } from '../lib/search/embedding-provider';
-import corpusJson from './help-corpus.generated.json';
 
 type HelpCorpusDoc = {
   articleId: string;
@@ -20,8 +19,30 @@ type HelpCorpusDoc = {
   chunks: string[];
 };
 export type HelpCorpus = { hash: string; docs: HelpCorpusDoc[] };
+
+/**
+ * The corpus ships as its own Worker module (Ruling BUNDLE-BUDGET-12: apps/api/src/cf/modules/help-corpus.mjs, built by
+ * scripts/build-help-corpus.mjs, uploaded by the `rules` entry of wrangler.jsonc), so its 435 KB is not part of worker.js. It is
+ * loaded on first use (the hourly index job, or the first assistant turn) and cached per isolate. A variable specifier is left
+ * alone by the bundler: on the Worker it resolves to the uploaded module (named relative to src/), in Node to the file next to the
+ * sources. A missing module rejects loudly (the cron job logs it, the turn fails) - it is never an empty corpus.
+ */
+let corpusPromise: Promise<HelpCorpus> | undefined;
 // pq-allow(unused-export): imported by tests/unit/assistant-adapter.test.ts and assistant-eval.test.ts
-export const helpCorpus = (): HelpCorpus => corpusJson as unknown as HelpCorpus;
+export function helpCorpus(): Promise<HelpCorpus> {
+  corpusPromise ??= (async () => {
+    const nav = (globalThis as { navigator?: { userAgent?: string } }).navigator;
+    const spec =
+      nav?.userAgent === 'Cloudflare-Workers'
+        ? './cf/modules/help-corpus.mjs'
+        : '../cf/modules/help-corpus.mjs';
+    return ((await import(/* @vite-ignore */ spec)) as { default: HelpCorpus }).default;
+  })().catch(err => {
+    corpusPromise = undefined; // a failed load is retried, not cached
+    throw err;
+  });
+  return corpusPromise;
+}
 
 const HELP_NAMESPACE = '__help__';
 // pq-allow(unused-export): imported by tests/unit/assistant-adapter.test.ts
@@ -66,9 +87,10 @@ const vecId = async (chunkId: string) => (await sha256Hex(`help\u0001${chunkId}`
 /** Embeds the corpus when its hash changed. 'unavailable' (no index / no model / no KV) never throws: answers then have no help grounding. */
 export async function ensureHelpIndex(
   d: HelpDeps,
-  corpus: HelpCorpus = helpCorpus()
+  corpus?: HelpCorpus
 ): Promise<'skipped' | 'indexed' | 'unavailable'> {
   if (!d.vectors || !d.embed || !d.kv) return 'unavailable';
+  corpus ??= await helpCorpus();
   if ((await d.kv.get(HASH_KEY)) === corpus.hash) return 'skipped';
   const rows: Array<{ id: string; text: string; doc: HelpCorpusDoc }> = [];
   for (const doc of corpus.docs)
@@ -137,9 +159,12 @@ export async function helpSearch(
 }
 
 /** Figures the guides state (72 hours, 24 hours ...): typed sources for the binding-claim rail. A sentence may repeat a documented figure; an invented one is replaced by a pointer. */
-export function helpFigureSources(
-  corpus: HelpCorpus = helpCorpus()
-): Array<{ kind: 'limit'; key: string; text: { ar: string; en: string }; values: string[] }> {
+export async function helpFigureSources(
+  corpus?: HelpCorpus
+): Promise<
+  Array<{ kind: 'limit'; key: string; text: { ar: string; en: string }; values: string[] }>
+> {
+  corpus ??= await helpCorpus();
   const by = new Map<string, { title: string; values: Set<string> }>();
   for (const d of corpus.docs) {
     const e = by.get(d.articleId) ?? { title: d.title, values: new Set<string>() };

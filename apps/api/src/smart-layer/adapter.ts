@@ -123,7 +123,7 @@ export function storeAdapter(d: StoreAdapterDeps): SmartLayerAdapter {
           text: { ar: 'رسايل المساعد المجانية في اليوم', en: 'Free assistant messages per day' },
           values: [String(BUDGET.freeTurnsPerStorePerDay)],
         },
-        ...helpFigureSources(d.corpus),
+        ...(await helpFigureSources(d.corpus)),
       ];
     },
     async merchantDomains(ctx) {

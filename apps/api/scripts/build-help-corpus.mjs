@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Builds the two bundled assets of the assistant (the Worker cannot read the file system):
 //   apps/api/src/smart-layer/registry.generated.json     the capability registry as the engine's RegistryCap list (the engine's own `toRegistryView`)
-//   apps/api/src/smart-layer/help-corpus.generated.json  apps/help/content/{ar,en}/**/*.mdx as heading-aware chunks + a content hash (skip-if-unchanged index)
+//   apps/api/src/cf/modules/help-corpus.mjs             apps/help/content/{ar,en}/**/*.mdx as heading-aware chunks + a content hash (skip-if-unchanged index);
+//                                                       an ES module the Worker uploads separately (wrangler `rules`), NOT part of worker.js (Ruling BUNDLE-BUDGET-12)
 // `node apps/api/scripts/build-help-corpus.mjs` writes them (run it after changing `capabilities/` or `apps/help/content`; `tests/unit/assistant-adapter.test.ts` fails when they are stale); `--check` exits 1 when they are stale.
 import { build } from 'esbuild';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -76,7 +77,7 @@ export async function buildAssets() {
   const lines = (head, items) => `${head}\n${items.map(i => JSON.stringify(i)).join(',\n')}\n]`;
   return {
     registry: lines('[', registry) + '\n',
-    corpus: `{"hash":${JSON.stringify(corpus.hash)},"docs":${lines('[', corpus.docs)}}\n`,
+    corpus: `export default {"hash":${JSON.stringify(corpus.hash)},"docs":${lines('[', corpus.docs)}};\n`,
   };
 }
 
@@ -84,7 +85,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const { registry, corpus } = await buildAssets();
   const files = [
     ['registry.generated.json', registry],
-    ['help-corpus.generated.json', corpus],
+    [join('..', 'cf', 'modules', 'help-corpus.mjs'), corpus],
   ];
   if (process.argv.includes('--check')) {
     const stale = files
