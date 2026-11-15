@@ -11753,7 +11753,8 @@
     "channel": { "storefront": "Storefront", "whatsapp": "WhatsApp", "admin": "Merchant admin" },
     "helpKind": {
       "assistant_used": "used the Ebda AI Studio assistant",
-      "super_admin_action": "support changed the store"
+      "super_admin_action": "support changed the store",
+      "support_contact": "wrote to Ebda Store from the dashboard"
     },
     "fact": {
       "placed": "Order placed, not paid or confirmed",

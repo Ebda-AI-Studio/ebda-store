@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   rows: [] as Row[],
   store: { status: 'suspended', billingSuspendedReason: null as string | null } as Row | null,
   enqueue: vi.fn(),
+  help: vi.fn(),
   audit: vi.fn(),
   seq: 0,
 }));
@@ -106,6 +107,7 @@ vi.mock('@api/lib/after-tenant-commit', () => ({
   deferAfterTenantCommit: async (_n: string, run: () => Promise<unknown>) => run(),
 }));
 vi.mock('@api/services/email-queue.service', () => ({ emailQueue: { enqueue: m.enqueue } }));
+vi.mock('@api/lib/ci/emit', () => ({ sendOnboardingHelpToCi: m.help }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: async () => undefined }));
 
 let app: Express;
@@ -125,6 +127,7 @@ beforeEach(() => {
   m.store = { status: 'suspended', billingSuspendedReason: null };
   m.enqueue.mockReset().mockResolvedValue(undefined);
   m.audit.mockReset().mockResolvedValue(undefined);
+  m.help.mockReset().mockResolvedValue(undefined);
 });
 
 describe('A13 suspension reason and appeal', () => {
@@ -219,6 +222,12 @@ describe('A14 support request', () => {
     expect(m.enqueue.mock.calls[0][1].replyTo).toBe('owner@example.com');
   });
 
+  it('reports a support_contact help signal to the activation stream (ids only), once per request', async () => {
+    await request(app).post('/stores/store-a/support-requests').send(body);
+    expect(m.help).toHaveBeenCalledTimes(1);
+    expect(m.help).toHaveBeenCalledWith('store-a', 'support_contact');
+  });
+
   it('the sixth request in a day is 429 and nothing more is stored or sent', async () => {
     for (let i = 0; i < 5; i++) {
       expect((await request(app).post('/stores/store-a/support-requests').send(body)).status).toBe(
@@ -229,6 +238,7 @@ describe('A14 support request', () => {
     expect(sixth.status).toBe(429);
     expect(m.rows).toHaveLength(5);
     expect(m.enqueue).toHaveBeenCalledTimes(5);
+    expect(m.help).toHaveBeenCalledTimes(5);
   });
 
   it('requests older than a day do not count toward the cap', async () => {

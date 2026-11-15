@@ -361,7 +361,8 @@ describe('onboarding help', () => {
     ).toEqual([]);
     expect(await plan(progress(), 'assistant_used', '2026-12-30T00:00:00Z')).toEqual([]);
     expect(await plan(progress({ isDemo: true }))).toEqual([]);
-    expect(await plan(progress(), 'support_contact')).toEqual([]);
+    // support_contact (the in-product Contact Ebda Store request) is a real kind with a write path
+    expect(await plan(progress(), 'support_contact')).toHaveLength(1);
   });
 
   it('the wire envelopes are strict and carry only ids, closed codes and numbers', async () => {
@@ -372,9 +373,9 @@ describe('onboarding help', () => {
       expect(parseEnvelope(JSON.parse(JSON.stringify(env)))).toEqual(env);
     }
     const good = await buildEnvelope(help[0]!, 'store', new Date('2026-11-03T10:00:01Z'));
-    // support_contact has no write path: it is not a valid kind, and an extra key is refused (strict).
+    // an unknown kind is refused, and so is an extra key (strict).
     expect(() =>
-      parseEnvelope({ ...good, data: { step: 'went_live', kind: 'support_contact' } })
+      parseEnvelope({ ...good, data: { step: 'went_live', kind: 'phone_call' } })
     ).toThrow();
     expect(() =>
       parseEnvelope({ ...good, data: { ...good.data, phone: '01001234567' } })

@@ -11753,7 +11753,8 @@
     "channel": { "storefront": "المتجر", "whatsapp": "واتساب", "admin": "لوحة التاجر" },
     "helpKind": {
       "assistant_used": "استخدم مساعد Ebda AI Studio",
-      "super_admin_action": "الدعم عدّل في المتجر"
+      "super_admin_action": "الدعم عدّل في المتجر",
+      "support_contact": "كلّم ابدأ ستور من لوحة التحكم"
     },
     "fact": {
       "placed": "الأوردر اتعمل ولسه مدفعش ولا اتأكد",

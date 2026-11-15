@@ -30,7 +30,11 @@ export const ONBOARDING_STEPS = [
 /** Where a store's first real order came from: the shopper's storefront, WhatsApp, or the merchant's own admin. */
 export const FIRST_ORDER_CHANNELS = ['storefront', 'whatsapp', 'admin'] as const;
 /** Who touched the store while a step was still open (`support_contact` has no write path yet: Ruling ACT-1). */
-export const ONBOARDING_HELP_KINDS = ['assistant_used', 'super_admin_action'] as const;
+export const ONBOARDING_HELP_KINDS = [
+  'assistant_used',
+  'super_admin_action',
+  'support_contact',
+] as const;
 /** Events about a merchant or a cart, not about one order: they carry `orderId: null`. */
 export const ORDERLESS_TYPES = [
   'cart.abandoned',

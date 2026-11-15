@@ -19,6 +19,7 @@ import { tenantContext } from '../middleware/tenant-context';
 import { auditLog } from '../middleware/security';
 import { parseInput } from '../lib/parse-input';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { sendOnboardingHelpToCi } from '../lib/ci/emit';
 import { getAuthUser } from '../utils/store-helpers';
 import {
   createSupportRequest,
@@ -83,6 +84,10 @@ router.post(
           replyTo: user.email,
           storeId,
         });
+      });
+      // Activation signal (Ruling ACT-1): the merchant asked for help. Ids only, never the message; advisory.
+      void deferAfterTenantCommit('support-request.help-signal', async () => {
+        await sendOnboardingHelpToCi(storeId, 'support_contact');
       });
       res.status(201).json({ success: true, data: { id: row.id } });
     } catch (error) {
