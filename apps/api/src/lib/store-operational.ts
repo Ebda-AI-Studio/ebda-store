@@ -19,9 +19,7 @@ import logger from './logger';
 const STORE_NOT_OPERATIONAL = 'STORE_NOT_OPERATIONAL';
 
 const MESSAGE_EN =
-  'This store is suspended, so Ebda has paused messages to customers and payouts. Contact support to get it reactivated.';
-const MESSAGE_AR =
-  'المتجر ده موقوف، فـ إبدأ وقفت الرسايل للعملاء والمدفوعات. كلّم الدعم عشان نفعّله تاني.';
+  'This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.';
 
 /** Pure: the status a store must have to message customers / pay out. */
 export function isStoreOperational(status: string | null | undefined): boolean {
@@ -51,6 +49,7 @@ export async function assertStoreOperational(storeId: string): Promise<void> {
   if (await storeOperational(storeId)) return;
   throw new AppError(423, STORE_NOT_OPERATIONAL, MESSAGE_EN, {
     messageEn: MESSAGE_EN,
-    messageAr: MESSAGE_AR,
+    messageAr:
+      'المتجر ده موقوف، فـ إبدأ وقفت الرسايل للعملاء والمدفوعات. كلّم الدعم عشان نفعّله تاني.',
   });
 }
