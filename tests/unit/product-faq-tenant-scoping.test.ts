@@ -57,7 +57,7 @@ vi.mock('../../apps/api/src/services/product.service', () => ({
   ProductService: {},
 }));
 vi.mock('../../apps/api/src/lib/public-cache', () => ({
-  invalidateCachedPrefix: vi.fn(),
+  invalidateStoreProductCaches: vi.fn(),
 }));
 
 import productRoutes from '../../apps/api/src/routes/product.routes';
