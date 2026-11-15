@@ -81,6 +81,11 @@ export class GscNoAccessError extends Error {
   }
 }
 
+/** Anchored RE2 regex matching only pages served on exactly `host` (dots and other metacharacters escaped). */
+export function gscPageHostRegex(host: string): string {
+  return `^https?://${host.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`;
+}
+
 /** Parses + validates GSC_SERVICE_ACCOUNT_JSON. Never logs the raw value (may contain the private key). Returns null on anything unset/malformed/incomplete. */
 function parseServiceAccount(): ServiceAccountCreds | null {
   const raw = process.env.GSC_SERVICE_ACCOUNT_JSON;
@@ -377,16 +382,23 @@ export async function querySearchAnalytics(
 
   const accessToken = await mintAccessToken(creds);
 
-  // Parent-domain property: restrict to this store's host. `contains` on the
-  // `page` dimension with the scheme-anchored `https://<host>/` — `https://`
-  // precedes the host, so `ab.ebda.app` can never match `b.ebda.app`.
+  // Parent-domain property: restrict to this store's host. An ANCHORED RE2
+  // regex on the `page` dimension (`^https?://<escaped host>/`) — a plain
+  // `contains` would also match another store's page whose path or query
+  // carries this host (e.g. `https://x.ebda.app/?r=https://b.ebda.app/`),
+  // leaking that store's clicks into this one. Anchoring at `^` also keeps
+  // `ab.ebda.app` from matching `b.ebda.app`.
   const filter = opts.pageHost
     ? {
         dimensionFilterGroups: [
           {
             groupType: 'and',
             filters: [
-              { dimension: 'page', operator: 'contains', expression: `https://${opts.pageHost}/` },
+              {
+                dimension: 'page',
+                operator: 'includingRegex',
+                expression: gscPageHostRegex(opts.pageHost),
+              },
             ],
           },
         ],

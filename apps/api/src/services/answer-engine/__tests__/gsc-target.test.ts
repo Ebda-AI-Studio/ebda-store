@@ -6,6 +6,7 @@ import {
   listAccessibleGscSites,
   resetGscSitesCache,
   querySearchAnalytics,
+  gscPageHostRegex,
 } from '../gsc-client';
 
 const KEY = generateKeyPairSync('rsa', { modulusLength: 2048 })
@@ -107,7 +108,13 @@ describe('sites.list + page filter', () => {
       expect(JSON.parse(String(call[1].body)).dimensionFilterGroups).toEqual([
         {
           groupType: 'and',
-          filters: [{ dimension: 'page', operator: 'contains', expression: 'https://b.ebda.app/' }],
+          filters: [
+            {
+              dimension: 'page',
+              operator: 'includingRegex',
+              expression: '^https?://b\\.ebda\\.app/',
+            },
+          ],
         },
       ]);
     }
@@ -124,5 +131,18 @@ describe('sites.list + page filter', () => {
     await querySearchAnalytics('sc-domain:ebda.app', '2026-11-01', '2026-11-01');
     const body = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body));
     expect(body.dimensionFilterGroups).toBeUndefined();
+  });
+});
+
+describe('gscPageHostRegex', () => {
+  const re = (h: string) => new RegExp(gscPageHostRegex(h));
+  it('matches only pages served on exactly that host', () => {
+    expect(re('b.ebda.app').test('https://b.ebda.app/products/x')).toBe(true);
+    expect(re('B.Ebda.app').test('https://b.ebda.app/')).toBe(true);
+  });
+  it('never matches another store whose path or query carries the host', () => {
+    expect(re('b.ebda.app').test('https://x.ebda.app/?r=https://b.ebda.app/')).toBe(false);
+    expect(re('b.ebda.app').test('https://ab.ebda.app/')).toBe(false);
+    expect(re('b.ebda.app').test('https://bxebda.app/')).toBe(false);
   });
 });
