@@ -170,13 +170,20 @@ export type LabelLayout = {
   printable: boolean;
 };
 
-/** Narrowest bar a thermal head (203 dpi, ~0.125 mm/dot) prints reliably: 1.5 dots. */
+/**
+ * Narrowest bar a thermal head (203 dpi, ~0.125 mm/dot) prints reliably: 1.5 dots = 0.19 mm.
+ * A label is flagged only when `moduleMm = barcodeWidthMm / modules < MIN_MODULE_MM`, where
+ * modules = bars + quiet zones (EAN-13: 95 + 18 = 113, Code 128 of 13 digits: ~132) and the width
+ * is the label's printable width minus 2 x PAD. Plain bars on the narrowest preset (a4-5x13,
+ * 35.1 mm) give 0.31 mm (EAN-13) and 0.27 mm (Code 128): never flagged, so the warning is real.
+ */
 export const MIN_MODULE_MM = 0.19;
 const PAD = 1.5;
 
 function priceText(minor: number, lang: 'ar' | 'en'): string {
   const v = (minor / 100).toFixed(minor % 100 === 0 ? 0 : 2);
-  return lang === 'ar' ? `${v} ج.م` : `EGP ${v}`;
+  // No-break space: the amount and the currency can never wrap onto separate lines.
+  return lang === 'ar' ? `${v}\u00a0ج.م` : `EGP\u00a0${v}`;
 }
 
 /** EAN-13 digits grouped as printed: 1 | 6 | 6. */
@@ -335,6 +342,33 @@ export function layoutLabel(
     dropped,
     printable: moduleMm >= MIN_MODULE_MM && barH >= 5,
   };
+}
+
+export type ShapePrintability = {
+  printable: boolean;
+  /** Smallest label height (mm, 0.5 steps) on which this shape prints; null = height cannot fix it. */
+  minHeightMm: number | null;
+};
+
+/**
+ * Can `shape` print on `preset` for this item? Runs the real layout (same `printable` rule as the
+ * preview). When it cannot, searches upward for the shortest label height that works; a
+ * continuous roll grows to fit, so more height never helps there (minHeightMm = null).
+ */
+export function shapePrintability(
+  preset: LabelPreset,
+  item: LabelItem,
+  settings: Pick<LabelSettings, 'shape' | 'lang' | 'content'>,
+  shape: string
+): ShapePrintability {
+  const s = { ...settings, shape };
+  if (layoutLabel(preset, item, s).printable) return { printable: true, minHeightMm: null };
+  if (preset.continuous) return { printable: false, minHeightMm: null };
+  for (let h = preset.heightMm + 0.5; h <= 150; h += 0.5) {
+    if (layoutLabel({ ...preset, heightMm: h }, item, s).printable)
+      return { printable: false, minHeightMm: h };
+  }
+  return { printable: false, minHeightMm: null };
 }
 
 /** Left/top of cell `index` (0-based, row-major) on an A4 sheet preset, mm. */

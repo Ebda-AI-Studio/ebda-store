@@ -29,7 +29,7 @@ export const SAMPLE_ITEM: LabelItem = {
   name: 'Sample product',
   nameAr: 'منتج تجريبي',
   variantTitle: 'M',
-  variantTitleAr: 'م',
+  variantTitleAr: 'وسط',
   priceMinor: 25000,
   barcode: '2000000000015',
 };
