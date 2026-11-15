@@ -72,6 +72,8 @@
   "GET /admin/billing/events",
   "GET /admin/billing/grants",
   "GET /admin/billing/subscriptions",
+  "GET /admin/ci/activation",
+  "GET /admin/ci/activation/funnel",
   "GET /admin/ci/gates",
   "GET /admin/ci/insights",
   "GET /admin/customers",
