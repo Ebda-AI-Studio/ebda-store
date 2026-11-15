@@ -1,0 +1,37 @@
+{
+  "id": "customers.list-detail",
+  "status": "live",
+  "area": "customers",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "العملاء",
+  "titleEn": "Customer list, profile, order history, search",
+  "screens": ["/stores/[id]/customers", "/customers/[customerKey]"],
+  "api": [
+    "GET /stores/:storeId/customers",
+    "GET .../customers/search",
+    "GET .../customers/:customerKey"
+  ],
+  "mcpTool": "admin_list_customers; admin_get_customer",
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["مين احسن عملائي؟", "دور على عميل برقم تليفونه", "العميل ده طلب كام مرة؟"],
+    "en": ["Find a customer by phone"]
+  },
+  "steps": ["Customers page."],
+  "edgeCases": [
+    "PII: masked in assistant logs",
+    "Guests keyed by buyer key",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}

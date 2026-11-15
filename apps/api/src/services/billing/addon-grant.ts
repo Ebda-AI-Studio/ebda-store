@@ -170,7 +170,7 @@ export async function claimMarkerRow(
     ],
     skipDuplicates: true,
   });
-  return count === 1;
+  return count > 0;
 }
 
 /**

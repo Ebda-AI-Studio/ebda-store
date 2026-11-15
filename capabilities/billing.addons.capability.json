@@ -55,5 +55,6 @@
     "Refunds stay a super-admin action; there is no merchant self-refund",
     "The AI packs show a credits meter: requests left today, what used them (from the AI usage ledger) and each running pack with its end date"
   ],
-  "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"]
+  "gaps": ["Refunding the earlier of two stacked terms does not pull the later term forward"],
+  "assistantNote": "assistant says plan/override cause and links billing; cannot enable"
 }
