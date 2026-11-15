@@ -4,7 +4,6 @@
     "operator-reason|platform.audit-logs",
     "operator-reason|platform.feature-overrides",
     "operator-reason|platform.scans-rollups",
-    "operator-reason|platform.store-delete",
     "operator-reason|store.delete-custom-page",
     "operator-reason|team.audit-log",
     "policy-free-writes|account.login",

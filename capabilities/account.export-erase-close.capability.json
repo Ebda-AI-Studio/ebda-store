@@ -24,8 +24,12 @@
   },
   "helpArticle": "export-your-store-data",
   "questions": {
-    "ar": ["عايز نسخة من بيانات متجري", "ازاي اقفل حسابي؟"],
-    "en": ["Can I download all my store data?", "How do I close my account?"]
+    "ar": ["عايز نسخة من بيانات متجري", "ازاي اقفل حسابي؟", "عايز انزل كل بياناتي"],
+    "en": [
+      "Can I download all my store data?",
+      "How do I close my account?",
+      "How do I export everything?"
+    ]
   },
   "steps": [
     "Open Settings, press Download my data",
