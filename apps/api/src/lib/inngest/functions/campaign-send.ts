@@ -289,7 +289,14 @@ const campaignSendFn = inngest.createFunction(
         return reason;
       };
       if (audience.length === 0) return { aborted: await abort('EMPTY_AUDIENCE') };
-      if (audience.length > remaining) return { aborted: await abort('DAILY_CAP_EXCEEDED') };
+      // A RESUME (a campaign paused when its store was suspended) rebuilds the whole audience, but this campaign's own
+      // already-sent recipients are in `alreadySent` too: compare only the recipients still to send, never count them twice.
+      const ownSent = await inCampaignStore(storeId, db =>
+        db.campaignRecipient.count({ where: { campaignId, storeId, status: 'sent' } })
+      );
+      if (Math.max(0, audience.length - ownSent) > remaining) {
+        return { aborted: await abort('DAILY_CAP_EXCEEDED') };
+      }
 
       // Link a CRM customer by email, for display only (never widens consent).
       const customers = await inCampaignStore(storeId, db =>

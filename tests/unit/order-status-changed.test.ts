@@ -7,7 +7,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const op = vi.hoisted(() => ({ value: true }));
-vi.mock('@api/lib/store-operational', () => ({
+vi.mock('@api/lib/store-operational', async orig => ({
+  isPaidForReceipt: (await orig<typeof import('@api/lib/store-operational')>()).isPaidForReceipt,
   STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
   isStoreOperational: (s: unknown) => s === 'active',
   storeOperational: async () => op.value,
@@ -167,12 +168,29 @@ describe('order-status-changed fanout', () => {
     expect(h.createShipment).not.toHaveBeenCalled();
   });
 
-  it('SUSPEND-OUT-1b: a suspended store still sends the payment-success RECEIPT but not the shipped email', async () => {
+  it('SUSPEND-OUT-1b: a suspended store still sends the payment-success RECEIPT for a PAID order but not the shipped email', async () => {
     op.value = false;
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, paymentStatus: 'completed' });
     await handleOrderStatusChanged('o1', 's1', 'confirmed', false, stepStub);
     expect(h.sendPaymentSuccess).toHaveBeenCalled();
     await handleOrderStatusChanged('o1', 's1', 'shipped', false, stepStub);
     expect(h.sendOrderShipped).not.toHaveBeenCalled();
+  });
+
+  it('SUSPEND-OUT-1b: a suspended store sends NO payment-success mail for an unpaid (COD) order; disputed counts as paid', async () => {
+    op.value = false;
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, paymentStatus: 'cod_pending' });
+    await handleOrderStatusChanged('o1', 's1', 'confirmed', false, stepStub);
+    expect(h.sendPaymentSuccess).not.toHaveBeenCalled();
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, paymentStatus: 'disputed' });
+    await handleOrderStatusChanged('o1', 's1', 'confirmed', false, stepStub);
+    expect(h.sendPaymentSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('an active store sends the payment-success mail whatever the payment status (unchanged)', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, paymentStatus: 'cod_pending' });
+    await handleOrderStatusChanged('o1', 's1', 'confirmed', false, stepStub);
+    expect(h.sendPaymentSuccess).toHaveBeenCalled();
   });
 
   it('refunded WITHOUT captured payment → no refund email/dispatch', async () => {

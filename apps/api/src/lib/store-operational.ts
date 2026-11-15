@@ -27,11 +27,16 @@ export function isStoreOperational(status: string | null | undefined): boolean {
 }
 
 /**
- * Ruling SUSPEND-OUT-1b: an order whose payment was taken still gets its RECEIPT (payment-success mail, customer invoice)
- * while the store is suspended. Paid = `completed` or `partially_refunded`; COD-pending, pending and refunded are not.
+ * Ruling SUSPEND-OUT-1b: money was taken for the order, so its RECEIPT (payment-success mail, customer invoice) is still
+ * sent for a suspended store. Paid = `completed`, `partially_refunded` or `disputed` (taken, then contested); COD-pending,
+ * pending, failed and refunded are not.
  */
-export function isPaidOrder(paymentStatus: string | null | undefined): boolean {
-  return paymentStatus === 'completed' || paymentStatus === 'partially_refunded';
+export function isPaidForReceipt(paymentStatus: string | null | undefined): boolean {
+  return (
+    paymentStatus === 'completed' ||
+    paymentStatus === 'partially_refunded' ||
+    paymentStatus === 'disputed'
+  );
 }
 
 /** May this store send to customers / pay out right now? Unknown or soft-deleted = no. A lookup failure throws (a retry beats a wrong send). */

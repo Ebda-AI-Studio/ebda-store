@@ -1,4 +1,4 @@
-import { isPaidOrder, storeOperational } from '../../store-operational';
+import { isPaidForReceipt, storeOperational } from '../../store-operational';
 import type { JobDef } from '../../jobs/types';
 import { storeDb } from '../../repo-factory';
 import { runInStoreCtx } from '../../jobs/store-db';
@@ -53,7 +53,7 @@ export const invoiceEmail: JobDef = inngest.createFunction(
     // Ruling SUSPEND-OUT-1b: the invoice of a PAID order is a receipt and still sends; so does the owner copy (`toMerchant`).
     if (
       !toMerchant &&
-      !isPaidOrder(order.paymentStatus) &&
+      !isPaidForReceipt(order.paymentStatus) &&
       !(await step.run('check-store-active', () => storeOperational(storeId)))
     ) {
       logger.info(

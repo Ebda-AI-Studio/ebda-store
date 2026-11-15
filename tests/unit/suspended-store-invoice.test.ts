@@ -72,6 +72,12 @@ describe('invoice email for a suspended store', () => {
     expect(h.sendInvoice).toHaveBeenCalledTimes(1);
   });
 
+  it('a disputed order counts as paid (money was taken): its invoice still sends', async () => {
+    h.paymentStatus.value = 'disputed';
+    await run(base);
+    expect(h.sendInvoice).toHaveBeenCalledTimes(1);
+  });
+
   it('the owner copy (toMerchant) still sends for an unpaid order', async () => {
     h.paymentStatus.value = 'cod_pending';
     await run({ ...base, toMerchant: true });
