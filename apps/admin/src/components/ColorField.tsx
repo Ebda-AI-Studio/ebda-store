@@ -34,7 +34,7 @@ const RECENT_MAX = 6;
  * Normalize a typed or pasted colour to '#RRGGBB'. Trims spaces, accepts with/without '#', 3, 6 or 8 digits (an
  * alpha pair is dropped: stored colours are opaque). Null when it is not a colour.
  */
-export function normalizeHex(raw: string): { hex: string; alphaDropped: boolean } | null {
+function normalizeHex(raw: string): { hex: string; alphaDropped: boolean } | null {
   const s = raw.trim().replace(/^#/, '').toLowerCase();
   if (/^[0-9a-f]{3}$/.test(s))
     return {

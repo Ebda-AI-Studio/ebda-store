@@ -79,7 +79,7 @@
     "app/stores/[id]/pwa/_components/PwaManifestPreview.tsx": 2,
     "app/stores/[id]/pwa/_components/types.ts": 2,
     "components/ColorContrastPreview.tsx": 1,
-    "components/ColorField.tsx": 2,
+    "components/ColorField.tsx": 1,
     "components/OrderAlertsModal.tsx": 11,
     "components/ReceiptBarcodePicker.tsx": 1,
     "components/SectionPreview.tsx": 9,
