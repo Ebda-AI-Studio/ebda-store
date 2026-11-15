@@ -4,6 +4,7 @@ import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import { acrossStoresDb, readStoreDb, withStoreDb } from '../../jobs/store-db';
 import { alarmStoreId } from '../../jobs/store-scope';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
+import { codConfirmationFields } from '../../wa/cod-confirmation-fields';
 import { signCartRestoreToken } from '../../cart-restore-token';
 import { inngest } from '../client';
 import { redis } from '../../../services/redis.service';
@@ -80,7 +81,10 @@ async function orderEvents(event: SourceEvent): Promise<Planned[]> {
   };
   if (!orderId || !storeId) return [];
   const order = await readStoreDb(storeId, db =>
-    db.order.findUnique({ where: { id: orderId, storeId }, select: orderSelect })
+    db.order.findUnique({
+      where: { id: orderId, storeId },
+      select: { ...orderSelect, items: { select: { quantity: true } } },
+    })
   );
   // `order/created` can be sent from INSIDE the request transaction (Ruling WH-8): the order or its
   // COD payment may not be visible yet. Throw so the job retries (as the other fan-outs do) instead
@@ -137,6 +141,13 @@ async function orderEvents(event: SourceEvent): Promise<Planned[]> {
     order.paymentStatus === 'unpaid' &&
     order.payments.some(p => p.provider === 'cod' && p.status === 'cod_pending');
   if (awaitingCod) {
+    // Optional extras for the richer COD message (contract v1.6). A failed read only drops them: the plain request still goes.
+    const store = await withStoreDb(storeId, db =>
+      db.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, nameAr: true, slug: true, domain: true },
+      })
+    ).catch(() => null);
     out.push({
       seed: `cod:${orderId}`,
       occurredAt: order.createdAt,
@@ -154,6 +165,13 @@ async function orderEvents(event: SourceEvent): Promise<Planned[]> {
           orderNumber: order.orderNumber,
           totalMinor: order.total,
           currency: order.currency,
+          ...codConfirmationFields({
+            orderId,
+            locale: loc,
+            shippingAddress: order.shippingAddress,
+            items: order.items,
+            store,
+          }),
         },
       },
     });
