@@ -12,7 +12,7 @@ import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { withIdempotencyKey } from '../../lib/money-idempotency';
-import { storeAiAllowance } from '../../lib/ai-quota';
+import { maxStoreDailyRequests, storeAiAllowance, storeAiExtraRequests } from '../../lib/ai-quota';
 import {
   consumeConfirmToken,
   hashConfirmArgs,
@@ -88,6 +88,17 @@ async function quote(storeId: string, sku: string) {
     throw new AppError(409, 'NO_BILLING_EMAIL', 'The store owner has no email address');
   if (sub?.status === 'comped')
     throw new AppError(409, 'STORE_COMPED', 'Comped stores are not billed');
+  if (item.kind === 'ai_topup') {
+    // Never sell capacity the platform cannot back (money-abuse audit P6): base + packs <= one store's share of the day.
+    const extra = await storeAiExtraRequests(storeId);
+    const base = (await storeAiAllowance(storeId)).baseCap;
+    if (base + extra + (item.aiExtraRequests ?? 0) > maxStoreDailyRequests())
+      throw new AppError(
+        409,
+        'AI_CAPACITY_UNAVAILABLE',
+        'The shared AI capacity cannot back this top-up right now. Nothing was charged.'
+      );
+  }
   if (item.kind === 'feature') {
     // A super-admin "off" (abuse, dispute) is never sold around: the owner contacts support instead.
     const off = await withStore(storeId, tx =>
