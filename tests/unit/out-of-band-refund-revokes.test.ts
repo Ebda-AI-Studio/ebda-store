@@ -44,6 +44,7 @@ import { StubBillingProvider } from '../../apps/api/src/services/billing/stub.pr
 import {
   applyWebhookEvent,
   reconcileGatewayReversals,
+  refundCharge,
   sweepStuckCharges,
 } from '../../apps/api/src/services/billing/subscription-billing.service';
 
@@ -300,11 +301,19 @@ describe('an Ebda-started refund is never booked a second time as out-of-band (o
       )
       .get();
 
-  it('race: the webhook beats the refund API response -> it attaches to the pending Ebda row, no second booking, plan untouched', async () => {
+  it('ordering webhook -> API return: in-window webhook gets 503; after refundCharge writes the ref the redelivery settles THAT row once', async () => {
     const db = rig();
     ebdaRefund(db, { status: 'pending', ref: null });
-    const out = await applyWebhookEvent('stub', refundHook());
-    expect(out).toMatchObject({ outcome: 'processed', detail: 'attached_to_ebda_refund' });
+    await expect(applyWebhookEvent('stub', refundHook())).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'REFUND_NOT_YET_RECORDED',
+    });
+    expect(refunds(db)).toHaveLength(1);
+    // refundCharge's API call returns and writes the gateway ref onto its pending row
+    db.prepare(
+      `UPDATE billing_events SET provider_ref = 'txn-rf-1' WHERE id = '55555555-5555-4555-8555-555555555555'`
+    ).run();
+    expect(await applyWebhookEvent('stub', refundHook())).toMatchObject({ outcome: 'processed' });
     expect(refunds(db)).toEqual([{ a: 1000, r: 'txn-rf-1', c: CHARGE, s: 'succeeded' }]);
     expect(sub(db)).toEqual({ p: 'growth', s: 'active' }); // an Ebda refund is a super-admin decision, no auto-revoke
   });
@@ -321,13 +330,56 @@ describe('an Ebda-started refund is never booked a second time as out-of-band (o
     expect(refunds(db)).toHaveLength(1);
   });
 
-  it('inside the window, a DIFFERENT amount is a different refund: booked once and paged, the Ebda row left alone', async () => {
+  it('inside the window, a DIFFERENT amount: still 503, nothing booked (it could be the same money)', async () => {
     const db = rig();
     ebdaRefund(db, { status: 'pending', ref: null, amount: 400 });
-    await applyWebhookEvent('stub', refundHook({ amountMinor: 600 }));
-    expect(refunds(db)).toHaveLength(2);
+    await expect(applyWebhookEvent('stub', refundHook({ amountMinor: 600 }))).rejects.toMatchObject(
+      {
+        statusCode: 503,
+      }
+    );
+    expect(refunds(db)).toHaveLength(1);
     expect(ebdaRow(db)).toEqual({ s: 'pending', f: null });
-    expect(alerts().some(a => a.title.includes('may duplicate'))).toBe(true);
+  });
+
+  it('ordering out-of-band booking -> API return: refundCharge finds its ref already booked, links, never settles twice', async () => {
+    const db = rig();
+    // past the window a different-amount reversal was booked out-of-band (the Ebda row stayed pending)
+    ebdaRefund(db, { status: 'pending', ref: null, ageMs: 20 * 60_000, amount: 300 });
+    await applyWebhookEvent(
+      'stub',
+      refundHook({ providerRef: 'txn-rf-5', eventId: 'txn-rf-5:SUCCESS', amountMinor: 200 })
+    );
+    expect(ebdaRow(db)).toEqual({ s: 'pending', f: null });
+    const before = refunds(db);
+    // the late API answer of a SECOND Ebda refund carries that very ref -> linked, not booked again
+    const provider = {
+      name: 'stub',
+      refund: async () => ({ status: 'succeeded', refundId: 'txn-rf-5', raw: {} }),
+    } as never;
+    db.prepare(
+      `UPDATE billing_events SET status = 'failed' WHERE id = '55555555-5555-4555-8555-555555555555'`
+    ).run();
+    await refundCharge({ eventId: CHARGE, amountMinor: 200, provider });
+    const rows = db
+      .prepare(
+        `SELECT amount_minor a, status s, failure_reason f FROM billing_events WHERE type = 'refund' AND idempotency_key LIKE 'refund:%' AND amount_minor = 200`
+      )
+      .all();
+    expect(rows).toEqual([
+      { a: 200, s: 'failed', f: expect.stringMatching(/^linked_to_gateway_reversal:/) },
+    ]);
+    const succeeded = (
+      db
+        .prepare(
+          `SELECT COALESCE(SUM(amount_minor),0) n FROM billing_events WHERE type = 'refund' AND status = 'succeeded'`
+        )
+        .get() as { n: number }
+    ).n;
+    expect(succeeded).toBe(200);
+    expect(refunds(db).filter(r => (r as { s: string }).s === 'succeeded')).toHaveLength(
+      before.filter(r => (r as { s: string }).s === 'succeeded').length
+    );
   });
 
   it('PAST the window a stuck pending row never blocks: booked once, plan revoked, stale row superseded, paged', async () => {

@@ -1390,6 +1390,10 @@ async function sweepStuckRefunds(now: Date, provider: BillingProvider | null): P
           merchantOrderId: charge.id,
         });
         if (!res.reversals.some(v => v.ref === refund.providerRef)) return false;
+        if (
+          await linkToBookedReversal(tx, r.storeId, refund.id, refund.provider, refund.providerRef)
+        )
+          return true;
         await settleRefundInTx(tx, r.storeId, refund.id, true);
         return true;
       });
@@ -1724,25 +1728,15 @@ export async function applyWebhookEvent(
         if (known.kind === 'booked') return ignore('refund_already_booked');
         if (known.kind === 'ebda_refund_pending' && refundInFlight(known.row, now)) {
           // Ebda Store started a refund on this charge minutes ago and its API call has not written the ref yet: the
-          // webhook can beat the response (Ruling MONEY-REVERSAL-2). The SAME amount = it is that refund: attach and
-          // settle it. No amount stated = cannot tell yet: the gateway redelivers, and only inside the window. A
-          // different amount = a different refund: booked below like any other (and paged).
-          if (event.amountMinor === known.row.amountMinor) {
-            await tx.billingEvent.updateMany({
-              where: { id: known.row.id, storeId: charge.storeId, status: 'pending' },
-              data: { providerRef: event.providerRef },
-            });
-            await settleRefundInTx(tx, charge.storeId, known.row.id, true);
-            return { duplicate: false, outcome: 'processed', detail: 'attached_to_ebda_refund' };
-          }
-          if (event.amountMinor === null) {
-            throw new AppError(
-              503,
-              'REFUND_NOT_YET_RECORDED',
-              'An Ebda Store refund for this charge is still being recorded; retry shortly',
-              { retryable: true }
-            );
-          }
+          // webhook can beat the response (Ruling MONEY-REVERSAL-2). Whatever the amount, nothing is booked from here
+          // while it is in flight: the gateway redelivers, and once refundCharge has written the ref the delivery
+          // matches that row (or, past the window, is booked once and paged). Booking now could count the money twice.
+          throw new AppError(
+            503,
+            'REFUND_NOT_YET_RECORDED',
+            'An Ebda Store refund for this charge is still being recorded; retry shortly',
+            { retryable: true }
+          );
         }
         if (known.kind === 'ebda_refund_unreferenced') {
           ambiguousReversal = true;
@@ -1996,6 +1990,30 @@ async function reversalIdentity(
   if (unref?.status === 'pending') return { kind: 'ebda_refund_pending', row: unref };
   if (unref) return { kind: 'ebda_refund_unreferenced' };
   return { kind: 'new' };
+}
+
+/**
+ * A pending Ebda Store refund whose gateway ref turns out to be booked already by ANOTHER refund row (an out-of-band
+ * booking made after the in-flight window): close this one as linked to that booking instead of settling it, so one
+ * gateway reversal stays one ledger row. Returns true when it linked.
+ */
+async function linkToBookedReversal(
+  tx: Tx,
+  storeId: string,
+  refundId: string,
+  provider: string,
+  ref: string
+): Promise<boolean> {
+  const booked = await tx.billingEvent.findFirst({
+    where: { storeId, type: 'refund', provider, providerRef: ref, NOT: { id: refundId } },
+    select: { id: true },
+  });
+  if (!booked) return false;
+  await tx.billingEvent.updateMany({
+    where: { id: refundId, storeId, status: 'pending' },
+    data: { status: 'failed', failureReason: `linked_to_gateway_reversal:${booked.id}` },
+  });
+  return true;
 }
 
 /**
@@ -2581,6 +2599,14 @@ export async function refundCharge(args: {
       idempotencyKey: key,
     });
     await withStore(charge.storeId, async tx => {
+      // One money fact = one ledger row: the gateway's ref may already be booked (a webhook / the reconcile booked it
+      // out-of-band after the in-flight window). Then this row is linked to that booking and never settled again.
+      if (
+        res.refundId &&
+        (await linkToBookedReversal(tx, charge.storeId, refundId, charge.provider, res.refundId))
+      ) {
+        return;
+      }
       await tx.billingEvent.updateMany({
         where: { id: refundId, storeId: charge.storeId, status: 'pending' },
         data: { providerRef: res.refundId ?? undefined, raw: res.raw as Prisma.InputJsonValue },
