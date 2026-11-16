@@ -7,7 +7,7 @@ import type { Request, RequestHandler } from 'express';
  * `plannedRateLimit`): the same store name, window, key function and skip predicate, so a plan cannot disagree with its
  * limiter. A limiter whose key depends on state set later in the chain (`req.user`) carries no plan and counts directly.
  */
-export interface LimitPlan {
+interface LimitPlan {
   /** Store name: the counter key is `rl:<name>:<key>`. */
   name: string;
   windowMs: number;
@@ -19,7 +19,7 @@ export interface LimitPlan {
 }
 
 /** A middleware that knows several hits / peeks of its own (the public router's limiter family). */
-export type LimitPlanner = (req: Request, path: string) => { hits: string[]; peeks: string[] };
+type LimitPlanner = (req: Request, path: string) => { hits: string[]; peeks: string[] };
 
 const PLAN = Symbol.for('ebda.limitPlan');
 const PLANNER = Symbol.for('ebda.limitPlanner');
@@ -35,18 +35,18 @@ const NO_PLAN = Symbol.for('ebda.limitNoPlan');
 export function withoutLimitPlan<T extends RequestHandler>(mw: T, reason: string): T {
   return Object.assign(mw, { [NO_PLAN]: reason });
 }
-export function noLimitPlanReason(fn: unknown): string | undefined {
+function noLimitPlanReason(fn: unknown): string | undefined {
   return (fn as Record<symbol, string | undefined> | null)?.[NO_PLAN];
 }
 export function withLimitPlanner<T extends RequestHandler>(mw: T, planner: LimitPlanner): T {
   return Object.assign(mw, { [PLANNER]: planner });
 }
-export function limitPlannerOf(fn: unknown): LimitPlanner | undefined {
+function limitPlannerOf(fn: unknown): LimitPlanner | undefined {
   return (fn as Record<symbol, LimitPlanner | undefined> | null)?.[PLANNER];
 }
 
 /** An express-rate-limit middleware (it exposes `resetKey` + `getKey`). */
-export function isRateLimiter(fn: unknown): boolean {
+function isRateLimiter(fn: unknown): boolean {
   const f = fn as { resetKey?: unknown; getKey?: unknown } | null;
   return typeof f?.resetKey === 'function' && typeof f?.getKey === 'function';
 }
@@ -153,6 +153,7 @@ export function plannedSteps(
 }
 
 /** Every planned and unplanned limiter in a router tree (tests: completeness of the plans). */
+// pq-allow(unused-export): imported by tests/unit/request-limit-prefetch.workers.test.ts
 export function allLimiterHandles(
   router: unknown
 ): Array<{ handle: unknown; planned: boolean; noPlanReason?: string }> {

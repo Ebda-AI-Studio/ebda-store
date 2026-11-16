@@ -30,7 +30,7 @@ const HELD_BODY_ERROR = Symbol('ebda.heldBodyError');
 /** Every limiter a planner (the public router's family) names counts per 60 s (public-limit-prefetch.ts). */
 const PUBLIC_WINDOW_MS = 60_000;
 
-export interface RequestLimitPrefetchOptions {
+interface RequestLimitPrefetchOptions {
   /** The global limiter (its plan is read off it). */
   global: RequestHandler;
   /** The API router and the path it is mounted at. */
@@ -65,7 +65,7 @@ function predictionCopy(req: Request, own: Record<PropertyKey, unknown>): Reques
 }
 
 /** The planned limiters this request meets: the global limiter first, then the API router's, in chain order. */
-export function requestLimitSteps(
+function requestLimitSteps(
   req: Request,
   opts: Pick<RequestLimitPrefetchOptions, 'global' | 'router' | 'mount'>
 ): PlannedStep[] {
@@ -75,7 +75,7 @@ export function requestLimitSteps(
 }
 
 /** The hits (and peeks) of those steps, one per key. */
-export function requestLimitPlan(
+function requestLimitPlan(
   req: Request,
   steps: PlannedStep[],
   prepare: RequestLimitPrefetchOptions['prepare']

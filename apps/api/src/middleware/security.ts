@@ -738,6 +738,7 @@ type RedisCaller = { call: (...args: any[]) => unknown };
  * reconnecting, and `maxRetriesPerRequest: 3` would hold the request for
  * seconds before failing. A limiter must never make a request wait on Redis.
  */
+// pq-allow(unused-export): imported by tests/unit/rate-limit-redis-at-boot.test.ts
 export const rateLimitRedisClient = (): RedisCaller | null =>
   rateLimitSharedEnabled() && redis.isAvailable() ? redis.getClient() : null;
 
