@@ -87,10 +87,10 @@ describe('layoutLabel', () => {
   it('uses the language of the label for name, variant and price', () => {
     const ar = layoutLabel(labelPresetById('a4-3x7')!, ITEM, { ...ALL, lang: 'ar' });
     expect(ar.texts.find(t => t.role === 'name')!.text).toBe('خاتم ذهب');
-    expect(ar.texts.find(t => t.role === 'price')!.text).toBe('1250 ج.م');
+    expect(ar.texts.find(t => t.role === 'price')!.text).toBe('1250\u00a0ج.م');
     expect(ar.texts.find(t => t.role === 'name')!.rtl).toBe(true);
     const en = layoutLabel(labelPresetById('a4-3x7')!, ITEM, { ...ALL, lang: 'en' });
-    expect(en.texts.find(t => t.role === 'price')!.text).toBe('EGP 1250');
+    expect(en.texts.find(t => t.role === 'price')!.text).toBe('EGP\u00a01250');
     expect(en.texts.find(t => t.role === 'digits')!.text).toBe('2 000000 000015');
     // Arabic name missing -> falls back to the English one
     const fb = layoutLabel(
