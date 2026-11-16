@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   isGscConfigured,
@@ -6,38 +7,11 @@ import {
   GscNoAccessError,
 } from '../gsc-client';
 
-// Throwaway RSA key generated solely for this test suite — NEVER a real
-// Google service-account credential. Regenerate with:
-//   node -e "const c=require('crypto');const {privateKey}=c.generateKeyPairSync('rsa',{modulusLength:2048,privateKeyEncoding:{type:'pkcs8',format:'pem'},publicKeyEncoding:{type:'spki',format:'pem'}});console.log(JSON.stringify(privateKey))"
-const DUMMY_PRIVATE_KEY =
-  '-----BEGIN PRIVATE KEY-----\n' +
-  'MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCdxE5/1ApPeous\n' +
-  'HfnbTKSun0beSeO/53TeFRruO81iykxslbJ2AFz78u1y/4UCKh0fJn6kHCE5CKa4\n' +
-  'rNk2IfwEWd+k0lhyfvq2c40Cv0EDeu4QLug783yYK/jx9aeOM2gXCRSFoLQkgnuE\n' +
-  '7p38fgFlciW3S9glBkZ4bUIdwt6N3VAJJQbaGIB1Kd3ZGqM82gz4oUqO3H7ElYUA\n' +
-  'RfooyMKUVSL71VLfbEnY5bhNUV3IPH81ZHkHMgRxyZqWUVN7z4YQwWMFieBzLw1A\n' +
-  'J8LLKbuIBOG8aOBhgTSFs/0QoLLyK1+APD/1UqRL6+6dRo6gspAEtQT/bVnuWw0h\n' +
-  'XRQQCLF3AgMBAAECggEADx3z8PcDXzw8d+s4uWpYTqHVFjr5nLYekk0ZaIHIcKfh\n' +
-  'DM0x7XFOzOwpE8onbN6rgwRFluSvIO+S8hfLNGRV6Ut8oibER4Gin6rmHxZDsi6s\n' +
-  'SFaw9VWjtv0M/I+aVNuDeiQ/mCee5e9ZdeewsbSX3lLtXuk14SOpyvjvyzmUk6kz\n' +
-  'nDjm07wI9wchYGBdTM7cFDagEuV6dm7xXAFfY5mkviqnPNWmjWChxTLTYs14cL0y\n' +
-  '1RSMjkwLS6TWBQ1WJ83UUrqaDa7inrzE24uf9SEDeBrjPr5smZUwVEmJtAmwq+n8\n' +
-  'ItsSC+X8UKLL5pB6IGJ0EOrC6PNjAEw0qq5iAWE3OQKBgQDLXPIKzsYNK2RR+RoZ\n' +
-  'IJiqW+2FMNILQlw4RRBy41fK/g6MVq5aQQnrJmCL/DF+7XQzruD5vPnDTKeoWP6j\n' +
-  'qtZg+OV5C0bMvCAIpdVb91XYf1GjKajGBqhr9c6jS/Izq72HXt7xlpNqeCtXAQ+Q\n' +
-  'wBPhe2zXJUVJJlDV8ncDU8clLQKBgQDGmhrqrc8xyZWWqE/iYFsq9n7mEWeMGC/u\n' +
-  'kBNSpI/QOlhARKmZMl9qRLK56gE0R3CYuc8+HE5I9S+TcstK9EqM5xd/DI4aKHEM\n' +
-  '/OccZdq9COcuJVHGWTKVABBDuxzWNJZdNlZTUVVfr/7cjw8bhTKeXTF3M+0CrOv3\n' +
-  '4KAAI7ZfswKBgQC02PYiaFm2EnWHdHgiClvZfCDQxma0PpJWNAz5rnU/fwkfAmLQ\n' +
-  'vm/8n0dSlbbKgo5I++b0EHsok72xN1tT3zQATrd7Gm0e2tm99wOzYlQEUM0fxYdi\n' +
-  'ez9BqvnVPE+qZbsJbHPk8hwsnaslFztpZXcImUNkXK+t6pYOfS4bVmCODQKBgQCl\n' +
-  'ehXfYD75TuuTAl69UmfkHkqRzAKpGiYl8moHPBKP/20074EYon4Z/2+jtLSYKMZK\n' +
-  'mtdw+wjHhXPEuatlorLTQGG1fHKSnQvFNJwkb0GYrGhjbLj8OaoJuGnU5X0bhemb\n' +
-  'dQDsnyIxfmUuxQxjc9I/XYsvtVZQGmDqwoDOXPNCPQKBgH6obOBiUXgg3MoH87nv\n' +
-  'MbjSqfgFDTC65/Zfst8xVKoTECTO/suCivDWm+Aktlz2+ZHXmaWq1FYcM9qiymy1\n' +
-  'XymzvZWoFPjMq4v5/A1/Zz726KprvTuV2iDfyq5n0nfLHN2GUXCAbG7qZ4eLfSAN\n' +
-  'ZxRpMf4ygB73H96B5qxMMR3/\n' +
-  '-----END PRIVATE KEY-----\n';
+// Throwaway RSA key generated at test runtime: no PEM is committed and it is
+// NEVER a real Google service-account credential.
+const DUMMY_PRIVATE_KEY = generateKeyPairSync('rsa', { modulusLength: 2048 })
+  .privateKey.export({ type: 'pkcs8', format: 'pem' })
+  .toString();
 
 const DUMMY_SERVICE_ACCOUNT_JSON = JSON.stringify({
   // nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account -- fake test fixture (dummy-project + throwaway key), not a real credential

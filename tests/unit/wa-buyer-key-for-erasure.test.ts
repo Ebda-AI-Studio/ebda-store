@@ -17,7 +17,11 @@ describe('buyerKeyForErasure (an erase must never fail because WhatsApp is not c
     expect(await buyerKeyForErasure('not a phone')).toBeUndefined();
     delete process.env.SUITE_BUYER_KEY_SECRET;
     expect(await buyerKeyForErasure('01001234567')).toBeUndefined();
+  });
+  it('a secret that is set but shorter than 32 chars THROWS (WA-4): the erasure must not silently skip Chat', async () => {
     process.env.SUITE_BUYER_KEY_SECRET = 'short';
-    expect(await buyerKeyForErasure('01001234567')).toBeUndefined();
+    await expect(buyerKeyForErasure('01001234567')).rejects.toThrow(/SUITE_BUYER_KEY_SECRET/);
+    // no phone: nothing to key, so nothing to refuse
+    expect(await buyerKeyForErasure(null)).toBeUndefined();
   });
 });

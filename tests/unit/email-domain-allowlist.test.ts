@@ -64,7 +64,10 @@ const read = (f: string): string | null => {
 
 describe('email domains in source (Ruling WA-LEGACY-1)', () => {
   const source = tracked.filter(
-    f => /^(apps|packages)\/[^/]+\/(?!.*generated)/.test(f) && !isTest(f)
+    f =>
+      /^(apps|packages)\/[^/]+\/(?!.*generated)/.test(f) &&
+      !isTest(f) &&
+      !/\/foundation\/vectors\//.test(f) // vendored cross-product test vectors (an e-mail inside a mask test, an e-mail-shaped hostile link)
   );
 
   it('actually scans source (not an empty-set pass)', () => {

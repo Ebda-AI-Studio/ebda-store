@@ -1,0 +1,112 @@
+name: PR quality
+
+# Anti-slop gate. Copy of ebda-foundation/.github/workflows/pr-quality.yml with `on:` = pull_request_target (foundation Ruling AIR-3 applies:
+# switch to `uses:` once the foundation's Actions access is `organization`). Everything under `jobs:` must stay identical.
+# Runs from the base branch and judges the PR against the base's baseline and eslint suppressions (foundation PRQ-3). Forks are checked, not skipped (PRQ-5).
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: pr-quality-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pr-body:
+    name: PR body sections
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    # fork-guard-exempt: forks must be checked too (a skipped check is a pass); only the base branch's scripts run, the PR body is data
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.base_ref }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Check Verified / Not verified / Cost-if-wrong, fix and review-finding rules (warn-only until bodyCheckEnforceFrom)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_QUALITY_CONFIG: .pr-quality.json
+        run: |
+          set -euo pipefail
+          # the pulls/files API pages through any size; `gh pr diff` fails with HTTP 406 above 300 files
+          CHANGED_FILES="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')"
+          export CHANGED_FILES
+          node .github/pr-quality/pr-body-check.mjs
+
+  slop-baselines:
+    name: Slop baselines
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 10
+    # fork-guard-exempt: forks must be checked too (a skipped check is a pass); the PR is only scanned as data, symlinks are never followed
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+      - name: Fetch the PR head as DATA (git archive of the pull ref; nothing from it is checked out or executed)
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git -C base fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+          [ "$(git -C base rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
+          # checkout-index from a throwaway index, not `git archive`: archive honours the PR's own export-ignore attributes,
+          # which would let a PR hide files from the scan. Files are written as plain data; no hook or filter runs.
+          mkdir pr
+          export GIT_INDEX_FILE="$RUNNER_TEMP/pr.index"
+          git -C base read-tree refs/pr/head
+          git -C base checkout-index --all --prefix="$GITHUB_WORKSPACE/pr/"
+          rm -f "$GIT_INDEX_FILE"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: no-any, no-console, todo-no-issue, emoji-copy, duplicate-helper, unused-export (baseline may only shrink, judged against the base)
+        run: node base/.github/pr-quality/slop-guard.mjs --root pr --base-root base
+
+      - name: Remove the checkouts (a shared runner keeps its workspace between jobs; never leave a fork's files on it)
+        if: always()
+        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base"
+
+  capability-ratchet:
+    name: Capability baselines
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 10
+    # fork-guard-exempt: forks must be checked too (a skipped check is a pass); the PR is only read as data, symlinks are refused
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Capability baselines may only shrink (judged against the base branch)
+        run: |
+          if [ -f base/.github/pr-quality/capability-ratchet.mjs ]; then
+            node base/.github/pr-quality/capability-ratchet.mjs --base base --pr pr
+          else
+            # the adoption PR: the script reaches the base branch only when this PR merges; every later PR is judged by it
+            echo "::notice::capability-ratchet.mjs is not on the base branch yet (adoption PR): nothing to compare"
+          fi
+
+      - name: Remove the checkouts (a shared runner keeps its workspace between jobs; never leave a fork's files on it)
+        if: always()
+        run: rm -rf "$GITHUB_WORKSPACE/pr" "$GITHUB_WORKSPACE/base"

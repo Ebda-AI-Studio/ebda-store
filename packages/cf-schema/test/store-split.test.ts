@@ -44,7 +44,7 @@ describe('Store split', () => {
       databases: Record<string, { columnCounts: Record<string, number>; maxColumns: number }>;
     }>('generated/manifest.json');
     const b = classifyStoreColumns(scalars) as Record<string, string[]>;
-    expect(manifest.databases.d1.columnCounts.stores).toBe(b.d1Only.length + b.mirror.length + 1); // + storage_backend (CF-only)
+    expect(manifest.databases.d1.columnCounts.stores).toBe(b.d1Only.length + b.mirror.length + 2); // + storage_backend, template_original (CF-only)
     expect(manifest.databases['store-do'].columnCounts.store_profile).toBe(
       1 + b.mirror.length - 1 + b.profile.length
     ); // id becomes store_id

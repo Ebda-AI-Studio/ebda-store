@@ -2,6 +2,7 @@ import nextPlugin from '@next/eslint-plugin-next';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
+import { slopRules } from '../../eslint.slop.mjs';
 
 export default [
   { ignores: ['.next/**', 'out/**', 'node_modules/**'] },
@@ -36,4 +37,5 @@ export default [
     settings: { react: { version: 'detect' } },
   },
   { files: ['src/components/PageLink.tsx'], rules: { 'no-restricted-imports': 'off' } },
+  ...slopRules,
 ];

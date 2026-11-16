@@ -1,3 +1,4 @@
+import { storeOperational } from '../../store-operational';
 import type { JobDef } from '../../jobs/types';
 import { storeActiveForJob, withStoreDb } from '../../jobs/store-db';
 
@@ -29,7 +30,7 @@ import {
 } from '../../../services/campaign.service';
 
 /**
- * Email campaign sender (D2). Plan: docs/plans/2026-09-25-email-campaigns.md.
+ * Email campaign sender (D2). Plan: docs/plans/done/2026-09-25-email-campaigns.md.
  *
  * Triggered ONLY by `campaign/send-requested`, which only
  * `POST /stores/:storeId/campaigns/:id/send` emits — a merchant pressing send
@@ -140,6 +141,8 @@ interface BatchResult {
   failed: number;
   skipped: number;
   cancelled: boolean;
+  /** The store stopped being operational: the campaign is paused (recipients stay `queued`), not failed. */
+  paused?: boolean;
   /**
    * The step stopped early to stay inside its wall-clock budget (issue 2115);
    * its unsent recipients are still `queued` and are picked up by the
@@ -286,7 +289,17 @@ const campaignSendFn = inngest.createFunction(
         return reason;
       };
       if (audience.length === 0) return { aborted: await abort('EMPTY_AUDIENCE') };
-      if (audience.length > remaining) return { aborted: await abort('DAILY_CAP_EXCEEDED') };
+      // Arithmetic (cap 10): `remaining` = cap - EVERY send in 24h, this campaign's own included. A resume needs only the
+      // recipients not yet sent, so need = audience - ownSent; compare need to `remaining`, never audience to it.
+      //   own 5 sent, others 0, audience 8: remaining 5, need 3 -> go.   others 4 + own 5: remaining 1, need 3 -> refuse.
+      // A RESUME (a campaign paused when its store was suspended) rebuilds the whole audience, but this campaign's own
+      // already-sent recipients are in `alreadySent` too: compare only the recipients still to send, never count them twice.
+      const ownSent = await inCampaignStore(storeId, db =>
+        db.campaignRecipient.count({ where: { campaignId, storeId, status: 'sent' } })
+      );
+      if (Math.max(0, audience.length - ownSent) > remaining) {
+        return { aborted: await abort('DAILY_CAP_EXCEEDED') };
+      }
 
       // Link a CRM customer by email, for display only (never widens consent).
       const customers = await inCampaignStore(storeId, db =>
@@ -351,6 +364,11 @@ const campaignSendFn = inngest.createFunction(
       if (!campaign || !store || campaign.status !== 'sending') {
         await failQueuedRecipients(storeId, campaignId, 'CANCELLED');
         return { sent: 0, failed: 0, skipped: 0, cancelled: true };
+      }
+      // Ruling SUSPEND-OUT-1: ONE status read per batch (not per recipient). A store suspended mid-send PAUSES the campaign:
+      // nothing is marked failed, the recipients stay `queued`, and a new Send after reactivation resumes them.
+      if (!(await storeOperational(storeId))) {
+        return { sent: 0, failed: 0, skipped: 0, cancelled: false, paused: true };
       }
       const base = storefrontBaseUrl(store);
       let sent = 0;
@@ -434,6 +452,7 @@ const campaignSendFn = inngest.createFunction(
             html,
             headers: listUnsubscribeHeaders(config.apiUrl, token),
             idempotencyKey: `campaign-recipient/${r.id}`,
+            operationalChecked: true,
           }));
         } catch (err) {
           // A throttle is transient: rethrow so the step retries with
@@ -480,11 +499,16 @@ const campaignSendFn = inngest.createFunction(
     };
 
     let cancelled = false;
+    let paused = false;
     let anyDeferred = false;
     for (let i = 0; i < batches.length; i++) {
       const result: BatchResult = await step.run(`batch-${i}`, () => sendBatch(batches[i]));
       logger.info({ campaignId, storeId, batch: i, ...result }, '[CAMPAIGN] batch done');
       if (result.deferred) anyDeferred = true;
+      if (result.paused) {
+        paused = true;
+        break;
+      }
       if (result.cancelled) {
         cancelled = true;
         break;
@@ -500,6 +524,7 @@ const campaignSendFn = inngest.createFunction(
       let pass = 0;
       anyDeferred &&
       !cancelled &&
+      !paused &&
       pass < CAMPAIGN_LEFTOVER_MAX_PASSES &&
       leftoverSteps < CAMPAIGN_LEFTOVER_MAX_STEPS;
       pass++
@@ -530,11 +555,36 @@ const campaignSendFn = inngest.createFunction(
           '[CAMPAIGN] leftover batch done'
         );
         if (result.deferred) anyDeferred = true;
+        if (result.paused) {
+          paused = true;
+          break;
+        }
         if (result.cancelled) {
           cancelled = true;
           break;
         }
       }
+    }
+
+    // Paused (Ruling SUSPEND-OUT-1): back to `draft` with the counts so far; queued recipients are kept, so Send after
+    // reactivation re-materializes idempotently (skipDuplicates) and mails only those still `queued`.
+    if (paused) {
+      await step.run('pause-store-not-operational', () =>
+        inCampaignStore(storeId, async (db, w) => {
+          const counts = await computeRecipientCounts(db, storeId, campaignId);
+          await w.campaign.updateMany({
+            where: { id: campaignId, storeId, status: 'sending' },
+            data: {
+              ...counts,
+              status: 'draft',
+              scheduledAt: null,
+              lastError: 'STORE_NOT_OPERATIONAL',
+            },
+          });
+        })
+      );
+      logger.warn({ campaignId, storeId }, '[CAMPAIGN] store not operational; campaign paused');
+      return { paused: 'store-not-operational' };
     }
 
     // 6. Finalize counts + status.

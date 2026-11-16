@@ -66,6 +66,47 @@ export function clearOriginStoreCache(): void {
   originStoreCache.clear();
 }
 
+/**
+ * True when the request was made by a browser page on a STORE origin: a `<slug>.ebda.app`
+ * host, a merchant custom domain, an unknown host or `Origin: null` — anything that sent an
+ * Origin and is not a platform origin. Such a page is merchant-controlled (any merchant can
+ * verify a domain they own), so it is never trusted with an identity beyond the origin
+ * store's own customer. See {@link nonCustomerTokenAllowedForRequest}.
+ */
+export function isStoreOriginRequest(req: Request): boolean {
+  const origin = req.headers.origin as string | undefined;
+  return (
+    !!origin &&
+    !isPlatformOrigin(origin, {
+      webUrl: config.webUrl,
+      adminUrl: config.adminUrl,
+      nodeEnv: config.nodeEnv,
+    })
+  );
+}
+
+/**
+ * Issue #622 / Ruling CORS-TB-1: credentialed cross-origin = same-tenant only.
+ *
+ * The `token` cookie on the API host carries EVERY kind of session: a shopper's store-bound
+ * customer token, and — set by `POST /auth/session` from the admin app — a merchant's,
+ * staff member's or platform admin's identity token (plus HS256 impersonation tokens). The
+ * cookie is SameSite=None and CORS is credentialed for every verified merchant domain, so a
+ * page on merchant A's domain makes a lured store-B owner's (or a super_admin's) browser
+ * send that cookie. The customer case is closed by {@link customerTokenMatchesRequestStore};
+ * this closes the rest: from a store origin, a non-customer token is NO identity at all.
+ *
+ * This is an allow-list on the PRINCIPAL, not on paths. `restrictPlatformOnlyOrigins` denies
+ * the /admin, /payment-settings and /stores prefixes, but ~20 other credentialed mounts
+ * (/auth/me, /realtime/session, /uploads, /onboarding, /mcp/admin, /provider-activation, …)
+ * were reachable with a merchant identity from any merchant origin. Enumerating paths goes
+ * stale with every new router; refusing the identity cannot. The storefront never needs a
+ * non-customer identity (apps/web AuthContext already rejects any role but `customer`).
+ */
+export function nonCustomerTokenAllowedForRequest(req: Request): boolean {
+  return !isStoreOriginRequest(req);
+}
+
 export async function customerTokenMatchesRequestStore(
   req: Request,
   tokenStoreId: unknown
@@ -76,14 +117,7 @@ export async function customerTokenMatchesRequestStore(
   const headerStore = await resolvePublicStoreId(req);
   if (headerStore !== undefined && headerStore !== tokenStoreId) return false;
 
-  const isStoreOrigin =
-    !!origin &&
-    !isPlatformOrigin(origin, {
-      webUrl: config.webUrl,
-      adminUrl: config.adminUrl,
-      nodeEnv: config.nodeEnv,
-    });
-  if (isStoreOrigin) {
+  if (origin && isStoreOriginRequest(req)) {
     return (await storeIdForOrigin(origin)) === tokenStoreId;
   }
   return true;

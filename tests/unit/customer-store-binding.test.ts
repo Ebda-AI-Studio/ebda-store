@@ -9,13 +9,16 @@
  * request's Origin. A header alone is not enough — the attacker sends A's id — which is
  * why the Origin case below is the one that proves the fix.
  *
- * Merchant/staff/super_admin tokens are not customer tokens and are untouched.
+ * Merchant/staff/super_admin tokens are not store-bound, so from a STORE origin they are no
+ * identity at all (#622 / Ruling CORS-TB-1: credentialed cross-origin = same-tenant only);
+ * from a platform origin or with no Origin they are untouched.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import type { Request, Response, NextFunction } from 'express';
+import { ORIGINAL_ROOT } from '../helpers/original-repo-root';
 
 const SLUG_TO_STORE: Record<string, string> = { 'shop-a': 'store-a', 'shop-b': 'store-b' };
 const DOMAIN_TO_STORE: Record<string, string> = { 'shop-a.com': 'store-a' };
@@ -158,18 +161,62 @@ describe('authenticate: customer token ↔ request store', () => {
   });
 
   it.each(['store_admin', 'staff', 'super_admin'])(
-    'a %s token is unaffected (any Origin, any X-Store-ID, with or without storeId)',
+    'a %s token works from a platform origin or with no Origin (any X-Store-ID, with or without storeId)',
     async role => {
       for (const storeId of [undefined, 'store-a', null]) {
-        const req = makeReq(sign({ userId: 'u-9', role, storeId }), {
-          origin: 'https://shop-b.ebda.app',
-          'x-store-id': 'store-b',
-        });
-        expect(await runAuthenticate(req)).toBeUndefined();
-        expect(req.user?.role).toBe(role);
+        for (const origin of [PLATFORM_ORIGIN, undefined]) {
+          const req = makeReq(sign({ userId: 'u-9', role, storeId }), {
+            ...(origin ? { origin } : {}),
+            'x-store-id': 'store-b',
+          });
+          expect(await runAuthenticate(req)).toBeUndefined();
+          expect(req.user?.role).toBe(role);
+        }
       }
     }
   );
+
+  // #622: merchant A verifies a domain and lures store B's owner (or a super_admin). The
+  // browser sends B's cookie; it must not become an identity on ANY route.
+  it.each(['store_admin', 'staff', 'super_admin'])(
+    'a %s token from a STORE origin is refused, even its own store (#622)',
+    async role => {
+      for (const origin of [
+        'https://shop-a.com', // store A's verified custom domain
+        'https://shop-a.ebda.app', // store subdomain
+        'https://shop-b.ebda.app', // the token's own store: still not an admin surface
+        'https://evil.example',
+        'null',
+      ]) {
+        const req = makeReq(sign({ userId: 'u-9', role, storeId: 'store-b' }), {
+          origin,
+          'x-store-id': 'store-b',
+        });
+        expect(await runAuthenticate(req), `${role} @ ${origin}`).toMatchObject({
+          statusCode: 401,
+          code: 'TOKEN_INVALID',
+        });
+        expect(req.user).toBeUndefined();
+      }
+    }
+  );
+
+  it('an impersonation token for a merchant is refused from a store origin (#622)', async () => {
+    const req = makeReq(
+      sign({ userId: 'u-9', role: 'store_admin', storeId: null, impersonatedBy: 'sa-1' }),
+      { origin: 'https://shop-a.com' }
+    );
+    expect(await runAuthenticate(req)).toMatchObject({ statusCode: 401 });
+  });
+
+  it("store A's custom domain + store B shopper token is refused (#622 exploit)", async () => {
+    const req = makeReq(sign({ userId: 'cust-2', role: 'customer', storeId: 'store-b' }), {
+      origin: 'https://shop-a.com',
+      'x-store-id': 'store-b',
+    });
+    expect(await runAuthenticate(req)).toMatchObject({ statusCode: 401 });
+    expect(req.user).toBeUndefined();
+  });
 });
 
 describe('optionalAuthenticate: a mismatched customer token is a guest', () => {
@@ -187,13 +234,24 @@ describe('optionalAuthenticate: a mismatched customer token is a guest', () => {
     expect(req.user).toBeUndefined();
   });
 
-  it('an admin token keeps its identity regardless of store headers', async () => {
+  it('an admin token keeps its identity from a platform origin regardless of store headers', async () => {
     const req = makeReq(sign({ userId: 'a-1', role: 'store_admin' }), {
-      origin: 'https://shop-b.ebda.app',
+      origin: PLATFORM_ORIGIN,
       'x-store-id': 'store-b',
     });
     await optionalAuthenticate(req, {} as Response, vi.fn() as unknown as NextFunction);
     expect(req.user?.userId).toBe('a-1');
+  });
+
+  it('an admin token from a store origin is a guest (#622)', async () => {
+    const req = makeReq(sign({ userId: 'a-1', role: 'store_admin' }), {
+      origin: 'https://shop-a.com',
+    });
+    const next = vi.fn();
+    await optionalAuthenticate(req, {} as Response, next as unknown as NextFunction);
+    expect(next).toHaveBeenCalledOnce();
+    expect(next).toHaveBeenCalledWith();
+    expect(req.user).toBeUndefined();
   });
 });
 
@@ -207,11 +265,12 @@ function cases2(): Array<[string, Record<string, string>, boolean]> {
       false,
     ],
     ['token A + Origin A is identified', { origin: 'https://shop-a.ebda.app' }, true],
+    ['token A + custom domain of A is identified', { origin: 'https://shop-a.com' }, true],
   ];
 }
 
 describe('coverage: the binding cannot be forgotten by a customer route', () => {
-  const apiSrc = path.resolve(__dirname, '../../apps/api/src');
+  const apiSrc = path.resolve(ORIGINAL_ROOT, 'apps/api/src');
   const walk = (dir: string, out: string[] = []): string[] => {
     for (const e of readdirSync(dir)) {
       const p = path.join(dir, e);
@@ -259,6 +318,12 @@ describe('coverage: the binding cannot be forgotten by a customer route', () => 
   it('authenticate and optionalAuthenticate both enforce the binding for customer tokens', () => {
     const src = readFileSync(path.join(apiSrc, 'middleware/auth.ts'), 'utf-8');
     expect(src.match(/customerTokenMatchesRequestStore\(/g)?.length).toBe(2);
+  });
+
+  it('both verifiers refuse non-customer tokens from store origins on BOTH token kinds (#622)', () => {
+    const src = readFileSync(path.join(apiSrc, 'middleware/auth.ts'), 'utf-8');
+    // accounts (ES256) branch + HS256 branch, in authenticate and optionalAuthenticate.
+    expect(src.match(/nonCustomerTokenAllowedForRequest\(req\)/g)?.length).toBe(4);
   });
 
   it('token mints stamp the store id (login, refresh and MFA all go through generateTokens)', () => {

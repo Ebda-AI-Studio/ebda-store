@@ -1,0 +1,33 @@
+{
+  "id": "self.instapay-auto-confirm",
+  "status": "planned",
+  "plan": "register row SELF-SERVICE gap 3; spec 7.4",
+  "area": "billing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تفعيل الاشتراك تلقائي بإنستاباي",
+  "titleEn": "InstaPay subscription auto-confirm by AI when receipt matches",
+  "screens": ["/stores/[id]/billing"],
+  "api": ["(planned) billing receipt reader + daily digest + revert"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "unclassified",
+    "note": "revert: not-received puts plan back to unpaid with 48 h grace"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["الباقة هتتفعل امتى بعد انستاباي؟", "ليه لسه مستني؟"],
+    "en": ["How fast is my plan activated after InstaPay?"]
+  },
+  "steps": [
+    "Today: wait for Ebda team confirmation. Assistant says: confirmation is manual now, automatic matching is coming."
+  ],
+  "edgeCases": [
+    "First payment capped to ~1 month; duplicate receipt global index",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)"
+  ],
+  "gaps": ["BLOCKER gap 3; NOT BUILT"]
+}

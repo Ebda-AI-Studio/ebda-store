@@ -62,9 +62,15 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
   const ROUTED = `\${{ fromJSON(${ROUTE} || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
   // Push-to-main deploy workflows (cf-*-deploy.yml) keep the plain selector: no PR label can reach them.
   const PLAIN = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
+  // Ruling HOST-RUNNERS-2: light jobs (label checks, PR quality, blast-radius, gitleaks, AI review classify, the CI
+  // affected-paths / guards / aggregator jobs) prefer EBDA_LIGHT_RUNS_ON (the ebda-mac-light runners), then EBDA_RUNS_ON,
+  // then hosted ubuntu-24.04. Deleting both variables is still the single switch back to hosted runners.
+  const LIGHT = `\${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
   it('every runs-on is the EBDA_RUNS_ON switch with an ubuntu-24.04 fallback', () => {
     // The literal-runner exception db-backup.yml had (Ruling OFFMACHINE-1) went with that workflow (Ruling NZ-17-BACKUP-1).
-    const bad = runsOnValues().filter(r => r.value !== ROUTED && r.value !== PLAIN);
+    const bad = runsOnValues().filter(
+      r => r.value !== ROUTED && r.value !== PLAIN && r.value !== LIGHT
+    );
     expect(
       bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
       'runs-on must be exactly the EBDA_RUNS_ON switch (fallback ubuntu-24.04)'
@@ -120,6 +126,79 @@ describe('nothing under .github mentions a self-hosted runner or its switches', 
       expect(raw, f).not.toMatch(
         /vars\.USE_SELF_HOSTED|vars\.SCHEDULED_ON_CLOUD|inputs\.force_cloud/
       );
+    }
+  });
+});
+
+describe('light jobs route to the light runners, heavy jobs never do (Ruling HOST-RUNNERS-2)', () => {
+  const LIGHT_EXPR = 'vars.EBDA_LIGHT_RUNS_ON';
+  const lightLines = runsOnValues().filter(r => r.value.includes(LIGHT_EXPR));
+  it('the light set is exactly the listed cheap jobs', () => {
+    const jobAt = (file: string, line: number) => {
+      const lines = fs.readFileSync(path.join(WORKFLOWS, file), 'utf8').split('\n').slice(0, line);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const m = /^  ([a-z0-9_-]+):\s*$/.exec(lines[i]);
+        if (m) return `${file}:${m[1]}`;
+      }
+      return `${file}:?`;
+    };
+    expect(lightLines.map(r => jobAt(r.file, r.line)).sort()).toEqual(
+      [
+        'ai-review.yml:classify',
+        'ai-review.yml:fork-gate',
+        'ai-review.yml:manual-pass',
+        'ai-review.yml:review',
+        'blast-radius.yml:blast-radius',
+        'cf-accounts-deploy.yml:deploy',
+        'cf-accounts-deploy.yml:notify-failure',
+        'cf-accounts-deploy.yml:plan',
+        'cf-admin-deploy.yml:deploy',
+        'cf-admin-deploy.yml:notify-failure',
+        'cf-admin-deploy.yml:plan',
+        'cf-api-deploy.yml:deploy',
+        'cf-api-deploy.yml:notify-failure',
+        'cf-api-deploy.yml:plan',
+        'cf-docs-deploy.yml:deploy',
+        'cf-docs-deploy.yml:notify-failure',
+        'cf-docs-deploy.yml:plan',
+        'cf-help-deploy.yml:deploy',
+        'cf-help-deploy.yml:notify-failure',
+        'cf-help-deploy.yml:plan',
+        'cf-marketing-deploy.yml:deploy',
+        'cf-marketing-deploy.yml:notify-failure',
+        'cf-marketing-deploy.yml:plan',
+        'cf-orders-deploy.yml:deploy',
+        'cf-orders-deploy.yml:notify-failure',
+        'cf-orders-deploy.yml:plan',
+        'cf-status-deploy.yml:deploy',
+        'cf-status-deploy.yml:notify-failure',
+        'cf-status-deploy.yml:plan',
+        'cf-web-deploy.yml:deploy',
+        'cf-web-deploy.yml:notify-failure',
+        'cf-web-deploy.yml:plan',
+        'ci-full-pr.yml:dispatch',
+        'ci.yml:app-builds',
+        'ci.yml:changes',
+        'ci.yml:guards',
+        'ci.yml:lint',
+        'ci.yml:notify-failure',
+        'ci.yml:typecheck',
+        'ci.yml:unit-gate',
+        'deploy-change-label.yml:deploy-label',
+        'gitleaks.yml:notify-failure',
+        'gitleaks.yml:scan',
+        'pr-quality.yml:pr-body',
+        'pr-quality.yml:slop-baselines',
+      ].sort()
+    );
+  });
+  it('no light job takes the heavy lock or a per-job database', () => {
+    const ci = fs.readFileSync(path.join(WORKFLOWS, 'ci.yml'), 'utf8');
+    for (const job of ['changes', 'guards', 'unit-gate', 'app-builds']) {
+      const start = ci.indexOf(`\n  ${job}:\n`);
+      const next = ci.slice(start + 1).search(/\n  [a-z0-9_-]+:\n/);
+      const body = ci.slice(start, next < 0 ? undefined : start + 1 + next);
+      expect(body, job).not.toMatch(/heavy-lock\.sh|ci-services\.sh/);
     }
   });
 });

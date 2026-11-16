@@ -1,0 +1,7 @@
+{
+  "src/index.ts": {
+    "no-console": {
+      "count": 1
+    }
+  }
+}

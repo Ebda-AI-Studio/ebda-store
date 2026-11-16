@@ -6,6 +6,7 @@ import {
   mediaSurface,
   paymentsSurface,
   storeDoSurface,
+  vectorizeSurface,
   type ErasureEnv,
   type ErasureSurface,
   type IdentityPort,
@@ -14,6 +15,7 @@ import {
   type Subject,
 } from '../cf/erasure';
 import { ownedStoreIds } from '../lib/definer';
+import { purgeStoreVectors } from '../lib/search/purge-store-vectors';
 import { paymentsErasurePort } from './billing/payments-erasure';
 import { auditLog } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
@@ -62,6 +64,7 @@ export function closureDeps(req: Request): ClosureDeps {
       paymentsSurface(paymentsErasurePort, storesOf),
       mediaSurface(need(env.MEDIA_BUCKET as R2BucketLike | undefined, 'MEDIA_BUCKET')),
       ciSurface(need(env.CI_BUCKET as R2BucketLike | undefined, 'CI_BUCKET')),
+      vectorizeSurface(purgeStoreVectors),
       identity(),
     ],
     staffSurfaces: () => [identity()],

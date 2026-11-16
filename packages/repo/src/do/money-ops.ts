@@ -20,6 +20,7 @@ import {
 } from './loyalty';
 import { placeOrder, quoteOrder, type CheckoutInput } from './checkout';
 import { cancelOrder, refundOrder } from './refund';
+import { takeMoneyAlerts } from './refundable';
 import {
   applyPaymentEventSync,
   beginRefund,
@@ -31,6 +32,7 @@ import {
   markRefundIndeterminate,
   matchRefundToClaim,
   recordInstapayRefund,
+  recordManualRefund,
   releaseRefund,
   type ConfirmedTransaction,
   type PaymentWebhookInput,
@@ -203,6 +205,7 @@ export type MoneyOpName =
   | 'refundRelease'
   | 'refundMatchClaim'
   | 'instapayRefundRecord'
+  | 'manualRefundRecord'
   | 'refundIndeterminate'
   | 'refundBook'
   | 'journalSale'
@@ -307,6 +310,8 @@ export type MoneyOpName =
   | 'analyticsCashflow'
   | 'taxReportLines'
   | 'analyticsImportReset';
+/** The states a refused cancel records as a delivery exception (the order left the store; COD-REFUSE-1). */
+const EXCEPTION_NOTE_STATES = ['processing', 'shipped', 'delivered'];
 function boundedInt(v: unknown, name: string, min: number, max: number): number {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
     throw new MoneyError('BAD_ARGS', name, 400);
@@ -342,6 +347,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'refundRelease',
   'refundMatchClaim',
   'instapayRefundRecord',
+  'manualRefundRecord',
   'refundIndeterminate',
   'refundBook',
   'journalSale',
@@ -622,6 +628,40 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       if (cur && (cur.payment_status === 'paid' || cur.payment_status === 'refunded'))
         throw new MoneyError('ORDER_ALREADY_PAID', 'the order was paid; not cancelled', 409);
     }
+    // A cancel that is only valid from given states (Fixes #614: a customer's WhatsApp "refused" must never cancel and
+    // restock an order the merchant shipped a moment earlier). Read and decided in THIS section (the DO runs one op at a
+    // time, no await between the read and the write), so a ship that lands first wins: the order is left as it is and the
+    // refusal is recorded on it as a note for the merchant (a delivery exception), nothing else.
+    if (Array.isArray(a.onlyFrom)) {
+      const allowed = (a.onlyFrom as unknown[]).filter((x): x is string => typeof x === 'string');
+      const cur = db.all(
+        'SELECT status FROM orders WHERE id = ? AND store_id = ? AND deleted_at IS NULL',
+        [orderId, storeId]
+      )[0];
+      if (!cur) throw new MoneyError('ORDER_NOT_FOUND', 'order not found', 404);
+      if (!allowed.includes(cur.status as string)) {
+        // The note is a delivery exception: only an order that LEFT the store (processing / shipped / delivered) gets
+        // it. An order the merchant cancelled or refunded in between gets nothing (a "stock not returned" note there
+        // would be false and invite a manual double restock). Written once: a repeated refusal adds no second copy.
+        const note = typeof a.exceptionNote === 'string' ? a.exceptionNote.slice(0, 500) : '';
+        if (note && EXCEPTION_NOTE_STATES.includes(cur.status as string))
+          db.run(
+            "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ?1 ELSE notes || char(10) || ?1 END, updated_at = ?4 WHERE id = ?2 AND store_id = ?3 AND instr(COALESCE(notes, ''), ?1) = 0",
+            [note, orderId, storeId, Date.now()]
+          );
+        return {
+          orderId,
+          kind: 'cancel',
+          replayed: false,
+          skipped: 'status_moved',
+          status: cur.status as string,
+          couponUnclaimed: false,
+          walletReversed: 0,
+          loyalty: { earnedReversed: 0, redeemedRecredited: 0 },
+          backorderLinesCancelled: 0,
+        };
+      }
+    }
     const r = cancelOrder(db, {
       storeId,
       orderId,
@@ -696,6 +736,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       paymentId: id(a.paymentId, 'paymentId'),
       amount: typeof a.amount === 'number' ? a.amount : undefined,
       refundKey: typeof a.refundKey === 'string' ? a.refundKey : undefined,
+      attemptKey: typeof a.attemptKey === 'string' ? a.attemptKey.slice(0, 200) : undefined,
       reason: typeof a.reason === 'string' ? a.reason : undefined,
       itemLevel: a.itemLevel === true,
     }),
@@ -728,6 +769,15 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
         a.record && typeof a.record === 'object' && !Array.isArray(a.record)
           ? (a.record as Record<string, unknown>)
           : {},
+      actorUserId: typeof a.actorUserId === 'string' ? a.actorUserId : null,
+    }),
+  /** The merchant's "I refunded it outside a provider" record on `refunded` (MONEYB-5), bounded by the order balance (#624). */
+  manualRefundRecord: (db, storeId, a) =>
+    recordManualRefund(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      method: typeof a.method === 'string' ? a.method.slice(0, 40) : 'other',
+      reference: typeof a.reference === 'string' ? a.reference.slice(0, 120) : null,
       actorUserId: typeof a.actorUserId === 'string' ? a.actorUserId : null,
     }),
   refundRelease: (db, storeId, a) =>
@@ -1167,7 +1217,17 @@ export function runMoneyOp(
     throw new MoneyError('MONEY_OP_NOT_ALLOWED', `money operation ${op}`, 400);
   if (!args || typeof args !== 'object' || Array.isArray(args))
     throw new MoneyError('BAD_ARGS', 'args', 400);
-  return runKeyed(db, TABLE, op, args, key, now, () =>
-    OPS[op as MoneyOpName](db, storeId, args as Args)
-  );
+  // money alerts raised inside the operation (a trimmed give-back, #659 B2) leave the DO only with a COMMITTED result
+  takeMoneyAlerts();
+  try {
+    return runKeyed(db, TABLE, op, args, key, now, () => {
+      const out = OPS[op as MoneyOpName](db, storeId, args as Args);
+      const moneyAlerts = takeMoneyAlerts();
+      return moneyAlerts.length > 0 && out && typeof out === 'object' && !Array.isArray(out)
+        ? { ...(out as Record<string, unknown>), moneyAlerts }
+        : out;
+    });
+  } finally {
+    takeMoneyAlerts();
+  }
 }

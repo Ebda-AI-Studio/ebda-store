@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   putPrivate: vi.fn(async () => ({ key: 'instapay-refunds/shot.png' })),
   deletePrivate: vi.fn(async () => undefined),
   updateStatus: vi.fn(async () => undefined),
+  recordRefundOutsideReturn: vi.fn(async () => undefined),
 }));
 
 vi.mock('@api/lib/repo-factory', () => ({
@@ -22,7 +23,12 @@ vi.mock('@api/lib/repo-factory', () => ({
 vi.mock('@api/services/storage.service', () => ({
   StorageService: { putPrivate: h.putPrivate, deletePrivate: h.deletePrivate },
 }));
-vi.mock('@api/services/order.service', () => ({ OrderService: { updateStatus: h.updateStatus } }));
+vi.mock('@api/services/order.service', () => ({
+  OrderService: {
+    updateStatus: h.updateStatus,
+    recordRefundOutsideReturn: h.recordRefundOutsideReturn,
+  },
+}));
 vi.mock('@api/services/payment-providers/instapay-receipt.service', () => ({
   InstapayReceiptService: {},
   sniffReceiptMime: () => 'image/png',
@@ -111,5 +117,33 @@ describe('InstapayService.recordRefund on a DO store', () => {
     await expect(call()).rejects.toThrow(/between 1 and/);
     expect(h.deletePrivate).toHaveBeenCalledWith('instapay-refunds/shot.png');
     expect(h.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('#629: a partial refund is booked like a gateway partial (GL + credit note keyed on the bank reference), never flips the order', async () => {
+    h.money.instapayRefundRecord.mockResolvedValueOnce(
+      answer({ full: false, status: 'partially_refunded', refundedAmount: 9000 })
+    );
+    await call();
+    expect(h.updateStatus).not.toHaveBeenCalled();
+    expect(h.recordRefundOutsideReturn).toHaveBeenCalledWith(
+      's1',
+      'o1',
+      { providerRefundId: 'instapay:11112222', amount: 9000 },
+      { sendNow: true }
+    );
+  });
+
+  it('#629: a replay of a partial re-sends the (idempotent) booking so a failed first send converges', async () => {
+    h.money.instapayRefundRecord.mockResolvedValueOnce(
+      answer({ duplicate: true, full: false, status: 'partially_refunded' })
+    );
+    await call();
+    expect(h.recordRefundOutsideReturn).toHaveBeenCalledTimes(1);
+  });
+
+  it('#629: a full refund is NOT booked as a partial (the order flip runs the whole reversal)', async () => {
+    h.money.instapayRefundRecord.mockResolvedValueOnce(answer({}));
+    await call();
+    expect(h.recordRefundOutsideReturn).not.toHaveBeenCalled();
   });
 });

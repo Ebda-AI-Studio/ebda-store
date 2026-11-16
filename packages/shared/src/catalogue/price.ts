@@ -1,7 +1,7 @@
 /**
  * Egyptian price parser for catalogue import. Deterministic: a tokeniser (digits, separators,
  * markers) followed by a small rule table. The model's own reading of a price is only ever a
- * cross-check; this function is authoritative (docs/plans/2026-10-21-search-p3-catalogue-import.md).
+ * cross-check; this function is authoritative (docs/plans/done/2026-10-21-search-p3-catalogue-import.md).
  * Money is integer piastres (minor units), never floats.
  */
 import { toAsciiDigits } from '../instapay-receipt';

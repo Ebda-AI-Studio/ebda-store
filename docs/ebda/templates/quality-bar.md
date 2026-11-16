@@ -1,6 +1,6 @@
 # Template quality bar (binding for every template and every look)
 
-Every template (Qamar, Souq, Jasmine, Lamma, Dahab) and every look inside it must pass these rules before a look moves to `built`. The rules extend the **B0 taste bar** (`docs/plans/2026-10-14-phase-b0-platform-commerce.md` § Taste bar: leave-out limits, the three motion moments, Arabic-first, the taste gate) and the shared bar in `2026-10-14-directions.md`. Neither is repeated here.
+Every template (Qamar, Souq, Jasmine, Lamma, Dahab) and every look inside it must pass these rules before a look moves to `built`. The rules extend the **B0 taste bar** (`docs/plans/done/2026-10-14-phase-b0-platform-commerce.md` § Taste bar: leave-out limits, the three motion moments, Arabic-first, the taste gate) and the shared bar in `2026-10-14-directions.md`. Neither is repeated here.
 
 - **Source:** the B1 Qamar audits (`.superpowers/sdd/2026-10-15-phase-b1-qamar/taste/consolidated.md`). Ids in brackets point there.
 - **Check column:** `test` = unit/integration · `lint` = a grep or ESLint gate in CI · `shot` = the screenshot matrix below · `critique` = the impeccable pass.

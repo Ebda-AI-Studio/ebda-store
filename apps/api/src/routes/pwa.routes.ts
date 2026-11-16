@@ -8,6 +8,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { PWAService, generatePwaIconSet } from '../services/pwa.service';
 import { assertStorageRoom } from '../services/plan-limit.service';
+import { releaseOnFailure } from '../lib/storage-usage';
 import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
 import { tenantContext } from '../middleware/tenant-context';
 import { AppError } from '../middleware/error-handler';
@@ -19,7 +20,7 @@ const router = Router();
 // NOT populate req.params.storeId at the mount level — every route below
 // declares its own '/:storeId/...' path. router.param runs AFTER Express
 // resolves :storeId for the matched route, so RLS tenant context is set
-// correctly here. See F2, docs/plans/2026-07-02-rls-cutover.md.
+// correctly here. See F2, docs/plans/done/2026-07-02-rls-cutover.md.
 router.param('storeId', tenantContext);
 
 // Validation schemas
@@ -202,7 +203,7 @@ router.post(
         where: { id: storeId },
         select: { pwaSettings: true },
       });
-      await assertStorageRoom(storeId, file.size * 2); // source + generated set, rounded up (S3-X8 / #615)
+      releaseOnFailure(res, await assertStorageRoom(storeId, file.size * 2)); // source + generated set, rounded up (S3-X8 / #615)
       // The maskable icon is padded with the store's PWA background (D1016-ICONS-1).
       const bg = (previous?.pwaSettings as Record<string, unknown> | null)?.backgroundColor;
       const generated = await generatePwaIconSet(storeId, file.buffer, {

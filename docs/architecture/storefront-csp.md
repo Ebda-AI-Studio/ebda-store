@@ -93,7 +93,7 @@ reused, so **a nonce forces dynamic rendering**. Next.js documents this: a route
 using a nonce opts out of the Full Route Cache.
 
 That directly conflicts with `STOREFRONT_TENANT_ROUTING`
-(`docs/plans/2026-07-12-tenant-cacheable-routing.md`), whose entire purpose is
+(`docs/plans/done/2026-07-12-tenant-cacheable-routing.md`), whose entire purpose is
 to make anonymous storefront routes cacheable by resolving the store from route
 params instead of `headers()`. Shipping a nonce would permanently foreclose it.
 
@@ -148,7 +148,7 @@ XSS lives on the anonymous pages, so it would protect the lower-risk half.
 
 - `docs/audits/2026-09-02-adversarial-audit.md` — the finding and the attacks
   that were tried against the escapers.
-- `docs/plans/2026-07-12-tenant-cacheable-routing.md` — the caching work.
+- `docs/plans/done/2026-07-12-tenant-cacheable-routing.md` — the caching work.
 - `apps/web/src/lib/csp.ts` — the policy itself (built per request by `apps/web/middleware.ts`).
 
 ## connect-src names exact hosts (S5, 2026-11-12)

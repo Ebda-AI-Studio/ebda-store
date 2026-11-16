@@ -14,6 +14,12 @@ vi.mock('@ebda/database', () => {
   const prisma = { store: { findUnique } };
   return { prisma, withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma) };
 });
+vi.mock('@api/lib/store-operational', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/lib/store-operational')>()),
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+}));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

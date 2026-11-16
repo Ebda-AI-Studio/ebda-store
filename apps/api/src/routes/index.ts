@@ -58,6 +58,7 @@ import tagRoutes from './tag.routes';
 import sizeChartRoutes from './size-chart.routes';
 import goldRateRoutes from './gold-rate.routes';
 import aiRoutes from './ai.routes';
+import { assistantAdminRoutes, assistantRoutes } from './assistant.routes';
 import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
 import featureRoutes from './feature.routes';
@@ -311,6 +312,9 @@ router.use('/stores/:storeId/gold-rates', tenantContext, goldRateRoutes);
 // the `/results/*` endpoints at once — enough to exhaust `connection_limit=15`
 // and make unrelated requests on the pod fail P2024. See `aiRouteContext`.
 router.use('/stores/:storeId/ai', aiRouteContext, aiRoutes);
+// The Ebda assistant: same reason as /ai (a model call must not sit inside a request transaction). Above the bare `/stores/:storeId` mounts below.
+router.use('/stores/:storeId/assistant', aiRouteContext, assistantRoutes);
+router.use('/admin/assistant', assistantAdminRoutes);
 router.use('/stores/:storeId/typography', tenantContext, typographyRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
 // Context per request (SP6b): the admin payment link calls a payment gateway, so it runs
@@ -338,7 +342,7 @@ router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 // matched route — verified fast, DB-only, no inner context/tx. The
 // `tenantContext` argument here is kept only for readability/consistency
 // with the correctly-wired `/stores/:storeId/...` mounts above. See
-// docs/plans/2026-07-02-rls-cutover.md (Phase 1a) and
+// docs/plans/done/2026-07-02-rls-cutover.md (Phase 1a) and
 // docs/audits/2026-07-02-tenancy-rls-auth.md (F2).
 //
 // inventoryRoutes is the exception: REWORKED 2026-07-02 (surgical
@@ -382,7 +386,7 @@ router.use('/stores', tenantContext, variantRoutes);
 // '/:storeId/loyalty/...' paths, so they need the '/public' mount — a single
 // '/stores' mount left the storefront calling '/public/:storeId/loyalty/join'
 // etc. against a router that never listened there, 404ing on every live
-// store. See F2, docs/plans/2026-07-02-rls-cutover.md for the RLS wiring.
+// store. See F2, docs/plans/done/2026-07-02-rls-cutover.md for the RLS wiring.
 //
 // TWO SEPARATE ROUTERS, and the split is load-bearing: `publicLoyaltyRoutes`
 // carries ONLY join/my-points/my-transactions/info. Mounting the whole

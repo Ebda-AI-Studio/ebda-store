@@ -7,6 +7,7 @@ import { r2KeyBelongsToStore } from '../services/r2-cleanup.service';
 import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
 import { assertStorageRoom } from '../services/plan-limit.service';
+import { releaseOnFailure } from '../lib/storage-usage';
 import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { runInStoreTenantContext } from '../lib/store-scoped-read';
@@ -247,7 +248,8 @@ router.post(
         res.status(resolved.status).json({ success: false, error: resolved.error });
         return;
       }
-      if (resolved.storeId) await assertStorageRoom(resolved.storeId, req.file.size);
+      if (resolved.storeId)
+        releaseOnFailure(res, await assertStorageRoom(resolved.storeId, req.file.size));
 
       const result = await withOptionalTenantContext(resolved.storeId, async () => {
         // R2 upload itself doesn't touch Postgres so the tenant
@@ -397,7 +399,8 @@ router.post(
         res.status(resolved.status).json({ success: false, error: resolved.error });
         return;
       }
-      if (resolved.storeId) await assertStorageRoom(resolved.storeId, file.size);
+      if (resolved.storeId)
+        releaseOnFailure(res, await assertStorageRoom(resolved.storeId, file.size));
       if (!VIDEO_FOLDERS.has(resolved.folder)) {
         res.status(400).json({
           success: false,
@@ -500,9 +503,12 @@ router.post(
         return;
       }
       if (resolved.storeId)
-        await assertStorageRoom(
-          resolved.storeId,
-          files.reduce((n, f) => n + f.size, 0)
+        releaseOnFailure(
+          res,
+          await assertStorageRoom(
+            resolved.storeId,
+            files.reduce((n, f) => n + f.size, 0)
+          )
         );
 
       const results = await withOptionalTenantContext(resolved.storeId, async () => {
@@ -726,7 +732,7 @@ router.post(
           .json({ success: false, error: { code: access.code, message: access.message } });
         return;
       }
-      await assertStorageRoom(storeId, req.file.size);
+      releaseOnFailure(res, await assertStorageRoom(storeId, req.file.size));
 
       const ext = FONT_EXT[fontKind].slice(1);
       const result = await withOptionalTenantContext(storeId, async () => {

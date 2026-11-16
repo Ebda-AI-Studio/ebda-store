@@ -22,6 +22,10 @@ const nextConfig = {
   env: { NEXT_PUBLIC_COPYRIGHT_YEAR: String(new Date().getUTCFullYear()) },
   outputFileTracingRoot: ROOT,
   turbopack: { root: ROOT },
+  // The 404 page is its own document (header, footer, both languages). As `not-found.tsx` Next embeds it in every
+  // page's RSC payload (about 7 KB gzip of HTML per page, twice); `global-not-found.tsx` renders it for unmatched
+  // paths only.
+  experimental: { globalNotFound: true },
 };
 
 module.exports = nextConfig;

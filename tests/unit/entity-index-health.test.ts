@@ -1,6 +1,6 @@
 /**
  * Issue 458 (Ruling NZ-MONEY-5): a StoreDO records its dead-lettered entity-index rows in D1 `system_settings`; the API Worker's
- * hourly cron alerts once per row per day. A fake D1 over a key/value map stands in for the two `system_settings` families.
+ * hourly cron alerts ONE aggregated P1 per run. A fake D1 over a key/value map stands in for the two `system_settings` families.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -17,19 +17,28 @@ import {
 
 function fakeD1() {
   const kv = new Map<string, string>();
+  const deletedStores = new Set<string>();
+  const maxParams: number[] = [];
   const calls: string[] = [];
   const d1 = {
     prepare: (sql: string) => ({
       bind: (...v: unknown[]) => ({
-        all: async () => ({
-          results: [...kv]
-            .filter(
-              ([k]) =>
-                k.startsWith(String(v[0]).replace('%', '')) ||
-                k.startsWith(String(v[1]).replace('%', ''))
-            )
-            .map(([key, value]) => ({ key, value })),
-        }),
+        all: async () => {
+          if (sql.includes('FROM stores')) {
+            maxParams.push(v.length);
+            if (v.length > 100) throw new Error('too many SQL variables');
+            return { results: v.filter(id => deletedStores.has(String(id))).map(id => ({ id })) };
+          }
+          return {
+            results: [...kv]
+              .filter(
+                ([k]) =>
+                  k.startsWith(String(v[0]).replace('%', '')) ||
+                  k.startsWith(String(v[1]).replace('%', ''))
+              )
+              .map(([key, value]) => ({ key, value })),
+          };
+        },
         run: async () => {
           calls.push(sql.split(' ')[0]!);
           if (sql.startsWith('DELETE')) kv.delete(String(v[0]));
@@ -41,7 +50,7 @@ function fakeD1() {
       }),
     }),
   };
-  return { kv, d1, calls };
+  return { kv, d1, calls, deletedStores, maxParams };
 }
 const report = (n: number, abandoned = false): DeadLetterReport => ({
   dead: n,
@@ -87,7 +96,7 @@ describe('StoreDO publishes entity-index health', () => {
   });
 });
 
-describe('hourly health cron alerts once per row per day', () => {
+describe('hourly health cron alerts ONE aggregated P1 per run', () => {
   const seed = (f: ReturnType<typeof fakeD1>, r: DeadLetterReport) =>
     f.kv.set(
       indexHealthKey('s1'),
@@ -108,20 +117,75 @@ describe('hourly health cron alerts once per row per day', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it('one P1 per dead row; the next hours stay quiet; a day later it alerts again', async () => {
+  it('ONE aggregated P1 for N rows; the next hours stay quiet; a day later it alerts again', async () => {
     const f = fakeD1();
     seed(f, report(2));
     const send = sent();
     const t0 = Date.UTC(2026, 10, 6, 10);
     expect((await alertEntityIndexHealth(f.d1, send as never, t0)).alerted).toBe(2);
-    expect(send).toHaveBeenCalledTimes(2);
-    const titles = send.mock.calls.map(c => c[0].title);
-    expect(new Set(titles).size).toBe(2); // distinct titles: sendAlert throttles per (level, title)
+    expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]![0]).toMatchObject({ level: 'p1' });
+    expect(send.mock.calls[0]![0].body).toMatch(/2 entity-index row\(s\) in 1 store\(s\)/);
     expect((await alertEntityIndexHealth(f.d1, send as never, t0 + 3600_000)).alerted).toBe(0);
     expect((await alertEntityIndexHealth(f.d1, send as never, t0 + 23 * 3600_000)).alerted).toBe(0);
-    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(1);
     expect((await alertEntityIndexHealth(f.d1, send as never, t0 + 25 * 3600_000)).alerted).toBe(2);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('rows across several stores still make ONE send', async () => {
+    const f = fakeD1();
+    for (const id of ['a', 'b', 'c'])
+      f.kv.set(
+        indexHealthKey(id),
+        JSON.stringify({ storeId: id, dead: 1, abandoned: 0, rows: report(1).rows, updatedAt: 1 })
+      );
+    const send = sent();
+    expect((await alertEntityIndexHealth(f.d1, send as never, 1)).alerted).toBe(3);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]![0].body).toMatch(/3 entity-index row\(s\) in 3 store\(s\)/);
+  });
+
+  it('a store marked deleted: no alert, health + dedupe rows removed; a store merely missing from the directory still alerts', async () => {
+    const f = fakeD1();
+    for (const id of ['gone', 'missing'])
+      f.kv.set(
+        indexHealthKey(id),
+        JSON.stringify({ storeId: id, dead: 1, abandoned: 0, rows: report(1).rows, updatedAt: 1 })
+      );
+    f.kv.set(`${ALERTED_PREFIX}gone`, JSON.stringify({ '1': 1 }));
+    f.deletedStores.add('gone');
+    const send = sent();
+    const r = await alertEntityIndexHealth(f.d1, send as never, 5);
+    expect(r).toEqual({ stores: 1, alerted: 1 });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]![0].body).toContain('missing:');
+    expect(send.mock.calls[0]![0].body).not.toContain('gone:');
+    expect(f.kv.has(indexHealthKey('gone'))).toBe(false);
+    expect(f.kv.has(`${ALERTED_PREFIX}gone`)).toBe(false);
+    expect(f.kv.has(indexHealthKey('missing'))).toBe(true);
+  });
+
+  it('101 stores: the directory lookup is chunked to <= 100 bound params', async () => {
+    const f = fakeD1();
+    for (let i = 0; i < 101; i++)
+      f.kv.set(
+        indexHealthKey(`s${i}`),
+        JSON.stringify({
+          storeId: `s${i}`,
+          dead: 1,
+          abandoned: 0,
+          rows: report(1).rows,
+          updatedAt: 1,
+        })
+      );
+    f.deletedStores.add('s100');
+    const send = sent();
+    const r = await alertEntityIndexHealth(f.d1, send as never, 5);
+    expect(Math.max(...f.maxParams)).toBeLessThanOrEqual(100);
+    expect(f.maxParams.length).toBe(2);
+    expect(f.kv.has(indexHealthKey('s100'))).toBe(false); // deleted store in the 2nd chunk is cleared
+    expect(r.stores).toBe(100);
   });
 
   it('an alert that was not sent (throttled/failed) is retried on the next tick', async () => {
@@ -138,7 +202,7 @@ describe('hourly health cron alerts once per row per day', () => {
     seed(f, report(1, true));
     const send = sent();
     await alertEntityIndexHealth(f.d1, send as never, 5);
-    expect(send.mock.calls[0]![0].title).toContain('ABANDONED');
+    expect(send.mock.calls[0]![0].body).toMatch(/1 abandoned/);
     expect(f.kv.has(`${ALERTED_PREFIX}s1`)).toBe(true);
     f.kv.delete(`${INDEX_HEALTH_PREFIX}s1`); // the DO wrote the row and cleared the health row
     await alertEntityIndexHealth(f.d1, send as never, 6);

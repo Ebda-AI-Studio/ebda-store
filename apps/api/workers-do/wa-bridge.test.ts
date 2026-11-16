@@ -72,6 +72,7 @@ const num = async (id: string, q: string) => (await sql<{ n: number }>(id, q))[0
 const inner = createBridge({
   port: createDoPort(),
   storefrontUrl: async () => 'https://shop.example',
+  buyerKeySecret: () => 'ebda-suite-buyer-key-test-v1',
 });
 const bridge = () =>
   new Proxy(inner, {
@@ -387,9 +388,17 @@ describe('WhatsAppBridge on a real StoreDO', () => {
 });
 
 const C = '0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c';
+// The bridge recomputes the buyer key from the phone (Ruling WA-BRIDGE-BIND-1, WA-2): each phone carries its pinned vector key
+// (tests/vectors/ebda-wa/buyer-key.json), so these orders are consistent buyers, not mismatches.
+const KEY_OF: Record<string, string> = {
+  '+201001234567': 'e8771d4105457e95d06a8589827d6c09043f73bb1750f2ef525bccbc22d67edd',
+  '+201112345678': '6ceb45953633dabff779c18ba4035a9fe58480c8383c822f93684a541a5c7cf5',
+  '+201212345678': 'e60124811e966cf6a4b953e5ef6fcc922593cf49f579bdbec82f97cae902c538',
+  '+201512345678': '579c854eab21f3746ff0d980995474cb23a3c0b22651f3993f8e4281b4a46863',
+};
 const cod = (key: string, id = 'shop-c-p1', qty = 1, phone = buyer.phoneE164) => ({
   items: [{ variantId: id, quantity: qty }],
-  buyer: { ...buyer, phoneE164: phone },
+  buyer: { ...buyer, phoneE164: phone, buyerKey: KEY_OF[phone] ?? buyer.buyerKey },
   address: { area: 'Maadi', street: '9 Road 233' },
   paymentMethod: 'cod' as const,
   idempotencyKey: key,
@@ -463,6 +472,36 @@ describe('WA-RPC-8: replay completes the order (#616) and refusals are typed (#6
     });
   });
 
+  it('BRIDGE-ACTIVE-1: only an active product reaches the bridge (getProducts and listCatalog); a draft or archived one is gone for the cart check and the event sync, and the order engine refuses it too', async () => {
+    const T = Date.now();
+    await sql(
+      C,
+      "INSERT INTO products (id, store_id, name, slug, price, inventory, status, has_variants, created_at, updated_at) VALUES ('shop-c-draft', ?1, 'Draft', 'draft', 7000, 5, 'draft', 0, ?2, ?2), ('shop-c-dv', ?1, 'Draft with variant', 'draft-v', 8000, 0, 'draft', 1, ?2, ?2), ('shop-c-arv', ?1, 'Archived with variant', 'arch-v', 8000, 0, 'archived', 1, ?2, ?2)",
+      C,
+      T
+    );
+    await sql(
+      C,
+      "INSERT INTO product_variants (id, product_id, title, price, inventory, is_active, created_at, updated_at) VALUES ('shop-c-dv-1', 'shop-c-dv', 'M', 8000, 5, 1, ?1, ?1), ('shop-c-arv-1', 'shop-c-arv', 'M', 8000, 5, 1, ?1, ?1)",
+      T
+    );
+    const ids = [
+      'shop-c-p1',
+      'shop-c-gone',
+      'shop-c-draft',
+      'shop-c-dv-1',
+      'shop-c-arv-1',
+      'shop-c-dv',
+    ];
+    const got = await bridge().getProducts(C, ids);
+    expect(got.ok && got.value.items.map(i => i.retailerId)).toEqual(['shop-c-p1']);
+    const listed = await bridge().listCatalog(C, null, 100);
+    expect(listed.ok && listed.value.items.map(i => i.retailerId)).toEqual(['shop-c-p1']);
+    // the money path: the order engine itself refuses a draft (typed, nothing written)
+    const r = await bridge().createOrderFromChat(C, cod('example-idem-active1', 'shop-c-draft'));
+    expect(r).toMatchObject({ ok: false, reason: 'out_of_stock', code: 'PRODUCT_UNAVAILABLE' });
+  });
+
   it('#617: the same key with different lines is a typed invalid (IDEMPOTENCY_CONFLICT), not retried forever', async () => {
     const b = bridge();
     await b.createOrderFromChat(C, cod('example-idem-r617b', 'shop-c-p1', 1, '+201212345678'));
@@ -522,6 +561,10 @@ describe('WA-RPC-8: replay completes the order (#616) and refusals are typed (#6
       code: 'SOMETHING_NEW',
     });
     expect(refusalOf({ code: 'DB_BUSY', statusCode: 503, message: 'm' }, [])).toBeNull();
+    // #662: a pricing invariant breach (status 500) is a bug, not a refusal; any listed code carrying a 5xx is not a refusal
+    expect(refusalOf({ code: 'NEGATIVE_TOTAL', status: 500, message: 'm' }, [])).toBeNull();
+    expect(refusalOf({ code: 'BAD_ARGS', status: 500, message: 'm' }, [])).toBeNull();
+    expect(refusalOf({ code: 'OUT_OF_STOCK', status: 500, message: 'm' }, ['v1'])).toBeNull();
     expect(refusalOf(new Error('boom'), [])).toBeNull();
   });
 });

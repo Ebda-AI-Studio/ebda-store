@@ -82,6 +82,7 @@ import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
 import { anonymiseDeletedStore, finishStoreDeletion } from '../lib/store-delete-post-commit';
+import { purgeStoreVectors } from '../lib/search/purge-store-vectors';
 import { cfBindings } from '../cf/bindings';
 import { eraseStorePlatformData, type D1Like } from '../cf/erasure/platform-subject';
 import { paymentsErasurePort } from './billing/payments-erasure';
@@ -523,7 +524,7 @@ export class StoreService {
             products: await (await storeDb(storeId)).product.count({ where: { storeId } }),
             orders: await prisma.order.count({ where: { storeId } }),
           }),
-          { storeIds: stores.map(st => st.id) }
+          { storeIds: stores.map(st => st.id), abortOnError: true }
         )
       ).map(r => [r.storeId, r.value])
     );
@@ -1281,6 +1282,7 @@ export class StoreService {
           if (d1) await eraseStorePlatformData(d1, id);
         },
         erasePayments: (id, requestId) => paymentsErasurePort.scrub([id], requestId),
+        purgeVectors: id => purgeStoreVectors(id),
       });
 
     // Invalidate store cache (best-effort, post-commit)
@@ -1905,6 +1907,24 @@ export class StoreService {
   static async setMcpWriteEnabled(storeId: string, enabled: boolean) {
     await this.setSettingsKey(storeId, 'mcpWriteEnabled', enabled);
     return enabled;
+  }
+
+  /**
+   * Merchant's switch for AUTOMATIC product recommendations (`settings.autoRecommendationsEnabled`, absent = on).
+   * Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
+   */
+  static async setAutoRecommendationsEnabled(storeId: string, enabled: boolean) {
+    await this.setSettingsKey(storeId, 'autoRecommendationsEnabled', enabled);
+    return enabled;
+  }
+
+  /**
+   * The Smart Layer assistant's per-store rollout mode (`settings.assistantMode`, absent = off). Set ONLY by a super admin (routes/assistant.routes.ts):
+   * a merchant can never raise it. Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
+   */
+  static async setAssistantMode(storeId: string, mode: 'off' | 'answer-only' | 'suggest' | 'act') {
+    await this.setSettingsKey(storeId, 'assistantMode', mode);
+    return mode;
   }
 
   /**

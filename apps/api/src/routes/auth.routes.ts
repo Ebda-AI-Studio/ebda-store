@@ -13,6 +13,10 @@ import {
 } from '../middleware/auth';
 import { isAccountsToken, verifyAccountsToken } from '../lib/accounts-token';
 import {
+  customerTokenMatchesRequestStore,
+  isStoreOriginRequest,
+} from '../lib/customer-store-binding';
+import {
   isIdentityManagedUser,
   revokeIdentitySession,
   setAccountStatus,
@@ -42,6 +46,7 @@ import { resolvePublicStoreId } from '../utils/store-helpers';
 import { customerAuthRoute } from '../lib/customer-auth';
 import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
+import logger from '../lib/logger';
 import { passwordSchema } from '../services/merchant-signup.service';
 import { assertNotDemoStore } from '../services/plan-limit.service';
 import { closeNonCustomerAccount } from '../services/account-closure.service';
@@ -752,12 +757,59 @@ function isAuthFailure(error: unknown): boolean {
   return error instanceof AppError && error.statusCode === 401;
 }
 
+/**
+ * ID-05 / Ruling CORS-TB-2: from a STORE origin, `/auth/logout` may end only that store's
+ * own customer session.
+ *
+ * The route is CSRF-exempt and reads the ambient SameSite=None cookies, and every verified
+ * merchant domain is CORS-credentialed. Without this, a page on merchant A's domain could
+ * POST here and revoke a lured store-B owner's identity session suite-wide (or any other
+ * store's shopper session). Same rule as CORS-TB-1 for reads: credentialed cross-origin is
+ * same-tenant only.
+ *
+ * Every AMBIENT credential that verifies (access token from Bearer or cookie, refresh cookie;
+ * signature checked, expiry ignored so an expired session can still log out) must be a
+ * customer token bound to the origin's store. An identity-service (ES256) token, any
+ * non-customer role, or another store's customer refuses the whole request with no side
+ * effect. A credential that does not verify is nobody's session, so clearing it stays
+ * allowed (the #1531 dead-cookie heal). The body refresh token is caller-supplied and only
+ * revokes what the caller already holds, so it is not an ambient credential here.
+ */
+async function storeOriginMayEndAmbientSession(req: Request): Promise<boolean> {
+  if (!isStoreOriginRequest(req)) return true;
+  const authHeader = req.headers.authorization;
+  const ambient = [
+    authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : undefined,
+    req.cookies?.token as string | undefined,
+    req.cookies?.refresh_token as string | undefined,
+  ].filter((t): t is string => typeof t === 'string' && t.length > 0);
+  for (const credential of ambient) {
+    if (isAccountsToken(credential)) return false;
+    const claims = verifyRefreshJwt(credential, { ignoreExpiration: true });
+    if (!claims) continue; // not a session at all
+    if (claims.role !== 'customer') return false;
+    if (!(await customerTokenMatchesRequestStore(req, claims.storeId))) return false;
+  }
+  return true;
+}
+
 // POST /auth/logout
 // Optional-auth: we denylist the access-token jti when a valid Bearer token
 // is present, but NEVER 401 the logout itself — clients with an already-expired
 // or missing token must still be able to clear their session cookie.
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (!(await storeOriginMayEndAmbientSession(req))) {
+      logger.warn(
+        { origin: req.headers.origin, path: req.path },
+        '[SECURITY] refused cross-store logout from a store origin'
+      );
+      res.status(403).json({
+        success: false,
+        error: { code: 'ORIGIN_NOT_PERMITTED', message: 'Origin not permitted' },
+      });
+      return;
+    }
     // Read the refresh token from the body OR the cookie so a pure-browser
     // client (which never had the token in JS) still gets it revoked
     // server-side, not just cleared locally.
