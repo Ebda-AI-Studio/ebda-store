@@ -20,6 +20,7 @@ import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
+import { assertAiQuota } from '../ai-quota';
 import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 
 export type MetaAeoKind = 'store' | 'product' | 'category';
@@ -84,6 +85,8 @@ export interface GenerateProductMetaAeoInput {
     name: string;
     description?: string | null;
   };
+  /** A background sweep: budgeted against the bulk ceiling (keeps the interactive reserve). */
+  bulk?: boolean;
 }
 
 /**
@@ -105,43 +108,50 @@ export async function generateProductMetaAeo(
   apiKey: string,
   modelName: string
 ): Promise<GeneratedMetaAeo> {
-  const genai = new GeminiFailoverClient(apiKey);
-  const model = genai.getGenerativeModel({
-    model: modelName,
-    generationConfig: { responseMimeType: 'application/json' },
-  });
-
-  const prompt = buildMetaAeoPrompt(
-    'product',
-    input.product.name,
-    input.product.description ?? '',
-    input.storeName
-  );
-  let result;
+  // The budget lives HERE, not in the callers: every per-product route and sweep that reaches this model call
+  // reserves the store's slot and gives it back in the finally (#838, #845, Ruling AI-SLICE-ATOMIC-1).
+  const aiSlot = await assertAiQuota({ storeId: input.storeId, bulk: input.bulk === true });
   try {
-    result = await model.generateContent(prompt);
-  } catch (err) {
-    rethrowAsAppError(err, 'AI product meta AEO generation failed');
+    const genai = new GeminiFailoverClient(apiKey);
+    const model = genai.getGenerativeModel({
+      model: modelName,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    const prompt = buildMetaAeoPrompt(
+      'product',
+      input.product.name,
+      input.product.description ?? '',
+      input.storeName
+    );
+    let result;
+    try {
+      result = await model.generateContent(prompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI product meta AEO generation failed');
+    }
+
+    const usage = result.response.usageMetadata;
+    await recordUsage(
+      input.storeId,
+      'aeo',
+      usage?.promptTokenCount ?? 0,
+      usage?.candidatesTokenCount ?? 0,
+      false,
+      { model: modelName }
+    );
+
+    const raw = result.response.text();
+    const parsed = parseAiJson<{ en?: unknown; ar?: unknown }>(raw);
+    if (typeof parsed.en !== 'string' || !parsed.en.trim()) {
+      throw new Error('AI returned unexpected format');
+    }
+
+    return {
+      en: parsed.en.trim().slice(0, 160),
+      ar: typeof parsed.ar === 'string' ? parsed.ar.trim().slice(0, 160) : '',
+    };
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
   }
-
-  const usage = result.response.usageMetadata;
-  await recordUsage(
-    input.storeId,
-    'aeo',
-    usage?.promptTokenCount ?? 0,
-    usage?.candidatesTokenCount ?? 0,
-    false,
-    { model: modelName }
-  );
-
-  const raw = result.response.text();
-  const parsed = parseAiJson<{ en?: unknown; ar?: unknown }>(raw);
-  if (typeof parsed.en !== 'string' || !parsed.en.trim()) {
-    throw new Error('AI returned unexpected format');
-  }
-
-  return {
-    en: parsed.en.trim().slice(0, 160),
-    ar: typeof parsed.ar === 'string' ? parsed.ar.trim().slice(0, 160) : '',
-  };
 }

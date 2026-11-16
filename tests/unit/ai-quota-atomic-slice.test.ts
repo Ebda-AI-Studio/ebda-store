@@ -143,4 +143,23 @@ describe('every reserving call site releases its slot (static ratchet, comments 
     expect(reserving).toBeGreaterThan(20); // the scan is not vacuous
     expect(offenders).toEqual([]);
   });
+
+  it('reserve: false only where NO model call follows (probes); a model call is never reachable behind a check-only quota', () => {
+    /** file -> why it may check without reserving. A file here must not call a model or a model-calling generator. */
+    const CHECK_ONLY: Record<string, string> = {
+      'lib/inngest/functions/queue-depth-watch.ts':
+        'resume probe: decides whether to re-send a stuck sweep, no model call',
+    };
+    const MODEL = /\.generateContent\(|\bai\.run\(|\bAI\.run\(|\bgenerateProduct\w+\(/;
+    const offenders: string[] = [];
+    for (const f of walk(SRC)) {
+      const src = strip(readFileSync(f, 'utf8'));
+      if (!/assertAiQuota\([^)]*reserve:\s*false/.test(src)) continue;
+      const rel = relative(SRC, f).split('\\').join('/');
+      if (!(rel in CHECK_ONLY))
+        offenders.push(`${rel}: reserve: false outside the probe allowlist`);
+      else if (MODEL.test(src)) offenders.push(`${rel}: a check-only file reaches a model call`);
+    }
+    expect(offenders).toEqual([]);
+  });
 });

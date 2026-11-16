@@ -1163,7 +1163,6 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 continue;
               }
               try {
-                await assertAiQuota({ storeId, bulk: true, reserve: false });
                 // Shared core — identical prompt + parse + usage-recording
                 // path as the per-product "Generate with AI" route
                 // (POST /ai/product-meta-aeo). DRY: both call
@@ -1172,7 +1171,12 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 const generated = await callWithRetry(
                   () =>
                     generateProductMetaAeo(
-                      { storeId, storeName, product: { name: p.name, description: p.description } },
+                      {
+                        storeId,
+                        storeName,
+                        product: { name: p.name, description: p.description },
+                        bulk: true,
+                      },
                       config.googleAiKey,
                       MODEL
                     ),

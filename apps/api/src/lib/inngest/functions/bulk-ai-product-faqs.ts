@@ -219,8 +219,6 @@ const bulkAiProductFaqsFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota({ storeId, bulk: true, reserve: false });
-
               // Shared core — identical to the per-product "Draft with AI" path.
               const faqs = await callWithRetry(
                 () =>
@@ -235,6 +233,7 @@ const bulkAiProductFaqsFn = inngest.createFunction(
                         options: product.options,
                       },
                       count: FAQS_PER_PRODUCT,
+                      bulk: true,
                     },
                     apiKey,
                     MODEL

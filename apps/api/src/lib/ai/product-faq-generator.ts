@@ -16,6 +16,7 @@ import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { validateFaqGrounding } from './faq-grounding-validator';
 import { recordUsage } from '../../services/ai.service';
+import { assertAiQuota } from '../ai-quota';
 import logger from '../logger';
 import { EGYPTIAN_ARABIC_REGISTER } from './arabic-register';
 
@@ -55,6 +56,8 @@ export interface GenerateProductFaqsInput {
   };
   /** How many FAQ pairs to draft (1..10). */
   count: number;
+  /** A background sweep: budgeted against the bulk ceiling (keeps the interactive reserve). */
+  bulk?: boolean;
 }
 
 /**
@@ -132,52 +135,59 @@ export async function generateProductFaqs(
   apiKey: string,
   modelName: string
 ): Promise<GeneratedProductFaq[]> {
-  const genai = new GeminiFailoverClient(apiKey);
-  const model = genai.getGenerativeModel({ model: modelName });
-
-  const prompt = buildProductFaqPrompt(input);
-  let result;
+  // The budget lives HERE, not in the callers: every per-product route and sweep that reaches this model call
+  // reserves the store's slot and gives it back in the finally (#838, #845, Ruling AI-SLICE-ATOMIC-1).
+  const aiSlot = await assertAiQuota({ storeId: input.storeId, bulk: input.bulk === true });
   try {
-    result = await model.generateContent(prompt);
-  } catch (err) {
-    rethrowAsAppError(err, 'AI product FAQ generation failed');
-  }
+    const genai = new GeminiFailoverClient(apiKey);
+    const model = genai.getGenerativeModel({ model: modelName });
 
-  const usage = result.response.usageMetadata;
-  await recordUsage(
-    input.storeId,
-    'product-faqs',
-    usage?.promptTokenCount ?? 0,
-    usage?.candidatesTokenCount ?? 0,
-    false,
-    { model: modelName }
-  );
+    const prompt = buildProductFaqPrompt(input);
+    let result;
+    try {
+      result = await model.generateContent(prompt);
+    } catch (err) {
+      rethrowAsAppError(err, 'AI product FAQ generation failed');
+    }
 
-  const raw = result.response.text();
-
-  // parseAiJson strips code fences + trailing prose (outermost-JSON-span
-  // slice) and sanitises control chars before JSON.parse — the canonical
-  // hardened Gemini parse path.
-  const faqs = parseAiJson<GeneratedProductFaq[]>(raw);
-  if (!Array.isArray(faqs)) {
-    throw new Error('AI returned unexpected format');
-  }
-
-  // Deterministic grounding guard — drop any FAQ whose answer states a
-  // measurement (weight/size/volume/dimension) not present in the product's
-  // known facts. This catches the residual "200g" hallucination the prompt
-  // rule alone can't guarantee, on BOTH the draft route and the bulk sweep.
-  const { kept, dropped } = validateFaqGrounding(faqs, input.product);
-  if (dropped.length > 0) {
-    logger.warn(
-      {
-        storeId: input.storeId,
-        product: input.product.name,
-        droppedCount: dropped.length,
-        offending: dropped.flatMap(d => d.offending),
-      },
-      'faq-grounding: dropped ungrounded measurement claim(s)'
+    const usage = result.response.usageMetadata;
+    await recordUsage(
+      input.storeId,
+      'product-faqs',
+      usage?.promptTokenCount ?? 0,
+      usage?.candidatesTokenCount ?? 0,
+      false,
+      { model: modelName }
     );
+
+    const raw = result.response.text();
+
+    // parseAiJson strips code fences + trailing prose (outermost-JSON-span
+    // slice) and sanitises control chars before JSON.parse — the canonical
+    // hardened Gemini parse path.
+    const faqs = parseAiJson<GeneratedProductFaq[]>(raw);
+    if (!Array.isArray(faqs)) {
+      throw new Error('AI returned unexpected format');
+    }
+
+    // Deterministic grounding guard — drop any FAQ whose answer states a
+    // measurement (weight/size/volume/dimension) not present in the product's
+    // known facts. This catches the residual "200g" hallucination the prompt
+    // rule alone can't guarantee, on BOTH the draft route and the bulk sweep.
+    const { kept, dropped } = validateFaqGrounding(faqs, input.product);
+    if (dropped.length > 0) {
+      logger.warn(
+        {
+          storeId: input.storeId,
+          product: input.product.name,
+          droppedCount: dropped.length,
+          offending: dropped.flatMap(d => d.offending),
+        },
+        'faq-grounding: dropped ungrounded measurement claim(s)'
+      );
+    }
+    return kept;
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
   }
-  return kept;
 }
