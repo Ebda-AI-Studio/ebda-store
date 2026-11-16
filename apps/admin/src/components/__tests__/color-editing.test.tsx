@@ -113,8 +113,10 @@ describe('ColorField popover', () => {
   it('accepts a pasted code with spaces and no #, normalised and remembered as a recent colour', () => {
     const onChange = mount('');
     fireEvent.click(screen.getByRole('button', { name: /Background/ }));
-    fireEvent.change(screen.getByLabelText('hexValueAriaLabel'), { target: { value: ' B08D57 ' } });
+    const box = screen.getByLabelText('hexValueAriaLabel');
+    fireEvent.change(box, { target: { value: ' B08D57 ' } });
     expect(onChange).toHaveBeenLastCalledWith('#b08d57');
+    fireEvent.blur(box); // remembered on blur, not on every keystroke
     expect(window.localStorage.getItem('ebda.colors.recent')).toContain('#b08d57');
   });
 
@@ -144,8 +146,29 @@ describe('hex entry edge cases', () => {
     fireEvent.change(screen.getByLabelText('hexValueAriaLabel'), { target: { value: text } });
     return onChange;
   };
-  it('expands a 3-digit code and drops an alpha pair with a note', () => {
-    expect(type('#F0A')).toHaveBeenLastCalledWith('#ff00aa');
+  it('typing a 6-digit code one key at a time stores that colour, never an expanded 3-digit prefix', () => {
+    const onChange = vi.fn();
+    render(<ColorField label="Bg" value="" onChange={onChange} theme={legacy} />);
+    fireEvent.click(screen.getByRole('button', { name: /Bg/ }));
+    const box = screen.getByLabelText('hexValueAriaLabel') as HTMLInputElement;
+    let typed = '';
+    for (const ch of '#b08d57') {
+      typed += ch;
+      fireEvent.change(box, { target: { value: typed } });
+      expect(box.value).toBe(typed); // the text is never rewritten mid-typing
+    }
+    expect(onChange.mock.calls.map(c => c[0])).toEqual(['#b08d57']);
+    expect(window.localStorage.getItem('ebda.colors.recent')).toBeNull();
+  });
+  it('expands a 3-digit code on blur and drops an alpha pair with a note', () => {
+    const three = vi.fn();
+    render(<ColorField label="Bg" value="" onChange={three} theme={legacy} />);
+    fireEvent.click(screen.getByRole('button', { name: /Bg/ }));
+    const box = screen.getByLabelText('hexValueAriaLabel');
+    fireEvent.change(box, { target: { value: '#F0A' } });
+    expect(three).not.toHaveBeenCalled();
+    fireEvent.blur(box);
+    expect(three).toHaveBeenLastCalledWith('#ff00aa');
     cleanup();
     expect(type('#b08d5780')).toHaveBeenLastCalledWith('#b08d57');
     expect(screen.getByText('alphaIgnored')).toBeTruthy();

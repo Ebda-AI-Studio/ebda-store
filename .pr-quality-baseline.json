@@ -484,7 +484,6 @@
     "unused-export|apps/admin/src/components/ui/Button.tsx|BUTTON_VARIANTS",
     "unused-export|apps/admin/src/components/ui/Button.tsx|ButtonSize",
     "unused-export|apps/admin/src/components/ui/Button.tsx|ButtonVariant",
-    "unused-export|apps/admin/src/components/ui/tokens.ts|CONTROL_HEIGHT",
     "unused-export|apps/admin/src/components/ui/tokens.ts|NAV_HEIGHT",
     "unused-export|apps/admin/src/contexts/FocusModeContext.tsx|FocusModeContextValue",
     "unused-export|apps/admin/src/contexts/FocusModeContext.tsx|restorableFocusStoreId",

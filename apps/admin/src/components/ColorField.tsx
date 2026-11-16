@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ColorContrastPreview } from './ColorContrastPreview';
 import { COLOR_TOKENS, resolveColorForMeasure } from '@ebda/shared';
 import type { StoreTheme, ColorToken } from '@ebda/shared';
@@ -104,7 +104,12 @@ export function ColorField({
   const [error, setError] = useState(false);
   const [alphaDropped, setAlphaDropped] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
-  useEffect(() => setRaw(hexValue), [hexValue]);
+  // The typed text belongs to the merchant while the box has focus: never overwrite it from the committed value.
+  const editing = useRef(false);
+  const pickerValue = useRef<string | null>(null);
+  useEffect(() => {
+    if (!editing.current) setRaw(hexValue);
+  }, [hexValue]);
   useEffect(() => {
     if (open) setRecent(readRecent());
   }, [open]);
@@ -126,15 +131,29 @@ export function ColorField({
     onChange(hex);
     setRecent(rememberRecent(hex));
   };
-  const tryCommit = (text: string, onBlur: boolean) => {
+  /** While typing: apply only a complete 6/8-digit code, keep the text as typed, remember nothing. */
+  const liveCommit = (text: string) => {
+    const s = text.trim().replace(/^#/, '');
+    if (!/^(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) return;
+    const n = normalizeHex(text);
+    if (!n) return;
+    setError(false);
+    setAlphaDropped(n.alphaDropped);
+    onChange(n.hex);
+  };
+  /** On blur: normalise (3-digit expands here, not mid-typing), show it, remember it. */
+  const blurCommit = (text: string) => {
+    editing.current = false;
     const n = normalizeHex(text);
     if (n) {
       setError(false);
       setAlphaDropped(n.alphaDropped);
       setRaw(n.hex);
       commit(n.hex);
-    } else if (onBlur && text.trim() !== '') {
+    } else if (text.trim() !== '') {
       setError(true);
+    } else {
+      setRaw(hexValue);
     }
   };
 
@@ -232,21 +251,30 @@ export function ColorField({
                 aria-label={t('hexValueAriaLabel')}
                 aria-invalid={error || undefined}
                 className="font-mono uppercase"
+                onFocus={() => {
+                  editing.current = true;
+                }}
                 onChange={e => {
                   setRaw(e.target.value);
                   setError(false);
-                  tryCommit(e.target.value, false);
+                  liveCommit(e.target.value);
                 }}
-                onBlur={() => tryCommit(raw, true)}
+                onBlur={() => blurCommit(raw)}
               />
             </Field>
             <input
               type="color"
               value={normalizeHex(hexValue)?.hex ?? '#ffffff'}
               onChange={e => {
+                // Dragging fires this per frame: apply live, remember only when the picker is released.
                 setRaw(e.target.value);
                 setError(false);
-                commit(e.target.value);
+                pickerValue.current = e.target.value;
+                onChange(e.target.value);
+              }}
+              onBlur={() => {
+                if (pickerValue.current) setRecent(rememberRecent(pickerValue.current));
+                pickerValue.current = null;
               }}
               className="h-11 w-11 shrink-0 cursor-pointer rounded-md border border-input bg-background p-0.5 sm:h-10 sm:w-10"
               aria-label={t('colorPickerAriaLabel')}

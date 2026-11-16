@@ -47,7 +47,7 @@ export function TemplateGallery({
   }, []);
 
   const current = getLook(currentLook);
-  const tabs: LookTemplate[] = builtLookTemplates();
+  const tabs: LookTemplate[] = [...builtLookTemplates()];
   if (current && !tabs.includes(current.template)) tabs.push(current.template);
   const [family, setFamily] = useState<LookTemplate>(() => current?.template ?? tabs[0]!);
   const [picked, setPicked] = useState<LookId | null>(null);

@@ -94,10 +94,12 @@ export function ResizablePane({
 
   // A narrower window never lets the panes squeeze the canvas below its minimum.
   useEffect(() => {
-    const onResize = () => setWidth(w => clamp(w));
+    // Paint-only: the saved/preferred width stays in state, so widening the window restores it.
+    const onResize = () => own.current?.style.setProperty('--pane-w', `${clamp(width)}px`);
+    onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [clamp]);
+  }, [clamp, width]);
 
   const paint = useRef(
     createFrameCoalescer<number>(w => own.current?.style.setProperty('--pane-w', `${w}px`))

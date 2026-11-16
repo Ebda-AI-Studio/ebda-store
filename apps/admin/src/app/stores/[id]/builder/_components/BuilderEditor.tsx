@@ -573,7 +573,10 @@ export function BuilderEditor({
         setGalleryOpen(true); // back to the gallery, to preview again
         return void toastError(r.error.code === 'DRAFT_MOVED' ? t('look.moved') : t('look.failed'));
       }
-      toastSuccess(t('look.applied'), t('look.appliedHint'));
+      toastSuccess(
+        t('look.applied'),
+        lookPreview.willPublish ? t('look.publishNote') : t('look.appliedHint')
+      );
       setLookPreview(null);
       setGalleryOpen(false);
       await b.reload();
