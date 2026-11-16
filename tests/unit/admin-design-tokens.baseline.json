@@ -193,7 +193,6 @@
     "app/stores/[id]/announcement/page.tsx": 1,
     "app/stores/[id]/blog/page.tsx": 1,
     "app/stores/[id]/branding/_components/LocationsTab.tsx": 1,
-    "app/stores/[id]/builder/_components/LookSwitchPane.tsx": 1,
     "app/stores/[id]/builder/_components/SectionTree.tsx": 1,
     "app/stores/[id]/categories/CategoryTable.tsx": 5,
     "app/stores/[id]/customers/[customerKey]/_components/CustomerWalletCard.tsx": 1,

@@ -56,7 +56,7 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
-import { getStoreHref } from '../../../../../lib/store-url';
+import { getBuilderPreviewOrigin } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
 import { setCanvasHover } from '../_lib/canvas-hover-store';
 import { describeMove, describeStructure } from '../_lib/announce-move';
@@ -76,6 +76,7 @@ import { RevisionsPanel } from './RevisionsPanel';
 import { AiPatchPane, type AiPatchProposal } from './AiPatchPane';
 import { PageSwitcher, type PreviewProduct } from './PageSwitcher';
 import { PageSettingsPanel } from './PageSettingsPanel';
+import { TemplateGallery } from './TemplateGallery';
 import { LookSwitchPane, type LookDesignChoice, type LookPreviewResult } from './LookSwitchPane';
 
 interface StoreInfo {
@@ -172,7 +173,8 @@ export function BuilderEditor({
   const [drawer, setDrawer] = useState<'start' | 'end' | null>(null);
   const [reloadKey, setReloadKey] = useState(1);
   // Changing the look (Task 9): the pane is open, a proposal is being shown in the canvas, a call is in flight.
-  const [lookOpen, setLookOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [confirmLook, setConfirmLook] = useState(false);
   const [lookPreview, setLookPreview] = useState<
     (LookPreviewResult & { draft: PageDefinition; design: LookDesignChoice }) | null
   >(null);
@@ -345,10 +347,6 @@ export function BuilderEditor({
     [storeId, t, toastError, toastSuccess]
   );
 
-  // Picking a section closes the look pane: the right pane follows what is selected.
-  useEffect(() => {
-    if (selection) setLookOpen(false);
-  }, [selection]);
   const previewingRef = useRef(false);
   previewingRef.current = lookPreview !== null || patchPreview !== null;
   // A proposal is computed from the document as it was; if the draft moves under it (the tree,
@@ -514,6 +512,7 @@ export function BuilderEditor({
       );
       if (r.error || !r.data) return void toastError(t('look.previewFailed'));
       setLookPreview({ ...r.data, design });
+      setGalleryOpen(false);
       setDrawer(d => (d === 'end' ? null : d));
     } finally {
       setLookBusy(null);
@@ -571,12 +570,12 @@ export function BuilderEditor({
       if (r.error) {
         // the page moved since the preview: show nothing stale, ask for a new preview
         setLookPreview(null);
-        setDrawer('end'); // back to the picker, to preview again
+        setGalleryOpen(true); // back to the gallery, to preview again
         return void toastError(r.error.code === 'DRAFT_MOVED' ? t('look.moved') : t('look.failed'));
       }
-      toastSuccess(t('look.applied'));
+      toastSuccess(t('look.applied'), t('look.appliedHint'));
       setLookPreview(null);
-      setLookOpen(false);
+      setGalleryOpen(false);
       await b.reload();
       void refreshStore();
       void refreshTypography();
@@ -815,65 +814,62 @@ export function BuilderEditor({
   );
 
   // Nothing selected: the page's own settings (background, spacing, filters, image shapes...).
-  const endPane =
-    lookOpen && !selection ? (
-      <LookSwitchPane
-        currentLook={(store.look as LookId | null | undefined) ?? null}
-        preview={lookPreview}
-        busy={lookBusy}
-        onPreview={(id, design) => void previewLook(id, design)}
-        onApply={() => void applyLookNow()}
-        onCancelPreview={() => setLookPreview(null)}
-      />
-    ) : !selection ? (
-      <PageSettingsPanel
-        storeId={storeId}
-        pageKey={pageKey}
-        doc={b.doc}
-        theme={effectiveTheme(store.theme, b.doc.theme)}
-        dispatch={dispatch}
-        onSwitchPage={next => void switchPage(next)}
-      />
-    ) : (
-      <SettingsPanel
-        storeId={storeId}
-        doc={b.doc}
-        selection={selection}
-        viewport={viewport}
-        onViewportChange={setViewport}
-        theme={effectiveTheme(store.theme, b.doc.theme)}
-        template={store.template ? normalizeLegacyTemplate(store.template) : undefined}
-        look={store.look}
-        errors={b.errors}
-        dispatch={dispatch}
-        focusField={focusField}
-        onAiFill={sectionId => {
-          const req = b.doc ? aiFillRequestForSection(b.doc, sectionId) : null;
-          if (req) void runAiFill(req);
-        }}
-        chromeEdit={{
-          chrome: b.doc.chrome,
-          liveVersion: b.publishedRev,
-          // Header / footer links ride the draft document (autosave) and go
-          // live only on Publish. Each edit carries one key; merge it into the
-          // LATEST document so quick edits to different lists never drop each other.
-          onChange: patch =>
-            b.patchDocument(doc => ({
-              ...doc,
-              chrome: {
-                ...doc.chrome,
-                ...patch,
-                ...(patch.footerLinks
-                  ? { footerLinks: { ...doc.chrome?.footerLinks, ...patch.footerLinks } }
-                  : {}),
-                ...(patch.utilityBar
-                  ? { utilityBar: { ...doc.chrome?.utilityBar, ...patch.utilityBar } }
-                  : {}),
-              },
-            })),
-        }}
-      />
-    );
+  const endPane = lookPreview ? (
+    <LookSwitchPane
+      preview={lookPreview}
+      busy={lookBusy}
+      onApply={() => setConfirmLook(true)}
+      onCancelPreview={() => setLookPreview(null)}
+    />
+  ) : !selection ? (
+    <PageSettingsPanel
+      storeId={storeId}
+      pageKey={pageKey}
+      doc={b.doc}
+      theme={effectiveTheme(store.theme, b.doc.theme)}
+      dispatch={dispatch}
+      onSwitchPage={next => void switchPage(next)}
+    />
+  ) : (
+    <SettingsPanel
+      storeId={storeId}
+      doc={b.doc}
+      selection={selection}
+      viewport={viewport}
+      onViewportChange={setViewport}
+      theme={effectiveTheme(store.theme, b.doc.theme)}
+      template={store.template ? normalizeLegacyTemplate(store.template) : undefined}
+      look={store.look}
+      errors={b.errors}
+      dispatch={dispatch}
+      focusField={focusField}
+      onAiFill={sectionId => {
+        const req = b.doc ? aiFillRequestForSection(b.doc, sectionId) : null;
+        if (req) void runAiFill(req);
+      }}
+      chromeEdit={{
+        chrome: b.doc.chrome,
+        liveVersion: b.publishedRev,
+        // Header / footer links ride the draft document (autosave) and go
+        // live only on Publish. Each edit carries one key; merge it into the
+        // LATEST document so quick edits to different lists never drop each other.
+        onChange: patch =>
+          b.patchDocument(doc => ({
+            ...doc,
+            chrome: {
+              ...doc.chrome,
+              ...patch,
+              ...(patch.footerLinks
+                ? { footerLinks: { ...doc.chrome?.footerLinks, ...patch.footerLinks } }
+                : {}),
+              ...(patch.utilityBar
+                ? { utilityBar: { ...doc.chrome?.utilityBar, ...patch.utilityBar } }
+                : {}),
+            },
+          })),
+      }}
+    />
+  );
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground" data-testid="builder">
@@ -997,15 +993,11 @@ export function BuilderEditor({
         </span>
         {isHome && (
           <Button
-            variant={lookOpen ? 'soft' : 'outline'}
+            variant={galleryOpen ? 'soft' : 'outline'}
             size="sm"
             type="button"
-            onClick={() => {
-              setLookOpen(o => !o);
-              setSelection(null);
-              setDrawer(d => (d === 'end' ? d : 'end'));
-            }}
-            aria-pressed={lookOpen}
+            onClick={() => setGalleryOpen(true)}
+            aria-haspopup="dialog"
             data-testid="open-look-switch"
             data-setting-id="builder.look-switch"
           >
@@ -1068,7 +1060,7 @@ export function BuilderEditor({
           <Button
             size="sm"
             type="button"
-            onClick={() => void applyLookNow()}
+            onClick={() => setConfirmLook(true)}
             disabled={lookBusy !== null}
             className="font-semibold"
             data-testid="look-bar-apply"
@@ -1143,7 +1135,7 @@ export function BuilderEditor({
           className="min-w-0 flex-1 outline-none lg:min-w-[400px]"
         >
           <Canvas
-            storefrontUrl={getStoreHref(store)}
+            storefrontUrl={getBuilderPreviewOrigin(store)}
             path={canvasPath}
             token={token}
             doc={lookPreview?.draft ?? patchPreview?.candidate ?? b.doc}
@@ -1169,6 +1161,31 @@ export function BuilderEditor({
           {endPane}
         </ResizablePane>
       </div>
+
+      {galleryOpen && (
+        <TemplateGallery
+          currentLook={(store.look as LookId | null | undefined) ?? null}
+          busy={lookBusy === 'preview'}
+          onPreview={(id, design) => void previewLook(id, design)}
+          onClose={() => setGalleryOpen(false)}
+        />
+      )}
+
+      {confirmLook && lookPreview && (
+        <ConfirmDialog
+          tone="primary"
+          title={t('look.confirmTitle')}
+          body={t('look.confirmBody', {
+            look: getLook(lookPreview.look)?.name[locale === 'ar' ? 'ar' : 'en'] ?? '',
+          })}
+          confirmLabel={t('look.confirmApply')}
+          onCancel={() => setConfirmLook(false)}
+          onConfirm={() => {
+            setConfirmLook(false);
+            void applyLookNow();
+          }}
+        />
+      )}
 
       {pending && (
         <ConfirmDialog

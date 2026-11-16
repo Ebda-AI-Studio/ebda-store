@@ -10478,7 +10478,21 @@
       "previewFailed": "Could not prepare the preview. Try again.",
       "saveFirst": "Fix the errors on this page before changing the look.",
       "applied": "The look is applied.",
-      "current": "Current look"
+      "current": "Current look",
+      "galleryTitle": "Choose a template",
+      "galleryIntro": "Pick one to see it on your own page. Nothing changes until you apply it.",
+      "currentBadge": "Current",
+      "families": "Template families",
+      "detailLabel": "Template details",
+      "previewCta": "Preview on my page",
+      "alreadyCurrent": "This is your current template.",
+      "previewNote": "You will see it on your own page before anything changes.",
+      "pickPrompt": "Pick a template to see more about it.",
+      "close": "Close",
+      "confirmTitle": "Apply this template?",
+      "confirmBody": "{look} will change the design of your pages. Your content stays. You can bring the previous version back from History.",
+      "confirmApply": "Apply template",
+      "appliedHint": "Applied as a draft. You can bring the previous version back anytime from History."
     },
     "search": {
       "fonts": "Fonts",
