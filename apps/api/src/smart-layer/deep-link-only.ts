@@ -15,6 +15,10 @@ export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
   'billing.pay-card': { secret: 'card details' },
   'payment.card-providers': { secret: 'provider API keys' },
   'payment.instapay-merchant': { secret: 'provider credentials' },
+  'self.provider-self-activation': {
+    secret:
+      'provider API keys (the on switch runs a server-side connection test with the saved keys and a single-use, test-run-bound confirmation; chat cannot stand in for that screen)',
+  },
 };
 
 /** Capabilities another plan owns on this same engine, with who owns them. Not a hole: the owning plan registers the tools. */
