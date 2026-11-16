@@ -1,3 +1,4 @@
+import { assertStoreOperational } from '../lib/store-operational';
 import { prisma, withStore, runInTenantContext, type Prisma } from '@ebda/database';
 import {
   storeDb,
@@ -428,6 +429,9 @@ export async function requestCampaignSend(
   campaignId: string,
   scheduledAtIso?: string
 ): Promise<{ status: 'scheduled'; scheduledAt: Date; audience: number }> {
+  // Ruling SUSPEND-OUT-1: a campaign to customers is refused (423) for a store that is not `active`. Here, not in the route:
+  // the admin route and the assistant tool both go through this function.
+  await assertStoreOperational(storeId);
   const campaign = await findCampaignOr404(storeId, campaignId);
   if (campaign.status !== 'draft') {
     throw new AppError(409, 'CAMPAIGN_NOT_DRAFT', 'This campaign has already been sent');
