@@ -468,6 +468,7 @@ campaignTestSendRouter.post(
           hidePoweredBy,
         });
         await StoreMailer.sendMarketingEmail(store as CampaignStoreContext, {
+          toMerchant: true,
           to: user.email,
           subject,
           html,
