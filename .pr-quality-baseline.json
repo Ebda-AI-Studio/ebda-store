@@ -463,7 +463,6 @@
     "unused-export|apps/admin/src/components/ZoneEditor.tsx|ZoneEditorProps",
     "unused-export|apps/admin/src/components/admin-layout/buildPaletteItems.ts|keywordsForHref",
     "unused-export|apps/admin/src/components/admin-layout/hubs.ts|HubDefinition",
-    "unused-export|apps/admin/src/components/ai/AiUsageSummaryCard.tsx|AiUsageSummary",
     "unused-export|apps/admin/src/components/billing/EbdaBillingReceipt.tsx|BillingReceiptCharge",
     "unused-export|apps/admin/src/components/billing/UpsellDialog.tsx|billingHref",
     "unused-export|apps/admin/src/components/billing/fixtures.ts|billingFixture",
