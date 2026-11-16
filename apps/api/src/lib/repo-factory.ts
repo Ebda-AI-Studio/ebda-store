@@ -1798,6 +1798,7 @@ type CoalescedResult = { ok: true; json: string } | { ok: false; code?: string; 
  * Errors stay per caller: when the folded call fails (a refused store, a failed query, a thrown RPC) every batch is sent again
  * on its own, so each caller gets the answer it would have had alone. Reads only: writes go through `mutate`, never here.
  */
+// pq-allow(unused-export): imported by tests/unit/store-do-read-coalesce.test.ts
 export function coalesceReads(
   send: (queries: unknown[]) => Promise<CoalescedResult>,
   encode: (v: unknown) => string,
