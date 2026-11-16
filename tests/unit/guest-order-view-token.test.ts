@@ -24,7 +24,10 @@ describe('order view token', () => {
     expect(verifyOrderViewToken(t, A, Date.now() + ORDER_VIEW_TTL_MS + 5000)).toBe(false); // expired
     const [id, exp, sig] = t.split('.');
     expect(verifyOrderViewToken(`${id}.${Number(exp) + 100000}.${sig}`, A)).toBe(false); // exp edited
-    expect(verifyOrderViewToken(`${id}.${exp}.${sig.slice(0, -2)}AA`, A)).toBe(false); // sig edited
+    // sig edited: flip the FIRST char (always 6 significant bits) to a different one; editing the tail could leave the
+    // decoded bytes unchanged (base64url padding bits / the tail already being 'AA'), a ~1-in-1000 false failure.
+    const flipped = (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1);
+    expect(verifyOrderViewToken(`${id}.${exp}.${flipped}`, A)).toBe(false); // sig edited
     for (const bad of [undefined, null, '', 'x', `${A}.1.2`, 42, `${B}.${exp}.${sig}`]) {
       expect(verifyOrderViewToken(bad, A)).toBe(false);
     }
