@@ -1,0 +1,13 @@
+{
+  "_doc": "Budget for the storefront Worker (ebda-web, OpenNext), enforced by `scripts/ci/worker-startup-budget.mjs --app web` (CI: Worker dry-run (web)). Same method and caveats as worker-startup-budget.json (API): local-workerd numbers, regression gates with headroom, raise only with a Ruling. Bundle = cache-worker-entry.js (the generated entry the deploy uses). The absolute CPU ceiling runs on main/nightly; PRs compare against main built beside them (relative).",
+  "startupCpuMs": 90,
+  "bundleBytes": 16600000,
+  "bundleGzipBytes": 3350000,
+  "baseline": {
+    "recorded": "2026-11-15",
+    "before": { "startupCpuMs": 38.0, "bundleBytes": 22813353, "bundleGzipBytes": 4715303 },
+    "after": { "startupCpuMs": 38.6, "bundleBytes": 16070960, "bundleGzipBytes": 3221014 }
+  },
+  "relative": { "ratio": 0.25, "slackMs": 15 },
+  "_ruling": "Ruling WEB-COLD-3 (CLAUDE.md storefront note): the server graph of the Cloudflare build no longer carries @sentry/nextjs (3.7 MB raw; apps/web/src/lib/sentry-worker-stub.ts), 22.81 -> 16.07 MB raw, 4.72 -> 3.22 MB gzip. The old 22.8 MB bundle fails this budget."
+}
