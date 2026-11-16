@@ -2032,6 +2032,17 @@ function alertAmbiguousReversal(provider: string, ref: string | null, chargeId?:
   }).catch(() => undefined);
 }
 
+/**
+ * When the term a card charge paid for ends: a renewal pays from the period end it renewed (`forPeriodEnd`) for one
+ * interval; a checkout or upgrade starts a fresh period when it settles (no proration), so from its creation.
+ */
+function chargeTermEnd(charge: BillingEventRow): Date {
+  const interval = isInterval(charge.billingInterval) ? charge.billingInterval : 'monthly';
+  const from =
+    charge.type === 'renewal' && charge.forPeriodEnd ? charge.forPeriodEnd : charge.createdAt;
+  return addInterval(from, interval);
+}
+
 async function findReversedCharge(
   tx: Tx,
   storeId: string,
@@ -2159,8 +2170,11 @@ async function applyOutOfBandReversalInTx(
       select: { id: true },
     });
     const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
+    // Revoke when the reversed charge is the payment behind the current plan OR the term it paid for is still running
+    // (e.g. a yearly payment followed by an upgrade: the later charge is the latest, but the term the reversed money
+    // bought has not ended). Only a charge whose term is fully over leaves access unchanged (MONEY-REVERSAL-1).
     if (
-      latest?.id === charge.id &&
+      (latest?.id === charge.id || chargeTermEnd(charge).getTime() > now.getTime()) &&
       sub &&
       ['active', 'trialing', 'past_due'].includes(sub.status) &&
       sub.planCode !== FREE_PLAN_CODE &&

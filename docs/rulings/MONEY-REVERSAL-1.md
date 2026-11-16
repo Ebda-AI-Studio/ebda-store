@@ -18,7 +18,7 @@ Two paths book it, and both share `applyOutOfBandReversalInTx` and one idempoten
 What happens once it is booked:
 
 - **Recorded in full, never refused** (global never-abort rule). The reported amount stays in `raw`. The ledger amount is clamped to what the charge still holds, and any excess is paged.
-- **Full reversal.** The charge flips to `refunded` and the free months it earned are revoked. If it was the payment behind the current plan (the store's latest money-in row), the plan is revoked at once: `downgradeToFree(..., 'payment_reversed')`, which drops every cache layer. It is NOT sent into dunning, because retrying a card whose holder disputed the charge would charge them again.
+- **Full reversal.** The charge flips to `refunded` and the free months it earned are revoked. If it was the payment behind the current plan (the store's latest money-in row), OR the term it paid for is still running (renewal: from its `forPeriodEnd`; checkout/upgrade: from its settle, for one billing interval; e.g. a yearly payment later followed by an upgrade), the plan is revoked at once: `downgradeToFree(..., 'payment_reversed')`, which drops every cache layer. It is NOT sent into dunning, because retrying a card whose holder disputed the charge would charge them again.
 - **Partial reversal.** No plan change. A person decides from the P1.
 - **Paging.** Every booking raises a P1. So does a reversal that matches no charge, and so does an operation the code does not know.
 

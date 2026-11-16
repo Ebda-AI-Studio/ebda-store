@@ -218,6 +218,21 @@ describe('a refund made outside Ebda (webhook)', () => {
     expect(sub(db)).toEqual({ p: 'growth', s: 'active' });
   });
 
+  it('a reversed EARLIER charge whose term still runs (yearly, then an upgrade) still revokes the plan', async () => {
+    const db = rig();
+    const YEARLY = '77777777-7777-4777-8777-777777777777';
+    db.prepare(
+      `INSERT INTO billing_events (id, store_id, type, plan_code, billing_interval, amount_minor, provider, provider_ref, idempotency_key, status, created_at) VALUES (?, ?, 'checkout', 'growth', 'yearly', 1000, 'stub', 'txn-year', 'k-year', 'succeeded', ?)`
+    ).run(YEARLY, STORE, Date.now() - 150 * DAY);
+    // the later CHARGE (5 days ago) is the latest money row; the yearly term bought 150 days ago runs ~215 more days
+    await applyWebhookEvent(
+      'stub',
+      refundHook({ merchantOrderId: YEARLY, providerRef: 'txn-rf-y', eventId: 'txn-rf-y:SUCCESS' })
+    );
+    expect(chargeStatus(db, YEARLY)).toBe('refunded');
+    expect(sub(db)).toEqual({ p: 'free', s: 'canceled' });
+  });
+
   it('a refund that matches no charge is not dropped silently: P1', async () => {
     const db = rig();
     await applyWebhookEvent(
