@@ -37,7 +37,7 @@ export interface RedirectCache {
 }
 
 /** Ruling WEB-COLD-4: how long a cached cookie-less 308 may be served. Same window as the per-isolate verdict memo. */
-export const REDIRECT_CACHE_TTL_S = 60;
+const REDIRECT_CACHE_TTL_S = 60;
 
 export type DefaultLanguageOf = (host: string) => Promise<'ar' | 'en' | null>;
 
