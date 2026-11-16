@@ -112,6 +112,7 @@ import {
   hubUsers,
 } from '../lib/platform-hub';
 import { storeDb } from '../lib/repo-factory';
+import { closeClaimsOnSlugGrant } from '../services/trust-grants';
 import { customerRows } from '../lib/customer-directory';
 
 const router = Router();
@@ -960,6 +961,7 @@ router.put(
     try {
       const { id } = req.params;
       const { name, slug, plan, status } = updateStoreAdminSchema.parse(req.body);
+      await closeClaimsOnSlugGrant(req.user!.userId, slug);
 
       // Pre-read so a slug change can bust the OLD slug's cache key too.
       // NEON-ZERO (Ruling NZ-C-4): the store row is read and written through its own backend (DO / D1 directory), the

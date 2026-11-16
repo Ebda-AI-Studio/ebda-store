@@ -819,7 +819,6 @@
     "unused-export|apps/api/src/lib/ci/shipment-stamps.ts|ShipmentStampUpdate",
     "unused-export|apps/api/src/lib/ci/sink.ts|toAnalyticsPoint",
     "unused-export|apps/api/src/lib/ci/source.ts|CiAbandonedCartFacts",
-    "unused-export|apps/api/src/lib/ci/source.ts|CiStoreSetupFacts",
     "unused-export|apps/api/src/lib/cod-reconciliation.ts|ReconInput",
     "unused-export|apps/api/src/lib/cod-reconciliation.ts|ReconLine",
     "unused-export|apps/api/src/lib/cod-reconciliation.ts|SettlementParseResult",

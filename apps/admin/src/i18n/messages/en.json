@@ -2,6 +2,9 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
+    "storeNotOperational": "This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.",
+    "storeNotOperationalTitle": "Store suspended",
+    "storeNotOperationalAppeal": "Contact support to appeal",
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close",
@@ -343,6 +346,41 @@
         "allClear": "Nothing is waiting for you right now.",
         "loadFailed": "We could not load what needs your attention right now.",
         "retry": "Try again"
+      },
+      "assistantMode": {
+        "title": "Store assistant",
+        "subtitle": "Per-store rollout. Off by default; only a super admin can change it.",
+        "modeLabel": "Assistant mode",
+        "loading": "Loading…",
+        "loadFailed": "Could not load the assistant mode.",
+        "retry": "Retry",
+        "save": "Save mode",
+        "cancel": "Cancel",
+        "confirm": "Yes, change the mode",
+        "confirmTitle": "Turn the assistant on for this store?",
+        "confirmBody": "This store's team will get the assistant in mode \"{mode}\".",
+        "saveFailed": "Could not save the mode. Nothing was changed.",
+        "lastChanged": "Last changed by {by} at {at}",
+        "neverChanged": "Never changed (default: off).",
+        "unknownActor": "an unknown user",
+        "modes": {
+          "off": {
+            "label": "Off",
+            "meaning": "The assistant is hidden and never runs for this store."
+          },
+          "answer-only": {
+            "label": "Answer only",
+            "meaning": "It answers questions and explains screens. It never changes anything in the store."
+          },
+          "suggest": {
+            "label": "Suggest",
+            "meaning": "It can prepare changes as a preview, but nothing is applied unless the merchant confirms."
+          },
+          "act": {
+            "label": "Act",
+            "meaning": "The merchant can apply changes with one press; sensitive ones still need their confirmation."
+          }
+        }
       }
     },
     "list": {
@@ -1185,7 +1223,7 @@
     "model3d": {
       "title": "3D model",
       "intro": "Let shoppers rotate the product, see it in each colour or metal, and place it in their room (AR). One self-contained .glb file, up to {mb} MB.",
-      "disabled": "3D models are switched off for this store. Contact support to turn them on. You can still remove an existing model.",
+      "disabled": "Ebda Store staff switched 3D models off for this store. They are on by default, so this only happens when we turn them off for a reason, for example a problem with your models or your storage. Use Contact Ebda Store to ask why, or to ask us to turn them back on. You can still remove an existing model.",
       "chooseGlb": "Upload .glb model",
       "formatHint": "A .glb file with its textures inside. Special compression (Draco or KTX2) is not supported yet: export without it, or with meshopt, and use WebP images.",
       "replace": "Replace model",
@@ -1847,7 +1885,7 @@
       "countSingular": "{count} customer",
       "countPlural": "{count} customers",
       "paginationShowing": "Showing {from} to {to} of {total} customers",
-      "truncatedNotice": "This store is very large — the customer list is partial: it covers the most recent orders and the newest sign-ups who have not ordered yet. Use the export for a fuller picture, or contact support.",
+      "truncatedNotice": "This store is very large — the customer list is partial: it covers the most recent orders and the newest sign-ups who have not ordered yet. Use the export for a fuller picture, or use Contact Ebda Store.",
       "searchTruncatedNotice": "This search matches more customers than can be listed. Showing the first {shown} — narrow it by typing more of the name, phone or email.",
       "previous": "Previous",
       "next": "Next",
@@ -3004,7 +3042,7 @@
           "wrong_mode": "These look like credentials for the other mode (sandbox vs live). Check the mode.",
           "incomplete": "Some required fields are missing. Fill them in and save.",
           "unreachable": "Could not reach the carrier. Try again in a minute.",
-          "unknown": "The test did not give a clear answer. Try again, or contact support.",
+          "unknown": "The test did not give a clear answer. Try again, or use Contact Ebda Store.",
           "latency": "{ms} ms"
         },
         "messages": {
@@ -4372,7 +4410,7 @@
         "REFUND_EXCEEDS_ORDER": "This would refund more than the customer paid for the order. Earlier refunds (card, InstaPay, store credit or a cash return) already cover part of it, so nothing was changed.",
         "ORDER_ALREADY_REFUNDED": "This order is already refunded in full, so this return cannot refund the customer again.",
         "INVALID_REFUND_AMOUNT": "This return has no refund amount. Set the refund amount before completing it.",
-        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support.",
+        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and use Contact Ebda Store.",
         "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\".",
         "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
@@ -5153,7 +5191,7 @@
         "wrong_mode": "These look like credentials for the other mode (sandbox vs live). Check the mode.",
         "incomplete": "Some required fields are missing. Fill them in and save.",
         "unreachable": "Could not reach the provider. Try again in a minute.",
-        "unknown": "The test did not give a clear answer. Try again, or contact support.",
+        "unknown": "The test did not give a clear answer. Try again, or use Contact Ebda Store.",
         "latency": "{ms} ms"
       },
       "messages": {
@@ -6280,7 +6318,9 @@
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)",
       "wholesalePendingBadge": "{count} wholesale applications waiting",
-      "navPlatformCiInsights": "Customer Intelligence"
+      "navPlatformCiInsights": "Customer Intelligence",
+      "navPlatformActivation": "Merchant activation",
+      "navPlatformTrustRequests": "Support and trust requests"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -6525,6 +6565,60 @@
     },
     "confirm": {
       "cancel": "Cancel"
+    },
+    "support": {
+      "open": "Contact Ebda Store",
+      "title": "Contact Ebda Store",
+      "topic": "What is it about?",
+      "send": "Send",
+      "cancel": "Cancel",
+      "messageRequired": "Write a few words so we can help.",
+      "limit": "You can send 5 requests a day. Please try again tomorrow.",
+      "alreadyOpen": "You already sent this one and it is being reviewed.",
+      "failed": "We could not send it. Please try again.",
+      "slug": "Address you want",
+      "evidenceUrl": "Link to proof (optional, https)",
+      "intro": {
+        "support": "Tell us what you need. A person at Ebda Store reads it and replies by email.",
+        "appeal": "Explain why your store should be switched back on. A person at Ebda Store reviews it and decides.",
+        "slug": "Tell us why this address is yours, for example a trademark or your registered business name. A person at Ebda Store reviews it.",
+        "cap": "Tell us why you need more stores and how you can prove it. A person at Ebda Store reviews it."
+      },
+      "message": {
+        "support": "Your message",
+        "appeal": "Your appeal",
+        "slug": "Proof that this brand is yours",
+        "cap": "Why you need a higher limit"
+      },
+      "sent": {
+        "support": "Sent. We will reply to your email.",
+        "appeal": "Appeal sent. We will review it and reply by email.",
+        "slug": "Claim sent. We will review it and reply by email.",
+        "cap": "Request sent. We will review it and reply by email."
+      },
+      "topics": {
+        "billing": "Billing",
+        "plan": "Plan or upgrade",
+        "orders": "Orders",
+        "products": "Products",
+        "payments": "Payments",
+        "shipping": "Shipping",
+        "domain": "Domain",
+        "three_d_models": "3D models",
+        "account": "My account",
+        "other": "Something else"
+      },
+      "suspended": {
+        "title": "Your store is suspended",
+        "noReason": "No reason was recorded. Send an appeal and we will explain.",
+        "reason": {
+          "policy": "Reason: {reason}",
+          "billing": "Reason: billing ({reason})."
+        },
+        "billingHint": "Settle your invoice to switch the store back on, or use Contact Ebda Store.",
+        "appealOpen": "Your appeal is under review. We will reply by email.",
+        "appeal": "Appeal this decision"
+      }
     }
   },
   "finance": {
@@ -6541,7 +6635,7 @@
       "system": "System",
       "code": "Code",
       "name": "Name",
-      "noAccountsHint": "No accounts seeded yet. Refresh or contact support.",
+      "noAccountsHint": "No accounts seeded yet. Refresh, or use Contact Ebda Store.",
       "seedButton": "Seed default accounts",
       "seeding": "Seeding…",
       "seedSuccess": "Seeded {count} account(s).",
@@ -7019,7 +7113,7 @@
       "orderNumberPlaceholder": "Order number (e.g. ORD-0001)…",
       "loadOrder": "Load Order",
       "orderNotFound": "Order not found",
-      "featureNotOnPlan": "Barcode scanning is not included in your current plan. Contact support or upgrade your plan to use it.",
+      "featureNotOnPlan": "Barcode scanning is not included in your current plan. Upgrade your plan, or use Contact Ebda Store to ask about it.",
       "barcodeNotFound": "Barcode not found in this store",
       "ambiguousWarning": "Barcode matches both a product and a variant — using variant.",
       "receiving": {
@@ -8565,7 +8659,7 @@
     },
     "hatch": {
       "title": "Open writes are ON for this store",
-      "body": "A platform administrator has switched off the key requirement here, so any agent can add to a cart and place orders WITHOUT presenting a key. Whether a key is issued below makes no difference while this is on. Ask support to switch it back off once your agent is using its key."
+      "body": "A platform administrator has switched off the key requirement here, so any agent can add to a cart and place orders WITHOUT presenting a key. Whether a key is issued below makes no difference while this is on. Use Contact Ebda Store to ask us to switch it back on once your agent is using its key."
     },
     "actions": {
       "mint": "Issue key",
@@ -8880,7 +8974,7 @@
     "walletsWithBalance": "Customers with a balance",
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
-    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda Store support to turn it on.",
+    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Use Contact Ebda Store to ask us to turn it on.",
     "colCustomer": "Customer",
     "colContact": "Contact",
     "colBalance": "Balance",
@@ -8925,7 +9019,7 @@
     "hidden": "Hidden",
     "unlimited": "Unlimited",
     "priceNotSet": "Not set",
-    "priceHint": "Prices are in EGP (stored as piastres). A blank price means not set yet, not free.",
+    "priceHint": "Prices are in EGP. An empty price is not free: it means no price has been set for that period yet.",
     "save": "Save plan",
     "saving": "Saving…",
     "table": {
@@ -8941,10 +9035,21 @@
       "nameAr": "Name (Arabic)",
       "sort": "Sort order",
       "isPublic": "Shown on the public pricing page",
-      "priceMonthly": "Monthly price (EGP)",
-      "priceYearly": "Yearly price (EGP)",
-      "limitsTitle": "Limits",
-      "bpsHint": "Fees are in basis points (100 = 1%). Online and cash-on-delivery fees are set separately."
+      "priceMonthly": "Monthly price",
+      "priceYearly": "Yearly price",
+      "priceMonthlyHelp": "Leave empty if there is no monthly price yet. The plan then shows \"price soon\" and merchants cannot subscribe monthly.",
+      "priceYearlyHelp": "Leave empty if there is no yearly price yet. The plan then shows \"price soon\" and merchants cannot subscribe yearly.",
+      "currency": "EGP",
+      "feesHelp": "Percentage of each order value kept by the platform, from 0 to 100 with up to 2 decimals (for example 2.5).",
+      "invalidFee": "Enter a percentage from 0 to 100 with up to 2 decimals.",
+      "sectionVisibility": "Visibility and order",
+      "sectionPrices": "Prices",
+      "sectionLimits": "Limits",
+      "sectionFees": "Fees",
+      "sectionFeatures": "Features",
+      "sectionTiers": "Analytics and support",
+      "isPublicHelp": "Off hides the plan from the public pricing page.",
+      "close": "Close"
     },
     "limits": {
       "maxProducts": "Products",
@@ -8952,8 +9057,8 @@
       "maxOrdersPerMonth": "Orders per month",
       "maxStorageMb": "Storage (MB)",
       "customDomain": "Custom domain",
-      "platformFeeBps": "Platform fee, online orders (bps)",
-      "codPlatformFeeBps": "Platform fee, cash on delivery (bps)",
+      "platformFeeBps": "Platform fee on online orders (%)",
+      "codPlatformFeeBps": "Platform fee on cash on delivery (%)",
       "abandonedCartAutomation": "Abandoned-cart recovery",
       "whatsappAutomation": "WhatsApp automation",
       "maxStores": "Stores per owner",
@@ -8972,7 +9077,7 @@
       "priority": "Priority"
     },
     "errors": {
-      "invalidNumber": "Enter valid numbers for the price and sort order.",
+      "invalidNumber": "Enter valid numbers for the prices and sort order.",
       "saveFailed": "Could not save the plan."
     },
     "toasts": {
@@ -9015,7 +9120,7 @@
     "upgradeTitle": "Upgrade",
     "upgradeBody": "Move to a bigger plan for more products, staff and orders, a custom domain and automation.",
     "upgradeCta": "Upgrade plan",
-    "upgradeSoon": "Online upgrade is coming soon. Contact support to change your plan now.",
+    "upgradeSoon": "Online upgrade is coming soon. Use Contact Ebda Store to change your plan now.",
     "priceTbd": "Price to be announced",
     "perMonth": "/ month",
     "adminTitle": "Platform admin",
@@ -9321,7 +9426,7 @@
         "available": "{host} is available",
         "taken": "This address is already taken",
         "reserved": "This address is reserved. Choose another one.",
-        "protected": "This address matches a protected brand name. Contact support to claim it, or choose another one.",
+        "protected": "This address matches a protected brand name. If it is your brand, claim it below with proof. Otherwise choose another address.",
         "tooShort": "Use at least 3 characters",
         "tooLong": "Use at most 40 characters",
         "invalid": "Use lowercase letters, digits and single hyphens only",
@@ -9329,8 +9434,9 @@
         "create": "Create my store",
         "creating": "Creating…",
         "createFailed": "We could not create the store. Please try again.",
-        "dailyLimit": "You have created several stores today. Please try again tomorrow or contact support.",
-        "limit": "You have reached the store limit for this account."
+        "dailyLimit": "You have created several stores today. Try again tomorrow.",
+        "limit": "You have reached the store limit for this account. Ask for a higher limit below.",
+        "claimAddress": "Claim this address"
       },
       "template": {
         "title": "Pick a look",
@@ -9879,7 +9985,7 @@
       "rejected": "Your submission was rejected: {reason}. Fix the details and submit again.",
       "revoked": "Your VAT verification was revoked: {reason}. VAT is switched off until you are verified again."
     },
-    "verifiedNote": "To change these details, contact Ebda Store support.",
+    "verifiedNote": "To change these details, use Contact Ebda Store.",
     "form": {
       "trn": "Tax registration number",
       "trnHint": "9 digits, as printed on your tax card. Spaces and dashes are fine.",
@@ -11664,6 +11770,114 @@
     "savedTitle": "Shipping saved",
     "savedBody": "The return policy was updated.",
     "saveLabel": "Save shipping"
+  },
+  "trustRequests": {
+    "title": "Support and trust requests",
+    "subtitle": "Everything merchants send to Ebda Store staff: support requests, suspension appeals, protected address claims and store limit requests.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "No requests match.",
+    "loadMore": "Show more",
+    "filter": {
+      "title": "Filters",
+      "kind": "Type",
+      "status": "Status",
+      "store": "Store id",
+      "storePlaceholder": "Store id (UUID)",
+      "from": "Created from",
+      "to": "Created to",
+      "all": "All"
+    },
+    "kind": {
+      "support": "Support request",
+      "suspension_appeal": "Suspension appeal",
+      "slug_claim": "Protected address claim",
+      "store_cap": "Store limit request"
+    },
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved",
+      "rejected": "Rejected"
+    },
+    "list": {
+      "title": "Requests"
+    },
+    "col": {
+      "kind": "Type",
+      "status": "Status",
+      "store": "Store",
+      "summary": "Request",
+      "created": "Created",
+      "open": "Open"
+    },
+    "detail": {
+      "title": "Request",
+      "open": "Open",
+      "message": "Message",
+      "requester": "Requester id",
+      "topic": "Topic",
+      "slug": "Address",
+      "page": "Page",
+      "evidence": "Evidence",
+      "resolve": "Resolve",
+      "reject": "Reject",
+      "close": "Close",
+      "decided": "This request was already decided.",
+      "newLimit": "New store limit",
+      "newLimitHelp": "Whole number from 3 to 20. It is the owner's cap on stores (the latest decision wins) and never goes above their paid plan.",
+      "failed": "Could not save the decision. It may already be decided; reload the list."
+    }
+  },
+  "activation": {
+    "title": "Merchant activation",
+    "subtitle": "How long each store takes from signup to its first order and its first delivered order, and where help was needed.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "No stores yet.",
+    "unavailable": "Activation data is not available in this environment.",
+    "loadMore": "Show more stores",
+    "helpNeeded": "Help needed",
+    "steps": {
+      "store_created": "Store created",
+      "payment_methods": "Payment methods",
+      "went_live": "Went live",
+      "first_order": "First order",
+      "first_fulfilled_order": "First delivered order"
+    },
+    "col": { "step": "Step", "store": "Store", "stopped": "Where the order stopped" },
+    "funnel": {
+      "title": "Funnel by signup date",
+      "body": "Stores that signed up in the range: how many reached each step and the median time from signup. Updated once a day.",
+      "from": "From",
+      "to": "To",
+      "stores": "{n} stores signed up in this range.",
+      "truncated": "Only the first stores were read; narrow the range.",
+      "count": "Reached",
+      "median": "Median time from signup",
+      "help": "Stores that needed help"
+    },
+    "stores": { "title": "Stores" },
+    "channel": { "storefront": "Storefront", "whatsapp": "WhatsApp", "admin": "Merchant admin" },
+    "helpKind": {
+      "assistant_used": "used the Ebda AI Studio assistant",
+      "super_admin_action": "support changed the store",
+      "support_contact": "wrote to Ebda Store from the dashboard"
+    },
+    "fact": {
+      "placed": "Order placed, not paid or confirmed",
+      "payment_failed": "Payment failed",
+      "paid": "Paid, not shipped",
+      "cod_confirmed": "COD confirmed, shipment not booked",
+      "cod_unconfirmed": "COD never confirmed",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded",
+      "booked": "Shipment booked, not picked up",
+      "picked_up": "Picked up, not delivered",
+      "attempted": "Delivery attempted, not delivered",
+      "delivered": "Delivered",
+      "returned": "Returned"
+    },
+    "duration": { "minutes": "{n} min", "hours": "{n} h", "days": "{n} d" }
   },
   "assistant": {
     "title": "Assistant",
