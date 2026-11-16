@@ -17,6 +17,7 @@
  * variant of the address has unsubscribed, nothing is sent. Every email carries
  * the per-subscriber one-click unsubscribe (RFC 8058 headers + footer link).
  */
+import { activeStoreIds, storeOperational } from '../lib/store-operational';
 import { acrossStoresFlat, runInStoreScope, runInTenantContext, withStore } from '@ebda/database';
 import { storeRepo, type StoreReads, type StoreWrites } from '../lib/repo-factory';
 import { storefrontOrigin } from '@ebda/shared';
@@ -102,11 +103,15 @@ export async function sweepCartRecoveryEmails(
 
   // Only stores with the channel ON are scanned at all (one config read per store, then the
   // cart queries only for the enabled ones).
+  // A store that is not `active` is not swept at all (Ruling SUSPEND-OUT-1).
+  const operational = await activeStoreIds();
   const enabled = await acrossStoresFlat(async storeId =>
-    (await storeRepo(storeId)).db.abandonedCartConfig.findMany({
-      where: { storeId, emailEnabled: true },
-      select: { storeId: true, emailDelayMinutes: true },
-    })
+    !operational.has(storeId)
+      ? []
+      : (await storeRepo(storeId)).db.abandonedCartConfig.findMany({
+          where: { storeId, emailEnabled: true },
+          select: { storeId: true, emailDelayMinutes: true },
+        })
   );
   if (enabled.length === 0) return result;
 
@@ -302,6 +307,8 @@ export async function deliverCartRecoveryEmail(
   };
 
   if (!store) return skip('store_missing');
+  // Queued before the store was suspended: do not mail the shopper (Ruling SUSPEND-OUT-1).
+  if (!(await storeOperational(storeId))) return skip('store_not_active');
   if (!cfg?.emailEnabled) return skip('disabled');
   if (ac.status === 'recovered' || ac.recoveredAt) return skip('recovered');
   if (!ac.customerEmail || !ac.customerEmail.includes('@')) return skip('no_email');
