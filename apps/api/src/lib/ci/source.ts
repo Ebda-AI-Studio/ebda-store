@@ -63,7 +63,7 @@ export interface CiAbandonedCartFacts {
   recoveredAt: Date | null;
 }
 
-export interface CiStoreSetupFacts {
+interface CiStoreSetupFacts {
   /** When the owner's account was created (the signup), or null if unknown. */
   ownerSignupAt: Date | null;
   template: string | null;
