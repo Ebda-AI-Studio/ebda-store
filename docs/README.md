@@ -37,6 +37,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 ## admin - Admin app standards
 
 - [admin/ACTION-PLACEMENT-STANDARD.md](admin/ACTION-PLACEMENT-STANDARD.md) - Admin action-placement standard
+- [admin/activation-view.md](admin/activation-view.md) - Super-admin merchant activation view (Ruling ACT-1)
 
 ## adr - Architecture decision records
 
