@@ -1,0 +1,4 @@
+{
+  "judge": [],
+  "note": "Human labels for the advisory LLM judge (SL-JUDGE-1) are not collected yet: until Cohen's kappa against labels reaches 0.6 the release gate uses code graders only."
+}

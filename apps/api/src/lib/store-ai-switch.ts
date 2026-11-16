@@ -11,7 +11,8 @@
  * model round trip, so a merchant who flips it off is obeyed on the very next call.
  */
 import type { NextFunction, Request, Response } from 'express';
-import { storeDb } from './repo-factory';
+import { prisma } from '@ebda/database';
+import { storeDb, storeUpdate } from './repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { readInStoreContext } from './store-scoped-read';
 
@@ -52,4 +53,12 @@ export async function requireAiEnabled(
   } catch (error) {
     next(error);
   }
+}
+
+/**
+ * Flips the merchant's AI switch. The one writer: `PUT /stores/:storeId/ai/settings` (routes/ai.routes.ts) and the assistant's `ai_switch_set`
+ * tool both call it, so the two cannot drift.
+ */
+export async function setStoreAiEnabled(storeId: string, enabled: boolean): Promise<void> {
+  await storeUpdate(prisma, { where: { id: storeId }, data: { aiFeaturesEnabled: enabled } });
 }

@@ -199,3 +199,60 @@ describe('shopper erasure on the store DO', () => {
     expect(await rows(stub, 'SELECT customer_id FROM orders')).toEqual([{ customer_id: 'u1' }]);
   });
 });
+
+// Smart Layer review (Opus, Low): erasing a shopper also removes the assistant's masked journal rows that name them
+// (masking removes phones, e-mails and cards, not names).
+describe('eraseShopper and the assistant journal', () => {
+  it('deletes sl_turns and sl_audit rows naming the shopper and keeps the others', async () => {
+    const store = 'sl-erase-1';
+    const stub = await seeded(store);
+    const x = (sql: string, ...b: unknown[]) => rows(stub, sql, ...b);
+    await x(
+      "INSERT INTO customers (id, store_id, first_name, last_name, email, phone, created_at, updated_at) VALUES ('crm1', ?, 'منى', 'السيد', 'shop@example.test', '+201011111111', 1, 1)",
+      store
+    );
+    const call = (o: string, a: unknown[]) => stub.smartLayerOp(store, o, JSON.stringify(a));
+    const turn = (id: string, text: string) => ({
+      id,
+      storeId: store,
+      conversationId: 'c',
+      userId: 'm',
+      role: 'assistant',
+      maskedText: text,
+      at: Date.now(),
+      releaseId: 'r',
+    });
+    await call('appendTurn', [turn('a', 'لقيت العميلة منى السيد في القايمة')]);
+    await call('appendTurn', [turn('b', 'مبيعات النهاردة 1000 جنيه')]);
+    // A DIFFERENT shopper who shares the first name is untouched; a row naming the customer id goes; a longer word containing the name does not match.
+    await call('appendTurn', [turn('c', 'العميلة منى الشريف طلبت شحن')]);
+    await call('appendTurn', [turn('d', 'customer crm1 asked for a refund')]);
+    await call('appendTurn', [turn('e', 'منى السيدة الفاضلة')]);
+    const audit = (id: string, p: string) => ({
+      id,
+      storeId: store,
+      userId: 'm',
+      turnId: id,
+      at: Date.now(),
+      releaseId: 'r',
+      maskedPrompt: p,
+      maskedOutput: '',
+      rails: {},
+      toolsOffered: [],
+      toolCalls: [],
+      outcome: 'answered',
+      inputTokens: 0,
+      outputTokens: 0,
+      model: 'm',
+    });
+    await call('appendAudit', [audit('x1', 'دور على منى السيد')]);
+    await call('appendAudit', [audit('x2', 'مبيعات النهاردة')]);
+    expect((await op(stub, store, 'eraseShopper', args)).ok).toBe(true);
+    expect(await rows(stub, 'SELECT id FROM sl_turns')).toEqual([
+      { id: 'b' },
+      { id: 'c' },
+      { id: 'e' },
+    ]);
+    expect(await rows(stub, 'SELECT id FROM sl_audit')).toEqual([{ id: 'x2' }]);
+  });
+});

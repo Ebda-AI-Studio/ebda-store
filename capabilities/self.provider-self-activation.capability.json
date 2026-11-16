@@ -1,0 +1,31 @@
+{
+  "id": "self.provider-self-activation",
+  "status": "planned",
+  "plan": "audit gap 5",
+  "area": "payments",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تفعيل البوابة تلقائي",
+  "titleEn": "Provider auto-activates when my Test connection passes",
+  "screens": ["/stores/[id]/payment-settings"],
+  "api": ["(planned)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ليه البوابة لسه مش مفعلة؟"],
+    "en": ["Why is my provider not active yet?"]
+  },
+  "steps": ["Today: Test then request activation, super-admin completes."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
+  ],
+  "gaps": ["gap 5"]
+}

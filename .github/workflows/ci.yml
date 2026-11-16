@@ -1654,7 +1654,8 @@ jobs:
 
   notify-failure:
     name: Notify on failure (main and nightly)
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    # Seconds-long reporting job: runs on the light runner so it never queues behind heavy PR jobs and holds main (2026-11-15).
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 3
     needs:
       [

@@ -1,0 +1,48 @@
+{
+  "id": "onboarding.signup",
+  "status": "live",
+  "area": "onboarding",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اعمل حساب تاجر جديد",
+  "titleEn": "Sign up as a merchant",
+  "screens": ["/signup"],
+  "api": [
+    "POST /auth/merchant/signup",
+    "GET /auth/merchant/signup-token",
+    "POST /auth/merchant/resend-verification",
+    "POST accounts:/signup",
+    "POST accounts:/otp/verify"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["public"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "create-your-store",
+  "questions": {
+    "ar": [
+      "ازاي أفتح متجر على ابدأ؟",
+      "عايز اعمل حساب تاجر",
+      "مش وصلني كود التفعيل",
+      "signup token ده ايه وجبته منين؟"
+    ],
+    "en": ["How do I create a merchant account?", "I did not get the verification code"]
+  },
+  "steps": [
+    "Open /signup, enter email/phone and password, enter the OTP/verification link, then continue to onboarding."
+  ],
+  "edgeCases": [
+    "Verification email/OTP not delivered: resend (rate limited per email and IP)",
+    "Signup velocity limiter per IP/subnet blocks bulk signups: shown as a wait message",
+    "Egyptian phone formats and Arabic-Indic digits must normalise",
+    "Email already registered: sign in or reset password",
+    "Mobile browser opens the OTP in another tab",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Assistant is not available before login: the public site has no help bot"]
+}

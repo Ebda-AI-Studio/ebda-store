@@ -23,6 +23,7 @@ import { DashboardAccountingSummary } from './_components/DashboardAccountingSum
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
 import { AcquisitionCard } from './_components/AcquisitionCard';
+import { AssistantModeCard } from './_components/AssistantModeCard';
 import { QuickActions } from './_components/QuickActions';
 import { SettingsLink } from './_components/SettingsLink';
 import { SuspendStoreModal } from './_components/SuspendStoreModal';
@@ -145,6 +146,7 @@ export default function StoreDetailPage() {
         <div className="space-y-6">
           <StoreOwnerCard owner={store.owner} />
           {isSuperAdmin && <AcquisitionCard acquisition={store.owner.acquisition} />}
+          {isSuperAdmin && <AssistantModeCard storeId={store.id} />}
         </div>
       </div>
 

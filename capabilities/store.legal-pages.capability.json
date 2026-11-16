@@ -1,0 +1,38 @@
+{
+  "id": "store.legal-pages",
+  "status": "live",
+  "area": "content",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "صفحات السياسات",
+  "titleEn": "Edit store policy pages (privacy, terms, returns, shipping)",
+  "screens": ["/stores/[id]/content"],
+  "api": [
+    "GET /stores/:storeId/pages",
+    "GET /stores/:storeId/pages/:slug",
+    "PUT /stores/:storeId/pages/:slug"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (page revisions)"
+  },
+  "helpArticle": "store-content-faqs-pages-blog",
+  "questions": {
+    "ar": ["ازاي اكتب سياسة الاسترجاع؟", "عدل صفحة الشروط"],
+    "en": ["Edit my privacy policy"]
+  },
+  "steps": ["Pages > edit by slug; legal pages protected from deletion."],
+  "edgeCases": [
+    "MFA required",
+    "Legal pages cannot be deleted by anyone but super-admin",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

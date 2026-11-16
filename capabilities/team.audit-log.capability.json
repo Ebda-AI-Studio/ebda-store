@@ -10,7 +10,7 @@
   "api": ["GET /stores/:storeId/activity"],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "free",
   "undo": {
     "class": "none",
@@ -26,7 +26,8 @@
     "Staff get 403",
     "Another store answers 404",
     "Contact fields, keys and tokens are masked or dropped; IP shows its network prefix only",
-    "Platform staff can read any store's log (support override)"
+    "Platform staff can read any store's log (support override)",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
   ],
   "gaps": []
 }

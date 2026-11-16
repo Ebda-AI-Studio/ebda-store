@@ -53,14 +53,17 @@ vi.mock('@api/services/domain-provider', () => ({
 }));
 vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
+  const prisma = {
+    store: {
+      findUnique: vi.fn().mockResolvedValue({ emailDomainId: null }),
+      update: vi.fn().mockResolvedValue({}),
+    },
+  };
   return {
     ...actual,
-    prisma: {
-      store: {
-        findUnique: vi.fn().mockResolvedValue({ emailDomainId: null }),
-        update: vi.fn().mockResolvedValue({}),
-      },
-    },
+    prisma,
+    // services/store-domain.service.ts reads the store through withStore (the same row the route used to read via prisma)
+    withStore: async (_id: string, fn: (tx: unknown) => unknown) => fn(prisma),
     withRlsBypass: async (fn: (tx: unknown) => unknown) =>
       fn({
         user: { findFirst: vi.fn().mockResolvedValue(null), create: userCreate },
