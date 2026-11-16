@@ -681,7 +681,6 @@
     "route-uncovered|POST /admin/legal-policies/:docKey/:version/retry-failed",
     "route-uncovered|POST /admin/legal-policies/:docKey/:version/send-notice",
     "route-uncovered|POST /admin/notifications/onesignal/subscribe",
-    "route-uncovered|POST /admin/provider-activation/:storeId/:provider/activate",
     "route-uncovered|POST /admin/provider-activation/:storeId/:provider/reject",
     "route-uncovered|POST /admin/provider-activation/:storeId/:provider/test",
     "route-uncovered|POST /admin/provider-verification/:provider/confirm",
