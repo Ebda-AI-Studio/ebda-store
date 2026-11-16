@@ -11556,7 +11556,7 @@
       "variant": "Variant",
       "price": "Price",
       "digits": "Digits under the bars",
-      "qr": "Store QR",
+      "qr": "Product page QR",
       "lang": "Label language",
       "langAr": "Arabic",
       "langEn": "English"
@@ -11584,6 +11584,7 @@
       "checking": "Checking that the barcode scans…",
       "ok": "Barcode scans correctly",
       "notPrintable": "The bars are too thin to print at this size. Choose a bigger label, plain bars, or a roll.",
+      "qrRefused": "Barcode and QR cannot both scan at this size. Choose a bigger label, or untick the QR to print the barcode only.",
       "unreadable": "The barcode could not be read back. Change the style or the size.",
       "dropped": "Left out because the label is small: {parts}.",
       "copies": "{labels} labels on {pages} pages"
