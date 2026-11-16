@@ -27,6 +27,7 @@ import {
 } from '@ebda/shared/smart-layer';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { readAuditByResource } from '../lib/audit-read';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
@@ -511,6 +512,36 @@ assistantAdminRoutes.put(
         details: b,
       });
       res.json({ success: true, data: await readPlatformFlags() });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/** One store's rollout mode + who last changed it (from the `assistant.mode` audit rows), so the super-admin control can show the trail. */
+assistantAdminRoutes.get(
+  '/stores/:storeId/mode',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = z.string().uuid().parse(req.params.storeId);
+      const store = await StoreService.getById(storeId);
+      if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+      const raw = ((store.settings ?? {}) as Record<string, unknown>).assistantMode;
+      const mode = modeBody.shape.mode.safeParse(raw).success ? (raw as string) : 'off';
+      const last = (await readAuditByResource(storeId, 'store', storeId, 50)).find(
+        r => r.action === 'assistant.mode'
+      );
+      const by = last?.user
+        ? [last.user.firstName, last.user.lastName].filter(Boolean).join(' ')
+        : '';
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({
+        success: true,
+        data: {
+          mode,
+          lastChange: last ? { by: by || null, at: last.createdAt } : null,
+        },
+      });
     } catch (err) {
       next(err);
     }
