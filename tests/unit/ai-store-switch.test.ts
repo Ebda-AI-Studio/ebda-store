@@ -65,7 +65,7 @@ describe('assertAiQuota asks the switch first', () => {
   });
   it('on: continues to the normal quota checks', async () => {
     m.findUnique.mockResolvedValue({ aiFeaturesEnabled: true });
-    await expect(assertAiQuota({ storeId: 's1' })).resolves.toBeUndefined();
+    await expect(assertAiQuota({ storeId: 's1' })).resolves.toHaveProperty('release');
     expect(m.countAiUsage).toHaveBeenCalled();
   });
   it('a sweep stops on it instead of failing every product', () => {

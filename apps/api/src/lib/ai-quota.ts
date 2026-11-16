@@ -3,7 +3,11 @@ import { countAiUsage } from './definer';
 import { geminiKeyCount } from './ai/gemini-keys';
 import { AppError } from '../middleware/error-handler';
 import { AI_DISABLED_BY_MERCHANT_CODE, assertStoreAiEnabled } from './store-ai-switch';
-import { releaseStoreSlot, reserveStoreSlot } from './ai-store-reservation';
+import { reserveStoreSlot, type StoreSlot } from './ai-store-reservation';
+
+/** The caller's hold on the store's daily slice; release it in a `finally` once the model call is over. */
+type AiQuotaSlot = Pick<StoreSlot, 'release'>;
+const NO_SLOT: AiQuotaSlot = { release: async () => undefined };
 
 export const AI_QUOTA_DAILY_CODE = 'AI_QUOTA_DAILY_EXCEEDED';
 export const AI_QUOTA_MONTHLY_CODE = 'AI_QUOTA_MONTHLY_EXCEEDED';
@@ -97,21 +101,24 @@ const DEFAULT_STORE_DAILY_REQUEST_CAP = 150;
  * global caps (backward compatible).
  */
 export async function assertAiQuota(
-  opts: { storeId?: string; bulk?: boolean } = {}
-): Promise<void> {
+  opts: { storeId?: string; bulk?: boolean; reserve?: boolean } = {}
+): Promise<AiQuotaSlot> {
   // The merchant's own switch comes first: off means no AI spend at all for this store.
   if (opts.storeId) await assertStoreAiEnabled(opts.storeId);
 
   // Reserve the store's slice BEFORE counting (issue #845, ai-store-reservation.ts): the rows are written after the
   // model call, so a count alone lets concurrent calls all pass at cap-1. A refusal gives the slot straight back; an
   // accepted call's slot is released by `recordUsage` once its row exists.
-  const inFlight = opts.storeId ? await reserveStoreSlot(opts.storeId) : null;
+  // `reserve: false` = a check-only probe (no model call follows, e.g. queue-depth-watch, or an outer pre-check
+  // whose generator reserves itself): it counts, holds nothing.
+  const slot = opts.storeId && opts.reserve !== false ? await reserveStoreSlot(opts.storeId) : null;
   try {
-    await checkQuota(opts, inFlight ?? 1);
+    await checkQuota(opts, slot?.inFlight ?? 1);
   } catch (err) {
-    if (opts.storeId && inFlight !== null) await releaseStoreSlot(opts.storeId);
+    await slot?.release();
     throw err;
   }
+  return slot ?? NO_SLOT;
 }
 
 async function checkQuota(

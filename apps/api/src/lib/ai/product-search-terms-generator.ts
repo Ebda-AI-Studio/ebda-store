@@ -103,65 +103,69 @@ export async function generateProductSearchTerms(
   apiKey: string,
   modelName: string
 ): Promise<string | null> {
-  await assertAiQuota({ storeId: input.storeId, bulk: true });
-  const model = new GeminiFailoverClient(apiKey).getGenerativeModel({ model: modelName });
-  let result;
+  const aiSlot = await assertAiQuota({ storeId: input.storeId, bulk: true });
   try {
-    result = await model.generateContent(buildSearchTermsPrompt(input));
-  } catch (err) {
-    rethrowAsAppError(err, 'AI search terms failed');
-  }
-  const usage = result.response.usageMetadata;
-  await recordUsage(
-    input.storeId,
-    'search-terms',
-    usage?.promptTokenCount ?? 0,
-    usage?.candidatesTokenCount ?? 0,
-    false,
-    { model: modelName }
-  );
-  // parseAiJson THROWS on a non-JSON reply; an unusable reply is "no words", not an error.
-  let raw: unknown;
-  try {
-    raw = parseAiJson(result.response.text());
-  } catch {
-    return null;
-  }
-  // M4: Zod at the edge. Bounded before any split or filter: more than 100 items is not a
-  // usable reply; a non-string or over-long item is dropped on its own.
-  const parsed = SearchTermsReply.safeParse(raw);
-  if (!parsed.success) return null;
-  const replyTerms = parsed.data.terms.filter((t): t is string => t !== null);
-  // Split on the stored separators FIRST (as cleanSearchTerms will), so the PII gate sees
-  // every piece that can end up stored, not a "words, 0101…" string it might pass whole.
-  // Enforced, not only asked for (I5): a gender / age / season word the product data never
-  // states is dropped. Source = everything the prompt showed the model.
-  const invented = inventedAttributeFilter(
-    [
-      input.product.name,
-      input.product.nameAr,
-      input.product.description,
-      input.product.descriptionAr,
-      ...input.categoryNames,
-    ]
-      .filter(Boolean)
-      .join(' ')
-  );
-  const terms = replyTerms
-    // M3: NFKC first, so presentation-form glyphs (U+FB50–U+FEFF) become ordinary Arabic letters
-    // for every check below AND for storage (the SQL fold does not NFKC, Ruling SEARCH-2).
-    .flatMap(t => t.normalize('NFKC').split(/[,،\n]/))
-    .filter(
-      t =>
-        t.trim() &&
-        // M1: cleanSearchTerms would CUT a long piece at 60 (mid-word, and in UTF-16 units).
-        // The merchant form warns about that; the AI path has no reviewer, so drop it whole —
-        // a 60+ character phrase is never a search word. Counted in code points.
-        [...t.trim()].length <= SEARCH_TERM_MAX_LENGTH &&
-        !isPersonalDataTerm(t) &&
-        !DOMAIN_LIKE.test(t) &&
-        !hasMixedScriptWord(t) &&
-        !invented(t)
+    const model = new GeminiFailoverClient(apiKey).getGenerativeModel({ model: modelName });
+    let result;
+    try {
+      result = await model.generateContent(buildSearchTermsPrompt(input));
+    } catch (err) {
+      rethrowAsAppError(err, 'AI search terms failed');
+    }
+    const usage = result.response.usageMetadata;
+    await recordUsage(
+      input.storeId,
+      'search-terms',
+      usage?.promptTokenCount ?? 0,
+      usage?.candidatesTokenCount ?? 0,
+      false,
+      { model: modelName }
     );
-  return cleanSearchTerms(terms.join(','));
+    // parseAiJson THROWS on a non-JSON reply; an unusable reply is "no words", not an error.
+    let raw: unknown;
+    try {
+      raw = parseAiJson(result.response.text());
+    } catch {
+      return null;
+    }
+    // M4: Zod at the edge. Bounded before any split or filter: more than 100 items is not a
+    // usable reply; a non-string or over-long item is dropped on its own.
+    const parsed = SearchTermsReply.safeParse(raw);
+    if (!parsed.success) return null;
+    const replyTerms = parsed.data.terms.filter((t): t is string => t !== null);
+    // Split on the stored separators FIRST (as cleanSearchTerms will), so the PII gate sees
+    // every piece that can end up stored, not a "words, 0101…" string it might pass whole.
+    // Enforced, not only asked for (I5): a gender / age / season word the product data never
+    // states is dropped. Source = everything the prompt showed the model.
+    const invented = inventedAttributeFilter(
+      [
+        input.product.name,
+        input.product.nameAr,
+        input.product.description,
+        input.product.descriptionAr,
+        ...input.categoryNames,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    );
+    const terms = replyTerms
+      // M3: NFKC first, so presentation-form glyphs (U+FB50–U+FEFF) become ordinary Arabic letters
+      // for every check below AND for storage (the SQL fold does not NFKC, Ruling SEARCH-2).
+      .flatMap(t => t.normalize('NFKC').split(/[,،\n]/))
+      .filter(
+        t =>
+          t.trim() &&
+          // M1: cleanSearchTerms would CUT a long piece at 60 (mid-word, and in UTF-16 units).
+          // The merchant form warns about that; the AI path has no reviewer, so drop it whole —
+          // a 60+ character phrase is never a search word. Counted in code points.
+          [...t.trim()].length <= SEARCH_TERM_MAX_LENGTH &&
+          !isPersonalDataTerm(t) &&
+          !DOMAIN_LIKE.test(t) &&
+          !hasMixedScriptWord(t) &&
+          !invented(t)
+      );
+    return cleanSearchTerms(terms.join(','));
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+  }
 }

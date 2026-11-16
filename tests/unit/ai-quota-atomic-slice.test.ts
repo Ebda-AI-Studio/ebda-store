@@ -51,12 +51,13 @@ vi.mock('@ebda/database', () => ({
 vi.mock('../../apps/api/src/lib/definer', () => ({ countAiUsage: async () => 0 }));
 
 import { assertAiQuota } from '../../apps/api/src/lib/ai-quota';
-import { releaseStoreSlot } from '../../apps/api/src/lib/ai-store-reservation';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 const CAP = 150;
 const settle = (n: number) =>
   Promise.allSettled(Array.from({ length: n }, () => assertAiQuota({ storeId: 's1' })));
-const ok = (r: PromiseSettledResult<void>[]) => r.filter(x => x.status === 'fulfilled').length;
+const ok = (r: PromiseSettledResult<unknown>[]) => r.filter(x => x.status === 'fulfilled').length;
 
 beforeEach(() => {
   h.counters.clear();
@@ -88,17 +89,58 @@ describe('per-store daily slice is atomic', () => {
     expect(ok(await settle(5))).toBe(1);
   });
 
-  it('releasing a held slot (recordUsage does this once the row exists) frees room', async () => {
+  it('the handle releases exactly its own slot, once (idempotent), and frees room', async () => {
     h.rows = CAP - 2;
-    expect(ok(await settle(3))).toBe(2); // two held
-    await releaseStoreSlot('s1');
-    await releaseStoreSlot('s1');
-    expect(ok(await settle(3))).toBe(2);
+    const held = await Promise.all([
+      assertAiQuota({ storeId: 's1' }),
+      assertAiQuota({ storeId: 's1' }),
+    ]);
+    expect(ok(await settle(3))).toBe(0); // both slots held
+    await held[0].release();
+    await held[0].release(); // a second release frees nothing more
+    expect(ok(await settle(1))).toBe(1);
   });
 
-  it('release without a held slot is a no-op (a cached-hit record must not free someone else)', async () => {
+  it('a check-only probe (reserve: false) counts but holds nothing', async () => {
     h.rows = CAP - 1;
-    await releaseStoreSlot('s1');
+    for (let i = 0; i < 5; i++) await assertAiQuota({ storeId: 's1', reserve: false });
+    expect([...h.counters.values()].reduce((a, n) => a + n, 0)).toBe(0);
     expect(ok(await settle(3))).toBe(1);
+  });
+});
+
+describe('every reserving call site releases its slot (static ratchet, comments stripped)', () => {
+  const SRC = join(__dirname, '..', '..', 'apps', 'api', 'src');
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) return e.name === '__tests__' ? [] : walk(p);
+      return e.name.endsWith('.ts') && !e.name.endsWith('.test.ts') ? [p] : [];
+    });
+  const strip = (x: string) =>
+    x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
+
+  it('a reserving assertAiQuota is held in a variable and released in a finally; anything else is reserve: false', () => {
+    const offenders: string[] = [];
+    let reserving = 0;
+    for (const f of walk(SRC)) {
+      if (f.endsWith(join('lib', 'ai-quota.ts'))) continue;
+      const src = strip(readFileSync(f, 'utf8'));
+      const calls = [...src.matchAll(/(=\s*)?await assertAiQuota\(([^)]*)\)/g)];
+      for (const c of calls) {
+        if (/reserve:\s*false/.test(c[2])) continue;
+        reserving++;
+        if (!c[1])
+          offenders.push(`${relative(SRC, f)}: assertAiQuota result dropped (slot never released)`);
+      }
+      const held = calls.filter(c => c[1] && !/reserve:\s*false/.test(c[2])).length;
+      const released = (src.match(/finally\s*\{\s*await \w+\??\.release\(\)/g) ?? []).length;
+      if (released < held)
+        offenders.push(
+          `${relative(SRC, f)}: ${held} held slot(s), ${released} released in a finally`
+        );
+    }
+    expect(reserving).toBeGreaterThan(20); // the scan is not vacuous
+    expect(offenders).toEqual([]);
   });
 });

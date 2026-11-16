@@ -117,57 +117,60 @@ export interface CallGeminiBatchOpts<TItem> {
  * @throws AppError on missing API key, quota exceeded, API error, or malformed JSON.
  */
 export async function callGemini<T>(opts: CallGeminiOpts): Promise<T> {
-  await assertAiQuota({ storeId: opts.storeId });
-
-  const model = getClient().getGenerativeModel({
-    model: MODEL,
-    generationConfig: { responseMimeType: 'application/json' },
-  });
-
-  // Build parts: prompt text first so the instruction anchors the model
-  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
-    { text: opts.prompt },
-  ];
-  if (opts.imageBase64 && opts.imageMimeType) {
-    parts.push({ inlineData: { mimeType: opts.imageMimeType, data: opts.imageBase64 } });
-  }
-
-  let result;
+  const aiSlot = await assertAiQuota({ storeId: opts.storeId });
   try {
-    result = await model.generateContent({
-      contents: [{ role: 'user', parts }],
+    const model = getClient().getGenerativeModel({
+      model: MODEL,
+      generationConfig: { responseMimeType: 'application/json' },
     });
-  } catch (err) {
-    rethrowAsAppError(err, `callGemini(${opts.feature}) failed`);
-  }
 
-  const raw = stripJsonFences(result.response.text());
-  const usage = result.response.usageMetadata;
-  // The central writer (ai.service.ts) — not a local copy — so the row
-  // carries `model` and `costMicros` and accounting AI spend is counted in
-  // the per-store AI cost reporting (#1037). MODEL is passed explicitly: this
-  // module resolves GEMINI_MODEL itself and may not match the central default.
-  await recordUsage(
-    opts.storeId,
-    opts.feature,
-    usage?.promptTokenCount ?? 0,
-    usage?.candidatesTokenCount ?? 0,
-    false,
-    { model: MODEL }
-  );
+    // Build parts: prompt text first so the instruction anchors the model
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+      { text: opts.prompt },
+    ];
+    if (opts.imageBase64 && opts.imageMimeType) {
+      parts.push({ inlineData: { mimeType: opts.imageMimeType, data: opts.imageBase64 } });
+    }
 
-  try {
-    return JSON.parse(raw) as T;
-  } catch (err) {
-    logger.error(
-      { err, raw, storeId: opts.storeId, feature: opts.feature },
-      'callGemini: malformed JSON'
+    let result;
+    try {
+      result = await model.generateContent({
+        contents: [{ role: 'user', parts }],
+      });
+    } catch (err) {
+      rethrowAsAppError(err, `callGemini(${opts.feature}) failed`);
+    }
+
+    const raw = stripJsonFences(result.response.text());
+    const usage = result.response.usageMetadata;
+    // The central writer (ai.service.ts) — not a local copy — so the row
+    // carries `model` and `costMicros` and accounting AI spend is counted in
+    // the per-store AI cost reporting (#1037). MODEL is passed explicitly: this
+    // module resolves GEMINI_MODEL itself and may not match the central default.
+    await recordUsage(
+      opts.storeId,
+      opts.feature,
+      usage?.promptTokenCount ?? 0,
+      usage?.candidatesTokenCount ?? 0,
+      false,
+      { model: MODEL }
     );
-    throw new AppError(
-      502,
-      'AI_BAD_RESPONSE',
-      `Gemini returned malformed JSON for feature "${opts.feature}".`
-    );
+
+    try {
+      return JSON.parse(raw) as T;
+    } catch (err) {
+      logger.error(
+        { err, raw, storeId: opts.storeId, feature: opts.feature },
+        'callGemini: malformed JSON'
+      );
+      throw new AppError(
+        502,
+        'AI_BAD_RESPONSE',
+        `Gemini returned malformed JSON for feature "${opts.feature}".`
+      );
+    }
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
   }
 }
 

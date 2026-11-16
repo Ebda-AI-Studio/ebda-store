@@ -121,73 +121,76 @@ export class GeminiAnswerEngineProvider implements AnswerEngineProvider {
   readonly modelId = MODEL;
 
   async query(storeId: string, prompt: string): Promise<EngineAnswer> {
-    await assertAiQuota({ storeId });
-
-    if (!config.googleAiKey) {
-      throw new AppError(
-        503,
-        'AI_NOT_CONFIGURED',
-        'AI features are not configured on this server.'
-      );
-    }
-
-    let response: GeminiRestResponse;
-    let grounded: boolean;
-    let groundingUnavailableReason: string | undefined;
-
-    const groundedCall = await this.callGemini(prompt, [{ google_search: {} }]);
-
-    if (groundedCall.ok) {
-      response = groundedCall.body;
-      grounded = response.candidates?.[0]?.groundingMetadata !== undefined;
-    } else if (GROUNDING_UNAVAILABLE_STATUSES.has(groundedCall.status)) {
-      if (!hasWarnedGroundingUnavailable) {
-        hasWarnedGroundingUnavailable = true;
-        logger.warn(
-          { status: groundedCall.status, model: MODEL, message: groundedCall.errorMessage },
-          'answer-engine gemini: search grounding unavailable on this model/key (retired ' +
-            'alias, rejected tool shape, or quota) — falling back to an ungrounded call for ' +
-            'the rest of this scan'
+    const aiSlot = await assertAiQuota({ storeId });
+    try {
+      if (!config.googleAiKey) {
+        throw new AppError(
+          503,
+          'AI_NOT_CONFIGURED',
+          'AI features are not configured on this server.'
         );
       }
-      groundingUnavailableReason = `http_${groundedCall.status}`;
 
-      const fallback = await this.callGemini(prompt, []);
-      if (!fallback.ok) {
+      let response: GeminiRestResponse;
+      let grounded: boolean;
+      let groundingUnavailableReason: string | undefined;
+
+      const groundedCall = await this.callGemini(prompt, [{ google_search: {} }]);
+
+      if (groundedCall.ok) {
+        response = groundedCall.body;
+        grounded = response.candidates?.[0]?.groundingMetadata !== undefined;
+      } else if (GROUNDING_UNAVAILABLE_STATUSES.has(groundedCall.status)) {
+        if (!hasWarnedGroundingUnavailable) {
+          hasWarnedGroundingUnavailable = true;
+          logger.warn(
+            { status: groundedCall.status, model: MODEL, message: groundedCall.errorMessage },
+            'answer-engine gemini: search grounding unavailable on this model/key (retired ' +
+              'alias, rejected tool shape, or quota) — falling back to an ungrounded call for ' +
+              'the rest of this scan'
+          );
+        }
+        groundingUnavailableReason = `http_${groundedCall.status}`;
+
+        const fallback = await this.callGemini(prompt, []);
+        if (!fallback.ok) {
+          throw new AppError(
+            502,
+            'GEMINI_API_ERROR',
+            fallback.errorMessage ?? `Gemini API returned HTTP ${fallback.status}`
+          );
+        }
+        response = fallback.body;
+        grounded = false;
+      } else {
         throw new AppError(
           502,
           'GEMINI_API_ERROR',
-          fallback.errorMessage ?? `Gemini API returned HTTP ${fallback.status}`
+          groundedCall.errorMessage ?? `Gemini API returned HTTP ${groundedCall.status}`
         );
       }
-      response = fallback.body;
-      grounded = false;
-    } else {
-      throw new AppError(
-        502,
-        'GEMINI_API_ERROR',
-        groundedCall.errorMessage ?? `Gemini API returned HTTP ${groundedCall.status}`
-      );
+
+      const text = extractText(response);
+      const citedUrls = grounded ? extractCitedUrls(response) : [];
+
+      const promptTokens = response.usageMetadata?.promptTokenCount ?? 0;
+      const candidateTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
+      // Provenance is the model actually invoked: ANSWER_ENGINE_GEMINI_MODEL may
+      // differ from GEMINI_MODEL, which recordUsage would otherwise assume (#1038).
+      await recordUsage(storeId, 'answer_engine_gemini', promptTokens, candidateTokens, false, {
+        model: MODEL,
+      });
+
+      return {
+        text,
+        citedUrls,
+        grounded,
+        ...(groundingUnavailableReason ? { groundingUnavailableReason } : {}),
+        raw: response,
+      };
+    } finally {
+      await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
     }
-
-    const text = extractText(response);
-    const citedUrls = grounded ? extractCitedUrls(response) : [];
-
-    const promptTokens = response.usageMetadata?.promptTokenCount ?? 0;
-    const candidateTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
-    // Provenance is the model actually invoked: ANSWER_ENGINE_GEMINI_MODEL may
-    // differ from GEMINI_MODEL, which recordUsage would otherwise assume (#1038).
-    await recordUsage(storeId, 'answer_engine_gemini', promptTokens, candidateTokens, false, {
-      model: MODEL,
-    });
-
-    return {
-      text,
-      citedUrls,
-      grounded,
-      ...(groundingUnavailableReason ? { groundingUnavailableReason } : {}),
-      raw: response,
-    };
   }
 
   private async callGemini(

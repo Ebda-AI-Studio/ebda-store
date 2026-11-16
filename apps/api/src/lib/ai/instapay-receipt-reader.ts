@@ -230,46 +230,51 @@ const defaultCall: ReceiptModelCall = async ({
       code: 'AI_UNAVAILABLE',
     });
   }
-  await assertAiQuota({ storeId });
-  const override = cfBindings()?.INSTAPAY_RECEIPT_AI_MODEL ?? process.env.INSTAPAY_RECEIPT_AI_MODEL;
-  const model =
-    (typeof override === 'string' ? override.trim() : '') || INSTAPAY_RECEIPT_AI_MODEL_DEFAULT;
-  const out = await ai.run(
-    model,
-    {
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: buildReceiptPrompt(expectedReceivers) },
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-          ],
-        },
-      ],
-      // Workers AI's name for a JSON schema on this model family (workers-types: `guided_json`)
-      guided_json: receiptJsonSchema(
-        expectedReceivers.some(r => normalizeInstapayReceiver(r) !== null)
-      ),
-      max_tokens: 300,
-      temperature: 0,
-    },
-    { signal }
-  );
-  // Count the read against the store / platform AI caps (assertAiQuota above counts these rows). Workers AI reports
-  // token usage on most models; when it does not, the call still counts as one use.
-  const usage = (out as { usage?: { prompt_tokens?: number; completion_tokens?: number } } | null)
-    ?.usage;
-  await recordUsage(
-    storeId,
-    'instapay-receipt',
-    usage?.prompt_tokens ?? 0,
-    usage?.completion_tokens ?? 0,
-    false,
-    {
+  const aiSlot = await assertAiQuota({ storeId });
+  try {
+    const override =
+      cfBindings()?.INSTAPAY_RECEIPT_AI_MODEL ?? process.env.INSTAPAY_RECEIPT_AI_MODEL;
+    const model =
+      (typeof override === 'string' ? override.trim() : '') || INSTAPAY_RECEIPT_AI_MODEL_DEFAULT;
+    const out = await ai.run(
       model,
-    }
-  ).catch(() => undefined);
-  return unwrapWorkersAiAnswer(out);
+      {
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: buildReceiptPrompt(expectedReceivers) },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            ],
+          },
+        ],
+        // Workers AI's name for a JSON schema on this model family (workers-types: `guided_json`)
+        guided_json: receiptJsonSchema(
+          expectedReceivers.some(r => normalizeInstapayReceiver(r) !== null)
+        ),
+        max_tokens: 300,
+        temperature: 0,
+      },
+      { signal }
+    );
+    // Count the read against the store / platform AI caps (assertAiQuota above counts these rows). Workers AI reports
+    // token usage on most models; when it does not, the call still counts as one use.
+    const usage = (out as { usage?: { prompt_tokens?: number; completion_tokens?: number } } | null)
+      ?.usage;
+    await recordUsage(
+      storeId,
+      'instapay-receipt',
+      usage?.prompt_tokens ?? 0,
+      usage?.completion_tokens ?? 0,
+      false,
+      {
+        model,
+      }
+    ).catch(() => undefined);
+    return unwrapWorkersAiAnswer(out);
+  } finally {
+    await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
+  }
 };
 
 let modelCall: ReceiptModelCall = defaultCall;

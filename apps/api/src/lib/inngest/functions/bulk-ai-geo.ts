@@ -236,34 +236,37 @@ Generate a concise llms.txt file with the following sections:
 Use the exact URL format shown above. Keep the output under 2000 characters. Return ONLY the raw markdown text — no code fences, no extra commentary.`;
 
           try {
-            await assertAiQuota({ storeId, bulk: true });
+            const aiSlot = await assertAiQuota({ storeId, bulk: true });
+            try {
+              const genAI = getGenAI();
+              const model = genAI.getGenerativeModel({ model: MODEL });
+              const genResult = await callWithRetry(
+                () => model.generateContent(prompt),
+                `llms-txt:${storeId}`
+              ).catch((err: unknown) => rethrowAsAppError(err, 'AI llms.txt sweep failed'));
+              const usage = genResult.response.usageMetadata;
+              await recordUsage(
+                storeId,
+                'geo',
+                usage?.promptTokenCount ?? 0,
+                usage?.candidatesTokenCount ?? 0,
+                false
+              );
+              const text = genResult.response.text().trim();
 
-            const genAI = getGenAI();
-            const model = genAI.getGenerativeModel({ model: MODEL });
-            const genResult = await callWithRetry(
-              () => model.generateContent(prompt),
-              `llms-txt:${storeId}`
-            ).catch((err: unknown) => rethrowAsAppError(err, 'AI llms.txt sweep failed'));
-            const usage = genResult.response.usageMetadata;
-            await recordUsage(
-              storeId,
-              'geo',
-              usage?.promptTokenCount ?? 0,
-              usage?.candidatesTokenCount ?? 0,
-              false
-            );
-            const text = genResult.response.text().trim();
-
-            if (text.length > 50 && !isPlaceholderText(text)) {
-              await storeUpdate(prisma, {
-                where: { id: storeId },
-                data: { llmsTxt: text.slice(0, 4000) },
-              });
-              filled++;
-            } else {
-              skipped++;
+              if (text.length > 50 && !isPlaceholderText(text)) {
+                await storeUpdate(prisma, {
+                  where: { id: storeId },
+                  data: { llmsTxt: text.slice(0, 4000) },
+                });
+                filled++;
+              } else {
+                skipped++;
+              }
+              await sleep(THROTTLE_MS);
+            } finally {
+              await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
             }
-            await sleep(THROTTLE_MS);
           } catch (err) {
             if (isAiQuotaCapError(err)) throw err;
             const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
@@ -509,9 +512,9 @@ const bulkAiCitationCopyFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota({ storeId, bulk: true });
-
-              const prompt = `You are an expert at writing product descriptions optimised for LLM citation — the definitive, factual sentence an AI assistant would quote when answering "What is ${p.name}?".
+              const aiSlot = await assertAiQuota({ storeId, bulk: true });
+              try {
+                const prompt = `You are an expert at writing product descriptions optimised for LLM citation — the definitive, factual sentence an AI assistant would quote when answering "What is ${p.name}?".
 
 Product: "${p.name}"${p.nameAr ? ` / "${p.nameAr}"` : ''}
 From store: "${storeName}"
@@ -524,40 +527,43 @@ Write a citation-optimised product description:
 Return ONLY a JSON object with keys "en" and "ar". Both fields are plain text (no markdown). Under 300 chars each. ${EGYPTIAN_ARABIC_REGISTER}
 Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج X هو...\n• المعيار 1"}`;
 
-              const genResult = await callWithRetry(
-                () => model.generateContent(prompt),
-                `citation-copy:product:${p.id}`
-              ).catch((err: unknown) => rethrowAsAppError(err, 'AI citation-copy sweep failed'));
-              const usage = genResult.response.usageMetadata;
-              await recordUsage(
-                storeId,
-                'geo',
-                usage?.promptTokenCount ?? 0,
-                usage?.candidatesTokenCount ?? 0,
-                false
-              );
-              const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
-              const parsed = JSON.parse(raw) as { en: string; ar: string };
+                const genResult = await callWithRetry(
+                  () => model.generateContent(prompt),
+                  `citation-copy:product:${p.id}`
+                ).catch((err: unknown) => rethrowAsAppError(err, 'AI citation-copy sweep failed'));
+                const usage = genResult.response.usageMetadata;
+                await recordUsage(
+                  storeId,
+                  'geo',
+                  usage?.promptTokenCount ?? 0,
+                  usage?.candidatesTokenCount ?? 0,
+                  false
+                );
+                const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
+                const parsed = JSON.parse(raw) as { en: string; ar: string };
 
-              if (
-                typeof parsed.en === 'string' &&
-                parsed.en.trim() &&
-                !isPlaceholderText(parsed.en)
-              ) {
-                await (
-                  await storeWriter(storeId)
-                ).product.update({
-                  where: { id: p.id, storeId },
-                  data: {
-                    citationCopy: parsed.en.trim().slice(0, 500),
-                    citationCopyAr: parsed.ar?.trim().slice(0, 500) || p.citationCopyAr || null,
-                  },
-                });
-                bFilled++;
-              } else {
-                bSkipped++;
+                if (
+                  typeof parsed.en === 'string' &&
+                  parsed.en.trim() &&
+                  !isPlaceholderText(parsed.en)
+                ) {
+                  await (
+                    await storeWriter(storeId)
+                  ).product.update({
+                    where: { id: p.id, storeId },
+                    data: {
+                      citationCopy: parsed.en.trim().slice(0, 500),
+                      citationCopyAr: parsed.ar?.trim().slice(0, 500) || p.citationCopyAr || null,
+                    },
+                  });
+                  bFilled++;
+                } else {
+                  bSkipped++;
+                }
+                await sleep(THROTTLE_MS);
+              } finally {
+                await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
               }
-              await sleep(THROTTLE_MS);
             } catch (err) {
               if (isAiQuotaCapError(err)) {
                 bQuotaReached = true;
@@ -776,38 +782,41 @@ Generate a JSON object with the following structure:
 Populate using only the information provided above. For keyCategories, use the category names. For contactMethods, only include what was explicitly stated. Keep it concise. Return ONLY the raw JSON object — no markdown, no code fences.`;
 
           try {
-            await assertAiQuota({ storeId, bulk: true });
+            const aiSlot = await assertAiQuota({ storeId, bulk: true });
+            try {
+              const genAI = getGenAI();
+              const model = genAI.getGenerativeModel({
+                model: MODEL,
+                generationConfig: { responseMimeType: 'application/json' },
+              });
+              const genResult = await callWithRetry(
+                () => model.generateContent(prompt),
+                `brand-facts:${storeId}`
+              ).catch((err: unknown) => rethrowAsAppError(err, 'AI brand-facts sweep failed'));
+              const usage = genResult.response.usageMetadata;
+              await recordUsage(
+                storeId,
+                'geo',
+                usage?.promptTokenCount ?? 0,
+                usage?.candidatesTokenCount ?? 0,
+                false
+              );
+              const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
+              // Allowlisted keys in their expected shapes only (#1892) — never
+              // the model's raw object, whose nested values published
+              // "[object Object]" into the Organization JSON-LD.
+              const facts = normalizeBrandFacts(JSON.parse(raw));
 
-            const genAI = getGenAI();
-            const model = genAI.getGenerativeModel({
-              model: MODEL,
-              generationConfig: { responseMimeType: 'application/json' },
-            });
-            const genResult = await callWithRetry(
-              () => model.generateContent(prompt),
-              `brand-facts:${storeId}`
-            ).catch((err: unknown) => rethrowAsAppError(err, 'AI brand-facts sweep failed'));
-            const usage = genResult.response.usageMetadata;
-            await recordUsage(
-              storeId,
-              'geo',
-              usage?.promptTokenCount ?? 0,
-              usage?.candidatesTokenCount ?? 0,
-              false
-            );
-            const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
-            // Allowlisted keys in their expected shapes only (#1892) — never
-            // the model's raw object, whose nested values published
-            // "[object Object]" into the Organization JSON-LD.
-            const facts = normalizeBrandFacts(JSON.parse(raw));
-
-            if (facts) {
-              await storeUpdate(prisma, { where: { id: storeId }, data: { aboutJson: facts } });
-              filled++;
-            } else {
-              skipped++;
+              if (facts) {
+                await storeUpdate(prisma, { where: { id: storeId }, data: { aboutJson: facts } });
+                filled++;
+              } else {
+                skipped++;
+              }
+              await sleep(THROTTLE_MS);
+            } finally {
+              await aiSlot?.release(); // `?.`: test doubles of assertAiQuota resolve to undefined
             }
-            await sleep(THROTTLE_MS);
           } catch (err) {
             if (isAiQuotaCapError(err)) throw err;
             const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
