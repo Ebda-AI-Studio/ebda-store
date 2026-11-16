@@ -68,26 +68,42 @@ export function requestHoldsOrderViewToken(
 }
 
 /**
- * TEN-5 (2026-11-12 audit): route guard for the guest InstaPay WRITES (`receipt` upload, `submit`). The order UUID
- * alone is not a credential (it leaks through history, screenshots, shared links); anyone holding it could upload a
- * receipt or submit fields and freeze another shopper's hold. Same signed token the reads already use. Mount it
- * BEFORE multer so a refused request never buffers an upload. Bad/missing UUID falls through to the handler's own
- * zod 400.
+ * TEN-5 (2026-11-12 audit) + Ruling INSTAPAY-UPLOAD-1: route guard for the guest InstaPay WRITES (`receipt` upload,
+ * `submit`). The order UUID alone is not a credential (it leaks through history, screenshots, shared links). They accept the order's view token OR the SIGNED-IN customer who owns the order, so a shopper
+ * who returns on another tab or device (no sessionStorage token) can still pay. `ownsOrder` is the route's own
+ * fail-closed lookup (order id + the caller's customer id on the order's store); any throw or false is a 403, the same
+ * answer as no credential. The token path stays first and needs no lookup. Mount BEFORE multer.
  */
-export function requireOrderViewToken(
-  req: { get(name: string): string | undefined; params: Record<string, string | undefined> },
-  res: {
-    status(code: number): { json(body: unknown): unknown };
-  },
-  next: () => void
-): void {
-  const orderId = req.params.orderId ?? '';
-  if (!UUID_RE.test(orderId) || requestHoldsOrderViewToken(req, orderId)) return next();
-  res.status(403).json({
-    success: false,
-    error: {
-      code: 'ORDER_VIEW_TOKEN_REQUIRED',
-      message: 'This order can only be changed from the device that placed it.',
+export function requireOrderAccess(
+  ownsOrder: (customerId: string, orderId: string) => Promise<boolean>
+) {
+  return async (
+    req: {
+      get(name: string): string | undefined;
+      params: Record<string, string | undefined>;
+      user?: { role?: string; userId?: string };
     },
-  });
+    res: { status(code: number): { json(body: unknown): unknown } },
+    next: () => void
+  ): Promise<void> => {
+    const orderId = req.params.orderId ?? '';
+    if (!UUID_RE.test(orderId) || requestHoldsOrderViewToken(req, orderId)) return next();
+    const customerId = req.user?.role === 'customer' ? req.user.userId : undefined;
+    let owns = false;
+    if (customerId) {
+      try {
+        owns = await ownsOrder(customerId, orderId);
+      } catch {
+        owns = false;
+      }
+    }
+    if (owns) return next();
+    res.status(403).json({
+      success: false,
+      error: {
+        code: 'ORDER_VIEW_TOKEN_REQUIRED',
+        message: 'Sign in to the account that placed this order, or use the device that placed it.',
+      },
+    });
+  };
 }

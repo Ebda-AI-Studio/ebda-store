@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { storeDb, storeMoney } from '../lib/repo-factory';
-import { requestHoldsOrderViewToken, requireOrderViewToken } from '../lib/order-view-token';
+import { requestHoldsOrderViewToken, requireOrderAccess } from '../lib/order-view-token';
 import { maskReceiptPayerPii } from '../services/payment-providers/instapay-receipt.service';
 import {
   INSTAPAY_DEFAULT_EXPIRY_HOURS,
@@ -173,6 +173,21 @@ async function readOrderForPayment(storeId: string, where: Prisma.OrderWhereInpu
     return { ...order, customer, store };
   });
 }
+
+/** INSTAPAY-UPLOAD-1: does this signed-in customer own this order? A missing order or another customer's is false. */
+async function customerOwnsOrder(customerId: string, orderId: string): Promise<boolean> {
+  const storeId = await getOrderStoreId(orderId);
+  if (!storeId) return false;
+  return withStore(storeId, async () => {
+    const db = await storeDb(storeId);
+    const row = await db.order.findFirst({
+      where: { id: orderId, storeId, customerId },
+      select: { id: true },
+    });
+    return row !== null;
+  });
+}
+const requireInstapayOrderAccess = requireOrderAccess(customerOwnsOrder);
 
 /**
  * Ruling NZ-MONEY-2 (review NEW-1 of PR 455): an EXISTING payment's reference is handed out again only when D1 routes it. A
@@ -1075,8 +1090,10 @@ const receiptUpload = multer({
  */
 router.post(
   '/instapay/:orderId/receipt',
+  optionalAuthenticate,
+  rejectImpersonated,
   paymentLimiter,
-  requireOrderViewToken, // TEN-5: the order UUID alone is not a credential; refuse BEFORE multer buffers the file
+  requireInstapayOrderAccess, // TEN-5 + INSTAPAY-UPLOAD-1: view token OR the owning signed-in customer; refuse BEFORE multer buffers the file
   uploadLimiter,
   dailyUploadLimiter,
   receiptUpload.single('file'),
@@ -1128,8 +1145,10 @@ router.get(
  */
 router.post(
   '/instapay/:orderId/receipt/:receiptId/submit',
+  optionalAuthenticate,
+  rejectImpersonated,
   paymentLimiter,
-  requireOrderViewToken, // TEN-5
+  requireInstapayOrderAccess, // TEN-5 + INSTAPAY-UPLOAD-1
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const orderId = z.string().uuid().parse(req.params.orderId);

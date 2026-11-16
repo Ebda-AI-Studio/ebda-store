@@ -209,11 +209,11 @@ describe('route wiring', () => {
 
 describe('TEN-5: InstaPay receipt upload + submit need the order view token', () => {
   const run = async (orderId: string, header?: string) => {
-    const { requireOrderViewToken } = await import('@api/lib/order-view-token');
+    const { requireOrderAccess } = await import('@api/lib/order-view-token');
     let status = 0;
     let body: { error?: { code?: string } } = {};
     let nexted = false;
-    requireOrderViewToken(
+    await requireOrderAccess(async () => false)(
       {
         get: (n: string) => (n.toLowerCase() === 'x-order-view-token' ? header : undefined),
         params: { orderId },
@@ -241,16 +241,86 @@ describe('TEN-5: InstaPay receipt upload + submit need the order view token', ()
     expect((await run(A, signOrderViewToken(A))).nexted).toBe(true);
   });
 
+  describe('INSTAPAY-UPLOAD-1: the owning signed-in customer is accepted too', () => {
+    const call = async (
+      orderId: string,
+      opts: {
+        header?: string;
+        user?: { role?: string; userId?: string };
+        owns?: (c: string, o: string) => Promise<boolean>;
+      }
+    ) => {
+      const { requireOrderAccess } = await import('@api/lib/order-view-token');
+      let status = 0;
+      let nexted = false;
+      await requireOrderAccess(opts.owns ?? (async () => false))(
+        {
+          get: (n: string) => (n.toLowerCase() === 'x-order-view-token' ? opts.header : undefined),
+          params: { orderId },
+          user: opts.user,
+        },
+        {
+          status(c: number) {
+            status = c;
+            return { json: () => undefined };
+          },
+        },
+        () => {
+          nexted = true;
+        }
+      );
+      return { status, nexted };
+    };
+    const owner = { role: 'customer', userId: 'cust-1' };
+    const ownsA = async (c: string, o: string) => c === 'cust-1' && o === A;
+
+    it('lets the owning customer through with no token', async () => {
+      expect((await call(A, { user: owner, owns: ownsA })).nexted).toBe(true);
+    });
+    it("refuses another customer's order, a guest, a non-customer role and an unowned order", async () => {
+      expect((await call(B, { user: owner, owns: ownsA })).status).toBe(403);
+      expect(
+        (await call(A, { user: { role: 'customer', userId: 'cust-2' }, owns: ownsA })).status
+      ).toBe(403);
+      expect((await call(A, { owns: ownsA })).status).toBe(403);
+      expect(
+        (await call(A, { user: { role: 'store_admin', userId: 'cust-1' }, owns: ownsA })).status
+      ).toBe(403);
+    });
+    it('fails closed when the ownership lookup throws', async () => {
+      const r = await call(A, {
+        user: owner,
+        owns: async () => {
+          throw new Error('db down');
+        },
+      });
+      expect(r).toEqual({ status: 403, nexted: false });
+    });
+    it('the view token still passes without any lookup', async () => {
+      const { signOrderViewToken } = await import('@api/lib/order-view-token');
+      let looked = false;
+      const r = await call(A, {
+        header: signOrderViewToken(A),
+        owns: async () => {
+          looked = true;
+          return false;
+        },
+      });
+      expect(r.nexted).toBe(true);
+      expect(looked).toBe(false);
+    });
+  });
+
   it('both write routes mount the guard before the handler (and upload before multer)', () => {
     const pay = fs.readFileSync(
       path.resolve(__dirname, '../../apps/api/src/routes/payment.routes.ts'),
       'utf8'
     );
     expect(pay).toMatch(
-      /'\/instapay\/:orderId\/receipt',\s*paymentLimiter,\s*requireOrderViewToken[^\n]*\n\s*uploadLimiter/
+      /'\/instapay\/:orderId\/receipt',\s*optionalAuthenticate,\s*rejectImpersonated,\s*paymentLimiter,\s*requireInstapayOrderAccess[^\n]*\n\s*uploadLimiter/
     );
     expect(pay).toMatch(
-      /'\/instapay\/:orderId\/receipt\/:receiptId\/submit',\s*paymentLimiter,\s*requireOrderViewToken/
+      /'\/instapay\/:orderId\/receipt\/:receiptId\/submit',\s*optionalAuthenticate,\s*rejectImpersonated,\s*paymentLimiter,\s*requireInstapayOrderAccess/
     );
   });
 });

@@ -46,15 +46,21 @@ describe('marketing CSP (public/_headers)', () => {
     expect(dir('frame-ancestors')).toBe("frame-ancestors 'none'");
     expect(dir('form-action')).toBe(`form-action 'self' ${BRAND_API_URL}`);
   });
-  it('S6: has a default-src floor and a self-only script-src (no remote script host, no eval)', () => {
+  it('S6: has a default-src floor and a script-src limited to self plus the consent-gated tracker hosts (no eval)', () => {
     expect(dir('default-src')).toBe("default-src 'self'");
-    expect(dir('script-src')).toBe("script-src 'self' 'unsafe-inline'");
+    // exactly the tracker hosts, derived and guarded by tests/unit/marketing-csp-trackers.test.ts
+    expect(dir('script-src')).toBe(
+      "script-src 'self' 'unsafe-inline' https://connect.facebook.net https://eu-assets.i.posthog.com https://static.cloudflareinsights.com"
+    );
     expect(dir('script-src-attr')).toBe("script-src-attr 'none'");
     expect(dir('object-src')).toBe("object-src 'none'");
     expect(dir('base-uri')).toBe("base-uri 'self'");
   });
   it('does not widen connect or frame sources for the form', () => {
-    expect(dir('connect-src')).toBe("connect-src 'self' https://api.ebda.app");
+    // the form adds nothing: the extra hosts are the tracker beacons (marketing-csp-trackers.test.ts)
+    expect(dir('connect-src')).toBe(
+      "connect-src 'self' https://api.ebda.app https://www.facebook.com https://connect.facebook.net https://eu.i.posthog.com https://eu-assets.i.posthog.com https://cloudflareinsights.com"
+    );
     expect(dir('frame-src')).toBe("frame-src 'none'");
     expect(csp).not.toMatch(/\*|unsafe-eval|turnstile|challenges\./i);
   });
