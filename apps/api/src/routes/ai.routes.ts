@@ -651,7 +651,7 @@ router.get('/bulk', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // Read-only cost estimate for a bulk sweep (G18): the AI requests the run can use (upper bound, smart-skip lowers it)
-// against what the store may still spend today. Registered BEFORE `/bulk/:jobId` so `estimate` is not read as a job id.
+// against what the store may still spend today. Exposes only this store's figures, never platform-wide usage. Registered BEFORE `/bulk/:jobId` so `estimate` is not read as a job id.
 router.get('/bulk/estimate', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
@@ -661,10 +661,24 @@ router.get('/bulk/estimate', async (req: Request, res: Response, next: NextFunct
       await storeDb(currentStoreId())
     ).product.count({ where: { storeId, status: 'active', deletedAt: null } });
     const requests = estimateBulkAiRequests(kind, products);
-    const quota = await getAiQuotaRemaining(storeId);
+    const [quota, aiEnabled] = await Promise.all([
+      getAiQuotaRemaining(storeId),
+      isStoreAiEnabled(storeId),
+    ]);
+    // `canStart` is the only hard stop (AI off, or nothing left today); `fits` is advisory: the estimate ignores smart-skip,
+    // so a big catalogue can show more requests than the daily slice and still need only a few, and the sweep stops
+    // cleanly at the cap (isAiQuotaCapError) instead of failing every remaining product.
     res.json({
       success: true,
-      data: { kind, products, requests, ...quota, allowed: requests <= quota.remaining },
+      data: {
+        kind,
+        products,
+        requests,
+        ...quota,
+        aiEnabled,
+        canStart: aiEnabled && quota.remaining > 0,
+        fits: requests <= quota.remaining,
+      },
     });
   } catch (error) {
     next(error);

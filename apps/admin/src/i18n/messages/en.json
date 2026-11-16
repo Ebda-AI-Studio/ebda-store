@@ -8209,7 +8209,9 @@
     "estimateObject": "This AI run",
     "estimateConsequence": "It uses up to {requests} of your AI requests ({products} products). You have {remaining} left today; products that are already filled are skipped, so it usually uses fewer.",
     "estimateAction": "Start the run",
-    "estimateBlocked": "This run needs up to {requests} AI requests but you only have {remaining} left ({limit}). Try again after the reset, or run it on fewer products.",
+    "estimateBlocked": "You have no AI requests left ({limit}). Try again after the reset.",
+    "estimatePartial": "It can use up to {requests} AI requests ({products} products) but you have {remaining} left today. Products that are already filled are skipped, and the run stops cleanly when your limit is reached; start it again after the reset to finish the rest.",
+    "estimateAiOff": "AI is switched off for this store. Turn it on in AI tools first.",
     "estimateLimitStoreDaily": "your store's daily limit, resets at 00:00 UTC",
     "estimateLimitGlobalDaily": "the platform's daily AI limit, resets at 00:00 UTC",
     "estimateLimitMonthly": "the monthly AI limit, resets next month"

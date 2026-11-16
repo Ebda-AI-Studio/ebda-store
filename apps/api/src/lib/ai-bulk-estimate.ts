@@ -2,12 +2,10 @@
  * How many AI requests a bulk sweep will make (G18). An UPPER BOUND: the sweeps smart-skip rows that are already
  * filled, so the real number is usually lower; the estimate must never be lower than what the run can spend.
  *
- *  - `perProduct`: one model call per active product (N products -> N requests)
- *  - `perProductMulti`: a master sweep that fans out into several per-product jobs
- *  - `storeLevel`: one call for the whole store (llms.txt, brand facts, citation copy)
- *  - `none`: no model call at all
+ *  - `{ perProduct: n }`: n model calls per active product (a master sweep fans out into several per-product jobs)
+ *  - `{ fixed: n }`: n calls for the whole store (llms.txt, brand facts, citation copy), 0 for a revert
  */
-type Shape = { perProduct: number } | { fixed: number } | { perProduct: number; fixed: number };
+type Shape = { perProduct: number } | { fixed: number };
 
 const BULK_AI_ESTIMATE: Record<string, Shape> = {
   translate: { perProduct: 1 },
@@ -37,7 +35,5 @@ export function isBulkAiKind(kind: string): boolean {
 export function estimateBulkAiRequests(kind: string, products: number): number {
   const shape = BULK_AI_ESTIMATE[kind];
   if (!shape) throw new Error(`unknown bulk AI kind: ${kind}`);
-  const perProduct = 'perProduct' in shape ? shape.perProduct : 0;
-  const fixed = 'fixed' in shape ? shape.fixed : 0;
-  return perProduct * Math.max(0, products) + fixed;
+  return 'perProduct' in shape ? shape.perProduct * Math.max(0, products) : shape.fixed;
 }

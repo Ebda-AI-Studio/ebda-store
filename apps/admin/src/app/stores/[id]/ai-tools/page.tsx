@@ -208,37 +208,43 @@ export default function AiToolsPage() {
     requests: number;
     remaining: number;
     limitedBy: 'store_daily' | 'global_daily' | 'monthly';
-    allowed: boolean;
+    aiEnabled: boolean;
+    canStart: boolean;
+    fits: boolean;
   };
 
   /**
-   * G18: before any bulk run, show what it can cost against the store's remaining AI quota, and refuse when it
-   * cannot fit. Read-only endpoint; the server still enforces the cap per call, so a failed estimate never blocks.
-   * Returns true when the run may go ahead.
+   * G18: before any bulk run, show what it can cost against the store's remaining AI quota. Hard stop only when the run
+   * cannot start at all (AI off, or no requests left): the estimate is an upper bound that ignores smart-skip, so a run
+   * that "does not fit" is warned about, not refused (a big catalogue would otherwise never be able to run). The server
+   * still enforces the cap per call, so a failed estimate never blocks. Returns true when the run may go ahead.
    */
   async function confirmEstimate(kind: string): Promise<boolean> {
     const { data } = await apiGet<BulkEstimate>(
       `/api/v1/stores/${storeId}/ai/bulk/estimate?kind=${encodeURIComponent(kind)}`
     );
     if (!data || data.requests === 0) return true;
-    const limitKey = {
-      store_daily: 'estimateLimitStoreDaily',
-      global_daily: 'estimateLimitGlobalDaily',
-      monthly: 'estimateLimitMonthly',
-    }[data.limitedBy] as 'estimateLimitStoreDaily';
-    if (!data.allowed) {
+    if (!data.aiEnabled) {
+      setError(t('estimateAiOff'));
+      return false;
+    }
+    if (!data.canStart) {
       setError(
         t('estimateBlocked', {
-          requests: data.requests,
-          remaining: data.remaining,
-          limit: t(limitKey),
+          limit: t(
+            {
+              store_daily: 'estimateLimitStoreDaily',
+              global_daily: 'estimateLimitGlobalDaily',
+              monthly: 'estimateLimitMonthly',
+            }[data.limitedBy] as 'estimateLimitStoreDaily'
+          ),
         })
       );
       return false;
     }
     return askConfirm({
       object: t('estimateObject'),
-      consequence: t('estimateConsequence', {
+      consequence: t(data.fits ? 'estimateConsequence' : 'estimatePartial', {
         requests: data.requests,
         products: data.products,
         remaining: data.remaining,

@@ -217,14 +217,11 @@ type AiQuotaRemaining = {
   remaining: number;
   /** Which limit is the tightest. */
   limitedBy: 'store_daily' | 'global_daily' | 'monthly';
-  storeDaily: { used: number; cap: number };
-  globalDaily: { used: number; cap: number };
-  monthly: { used: number; cap: number };
 };
 
 /**
  * Read-only: how many more AI requests a bulk sweep for this store can make before `assertAiQuota` would refuse it
- * (G18). Same counts and caps as the enforcing check, so the estimate shown before a run never disagrees with it.
+ * (G18). Same counts and caps as the enforcing check. The merchant's AI switch is checked by the route (`assertAiQuota` asks it first).
  */
 export async function getAiQuotaRemaining(storeId: string): Promise<AiQuotaRemaining> {
   const w = await readAiQuotaWindow({ storeId, bulk: true });
@@ -236,11 +233,6 @@ export async function getAiQuotaRemaining(storeId: string): Promise<AiQuotaRemai
   const limitedBy = (Object.keys(left) as Array<keyof typeof left>).reduce((a, b) =>
     left[b] < left[a] ? b : a
   );
-  return {
-    remaining: left[limitedBy],
-    limitedBy,
-    storeDaily: { used: w.storeToday, cap: w.storeDailyCap },
-    globalDaily: { used: w.today, cap: w.effectiveDailyCap },
-    monthly: { used: w.thisMonth, cap: w.monthlyCap },
-  };
+  // Only the merchant-facing figure leaves here: the platform-wide counters (all stores' usage) stay server-side.
+  return { remaining: left[limitedBy], limitedBy };
 }
