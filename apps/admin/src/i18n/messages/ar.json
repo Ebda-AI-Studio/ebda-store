@@ -8435,7 +8435,11 @@
       "topQueriesTitle": "أهم الكلمات المفتاحية (آخر يوم)",
       "noTopQueries": "مفيش بيانات كلمات مفتاحية لسه.",
       "notConnectedTitle": "Google Search Console مش مربوط لسه",
-      "notConnectedBody": "بمجرد إعداد وصول ابدأ ستور إلى Search Console لنطاق متجرك، ستظهر هنا مرات الظهور والنقرات وأهم الكلمات المفتاحية تلقائياً — لا حاجة لأي إجراء من جانبك."
+      "notConnectedBody": "بمجرد إعداد وصول ابدأ ستور إلى Search Console لنطاق متجرك، ستظهر هنا مرات الظهور والنقرات وأهم الكلمات المفتاحية تلقائياً — لا حاجة لأي إجراء من جانبك.",
+      "verifyingTitle": "بنتأكد من نطاقك مع Google",
+      "verifyingBody": "بنوثّق نطاقك مع Google Search Console تلقائياً، وغالباً بيخلص خلال يوم. بعدها هتلاقي بيانات البحث هنا. مش مطلوب منك أي حاجة.",
+      "awaitingDataTitle": "مستنيين أول بيانات بحث",
+      "awaitingDataBody": "متجرك متوصّل بـ Google Search Console. البيانات بتظهر هنا بعد ما تبدأ توصل بكام يوم."
     }
   },
   "lifecycleEmails": {
