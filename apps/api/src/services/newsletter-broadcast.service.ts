@@ -1,3 +1,4 @@
+import { assertStoreOperational } from '../lib/store-operational';
 import { storeDb } from '../lib/repo-factory';
 import { buildBroadcastMessage } from '../lib/newsletter-broadcast';
 import logger from '../lib/logger';
@@ -42,6 +43,9 @@ export async function broadcastNewsletter(
   storeId: string,
   body: { subject: string; html: string; text?: string; language?: string }
 ): Promise<BroadcastResult> {
+  // Ruling SUSPEND-OUT-1: a broadcast to subscribers is refused (423) for a store that is not `active`. Here, not in the
+  // route: the admin route and the assistant tool both call this function.
+  await assertStoreOperational(storeId);
   // `defaultLanguage` lives inside the `settings` JSON column, not a first-class column, so we read `settings` and extract it manually.
   const store = await (
     await storeDb(storeId)

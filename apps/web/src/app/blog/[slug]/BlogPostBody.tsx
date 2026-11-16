@@ -44,7 +44,7 @@ export async function fetchPost(storeId: string, slug: string): Promise<BlogDeta
   // store was verified from this header and it equals the path id; without it every 404 here is a counted miss.
   const res = await fetch(`${API_URL}/public/${storeId}/blog/${encodeURIComponent(slug)}`, {
     headers: { 'X-Store-ID': storeId },
-    next: { revalidate: 60 },
+    next: { revalidate: 60, tags: [`blog:${storeId}`] },
   });
   if (res.status === 404) return null; // definitive miss → caller resolves redirect / 404s
   if (!res.ok) throw new Error(`blog post fetch failed: ${res.status}`); // transient (5xx) → let it 500

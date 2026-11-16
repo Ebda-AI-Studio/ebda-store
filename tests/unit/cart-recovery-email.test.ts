@@ -8,6 +8,15 @@
  * once-per-cart claim and the converted-cart stop are mutation-checkable.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+vi.mock('@api/lib/store-operational', () => ({
+  STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
+  isStoreOperational: (s: unknown) => s === 'active',
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+  activeStoreIds: async () => ({ has: () => true }) as unknown as Set<string>,
+  requireOperationalStore: (_q: unknown, _r: unknown, next: () => void) => next(),
+}));
 import { matches, uuid, STORE_A, STORE_B } from '../helpers/campaign-fake-db';
 
 type Row = Record<string, any>;
