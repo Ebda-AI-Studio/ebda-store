@@ -187,7 +187,6 @@
     "app/login/page.tsx": 1,
     "app/stores/[id]/_components/DashboardAccountingSummary.tsx": 2,
     "app/stores/[id]/_components/NeedsAction.tsx": 1,
-    "app/stores/[id]/_components/StatsGrid.tsx": 1,
     "app/stores/[id]/affiliates/[affiliateId]/audit-trail/page.tsx": 1,
     "app/stores/[id]/affiliates/[affiliateId]/events/page.tsx": 1,
     "app/stores/[id]/ai-tools/_components/AiSweepResultsPanels.tsx": 5,
