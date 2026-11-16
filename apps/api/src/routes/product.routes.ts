@@ -10,7 +10,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
-import { invalidateCachedPrefix } from '../lib/public-cache';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { createProductFaq, deleteProductFaq } from '../services/product-faq.service';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { EXCERPT_MAX_LENGTH } from '../lib/ai/product-excerpt-generator';
@@ -533,9 +533,9 @@ router.put(
         )
       );
 
-      // Bust the public product cache so the storefront immediately reflects
-      // the new order on next request.
-      await invalidateCachedPrefix(`public:products:${storeId}:`);
+      // Bust the public product cache AND the storefront edge copy so the storefront immediately reflects
+      // the new order on next request (STORE-EDGE-4: a Redis-only bust left the edge HTML for hours).
+      await invalidateStoreProductCaches(storeId);
 
       res.json({ success: true });
     } catch (error) {
@@ -622,9 +622,9 @@ router.put(
         )
       );
 
-      // Bust the public product cache so the storefront immediately reflects
-      // the new order on next request.
-      await invalidateCachedPrefix(`public:products:${storeId}:`);
+      // Bust the public product cache AND the storefront edge copy so the storefront immediately reflects
+      // the new order on next request (STORE-EDGE-4: a Redis-only bust left the edge HTML for hours).
+      await invalidateStoreProductCaches(storeId);
 
       res.json({ success: true });
     } catch (error) {
@@ -991,6 +991,7 @@ router.post(
     try {
       const body = productFaqSchema.parse(req.body);
       const faq = await createProductFaq(req.params.storeId, req.params.id, body);
+      await invalidateStoreProductCaches(req.params.storeId);
       res.status(201).json({ success: true, data: faq });
     } catch (error) {
       next(error);
@@ -1026,6 +1027,7 @@ router.put(
       if (result.count === 0) {
         throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
       }
+      await invalidateStoreProductCaches(req.params.storeId);
       const updated = await (
         await storeDb(req.params.storeId)
       ).productFaq.findUnique({ where: { id: req.params.faqId } });
@@ -1044,6 +1046,7 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await deleteProductFaq(req.params.storeId, req.params.id, req.params.faqId);
+      await invalidateStoreProductCaches(req.params.storeId);
       res.json({ success: true, data: { message: 'FAQ deleted' } });
     } catch (error) {
       next(error);

@@ -67,6 +67,7 @@
   "GET /admin/:storeId/my-features",
   "GET /admin/answer-engine/providers",
   "GET /admin/assistant/flags",
+  "GET /admin/assistant/stores/:storeId/mode",
   "GET /admin/audit-logs",
   "GET /admin/billing/claims",
   "GET /admin/billing/claims/:id/receipt",
