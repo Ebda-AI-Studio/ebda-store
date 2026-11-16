@@ -21,6 +21,7 @@ import { messagingTools } from './messaging.tools';
 import { accountBillingTools } from './account-billing.tools';
 import { productsConfirmTools } from './products-confirm.tools';
 import { marketingConfirmTools } from './marketing-confirm.tools';
+import { trustTools } from './trust.tools';
 
 export function changeTools(): ToolSpec[] {
   return [
@@ -45,5 +46,6 @@ export function changeTools(): ToolSpec[] {
     ...accountBillingTools(),
     ...productsConfirmTools(),
     ...marketingConfirmTools(),
+    ...trustTools(),
   ];
 }
