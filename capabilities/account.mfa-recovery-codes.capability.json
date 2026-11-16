@@ -7,10 +7,7 @@
   "titleAr": "اعمل أكواد استرجاع جديدة للتحقق بخطوتين",
   "titleEn": "Make new two-step recovery codes",
   "screens": ["/account/security"],
-  "api": [
-    "GET /mfa/recovery-codes (identity service)",
-    "POST /mfa/recovery-codes/regenerate (identity service)"
-  ],
+  "api": [],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff", "super_admin"],
@@ -21,12 +18,16 @@
   },
   "helpArticle": "account-security",
   "questions": {
-    "ar": ["ضاعت أكواد الاسترداد بتاعتي", "ازاي اعمل أكواد استرجاع جديدة؟"],
+    "ar": [
+      "ضاعت أكواد الاسترداد بتاعتي",
+      "ازاي اعمل أكواد استرجاع جديدة؟",
+      "خلّصت أكواد التحقق الاحتياطية، اعمل ايه؟"
+    ],
     "en": ["How do I get new recovery codes?", "I lost my 2FA backup codes"]
   },
   "steps": [
     "Open Account, Security, Recovery codes",
-    "Enter password and a current authenticator code",
+    "Enter password and a current authenticator code (served by the accounts service: GET /mfa/recovery-codes, POST /mfa/recovery-codes/regenerate)",
     "Press Make new recovery codes and save the codes shown"
   ],
   "edgeCases": [
