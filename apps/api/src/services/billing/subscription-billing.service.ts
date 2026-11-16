@@ -160,6 +160,8 @@ interface ClaimInput {
   provider: string;
   idempotencyKey: string;
   relatedEventId?: string | null;
+  /** Operator choices that must survive until the row settles (e.g. a refund's keepAccess). */
+  raw?: Record<string, unknown>;
 }
 
 /**
@@ -208,6 +210,7 @@ async function claimEvent(input: ClaimInput): Promise<string | null> {
           idempotencyKey: input.idempotencyKey,
           status: 'pending',
           relatedEventId: input.relatedEventId ?? null,
+          ...(input.raw ? { raw: input.raw as Prisma.InputJsonValue } : {}),
           ...vatColumns(input.charge),
         },
       ],
@@ -1627,7 +1630,8 @@ export async function applyWebhookEvent(
         refundRow.storeId,
         refundRow.id,
         event.kind === 'refund.succeeded',
-        event.failureReason
+        event.failureReason,
+        effects
       );
       return { duplicate: false, outcome: 'processed' };
     }
@@ -1969,23 +1973,24 @@ async function confirmAndApplyWebhook(
 // ───────────────────────────── refunds ────────────────────────────────────
 
 /**
- * R-REFUND-PERIOD-1: the card twin of the InstaPay void in `recordManualRefundInner`. A FULL refund of the
- * latest paid charge (checkout / renewal / upgrade) that bought the CURRENT period moves `currentPeriodEnd`
- * back to that period's start, so the merchant does not keep a month they got their money back for.
- * An overdue end lands the store in `past_due` with the first dunning attempt already counted (the retry
- * key then differs from the refunded charge's), so the normal dunning path collects again or downgrades.
- * `keepAccess` (goodwill refund) skips it. A partial refund never changes the period.
+ * R-REFUND-PERIOD-1 (amended): a FULL refund of the latest paid charge (checkout / renewal / upgrade) that bought the
+ * CURRENT period ends that access at once: the subscription moves to free / `canceled` (`downgradeToFree`), with no
+ * provider and no saved card, so NO automatic charge ever follows the refund. Putting the store into dunning instead
+ * would charge the same card again ~3 days after the money went back. `keepAccess` (goodwill refund) skips it; a
+ * partial refund never changes the plan; an older charge (a newer paid charge exists) bought a period already used.
  */
-async function rollBackPeriodForRefund(
+async function endAccessForRefund(
   tx: Tx,
   charge: { id: string; storeId: string; type: string; createdAt: Date },
   keepAccess: boolean,
-  now: Date
+  now: Date,
+  effects: BillingEffect[]
 ): Promise<void> {
   if (keepAccess || !['checkout', 'renewal', 'upgrade'].includes(charge.type)) return;
   const { storeId } = charge;
   const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
-  if (!sub || sub.status !== 'active' || !sub.currentPeriodStart || !sub.currentPeriodEnd) return;
+  if (!sub || !['active', 'past_due', 'trialing'].includes(sub.status)) return;
+  if (sub.planCode === FREE_PLAN_CODE || isGrantedPlan(sub.planCode)) return;
   // only the NEWEST paid charge can own the current period: an older one bought a period already used up
   const newer = await tx.billingEvent.findFirst({
     where: {
@@ -1998,23 +2003,9 @@ async function rollBackPeriodForRefund(
     select: { id: true },
   });
   if (newer) return;
-  const target = sub.currentPeriodStart;
-  // the free months this payment earned go too, before the period is read (FOUNDING-3)
+  // the free months this payment earned go too (FOUNDING-3)
   await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
-  const overdue = target.getTime() <= now.getTime();
-  await tx.storeSubscription.update({
-    where: { storeId },
-    data: overdue
-      ? {
-          currentPeriodEnd: target,
-          status: 'past_due',
-          dunningAttempts: 1,
-          nextRetryAt: new Date(
-            Math.max(now.getTime(), addDays(target, DUNNING_RETRY_DAYS[0]).getTime())
-          ),
-        }
-      : { currentPeriodEnd: target },
-  });
+  await downgradeToFree(tx, storeId, 'canceled', effects);
 }
 
 async function settleRefundInTx(
@@ -2022,7 +2013,9 @@ async function settleRefundInTx(
   storeId: string,
   refundId: string,
   succeeded: boolean,
-  reason?: string
+  reason: string | undefined,
+  /** a full refund that ends access pushes its `downgraded` effect here; the caller runs it after the tx */
+  effects: BillingEffect[]
 ): Promise<void> {
   const upd = await tx.billingEvent.updateMany({
     where: { id: refundId, storeId, status: 'pending' },
@@ -2049,7 +2042,7 @@ async function settleRefundInTx(
     // R-REFUND-PERIOD-1: a full refund of the charge that paid the current period takes the period back.
     if (flipped.count > 0) {
       const keep = (refund.raw as { keepAccess?: unknown } | null)?.keepAccess === true;
-      await rollBackPeriodForRefund(tx, charge, keep, new Date());
+      await endAccessForRefund(tx, charge, keep, new Date(), effects);
     }
     // FOUNDING-3: the payment behind any free month is gone, so the free months go too (own store inline; a
     // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
@@ -2120,8 +2113,11 @@ export async function refundCharge(args: {
     provider: charge.provider,
     idempotencyKey: key,
     relatedEventId: charge.id,
+    // stored at claim time, so an async (webhook) confirmation applies the same choice (R-REFUND-PERIOD-1)
+    raw: { keepAccess: args.keepAccess === true },
   });
   if (!refundId) throw new AppError(409, 'REFUND_IN_PROGRESS', 'A refund is already in progress');
+  const effects: BillingEffect[] = [];
   try {
     const res = await provider.refund({
       chargeId: charge.providerRef,
@@ -2145,10 +2141,12 @@ export async function refundCharge(args: {
           charge.storeId,
           refundId,
           res.status === 'succeeded',
-          res.failureReason
+          res.failureReason,
+          effects
         );
       }
     });
+    await runBillingEffects(effects);
     // the referrer's side of a revoked grant lives in another tenant: take it back now, the sweep retries a miss
     await restoreRevokedGrants().catch(() => undefined);
     return { refundEventId: refundId, status: res.status };

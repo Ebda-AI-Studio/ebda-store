@@ -137,31 +137,33 @@ function world(over: { type?: string; subStatus?: string; start?: number; end?: 
 const sub = (db: DatabaseSync) =>
   db
     .prepare(
-      'SELECT status, current_period_end e, dunning_attempts d, next_retry_at r FROM store_subscriptions'
+      'SELECT status, plan_code p, current_period_end e, dunning_attempts d, next_retry_at r, provider pv FROM store_subscriptions'
     )
-    .get() as { status: string; e: number; d: number; r: number | null };
+    .get() as {
+    status: string;
+    p: string;
+    e: number;
+    d: number;
+    r: number | null;
+    pv: string | null;
+  };
 
 describe('refundCharge rolls the paid period back on a FULL refund', () => {
-  it('renewal: currentPeriodEnd goes back to the period start, past_due, first dunning attempt counted', async () => {
-    const { db, start } = world();
+  it('renewal: access ends at once (free / canceled) and NO automatic charge can follow', async () => {
+    const { db } = world();
     const out = await refundCharge({ eventId: EV, provider: provider() });
     expect(out.status).toBe('succeeded');
     expect(db.prepare('SELECT status FROM billing_events WHERE id = ?').get(EV)).toEqual({
       status: 'refunded',
     });
-    const s = sub(db);
-    expect(s.e).toBe(start);
-    expect(s.status).toBe('past_due');
-    expect(s.d).toBe(1);
-    expect(s.r).toBeGreaterThan(Date.now());
+    // canceled + no provider + no retry date: the daily cycle never selects it, nothing re-charges the card
+    expect(sub(db)).toMatchObject({ status: 'canceled', p: 'free', r: null, pv: null });
   });
 
-  it('checkout: the period ends now (past_due)', async () => {
+  it('checkout: access ends at once too', async () => {
     const { db } = world({ type: 'checkout' });
     await refundCharge({ eventId: EV, provider: provider() });
-    const s = sub(db);
-    expect(s.status).toBe('past_due');
-    expect(s.e).toBeLessThanOrEqual(Date.now());
+    expect(sub(db)).toMatchObject({ status: 'canceled', p: 'free', r: null });
   });
 
   it('keepAccess (goodwill): money goes back, the period stays', async () => {
@@ -186,13 +188,20 @@ describe('refundCharge rolls the paid period back on a FULL refund', () => {
     expect(sub(db)).toMatchObject({ status: 'active', e: end });
   });
 
-  it('an async (pending) refund records keepAccess on its row and leaves the period until it settles', async () => {
+  it('an async (pending) refund stores keepAccess at CLAIM time and leaves the plan until it settles', async () => {
     const { db, end } = world();
-    await refundCharge({ eventId: EV, provider: provider('pending') });
+    const p = {
+      name: 'stub',
+      refund: vi.fn(async () => {
+        // while the gateway call is in flight the row already carries the operator's choice
+        const raw = db.prepare("SELECT raw FROM billing_events WHERE type = 'refund'").get() as {
+          raw: string;
+        };
+        expect(JSON.parse(raw.raw)).toMatchObject({ keepAccess: true });
+        return { status: 'pending', refundId: 'rf-1', raw: {} };
+      }),
+    } as never;
+    await refundCharge({ eventId: EV, keepAccess: true, provider: p });
     expect(sub(db)).toMatchObject({ status: 'active', e: end }); // nothing yet
-    const raw = db.prepare("SELECT raw FROM billing_events WHERE type = 'refund'").get() as {
-      raw: string;
-    };
-    expect(JSON.parse(raw.raw)).toMatchObject({ keepAccess: false });
   });
 });
