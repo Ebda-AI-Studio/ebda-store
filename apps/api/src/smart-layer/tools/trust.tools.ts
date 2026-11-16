@@ -30,7 +30,7 @@ const contactSupport = change<{ topic: SupportTopic; message: string }>({
   name: 'contact_ebda_support',
   capabilityId: 'support.contact-ebda',
   description:
-    'Send a message to the Ebda Store team (support) from inside the chat, about my store. Say: "write to Ebda support", "I need help from the Ebda team", "ابعت للدعم". Pick the closest topic. The team answers by e-mail. Max 5 messages per store per day.',
+    'Send a message to the Ebda Store team (support) from inside the chat, about my store. Say: "write to Ebda Store support", "I need help from the Ebda Store team", "ابعت للدعم". Pick the closest topic. The team answers by e-mail. Max 5 messages per store per day.',
   schema: shape<{ topic: SupportTopic; message: string }>(
     {
       topic: f.enum(
