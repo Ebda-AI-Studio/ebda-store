@@ -18,6 +18,7 @@ import jwt from 'jsonwebtoken';
 import { readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import type { Request, Response, NextFunction } from 'express';
+import { ORIGINAL_ROOT } from '../helpers/original-repo-root';
 
 const SLUG_TO_STORE: Record<string, string> = { 'shop-a': 'store-a', 'shop-b': 'store-b' };
 const DOMAIN_TO_STORE: Record<string, string> = { 'shop-a.com': 'store-a' };
@@ -269,7 +270,7 @@ function cases2(): Array<[string, Record<string, string>, boolean]> {
 }
 
 describe('coverage: the binding cannot be forgotten by a customer route', () => {
-  const apiSrc = path.resolve(__dirname, '../../apps/api/src');
+  const apiSrc = path.resolve(ORIGINAL_ROOT, 'apps/api/src');
   const walk = (dir: string, out: string[] = []): string[] => {
     for (const e of readdirSync(dir)) {
       const p = path.join(dir, e);

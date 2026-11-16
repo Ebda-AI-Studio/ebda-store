@@ -6,6 +6,7 @@ import { commerceOutcomesPort, type CommerceOutcomesPort } from '../../ci/port';
 import {
   planCartReminder,
   planCartRecovered,
+  planOnboardingHelp,
   planOnboardingStep,
   planOrderCreated,
   planOrderStatusChanged,
@@ -18,6 +19,7 @@ import { prismaCiSource } from '../../ci/source';
 import {
   CI_CART_RECOVERED_EVENT,
   CI_CART_REMINDER_EVENT,
+  CI_ONBOARDING_HELP_EVENT,
   CI_ONBOARDING_STEP_EVENT,
   CI_PAYMENT_FAILED_EVENT,
   CI_SHIPMENT_BOOKED_EVENT,
@@ -60,7 +62,9 @@ export async function emitCiOutcomesFor(
                   ? await planCartRecovered(ctx, d)
                   : event.name === CI_ONBOARDING_STEP_EVENT
                     ? await planOnboardingStep(ctx, d)
-                    : [];
+                    : event.name === CI_ONBOARDING_HELP_EVENT
+                      ? await planOnboardingHelp(ctx, d)
+                      : [];
   await (deps.port ?? commerceOutcomesPort()).emit(planned);
   return planned.length;
 }
@@ -79,6 +83,7 @@ export const ciOutcomes: JobDef = inngest.createFunction(
       { event: CI_CART_REMINDER_EVENT },
       { event: CI_CART_RECOVERED_EVENT },
       { event: CI_ONBOARDING_STEP_EVENT },
+      { event: CI_ONBOARDING_HELP_EVENT },
     ],
   },
   async ({ event, step }) => {

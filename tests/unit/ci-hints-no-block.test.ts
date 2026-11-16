@@ -15,7 +15,7 @@ const CI_CLIENT =
 const ALLOWED = [
   /^routes\/ci\.routes\.ts$/,
   /^routes\/admin-ci\.routes\.ts$/,
-  /^services\/ci-(hints|insights|calibration)\.service\.ts$/,
+  /^services\/ci-(hints|insights|calibration|activation)\.service\.ts$/,
   /^lib\/inngest\/functions\/ci-aggregation\.ts$/,
   /^lib\/ci\/(hints|aggregate)\//,
   // The assistant's `customer_intelligence_settings` tool flips the store's own CI sharing switch through the same service the settings screen calls; it reads no hint and sits in no checkout / booking path.
