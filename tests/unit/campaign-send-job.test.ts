@@ -428,6 +428,72 @@ describe('campaign-send', () => {
     expect(db.recipients.find(r => r.email === 'b@x.test')!.status).toBe('unsubscribed');
   });
 
+  it('a subscriber who switched to cart-reminders-only consent after queueing is NOT emailed', async () => {
+    seed(['a@x.test', 'b@x.test']);
+    const realFindMany = holder.prisma.campaignRecipient.findMany;
+    holder.prisma.campaignRecipient.findMany = async (args: any) => {
+      const out = await realFindMany(args);
+      db.subscribers.find(s => s.email === 'b@x.test')!.consentScope = 'cart_reminders';
+      return out;
+    };
+
+    await runJob();
+
+    expect(sentTo()).toEqual(['a@x.test']);
+    expect(db.recipients.find(r => r.email === 'b@x.test')).toMatchObject({
+      status: 'unsubscribed',
+      error: 'CONSENT_SCOPE_CART_ONLY_BEFORE_SEND',
+    });
+    expect(db.recipients.find(r => r.email === 'b@x.test')!.sentAt).toBeNull();
+  });
+
+  it("another campaign's QUEUED recipients reserve cap: cap 10, A queued 8, B audience 5 -> B refused", async () => {
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '10';
+    seed(['b0@x.test', 'b1@x.test', 'b2@x.test', 'b3@x.test', 'b4@x.test']);
+    const otherId = uuid();
+    db.campaigns.push({
+      id: otherId,
+      storeId: STORE_A,
+      status: 'sending',
+      scheduledAt: new Date(),
+    });
+    for (let i = 0; i < 8; i++)
+      db.recipients.push({
+        id: uuid(),
+        campaignId: otherId,
+        storeId: STORE_A,
+        email: `a${i}@x.test`,
+        status: 'queued',
+        sentAt: null,
+      });
+
+    await runJob();
+
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
+  });
+
+  it("a paused (draft) campaign's queued recipients do NOT reserve cap", async () => {
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '10';
+    seed(['b0@x.test', 'b1@x.test', 'b2@x.test', 'b3@x.test', 'b4@x.test']);
+    const otherId = uuid();
+    db.campaigns.push({ id: otherId, storeId: STORE_A, status: 'draft', scheduledAt: null });
+    for (let i = 0; i < 8; i++)
+      db.recipients.push({
+        id: uuid(),
+        campaignId: otherId,
+        storeId: STORE_A,
+        email: `a${i}@x.test`,
+        status: 'queued',
+        sentAt: null,
+      });
+
+    await runJob();
+
+    expect(campaign().lastError).not.toBe('DAILY_CAP_EXCEEDED');
+    expect(sendMarketingEmail).toHaveBeenCalledTimes(5);
+  });
+
   it('a cancel before the batch sends nothing and leaves no queued row', async () => {
     seed(['a@x.test', 'b@x.test']);
     const realFindMany = holder.prisma.campaignRecipient.findMany;

@@ -278,7 +278,31 @@ const campaignSendFn = inngest.createFunction(
       const audience = await inCampaignStore(storeId, () => buildCampaignAudience(storeId));
       const alreadySent = await inCampaignStore(storeId, () => sentInLast24h(storeId));
       const dailyCap = await storeCampaignDailyCap(storeId);
-      const remaining = Math.max(0, dailyCap - alreadySent);
+      // Other campaigns of this store still `sending` have recipient rows `queued` that `alreadySent` (sent rows only)
+      // does not see. The per-store concurrency limit of 1 is per STEP, so a second campaign's materialize can run between
+      // the first one's send batches: reserve those not-yet-sent rows or two campaigns together send ~2x the cap.
+      // Paused (draft) and finished campaigns hold no reservation. Cart-recovery emails count in `alreadySent` once SENT
+      // (sentInLast24h); a cart reminder merely due but not yet sent is NOT reserved (residual, bounded by
+      // cartEmailDailyCap, Ruling CART-EMAIL-6).
+      const otherSending = await inCampaignStore(storeId, db =>
+        db.campaign.findMany({
+          where: { storeId, status: 'sending', id: { not: campaignId } },
+          select: { id: true },
+        })
+      );
+      const reservedByOthers =
+        otherSending.length === 0
+          ? 0
+          : await inCampaignStore(storeId, db =>
+              db.campaignRecipient.count({
+                where: {
+                  storeId,
+                  status: 'queued',
+                  campaignId: { in: otherSending.map(c => c.id) },
+                },
+              })
+            );
+      const remaining = Math.max(0, dailyCap - alreadySent - reservedByOthers);
       const abort = async (reason: string) => {
         await inCampaignStore(storeId, (_db, w) =>
           w.campaign.updateMany({
@@ -402,7 +426,7 @@ const campaignSendFn = inngest.createFunction(
           const subscriber = row.subscriberId
             ? await db.newsletterSubscriber.findFirst({
                 where: { id: row.subscriberId, storeId },
-                select: { isActive: true, unsubscribedAt: true },
+                select: { isActive: true, unsubscribedAt: true, consentScope: true },
               })
             : null;
           return { ...row, subscriber };
@@ -421,6 +445,20 @@ const campaignSendFn = inngest.createFunction(
             w.campaignRecipient.updateMany({
               where: { id: r.id, storeId, status: 'queued' },
               data: { status: 'unsubscribed', error: 'CONSENT_WITHDRAWN_BEFORE_SEND' },
+            })
+          );
+          skipped++;
+          continue;
+        }
+        // Same scope rule as `buildCampaignAudience`: 'cart_reminders' is consent for cart reminders ONLY, never
+        // campaigns. A subscriber who narrowed to it after this campaign was queued is not mailed. No new enum value
+        // (it would need a migration on both backends): reuse `unsubscribed` (counted as neither sent nor failed) with
+        // a distinct `error` code so the recipients tab shows why.
+        if (r.subscriber.consentScope === 'cart_reminders') {
+          await inCampaignStore(storeId, (_db, w) =>
+            w.campaignRecipient.updateMany({
+              where: { id: r.id, storeId, status: 'queued' },
+              data: { status: 'unsubscribed', error: 'CONSENT_SCOPE_CART_ONLY_BEFORE_SEND' },
             })
           );
           skipped++;
