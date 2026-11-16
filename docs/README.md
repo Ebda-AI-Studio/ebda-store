@@ -364,6 +364,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## security - Security
 
+- [security/2026-11-12-backfill-hardening-s-ten.md](security/2026-11-12-backfill-hardening-s-ten.md) - Backfill audit 2026-11-12: S2-S7, TEN-5, TEN-7 fixes
 - [security/audit-2026-10-14.md](security/audit-2026-10-14.md) - Security audit — 2026-10-14 (static, `apps/api` + `packages/database`)
 - [security/burp-manual-pentest-checklist.md](security/burp-manual-pentest-checklist.md) - Manual Burp Suite Pentest Checklist (quarterly)
 - [security/csp-hardening-plan.md](security/csp-hardening-plan.md) - CSP hardening: removing `script-src 'unsafe-inline'`
