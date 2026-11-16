@@ -48,7 +48,7 @@ Both arrive by email to the support inbox and are stored in `trust_requests` (`k
 
 ## Support and trust requests screen
 
-Super admin only, MFA required (`/trust-requests`, API `GET /admin/trust-requests`). It lists every support request, suspension appeal, protected address claim and store limit request, filtered by type, status, store id and created date; open one to read the full message and evidence, then **Resolve** (you acted on it) or **Reject** (you declined it). Each decision is written to the audit log (`trust_request.resolve` / `trust_request.reject`) and an already decided request cannot be decided again. Rejecting an appeal starts the merchant's 24 hour cooldown. The suspension reason notes are not requests and are not listed.
+Super admin only, MFA required (`/trust-requests`, API `GET /admin/trust-requests`). It lists every support request, suspension appeal, protected address claim and store limit request, filtered by type, status, store id and created date; open one to read the full message and evidence, then **Resolve** (you acted on it) or **Reject** (you declined it). Each decision is written to the audit log (`trust_request.resolve` / `trust_request.reject`) and an already decided request cannot be decided again. Rejecting an appeal starts the merchant's 24 hour cooldown. The list and the detail show a **Decided** date (`trust_requests.decided_at`, D1 migration 0013): set whenever a request leaves `open`, by Resolve, Reject, an appeal reject, a reactivation closing the appeal, or a granted address closing slug claims; empty while open, and for requests decided before 0013. The suspension reason notes are not requests and are not listed.
 
 **Staff path (override, for a contract-led merchant).**
 

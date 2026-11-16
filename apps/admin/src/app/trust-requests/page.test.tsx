@@ -31,6 +31,7 @@ const row = {
   slug: 'nike',
   evidenceUrl: 'https://example.com/proof',
   createdAt: '2026-11-14T10:00:00.000Z',
+  decidedAt: null as string | null,
 };
 const route = (calls: string[]) => async (url: string) => {
   calls.push(url);
@@ -115,5 +116,18 @@ describe('super-admin trust requests page', () => {
     fireEvent.click(await screen.findByText('detail.open'));
     fireEvent.click(await screen.findByText('detail.resolve'));
     expect((await screen.findByText('detail.failed')).getAttribute('role')).toBe('alert');
+  });
+});
+
+describe('decided date (G19)', () => {
+  it('shows when a decided request was decided, and a dash while it is open', async () => {
+    const decided = { ...row, id: 'd1', status: 'resolved', decidedAt: '2026-11-15T12:30:00.000Z' };
+    apiGet.mockImplementation(async () => ({
+      data: { rows: [decided, { ...row, id: 'o1' }], nextCursor: null },
+      error: null,
+    }));
+    render(<TrustRequestsPage />);
+    await waitFor(() => expect(screen.getByText('2026-11-15 12:30')).toBeTruthy());
+    expect(screen.getByText('col.decided')).toBeTruthy();
   });
 });

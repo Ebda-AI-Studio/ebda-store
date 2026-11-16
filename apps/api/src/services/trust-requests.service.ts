@@ -188,7 +188,7 @@ export async function rejectAppeal(db: TrustDb, storeId: string): Promise<{ id: 
   // conditional on still being open: two staff clicking at once reject it once
   const { count } = await db.trustRequest.updateMany({
     where: { id: open.id, storeId, status: 'open' },
-    data: { status: 'rejected', rejectedAt: new Date() },
+    data: { status: 'rejected', rejectedAt: new Date(), decidedAt: new Date() },
   });
   if (count === 0) throw new AppError(404, 'NO_OPEN_APPEAL', 'This store has no open appeal');
   return { id: open.id };
@@ -198,7 +198,7 @@ export async function rejectAppeal(db: TrustDb, storeId: string): Promise<{ id: 
 export async function closeAppealsOnReactivation(db: TrustDb, storeId: string): Promise<void> {
   await db.trustRequest.updateMany({
     where: { storeId, kind: 'suspension_appeal', status: 'open' },
-    data: { status: 'resolved' },
+    data: { status: 'resolved', decidedAt: new Date() },
   });
 }
 
@@ -402,6 +402,7 @@ const REVIEW_SELECT = {
   slug: true,
   evidenceUrl: true,
   rejectedAt: true,
+  decidedAt: true,
   grantedLimit: true,
   createdAt: true,
   updatedAt: true,
@@ -420,6 +421,7 @@ interface TrustReviewRow {
   slug: string | null;
   evidenceUrl: string | null;
   rejectedAt: Date | null;
+  decidedAt: Date | null;
   grantedLimit: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -515,6 +517,7 @@ export async function decideTrustRequest(
     where: { id, status: 'open', storeId: row.storeId, userId: row.userId },
     data: {
       status: decision,
+      decidedAt: new Date(),
       ...(decision === 'rejected' ? { rejectedAt: new Date() } : {}),
       ...(grantedLimit !== null ? { grantedLimit } : {}),
     },
@@ -537,7 +540,7 @@ export async function closeGrantedRequests(
   // cross-user by design: ANY merchant's open claim for this address is answered by the grant
   const { count } = await db.trustRequest.updateMany({
     where: { kind: 'slug_claim', slug: grant.slug.trim().toLowerCase(), status: 'open' },
-    data: { status: 'resolved' },
+    data: { status: 'resolved', decidedAt: new Date() },
   });
   return count;
 }

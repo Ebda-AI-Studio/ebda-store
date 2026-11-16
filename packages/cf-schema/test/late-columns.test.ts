@@ -57,6 +57,15 @@ const late = Object.entries(
   cols.filter(c => c.cfSince).map(c => ({ model, column: c.column, since: c.cfSince! }))
 );
 
+// model -> D1 table (a column name alone is not unique: `decided_at` also exists on other tables)
+const LATE_TABLE: Record<string, string> = {
+  Store: 'stores',
+  BillingEvent: 'billing_events',
+  TrustRequest: 'trust_requests',
+};
+const createBlock = (sql: string, table: string) =>
+  sql.match(new RegExp(`CREATE TABLE IF NOT EXISTS "${table}" \\([\\s\\S]*?\\n\\);`))?.[0] ?? '';
+
 describe('late columns (declared once, applied once)', () => {
   it('every late column is declared in cf-additions, absent from 0001, and added by exactly one numbered migration', () => {
     expect(late.length).toBeGreaterThan(0);
@@ -68,8 +77,12 @@ describe('late columns (declared once, applied once)', () => {
       ])
     );
     for (const c of late) {
-      expect(init, `0001 must not carry ${c.column}`).not.toMatch(new RegExp(`"${c.column}"`));
-      const hits = Object.values(numbered).filter(sql => sql.includes(`ADD COLUMN "${c.column}"`));
+      const block = createBlock(init, LATE_TABLE[c.model]);
+      expect(block, `0001 has no ${LATE_TABLE[c.model]} table`).not.toBe('');
+      expect(block, `0001 must not carry ${c.column}`).not.toMatch(new RegExp(`"${c.column}"`));
+      const hits = Object.values(numbered).filter(sql =>
+        sql.includes(`ALTER TABLE "${LATE_TABLE[c.model]}" ADD COLUMN "${c.column}"`)
+      );
       expect(hits, c.column).toHaveLength(1);
       expect(numbered[c.since], c.column).toContain(`ADD COLUMN "${c.column}"`);
     }
@@ -93,7 +106,7 @@ describe('late columns (declared once, applied once)', () => {
     );
     expect(counts).toEqual(manifest.databases.d1.columnCounts);
     for (const c of late) {
-      const table = c.model === 'Store' ? 'stores' : 'billing_events';
+      const table = LATE_TABLE[c.model];
       const names = (db.prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]).map(
         x => x.name
       );
