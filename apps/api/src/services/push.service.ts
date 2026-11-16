@@ -11,6 +11,7 @@ import webpush from 'web-push';
 import { currentStoreId, prisma, withStore, runInTenantContext } from '@ebda/database';
 import logger from '../lib/logger';
 import { config } from '../config';
+import { assertStoreOperational } from '../lib/store-operational';
 import { notificationConfigService } from './notification-config.service';
 import { withStoreRw } from '../lib/jobs/store-db';
 
@@ -415,6 +416,8 @@ class PushService {
     storeId: string,
     input: { titleEn: string; titleAr: string; bodyEn: string; bodyAr: string; url?: string }
   ): Promise<PushSendResult> {
+    // Ruling SUSPEND-OUT-1: a marketing push to a store's shoppers is refused (423) for a store that is not `active`.
+    await assertStoreOperational(storeId);
     return this.sendToStore(
       storeId,
       input.titleAr,
