@@ -250,6 +250,21 @@ describe('POST /stores/:id/staff: an invite never binds to an existing identity'
     expect(h.staffCreates).toEqual([]);
   });
 
+  it('S2-16: ROLE_CONFLICT is one generic message for a platform admin, a customer and a plain conflict: it never reveals the account kind', async () => {
+    h.existingId = 'probe-1';
+    const bodies: string[] = [];
+    for (const role of ['super_admin', 'customer']) {
+      h.account.mockResolvedValue({ role, emailVerified: true });
+      const r = await add();
+      expect(r.status).toBe(409);
+      expect(r.body.error.code).toBe('ROLE_CONFLICT');
+      bodies.push(JSON.stringify(r.body));
+    }
+    expect(bodies[0]).toBe(bodies[1]); // indistinguishable to the prober
+    expect(bodies[0]).not.toMatch(/admin|platform|customer/i);
+    expect(h.staffCreates).toEqual([]);
+  });
+
   it('a mid-signup merchant (Store profile exists, e-mail unverified) -> pending invite, no membership', async () => {
     h.existingId = 'pending-1';
     h.account.mockResolvedValue({ role: 'store_admin', emailVerified: false });
@@ -544,7 +559,13 @@ describe('POST /staff-invites/accept: the explicit accept step', () => {
     h.account.mockResolvedValue(goodAccount({ email: 'other@example.com' }));
     expect((await accept(token)).body.error.code).toBe('INVITE_EMAIL_MISMATCH');
     h.account.mockResolvedValue(goodAccount({ role: 'super_admin' }));
-    expect((await accept(token)).status).toBe(409);
+    const sa = await accept(token);
+    expect(sa.status).toBe(409);
+    expect(sa.body.error.code).toBe('ROLE_CONFLICT');
+    h.account.mockResolvedValue(goodAccount({ role: 'customer' }));
+    const cu = await accept(token);
+    expect(cu.body).toEqual(sa.body); // S2-16: same answer whichever kind of account this is
+    expect(JSON.stringify(sa.body)).not.toMatch(/admin|platform|customer/i);
     expect(h.staffCreates).toEqual([]);
     expect(h.invites[0].status).toBe('pending');
   });
