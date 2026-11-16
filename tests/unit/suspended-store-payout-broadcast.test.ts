@@ -71,7 +71,7 @@ vi.mock('@api/lib/logger', () => ({
 }));
 
 import { affiliateService } from '@api/services/affiliate.service';
-import { OneSignalService } from '@api/services/onesignal.service';
+import { pushService } from '@api/services/push.service';
 import { sweepCartRecoveryEmails } from '@api/services/cart-recovery-email.service';
 
 beforeEach(() => {
@@ -103,20 +103,23 @@ describe('affiliate payout (money out)', () => {
 });
 
 describe('push broadcast to storefront subscribers', () => {
-  const input = { storeId: 's1', titleEn: 't', titleAr: 't', bodyEn: 'b', bodyAr: 'b' };
+  const input = { titleEn: 't', titleAr: 't', bodyEn: 'b', bodyAr: 'b' };
 
-  it('a suspended store is refused with 423 and OneSignal is never called', async () => {
-    await expect(OneSignalService.broadcastToStore(input)).rejects.toMatchObject({
+  // Merchant broadcasts moved from OneSignal to native Web Push (pushService.broadcastToStore); the gate moved with it.
+  it('a suspended store is refused with 423 and no push is sent', async () => {
+    const send = vi.spyOn(pushService, 'sendToStore').mockResolvedValue({} as never);
+    await expect(pushService.broadcastToStore('s1', input)).rejects.toMatchObject({
       statusCode: 423,
       code: 'STORE_NOT_OPERATIONAL',
     });
-    expect(h.fetch).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('an active store broadcasts (unchanged)', async () => {
     h.active.value = true;
-    await OneSignalService.broadcastToStore(input).catch(() => undefined);
-    expect(h.fetch).toHaveBeenCalledTimes(1);
+    const send = vi.spyOn(pushService, 'sendToStore').mockResolvedValue({} as never);
+    await pushService.broadcastToStore('s1', input);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 });
 
