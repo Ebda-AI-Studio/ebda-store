@@ -17,7 +17,7 @@ export async function fetchBlogPosts(
 ): Promise<{ posts: BlogListItem[]; disabled: boolean }> {
   if (!storeId || storeId === 'demo') return { posts: [], disabled: false };
   const res = await fetch(`${API_URL}/public/${storeId}/blog?limit=${limit}`, {
-    next: { revalidate: 60 },
+    next: { revalidate: 60, tags: [`blog:${storeId}`] },
   });
   if (res.status === 404) return { posts: [], disabled: true };
   if (!res.ok) throw new Error(`blog list fetch failed: ${res.status}`);
