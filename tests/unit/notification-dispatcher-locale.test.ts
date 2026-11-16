@@ -36,6 +36,12 @@ vi.mock('@api/services/redis.service', () => ({
   redis: { incrementRateLimit: async () => 1 },
 }));
 vi.mock('@api/services/sms-consent.service', () => ({ SmsConsentService: {} }));
+vi.mock('@api/lib/store-operational', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/lib/store-operational')>()),
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+}));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
