@@ -18,6 +18,9 @@ describe('/contact (6c)', () => {
       expect(html).toContain('/.well-known/security.txt');
       expect(html).toContain('https://help.ebda.app');
       expect(html).toContain('https://status.ebda.app');
+      expect(html).toContain('https://www.instagram.com/ebdaaistudio');
+      expect(html).toContain('https://www.facebook.com/ebdaaistudio');
+      expect(html).toContain('https://www.linkedin.com/company/146968293');
       expect(html.match(/<h1/g)).toHaveLength(1);
     });
   }

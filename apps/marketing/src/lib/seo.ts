@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import {
   BRAND,
+  BRAND_SOCIAL_URLS,
   WHATSAPP_PACKAGES,
   officePostalAddress,
   servicesJsonLd,
@@ -306,6 +307,7 @@ export function jsonLd(
         legalName: locale === 'ar' ? BRAND.company.legalNameAr : BRAND.company.legalNameEn,
         foundingDate: BRAND.company.foundedOn,
         email: BRAND.supportEmail,
+        sameAs: [...BRAND_SOCIAL_URLS],
       },
       {
         // The product as a brand: "Ebda Store" (ابدأ ستور), made by the studio above.
@@ -399,6 +401,7 @@ export function studioJsonLd(locale: Locale) {
         foundingDate: BRAND.company.foundedOn,
         founder: FOUNDER,
         email: BRAND.supportEmail,
+        sameAs: [...BRAND_SOCIAL_URLS],
       },
       {
         '@type': 'WebSite',

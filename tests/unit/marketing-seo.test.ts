@@ -3,6 +3,7 @@
  * JSON-LD (parses, offers come from PLANS) and per-page metadata with a canonical.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { BRAND_SOCIAL_URLS } from '../../packages/shared/src/brand';
 
 // RootShell loads its fonts through next/font, which only exists inside the Next compiler.
 vi.mock('next/font/google', () => {
@@ -85,7 +86,7 @@ describe('JSON-LD', () => {
       // the studio is the organization / publisher; "Ebda Store" is the product brand organization
       // whose parent is the studio; the site and the app are the product
       byType.Organization = byId['https://ebda.app/#organization'];
-      expect(byType.Organization.sameAs).toBeUndefined(); // no verified public profiles: omitted, never empty
+      expect(byType.Organization.sameAs).toEqual([...BRAND_SOCIAL_URLS]); // the verified studio profiles (Ahmad, 2026-11-16), from BRAND.social
       expect(byType.Organization.name).toBe('Ebda AI Studio');
       const brand = byId['https://ebda.app/#store'];
       expect(brand['@type']).toBe('Organization');

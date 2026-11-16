@@ -203,6 +203,15 @@ export const BRAND = {
   contact: {
     whatsapp: '+201514191411',
   },
+  /**
+   * Ebda AI Studio's public profiles (Ahmad, 2026-11-16). One list feeds the footer on all five sites, the contact page and
+   * the Organization `sameAs` in the marketing JSON-LD (`socialLinks()` / `BRAND_SOCIAL_URLS`); never hardcode them.
+   */
+  social: {
+    instagram: 'https://www.instagram.com/ebdaaistudio',
+    facebook: 'https://www.facebook.com/ebdaaistudio',
+    linkedin: 'https://www.linkedin.com/company/146968293',
+  },
   legalUrls: {
     terms: 'https://ebda.app/terms',
     privacy: 'https://ebda.app/privacy',
@@ -299,6 +308,40 @@ export function whatsappUrl(text?: string): string {
 /** The WhatsApp number for display, e.g. `+20 151 419 1411` (render left-to-right, selectable). */
 export function whatsappDisplay(): string {
   return BRAND.contact.whatsapp.replace(/^\+20(\d{3})(\d{3})(\d{4})$/, '+20 $1 $2 $3');
+}
+
+/** The studio's public profile URLs, for Organization `sameAs`. */
+export const BRAND_SOCIAL_URLS: readonly string[] = [
+  BRAND.social.instagram,
+  BRAND.social.facebook,
+  BRAND.social.linkedin,
+];
+
+/** The studio's profiles as labelled links: `label` is the visible text, `aria` the full accessible name. */
+export function socialLinks(
+  lang: NavLang
+): { id: string; label: string; aria: string; href: string }[] {
+  const studio = studioName(lang);
+  return [
+    {
+      id: 'instagram',
+      label: L(lang, 'إنستجرام', 'Instagram'),
+      aria: L(lang, `${studio} على إنستجرام`, `${studio} on Instagram`),
+      href: BRAND.social.instagram,
+    },
+    {
+      id: 'facebook',
+      label: L(lang, 'فيسبوك', 'Facebook'),
+      aria: L(lang, `${studio} على فيسبوك`, `${studio} on Facebook`),
+      href: BRAND.social.facebook,
+    },
+    {
+      id: 'linkedin',
+      label: L(lang, 'لينكدإن', 'LinkedIn'),
+      aria: L(lang, `${studio} على لينكدإن`, `${studio} on LinkedIn`),
+      href: BRAND.social.linkedin,
+    },
+  ];
 }
 
 /** Hosted PNG of the mark for transactional email (mail clients drop SVG). */
@@ -842,6 +885,8 @@ export function siteFooter(lang: NavLang): {
     name: string;
     mission: string;
     contacts: { id: string; label: string; value: string; href: string }[];
+    socialLabel: string;
+    social: { id: string; label: string; aria: string; href: string }[];
   };
   columns: SiteFooterColumn[];
   copyright: (year: number) => string;
@@ -876,6 +921,8 @@ export function siteFooter(lang: NavLang): {
           href: whatsappUrl(),
         },
       ],
+      socialLabel: L(lang, `تابع ${studioName(lang)}`, `Follow ${studioName(lang)}`),
+      social: socialLinks(lang),
     },
     columns: [
       {
@@ -1052,9 +1099,15 @@ export function siteFooterHtml(lang: NavLang, markHtml: string, year: number): s
         `<div><dt>${esc(c.label)}</dt><dd><a href="${esc(c.href)}"${c.id === 'whatsapp' ? ' dir="ltr"' : ''}>${esc(c.value)}</a></dd></div>`
     )
     .join('');
+  const social = `<ul class="sf-social" aria-label="${esc(f.brand.socialLabel)}">${f.brand.social
+    .map(
+      s =>
+        `<li><a href="${esc(s.href)}" rel="noopener" aria-label="${esc(s.aria)}">${esc(s.label)}</a></li>`
+    )
+    .join('')}</ul>`;
   return (
     `<footer class="site-footer band-dark sf"><div class="wrap">` +
-    `<div class="sf-grid"><div class="sf-brand"><p class="sf-name">${markHtml}<span>${esc(f.brand.name)}</span></p><p class="sf-mission">${esc(f.brand.mission)}</p><dl class="sf-contact">${contacts}</dl></div>` +
+    `<div class="sf-grid"><div class="sf-brand"><p class="sf-name">${markHtml}<span>${esc(f.brand.name)}</span></p><p class="sf-mission">${esc(f.brand.mission)}</p><dl class="sf-contact">${contacts}</dl>${social}</div>` +
     f.columns.map(colHtml).join('') +
     `</div><div class="sf-bottom"><p class="muted small">${esc(f.copyright(year))}</p></div></div></footer>`
   );
@@ -1333,6 +1386,8 @@ export const SITE_FOOTER_CSS = `
 .sf-contact{margin:0;display:grid;gap:10px}
 .sf-contact dt{color:#a9b1af;font-size:.8125rem}
 .sf-contact dd{margin:0}
+.sf-social{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:0 20px}
+.sf-social a{display:inline-block;padding:11px 0;min-height:44px}
 .sf-col h2{font-size:.8125rem;font-weight:600;letter-spacing:.04em;color:${BRAND.colors.lift};margin:0 0 10px}
 html[lang=ar] .sf-col h2{letter-spacing:0}
 .sf-col ul{list-style:none;margin:0;padding:0;display:grid}

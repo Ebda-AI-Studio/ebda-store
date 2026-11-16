@@ -29,3 +29,24 @@ describe('Ebda AI Studio founder entity', () => {
     expect(llms).toContain('Founder: Ahmad Sharaf (https://mypovonai.com).');
   });
 });
+
+describe('Ebda AI Studio public profiles', () => {
+  const profiles = [
+    'https://www.instagram.com/ebdaaistudio',
+    'https://www.facebook.com/ebdaaistudio',
+    'https://www.linkedin.com/company/146968293',
+  ];
+  it('the studio Organization carries the three profiles as sameAs, from BRAND.social', () => {
+    for (const locale of ['ar', 'en'] as const) {
+      const orgs = studioOrgs(
+        seo.studioJsonLd(locale) as unknown as { '@graph': Node[] }
+      ) as unknown as { sameAs: string[] }[];
+      expect(orgs.length).toBeGreaterThan(0);
+      for (const o of orgs) expect(o.sameAs).toEqual(profiles);
+    }
+  });
+  it('llms.txt lists the profiles', () => {
+    const llms = readFileSync('apps/marketing/public/llms.txt', 'utf8');
+    for (const p of profiles) expect(llms).toContain(p);
+  });
+});
