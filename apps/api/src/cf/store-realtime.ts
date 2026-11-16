@@ -33,6 +33,7 @@ const PING_TIMEOUT_MS = 60_000;
  * is re-checked through the same /realtime/stores/:id/access rule once the last check is older than this.
  * Staleness class BOUNDED: a removal takes effect within this window (residual: up to 30 s of events).
  */
+// pq-allow(unused-export): imported by tests/unit/store-realtime-reverify.test.ts
 export const REVERIFY_MS = 30_000;
 
 interface Attachment {

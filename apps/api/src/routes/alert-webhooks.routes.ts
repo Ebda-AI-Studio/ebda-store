@@ -13,7 +13,7 @@ const router = Router();
 const alertsToken = (): string | undefined => process.env.ALERTS_WEBHOOK_TOKEN || undefined;
 
 /** Boot/health check: warn loudly when the token is unset in production (CLAUDE.md rule 12). Fail-closed at request time. */
-export function alertsBridgeConfigured(): boolean {
+function alertsBridgeConfigured(): boolean {
   return alertsToken() !== undefined;
 }
 if (!alertsBridgeConfigured() && process.env.NODE_ENV === 'production') {

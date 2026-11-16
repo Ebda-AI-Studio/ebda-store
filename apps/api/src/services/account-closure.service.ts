@@ -39,7 +39,7 @@ export type ClosureOutcome = { status: 'erased'; stores: string[]; ledger: Ledge
 
 const MONEY_IN_FLIGHT_AR =
   'مش هينفع نقفل الحساب دلوقتي لأن فيه فلوس لسه في الطريق على متجرك (طلبات أو استردادات). استنى لما تخلص وجرّب تاني.';
-export const ERASURE_NOT_ENABLED_MESSAGE =
+const ERASURE_NOT_ENABLED_MESSAGE =
   'طلب قفل الحساب اتسجل عندنا، بس الحذف لسه ماتفعّلش، فحسابك وبياناتك لسه موجودين. هنكمّل الطلب مع الدعم. / Your closure request was recorded, but account erasure is not enabled yet: your account and data still exist. Support will complete it.';
 const FAILED_AR = 'قفل الحساب ماكملش. اتسجل عندنا وهنراجعه مع الدعم.';
 

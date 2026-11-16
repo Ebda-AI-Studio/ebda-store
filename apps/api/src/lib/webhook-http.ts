@@ -66,6 +66,7 @@ export async function assertWebhookUrl(raw: string): Promise<URL> {
  * A `lookup` for `net.connect` that ignores the hostname and answers only with the addresses that already passed
  * the SSRF check. Handles both callback shapes (`all: true` from happy-eyeballs, single address otherwise).
  */
+// pq-allow(unused-export): imported by tests/unit/webhook-http.test.ts
 export function pinnedLookup(addresses: readonly string[]) {
   const entries = addresses.map(address => ({ address, family: address.includes(':') ? 6 : 4 }));
   return (
