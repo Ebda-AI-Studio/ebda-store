@@ -99,6 +99,24 @@ Suspension is for missed renewals + AUP violations. **The decision is super-admi
    - Store admin can still log into admin (so they can pay invoice + click reactivate)
    - Background jobs (Inngest functions, abandoned cart reminders, etc.) skip suspended stores
 
+### What a suspension stops (Ruling SUSPEND-OUT-1)
+
+One predicate, `apps/api/src/lib/store-operational.ts` (`isStoreOperational`: only `status = 'active'`), is checked at every send and payout entry point. It reads the store live (never the 60 s directory cache), so the next send after the flip is already refused.
+
+| Stopped while suspended / inactive                                                                        | Where                                                                                |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Abandoned-cart recovery: the sweep skips the store; email, SMS, push                                      | `abandoned-cart.service.ts`, `cart-recovery-email.service.ts`                        |
+| Customer SMS + storefront push on order events and back-in-stock                                          | `notification-dispatcher.service.ts`                                                 |
+| Marketing email: campaigns, newsletter broadcast (admin gets 423 `STORE_NOT_OPERATIONAL`)                 | `store-mailer.service.ts`, `campaign.routes.ts`, `newsletter.routes.ts`              |
+| Push broadcast to storefront subscribers (423)                                                            | `onesignal.service.ts`                                                               |
+| Ebda Chat events that message a customer: order created, status changed, shipment, cart                   | `wa-store-events.ts`                                                                 |
+| Customer emails: order confirmation, shipped, and the invoice of an UNPAID order (423 on the admin click) | `order-created.ts`, `order-status-changed.ts`, `invoice-email.ts`, `order.routes.ts` |
+| Affiliate payouts, the money-OUT path (423)                                                               | `affiliate.service.ts`                                                               |
+
+Campaigns are not failed when a store is suspended mid-send: the send PAUSES (campaign back to `draft`, recipients stay `queued`, one status read per batch) and a new Send after reactivation resumes the unsent recipients.
+
+Still allowed on purpose (Ruling SUSPEND-OUT-1b): receipts for paid orders (the payment-success email and the invoice of a paid order, including the admin invoice click), refunds to customers and the refund notice, the merchant's own mail (owner invoice copy, campaign test send to their own address, new-order alerts), data export, and the appeal / support routes. The admin UI shows the refusal from the error code `STORE_NOT_OPERATIONAL` (`details.messageEn` / `details.messageAr`; admin string `common.storeNotOperational`). Reactivating the store lifts all of it at once; nothing queued while suspended is replayed.
+
 ## Appeals
 
 A merchant of a suspended store sees the reason in a banner and can send ONE appeal (`POST /stores/:storeId/suspension/appeal`, 1000 characters). It reaches the support inbox by email and is stored (`kind = suspension_appeal`, `status = open`). A billing suspension (`billingSuspendedReason` set) cannot be appealed: the banner tells them to settle the invoice. You decide: reply to the merchant by email, then reactivate (below) to accept. To reject: reply to the merchant by email, then `POST /stores/:id/suspension/appeal/reject` (super admin, MFA). It sets the appeal to `rejected`, stamps `rejected_at`, writes an audit row (`store.suspension_appeal_reject`) and leaves the store suspended; 404 `NO_OPEN_APPEAL` when none is open. The merchant can send a new appeal 24 hours after `rejected_at` (until then: 429 `APPEAL_COOLDOWN`). Never edit `trust_requests` by hand.

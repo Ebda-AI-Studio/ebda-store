@@ -30,9 +30,17 @@ Ebda Chat / WhatsApp is a separate repo and Worker (`ebda-whatsapp`, `wa.ebda.ap
 
 ## Detection (where an incident shows up)
 
-1. **status.ebda.app** (`apps/status`, Worker `ebda-status`): probes every component every 5 minutes (8 s timeout; was 1 min until 2026-11-14); an
-   incident **opens after 2 consecutive failures** (detection 5-10 min), resolves after 1 good probe, and each open/resolve goes to
-   **Telegram** (`apps/status/src/alert.ts`). Probes: `apps/status/src/config.ts`.
+1. **status.ebda.app** (`apps/status`, Worker `ebda-status`): probes every component every 5 minutes (15 s hard timeout; was 1 min until 2026-11-14,
+   8 s until 2026-11-15); an incident **opens after 2 consecutive failures** (detection 5-10 min), resolves after 1 good probe, and each
+   open/resolve goes to **Telegram** (`apps/status/src/alert.ts`). **Slow is not down (STORE-EDGE-4):** a 200 with the right body
+   that took 8 s < t <= 15 s shows the component as **Degraded** (amber, "slow: over 8 s", response time on the page and in
+   `/api/status.json` `latencyMs` + `slow`) and pages nobody; a failure is non-200, body mismatch, timeout > 15 s, or **2 slow probes in a
+   row** (that one opens the incident at once). Cadence stays 5 min (frugality ruling), never back to 1 min. Constants:
+   `DEFAULT_TIMEOUT_MS`, `SLOW_THRESHOLD_MS`, `SLOW_STREAK_FAILS` in `apps/status/src/config.ts`. A lone Degraded storefront in quiet
+   hours is a cold render, not an outage: check `x-store-edge` on the page (`MISS` = cold, `STALE`/`HIT` = edge).
+   Storefront probes hit the locale-prefixed URL (`/ar`, `/ar/products/...`), not `/`: the unprefixed URL is a 308 hop (a second
+   Worker round trip, 41 % of probe latency measured 2026-11-15) that is not what the check is for; the redirect has its own unit test.
+   Probes: `apps/status/src/config.ts`.
 2. **API alerts → Telegram** (`apps/api/src/services/alerts.service.ts`): P1 alerts from jobs, queues, payment webhooks,
    email/SMS dead letters, `alerts-failure-watch`.
 3. **Sentry** (error tracker for api/web/admin/orders) → alert bridge → Telegram.

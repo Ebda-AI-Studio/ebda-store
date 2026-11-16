@@ -26,7 +26,7 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
 import { bustStoreCaches } from '../services/store.service';
 import { featureService } from '../services/feature.service';
-import { invalidateCached } from '../lib/public-cache';
+import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
 import { listGrants } from '../services/billing/grants.service';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
@@ -495,6 +495,7 @@ router.post(
         productIds,
       });
       if (report.apply) {
+        if (report.applied.length > 0) await invalidateStoreProductCaches(req.params.id);
         await auditLog({
           action: 'product.names_repaired',
           userId: req.user!.userId,
