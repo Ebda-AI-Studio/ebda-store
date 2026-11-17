@@ -135,22 +135,32 @@ describe('expense receipts (private bucket, #739 review)', () => {
   });
   it('an uploaded (private) receipt opens through the authorised receipt endpoint, never as a public URL', async () => {
     apiGetPage.mockResolvedValue(row('private:stores/store-1/receipts/r.jpg'));
-    apiFetch.mockResolvedValue(
-      new Response(new Blob(['x'], { type: 'image/jpeg' }), { status: 200 })
-    );
+    // a plain fetch-like answer: no dependence on how the test environment's Response/Blob classes interoperate
+    apiFetch.mockResolvedValue({ ok: true, status: 200, blob: async () => new Blob(['x']) });
     const tab = { location: { href: '' }, close: vi.fn() };
-    vi.stubGlobal(
-      'open',
-      vi.fn(() => tab)
-    );
+    const open = vi.fn(() => tab);
+    vi.stubGlobal('open', open);
+    // jsdom has no createObjectURL; define it for this test only and remove it after
+    const hadCreate = 'createObjectURL' in URL;
     (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => 'blob:receipt';
-    render(<ExpensesPage />);
-    fireEvent.click(await screen.findByText('actions.receipt'));
-    await waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith('/api/v1/stores/store-1/expenses/e1/receipt')
-    );
-    await waitFor(() => expect(tab.location.href).toBe('blob:receipt'));
-    vi.unstubAllGlobals();
+    try {
+      render(<ExpensesPage />);
+      fireEvent.click(await screen.findByText('actions.receipt'));
+      await waitFor(
+        () => expect(apiFetch).toHaveBeenCalledWith('/api/v1/stores/store-1/expenses/e1/receipt'),
+        { timeout: 5000 }
+      );
+      await waitFor(() => expect(tab.location.href).toBe('blob:receipt'), { timeout: 5000 });
+      // never the stored reference as a public URL
+      expect(open).not.toHaveBeenCalledWith(
+        expect.stringContaining('private:'),
+        expect.anything(),
+        expect.anything()
+      );
+    } finally {
+      vi.unstubAllGlobals();
+      if (!hadCreate) delete (URL as unknown as { createObjectURL?: unknown }).createObjectURL;
+    }
   });
   it('no receipt: no Receipt button', async () => {
     apiGetPage.mockResolvedValue(row(null));
