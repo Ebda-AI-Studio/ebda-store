@@ -20,6 +20,27 @@ export function isStoreBillingRoute(path: string): boolean {
   return BILLING_ROUTE_RE.test(path);
 }
 
+/**
+ * Ruling SUSPEND-REFUND-1: a suspension never strands a CUSTOMER's money. The routes that send money back to customers (a
+ * refund, recording or settling one, cancelling an order) stay open during a BILLING suspension (unpaid, over limit); a
+ * PLATFORM suspension (abuse / fraud) blocks them for the merchant, and a super admin refunds on the store's behalf
+ * through POST /payments/refund with a reason. Anchored at the order mount; the status route counts only for a cancel or
+ * a refund in the body.
+ */
+const ORDER_MONEY_BACK_RE =
+  /^(?:\/api\/v\d+)?\/stores\/[^/]+\/orders\/[^/]+\/(?:refund-via-provider|instapay-refund|refund-match-claim|refresh-refund-status)\/?$/i;
+const ORDER_STATUS_RE = /^(?:\/api\/v\d+)?\/stores\/[^/]+\/orders\/[^/]+\/status\/?$/i;
+// pq-allow(unused-export): exported for unit tests
+export function isCustomerMoneyBackRoute(method: string, path: string, body?: unknown): boolean {
+  const m = method.toUpperCase();
+  if (m === 'POST' && ORDER_MONEY_BACK_RE.test(path)) return true;
+  if (m === 'PUT' && ORDER_STATUS_RE.test(path)) {
+    const status = (body as { status?: unknown } | undefined)?.status;
+    return status === 'cancelled' || status === 'refunded';
+  }
+  return false;
+}
+
 // pq-allow(unused-export): exported for unit tests
 export const STORE_SUSPENDED_MESSAGES = {
   /** Suspended by the platform (no billing reason): nothing but reads. */
@@ -46,12 +67,18 @@ export function suspendedWriteBlock(
   store: { status: string; billingSuspendedReason?: string | null },
   role: string,
   method: string,
-  fullPath: string
+  fullPath: string,
+  /** The request body: a status change counts as money back only for a cancel or a refund (SUSPEND-REFUND-1). */
+  body?: unknown,
+  /** The caller IS a customer-money-back action (POST /payments/refund), whatever its path. */
+  moneyBack = false
 ): AppError | null {
   if (role === 'super_admin' || store.status !== 'suspended') return null;
   if (READ_METHODS.includes(method.toUpperCase())) return null;
   const billingReason = store.billingSuspendedReason ?? null;
   if (billingReason && isStoreBillingRoute(fullPath)) return null;
+  // SUSPEND-REFUND-1: a billing suspension never blocks money going back to customers.
+  if (billingReason && (moneyBack || isCustomerMoneyBackRoute(method, fullPath, body))) return null;
   const m = billingReason ? STORE_SUSPENDED_MESSAGES.billing : STORE_SUSPENDED_MESSAGES.platform;
   return new AppError(403, 'STORE_SUSPENDED', m.en, {
     reason: billingReason ?? 'platform',
@@ -159,7 +186,13 @@ export async function requireStoreAccess(
 
     // Suspension is enforced AFTER the ownership/membership decision below, so a stranger never learns a store's status.
     const refuseIfSuspended = (): void => {
-      const block = suspendedWriteBlock(store, user.role, req.method, `${req.baseUrl}${req.path}`);
+      const block = suspendedWriteBlock(
+        store,
+        user.role,
+        req.method,
+        `${req.baseUrl}${req.path}`,
+        req.body
+      );
       if (block) throw block;
     };
 
@@ -280,13 +313,16 @@ export async function requireStoreAccess(
 export async function checkStoreAccess(
   storeId: string,
   user: { userId: string; role: string },
-  /** Pass for a WRITE (upload, delete): a suspended store then refuses exactly like `requireStoreAccess` (TEN-1). */
-  opts?: { write?: boolean }
+  /**
+   * Pass `write` for a WRITE (upload, delete): a suspended store then refuses exactly like `requireStoreAccess` (TEN-1).
+   * Add `moneyBack` for a refund to a customer: a BILLING suspension then lets it through (SUSPEND-REFUND-1).
+   */
+  opts?: { write?: boolean; moneyBack?: boolean }
 ): Promise<StoreAccessResult> {
   const r = await decideStoreAccess(storeId, user);
   if (r.ok && opts?.write) {
-    // Callers are non-billing routes, so the billing exemption never applies here.
-    const block = suspendedWriteBlock(r.store, user.role, 'POST', '/');
+    // Callers are non-billing routes, so the billing-route exemption never applies here; money back may.
+    const block = suspendedWriteBlock(r.store, user.role, 'POST', '/', undefined, opts.moneyBack);
     if (block) {
       return { ok: false, status: block.statusCode, code: block.code, message: block.message };
     }

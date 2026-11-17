@@ -1303,10 +1303,26 @@ async function refundOnce(
   if (!paymentRow) {
     throw new AppError(404, 'NOT_FOUND', 'Payment not found');
   }
+  let onBehalfOfSuspended = false;
   // BE:S-12: ownership for EVERY non-platform role. It used to check `store_admin` only, so a staff member holding
   // `orders:refund` (on any store) passed with no membership check at all.
-  if (user.role !== 'super_admin') {
-    const access = await checkStoreAccess(paymentRow.order.storeId, user, { write: true });
+  // SUSPEND-REFUND-1: a refund is money back to a customer. A billing-suspended store may still refund; a platform-
+  // suspended one refuses the merchant (403), and a super admin refunds on its behalf with a written reason.
+  if (user.role === 'super_admin') {
+    const s = await checkStoreAccess(paymentRow.order.storeId, user);
+    if (s.ok && s.store.status === 'suspended' && (data.reason ?? '').trim().length < 3) {
+      throw new AppError(
+        400,
+        'REASON_REQUIRED',
+        'This store is suspended: write why you are refunding on its behalf'
+      );
+    }
+    onBehalfOfSuspended = s.ok && s.store.status === 'suspended';
+  } else {
+    const access = await checkStoreAccess(paymentRow.order.storeId, user, {
+      write: true,
+      moneyBack: true,
+    });
     if (!access.ok && access.code === 'STORE_SUSPENDED') {
       throw new AppError(403, 'STORE_SUSPENDED', access.message); // a refund is a write (TEN-1)
     }
@@ -1333,8 +1349,14 @@ async function refundOnce(
     await runInStoreCtx(refundStoreId, () =>
       auditLogStrict({
         ...auditBase,
-        action: 'payment.refund_requested',
-        details: { amount: data.amount ?? null, reason: data.reason || null },
+        action: onBehalfOfSuspended
+          ? 'payment.refund_requested_for_suspended_store'
+          : 'payment.refund_requested',
+        details: {
+          amount: data.amount ?? null,
+          reason: data.reason || null,
+          ...(onBehalfOfSuspended ? { onBehalfOfSuspendedStore: true } : {}),
+        },
       })
     );
   } catch (err) {

@@ -32,7 +32,8 @@ async function call(
   method: string,
   path: string,
   role = 'store_admin',
-  userId = 'u1'
+  userId = 'u1',
+  body?: unknown
 ) {
   const { requireStoreAccess } = await import('@api/middleware/store-access');
   const row = { id: SID, ownerId: 'u1', name: 'S', ...store };
@@ -48,6 +49,7 @@ async function call(
       baseUrl,
       path: sub ?? '/',
       headers: {},
+      body,
     } as never,
     {} as never,
     next
@@ -148,6 +150,63 @@ describe('checkStoreAccess (mixed-audience writes)', () => {
     expect(await checkStoreAccess(SID, user, { write: true })).toMatchObject({
       ok: false,
       status: 403,
+      code: 'STORE_SUSPENDED',
+    });
+  });
+});
+
+describe("SUSPEND-REFUND-1: a suspension never strands a customer's money", () => {
+  const O = `${W}/orders`;
+  it('billing suspension: refunds, refund records and cancels stay open for the merchant', async () => {
+    for (const sub of [
+      '/o1/refund-via-provider',
+      '/o1/instapay-refund',
+      '/o1/refund-match-claim',
+      '/o1/refresh-refund-status',
+    ])
+      expect(await call(UNPAID, 'POST', `${O}|${sub}`), sub).toBeUndefined();
+    expect(
+      await call(UNPAID, 'PUT', `${O}|/o1/status`, 'store_admin', 'u1', { status: 'cancelled' })
+    ).toBeUndefined();
+    expect(
+      await call(UNPAID, 'PUT', `${O}|/o1/status`, 'store_admin', 'u1', { status: 'refunded' })
+    ).toBeUndefined();
+  });
+  it('billing suspension: any other order write (ship, edit) is still blocked', async () => {
+    expect(
+      await call(UNPAID, 'PUT', `${O}|/o1/status`, 'store_admin', 'u1', { status: 'shipped' })
+    ).toMatchObject({ statusCode: 403, code: 'STORE_SUSPENDED' });
+    expect(await call(UNPAID, 'POST', `${O}|/o1/mark-paid`)).toMatchObject({
+      code: 'STORE_SUSPENDED',
+    });
+    // the path must be the real order route, not a look-alike segment
+    expect(await call(UNPAID, 'POST', `${W}/products|/o1/refund-via-provider`)).toMatchObject({
+      code: 'STORE_SUSPENDED',
+    });
+  });
+  it('platform suspension: the merchant cannot refund or cancel', async () => {
+    expect(await call(PLATFORM, 'POST', `${O}|/o1/refund-via-provider`)).toMatchObject({
+      statusCode: 403,
+      code: 'STORE_SUSPENDED',
+    });
+    expect(
+      await call(PLATFORM, 'PUT', `${O}|/o1/status`, 'store_admin', 'u1', { status: 'cancelled' })
+    ).toMatchObject({ code: 'STORE_SUSPENDED' });
+  });
+  it('checkStoreAccess {moneyBack}: billing suspension passes, platform suspension refuses', async () => {
+    const { checkStoreAccess } = await import('@api/middleware/store-access');
+    const user = { userId: 'u1', role: 'store_admin' };
+    db.store.mockResolvedValue({ id: SID, ownerId: 'u1', name: 'S', ...UNPAID });
+    expect(await checkStoreAccess(SID, user, { write: true, moneyBack: true })).toMatchObject({
+      ok: true,
+    });
+    expect(await checkStoreAccess(SID, user, { write: true })).toMatchObject({
+      ok: false,
+      code: 'STORE_SUSPENDED',
+    });
+    db.store.mockResolvedValue({ id: SID, ownerId: 'u1', name: 'S', ...PLATFORM });
+    expect(await checkStoreAccess(SID, user, { write: true, moneyBack: true })).toMatchObject({
+      ok: false,
       code: 'STORE_SUSPENDED',
     });
   });
