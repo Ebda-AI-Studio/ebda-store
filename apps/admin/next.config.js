@@ -118,6 +118,10 @@ const nextConfig = {
   // page-builder consolidation (2026-05-19); the visual editor owns them since Ruling VE-6.
   async redirects() {
     return [
+      // `/admin` is a guessed alias (the admin app IS the root, and has no locale path prefix):
+      // send it, and its /ar and /en spellings, to the dashboard instead of a 404.
+      { source: '/admin', destination: '/', permanent: false },
+      { source: '/:locale(ar|en)/admin', destination: '/', permanent: false },
       {
         source: '/stores/:id/layout',
         destination: '/stores/:id/builder',

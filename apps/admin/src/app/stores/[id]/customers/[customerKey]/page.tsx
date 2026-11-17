@@ -108,7 +108,20 @@ function formatMajor(piastres: number): string {
   return formatPrice(piastres);
 }
 
+const CHIP_STATUSES = new Set([
+  'pending',
+  'confirmed',
+  'processing',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'refunded',
+  'paid',
+  'unpaid',
+]);
+
 function StatusChip({ status }: { status: string }) {
+  const tStatus = useT('orders.status');
   const cls =
     status === 'paid' || status === 'completed' || status === 'confirmed'
       ? 'bg-success/10 text-success-ink'
@@ -119,7 +132,7 @@ function StatusChip({ status }: { status: string }) {
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${cls}`}
     >
-      {status}
+      {CHIP_STATUSES.has(status) ? tStatus(status) : status}
     </span>
   );
 }

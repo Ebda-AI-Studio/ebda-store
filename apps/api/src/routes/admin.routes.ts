@@ -394,9 +394,11 @@ router.get(
         ownerId: ownerScopeForReq(req),
       });
 
+      // The admin UI reads `pagination` (every other list sends it); `meta` stays for existing callers.
+      // Without the alias the /stores subtitle read "0 stores" over a full page.
       res.json({
         success: true,
-        data: result,
+        data: { ...result, pagination: result.meta },
       });
     } catch (error) {
       next(error);

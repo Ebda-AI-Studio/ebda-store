@@ -170,8 +170,11 @@ describe.skipIf(e.E2E_DB === '1')(
         data: {
           stores: Array<{ id: string; _count: { products: number } }>;
           meta: { total: number };
+          pagination: { total: number };
         };
       };
+      // The admin /stores subtitle reads `pagination`; it read "0 stores" while `meta` carried the count.
+      expect(j.data.pagination.total).toBe(j.data.meta.total);
       for (const s of stores) {
         const row = j.data.stores.find(x => x.id === s.id);
         expect(row, `store ${s.slug} listed`).toBeTruthy();

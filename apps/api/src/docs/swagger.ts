@@ -343,6 +343,8 @@ All errors follow this format:
                 'Previous-period revenue; 0 means the change is "first sales", not a percentage',
             },
             previousOrders: { type: 'integer' },
+            previousCustomers: { type: 'integer' },
+            previousProfit: { type: 'integer', nullable: true },
             conversionRate: {
               type: 'number',
               format: 'float',
