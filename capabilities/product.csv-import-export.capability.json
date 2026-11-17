@@ -1,0 +1,52 @@
+{
+  "id": "product.csv-import-export",
+  "status": "live",
+  "area": "products",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "استيراد وتصدير منتجات CSV/Excel",
+  "titleEn": "Import/export products by CSV or Excel",
+  "screens": ["/stores/[id]/bulk"],
+  "api": [
+    "GET /stores/:storeId/bulk/export",
+    "GET .../export.xlsx",
+    "GET .../bulk/template",
+    "POST .../bulk/import-preview",
+    "POST .../bulk/import",
+    "POST .../bulk/import-xlsx",
+    "GET .../bulk/import-jobs/:jobId"
+  ],
+  "mcpTool": null,
+  "planGate": "bulk_operations",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "import: no auto-undo"
+  },
+  "helpArticle": "products-and-csv-import",
+  "questions": {
+    "ar": [
+      "ازاي استورد منتجات من اكسيل؟",
+      "حمل نموذج الاستيراد",
+      "الاستيراد فشل في صفين",
+      "نقل المتجر من سلة/زد/شوبيفاي"
+    ],
+    "en": ["How do I import products from Excel?", "Migrate my catalogue from Shopify/Salla/Zid"]
+  },
+  "steps": ["Download template, fill, preview (errors per row), import."],
+  "edgeCases": [
+    "Arabic encoding BOM, Arabic-Indic digits, comma decimals",
+    "Row errors: preview lists them; partial import",
+    "Variants columns",
+    "Images by URL only",
+    "Migration from Shopify/Salla/Zid/WooCommerce has no dedicated importer: map their CSV to the template",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No platform-specific migration importers (Shopify/Salla/Zid/WooCommerce)"]
+}

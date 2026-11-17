@@ -40,6 +40,9 @@ vi.mock('@api/services/loyalty-automation.service', () => ({
 vi.mock('@api/services/auth.service', () => ({
   AuthService: { cleanupRefreshTokens: async () => void legacy.ran.push('refresh-token-cleanup') },
 }));
+vi.mock('@api/lib/super-admin-invariant', () => ({
+  checkSuperAdminInvariant: async () => void legacy.ran.push('super-admin-invariant'),
+}));
 vi.mock('@api/cf/ops/backup-sweep', () => ({
   runBackupSweep: async () => {
     legacy.ran.push('backup-sweep');
@@ -256,6 +259,8 @@ describe('crons', () => {
     expect(parked).toEqual([
       { kind: 'legacy-cron', name: 'refresh-token-cleanup', cron: '0 */12 * * *' }, // every 12 h: rarer than a sweep
       { kind: 'legacy-cron', name: 'loyalty-daily', cron: '0 3 * * *' },
+      { kind: 'legacy-cron', name: 'assistant-weekly-unanswered', cron: '0 3 * * *' }, // the assistant's Monday digest: info level, parked like any rare legacy cron
+      { kind: 'legacy-cron', name: 'super-admin-invariant', cron: '0 3 * * *' }, // Ruling ID-20: read-only RPC + alert, parked like any rare legacy cron
       { kind: 'legacy-cron', name: 'backup-sweep', cron: '0 3 * * *' },
     ]);
   });

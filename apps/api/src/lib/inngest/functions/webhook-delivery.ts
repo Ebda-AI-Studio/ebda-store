@@ -28,7 +28,7 @@ import {
 } from '../../../services/webhook.service';
 
 /**
- * Merchant outgoing webhooks (docs/plans/2026-10-21-merchant-webhooks.md).
+ * Merchant outgoing webhooks (docs/plans/done/2026-10-21-merchant-webhooks.md).
  *   webhook-fanout         source event -> one delivery row per subscribed endpoint -> dispatch events
  *   webhook-deliver        up to WEBHOOK_MAX_ATTEMPTS tries with the step.sleep schedule (~24h)
  *   webhook-delivery-purge daily: rows older than WEBHOOK_LOG_RETENTION_DAYS

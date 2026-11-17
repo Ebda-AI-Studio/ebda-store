@@ -23,7 +23,7 @@ function migrationBlocks(): Record<string, string> {
   return out;
 }
 
-describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)', () => {
+describe('locked pricing contract (docs/plans/done/2026-10-05-pricing-decisions.md)', () => {
   it('charges the agreed monthly and annual amounts without platform fees', () => {
     expect(LOCKED_PUBLIC_PLANS.map(p => [p.code, p.priceMonthlyMinor, p.priceYearlyMinor])).toEqual(
       [

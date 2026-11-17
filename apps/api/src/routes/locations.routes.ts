@@ -22,7 +22,7 @@ import { storeDb } from '../lib/repo-factory';
  * router.param (below) sets RLS tenant context after Express resolves
  * :storeId for the matched route (NOTE: ':id' elsewhere in this file is
  * the location's own id, NOT the storeId — only 'storeId' is registered).
- * See F2, docs/plans/2026-07-02-rls-cutover.md.
+ * See F2, docs/plans/done/2026-07-02-rls-cutover.md.
  */
 const router = Router({ mergeParams: true });
 

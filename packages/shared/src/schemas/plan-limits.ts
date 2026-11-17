@@ -143,7 +143,7 @@ export type AssignSubscriptionInput = z.infer<typeof assignSubscriptionSchema>;
 
 // ── Plan catalog ─────────────────────────────────────────────────────────────
 // The FULL catalog as it stands after migration 20261005090000_locked_pricing:
-// Ahmad's locked public plans (2026-10-05, docs/plans/2026-10-05-pricing-decisions.md)
+// Ahmad's locked public plans (2026-10-05, docs/plans/done/2026-10-05-pricing-decisions.md)
 // plus the hidden compatibility rows (free / pro / comped / founding_free).
 // Hidden rows exist only so existing `store_subscriptions.plan_code` references
 // keep resolving; they are never offered. Their NEW limit fields (maxStores,

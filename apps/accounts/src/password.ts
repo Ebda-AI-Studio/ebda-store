@@ -17,6 +17,7 @@ export const BCRYPT_COST = 12;
  * A cost-12 hash of a value nobody can supply: compared against when the account does not exist, so a missing
  * account costs the same wall time as a wrong password (no stopwatch enumeration).
  */
+// nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash -- dummy hash for timing equalisation (random plaintext discarded), not a credential
 export const DUMMY_HASH = '$2b$12$fG8PP9O5RGPMiNPM8qnSGuf8W6QjNTyMUEITsE9qXgKBbrU9muUz2';
 
 export const hashPassword = (pw: string): Promise<string> => bcrypt.hash(pw, BCRYPT_COST);

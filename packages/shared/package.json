@@ -28,6 +28,11 @@
       "import": "./dist/constants/index.js",
       "default": "./src/constants/index.ts"
     },
+    "./smart-layer": {
+      "types": "./src/smart-layer-kit.ts",
+      "require": "./dist/smart-layer-kit.js",
+      "default": "./src/smart-layer-kit.ts"
+    },
     "./brand": {
       "types": "./src/brand/index.ts",
       "require": "./dist/brand/index.js",

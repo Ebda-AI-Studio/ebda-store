@@ -91,6 +91,8 @@ export interface GscDashboard {
   totals: GscDashboardTotals | null;
   topQueries: GscTopQuery[];
   lastUpdatedAt: string | null;
+  /** Empty-state diagnosis from the API; absent = generic not-connected. */
+  setup?: 'verifying' | 'awaiting_data';
 }
 
 export function formatPosition(position: number): string {

@@ -84,6 +84,8 @@ interface AiUsageSummaryCardProps {
    * Used on the AI Tools page where screen space is shared with sweep controls.
    */
   embedded?: boolean;
+  /** Called with each successful snapshot, so a page can gate its run buttons on the same numbers it shows. */
+  onLoaded?: (summary: AiUsageSummary) => void;
 }
 
 // ── Sparkline ──────────────────────────────────────────────────────────
@@ -167,7 +169,11 @@ function QuotaBar({
 
 // ── Main component ─────────────────────────────────────────────────────
 
-export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummaryCardProps) {
+export function AiUsageSummaryCard({
+  storeId,
+  embedded = false,
+  onLoaded,
+}: AiUsageSummaryCardProps) {
   const t = useT('components.aiUsageSummaryCard');
   const [summary, setSummary] = useState<AiUsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -188,12 +194,13 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
         return;
       }
       setSummary(data);
+      onLoaded?.(data);
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, onLoaded]);
 
   useEffect(() => {
     fetchSummary();

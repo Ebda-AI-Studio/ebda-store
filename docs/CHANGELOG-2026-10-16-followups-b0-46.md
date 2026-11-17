@@ -1,6 +1,6 @@
 # Changelog — B0-46 follow-up fixes (branch `fix/followups-b0-46`)
 
-User-visible changes in this PR, by who sees them. Rulings: `docs/RULINGS.md` § "2026-10-15 — B0-46 follow-up fixes (FU46-\*)". Plan: `docs/plans/2026-10-15-followups-b0-46.md`.
+User-visible changes in this PR, by who sees them. Rulings: `docs/RULINGS.md` § "2026-10-15 — B0-46 follow-up fixes (FU46-\*)". Plan: `docs/plans/done/2026-10-15-followups-b0-46.md`.
 
 Deploy order: web + admin first (they still accept the old API answers), then `gh workflow run cf-api-deploy.yml`.
 

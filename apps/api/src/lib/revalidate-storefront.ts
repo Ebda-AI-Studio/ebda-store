@@ -1,5 +1,6 @@
 import { storeHost } from '@ebda/shared';
 import logger from './logger';
+import { enqueueStorefrontPurge } from './storefront-purge-jobs';
 import { cfBindings, cfWaitUntil } from '../cf/bindings';
 
 /**
@@ -59,15 +60,20 @@ export async function revalidateStorefrontWithRetry(
 ): Promise<RevalidateOutcome> {
   let outcome = await revalidateStorefrontNow(opts);
   for (const delay of PURGE_RETRY_DELAYS_MS) {
-    if (outcome !== 'failed') return outcome;
+    if (outcome !== 'failed') break;
     await sleep(delay);
     outcome = await revalidateStorefrontNow(opts);
   }
   if (outcome === 'failed') {
     logger.error(
       { tags: opts.tags, slug: opts.slug, domain: opts.domain },
-      '[revalidate] storefront purge LOST after retries: storefront copies stay until their TTL'
+      '[revalidate] storefront purge failed after retries: queued for durable retry'
     );
+  }
+  // STORE-EDGE-4: the edge copy lives up to 6 h, so a purge the fast path could not land goes to the job layer
+  // (retries with backoff, then a dead-letter alert). `rejected` (401/503) is a config fault that can heal in minutes.
+  if (outcome === 'failed' || outcome === 'rejected') {
+    await enqueueStorefrontPurge(opts);
   }
   return outcome;
 }

@@ -8,7 +8,7 @@ import AboutClient from './AboutClient';
  * so the SAME rendering logic serves both `app/about/page.tsx` (legacy,
  * header-based) and `app/tenant-store/[tenant]/[locale]/about/page.tsx` (new,
  * params-based, dark-launched). See
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
  */
 export async function AboutPageBody({ store }: { store: ResolvedStore }) {
   const siteUrl = storeAbsoluteUrl(store, '');

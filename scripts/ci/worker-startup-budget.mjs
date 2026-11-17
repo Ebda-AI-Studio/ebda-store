@@ -41,7 +41,16 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const API = path.join(ROOT, 'apps/api');
+// `--app api|web` (default api). web = the OpenNext storefront Worker: its bundle is cache-worker-entry.js, its budget lives in
+// worker-startup-budget-web.json, and the baseline is built with the deploy's own setup + build scripts.
+const APP_NAME = (() => {
+  const i = process.argv.indexOf('--app');
+  return i > 0 ? process.argv[i + 1] : 'api';
+})();
+const API = path.join(ROOT, 'apps', APP_NAME);
+const BUNDLE_NAME = APP_NAME === 'web' ? 'cache-worker-entry.js' : 'worker.js';
+const BUDGET_FILE =
+  APP_NAME === 'api' ? 'worker-startup-budget.json' : `worker-startup-budget-${APP_NAME}.json`;
 
 /** Active (non-idle) CPU in ms of a Chrome cpuprofile. */
 export function activeMs(profile) {
@@ -105,15 +114,21 @@ export function relativeProblems(prMs, baseMs, { ratio, slackMs }) {
  */
 export const BANNED_BUNDLE_INPUTS = [
   {
+    // The web bundle's server graph is pre-bundled by OpenNext (one opaque input), so this fires on the ENTRY's own inputs only;
+    // the size budget is the gate for the rest. Kept for the API/entry case: the Next server SDK is never initialised on a Worker.
+    re: /node_modules\/@sentry\/nextjs\//,
+    why: '@sentry/nextjs inside a Worker bundle (apps/web/src/lib/sentry-worker-stub.ts, Ruling WEB-COLD-3)',
+  },
+  {
     re: /node_modules\/zod\/v4\/locales\/(?!en\.js$|index\.js$)[^/]+$/,
     why: 'zod non-English locales (a value import of the `zod` root namespace; apps/api/src/cf/stubs/zod-root.ts, Ruling BUNDLE-BUDGET-9)',
   },
 ];
 
 /** Verdict on the esbuild metafile of the dry-run: one problem per banned input class present in worker.js. */
-export function bannedInputProblems(metafile) {
-  const out = Object.entries(metafile?.outputs ?? {}).find(([k]) => k.endsWith('worker.js'))?.[1];
-  if (!out) return ['bundle metafile has no worker.js output'];
+export function bannedInputProblems(metafile, bundleName = 'worker.js') {
+  const out = Object.entries(metafile?.outputs ?? {}).find(([k]) => k.endsWith(bundleName))?.[1];
+  if (!out) return [`bundle metafile has no ${bundleName} output`];
   const inputs = Object.keys(out.inputs ?? {});
   return BANNED_BUNDLE_INPUTS.flatMap(({ re, why }) => {
     const hits = inputs.filter(f => re.test(f));
@@ -141,9 +156,9 @@ async function profileOnce(outdir, compat) {
   const { Miniflare } = await import('miniflare');
   const files = readdirSync(outdir);
   const mods = files
-    .filter(f => f === 'worker.js' || f.endsWith('.wasm'))
+    .filter(f => f === BUNDLE_NAME || f.endsWith('.wasm') || f.endsWith('.bin'))
     .map(f => ({
-      type: f.endsWith('.wasm') ? 'CompiledWasm' : 'ESModule',
+      type: f.endsWith('.wasm') ? 'CompiledWasm' : f.endsWith('.bin') ? 'Data' : 'ESModule',
       path: path.join(outdir, f),
     }));
   const mf = new Miniflare({
@@ -156,7 +171,7 @@ async function profileOnce(outdir, compat) {
         type: 'ESModule',
         path: path.join(outdir, '__budget_entry.mjs'),
         contents: `export default { async fetch() {
-          try { await import("./worker.js"); return new Response("ok"); }
+          try { await import("./${BUNDLE_NAME}"); return new Response("ok"); }
           catch (e) { return new Response("ERR " + (e && e.stack || e), { status: 500 }); } } }`,
       },
       ...mods,
@@ -195,8 +210,8 @@ async function profileOnce(outdir, compat) {
 
 /** Build `ref` into a throwaway worktree that borrows this checkout's installed deps. Returns { dir, outdir }. */
 function buildBaseline(ref, config) {
-  const sh = (cmd, args, cwd = ROOT) => {
-    const r = spawnSync(cmd, args, { cwd, encoding: 'utf8' });
+  const sh = (cmd, args, cwd = ROOT, env = process.env) => {
+    const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', env, maxBuffer: 64 * 1024 * 1024 });
     if (r.status !== 0)
       throw new Error(`${cmd} ${args.join(' ')} failed:\n${r.stdout}\n${r.stderr}`);
     return r.stdout;
@@ -219,7 +234,7 @@ function buildBaseline(ref, config) {
   // Borrow installed deps and built workspace packages; only apps/api SOURCE differs from the PR.
   for (const rel of [
     'node_modules',
-    'apps/api/node_modules',
+    `apps/${APP_NAME}/node_modules`,
     ...readdirSync(path.join(ROOT, 'packages')).flatMap(p => [
       `packages/${p}/node_modules`,
       `packages/${p}/dist`,
@@ -236,10 +251,16 @@ function buildBaseline(ref, config) {
     }
   }
   const outdir = mkdtempSync(path.join(tmpdir(), 'ebda-startup-base-out-'));
+  if (APP_NAME === 'web') {
+    // The storefront Worker only exists after the deploy's own generator + OpenNext build (same env as ci.yml's dry-run job).
+    const env = { ...process.env, OPENNEXT_CACHE: 'true', CF_SETUP_SKIP_DEPS: '1' };
+    for (const script of ['scripts/cf-setup-local.sh', 'scripts/cf-build.sh'])
+      sh('bash', [script, 'web'], dir, env);
+  }
   sh(
     'npx',
     ['wrangler', 'deploy', '--dry-run', '--config', config, '--outdir', outdir],
-    path.join(dir, 'apps/api')
+    path.join(dir, 'apps', APP_NAME)
   );
   return { dir, outdir };
 }
@@ -251,9 +272,7 @@ async function main() {
   };
   const runs = Number(arg('runs') ?? 5);
   const config = arg('config') ?? 'wrangler.jsonc';
-  const budget = JSON.parse(
-    readFileSync(path.join(ROOT, 'scripts/ci/worker-startup-budget.json'), 'utf8')
-  );
+  const budget = JSON.parse(readFileSync(path.join(ROOT, 'scripts/ci', BUDGET_FILE), 'utf8'));
   const outdir = mkdtempSync(path.join(tmpdir(), 'ebda-startup-budget-'));
   try {
     const built = spawnSync(
@@ -276,9 +295,10 @@ async function main() {
     );
     if (built.status !== 0)
       throw new Error(`wrangler dry-run failed:\n${built.stdout}\n${built.stderr}`);
-    const bundle = path.join(outdir, 'worker.js');
+    const bundle = path.join(outdir, BUNDLE_NAME);
     const banned = bannedInputProblems(
-      JSON.parse(readFileSync(path.join(outdir, 'meta.json'), 'utf8'))
+      JSON.parse(readFileSync(path.join(outdir, 'meta.json'), 'utf8')),
+      BUNDLE_NAME
     );
     const bytes = statSync(bundle).size;
     const gzip = gzipSync(readFileSync(bundle)).length;
@@ -350,7 +370,7 @@ async function main() {
     if (process.env.GITHUB_STEP_SUMMARY) {
       writeFileSync(
         process.env.GITHUB_STEP_SUMMARY,
-        `### API Worker startup budget\n\n| metric | measured | budget |\n|---|---|---|\n| startup CPU (min of ${runs}) | ${measured.startupCpuMs.toFixed(1)} ms | ${budget.startupCpuMs} ms |\n| bundle | ${bytes} B | ${budget.bundleBytes} B |\n| bundle gzip | ${gzip} B | ${budget.bundleGzipBytes} B |\n`,
+        `### ${APP_NAME} Worker startup budget\n\n| metric | measured | budget |\n|---|---|---|\n| startup CPU (min of ${runs}) | ${measured.startupCpuMs.toFixed(1)} ms | ${budget.startupCpuMs} ms |\n| bundle | ${bytes} B | ${budget.bundleBytes} B |\n| bundle gzip | ${gzip} B | ${budget.bundleGzipBytes} B |\n`,
         { flag: 'a' }
       );
     }
