@@ -42,7 +42,8 @@ function rig() {
       `INSERT INTO accounts (id, store_id, code, name_en, type, is_system) VALUES ('a${code}', 's1', '${code}', '${name}', '${type}', 1)`
     );
   const q = (sql: string, ...p: unknown[]) => raw.prepare(sql).all(...(p as never[])) as any[];
-  const op = (name: string, args: Record<string, unknown>) => runMoneyOp(db, S, name, args) as any;
+  const op = (name: string, args: Record<string, unknown>, key?: string) =>
+    runMoneyOp(db, S, name, args, key) as any;
   let n = 0;
   /** an order paid in full through a real webhook, with NO journal posted (the lost fan-out) */
   const paid = (provider = 'paymob') => {
@@ -187,6 +188,26 @@ describe('journalRepairSales (Ruling JOURNAL-RECONCILE-1)', () => {
     expect(r.saleEntries(online.orderId)).toBe(1);
   });
 
+  it('a second sale entry for the same order is impossible: the DO schema has a UNIQUE (store_id, source, source_id)', () => {
+    // packages/cf-schema/migrations/store/0001_init.sql:1371, applied to every StoreDO by apps/api/src/cf/store-do/migrations.ts
+    const r = rig();
+    const o = r.paid();
+    r.op('journalSale', { orderId: o.orderId });
+    const ins = () =>
+      r.raw
+        .prepare(
+          `INSERT INTO journal_entries (id, store_id, entry_number, posted_at, source, source_id, memo, memo_ar, status, created_at)
+           VALUES ('dup', 's1', 'JE-DUP', 0, 'order', ?, 'm', 'm', 'posted', 0)`
+        )
+        .run(o.orderId);
+    expect(ins).toThrow(/UNIQUE constraint failed/);
+    expect(
+      r.q(
+        "SELECT name FROM sqlite_master WHERE name = 'journal_entries_store_source_source_id_unique'"
+      )
+    ).toHaveLength(1);
+  });
+
   it('refuses a malformed window', () => {
     const r = rig();
     try {
@@ -195,5 +216,54 @@ describe('journalRepairSales (Ruling JOURNAL-RECONCILE-1)', () => {
     } catch (e) {
       expect((e as MoneyError).code).toBe('BAD_ARGS');
     }
+  });
+});
+
+describe('journalStaleCount: detection past the repair window (JOURNAL-RECONCILE-1)', () => {
+  const DAY = new Date().toISOString().slice(0, 10);
+  const dayStart = Date.parse(`${DAY}T00:00:00Z`);
+
+  it('counts paid orders older than the window with no entry, only from the first journal entry on', () => {
+    const r = rig();
+    const booked = r.paid(); // the books start 10 days ago
+    r.at(booked.orderId, dayStart - 10 * 24 * HOUR, dayStart - 10 * 24 * HOUR);
+    r.op('journalSale', { orderId: booked.orderId });
+    r.raw.prepare('UPDATE journal_entries SET created_at = ?').run(dayStart - 10 * 24 * HOUR);
+    const lost = r.paid(); // paid 5 days ago, never booked: past the 72 h repair window
+    r.at(lost.orderId, dayStart - 5 * 24 * HOUR, dayStart - 5 * 24 * HOUR);
+    const beforeBooks = r.paid(); // paid before the books existed: not "missing"
+    r.at(beforeBooks.orderId, dayStart - 20 * 24 * HOUR, dayStart - 20 * 24 * HOUR);
+    const recent = r.paid(); // inside the window: the repair's job, not counted
+    r.at(recent.orderId, dayStart - HOUR, dayStart - HOUR);
+    expect(r.op('journalStaleCount', { day: DAY, maxAgeHours: 72 }).missing).toBe(1);
+    r.raw.exec('UPDATE store_config SET accounting_enabled = 0');
+    expect(r.op('journalStaleCount', { day: DAY, maxAgeHours: 72 }).missing).toBe(0);
+  });
+
+  it('a store with no journal entry at all counts 0 (books never started)', () => {
+    const r = rig();
+    const o = r.paid();
+    r.at(o.orderId, dayStart - 5 * 24 * HOUR, dayStart - 5 * 24 * HOUR);
+    expect(r.op('journalStaleCount', { day: DAY, maxAgeHours: 72 }).missing).toBe(0);
+  });
+
+  it('keyed per day: a same-day replay returns the stored count and its original countedAt', () => {
+    const r = rig();
+    const booked = r.paid();
+    r.at(booked.orderId, dayStart - 10 * 24 * HOUR, dayStart - 10 * 24 * HOUR);
+    r.op('journalSale', { orderId: booked.orderId });
+    r.raw.prepare('UPDATE journal_entries SET created_at = ?').run(dayStart - 10 * 24 * HOUR);
+    const a = r.op('journalStaleCount', { day: DAY, maxAgeHours: 72 }, `journal-stale:${DAY}`);
+    expect(a.missing).toBe(0);
+    const lost = r.paid();
+    r.at(lost.orderId, dayStart - 5 * 24 * HOUR, dayStart - 5 * 24 * HOUR);
+    const b = r.op('journalStaleCount', { day: DAY, maxAgeHours: 72 }, `journal-stale:${DAY}`);
+    expect(b).toEqual(a);
+    expect(r.op('journalStaleCount', { day: DAY, maxAgeHours: 72 }).missing).toBe(1);
+  });
+
+  it('refuses a malformed day', () => {
+    const r = rig();
+    expect(() => r.op('journalStaleCount', { day: 'today', maxAgeHours: 72 })).toThrow();
   });
 });

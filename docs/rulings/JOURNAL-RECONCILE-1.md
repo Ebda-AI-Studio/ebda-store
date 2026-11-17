@@ -39,6 +39,27 @@ not all idempotent across a re-send, and the defect being repaired is the missin
 through the same idempotent `postOrderSaleJournal` that the fan-out uses cannot double-book: the DO
 serialises both, and the unique `(store_id, source, source_id)` index rejects a second entry.
 
+**Double-book guarantee.** Two layers protect against a second entry; the second one is what guarantees it.
+
+1. Inside `postEntry`'s `transactionSync` (`packages/repo/src/do/ledger.ts`, the `SELECT ... WHERE store_id AND source AND
+source_id` before the INSERT), an existing entry is returned with `created: false`. The DO runs one section at a time,
+   so this check already covers a fan-out landing at the same moment as a repair.
+2. The unique partial index `journal_entries_store_source_source_id_unique (store_id, source, source_id) WHERE source_id IS
+NOT NULL` (`packages/cf-schema/migrations/store/0001_init.sql:1371`) holds even against a code path that skips the
+   lookup. Every StoreDO applies it through `apps/api/src/cf/store-do/migrations.ts` (`STORE_MIGRATIONS`). The test inserts
+   a duplicate row directly and expects `UNIQUE constraint failed`.
+
+**Past the window: detection, not repair.** An outage longer than the look-back would drop out silently, so the same tick
+calls `journalStaleCount` (`countStaleMissingSaleJournals`) once per UTC day. That call is keyed `journal-stale:<day>`, so
+any same-day replay returns the stored count with its original `countedAt`.
+
+- **What it counts:** paid orders, paid before `day start - JOURNAL_REPAIR_MAX_AGE_HOURS`, that have no sale entry.
+- **Which orders count:** only orders paid on or after the store's first journal entry. Orders from before the books
+  started (accounting turned on later) never page.
+- **Alert:** a count above 0 pages P1 `journal.reconcile.stale` with the count. The alert fires only when the count was
+  computed in this tick (`countedAt` under 10 minutes old), so it goes out once a day per store.
+- **Repair:** these orders are booked by hand, or by widening the window for one run.
+
 **Floor.** `JOURNAL_REPAIR_MAX_AGE_HOURS` (default 72) bounds the look-back, so a store that turns
 accounting on never back-posts its history. On the first ticks after deploy, any order paid in the last
 72 h with no entry is posted and reported. That is the intended repair.

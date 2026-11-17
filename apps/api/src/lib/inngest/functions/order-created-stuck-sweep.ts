@@ -42,6 +42,8 @@ import { storeMoney } from '../../repo-factory';
  * Durable Object store's tick this posts the missing sale entry of every order
  * PAID 10 min .. JOURNAL_REPAIR_MAX_AGE_HOURS ago that has none (idempotent on
  * the entry's source id), reports each repair (info) and each failure (P1).
+ * Past the window it only DETECTS: once a UTC day it counts paid orders older
+ * than the window with no entry and pages P1 `journal.reconcile.stale`.
  */
 interface StuckOrder {
   id: string;
@@ -63,6 +65,8 @@ const SWEEP_TAKE = 200;
 // The journal reconcile looks back further than the re-send: a missing books entry is silent for the shopper, so an
 // outage over a weekend must still be repaired. Bounded so a store that turns accounting on never back-posts its history.
 const JOURNAL_REPAIR_MAX_AGE_HOURS = Number(process.env.JOURNAL_REPAIR_MAX_AGE_HOURS) || 72;
+// A stale count whose countedAt is older than this came from an earlier tick today (a keyed replay): already reported.
+const STALE_COUNT_FRESH_MS = 10 * 60_000;
 
 /** Minimal shape of the Inngest `step` this handler uses (kept for unit tests). */
 interface SweepStep {
@@ -181,15 +185,24 @@ async function repairMissingJournals(
   if (!storeId) return 0;
   const r = await step.run('repair-missing-journals', async () => {
     const money = await storeMoney(storeId);
-    if (!money) return { repaired: [], failed: [] };
+    if (!money) return { repaired: [], failed: [], staleMissing: 0 };
     const now = Date.now();
-    return money.journalRepairSales({
+    const fixed = await money.journalRepairSales({
       paidAfterMs: now - JOURNAL_REPAIR_MAX_AGE_HOURS * 3_600_000,
       paidBeforeMs: now - STUCK_ORDER_NOTIFY_MINUTES * 60_000,
       take: SWEEP_TAKE,
     });
+    // Detection past the window: counted once per UTC day (keyed op; a same-day replay returns the stored count with its
+    // original countedAt), so the P1 below fires once a day per store, not every hour.
+    const day = new Date(now).toISOString().slice(0, 10);
+    const stale = await money.journalStaleCount(
+      { day, maxAgeHours: JOURNAL_REPAIR_MAX_AGE_HOURS },
+      `journal-stale:${day}`
+    );
+    const freshCount = now - stale.countedAt < STALE_COUNT_FRESH_MS;
+    return { ...fixed, staleMissing: freshCount ? stale.missing : 0 };
   });
-  if (r.repaired.length === 0 && r.failed.length === 0) return 0;
+  if (r.repaired.length === 0 && r.failed.length === 0 && r.staleMissing === 0) return 0;
   await step.run('alert-journal-repairs', async () => {
     const store = { id: storeId, name: await storeNameOf(storeId) };
     if (r.repaired.length > 0) {
@@ -208,6 +221,24 @@ async function repairMissingJournals(
           `${STUCK_ORDER_NOTIFY_MINUTES}+ min after payment (the post-payment fan-out was lost) and ` +
           `were posted now. Find why the enqueue failed (Worker logs: fan-out enqueue failed).`,
         context: { storeId, orders: r.repaired.slice(0, 20).map(o => o.orderNumber) },
+      }).catch(() => undefined);
+    }
+    if (r.staleMissing > 0) {
+      logger.error(
+        { storeId, count: r.staleMissing },
+        '[order-created-stuck-sweep] paid orders older than the repair window have no sale journal'
+      );
+      await sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store,
+        source: 'journal.reconcile.stale',
+        title: 'Books: paid orders older than the repair window have no sale entry',
+        body:
+          `${r.staleMissing} paid order(s) paid more than ${JOURNAL_REPAIR_MAX_AGE_HOURS} h ago have no sale journal ` +
+          `entry. The hourly repair only reaches ${JOURNAL_REPAIR_MAX_AGE_HOURS} h back, so these stay missing until ` +
+          `booked by hand (or the window is widened for one run). Reported once a day.`,
+        context: { storeId, count: r.staleMissing },
       }).catch(() => undefined);
     }
     if (r.failed.length > 0) {

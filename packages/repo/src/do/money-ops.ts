@@ -39,7 +39,12 @@ import {
 } from './payments';
 import { cancelSaleDocument, issueRefundDocument } from './fiscal';
 import { changeOrderStatus } from './order-status';
-import { postOrderSaleJournal, postRefundJournal, repairMissingSaleJournals } from './ledger';
+import {
+  countStaleMissingSaleJournals,
+  postOrderSaleJournal,
+  postRefundJournal,
+  repairMissingSaleJournals,
+} from './ledger';
 import { applyWalletEntry, type WalletEntryType } from './refund';
 import {
   applyGoldRates,
@@ -211,6 +216,7 @@ export type MoneyOpName =
   | 'journalSale'
   | 'journalRefund'
   | 'journalRepairSales'
+  | 'journalStaleCount'
   | 'goldApplyRates'
   | 'goldDecidePending'
   | 'goldUpdateSettings'
@@ -354,6 +360,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'journalSale',
   'journalRefund',
   'journalRepairSales',
+  'journalStaleCount',
   'goldApplyRates',
   'goldDecidePending',
   'goldUpdateSettings',
@@ -927,6 +934,24 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
       paidBeforeMs: ms(a.paidBeforeMs, 'paidBeforeMs'),
       take: typeof a.take === 'number' ? Math.min(Math.max(1, a.take), 500) : 200,
     }),
+  /**
+   * Daily detection past the repair window (JOURNAL-RECONCILE-1): paid orders with no sale entry, paid before the UTC `day`'s
+   * start minus `maxAgeHours`. Args are day-stable so the caller keys it per day: a replay the same day returns the stored
+   * count with its original `countedAt`, which is how the sweep alerts once a day.
+   */
+  journalStaleCount: (db, storeId, a) => {
+    const day = typeof a.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.day) ? a.day : '';
+    const dayStart = Date.parse(`${day}T00:00:00Z`);
+    if (!day || Number.isNaN(dayStart)) throw new MoneyError('BAD_ARGS', 'day', 400);
+    const maxAgeHours = ms(a.maxAgeHours, 'maxAgeHours');
+    return {
+      missing: countStaleMissingSaleJournals(db, {
+        storeId,
+        paidBeforeMs: dayStart - maxAgeHours * 3_600_000,
+      }),
+      countedAt: Date.now(),
+    };
+  },
   journalRefund: (db, storeId, a) =>
     postRefundJournal(db, {
       storeId,

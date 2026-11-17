@@ -47,6 +47,7 @@ const h = vi.hoisted(() => ({
         failed: Array<{ orderId: string; orderNumber: string; error: string }>;
       }> => ({ repaired: [], failed: [] })
     ),
+    journalStaleCount: vi.fn(async () => ({ missing: 0, countedAt: Date.now() })),
     journalRefund: vi.fn(async () => ({ reversed: 2 })),
     orderNotifyClaim: vi.fn(async () => ({ claimed: true })),
     statusFanoutClaim: vi.fn(async () => ({ claimed: true })),
@@ -299,6 +300,31 @@ describe('order-created-stuck-sweep: journal reconcile (Ruling JOURNAL-RECONCILE
     expect(h.sendAlert).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'p1', source: 'journal.reconcile.failed' })
     );
+  });
+  it('paid orders past the window with no entry page P1 journal.reconcile.stale once a day (keyed per UTC day)', async () => {
+    h.doDb.order.findMany.mockResolvedValue([]);
+    h.money.journalStaleCount.mockResolvedValueOnce({ missing: 3, countedAt: Date.now() });
+    await handleOrderCreatedStuckSweep(step, alarm);
+    const day = new Date().toISOString().slice(0, 10);
+    expect(h.money.journalStaleCount).toHaveBeenCalledWith(
+      { day, maxAgeHours: 72 },
+      `journal-stale:${day}`
+    );
+    expect(h.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'p1',
+        source: 'journal.reconcile.stale',
+        context: expect.objectContaining({ count: 3 }),
+      })
+    );
+    // a later tick the same day gets the keyed replay (old countedAt): no second page
+    h.sendAlert.mockClear();
+    h.money.journalStaleCount.mockResolvedValueOnce({
+      missing: 3,
+      countedAt: Date.now() - 60 * 60_000,
+    });
+    await handleOrderCreatedStuckSweep(step, alarm);
+    expect(h.sendAlert).not.toHaveBeenCalled();
   });
   it('nothing missing: no alert; the platform cron tick (no store) never calls the DO', async () => {
     h.doDb.order.findMany.mockResolvedValue([]);

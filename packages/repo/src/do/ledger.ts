@@ -423,6 +423,38 @@ export function repairMissingSaleJournals(
   return { repaired, failed };
 }
 
+/**
+ * Detection past the repair window (Ruling JOURNAL-RECONCILE-1): how many paid orders, paid before `paidBeforeMs`, still
+ * have no sale entry. Same candidate rules as `repairMissingSaleJournals`. Counted only from the store's first journal
+ * entry on: orders paid before the books started (accounting turned on later) are not "missing", so they never page.
+ * A store with accounting off, or no entry at all, counts 0.
+ */
+export function countStaleMissingSaleJournals(
+  db: SyncSql,
+  a: { storeId: string; paidBeforeMs: number }
+): number {
+  const cfg = db.all('SELECT accounting_enabled FROM store_config WHERE store_id = ?', [
+    a.storeId,
+  ])[0];
+  if (!cfg || !cfg.accounting_enabled) return 0;
+  const row = db.all(
+    `SELECT COUNT(*) AS n FROM (
+       SELECT o.id,
+              COALESCE((SELECT MAX(p.paid_at) FROM payments p WHERE p.order_id = o.id AND p.status = 'completed'),
+                       o.created_at) AS paid_at
+         FROM orders o
+        WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.payment_status = 'paid'
+          AND o.status NOT IN ('cancelled', 'refunded') AND o.total > 0
+          AND NOT EXISTS (SELECT 1 FROM journal_entries e
+                           WHERE e.store_id = o.store_id AND e.source = 'order' AND e.source_id = o.id)
+     ) t
+     WHERE t.paid_at < ?2
+       AND t.paid_at >= (SELECT MIN(created_at) FROM journal_entries WHERE store_id = ?1)`,
+    [a.storeId, a.paidBeforeMs]
+  )[0];
+  return Number(row?.n ?? 0);
+}
+
 /** Reverse the sale, the COGS and any partial-return adjustment entries of an order (postRefundJournal). Idempotent. */
 export function postRefundJournal(
   db: SyncSql,
