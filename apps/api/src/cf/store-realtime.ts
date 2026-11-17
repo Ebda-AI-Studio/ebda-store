@@ -27,6 +27,14 @@ import { fetchWithTimeout } from '../lib/fetch-timeout';
 
 const PING_INTERVAL_MS = 25_000;
 const PING_TIMEOUT_MS = 60_000;
+/**
+ * TEN-7 (2026-11-12 audit): membership was checked once, at `subscribe:store`. A staff member removed later kept
+ * receiving that store's order events on an open socket. Before a store event reaches a socket, its membership
+ * is re-checked through the same /realtime/stores/:id/access rule once the last check is older than this.
+ * Staleness class BOUNDED: a removal takes effect within this window (residual: up to 30 s of events).
+ */
+// pq-allow(unused-export): imported by tests/unit/store-realtime-reverify.test.ts
+export const REVERIFY_MS = 30_000;
 
 interface Attachment {
   sid: string;
@@ -39,6 +47,8 @@ interface Attachment {
   token?: string;
   cookie?: string;
   subs: string[];
+  /** storeId -> epoch ms of the last successful membership check (subscribe or re-check). */
+  checked?: Record<string, number>;
 }
 
 interface RealtimeEnv {
@@ -195,7 +205,11 @@ export class StoreRealtime extends DurableObject<RealtimeEnv> {
     }
     if (!res.ok) return emitError('You do not have access to this store');
     if (!att.subs.includes(storeId)) {
-      const next = { ...att, subs: [...att.subs, storeId] };
+      const next = {
+        ...att,
+        subs: [...att.subs, storeId],
+        checked: { ...att.checked, [storeId]: Date.now() },
+      };
       this.setAtt(ws, next);
       await this.env.STORE_REALTIME.get(
         this.env.STORE_REALTIME.idFromName(`store:${storeId}`)
@@ -231,7 +245,11 @@ export class StoreRealtime extends DurableObject<RealtimeEnv> {
     for (const ws of this.ctx.getWebSockets()) {
       const att = this.att(ws);
       if (!att.userId) continue;
-      if (args.storeId && !att.subs.includes(args.storeId)) continue;
+      if (args.storeId) {
+        if (!att.subs.includes(args.storeId)) continue;
+        // TEN-7: a store event only goes to a socket whose membership still holds.
+        if (!(await this.stillMember(ws, att, args.storeId))) continue;
+      }
       try {
         ws.send(frame);
         n++;
@@ -240,6 +258,38 @@ export class StoreRealtime extends DurableObject<RealtimeEnv> {
       }
     }
     return n;
+  }
+
+  /**
+   * Re-check (at most every REVERIFY_MS) that this socket's user may still see `storeId`. A definitive "no"
+   * (4xx: removed, token revoked) drops the room for the socket; a transport/5xx failure withholds this one event
+   * but keeps the subscription (fail closed on delivery, no spurious unsubscribe on an outage).
+   */
+  private async stillMember(ws: WebSocket, att: Attachment, storeId: string): Promise<boolean> {
+    const last = att.checked?.[storeId] ?? 0;
+    if (Date.now() - last < REVERIFY_MS) return true;
+    let res: Response;
+    try {
+      res = await this.api(`/stores/${encodeURIComponent(storeId)}/access`, att);
+    } catch {
+      return false;
+    }
+    if (res.ok) {
+      this.setAtt(ws, { ...att, checked: { ...att.checked, [storeId]: Date.now() } });
+      return true;
+    }
+    if (res.status >= 400 && res.status < 500) {
+      this.setAtt(ws, { ...att, subs: att.subs.filter(s => s !== storeId) });
+      try {
+        ws.send(
+          '42' + JSON.stringify(['error', { message: 'You do not have access to this store' }])
+        );
+      } catch {
+        // closed
+      }
+      await this.pruneStores(att.userId as string, [storeId], ws);
+    }
+    return false;
   }
 
   async alarm(): Promise<void> {
