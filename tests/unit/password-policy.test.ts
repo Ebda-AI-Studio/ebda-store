@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import {
   addPasswordPolicyIssues,
   failedPasswordRules,
