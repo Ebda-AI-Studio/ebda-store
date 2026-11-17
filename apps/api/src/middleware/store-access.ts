@@ -21,6 +21,18 @@ export function isStoreBillingRoute(path: string): boolean {
 }
 
 /**
+ * A suspended store's owner must always be able to ask for it back (#804): the suspension appeal and a support request are
+ * the way out of a suspension, so no suspension (platform or billing) refuses them here. The appeal route itself decides
+ * what can be appealed (a billing suspension is settled on the Billing page, 409), and the over-limit 402 is decided before.
+ */
+const STORE_SUPPORT_RE =
+  /^(?:\/api\/v\d+)?\/stores\/[^/]+\/(?:suspension\/appeal|support-requests)\/?$/i;
+// pq-allow(unused-export): exported for unit tests
+export function isStoreSupportRoute(method: string, path: string): boolean {
+  return method.toUpperCase() === 'POST' && STORE_SUPPORT_RE.test(path);
+}
+
+/**
  * Ruling SUSPEND-REFUND-1: a suspension never strands a CUSTOMER's money. The routes that send money back to customers (a
  * refund, recording or settling one, cancelling an order) stay open during a BILLING suspension (unpaid, over limit); a
  * PLATFORM suspension (abuse / fraud) blocks them for the merchant, and a super admin refunds on the store's behalf
@@ -75,6 +87,7 @@ export function suspendedWriteBlock(
 ): AppError | null {
   if (role === 'super_admin' || store.status !== 'suspended') return null;
   if (READ_METHODS.includes(method.toUpperCase())) return null;
+  if (isStoreSupportRoute(method, fullPath)) return null;
   const billingReason = store.billingSuspendedReason ?? null;
   if (billingReason && isStoreBillingRoute(fullPath)) return null;
   // SUSPEND-REFUND-1: a billing suspension never blocks money going back to customers.

@@ -13,3 +13,5 @@ Ruling SUSPEND-REFUND-1 (controller, money review of #739/#674, 2026-11-17) - a 
 - Evidence: `tests/unit/store-suspended-readonly.test.ts` (SUSPEND-REFUND-1 block) and `tests/unit/suspend-refund-route.test.ts`.
 
 Cost if wrong: a billing-suspended merchant can refund and cancel, which is money leaving the store to customers, never to the merchant. A platform-suspended store's customers wait for a super admin to refund.
+
+Amendment (2026-11-17, after #804 landed on main): the way OUT of a suspension stays open too. `POST /stores/:id/suspension/appeal` and `POST /stores/:id/support-requests` are never refused by the read-only gate, whatever the suspension (`isStoreSupportRoute` in `middleware/store-access.ts`). The appeal route itself decides what can be appealed (a billing suspension is settled on the Billing page, 409), and the over-limit 402 is decided before the gate. Tests: `tests/unit/suspended-store-support-exempt.test.ts`, `tests/unit/suspended-store-admin-reaches-appeal.test.ts`. Cost if wrong: a suspended merchant could file many support requests; the support route's own limiter bounds that.
