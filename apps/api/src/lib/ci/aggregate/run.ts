@@ -15,6 +15,7 @@ import {
   ciCohortLatestKey,
   ciMetricAggKey,
   ciPartitionPrefix,
+  ciStoreActivationKey,
   ciStoreAggPrefix,
   ciStoreDayAggKey,
   ciStoreWindowKey,
@@ -33,6 +34,7 @@ import {
   type StoreDay,
 } from './cells';
 import { assertAggregateOnly } from './guard';
+import { foldActivation, type ActivationFile } from './activation-file';
 
 /** Cross-store k-thresholds (plan 4.1). Cells under them are written as `{ suppressed: true }` only. */
 export const COHORT_MIN_N = 100;
@@ -97,11 +99,25 @@ export async function aggregateStoreDay(
   ci: CiBucket,
   storeId: string,
   day: string
-): Promise<{ file: StoreDay; skipped: number }> {
+): Promise<{ file: StoreDay; skipped: number; events: CiEnvelope[] }> {
   const { events, skipped } = await readStoreDayEvents(ci, storeId, day);
   const file = foldStoreDay(storeId, day, events);
   await ci.put(ciStoreDayAggKey(storeId, day), json(file));
-  return { file, skipped };
+  return { file, skipped, events };
+}
+
+/** Folds the days' events into the store's activation file: 1 get + 1 put, and no put when nothing changed. */
+async function updateActivation(
+  ci: CiBucket,
+  storeId: string,
+  events: CiEnvelope[]
+): Promise<void> {
+  if (events.length === 0) return;
+  const key = ciStoreActivationKey(storeId);
+  const obj = await ci.get(key);
+  const prev = obj ? (JSON.parse(await obj.text()) as ActivationFile) : null;
+  const next = json(foldActivation(prev, storeId, events));
+  if (!prev || json(prev) !== next) await ci.put(key, next);
 }
 
 export async function rebuildWindow(
@@ -293,7 +309,13 @@ export async function aggregateStore(
 ): Promise<{ skippedLines: number; r2Calls: number }> {
   const b = budgeted(ci);
   let skippedLines = 0;
-  for (const day of days) skippedLines += (await aggregateStoreDay(b.ci, storeId, day)).skipped;
+  const events: CiEnvelope[] = [];
+  for (const day of days) {
+    const r = await aggregateStoreDay(b.ci, storeId, day);
+    skippedLines += r.skipped;
+    events.push(...r.events);
+  }
+  await updateActivation(b.ci, storeId, events);
   await rebuildWindow(b.ci, storeId, days.at(-1)!);
   return { skippedLines, r2Calls: b.calls() };
 }
