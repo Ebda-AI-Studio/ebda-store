@@ -80,7 +80,12 @@ vi.mock('@api/services/feature.service', () => ({
 }));
 vi.mock('@api/services/answer-engine/gsc-client', () => ({
   isGscConfigured: () => true,
-  gscSiteUrlsForDomain: (d: string) => [`sc-domain:${d}`],
+  resolveGscTarget: async (d: string) => ({ siteUrl: `sc-domain:${d}` }),
+  listAccessibleGscSites: async () => ['sc-domain:dahab.example'],
+  pickGscTarget: (h: string, sites: string[]) =>
+    sites.includes(`sc-domain:${h}`) ? { siteUrl: `sc-domain:${h}` } : null,
+  mintGscWriteToken: async () => 'unused',
+  resetGscSitesCache: () => {},
   querySearchAnalytics: async () => ({
     dateRows: [{ date: '2026-10-29', impressions: 10, clicks: 2, ctr: 0.2, position: 3 }],
     topQueries: [],

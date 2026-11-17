@@ -1,0 +1,568 @@
+/**
+ * SELF-SERVICE gaps A13 + A14 + A16: a merchant reads why their store was suspended and files ONE open appeal,
+ * sends a support request to Ebda staff from inside the product (5 per store per day), and claims a protected
+ * brand slug or asks for a higher store limit with evidence. Staff keep every decision (the override).
+ */
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import express, { type Express } from 'express';
+import request from 'supertest';
+import { SUPPORT_TOPICS } from '@ebda/shared';
+import { assertTenantScoped, TenantScopeViolation } from '../../packages/database/src/tenant-guard';
+
+type Row = Record<string, any>;
+const m = vi.hoisted(() => ({
+  rows: [] as Row[],
+  store: { status: 'suspended', billingSuspendedReason: null as string | null } as Row | null,
+  enqueue: vi.fn(),
+  help: vi.fn(),
+  audit: vi.fn(),
+  seq: 0,
+  alert: vi.fn(),
+}));
+
+const matches = (r: Row, where: Row = {}): boolean =>
+  Object.entries(where).every(([k, v]) => {
+    if (v && typeof v === 'object' && 'gte' in v) return r[k] >= v.gte;
+    if (v && typeof v === 'object' && 'in' in v) return v.in.includes(r[k]);
+    return r[k] === v;
+  });
+const trustRequest = {
+  create: async ({ data }: { data: Row }) => {
+    const dup =
+      (data.kind === 'suspension_appeal' &&
+        m.rows.some(
+          r => r.kind === data.kind && r.storeId === data.storeId && r.status === 'open'
+        )) ||
+      (data.kind === 'slug_claim' &&
+        m.rows.some(
+          r =>
+            r.kind === data.kind &&
+            r.userId === data.userId &&
+            r.slug === data.slug &&
+            r.status === 'open'
+        )) ||
+      (data.kind === 'store_cap' &&
+        m.rows.some(r => r.kind === data.kind && r.userId === data.userId && r.status === 'open'));
+    const slotTaken =
+      data.kind === 'support' &&
+      data.capSlot != null &&
+      m.rows.some(
+        r =>
+          r.kind === 'support' &&
+          r.storeId === data.storeId &&
+          r.capDay === data.capDay &&
+          r.capSlot === data.capSlot
+      );
+    if (dup || slotTaken) throw Object.assign(new Error('unique'), { code: 'P2002' });
+    const row = { id: `t${++m.seq}`, status: 'open', createdAt: new Date(), ...data };
+    m.rows.push(row);
+    return row;
+  },
+  findFirst: async ({ where, orderBy }: { where?: Row; orderBy?: Row }) => {
+    const hit = m.rows.filter(r => matches(r, where));
+    return (orderBy ? [...hit].reverse() : hit)[0] ?? null;
+  },
+  count: async ({ where }: { where?: Row }) => {
+    const n = m.rows.filter(r => matches(r, where)).length;
+    await new Promise(r => setTimeout(r, 2)); // a real DB round trip: parallel requests interleave here
+    return n;
+  },
+  updateMany: async ({ where, data }: { where?: Row; data: Row }) => {
+    const hit = m.rows.filter(r => matches(r, where));
+    hit.forEach(r => Object.assign(r, data));
+    return { count: hit.length };
+  },
+};
+const fakePrisma = {
+  trustRequest,
+  store: { findUnique: async () => m.store },
+};
+
+vi.mock('@ebda/database', async () => {
+  const real = await vi.importActual<typeof import('@ebda/database')>('@ebda/database');
+  return {
+    ...real,
+    prisma: fakePrisma,
+    withUser: async (_u: string, fn: (tx: any) => unknown) => fn(fakePrisma),
+  };
+});
+vi.mock('@api/middleware/auth', async () => {
+  const real = await vi.importActual<typeof import('@api/middleware/auth')>('@api/middleware/auth');
+  return {
+    ...real,
+    authenticate: (req: any, res: any, next: any) => {
+      if (req.header('x-anon')) return res.status(401).json({ success: false });
+      req.user = {
+        userId: req.header('x-user') ?? 'u1',
+        email: 'owner@example.com',
+        role: req.header('x-role') ?? 'store_admin',
+      };
+      next();
+    },
+  };
+});
+vi.mock('@api/middleware/require-mfa', () => ({
+  requireMfaEnrolled: (_q: any, _s: any, n: any) => n(),
+}));
+vi.mock('@api/middleware/require-verified-email', () => ({
+  requireVerifiedEmail: (_q: any, _s: any, n: any) => n(),
+}));
+vi.mock('@api/middleware/store-access', () => ({
+  requireStoreAccess: (req: any, res: any, next: any) =>
+    req.params.storeId === 'store-a' ? next() : res.status(404).json({ success: false }),
+}));
+vi.mock('@api/middleware/tenant-context', () => ({
+  tenantContext: (_q: any, _s: any, n: any) => n(),
+}));
+vi.mock('@api/middleware/security', async () => {
+  const real = await vi.importActual<typeof import('@api/middleware/security')>(
+    '@api/middleware/security'
+  );
+  return { ...real, auditLog: m.audit, writeLimiter: (_q: any, _s: any, n: any) => n() };
+});
+vi.mock('@api/lib/after-tenant-commit', () => ({
+  deferAfterTenantCommit: async (_n: string, run: () => Promise<unknown>) => run(),
+}));
+vi.mock('@api/services/email-queue.service', () => ({ emailQueue: { enqueue: m.enqueue } }));
+vi.mock('@api/lib/ci/emit', () => ({ sendOnboardingHelpToCi: m.help }));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: m.alert }));
+
+let app: Express;
+beforeAll(async () => {
+  const support = (await import('@api/routes/support.routes')).default;
+  const onboarding = (await import('@api/routes/onboarding.routes')).default;
+  const { errorHandler } = await import('@api/middleware/error-handler');
+  app = express();
+  app.use(express.json());
+  app.use('/stores', support);
+  app.use('/onboarding', onboarding);
+  app.use(errorHandler as any);
+});
+beforeEach(() => {
+  m.rows.length = 0;
+  m.seq = 0;
+  m.alert.mockReset().mockResolvedValue(undefined);
+  m.store = { status: 'suspended', billingSuspendedReason: null };
+  m.enqueue.mockReset().mockResolvedValue(undefined);
+  m.audit.mockReset().mockResolvedValue(undefined);
+  m.help.mockReset().mockResolvedValue(undefined);
+});
+
+describe('A13 suspension reason and appeal', () => {
+  const seedReason = () =>
+    m.rows.push({
+      id: 'r0',
+      kind: 'suspension',
+      storeId: 'store-a',
+      message: 'Selling counterfeit goods',
+      status: 'open',
+      createdAt: new Date('2026-11-01'),
+    });
+
+  it('a suspended store reads the reason staff recorded', async () => {
+    seedReason();
+    const res = await request(app).get('/stores/store-a/suspension');
+    expect(res.status).toBe(200);
+    expect(res.body.data.reason).toBe('Selling counterfeit goods');
+    expect(res.body.data.kind).toBe('policy');
+    expect(res.body.data.appeal).toBeNull();
+  });
+
+  it('a store that is not suspended answers 404', async () => {
+    m.store = { status: 'active', billingSuspendedReason: null };
+    expect((await request(app).get('/stores/store-a/suspension')).status).toBe(404);
+    const res = await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'x' });
+    expect(res.status).toBe(404);
+  });
+
+  it("another store's id answers 404 and reads nothing", async () => {
+    seedReason();
+    expect((await request(app).get('/stores/store-b/suspension')).status).toBe(404);
+  });
+
+  it('files one appeal, then the second is 409; staff are emailed once and an audit row is written', async () => {
+    seedReason();
+    const first = await request(app)
+      .post('/stores/store-a/suspension/appeal')
+      .send({ message: 'These are my own products, here are the invoices.' });
+    expect(first.status).toBe(201);
+    expect(m.enqueue).toHaveBeenCalledTimes(1);
+    expect(m.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'store.suspension_appeal', storeId: 'store-a' })
+    );
+    const second = await request(app)
+      .post('/stores/store-a/suspension/appeal')
+      .send({ message: 'again' });
+    expect(second.status).toBe(409);
+    expect(m.enqueue).toHaveBeenCalledTimes(1);
+    const read = await request(app).get('/stores/store-a/suspension');
+    expect(read.body.data.appeal.status).toBe('open');
+  });
+
+  it('refuses an empty or over-long message (Zod at the edge)', async () => {
+    seedReason();
+    expect(
+      (await request(app).post('/stores/store-a/suspension/appeal').send({ message: '' })).status
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post('/stores/store-a/suspension/appeal')
+          .send({ message: 'x'.repeat(1001) })
+      ).status
+    ).toBe(400);
+  });
+
+  it('a billing suspension shows its billing reason and cannot be appealed as a policy case', async () => {
+    m.store = { status: 'suspended', billingSuspendedReason: 'unpaid' };
+    const read = await request(app).get('/stores/store-a/suspension');
+    expect(read.body.data).toMatchObject({ kind: 'billing', reason: 'unpaid' });
+    const res = await request(app)
+      .post('/stores/store-a/suspension/appeal')
+      .send({ message: 'hi' });
+    expect(res.status).toBe(409);
+  });
+});
+
+describe('A14 support request', () => {
+  const body = {
+    topic: 'billing',
+    message: 'I was charged twice',
+    pageUrl: '/stores/store-a/billing',
+  };
+
+  it('stores a valid request and emails the support inbox once', async () => {
+    const res = await request(app).post('/stores/store-a/support-requests').send(body);
+    expect(res.status).toBe(201);
+    expect(m.rows).toHaveLength(1);
+    expect(m.rows[0]).toMatchObject({ kind: 'support', storeId: 'store-a', userId: 'u1' });
+    expect(m.enqueue).toHaveBeenCalledTimes(1);
+    expect(m.enqueue.mock.calls[0][1].replyTo).toBe('owner@example.com');
+  });
+
+  it('reports a support_contact help signal to the activation stream (ids only), once per request', async () => {
+    await request(app).post('/stores/store-a/support-requests').send(body);
+    expect(m.help).toHaveBeenCalledTimes(1);
+    expect(m.help).toHaveBeenCalledWith('store-a', 'support_contact');
+  });
+
+  it('the sixth request in a day is 429 and nothing more is stored or sent', async () => {
+    for (let i = 0; i < 5; i++) {
+      expect((await request(app).post('/stores/store-a/support-requests').send(body)).status).toBe(
+        201
+      );
+    }
+    const sixth = await request(app).post('/stores/store-a/support-requests').send(body);
+    expect(sixth.status).toBe(429);
+    expect(m.rows).toHaveLength(5);
+    expect(m.enqueue).toHaveBeenCalledTimes(5);
+    expect(m.help).toHaveBeenCalledTimes(5);
+  });
+
+  it('requests older than a day do not count toward the cap', async () => {
+    for (let i = 0; i < 5; i++)
+      m.rows.push({
+        kind: 'support',
+        storeId: 'store-a',
+        createdAt: new Date(Date.now() - 25 * 3600_000),
+        capDay: new Date(Date.now() - 25 * 3600_000).toISOString().slice(0, 10),
+        capSlot: i + 1,
+      });
+    expect((await request(app).post('/stores/store-a/support-requests').send(body)).status).toBe(
+      201
+    );
+  });
+
+  it('refuses an unknown topic, an empty message and a javascript: page url', async () => {
+    const post = (b: object) => request(app).post('/stores/store-a/support-requests').send(b);
+    expect((await post({ ...body, topic: 'nope' })).status).toBe(400);
+    expect((await post({ ...body, message: '' })).status).toBe(400);
+    expect((await post({ ...body, pageUrl: 'javascript:alert(1)' })).status).toBe(400);
+  });
+
+  it("another store's id answers 404 and stores nothing", async () => {
+    const res = await request(app).post('/stores/store-b/support-requests').send(body);
+    expect(res.status).toBe(404);
+    expect(m.rows).toHaveLength(0);
+  });
+
+  it('a request that cannot be emailed is still stored (the row is the record)', async () => {
+    m.enqueue.mockRejectedValue(new Error('smtp down'));
+    const res = await request(app).post('/stores/store-a/support-requests').send(body);
+    expect(res.status).toBe(201);
+    expect(m.rows).toHaveLength(1);
+  });
+});
+
+describe('A16 slug claim and store cap request', () => {
+  const claim = {
+    slug: 'nike',
+    evidence: 'I am the brand owner, trademark registration attached.',
+  };
+
+  it('stores a pending claim for a protected slug; staff are told once', async () => {
+    const res = await request(app).post('/onboarding/slug-claims').send(claim);
+    expect(res.status).toBe(201);
+    expect(m.rows[0]).toMatchObject({
+      kind: 'slug_claim',
+      slug: 'nike',
+      userId: 'u1',
+      status: 'open',
+    });
+    expect(m.enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('a duplicate open claim for the same slug is 409', async () => {
+    await request(app).post('/onboarding/slug-claims').send(claim);
+    const dup = await request(app).post('/onboarding/slug-claims').send(claim);
+    expect(dup.status).toBe(409);
+    expect(m.rows).toHaveLength(1);
+  });
+
+  it('a slug that is not protected is refused (nothing to claim)', async () => {
+    const res = await request(app)
+      .post('/onboarding/slug-claims')
+      .send({ ...claim, slug: 'my-little-shop-123' });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('SLUG_NOT_PROTECTED');
+    expect(m.rows).toHaveLength(0);
+  });
+
+  it('unauthenticated is 401', async () => {
+    const res = await request(app).post('/onboarding/slug-claims').set('x-anon', '1').send(claim);
+    expect(res.status).toBe(401);
+  });
+
+  it('requires evidence', async () => {
+    const res = await request(app).post('/onboarding/slug-claims').send({ slug: 'nike' });
+    expect(res.status).toBe(400);
+  });
+
+  it('stores a store-limit request with evidence; a second open one is 409', async () => {
+    const body = {
+      message: 'I run 12 branches and open them all this week.',
+      evidenceUrl: 'https://example.com/proof',
+    };
+    const first = await request(app).post('/onboarding/store-cap-requests').send(body);
+    expect(first.status).toBe(201);
+    expect(m.rows[0]).toMatchObject({ kind: 'store_cap', userId: 'u1' });
+    const second = await request(app).post('/onboarding/store-cap-requests').send(body);
+    expect(second.status).toBe(409);
+  });
+});
+
+describe('staff side of A13 (the decision stays with the super admin)', () => {
+  it('suspending records the reason the merchant reads; reactivating resolves the open appeal', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    const db = fakePrisma as any;
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'Counterfeit goods', false);
+    expect((await request(app).get('/stores/store-a/suspension')).body.data.reason).toBe(
+      'Counterfeit goods'
+    );
+    await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'please review' });
+    await svc.closeAppealsOnReactivation(db, 'store-a');
+    const appeal = m.rows.find(r => r.kind === 'suspension_appeal');
+    expect(appeal?.status).toBe('resolved');
+  });
+
+  it('a merchant route never resolves or rejects anything (no status write in support.routes)', async () => {
+    // behaviour: the merchant appeal route only ever files; a second file is 409 and nothing is decided
+    m.rows.push({ kind: 'suspension', storeId: 'store-a', message: 'x', createdAt: new Date() });
+    await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'again please' });
+    await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'again please' });
+    expect(m.rows.filter(r => r.kind === 'suspension_appeal').map(r => r.status)).toEqual(['open']);
+  });
+});
+
+describe('review fixes: alert carries ids only, cooldown, atomic cap, claim cap', () => {
+  const seedReason = () =>
+    m.rows.push({
+      kind: 'suspension',
+      storeId: 'store-a',
+      message: 'policy',
+      createdAt: new Date(),
+    });
+  const secret = 'call Mona on 01012345678';
+
+  it('support request: full text only in the e-mail; alert is info with ids + topic only', async () => {
+    const res = await request(app)
+      .post('/stores/store-a/support-requests')
+      .send({ topic: SUPPORT_TOPICS[0], message: secret });
+    expect(res.status).toBe(201);
+    expect(m.enqueue.mock.calls[0][1].text).toContain(secret);
+    expect(m.alert).toHaveBeenCalledTimes(1);
+    const a = m.alert.mock.calls[0][0];
+    expect(a.level).toBe('info');
+    expect(JSON.stringify(a)).not.toContain(secret);
+    expect(JSON.stringify(a)).not.toContain('owner@example.com');
+    expect(a.body).toContain(`request=${res.body.data.id}`);
+    expect(a.body).toContain(`topic=${SUPPORT_TOPICS[0]}`);
+    expect(a.body).toContain('store=store-a');
+  });
+
+  it('appeal, slug claim and store-cap alerts are info and carry no message or e-mail', async () => {
+    seedReason();
+    await request(app).post('/stores/store-a/suspension/appeal').send({ message: secret });
+    await request(app).post('/onboarding/slug-claims').send({ slug: 'google', evidence: secret });
+    await request(app).post('/onboarding/store-cap-requests').send({ message: secret });
+    expect(m.alert).toHaveBeenCalledTimes(3);
+    for (const [a] of m.alert.mock.calls) {
+      expect(a.level).toBe('info');
+      expect(JSON.stringify(a)).not.toContain(secret);
+      expect(JSON.stringify(a)).not.toContain('owner@example.com');
+    }
+  });
+
+  it('a rejected appeal cannot be re-filed for 24 h, then can', async () => {
+    seedReason();
+    m.rows.push({
+      id: 'old',
+      kind: 'suspension_appeal',
+      storeId: 'store-a',
+      status: 'rejected',
+      createdAt: new Date(Date.now() - 72 * 3600_000),
+      rejectedAt: new Date(Date.now() - 3600_000),
+    });
+    const blocked = await request(app)
+      .post('/stores/store-a/suspension/appeal')
+      .send({ message: 'please reconsider' });
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error.code).toBe('APPEAL_COOLDOWN');
+    expect(m.rows.filter(r => r.kind === 'suspension_appeal')).toHaveLength(1);
+    m.rows[m.rows.length - 1].rejectedAt = new Date(Date.now() - 25 * 3600_000);
+    expect(
+      (await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'again' }))
+        .status
+    ).toBe(201);
+  });
+
+  it('support cap: 8 parallel requests store exactly 5 and refuse 3 (atomic slot claim, no lock)', async () => {
+    const body = { topic: SUPPORT_TOPICS[0], message: 'burst' };
+    const res = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        request(app).post('/stores/store-a/support-requests').send(body)
+      )
+    );
+    expect(res.filter(r => r.status === 201)).toHaveLength(5);
+    expect(res.filter(r => r.status === 429)).toHaveLength(3);
+    expect(m.rows.filter(r => r.kind === 'support')).toHaveLength(5);
+    expect(m.enqueue).toHaveBeenCalledTimes(5);
+  });
+
+  it('a rejected appeal with only updated_at recent (no rejected_at) does not trigger the cooldown', async () => {
+    seedReason();
+    m.rows.push({
+      kind: 'suspension_appeal',
+      storeId: 'store-a',
+      status: 'rejected',
+      createdAt: new Date(Date.now() - 72 * 3600_000),
+      updatedAt: new Date(),
+    });
+    expect(
+      (await request(app).post('/stores/store-a/suspension/appeal').send({ message: 'x' })).status
+    ).toBe(201);
+  });
+
+  it('slug claims: at most 3 open per user, a 4th is 429; another user is unaffected', async () => {
+    for (const slug of ['google', 'apple', 'amazon'])
+      expect(
+        (
+          await request(app)
+            .post('/onboarding/slug-claims')
+            .send({ slug, evidence: 'We own this brand, registration attached.' })
+        ).status
+      ).toBe(201);
+    const fourth = await request(app)
+      .post('/onboarding/slug-claims')
+      .send({ slug: 'facebook', evidence: 'We own this brand, registration attached.' });
+    expect(fourth.status).toBe(429);
+    expect(fourth.body.error.code).toBe('TOO_MANY_OPEN_CLAIMS');
+    expect(m.rows.filter(r => r.kind === 'slug_claim')).toHaveLength(3);
+    expect(
+      (
+        await request(app)
+          .post('/onboarding/slug-claims')
+          .set('x-user', 'u2')
+          .send({ slug: 'facebook', evidence: 'We own this brand, registration attached.' })
+      ).status
+    ).toBe(201);
+  });
+});
+
+describe('episode notes (recordSuspension / getSuspension)', () => {
+  it('a re-suspension with no reason shows NO reason, never the earlier episode reason', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    const db = fakePrisma as any;
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'Counterfeit goods', false);
+    await svc.closeAppealsOnReactivation(db, 'store-a'); // reactivated
+    await new Promise(r => setTimeout(r, 2));
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, undefined, false); // suspended again
+    expect((await request(app).get('/stores/store-a/suspension')).body.data.reason).toBeNull();
+  });
+  it('a repeat suspend of an already suspended store with no reason writes nothing and keeps the reason', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    const db = fakePrisma as any;
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'Counterfeit goods', false);
+    expect(await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, undefined, true)).toBe(
+      false
+    );
+    expect(m.rows.filter(r => r.kind === 'suspension')).toHaveLength(1);
+    expect((await request(app).get('/stores/store-a/suspension')).body.data.reason).toBe(
+      'Counterfeit goods'
+    );
+  });
+  it('a repeat suspend WITH a new reason replaces what the merchant reads', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    const db = fakePrisma as any;
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'first', false);
+    await new Promise(r => setTimeout(r, 2));
+    await svc.recordSuspension(db, 'store-a', { userId: 'admin' }, 'second', true);
+    expect((await request(app).get('/stores/store-a/suspension')).body.data.reason).toBe('second');
+  });
+});
+
+describe('A16 under the REAL tenant guard (withUser, no ambient store)', () => {
+  // wraps the fake db so every call first runs the production guard with the scope withUser sets
+  const guarded = (userId: string) => {
+    const wrap: any = {};
+    for (const op of ['create', 'findFirst', 'count', 'updateMany'] as const)
+      wrap[op] = async (args: any) => {
+        assertTenantScoped('TrustRequest', op, args, { userId });
+        return (trustRequest as any)[op](args);
+      };
+    return { trustRequest: wrap, store: fakePrisma.store } as any;
+  };
+  it('slug claim and store-cap request pass the guard for the ambient user', async () => {
+    const svc = await import('@api/services/trust-requests.service');
+    await expect(
+      svc.fileSlugClaim(
+        guarded('u1'),
+        { userId: 'u1' },
+        { slug: 'nike', evidence: 'We own it, papers attached.' }
+      )
+    ).resolves.toBeDefined();
+    await expect(
+      svc.fileStoreCapRequest(
+        guarded('u1'),
+        { userId: 'u1' },
+        { message: 'I open twelve branches.' }
+      )
+    ).resolves.toBeDefined();
+  });
+  it('the guard still refuses another user and a missing user', () => {
+    const bad = (where: any, scope: any) =>
+      expect(() => assertTenantScoped('TrustRequest', 'count', { where }, scope)).toThrow(
+        TenantScopeViolation
+      );
+    bad({ userId: 'u2', kind: 'slug_claim' }, { userId: 'u1' });
+    bad({ userId: 'u1' }, {});
+    expect(() =>
+      assertTenantScoped(
+        'TrustRequest',
+        'create',
+        { data: { userId: 'u2', kind: 'store_cap' } },
+        { userId: 'u1' }
+      )
+    ).toThrow(TenantScopeViolation);
+  });
+});
