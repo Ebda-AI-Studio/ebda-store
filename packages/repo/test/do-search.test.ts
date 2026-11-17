@@ -182,7 +182,7 @@ describe('product search: FTS5 index vs the Postgres meaning', () => {
                 ? `${pick(3)}"${pick(2)}`
                 : `${pick(3 + Math.floor(r() * 4))} ${pick(3)}`;
         for (const o of OPTS) {
-          const got = searchProductIdSet(f.db, 's1', q, { ...o, limit: 10_000 })
+          const got = searchProductIdSet(f.db, 's1', q, { ...o, stem: false, limit: 10_000 })
             .ids.slice()
             .sort();
           expect(got, JSON.stringify({ q, o })).toEqual(oracleIds(ps, q, o));
@@ -386,7 +386,8 @@ describe('search-eval catalogue: DO keyword search equals the Postgres meaning o
   it(`all ${qs.length} eval queries (core + extra + hard) return the oracle set; keyword hit@10 per class is reported`, () => {
     const byClass = new Map<string, { n: number; hit: number }>();
     for (const e of qs) {
-      const o: ProductSearchOpts = { scope: 'storefront', limit: 10_000 };
+      // the oracle is the Postgres meaning (literal substring); stemming has its own suite (do-search-stemming.test.ts)
+      const o: ProductSearchOpts = { scope: 'storefront', limit: 10_000, stem: false };
       const got = searchProductIdSet(f.db, 's1', e.q, o).ids;
       expect(got.slice().sort(), e.q).toEqual(oracleIds(ps, e.q, o));
       const top10 = got.slice(0, 10).map(id => rows.find(r => r.id === id)!.type);
@@ -482,7 +483,8 @@ describe.skipIf(!PG_URL)(
       await load(ps);
       const f = fx(ps);
       for (const e of evalQueries()) {
-        const o: ProductSearchOpts = { scope: 'storefront', limit: 10_000 };
+        // the oracle is the Postgres meaning (literal substring); stemming has its own suite (do-search-stemming.test.ts)
+        const o: ProductSearchOpts = { scope: 'storefront', limit: 10_000, stem: false };
         expect(searchProductIdSet(f.db, 's1', e.q, o).ids, e.q).toEqual(
           await pgSearch('s1', e.q, o)
         );
@@ -525,7 +527,11 @@ describe.skipIf(!PG_URL)(
             { scope: 'storefront', field: 'name' },
             { scope: 'admin' },
           ] as ProductSearchOpts[]) {
-            const mine = searchProductIdSet(f.db, 's1', q, { ...o, limit: 10_000 }).ids;
+            const mine = searchProductIdSet(f.db, 's1', q, {
+              ...o,
+              stem: false,
+              limit: 10_000,
+            }).ids;
             expect(mine, JSON.stringify({ q, o })).toEqual(
               await pgSearch('s1', q, { ...o, limit: 10_000 })
             );

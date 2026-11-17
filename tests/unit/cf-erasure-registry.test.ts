@@ -19,6 +19,7 @@ import {
 
 import { INSTAPAY_RECEIPT_DDL } from '../../packages/repo/src/do/instapay-receipts';
 import { ERASURE_LEDGER_DDL } from '../../packages/repo/src/do/erase-shopper';
+import { SMART_LAYER_DDL } from '../../packages/repo/src/do/smart-layer';
 
 const ROOT = path.resolve(__dirname, '../..');
 const dir = path.join(ROOT, 'packages/cf-schema/migrations/store');
@@ -32,6 +33,7 @@ function openDo(): DatabaseSync {
   // tables the StoreDO creates at start that hold personal data (they are classified in the generator, not in the migrations)
   for (const s of INSTAPAY_RECEIPT_DDL) db.exec(s);
   db.exec(ERASURE_LEDGER_DDL);
+  for (const s of SMART_LAYER_DDL) db.exec(s);
   return db;
 }
 // like the Durable Object's `sql.exec`: the statement runs when called, `toArray()` only reads the cursor
@@ -63,7 +65,8 @@ describe('generated registry', () => {
     const db = openDo();
     expect(unclassifiedTables(tablesOf(db))).toEqual([]);
     // + the tables the DO creates itself at start that are not in the migrations: payment_event_log and vector_usage
-    // (reviewed no-pii in the generator); instapay_order_receipts (personal data) is already in the db above via its DDL
+    // (reviewed no-pii in the generator); instapay_order_receipts (personal data) is already in the db above via its DDL;
+    // the assistant's sl_* journal (masked, store-owned: goes with the store) is in the db above via its DDL
     expect(Object.keys(STORE_DO_REGISTRY).sort()).toEqual(
       [...tablesOf(db), 'payment_event_log', 'vector_usage'].sort()
     );

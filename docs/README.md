@@ -37,6 +37,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 ## admin - Admin app standards
 
 - [admin/ACTION-PLACEMENT-STANDARD.md](admin/ACTION-PLACEMENT-STANDARD.md) - Admin action-placement standard
+- [admin/activation-view.md](admin/activation-view.md) - Super-admin merchant activation view (Ruling ACT-1)
 
 ## adr - Architecture decision records
 
@@ -133,6 +134,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## ebda - Ebda program: plans, research, brand, templates
 
+- [ebda-assistant-rollout.md](ebda-assistant-rollout.md) - Ebda Store assistant: rollout stages and safety gate
 - [ebda/ads-tracking.md](ebda/ads-tracking.md) - Ebda Store acquisition tracking (own Meta ads + PostHog funnel)
 - [ebda/brand/ebda-brief-v2.html](ebda/brand/ebda-brief-v2.html) - ebda brief v2
 - [ebda/brand/operator.md](ebda/brand/operator.md) - Operator of Ebda
@@ -251,86 +253,89 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## plans - Implementation plans
 
-- [plans/2026-07-02-rls-cutover.md](plans/2026-07-02-rls-cutover.md) - RLS Cutover Plan — Option B (make the database backstop real)
+- [plans/README.md](plans/README.md) - Plans index: status lives in the program register; docs/plans = open work, done/ = shipped
+- [plans/done/2026-07-02-rls-cutover.md](plans/done/2026-07-02-rls-cutover.md) - RLS Cutover Plan — Option B (make the database backstop real)
 - [plans/2026-07-03-ai-bulk-sweeps.md](plans/2026-07-03-ai-bulk-sweeps.md) - AI Bulk Sweeps — fix Product FAQs + add 4 new catalogue sweeps
-- [plans/2026-07-04-hero-banner-link.md](plans/2026-07-04-hero-banner-link.md) - Hero banner links — make hero slides pressable (marketing space)
-- [plans/2026-07-12-tenant-cacheable-routing.md](plans/2026-07-12-tenant-cacheable-routing.md) - Tenant-Cacheable Storefront Routing — Implementation Plan
-- [plans/2026-07-20-refund-reversal-stuck-sweep.md](plans/2026-07-20-refund-reversal-stuck-sweep.md) - Refund-reversal stuck sweep — closing the silent stock-loss path
-- [plans/2026-09-02-adversarial-audit-remediation.md](plans/2026-09-02-adversarial-audit-remediation.md) - Adversarial Audit Remediation — Implementation Plan
-- [plans/2026-09-12-p2-backlog-remediation.md](plans/2026-09-12-p2-backlog-remediation.md) - P2 Audit-Backlog Remediation Plan
-- [plans/2026-09-16-store-resolve-transient-not-404.md](plans/2026-09-16-store-resolve-transient-not-404.md) - A transient store-resolve failure must not tell a shopper the store does not exist
-- [plans/2026-09-17-db-backup-assert-dump.md](plans/2026-09-17-db-backup-assert-dump.md) - Backup dumps are asserted, not just counted
-- [plans/2026-09-25-customer-wallet.md](plans/2026-09-25-customer-wallet.md) - D1 — Customer Wallet (store credit)
-- [plans/2026-09-25-email-campaigns.md](plans/2026-09-25-email-campaigns.md) - D2 — Email Campaigns (spec + plan)
-- [plans/2026-10-05-ebda-launch-readiness.md](plans/2026-10-05-ebda-launch-readiness.md) - Ebda launch readiness
-- [plans/2026-10-05-ebda-merchant-ui.md](plans/2026-10-05-ebda-merchant-ui.md) - Ebda merchant UI implementation plan
-- [plans/2026-10-05-pricing-decisions.md](plans/2026-10-05-pricing-decisions.md) - Ebda pricing — locked 2026-10-05
-- [plans/2026-10-05-pricing-implementation.md](plans/2026-10-05-pricing-implementation.md) - Locked pricing implementation plan
-- [plans/2026-10-07-builder-file-plan.md](plans/2026-10-07-builder-file-plan.md) - Ebda visual builder — file-by-file plan, phases 1–5
-- [plans/2026-10-07-builder-phase0-gap-matrix.md](plans/2026-10-07-builder-phase0-gap-matrix.md) - Ebda visual builder — Phase 0 gap matrix
-- [plans/2026-10-07-builder-template-shortlist.md](plans/2026-10-07-builder-template-shortlist.md) - Ebda storefront template shortlist (Phase 0)
-- [plans/2026-10-07-ebda-accounts-sso.md](plans/2026-10-07-ebda-accounts-sso.md) - Ebda Accounts — one login across store., whatsapp., crm.ebda.app (design only)
-- [plans/2026-10-07-ebda-visual-builder-roadmap.md](plans/2026-10-07-ebda-visual-builder-roadmap.md) - Ebda visual page builder — roadmap and specification
+- [plans/done/2026-07-04-hero-banner-link.md](plans/done/2026-07-04-hero-banner-link.md) - Hero banner links — make hero slides pressable (marketing space)
+- [plans/done/2026-07-12-tenant-cacheable-routing.md](plans/done/2026-07-12-tenant-cacheable-routing.md) - Tenant-Cacheable Storefront Routing — Implementation Plan
+- [plans/done/2026-07-20-refund-reversal-stuck-sweep.md](plans/done/2026-07-20-refund-reversal-stuck-sweep.md) - Refund-reversal stuck sweep — closing the silent stock-loss path
+- [plans/done/2026-09-02-adversarial-audit-remediation.md](plans/done/2026-09-02-adversarial-audit-remediation.md) - Adversarial Audit Remediation — Implementation Plan
+- [plans/done/2026-09-12-p2-backlog-remediation.md](plans/done/2026-09-12-p2-backlog-remediation.md) - P2 Audit-Backlog Remediation Plan
+- [plans/done/2026-09-16-store-resolve-transient-not-404.md](plans/done/2026-09-16-store-resolve-transient-not-404.md) - A transient store-resolve failure must not tell a shopper the store does not exist
+- [plans/done/2026-09-17-db-backup-assert-dump.md](plans/done/2026-09-17-db-backup-assert-dump.md) - Backup dumps are asserted, not just counted
+- [plans/done/2026-09-25-customer-wallet.md](plans/done/2026-09-25-customer-wallet.md) - D1 — Customer Wallet (store credit)
+- [plans/done/2026-09-25-email-campaigns.md](plans/done/2026-09-25-email-campaigns.md) - D2 — Email Campaigns (spec + plan)
+- [plans/done/2026-10-05-ebda-launch-readiness.md](plans/done/2026-10-05-ebda-launch-readiness.md) - Ebda launch readiness
+- [plans/done/2026-10-05-ebda-merchant-ui.md](plans/done/2026-10-05-ebda-merchant-ui.md) - Ebda merchant UI implementation plan
+- [plans/done/2026-10-05-pricing-decisions.md](plans/done/2026-10-05-pricing-decisions.md) - Ebda pricing — locked 2026-10-05
+- [plans/done/2026-10-05-pricing-implementation.md](plans/done/2026-10-05-pricing-implementation.md) - Locked pricing implementation plan
+- [plans/done/2026-10-07-builder-file-plan.md](plans/done/2026-10-07-builder-file-plan.md) - Ebda visual builder — file-by-file plan, phases 1–5
+- [plans/done/2026-10-07-builder-phase0-gap-matrix.md](plans/done/2026-10-07-builder-phase0-gap-matrix.md) - Ebda visual builder — Phase 0 gap matrix
+- [plans/done/2026-10-07-builder-template-shortlist.md](plans/done/2026-10-07-builder-template-shortlist.md) - Ebda storefront template shortlist (Phase 0)
+- [plans/done/2026-10-07-ebda-accounts-sso.md](plans/done/2026-10-07-ebda-accounts-sso.md) - Ebda Accounts — one login across store., whatsapp., crm.ebda.app (design only)
+- [plans/done/2026-10-07-ebda-visual-builder-roadmap.md](plans/done/2026-10-07-ebda-visual-builder-roadmap.md) - Ebda visual page builder — roadmap and specification
 - [plans/2026-10-07-egypt-payments-shipping-integrations.md](plans/2026-10-07-egypt-payments-shipping-integrations.md) - Egypt payments and shipping: connect-any-provider integrations
-- [plans/2026-10-07-egypt-vat-and-eta.md](plans/2026-10-07-egypt-vat-and-eta.md) - Egypt VAT gating and ETA e-receipt / e-invoice — research and design
+- [plans/done/2026-10-07-egypt-vat-and-eta.md](plans/done/2026-10-07-egypt-vat-and-eta.md) - Egypt VAT gating and ETA e-receipt / e-invoice — research and design
 - [plans/2026-10-07-product-3d-viewer.md](plans/2026-10-07-product-3d-viewer.md) - Product 3D viewer + AR (design + implementation plan)
-- [plans/2026-10-07-signup-funnel.md](plans/2026-10-07-signup-funnel.md) - Merchant signup funnel: plan choice, card on file, 14-day Growth trial
-- [plans/2026-10-10-ebda-store-naming.md](plans/2026-10-10-ebda-store-naming.md) - Ebda Store / Ebda AI Studio naming implementation plan
-- [plans/2026-10-11-stock-hold-admission.md](plans/2026-10-11-stock-hold-admission.md) - Stock-hold admission correction
-- [plans/2026-10-14-looks-phase-s.md](plans/2026-10-14-looks-phase-s.md) - Looks — Phase S (system contract) Implementation Plan
-- [plans/2026-10-14-marketing-levelup.md](plans/2026-10-14-marketing-levelup.md) - Marketing level-up (ebda.app) — 2026-10-14
-- [plans/2026-10-14-marketing-looks-showcase.md](plans/2026-10-14-marketing-looks-showcase.md) - Marketing: interactive looks showcase — 2026-10-14
-- [plans/2026-10-14-phase-b0-platform-commerce.md](plans/2026-10-14-phase-b0-platform-commerce.md) - Phase B0 — Platform Commerce Features Implementation Plan
-- [plans/2026-10-14-templates-and-editor-program.md](plans/2026-10-14-templates-and-editor-program.md) - Templates + editor program (launch gate) — 2026-10-14
-- [plans/2026-10-15-followups-b0-46.md](plans/2026-10-15-followups-b0-46.md) - B0-46 Follow-up Fixes Implementation Plan
-- [plans/2026-10-15-phase-b1-qamar.md](plans/2026-10-15-phase-b1-qamar.md) - Phase B1 — Qamar (fashion & boutiques) Implementation Plan
-- [plans/2026-10-15-policy-change-notify.md](plans/2026-10-15-policy-change-notify.md) - Policy Change Notify Implementation Plan
-- [plans/2026-10-15-semantic-search.md](plans/2026-10-15-semantic-search.md) - Arabic + English Search Program (P0–P3) Implementation Plan
-- [plans/2026-10-21-b2b-wholesale.md](plans/2026-10-21-b2b-wholesale.md) - B2B Wholesale Pricing Implementation Plan
-- [plans/2026-10-21-cart-email-campaigns.md](plans/2026-10-21-cart-email-campaigns.md) - Cart-recovery email + email campaigns in plans (2026-10-21)
-- [plans/2026-10-21-delete-old-force-skins.md](plans/2026-10-21-delete-old-force-skins.md) - Delete the Five Old Force Skins Implementation Plan
-- [plans/2026-10-21-merchant-webhooks.md](plans/2026-10-21-merchant-webhooks.md) - Merchant outgoing webhooks (2026-10-21)
-- [plans/2026-10-21-passkeys.md](plans/2026-10-21-passkeys.md) - Passkeys (WebAuthn) for merchants and shoppers - 2026-10-21
-- [plans/2026-10-21-phase-b2-souq.md](plans/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
-- [plans/2026-10-21-phase-b3-jasmine.md](plans/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
-- [plans/2026-10-21-phase-b4-lamma.md](plans/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/done/2026-10-07-signup-funnel.md](plans/done/2026-10-07-signup-funnel.md) - Merchant signup funnel: plan choice, card on file, 14-day Growth trial
+- [plans/done/2026-10-10-ebda-store-naming.md](plans/done/2026-10-10-ebda-store-naming.md) - Ebda Store / Ebda AI Studio naming implementation plan
+- [plans/done/2026-10-11-stock-hold-admission.md](plans/done/2026-10-11-stock-hold-admission.md) - Stock-hold admission correction
+- [plans/done/2026-10-14-looks-phase-s.md](plans/done/2026-10-14-looks-phase-s.md) - Looks — Phase S (system contract) Implementation Plan
+- [plans/done/2026-10-14-marketing-levelup.md](plans/done/2026-10-14-marketing-levelup.md) - Marketing level-up (ebda.app) — 2026-10-14
+- [plans/done/2026-10-14-marketing-looks-showcase.md](plans/done/2026-10-14-marketing-looks-showcase.md) - Marketing: interactive looks showcase — 2026-10-14
+- [plans/done/2026-10-14-phase-b0-platform-commerce.md](plans/done/2026-10-14-phase-b0-platform-commerce.md) - Phase B0 — Platform Commerce Features Implementation Plan
+- [plans/done/2026-10-14-templates-and-editor-program.md](plans/done/2026-10-14-templates-and-editor-program.md) - Templates + editor program (launch gate) — 2026-10-14
+- [plans/done/2026-10-15-followups-b0-46.md](plans/done/2026-10-15-followups-b0-46.md) - B0-46 Follow-up Fixes Implementation Plan
+- [plans/done/2026-10-15-phase-b1-qamar.md](plans/done/2026-10-15-phase-b1-qamar.md) - Phase B1 — Qamar (fashion & boutiques) Implementation Plan
+- [plans/done/2026-10-15-policy-change-notify.md](plans/done/2026-10-15-policy-change-notify.md) - Policy Change Notify Implementation Plan
+- [plans/done/2026-10-15-semantic-search.md](plans/done/2026-10-15-semantic-search.md) - Arabic + English Search Program (P0–P3) Implementation Plan
+- [plans/done/2026-10-21-b2b-wholesale.md](plans/done/2026-10-21-b2b-wholesale.md) - B2B Wholesale Pricing Implementation Plan
+- [plans/done/2026-10-21-cart-email-campaigns.md](plans/done/2026-10-21-cart-email-campaigns.md) - Cart-recovery email + email campaigns in plans (2026-10-21)
+- [plans/done/2026-10-21-delete-old-force-skins.md](plans/done/2026-10-21-delete-old-force-skins.md) - Delete the Five Old Force Skins Implementation Plan
+- [plans/done/2026-10-21-merchant-webhooks.md](plans/done/2026-10-21-merchant-webhooks.md) - Merchant outgoing webhooks (2026-10-21)
+- [plans/done/2026-10-21-passkeys.md](plans/done/2026-10-21-passkeys.md) - Passkeys (WebAuthn) for merchants and shoppers - 2026-10-21
+- [plans/done/2026-10-21-phase-b2-souq.md](plans/done/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
+- [plans/done/2026-10-21-phase-b3-jasmine.md](plans/done/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
+- [plans/done/2026-10-21-phase-b4-lamma.md](plans/done/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/2026-11-15-gsc-custom-domain-verification.md](plans/2026-11-15-gsc-custom-domain-verification.md) - GSC data for custom merchant domains: automatic META verification via the Site Verification API, then sites.add (2026-11-15)
 - [plans/2026-11-05-nz-17-postgres-removal.md](plans/2026-11-05-nz-17-postgres-removal.md) - N-17: inventory of Postgres residue, what replaces the Postgres integration suite, CI footprint (2026-11-05)
-- [plans/2026-11-03-sharia-gold-bnpl-aup.md](plans/2026-11-03-sharia-gold-bnpl-aup.md) - Sharia decisions: gold prepaid, BNPL off by default, acceptable use (2026-11-03)
-- [plans/2026-10-21-phase-b5-dahab-looks.md](plans/2026-10-21-phase-b5-dahab-looks.md) - Phase B5 — Dahab redesign: Worn / Workshop / Gift box Implementation Plan
-- [plans/2026-10-21-search-p3-catalogue-import.md](plans/2026-10-21-search-p3-catalogue-import.md) - Search P3: Catalogue Import from Photos and PDFs Implementation Plan
-- [plans/2026-10-21-shaped-barcodes.md](plans/2026-10-21-shaped-barcodes.md) - Shaped, scannable order barcodes (2026-10-21)
-- [plans/2026-10-21-template-editor-pass.md](plans/2026-10-21-template-editor-pass.md) - Template Editor Pass Implementation Plan
+- [plans/done/2026-11-03-sharia-gold-bnpl-aup.md](plans/done/2026-11-03-sharia-gold-bnpl-aup.md) - Sharia decisions: gold prepaid, BNPL off by default, acceptable use (2026-11-03)
+- [plans/done/2026-10-21-phase-b5-dahab-looks.md](plans/done/2026-10-21-phase-b5-dahab-looks.md) - Phase B5 — Dahab redesign: Worn / Workshop / Gift box Implementation Plan
+- [plans/done/2026-10-21-search-p3-catalogue-import.md](plans/done/2026-10-21-search-p3-catalogue-import.md) - Search P3: Catalogue Import from Photos and PDFs Implementation Plan
+- [plans/done/2026-10-21-shaped-barcodes.md](plans/done/2026-10-21-shaped-barcodes.md) - Shaped, scannable order barcodes (2026-10-21)
+- [plans/done/2026-10-21-template-editor-pass.md](plans/done/2026-10-21-template-editor-pass.md) - Template Editor Pass Implementation Plan
 - [plans/2026-10-22-visual-editor.md](plans/2026-10-22-visual-editor.md) - Visual Editor Implementation Plan
 - [plans/2026-10-23-launch-polish.md](plans/2026-10-23-launch-polish.md) - Launch step 5: impeccable polish pass (5 templates x 3 looks + visual editor)
-- [plans/2026-10-23-marketing-captures.md](plans/2026-10-23-marketing-captures.md) - Marketing captures refresh (launch step 6) - 2026-10-23
-- [plans/2026-10-24-cf-phase0-go-no-go.md](plans/2026-10-24-cf-phase0-go-no-go.md) - Phase 0 go/no-go: Ebda Store on Cloudflare only (Ruling INFRA-CF-1)
-- [plans/2026-10-24-cf-phase2-architecture.md](plans/2026-10-24-cf-phase2-architecture.md) - Phase 2 architecture: how the repo layer reaches 2,500 Prisma call sites (Ruling CF-REPO-1, PROPOSED)
-- [plans/2026-10-24-identity-extraction.md](plans/2026-10-24-identity-extraction.md) - Shared identity service: extraction plan (Rulings ID-1, ID-2, ID-3)
-- [plans/2026-10-24-looks-from-live-demos.md](plans/2026-10-24-looks-from-live-demos.md) - Looks from the live demo stores (Ruling MKT-PHONES-1) - 2026-10-24
-- [plans/2026-10-25-ci1-capture-impl.md](plans/2026-10-25-ci1-capture-impl.md) - CI-1 capture: implementation plan (Store, pre-launch)
+- [plans/done/2026-10-23-marketing-captures.md](plans/done/2026-10-23-marketing-captures.md) - Marketing captures refresh (launch step 6) - 2026-10-23
+- [plans/done/2026-10-24-cf-phase0-go-no-go.md](plans/done/2026-10-24-cf-phase0-go-no-go.md) - Phase 0 go/no-go: Ebda Store on Cloudflare only (Ruling INFRA-CF-1)
+- [plans/done/2026-10-24-cf-phase2-architecture.md](plans/done/2026-10-24-cf-phase2-architecture.md) - Phase 2 architecture: how the repo layer reaches 2,500 Prisma call sites (Ruling CF-REPO-1, PROPOSED)
+- [plans/done/2026-10-24-identity-extraction.md](plans/done/2026-10-24-identity-extraction.md) - Shared identity service: extraction plan (Rulings ID-1, ID-2, ID-3)
+- [plans/done/2026-10-24-looks-from-live-demos.md](plans/done/2026-10-24-looks-from-live-demos.md) - Looks from the live demo stores (Ruling MKT-PHONES-1) - 2026-10-24
+- [plans/done/2026-10-25-ci1-capture-impl.md](plans/done/2026-10-25-ci1-capture-impl.md) - CI-1 capture: implementation plan (Store, pre-launch)
 - [plans/2026-10-25-providers-unverified-connect.md](plans/2026-10-25-providers-unverified-connect.md) - Providers: connect unverified providers, check on save, learn from the first merchant
 - [plans/2026-10-25-templates-match-mockups.md](plans/2026-10-25-templates-match-mockups.md) - Make the real templates look like the Python mock-ups (2026-10-25)
-- [plans/2026-10-25-wa-store-contract-store-side.md](plans/2026-10-25-wa-store-contract-store-side.md) - Ebda Store side of the WhatsApp contract (producer, consumer, buyer key)
-- [plans/2026-10-26-search-as-you-type.md](plans/2026-10-26-search-as-you-type.md) - Search as you type, everywhere (2026-10-26)
+- [plans/done/2026-10-25-wa-store-contract-store-side.md](plans/done/2026-10-25-wa-store-contract-store-side.md) - Ebda Store side of the WhatsApp contract (producer, consumer, buyer key)
+- [plans/done/2026-10-26-search-as-you-type.md](plans/done/2026-10-26-search-as-you-type.md) - Search as you type, everywhere (2026-10-26)
+- [plans/2026-11-12-arabic-stemming.md](plans/2026-11-12-arabic-stemming.md) - Arabic light stemming for storefront search (2026-11-12)
 - [plans/2026-10-26-storefront-locale-paths.md](plans/2026-10-26-storefront-locale-paths.md) - Storefront English at its own URL (audit M-168, SEO-9)
-- [plans/2026-10-28-customer-intelligence.md](plans/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
-- [plans/2026-10-28-store-on-cloudflare.md](plans/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan
-- [plans/2026-11-03-admin-audit-polish.md](plans/2026-11-03-admin-audit-polish.md) - Admin impeccable-audit polish: plan gate, OneSignal opt-in, formatting, Egyptian copy, sign-in
+- [plans/done/2026-10-28-customer-intelligence.md](plans/done/2026-10-28-customer-intelligence.md) - Customer Intelligence (CI): capture, internal learning, merchant features
+- [plans/done/2026-10-28-store-on-cloudflare.md](plans/done/2026-10-28-store-on-cloudflare.md) - Ebda Store on Cloudflare only: detailed executable plan
+- [plans/done/2026-11-03-admin-audit-polish.md](plans/done/2026-11-03-admin-audit-polish.md) - Admin impeccable-audit polish: plan gate, OneSignal opt-in, formatting, Egyptian copy, sign-in
 - [plans/2026-11-02-neon-zero.md](plans/2026-11-02-neon-zero.md) - NEON-ZERO-1: the Ebda API with zero Postgres, Neon or Hyperdrive (inventory, scale rules, design note)
-- [plans/2026-11-03-editor-theme-spacing.md](plans/2026-11-03-editor-theme-spacing.md) - SP-1..3: simplified Theme panel (tiers, presets, density) and per-section, per-device spacing in the visual editor
-- [plans/2026-11-03-contact-form.md](plans/2026-11-03-contact-form.md) - CONTACT-FORM-1: studio service-enquiry form on the contact page
-- [plans/2026-11-03-storefront-premium-defaults.md](plans/2026-11-03-storefront-premium-defaults.md) - Storefront premium defaults (audit 2026-11-03)
+- [plans/done/2026-11-03-editor-theme-spacing.md](plans/done/2026-11-03-editor-theme-spacing.md) - SP-1..3: simplified Theme panel (tiers, presets, density) and per-section, per-device spacing in the visual editor
+- [plans/done/2026-11-03-contact-form.md](plans/done/2026-11-03-contact-form.md) - CONTACT-FORM-1: studio service-enquiry form on the contact page
+- [plans/done/2026-11-03-storefront-premium-defaults.md](plans/done/2026-11-03-storefront-premium-defaults.md) - Storefront premium defaults (audit 2026-11-03)
 - [plans/ai-features.md](plans/ai-features.md) - AI features plan — making "Ebda AI Studio" mean something
-- [plans/2026-10-26-barcode-1.md](plans/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
-- [plans/2026-10-26-qr-1.md](plans/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
-- [plans/2026-11-10-store-miss-counts-unverified-store-only.md](plans/2026-11-10-store-miss-counts-unverified-store-only.md) - LAUNCH-RL-MISS-3: a dead product or blog link inside a verified store is not a store-miss
-- [plans/2026-11-10-ssr-client-address.md](plans/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
+- [plans/done/2026-10-26-barcode-1.md](plans/done/2026-10-26-barcode-1.md) - BARCODE-1 Product Barcodes and Label Printing Implementation Plan
+- [plans/done/2026-10-26-qr-1.md](plans/done/2026-10-26-qr-1.md) - QR-1 Merchant QR Codes Implementation Plan
+- [plans/done/2026-11-10-store-miss-counts-unverified-store-only.md](plans/done/2026-11-10-store-miss-counts-unverified-store-only.md) - LAUNCH-RL-MISS-3: a dead product or blog link inside a verified store is not a store-miss
+- [plans/done/2026-11-10-ssr-client-address.md](plans/done/2026-11-10-ssr-client-address.md) - RL-SSR-IP-6: storefront server renders forward the shopper address (signed with REVALIDATE_SECRET) so the API limits charge the shopper, not the storefront Worker
 - [plans/2026-11-11-nz-money-auth.md](plans/2026-11-11-nz-money-auth.md) - NZ money + auth: InstaPay refund record, refund match-claim, agent COD, WhatsApp COD outcome, grants, tax report, customer MFA, merchant e-mail flows on a Durable Object store
-- [plans/2026-11-10-services-header-actions.md](plans/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
-- [plans/2026-11-10-resolve-bulletproof.md](plans/2026-11-10-resolve-bulletproof.md) - Store resolution bulletproofing: epoch-checked caches, stale-if-error, 503 + Retry-After (Ruling RESOLVE-BULLETPROOF-1)
+- [plans/done/2026-11-10-services-header-actions.md](plans/done/2026-11-10-services-header-actions.md) - the Menu's CTA and WhatsApp as one pinned pair, the short contact CTA on service pages, and the header bar's width ladder (NAV-CTA-2, NAV-MENU-ACTIONS-1, NAV-BAR-FIT-1)
+- [plans/done/2026-11-10-resolve-bulletproof.md](plans/done/2026-11-10-resolve-bulletproof.md) - Store resolution bulletproofing: epoch-checked caches, stale-if-error, 503 + Retry-After (Ruling RESOLVE-BULLETPROOF-1)
 - [plans/2026-11-10-storefront-cold-render.md](plans/2026-11-10-storefront-cold-render.md) - PERF-LATENCY: why a cold storefront render took 4-12 s (empty per-build data cache after every deploy), the build-independent fetch cache and the widened warm step (Ruling WEB-COLD-2)
-- [plans/2026-11-10-accounts-standalone-signin.md](plans/2026-11-10-accounts-standalone-signin.md) - ACCOUNTS-PAGE-1: accounts.ebda.app/login as a standalone Ebda AI Studio sign-in page over the same /login and /login/mfa, allowlisted return
-- [plans/2026-11-10-api-hangs.md](plans/2026-11-10-api-hangs.md) - API-HANG-1: every AuthState call bounded at 2.5 s, a public cache fill answers before its write-back
+- [plans/done/2026-11-10-accounts-standalone-signin.md](plans/done/2026-11-10-accounts-standalone-signin.md) - ACCOUNTS-PAGE-1: accounts.ebda.app/login as a standalone Ebda AI Studio sign-in page over the same /login and /login/mfa, allowlisted return
+- [plans/done/2026-11-10-api-hangs.md](plans/done/2026-11-10-api-hangs.md) - API-HANG-1: every AuthState call bounded at 2.5 s, a public cache fill answers before its write-back
 
 ## privacy - Privacy
 
@@ -343,6 +348,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [runbooks/SUPER-ADMIN-PLAYBOOK.md](runbooks/SUPER-ADMIN-PLAYBOOK.md) - Super-admin playbook
 - [runbooks/analytics-cutover.md](runbooks/analytics-cutover.md) - Per-store analytics to the StoreDO, AiUsage to D1 (controller runs it)
 - [runbooks/platform-family-cutover.md](runbooks/platform-family-cutover.md) - Platform table family cutover, Postgres to D1 (controller runs it)
+- [runbooks/grant-plan-d1.md](runbooks/grant-plan-d1.md) - Grant a plan on platform D1 with no money row (internal stores; controller runs it)
 - [runbooks/drop-legacy-app-role.md](runbooks/drop-legacy-app-role.md) - Drop the unused legacy app login role (production Neon)
 - [runbooks/ebda-names-rollout.md](runbooks/ebda-names-rollout.md) - Rollout: Ebda names replace the inherited service, token and env names
 - [runbooks/google-search-console-indexing.md](runbooks/google-search-console-indexing.md) - Google Search Console — Indexing Guide for demo-merchant.com
@@ -364,6 +370,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## security - Security
 
+- [security/2026-11-12-backfill-hardening-s-ten.md](security/2026-11-12-backfill-hardening-s-ten.md) - Backfill audit 2026-11-12: S2-S7, TEN-5, TEN-7 fixes
 - [security/audit-2026-10-14.md](security/audit-2026-10-14.md) - Security audit — 2026-10-14 (static, `apps/api` + `packages/database`)
 - [security/burp-manual-pentest-checklist.md](security/burp-manual-pentest-checklist.md) - Manual Burp Suite Pentest Checklist (quarterly)
 - [security/csp-hardening-plan.md](security/csp-hardening-plan.md) - CSP hardening: removing `script-src 'unsafe-inline'`
@@ -384,6 +391,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [superpowers/plans/2026-04-23-final-push-plan.md](superpowers/plans/2026-04-23-final-push-plan.md) - Final Push — Plan
 - [superpowers/plans/2026-04-23-remaining-refactors-master-plan.md](superpowers/plans/2026-04-23-remaining-refactors-master-plan.md) - Remaining Refactors — Master Plan
 - [superpowers/plans/2026-04-29-tenant-control-batch-2.md](superpowers/plans/2026-04-29-tenant-control-batch-2.md) - Tenant Control Batch 2 — 2026-04-29
+- [superpowers/plans/2026-11-14-instapay-auto-confirm.md](superpowers/plans/2026-11-14-instapay-auto-confirm.md) - InstaPay Auto-Confirm Implementation Plan
 - [superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md](superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md) - Storefront per-store PWA — extend to full size set
 - [superpowers/plans/2026-05-16-mobile-ui-ship.md](superpowers/plans/2026-05-16-mobile-ui-ship.md) - Mobile UI ship — match Storefront + Bank-Alkahraman sizing
 - [superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md](superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md) - Ebda Store Storefront UI/UX Refresh — Plan
@@ -439,9 +447,10 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [uat/store-creation.md](uat/store-creation.md) - UAT: Store Creation (Super-Admin Flow)
 - [uat/storefront-design-save.md](uat/storefront-design-save.md) - UAT: Storefront Design Save — Smart Palette & Page Builder
 - [uat/tax-reports.md](uat/tax-reports.md) - UAT — Tax Reports (accounting.tax_reports)
-- [plans/2026-11-10-preqa-p2-batch.md](plans/2026-11-10-preqa-p2-batch.md) - Pre-QA sweep P2 batch: JSON-LD on every marketing page, brand name in legal copy, guest auth calls, menu vs cookie bar, look preview colour, checkout selects, returns register, /en manifest (2026-11-10)
-- [plans/2026-11-10-review-followups.md](plans/2026-11-10-review-followups.md) - the #510/#511/#512 review fix-after items and the R20 template cleanup: four tests made to fail on the real defect, the Menu start button CSS, the SEO majority-Arabic rule, D1 0009 / StoreDO 0004 (SEO-LANG-SHARE-1, SKIN-DEL-9, REVIEW-FU-1)
-- [plans/2026-11-10-qa-p2-admin-batch.md](plans/2026-11-10-qa-p2-admin-batch.md) - QA P2-1..10 status on main, F6 onboarding look name + i18n guards, F2 search (already fixed), storefront auth refusals in Arabic (2026-11-10)
-- [plans/2026-11-10-ci-full-lane-on-main.md](plans/2026-11-10-ci-full-lane-on-main.md) - CI-FULL-MAIN-1: every push to main and a nightly run the full CI lane (build, integration, workerd incl. route-sweep, e2e, audit); a red main opens the ci-main-red issue (2026-11-10)
-- [plans/2026-11-11-bootstrap-super-admin.md](plans/2026-11-11-bootstrap-super-admin.md) - Password-less platform super-admin bootstrap + daily 0-admin invariant (Ruling ID-20)
-- [plans/2026-11-12-storage-limit-enforce.md](plans/2026-11-12-storage-limit-enforce.md) - S3-X8: enforce maxStorageMb on the four upload routes, usage from the R2 listing (60 s bounded-stale)
+- [plans/done/2026-11-10-preqa-p2-batch.md](plans/done/2026-11-10-preqa-p2-batch.md) - Pre-QA sweep P2 batch: JSON-LD on every marketing page, brand name in legal copy, guest auth calls, menu vs cookie bar, look preview colour, checkout selects, returns register, /en manifest (2026-11-10)
+- [plans/done/2026-11-10-review-followups.md](plans/done/2026-11-10-review-followups.md) - the #510/#511/#512 review fix-after items and the R20 template cleanup: four tests made to fail on the real defect, the Menu start button CSS, the SEO majority-Arabic rule, D1 0009 / StoreDO 0004 (SEO-LANG-SHARE-1, SKIN-DEL-9, REVIEW-FU-1)
+- [plans/done/2026-11-10-qa-p2-admin-batch.md](plans/done/2026-11-10-qa-p2-admin-batch.md) - QA P2-1..10 status on main, F6 onboarding look name + i18n guards, F2 search (already fixed), storefront auth refusals in Arabic (2026-11-10)
+- [plans/done/2026-11-10-ci-full-lane-on-main.md](plans/done/2026-11-10-ci-full-lane-on-main.md) - CI-FULL-MAIN-1: every push to main and a nightly run the full CI lane (build, integration, workerd incl. route-sweep, e2e, audit); a red main opens the ci-main-red issue (2026-11-10)
+- [plans/done/2026-11-11-bootstrap-super-admin.md](plans/done/2026-11-11-bootstrap-super-admin.md) - Password-less platform super-admin bootstrap + daily 0-admin invariant (Ruling ID-20)
+- [plans/done/2026-11-12-storage-limit-enforce.md](plans/done/2026-11-12-storage-limit-enforce.md) - S3-X8: enforce maxStorageMb on the four upload routes, usage from the R2 listing (60 s bounded-stale)
+- [plans/2026-11-12-auto-recommendations.md](plans/2026-11-12-auto-recommendations.md) - Automatic product recommendations: merchant picks, then bought-together, then similar items (Vectorize), cap 8, merchant switch

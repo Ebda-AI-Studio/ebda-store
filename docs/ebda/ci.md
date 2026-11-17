@@ -16,6 +16,57 @@ CI-HOSTED-1 scheduled no-op is retired).
 > fixture/helper or anything under `packages/database` runs the whole tier. Outputs `integration` and `integration_paths`
 > feed the `Integration Tests` job's `if` and its vitest targets. #227 merged four edited integration tests that never ran.
 
+## Ruling PR-CI-CHEAP-1 (2026-11-14): PRs pay for what they touch
+
+Measured: ~11 approved PRs queued behind two heavy Mac runners. Changes (all in `ci.yml`):
+
+- **PR unit tests are ONE job when the affected set is narrow** (`Unit shard 1/1 (affected)`): the setup (npm ci, builds, Chromium,
+  heavy lock) was paid three times for a few minutes of tests. When `ci-affected.mjs` reports `all` (root config, packages/shared or
+  packages/database changed = the whole suite) the same job keeps 3 shards (`Unit shard i/3 (affected)`). The total comes from
+  `changes.outputs.all` (`UNIT_SHARDS`), never a literal. Main/nightly keep the 3 coverage shards (`test-unit-shard`). Check name
+  `Unit Tests (affected)` unchanged.
+- **Lint and Type Check run on the light runner** (`EBDA_LIGHT_RUNS_ON`, GitHub Linux): no workerd or macOS need.
+- **`API Worker boots on workerd` (merge-gate REQUIRED) is a fast pass only when it provably cannot matter.** The job keeps no `if`
+  (derived required list unchanged). Its first step runs `scripts/ci/api-smoke-scope.mjs` (node builtins only; checkout depth 2 = the merge commit's two parents): the boot is SKIPPED only when EVERY changed file is on a short allowlist (docs/**, \*.md, apps/{web,admin,marketing,help,
+  docs,orders}/**, tests outside integration/workers). Anything else (package.json, lockfile, tsconfig, packages/**, wrangler, prisma,
+  scripts/**, .github/\*\*, apps/api, an unknown path, an empty or unreadable diff) RUNS it. Every later step is gated on
+  `steps.scope.outputs.run`. Pinned by `tests/unit/ci-api-smoke-scope.test.ts` (both directions, gating, no-node_modules imports).
+  Push to main, nightly and dispatch always run it whole.
+- Concurrency was already cancel-in-progress for PRs only (main gets a group per SHA, never cancelled).
+- Unchanged: App build / Worker dry-run / workerd integration / Integration Tests are already gated on the affected outputs;
+  the `full-ci` label still dispatches the full lane pre-merge.
+
+Heavy-runner jobs per PR, COMPUTED (not measured runs) by running `scripts/ci-affected.mjs --files` on each PR's real file list and counting the jobs the workflow would start, before -> after: docs-only (#759) 1 -> 0 (+1 seconds-long skip pass);
+api-only (#758) 8 -> 4; web-only (#722) 7 -> 2 (+1 skip pass).
+
+## Ruling CI-SLIM-1 (2026-11-12): 3 unit shards + an opt-in pre-merge full tier
+
+Measured on the Mac (10 cores, 16 GB, load ~10.7, heavy jobs serialised by `heavy-lock.sh`): a code PR push runs 15-20 jobs;
+the per-run sum of job durations on 5 recent PR runs was 2,847-3,976 s wall, of which 682-1,149 s was waiting for the
+heavy lock, leaving **1,709-2,859 s (avg 2,303 s, 38 min) of real heavy-runner work**. The unit shards (6 + workerd extras
+= 7 jobs) were 1,163-1,451 s of that (avg 1,278 s); every job repeats ~60 s of checkout + `npm-ci` + prisma/shared builds.
+
+- **3 shards instead of 6 + 1.** `Unit shard i/3` (i = 1..3) in both the PR lane (`unit`) and the full lane (`test-unit-shard`);
+  the workerd extras (editor matrix, status, accounts, prisma-lite DO) run as the tail of shard 3 (`!cancelled()`, so they
+  still run when the vitest step failed). Setup is paid 3 times, not 7: about 4 x 60 s = **~4 min of heavy work and four
+  lock turns saved per PR push**. Total vitest time is unchanged (same files), so this is an overhead cut, not a speed-up
+  of the tests; shard 3 carries ~1 min more than 1 and 2. The blob reports are still `unit-blob-<n>`, merged by `Unit Tests`.
+- **Pre-merge full tier, opt-in by label `full-ci`** (`.github/workflows/ci-full-pr.yml`). Adding the label (or pushing while
+  it is on the PR) dispatches `ci.yml` (`workflow_dispatch`, the existing full lane) on the PR branch; the checks attach to
+  the head sha, so `ops/merge-gate.sh` sees them and refuses on a failure. Use it for PRs that touch money, auth, data,
+  migrations or anything the AI review marks `risky-path`, once, just before merge. A new full dispatch on the same branch
+  cancels the previous one (`ci.yml` group `ci-full-<ref>`); a dispatch on a PR branch never pages Telegram and never opens
+  `ci-main-red`. Mutation stays Sunday / manual.
+  Why not automatic on `ai-review-passed`: that label is added with `GITHUB_TOKEN`, which raises no event, and one full run is
+  ~7,200 s wall (measured: main runs 42990056432 and 43028985811, 7,297 s and 7,168 s) - with ~3,200 s per PR push the host
+  cannot afford it as a default. Cost if wrong: a risky PR merged without `full-ci` is first proven by the push-to-main full run.
+- **Required checks are unchanged**: `Repo guards`, `Detect affected workspaces`, `Unit Tests (affected)`, `App builds
+(affected)`, `API Worker boots on workerd` (derived by `ops/merge-gate-required.mjs`). The full-tier checks are not
+  required (they exist only when `full-ci` was used); `ci-full-pr.yml:dispatch` is a light job (pinned in
+  `workflow-hosted-runners-only.test.ts`). The only renamed checks are the matrix names `Unit shard i/6` -> `Unit shard i/3` and
+  `Unit workerd extras` (gone); neither is required or listed in the `ebda-main-protection` ruleset.
+- **Concurrency**: PR runs were already one group per PR ref with cancel-in-progress; unchanged.
+
 ## The Mac runner (Ruling CI-MAC-RUNNER-1, 2026-11-11)
 
 The org's 50,000 hosted minutes ran out on 2026-11-11 (ebda-store used 49,451) and paid add-ons are capped at $0, so
@@ -35,7 +86,7 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   on two runners and 10-second label checks waited behind 30-minute suites. Two LIGHT runners were added:
   `~/actions-runner-ebda-light-{1,2}` (`ebda-mac-light-1/2`, label `ebda-mac-light` ONLY, no default labels, so a job
   asking for `["self-hosted","ebda-mac"]` never lands there). `EBDA_LIGHT_RUNS_ON='["ebda-mac-light"]'` routes the cheap jobs
-  there: deploy-change label, PR quality (body + slop), blast-radius, gitleaks, AI review classify / manual-pass / fork-gate,
+  there: deploy-change label, PR quality (body + slop), blast-radius, gitleaks, AI review (classify / review / manual-pass / fork-gate),
   and CI `changes`, `guards`, `unit-gate`, `app-builds`. Their fallback chain is light var, then `EBDA_RUNS_ON`, then hosted
   `ubuntu-24.04`. None of them takes the heavy lock or a per-job database (pinned by
   `tests/unit/workflow-hosted-runners-only.test.ts`), so heavy work stays at one suite at a time on the two `ebda-mac`
@@ -58,6 +109,11 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   localhost, so the password is not what authenticates. The integration suite's own `tests/helpers/app-role-login.ts` still
   sets the same `ci-only-app-pw` the local dev scripts use (no other repo on this host uses `ebda_app`; GCC uses `horse_app`).
   Cost if wrong: a different `ebda_app` password set by another tool on this host would be overwritten during an Ebda run.
+- **Ruling CI-MAC-TZ-1** - `ci-services.sh up` runs `ALTER DATABASE <per-job db> SET timezone TO 'UTC'` on the Mac. The host cluster defaults to the
+  Mac's zone (UTC+3) while the Linux container is UTC, and the pg adapter writes a Date as a UTC wall-clock string that the session
+  zone then reads, so writes outside a tenant transaction (which pins UTC) shifted by the offset: staff-invite-seats fixtures expired in the
+  past and every accept returned 400 (main red since the Mac cutover, #720). Only the per-job database is altered, never the shared cluster.
+  Cost if wrong: a test that relies on a non-UTC session zone would see UTC on the Mac.
 - **No docker on the Mac**: the trufflehog action runs in a container, so `Security Audit` runs it on Linux only and, on the Mac,
   the same release (v3.99.8) natively from `~/.ebda-ci/tools` (checksum re-verified each run, downloaded only on a miss). The AI
   review installs the claude CLI with `--ignore-scripts`, so it links the per-platform native binary itself. The checkout is depth 1, so a push
@@ -194,3 +250,33 @@ register when:
 Optional secrets: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALERT_CHAT_ID` enable the
 failure alerts on main and cron runs; without them the notify jobs skip.
 `vars.OPENNEXT_CACHE` is read by the Worker dry-run, as in the deploy workflow.
+
+- **Ruling HOST-RUNNERS-3** (2026-11-12) - the AI `review` job moves to the light runners. It is one CLI install plus one
+  tool-less `claude -p --max-turns 1`, with no heavy lock and no database, yet it sat on `ebda-mac` and waited 1-3 h behind
+  the heavy suites; every merge is gated on it, so it set the merge rate. Evidence: 2026-11-12 20:30Z, 26 runs queued, both
+  `ebda-mac` busy, both `ebda-mac-light` idle. Cost if wrong: a slow review competes with the light lane (bounded by its
+  20-minute timeout); move it back by editing `ai-review.yml:review` and the pinned list.
+
+- **Ruling HOST-RUNNERS-4** (2026-11-13) - every job that takes the heavy host lock gets job `timeout-minutes` = its
+  run budget + 60, because GitHub counts the lock wait against the job timeout and `heavy-lock.sh` may wait up to
+  `HEAVY_LOCK_MAX_WAIT_S` (3600 s). Evidence: #747 `Unit shard 3/3` waited 1771 s for the lock, ran 7948 tests green
+  and was cancelled 0.3 s later at the old 35-minute limit. Pinned by `tests/unit/heavy-lock-wait-budget.test.ts`
+  (timeout must exceed the lock max wait + 20 min). Cost if wrong: a genuinely hung heavy job holds the lock up to
+  60 minutes longer before GitHub kills it.
+- **Ruling HOST-RUNNERS-5** (2026-11-13) - all `cf-*-deploy.yml` jobs (plan / deploy / notify-failure) move to the
+  light runners. A deploy takes no heavy lock and no database (same as CI `app-builds`, already light), yet the #745
+  API deploy sat queued ~70 min behind two heavy suites while both light runners were idle. Cost if wrong: a large
+  OpenNext build competes with light checks for the light runners; move back by editing the deploy workflows and the
+  pinned light list in `tests/unit/workflow-hosted-runners-only.test.ts`.
+- **Ruling AI-REVIEW-HANG-1** (2026-11-13) - the `review` step cuts `claude -p` at 8 minutes (`timeout 480`) and
+  retries once; two failures fail the step closed (no label). Evidence: #740's review was cancelled at the 20-minute
+  job timeout twice on a 35 KB diff while #742's 257 KB diff passed (network hangs to the model API that day).
+  Pinned by `tests/unit/ai-review-hang-bound.test.ts`. Cost if wrong: a slow-but-healthy review over 8 min is retried
+  and can fail where it would have finished; raise the bound with this test.
+- **Ruling DEPLOY-PLAN-CLONE-1** (2026-11-13) - every `cf-*-deploy.yml` `plan` job checks out with
+  `filter: blob:none` (full history, file contents fetched on demand) and a 15-minute limit. Evidence: on a slow link
+  (measured 56 KB/s to codeload, 350 KB/s to Cloudflare) the full-history clone ran past the old 5-minute limit and
+  cancelled the API deploys for #748 and #740 (runs for b0e2cb22e and eb26f66c0); a cancelled deploy is a deploy that
+  did not happen and nothing retries it. `deploy-plan.mjs` needs only trees (`diff --name-only`) plus two lazy
+  `git show` of `package-lock.json`, and already deploys when that read fails. Cost if wrong: a blob fetched lazily
+  per `git show` on a slow link; worst case the plan deploys when it could have skipped.

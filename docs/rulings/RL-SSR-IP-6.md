@@ -1,6 +1,6 @@
 # RL-SSR-IP-6
 
-> Section: 2026-11-10 — SSR client address (branch `fix/ssr-client-address`, plan `docs/plans/2026-11-10-ssr-client-address.md`)
+> Section: 2026-11-10 — SSR client address (branch `fix/ssr-client-address`, plan `docs/plans/done/2026-11-10-ssr-client-address.md`)
 
 **Ruling RL-SSR-IP-6 — a storefront server render is charged to the shopper's address: the storefront Worker
 forwards the shopper's `cf-connecting-ip` signed with `REVALIDATE_SECRET`, and the API believes it only on

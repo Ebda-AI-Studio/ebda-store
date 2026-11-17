@@ -1,5 +1,5 @@
 /**
- * The `commerce_outcomes` event contract v1 (docs/plans/2026-10-28-customer-intelligence.md 1.2).
+ * The `commerce_outcomes` event contract v1 (docs/plans/done/2026-10-28-customer-intelligence.md 1.2).
  *
  * One versioned envelope; `data` is a STRICT object per type, so an extra key (a phone, a name, an
  * address line) fails validation instead of riding along. `buyerKey` is the only buyer identifier.
@@ -16,9 +16,31 @@ const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 export const PAYMENT_FAILURE_CODES = ['declined', 'expired', 'cancelled'] as const;
 /** `notification` = the push/SMS/WhatsApp steps, which the dispatcher routes per store; `email` has its own sender. */
 export const CART_CHANNELS = ['email', 'notification'] as const;
-export const ONBOARDING_STEPS = ['store_created', 'payment_methods', 'went_live'] as const;
+/**
+ * Setup milestones in funnel order. `first_order` / `first_fulfilled_order` are the activation half (Ruling ACT-1):
+ * recorded once per store, ever, by `planActivationMilestones`.
+ */
+export const ONBOARDING_STEPS = [
+  'store_created',
+  'payment_methods',
+  'went_live',
+  'first_order',
+  'first_fulfilled_order',
+] as const;
+/** Where a store's first real order came from: the shopper's storefront, WhatsApp, or the merchant's own admin. */
+export const FIRST_ORDER_CHANNELS = ['storefront', 'whatsapp', 'admin'] as const;
+/** Who touched the store while a step was still open (`support_contact` has no write path yet: Ruling ACT-1). */
+export const ONBOARDING_HELP_KINDS = [
+  'assistant_used',
+  'super_admin_action',
+  'support_contact',
+] as const;
 /** Events about a merchant or a cart, not about one order: they carry `orderId: null`. */
-export const ORDERLESS_TYPES = ['cart.abandoned', 'merchant.onboarding_step'] as const;
+export const ORDERLESS_TYPES = [
+  'cart.abandoned',
+  'merchant.onboarding_step',
+  'merchant.onboarding_help',
+] as const;
 
 const money = z.number().int().nonnegative();
 const short = z.string().min(1).max(48);
@@ -116,6 +138,15 @@ const dataByType = {
     step: z.enum(ONBOARDING_STEPS),
     secondsSinceSignup: z.number().int().nonnegative().nullable(),
     template: short.nullable(),
+    /** `first_order` only. */
+    channel: z.enum(FIRST_ORDER_CHANNELS).nullable().optional(),
+    /** `first_order` / `first_fulfilled_order`: the order's id (an id, no person). The envelope's own `orderId` stays null. */
+    orderId: z.string().uuid().nullable().optional(),
+  }),
+  /** The merchant needed help at `step` (the first milestone not yet reached). One per (store, step, kind). */
+  'merchant.onboarding_help': z.strictObject({
+    step: z.enum(ONBOARDING_STEPS),
+    kind: z.enum(ONBOARDING_HELP_KINDS),
   }),
 } as const;
 

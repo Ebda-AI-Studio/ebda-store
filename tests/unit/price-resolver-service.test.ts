@@ -1,5 +1,5 @@
 /**
- * PriceResolver loader (docs/plans/2026-10-21-b2b-wholesale.md, Task 2). The pure arithmetic is pinned in
+ * PriceResolver loader (docs/plans/done/2026-10-21-b2b-wholesale.md, Task 2). The pure arithmetic is pinned in
  * packages/shared/src/__tests__/price-resolver.test.ts; this file pins what the LOADER decides: who the buyer is
  * (Ruling B2B-2: authenticated user id only), whether wholesale pricing is on at all (Review Focus 13), and the
  * quantity scoping across cart lines (Ruling B2B-4). Prisma and the feature service are mocked, so every assertion is

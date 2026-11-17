@@ -375,7 +375,7 @@ model Store {
   aiNarrationEnabled Boolean @default(true) @map("ai_narration_enabled")
   insightsRollupCron String  @default("daily") @map("insights_rollup_cron")
 
-  /// Customer Intelligence (CI-1, docs/plans/2026-10-28-customer-intelligence.md rule 3): the merchant's
+  /// Customer Intelligence (CI-1, docs/plans/done/2026-10-28-customer-intelligence.md rule 3): the merchant's
   /// opt-in to cross-store signals. Default OFF; only the (later) onboarding/settings write path sets it.
   ciSharing          Boolean   @default(false) @map("ci_sharing")
   ciSharingChangedAt DateTime? @map("ci_sharing_changed_at")
@@ -435,6 +435,7 @@ model Store {
   shipments                  Shipment[]
   shipmentPickups            ShipmentPickup[]
   providerActivationRequests ProviderActivationRequest[]
+  trustRequests              TrustRequest[]
   codRemittances             CodRemittance[]
   pageRevisions              StorePageRevision[]
   productModels              ProductModel[]
@@ -2894,7 +2895,7 @@ model Shipment {
   // How many times booking with the carrier was tried (the Inngest retry counts here).
   createAttempts       Int       @default(0) @map("create_attempts")
   lastPolledAt         DateTime? @map("last_polled_at")
-  // Customer Intelligence (CI-1, docs/plans/2026-10-28-customer-intelligence.md 1.1). The three
+  // Customer Intelligence (CI-1, docs/plans/done/2026-10-28-customer-intelligence.md 1.1). The three
   // timestamps are the FIRST time the carrier reached that state and are never overwritten (they
   // guard the first-time-only shipment events); deliveryAttempts counts failed-attempt statuses.
   pickedUpAt           DateTime? @map("picked_up_at")
@@ -3485,7 +3486,7 @@ enum LoyaltyTransactionType {
 // ==========================================
 // Customer Wallet (store credit)
 // ==========================================
-// Design + invariants: docs/plans/2026-09-25-customer-wallet.md. Every write
+// Design + invariants: docs/plans/done/2026-09-25-customer-wallet.md. Every write
 // goes through WalletService.applyEntry, which locks the wallet row
 // (SELECT ... FOR UPDATE), re-checks the idempotency key and the balance
 // UNDER the lock, then appends a ledger row and updates the cached balance in
@@ -3618,7 +3619,7 @@ model NewsletterSubscriber {
 // Business plan baselines (not Basic); a super-admin override still wins.
 // Nothing here sends by itself: a row only reaches Resend after a merchant
 // creates a campaign AND presses send (POST /stores/:id/campaigns/:id/send).
-// Plan: docs/plans/2026-09-25-email-campaigns.md.
+// Plan: docs/plans/done/2026-09-25-email-campaigns.md.
 
 /// Where an SMS-marketing consent was given or withdrawn (issue 206).
 enum SmsConsentSource {
@@ -5719,6 +5720,43 @@ model ProviderActivationRequest {
   @@map("provider_activation_requests")
 }
 
+// SELF-SERVICE trust and support (A13/A14/A16): one small table for the requests a merchant files with Ebda staff.
+// `kind`: support (in-product "Contact Ebda Store"), suspension (the reason a super admin gave when suspending,
+// readable by the merchant), suspension_appeal, slug_claim (protected brand slug), store_cap (more stores per day).
+// Staff decide; a merchant has no route that sets a decision. `store_id` is null for the two kinds filed before a
+// store exists (slug_claim, store_cap); `user_id` is the requester (no FK: identity lives outside this database).
+model TrustRequest {
+  id          String   @id @default(uuid())
+  kind        String
+  storeId     String?  @map("store_id")
+  userId      String?  @map("user_id")
+  topic       String?
+  message     String?
+  pageUrl     String?  @map("page_url")
+  slug        String?
+  evidenceUrl String?  @map("evidence_url")
+  // open | resolved | rejected
+  status      String   @default("open")
+  // set by the super-admin reject route; the merchant's appeal cooldown keys on it (never on updated_at)
+  rejectedAt  DateTime? @map("rejected_at")
+  // support requests only: claim one of 5 slots per store per UTC day through a partial UNIQUE (store_id, cap_day,
+  // cap_slot); a lost race is a unique violation, so the daily cap is atomic on Postgres and D1 alike
+  capDay      String?  @map("cap_day")
+  capSlot     Int?     @map("cap_slot")
+  // store_cap requests only: the owner's self-serve store limit granted when staff RESOLVED it (> the previous limit,
+  // <= STORE_LIMIT_MAX). The owner's effective limit is the largest granted_limit among their resolved requests,
+  // else MAX_SELF_SERVE_STORES_PER_OWNER (services/owner-store-limit.ts).
+  grantedLimit Int?    @map("granted_limit")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, kind, createdAt(sort: Desc)])
+  @@index([userId, kind, status])
+  @@map("trust_requests")
+}
+
 // PROVIDERS-3: what the first merchants' real traffic proves about a provider. GLOBAL (no tenant
 // data: store ids are plain strings with no FK, so deleting a store never erases the evidence).
 // `provider_verifications` holds the per-provider counters and `verified_at` (set automatically
@@ -5836,7 +5874,7 @@ model FiscalDocumentCounter {
 }
 
 // ---------------------------------------------------------------------------
-// Merchant OUTGOING webhooks (docs/plans/2026-10-21-merchant-webhooks.md).
+// Merchant OUTGOING webhooks (docs/plans/done/2026-10-21-merchant-webhooks.md).
 // Viewer: admin /stores/[id]/webhooks (endpoints + delivery log). Store delete cascades.
 // ---------------------------------------------------------------------------
 
@@ -5982,7 +6020,7 @@ model GoldRateSettings {
 }
 
 // ==========================================
-// Egypt ETA e-receipt connector (Ruling ETA-1; docs/plans/2026-10-07-egypt-vat-and-eta.md)
+// Egypt ETA e-receipt connector (Ruling ETA-1; docs/plans/done/2026-10-07-egypt-vat-and-eta.md)
 // ==========================================
 
 /// One row per store: the merchant's OWN ETA credentials (client id/secret, POS pre-shared key and the optional

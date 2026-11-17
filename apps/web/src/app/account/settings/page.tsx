@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { localizedMetadata } from '@/lib/seo/localized-metadata';
 // Renamed from the conventional `dynamic` to avoid colliding with the route
 // segment config export of the same name below (tenant-cacheable routing,
-// Phase 1 — see docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9).
+// Phase 1 — see docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.3/§9).
 import nextDynamic from 'next/dynamic';
 
 const SettingsClient = nextDynamic(() => import('./SettingsClient'), {
