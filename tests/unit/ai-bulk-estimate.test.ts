@@ -104,8 +104,8 @@ describe('wiring (source contract)', () => {
     const startFn = src.slice(src.indexOf('async function start('));
     expect(startFn.indexOf('confirmEstimate(')).toBeGreaterThan(-1);
     expect(startFn.indexOf('confirmEstimate(')).toBeLessThan(startFn.indexOf('apiPost'));
-    const tr = src.slice(src.indexOf('async function startTranslate('));
-    expect(tr.indexOf('confirmEstimate(')).toBeLessThan(tr.indexOf('apiPost'));
+    // translate is a catalogue tool now (endpoint /bulk/translate): it goes through the same start()
+    expect(src).not.toContain('async function startTranslate(');
   });
   it('the page hard-stops only on canStart, never on an over-estimate (fits is advisory)', () => {
     const src = fs.readFileSync(
@@ -114,7 +114,7 @@ describe('wiring (source contract)', () => {
     );
     const fn = src.slice(
       src.indexOf('async function confirmEstimate('),
-      src.indexOf('async function startTranslate(')
+      src.indexOf('async function start(')
     );
     expect(fn).toContain('!data.canStart');
     expect(fn).toContain('data.fits');
