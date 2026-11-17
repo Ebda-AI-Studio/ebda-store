@@ -281,3 +281,22 @@ describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
     expect(line).toContain('csp-directive-floor.test.ts');
   });
 });
+
+describe('S5: storefront connect-src names exact hosts, no ad/storage wildcards', () => {
+  it('has no *.r2.dev, *.facebook.com or *.tiktok.com wildcard in connect-src', async () => {
+    const { buildStorefrontCsp } = await import('../../apps/web/src/lib/csp');
+    const connect = buildStorefrontCsp('AAAAAAAAAAAAAAAAAAAAAA==')
+      .split('; ')
+      .find(d => d.startsWith('connect-src '))!;
+    expect(connect).not.toContain('*.r2.dev');
+    expect(connect).not.toContain('*.facebook.com');
+    expect(connect).not.toContain('*.tiktok.com');
+    for (const h of [
+      'https://media.ebda.app',
+      'https://www.facebook.com',
+      'https://connect.facebook.net',
+      'https://analytics.tiktok.com',
+    ])
+      expect(connect).toContain(h);
+  });
+});
