@@ -1,9 +1,15 @@
 // Ruling DO-METRICS-1: operator metrics on the StoreDO schema (node:sqlite). Proves the enforcement the ruling names: constant allow-list,
 // static guard, EXPLAIN index test, numbers-only shape and the rollback guard. Runtime read-only does not exist (workerd refuses query_only).
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { openSqlite } from './diff-harness';
 import { nodeSyncSql } from './node-sync-sql';
 import { ensureMoneyOpsSchema, MONEY_OP_NAMES, runMoneyOp } from '../src/do/money-ops';
+import {
+  JOURNAL_REPAIR_GRACE_MINUTES_DEFAULT,
+  JOURNAL_REPAIR_MAX_AGE_HOURS_DEFAULT,
+} from '../../shared/src/journal-reconcile';
 import { DO_METRICS, DO_METRIC_NAMES, runDoMetric, type DoMetricDef } from '../src/do/do-metrics';
 
 function rig() {
@@ -212,6 +218,25 @@ describe('journal_unrepaired_* apply PR #926 candidate rules exactly', () => {
     first(200 * H);
     order({ paidAgoMs: 2 * H, store: 's2' });
     expect(m('journal_unrepaired_in_window')).toBe(0);
+  });
+});
+
+describe('the window and grace come from the ONE shared module (nothing to keep in sync)', () => {
+  it("the shared defaults are #926's: 72 h and 10 min", () => {
+    expect(JOURNAL_REPAIR_MAX_AGE_HOURS_DEFAULT).toBe(72);
+    expect(JOURNAL_REPAIR_GRACE_MINUTES_DEFAULT).toBe(10);
+  });
+  it('the metric SQL embeds exactly those constants, as milliseconds', () => {
+    const win = JOURNAL_REPAIR_MAX_AGE_HOURS_DEFAULT * 3_600_000;
+    const grace = JOURNAL_REPAIR_GRACE_MINUTES_DEFAULT * 60_000;
+    expect(DO_METRICS.journal_unrepaired_in_window.sql).toContain(`- ${win})`);
+    expect(DO_METRICS.journal_unrepaired_in_window.sql).toContain(`- ${grace})`);
+    expect(DO_METRICS.journal_unrepaired_stale.sql).toContain(`- ${win})`);
+    expect(DO_METRICS.journal_unrepaired_stale.sql).not.toContain(`- ${grace})`);
+  });
+  it('no other module re-declares the 72 h / 10 min as a literal for the journal reconcile', () => {
+    const src = readFileSync(path.resolve(__dirname, '../src/do/do-metrics.ts'), 'utf8');
+    expect(src).not.toMatch(/259200000|\b600000\b/);
   });
 });
 

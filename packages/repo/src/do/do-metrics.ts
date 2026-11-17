@@ -4,6 +4,13 @@
 // this constant table + tests/static guard (packages/repo/test/do-metrics.test.ts: one statement, SELECT only, no write/DDL keyword, an index
 // per table read) + the numbers-only return + the rollback guard in `runDoMetric` (a write inside the metric throws and rolls back).
 import { MoneyError, type SyncSql } from './sync-sql';
+import {
+  JOURNAL_REPAIR_GRACE_MINUTES_DEFAULT,
+  JOURNAL_REPAIR_MAX_AGE_HOURS_DEFAULT,
+} from '../../../shared/src/journal-reconcile';
+
+const WINDOW_MS = JOURNAL_REPAIR_MAX_AGE_HOURS_DEFAULT * 3_600_000;
+const GRACE_MS = JOURNAL_REPAIR_GRACE_MINUTES_DEFAULT * 60_000;
 
 export interface DoMetricDef {
   /** One statement, SELECT only, ONE row with ONE integer column `n`. `?1` is not used: a metric takes no argument. */
@@ -35,12 +42,14 @@ export const DO_METRICS = {
   /**
    * Paid orders with no sale entry that the hourly repair WILL fix: paid between 72 h and 10 min ago (Ruling JOURNAL-RECONCILE-1, PR #926).
    * Exactly #926's candidate rules: accounting on for the store, order total > 0, not cancelled/refunded/deleted, "paid at" = the latest
-   * completed payment's paid_at (else the order's created_at), no `order` sale entry of this store. The 72 h mirrors the default of
-   * JOURNAL_REPAIR_MAX_AGE_HOURS (a DO has no env: change both together; do-metrics.test.ts pins the number).
+   * completed payment's paid_at (else the order's created_at), no `order` sale entry of this store. The window and grace come from
+   * packages/shared/src/journal-reconcile.ts, the single source #926's sweep should import (a DO has no env).
    */
   journal_unrepaired_in_window: {
     doc: "Paid orders (paid 10 min to 72 h ago) with no 'order' sale journal entry: the hourly repair will post them.",
-    sql: UNREPAIRED_SQL('t.paid_at >= (NOW_MS - 259200000) AND t.paid_at < (NOW_MS - 600000)'),
+    sql: UNREPAIRED_SQL(
+      `t.paid_at >= (NOW_MS - ${WINDOW_MS}) AND t.paid_at < (NOW_MS - ${GRACE_MS})`
+    ),
   },
   /**
    * Same rules, paid MORE than 72 h ago and not before the store's first journal entry (the floor of journal.reconcile.stale: a store that
@@ -49,7 +58,7 @@ export const DO_METRICS = {
   journal_unrepaired_stale: {
     doc: "Paid orders (paid over 72 h ago, after the store's first journal entry) with no 'order' sale entry: needs a person.",
     sql: UNREPAIRED_SQL(
-      't.paid_at < (NOW_MS - 259200000) AND t.paid_at >= (SELECT MIN(created_at) FROM journal_entries WHERE store_id = t.store_id)'
+      `t.paid_at < (NOW_MS - ${WINDOW_MS}) AND t.paid_at >= (SELECT MIN(created_at) FROM journal_entries WHERE store_id = t.store_id)`
     ),
   },
   /** Active push subscriptions of the store (track 4). */
