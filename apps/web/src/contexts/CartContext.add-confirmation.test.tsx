@@ -47,6 +47,13 @@ function Grab() {
   api = useCart();
   return <span data-testid="n">{api.items.length}</span>;
 }
+interface ToastArg {
+  type: string;
+  title: string;
+  message: string;
+  action: { label: string; href: string };
+}
+const firstToast = () => (h.addToast.mock.calls[0] as unknown as [ToastArg])[0];
 const ring = {
   id: 'p1',
   name: 'Ring',
@@ -86,7 +93,7 @@ describe('add to cart confirms immediately', () => {
     });
     // the server has not answered: the confirmation is already on screen
     expect(h.addToast).toHaveBeenCalledTimes(1);
-    const toast = (h.addToast.mock.calls[0] as unknown as [Record<string, any>])[0];
+    const toast = firstToast();
     expect(toast.type).toBe('success');
     expect(toast.title).toBe('اتضاف للسلة ✓');
     expect(toast.message).toBe('خاتم');
@@ -106,7 +113,7 @@ describe('add to cart confirms immediately', () => {
     await act(async () => {
       await api.addItem(ring, 1);
     });
-    const toast = (h.addToast.mock.calls[0] as unknown as [Record<string, any>])[0];
+    const toast = firstToast();
     expect(toast.action.href).toBe('/cart');
   });
 
@@ -117,7 +124,7 @@ describe('add to cart confirms immediately', () => {
     await act(async () => {
       await api.addItem(ring, 1);
     });
-    const toast = (h.addToast.mock.calls[0] as unknown as [Record<string, any>])[0];
+    const toast = firstToast();
     expect(toast.title).toBe('Added to cart ✓');
     expect(toast.message).toBe('Ring');
   });
