@@ -113,6 +113,7 @@ export function cachegenStoreShards(): number[] {
 
 interface AuthStateStub extends DurableObjectStubLike {
   apply(ops: Op[]): Promise<unknown[]>;
+  colo(): Promise<string | null>;
 }
 
 /**
@@ -242,4 +243,31 @@ export async function applyOnAll(ops: Op[]): Promise<unknown[][]> {
 
 export function authStateAvailable(): boolean {
   return cfBindings()?.AUTH_STATE !== undefined;
+}
+
+/**
+ * Placement probe (Ruling PERF-AUTHSTATE-1, measurement only; used by the flag-gated echo route): which Cloudflare location each
+ * AuthState instance runs in and how long one empty round trip to it takes from this Worker. Sampled shards only.
+ */
+export async function authStateColos(
+  shards: number[]
+): Promise<Array<{ shard: number; name: string; colo: string | null; rttMs: number }>> {
+  return Promise.all(
+    shards.map(async shard => {
+      const t0 = performance.now();
+      let colo: string | null = null;
+      try {
+        colo = await withAuthStateDeadline(`colo:${shard}`, stub(shard).colo(), 5_000);
+      } catch {
+        /* reported as null */
+      }
+      const name =
+        shard === CACHEGEN_SHARD
+          ? cachegenPlacement().name
+          : shard < CACHEGEN_SHARD
+            ? `${cachegenPlacement().name}-s${CACHEGEN_SHARD - 1 - shard}`
+            : `shard-${shard}`;
+      return { shard, name, colo, rttMs: Math.round(performance.now() - t0) };
+    })
+  );
 }

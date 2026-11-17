@@ -35,6 +35,21 @@ export class AuthState extends DurableObject {
     return out;
   }
 
+  /**
+   * Where THIS instance runs (Ruling PERF-AUTHSTATE-1, measurement only): the Cloudflare location code from the edge trace,
+   * `null` when it cannot be read. Called only by the flag-gated super-admin echo route (DO_COLO_ECHO); no state is touched.
+   */
+  async colo(): Promise<string | null> {
+    try {
+      const r = await fetch('https://www.cloudflare.com/cdn-cgi/trace', {
+        signal: AbortSignal.timeout(2_000),
+      });
+      return /^colo=([A-Z]{3})$/m.exec(await r.text())?.[1] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async alarm(): Promise<void> {
     if (this.store.purge(Date.now())) {
       await this.ctx.storage.setAlarm(Date.now() + PURGE_EVERY_MS);
