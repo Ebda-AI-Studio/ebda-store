@@ -9263,7 +9263,7 @@
     "usageTitle": "Usage",
     "ordersThisMonth": "Orders this month",
     "usedOf": "{used} of {limit}",
-    "storageNotTracked": "Up to {limit} MB (usage is not tracked yet)",
+    "storageUnknown": "Not known right now",
     "includedTitle": "Included in your plan",
     "included": "Included",
     "notIncluded": "Not included",

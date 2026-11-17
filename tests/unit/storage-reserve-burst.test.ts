@@ -5,12 +5,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const MB = 1024 * 1024;
-const h = vi.hoisted(() => ({ listCalls: 0 }));
+const h = vi.hoisted(() => ({ listCalls: 0, listFails: false }));
 vi.mock('@ebda/database', async () => {
   const mock = await import('./helpers/database-mock');
   return mock.databaseMock({
     prisma: {},
-    extra: { withStore: async (_i: string, fn: any) => fn({}) },
+    extra: {
+      withStore: async (_i: string, fn: any) =>
+        fn({
+          product: { count: async () => 3 },
+          storeStaff: { count: async () => 1 },
+          order: { count: async () => 2 },
+          store: { findUnique: async () => ({ domain: null }) },
+        }),
+    },
   });
 });
 vi.mock('@api/services/plan-entitlements', async orig => ({
@@ -19,17 +27,22 @@ vi.mock('@api/services/plan-entitlements', async orig => ({
 }));
 vi.mock('@api/services/storage.service', () => ({
   StorageService: {
-    listStoreSizes: async () => (h.listCalls++, { sizes: [8 * MB], nextCursor: null }),
+    listStoreSizes: async () => {
+      h.listCalls++;
+      if (h.listFails) throw new Error('r2 down');
+      return { sizes: [8 * MB], nextCursor: null };
+    },
   },
 }));
 
-import { assertStorageRoom } from '@api/services/plan-limit.service';
+import { assertStorageRoom, getUsageSummary } from '@api/services/plan-limit.service';
 import { releaseOnFailure, resetStorageUsageCache } from '@api/lib/storage-usage';
 
 const S = '11111111-1111-4111-8111-111111111111';
 beforeEach(() => {
   resetStorageUsageCache();
   h.listCalls = 0;
+  h.listFails = false;
 });
 
 describe('assertStorageRoom reserves bytes (#630)', () => {
@@ -91,5 +104,28 @@ describe('assertStorageRoom reserves bytes (#630)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('storage ceiling + usage (QA-STOR-1)', () => {
+  it('a capped-plan store over its ceiling gets 402 with the Egyptian Arabic "storage full" message', async () => {
+    const err = (await assertStorageRoom(S, 3 * MB).catch(e => e)) as {
+      statusCode: number;
+      details: Record<string, unknown>;
+    };
+    expect(err.statusCode).toBe(402);
+    expect(err.details).toMatchObject({ limitKey: 'maxStorageMb', limit: 10, used: 8 });
+    expect(String(err.details.messageAr)).toMatch(/[\u0600-\u06FF]/);
+    expect(err.details.messageAr).not.toBe(err.details.messageEn);
+  });
+  it('the billing usage shows the used MB from the SAME counter the ceiling uses', async () => {
+    const out = await getUsageSummary(S);
+    expect(out.usage.maxStorageMb).toBe(8);
+  });
+  it('a failed listing is UNKNOWN on the billing page (null), never 0; the upload gate still fails open', async () => {
+    h.listFails = true;
+    expect((await getUsageSummary(S)).usage.maxStorageMb).toBeNull();
+    resetStorageUsageCache();
+    await expect(assertStorageRoom(S, 1 * MB)).resolves.toBeTruthy();
   });
 });

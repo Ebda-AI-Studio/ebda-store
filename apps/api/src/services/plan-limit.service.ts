@@ -67,16 +67,23 @@ import logger from '../lib/logger';
 
 type Tx = Prisma.TransactionClient;
 
-/** S3-X8: R2 bytes under the store's prefix, rounded UP to whole MB. */
-async function storageUsageMb(storeId: string): Promise<number> {
+/** S3-X8: R2 bytes under the store's prefix, rounded UP to whole MB; null when the listing failed (UNKNOWN, never 0). */
+async function readStorageUsageMb(storeId: string): Promise<number | null> {
   try {
     const bytes = await cachedStoreBytes(storeId, c => StorageService.listStoreSizes(storeId, c));
     return Math.ceil(bytes / BYTES_PER_MB);
   } catch (err) {
-    // A plan ceiling is not worth refusing a merchant's upload because OUR bucket listing failed: fail OPEN, say so.
-    logger.warn({ err, storeId }, '[plan-limit] storage usage unavailable, allowing the upload');
-    return 0;
+    logger.warn({ err, storeId }, '[plan-limit] storage usage unavailable');
+    return null;
   }
+}
+
+/** The gate's read: a plan ceiling is not worth refusing an upload because OUR bucket listing failed, so it fails OPEN. */
+async function storageUsageMb(storeId: string): Promise<number> {
+  const mb = await readStorageUsageMb(storeId);
+  if (mb === null)
+    logger.warn({ storeId }, '[plan-limit] storage usage unavailable, allowing the upload');
+  return mb ?? 0;
 }
 
 /** S3-X8: gate an upload of `bytes` on the plan's storage ceiling (402 PLAN_LIMIT_REACHED; null = unlimited). */
@@ -478,11 +485,13 @@ async function notifyMerchantOverOrderLimit(
 export async function getUsageSummary(storeId: string) {
   const e = await getEntitlements(storeId);
   if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  const [products, staff, orders, domain] = await Promise.all([
+  const [products, staff, orders, domain, storageMb] = await Promise.all([
     countUsage(storeId, 'maxProducts'),
     countUsage(storeId, 'maxStaff'),
     countUsage(storeId, 'maxOrdersPerMonth'),
     countUsage(storeId, 'customDomain'),
+    // QA-STOR-1: the SAME counter the upload ceiling uses; null = the listing failed (shown as unknown, never 0)
+    readStorageUsageMb(storeId),
   ]);
   return {
     entitlements: e,
@@ -490,7 +499,7 @@ export async function getUsageSummary(storeId: string) {
       maxProducts: products,
       maxStaff: staff,
       maxOrdersPerMonth: orders,
-      maxStorageMb: null as number | null,
+      maxStorageMb: storageMb,
       customDomain: domain,
     },
   };

@@ -990,16 +990,32 @@ export default function StoreBillingPage() {
                   />
                 );
               })}
-              <div className="flex items-baseline justify-between gap-2 text-sm">
-                <span className="font-medium">{tLimits('maxStorageMb')}</span>
-                <span className="text-muted-foreground">
-                  {data.limits.maxStorageMb === null
-                    ? t('unlimited')
-                    : t('storageNotTracked', {
-                        limit: data.limits.maxStorageMb.toLocaleString('en'),
-                      })}
-                </span>
-              </div>
+              {data.usage.maxStorageMb === null ? (
+                // QA-STOR-1: the storage counter could not be read right now: say so, never show 0
+                <div
+                  className="flex items-baseline justify-between gap-2 text-sm"
+                  data-testid="storage-usage-unknown"
+                >
+                  <span className="font-medium">{tLimits('maxStorageMb')}</span>
+                  <span className="text-muted-foreground">
+                    {t('storageUnknown')} ·{' '}
+                    {data.limits.maxStorageMb === null
+                      ? t('unlimited')
+                      : data.limits.maxStorageMb.toLocaleString('en')}
+                  </span>
+                </div>
+              ) : (
+                <UsageBar
+                  label={tLimits('maxStorageMb')}
+                  used={data.usage.maxStorageMb}
+                  limit={data.limits.maxStorageMb}
+                  unlimitedLabel={t('unlimited')}
+                  usedOfLabel={t('usedOf', {
+                    used: data.usage.maxStorageMb.toLocaleString('en'),
+                    limit: (data.limits.maxStorageMb ?? 0).toLocaleString('en'),
+                  })}
+                />
+              )}
             </div>
           </section>
 

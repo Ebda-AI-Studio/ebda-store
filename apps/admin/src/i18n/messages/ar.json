@@ -9263,7 +9263,7 @@
     "usageTitle": "الاستخدام",
     "ordersThisMonth": "طلبات هذا الشهر",
     "usedOf": "{used} من {limit}",
-    "storageNotTracked": "حتى {limit} ميجابايت (لا يتم تتبّع الاستخدام بعد)",
+    "storageUnknown": "مش معروف دلوقتي",
     "includedTitle": "ما تتضمنه باقتك",
     "included": "متاح",
     "notIncluded": "غير متاح",
