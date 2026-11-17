@@ -14,9 +14,12 @@
  * SHIPPING entries: a field's `bind` is `settings.<key>` and means "lands under this key in the flat
  * credentials map the carrier adapter takes" (carriers have no apiKey/secretKey slots).
  *
- * `verified` (PROVIDERS-2): a provider that has NOT completed a full flow against its real
- * sandbox is shown to merchants as "coming soon" and can never be enabled. It flips to true only
- * with the evidence named in `verification` (`scripts/provider-sandbox-check.mjs <code>` output).
+ * `verified` (PROVIDERS-2, Ruling GW-VERIFIED-1): an API provider is `verified: true` ONLY with an evidence
+ * reference in `verification.evidence` (the date of a recorded full run - create, pay, webhook, paid,
+ * refund, refunded - AND a run id or link to its record: a `scripts/provider-sandbox-check.mjs` output
+ * or a GATEWAY-LIVE-PROOF-RUNBOOK run). A bare boolean or a bare date is a claim, not evidence, and is
+ * refused by `tests/unit/provider-connect.test.ts`. Unverified providers show merchants the
+ * "not yet tried on a live account" note and need a passing Test connection before they are enabled.
  *
  * Every URL below is the provider's OWN documentation or dashboard (fetched 2026-10-07).
  * Nothing here is a secret.
@@ -72,9 +75,17 @@ export interface ProviderWebhookDef {
   setupHelp: LocalizedText;
 }
 
+/** The record of a full provider run (GW-VERIFIED-1). Both parts are required. */
+export interface ProviderEvidence {
+  /** ISO date (YYYY-MM-DD) of the run that proved create + pay + webhook + refund end to end. */
+  runAt: string;
+  /** Where the run is recorded: a run id (`sandbox-check:<id>`) or a link to the run record. */
+  runRef: string;
+}
+
 export interface ProviderVerification {
-  /** ISO date of the sandbox run that proved create + webhook + refund, or null. */
-  sandboxVerifiedAt: string | null;
+  /** The run that justifies `verified: true`, or null (unverified, or a manual method). */
+  evidence: ProviderEvidence | null;
   /** What is still unproven (shown to super admins). */
   note: string;
 }
@@ -151,7 +162,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     manual: false,
     verified: false,
     verification: {
-      sandboxVerifiedAt: null,
+      evidence: null,
       note: 'Built from the official Intention API, refund/void and HMAC pages; not yet run against a Paymob test account (scripts/provider-sandbox-check.mjs paymob). Re-verified 2026-10-24 against developers.paymob.com (create-intention, unified-checkout-redirection, HMAC transaction callback incl. the worked example) and the official Postman collections (github.com/PaymobAccept/API-Postman-Collections): fixed billing_data.country (EGY), expiration cap (3110400 s), items sum rule, 50-char name cap, refund-callback detection via is_refund/is_void. UNCONFIRMED (docs silent or conflicting): transaction-inquiry auth (Postman: Bearer header + body order_id; older docs: auth_token in body, both are sent), what inquiry answers for an unknown order, whether items[].amount is per unit or per line, how a null HMAC field is stringified, the source_data.type of BNPL/installment (docs: not refundable), the exact void cut-off, callback retry policy and rate limits.',
     },
     capabilities: {
@@ -262,10 +273,12 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     name: { en: 'Kashier', ar: 'كاشير' },
     logo: { monogram: 'K', color: '#00A19A' },
     manual: false,
-    verified: true,
+    // GW-VERIFIED-1: the 2026-10-08 run below has no run record in the repo, so it is a claim, not evidence. Back to
+    // unverified until a recorded run (GATEWAY-LIVE-PROOF-RUNBOOK) fills `evidence`.
+    verified: false,
     verification: {
-      sandboxVerifiedAt: '2026-10-08',
-      note: 'Verified 2026-10-08 against a real Kashier test account: test connection, guest payment session, paid status, partial + full refund, and a real signed webhook delivery (tampered body rejected). Order-search status does not report refunds; refund state comes from the refund response and the webhook. Re-read 2026-10-24 against developers.kashier.io (payment-sessions, refunds, webhooks guide + payloads, api-keys, rate-limits, openapi.yaml): no discrepancy, nothing changed; the docs signature example still reproduces the documented HMAC. UNCONFIRMED: the allowedMethods token for BNPL (docs only show card,wallet), whether a webhook data.status can be INITIATED/UNKNOWN/EXPIRED/CANCEL/REVOKED (payloads page says SUCCESS|FAILURE|PENDING; the OpenAPI enum is wider).',
+      evidence: null,
+      note: 'UNVERIFIED (GW-VERIFIED-1, 2026-11-17): reported as run 2026-10-08 against a real Kashier test account, but no run record exists, so it does not count. Reported then: test connection, guest payment session, paid status, partial + full refund, and a real signed webhook delivery (tampered body rejected). Order-search status does not report refunds; refund state comes from the refund response and the webhook. Re-read 2026-10-24 against developers.kashier.io (payment-sessions, refunds, webhooks guide + payloads, api-keys, rate-limits, openapi.yaml): no discrepancy, nothing changed; the docs signature example still reproduces the documented HMAC. UNCONFIRMED: the allowedMethods token for BNPL (docs only show card,wallet), whether a webhook data.status can be INITIATED/UNKNOWN/EXPIRED/CANCEL/REVOKED (payloads page says SUCCESS|FAILURE|PENDING; the OpenAPI enum is wider).',
     },
     capabilities: {
       methods: ['card', 'wallet', 'bnpl'],
@@ -350,7 +363,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     manual: false,
     verified: false,
     verification: {
-      sandboxVerifiedAt: null,
+      evidence: null,
       note: 'Built from developer.fawrystaging.com; not yet run against FawryPay staging (scripts/provider-sandbox-check.mjs fawry). Re-verified 2026-10-24 against the charge (PayAtFawry), hosted checkout link, refund, cancel, status v2 and server notification v2 pages: endpoints, hosts, signature formulas and field names match; nothing changed. Status v2 answering 9938 for an unknown order is STILL unconfirmed: the status v2 page documents only the 9946 error sample (9938 is listed on the charge, refund and cancel pages). Also UNCONFIRMED: the production host of status v2, whether paymentAmount includes fawryFees (the status v2 sample shows paymentAmount 152.00 beside orderAmount 150.00 and fawryFees 2.00, so the paid-amount check against the order total may differ by the fee), the charge page types merchantRefNum as Integer while the hosted page says String, duplicate merchantRefNum behaviour, rate limits.',
     },
     capabilities: {
@@ -418,7 +431,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     manual: false,
     verified: false,
     verification: {
-      sandboxVerifiedAt: null,
+      evidence: null,
       note: 'CREATION ONLY (PLANS-ALL-1). Built from docs.geidea.net/docs/geidea-checkout-v2 (read 2026-10-26): POST /payment-intent/api/v2/direct/session on api.merchant.geidea.net, Basic auth publicKey:apiPassword, base64(HMAC-SHA256(apiPassword, publicKey+amount(2dp)+currency+merchantReferenceId+timestamp)), responseCode 000 + session.id. NOT documented publicly, so NOT implemented and fail-closed: the server callback payload and its signature (every Geidea webhook is REFUSED until a real merchant or Geidea support confirms the format), order retrieval, refunds/voids, the Egypt hosted-page address (needs GEIDEA_HPP_BASE_URL, else createPayment fails closed), a harmless credential check (no Test connection call: the connection is unverified), the timestamp time zone (UTC assumed), a separate sandbox host (same host assumed). A Geidea payment can be created but is not auto-confirmed by Ebda Store yet.',
     },
     capabilities: {
@@ -476,7 +489,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     logo: { monogram: 'C', color: '#64748B' },
     manual: true,
     verified: true,
-    verification: { sandboxVerifiedAt: null, note: 'Manual: no provider API.' },
+    verification: { evidence: null, note: 'Manual: no provider API.' },
     capabilities: { methods: ['cod'], refunds: false, partialRefunds: false, webhooks: false },
     fields: [],
     docs: { overview: '', credentials: '' },
@@ -490,7 +503,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     manual: true,
     verified: true,
     verification: {
-      sandboxVerifiedAt: null,
+      evidence: null,
       note: 'Manual transfer confirmed by the merchant: no provider API.',
     },
     capabilities: { methods: ['instapay'], refunds: false, partialRefunds: false, webhooks: false },
@@ -508,7 +521,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     manual: false,
     verified: false,
     verification: {
-      sandboxVerifiedAt: null,
+      evidence: null,
       note: 'Built from the official OpenAPI (docs.bosta.co/api/api.yaml) and the how-to pages; not yet run against a Bosta test account (scripts/provider-sandbox-check.mjs bosta). Re-read 2026-10-24 against api.yaml and docs.bosta.co/docs/how-to/{get-delivery-status-via-webhook,create-your-first-delivery,get-your-api-key}: auth, endpoints, create body, 30,000 EGP COD cap, webhook payload and the 23-state table all match the adapter. Still unconfirmed (the docs are silent): decimal COD (the schema type is number, every example is an integer), duplicate-reference error, webhook retries, which delivery states allow terminate, and stg-app.bosta.co (named only by Bosta’s SDK README).',
     },
     capabilities: {
@@ -578,7 +591,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     manual: false,
     verified: false,
     verification: {
-      sandboxVerifiedAt: null,
+      evidence: null,
       note: 'Built from docs.shipblu.com + the official OpenAPI (api.shipblu.com/docs/?format=openapi); no ShipBlu staging key yet (scripts/provider-sandbox-check.mjs shipblu). Re-read 2026-10-24 (docs.shipblu.com/{quick-start,tutorial,api-reference}, the OpenAPI, and the official Postman collection docs.shipblu.com/assets/js/ShipBluAPI.json): auth, endpoints, the 32-status enum and the create body match the adapter; the Postman create example omits address.what3words, so not sending it is consistent with the docs. Still unconfirmed (the docs are silent): cancel (no endpoint), webhooks (none documented), COD unit of cash_amount (example 100, unit unstated), duplicate-reference behaviour.',
     },
     capabilities: {
@@ -621,7 +634,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     manual: false,
     verified: false,
     verification: {
-      sandboxVerifiedAt: null,
+      evidence: null,
       note: 'Built from the official Swagger (integration.mylerz.net/swagger/docs/v1). Mylerz publishes NO sandbox: sandbox mode needs a staging host from Mylerz (MYLERZ_BASE_URL outside production), so a live run needs a real merchant account. Re-read 2026-10-24: every endpoint and DTO the adapter uses still matches the Swagger (no other official Mylerz doc is reachable: mylerz.net/developers is a script-only page). Still unconfirmed (the Swagger carries no descriptions or examples): status table, COD unit (OrderDTO.COD_Value is typed string, the other COD fields are double), duplicate-reference behaviour, webhook payload (POST /api/Merchant registration DTO only).',
     },
     capabilities: {
@@ -698,7 +711,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     manual: false,
     verified: false,
     verification: {
-      sandboxVerifiedAt: null,
+      evidence: null,
       note: 'Built from the four public WSDLs on ws.aramex.net (SOAP element order from the schema). Re-verified 2026-10-24 against the WSDLs (51 request types, no drift) and Aramex’s official Shipping Services API Manual (aramex.com/docs/default-source/resourses/resourcesdata/shipping-services-api-manual.pdf; 403 to plain HTTP clients, readable in a browser): Source 24, units KG/CM, PaymentType P, service code CODS, ReportID 9201 + URL, EGP as a valid currency code, test host ws.dev.aramex.net, no shipment-cancel operation (pickups only) and the Appendix F error codes are documented; pickup Status and volume were corrected to the manual. Still UNVERIFIED (scripts/provider-sandbox-check.mjs aramex): domestic-Egypt product types (Appendix A lists only EXP types), the tracking UpdateCode table (in no file we hold), EGP COD enablement on the account. Also checked against Ahmad-supplied official files (Shipments Tracking WSDL, createShipmentsPHP.txt sample): tracking request/response shape matches, duplicate bookings are now guarded by ForeignHAWB (manual Table 18, ERR30), unit case is not significant (sample uses cm/Kg); no supplied file lists the tracking UpdateCode table or any domestic product type.',
     },
     capabilities: {
@@ -822,7 +835,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     logo: { monogram: 'D', color: '#64748B' },
     manual: true,
     verified: true,
-    verification: { sandboxVerifiedAt: null, note: 'Manual: no carrier API.' },
+    verification: { evidence: null, note: 'Manual: no carrier API.' },
     capabilities: { methods: ['cod'], refunds: false, partialRefunds: false, webhooks: false },
     fields: [],
     docs: { overview: '', credentials: '' },

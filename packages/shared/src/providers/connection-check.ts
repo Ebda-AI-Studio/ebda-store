@@ -95,7 +95,7 @@ export function describeConnectionCheck(input: ConnectionCheckInput): Connection
         warning: false,
         messageEn:
           'The provider answered in a way we do not recognise. Your credentials were saved; the Ebda Store team has been told.',
-        messageAr: 'الشركة ردت برد مش مفهوم عندنا. البيانات اتحفظت، وفريق إبدا اتبلغ.',
+        messageAr: 'الشركة ردت برد مش مفهوم عندنا. البيانات اتحفظت، وفريق ابدأ ستور اتبلغ.',
       };
   }
 }
