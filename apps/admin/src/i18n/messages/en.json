@@ -585,6 +585,7 @@
       "fallbackThisStore": "this store",
       "toolbar": {
         "addProduct": "Add Product",
+        "importExport": "Import & export",
         "bulkImport": "Bulk Import",
         "backToStore": "Back to Store",
         "orderNewArrivals": "Order New Arrivals",
@@ -635,6 +636,7 @@
         "descriptionActiveOnly": "Your products may still be drafts. Check the Drafts view, or add a product.",
         "showDrafts": "Show drafts",
         "addProduct": "Add Product",
+        "importExport": "Import & export",
         "titleFiltered": "No matching products"
       },
       "pagination": {

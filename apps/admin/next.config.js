@@ -118,6 +118,12 @@ const nextConfig = {
   // page-builder consolidation (2026-05-19); the visual editor owns them since Ruling VE-6.
   async redirects() {
     return [
+      // /products/import is not a product id: the CSV/XLSX/photo import lives on the Bulk page.
+      {
+        source: '/stores/:id/products/import',
+        destination: '/stores/:id/bulk',
+        permanent: false,
+      },
       {
         source: '/stores/:id/layout',
         destination: '/stores/:id/builder',
