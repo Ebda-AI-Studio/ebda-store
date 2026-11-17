@@ -73,9 +73,9 @@ describe('decided_at is set on every decide path (G19)', () => {
 });
 
 describe('the column exists in D1 as its own numbered migration', () => {
-  it('0013 adds decided_at once and 0012 is untouched by it', () => {
+  it('0018 (renumbered from 0013, Ruling D1-0013-2) adds decided_at once and 0012 is untouched by it', () => {
     const dir = path.resolve(__dirname, '../../packages/cf-schema/migrations/platform');
-    expect(fs.readFileSync(path.join(dir, '0013_trust_requests_decided_at.sql'), 'utf8')).toContain(
+    expect(fs.readFileSync(path.join(dir, '0018_trust_requests_decided_at.sql'), 'utf8')).toContain(
       'ALTER TABLE "trust_requests" ADD COLUMN "decided_at" INTEGER'
     );
     expect(fs.readFileSync(path.join(dir, '0012_trust_requests.sql'), 'utf8')).not.toContain(
