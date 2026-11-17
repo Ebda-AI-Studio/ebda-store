@@ -7,12 +7,15 @@ import {
   type LedgerEntry,
   type MerchantSubject,
 } from '../cf/erasure';
+import logger from '../lib/logger';
 import { liveBilledStoresOf, OWNER_HAS_BILLED_STORE_MESSAGE_AR } from './account-closure-guard';
 
 /**
  * Merchant / staff account closure (M-024, Ruling M024-1): the TRIGGER for the PDPL erasure job (`cf/erasure/job.ts`),
  * which had no caller. Flag-gated by `PDPL_CF_ERASURE_ENABLED`: while the flag is off the request is recorded (an audit
- * row, so it is never lost and ops can run it the day the flag is on) and answered `recorded`; nothing is erased.
+ * row, so it is never lost and ops can run it the day the flag is on), ops is alerted, and the caller gets a 503
+ * `ERASURE_NOT_ENABLED` with an honest message; nothing is erased (S3, 2026-11-12 audit: it used to answer 202 and the
+ * UI told the user the account was closed while every byte of PII stayed).
  *
  * Order, all before anything is erased: (1) an owner with a live billed store is refused (OFFBOARD-1, the same predicate
  * as DELETE /auth/me); (2) the job's own StoreDO gate refuses while money is in flight (the job stops before identity,
@@ -32,12 +35,12 @@ export interface ClosureDeps {
   alert?: (title: string, body: string) => Promise<unknown>;
 }
 
-export type ClosureOutcome =
-  | { status: 'recorded'; stores: string[] }
-  | { status: 'erased'; stores: string[]; ledger: LedgerEntry[] };
+export type ClosureOutcome = { status: 'erased'; stores: string[]; ledger: LedgerEntry[] };
 
 const MONEY_IN_FLIGHT_AR =
   'مش هينفع نقفل الحساب دلوقتي لأن فيه فلوس لسه في الطريق على متجرك (طلبات أو استردادات). استنى لما تخلص وجرّب تاني.';
+const ERASURE_NOT_ENABLED_MESSAGE =
+  'طلب قفل الحساب اتسجل عندنا، بس الحذف لسه ماتفعّلش، فحسابك وبياناتك لسه موجودين. هنكمّل الطلب مع الدعم. / Your closure request was recorded, but account erasure is not enabled yet: your account and data still exist. Support will complete it.';
 const FAILED_AR = 'قفل الحساب ماكملش. اتسجل عندنا وهنراجعه مع الدعم.';
 
 export async function closeNonCustomerAccount(
@@ -51,7 +54,19 @@ export async function closeNonCustomerAccount(
   }
   if (!erasureEnabled(deps.env)) {
     await deps.recordRequest(input.userId, input.requestId, stores);
-    return { status: 'recorded', stores };
+    logger.error(
+      { requestId: input.requestId, stores: stores.length, rule: 'S3' },
+      'account closure requested but PDPL_CF_ERASURE_ENABLED is off: nothing erased, request recorded'
+    );
+    if (deps.alert) {
+      await deps
+        .alert(
+          'account closure NOT erased: PDPL erasure flag off',
+          `A merchant/staff closure was requested (request ${input.requestId}, ${stores.length} store(s)). PDPL_CF_ERASURE_ENABLED is not "true", so nothing was erased and the user was told so (503 ERASURE_NOT_ENABLED). Run it by hand once the flag is on.`
+        )
+        .catch(() => undefined);
+    }
+    throw new AppError(503, 'ERASURE_NOT_ENABLED', ERASURE_NOT_ENABLED_MESSAGE);
   }
   const run = deps.run ?? runErasure;
   const ledger: LedgerEntry[] = [];

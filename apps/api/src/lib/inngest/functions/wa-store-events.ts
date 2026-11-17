@@ -6,6 +6,7 @@ import { alarmStoreId } from '../../jobs/store-scope';
 import { BUYER_KEY_VERSION, buyerKeyFor, storefrontOrigin, toE164 } from '@ebda/shared';
 import { signCartRestoreToken } from '../../cart-restore-token';
 import { inngest } from '../client';
+import { storeOperational } from '../../store-operational';
 import { redis } from '../../../services/redis.service';
 import logger from '../../logger';
 import { suiteBuyerKeySecret } from '../../wa/config';
@@ -416,6 +417,14 @@ export async function resendConsentFor(storeId: string, sinceMs: number): Promis
   return n;
 }
 
+/** Source events whose Ebda Chat envelope is a message to a customer. */
+const CUSTOMER_FACING_EVENTS: ReadonlySet<string> = new Set([
+  'order/created',
+  'order/status-changed',
+  'shipment/status-updated',
+  'cart/abandoned',
+]);
+
 export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
   const storeId = (event.data as { storeId?: string } | undefined)?.storeId;
   if (!storeId) return 0;
@@ -458,6 +467,9 @@ export async function emitStoreEventsFor(event: SourceEvent): Promise<number> {
     ]);
     return 1;
   }
+  // Ruling SUSPEND-OUT-1: order / shipment / cart events reach the CUSTOMER through Ebda Chat, so a store that is not
+  // `active` emits none of them (plan, consent, erasure and catalog state above/below stay: they are not customer messages).
+  if (CUSTOMER_FACING_EVENTS.has(event.name) && !(await storeOperational(storeId))) return 0;
   if (!(await isWhatsAppLinked(storeId))) return 0;
   const planned =
     event.name === 'order/created'
