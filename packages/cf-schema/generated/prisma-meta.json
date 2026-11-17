@@ -1100,6 +1100,18 @@
           "to": ["store_id"],
           "toProps": ["storeId"]
         },
+        "trustRequests": {
+          "kind": "relation",
+          "type": "TrustRequest",
+          "list": true,
+          "optional": false,
+          "external": false,
+          "owner": false,
+          "from": ["id"],
+          "fromProps": ["id"],
+          "to": ["store_id"],
+          "toProps": ["storeId"]
+        },
         "codRemittances": {
           "kind": "relation",
           "type": "CodRemittance",
@@ -21066,6 +21078,144 @@
           "type": "Store",
           "list": false,
           "optional": false,
+          "external": false,
+          "owner": true,
+          "from": ["store_id"],
+          "fromProps": ["storeId"],
+          "to": ["id"],
+          "toProps": ["id"],
+          "onDelete": "Cascade"
+        }
+      }
+    },
+    "TrustRequest": {
+      "table": "trust_requests",
+      "db": "d1",
+      "pk": ["id"],
+      "uniques": [],
+      "fields": {
+        "id": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "id",
+          "list": false,
+          "optional": false,
+          "default": "uuid()",
+          "id": true
+        },
+        "kind": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "kind",
+          "list": false,
+          "optional": false
+        },
+        "storeId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "store_id",
+          "list": false,
+          "optional": true
+        },
+        "userId": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "user_id",
+          "list": false,
+          "optional": true
+        },
+        "topic": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "topic",
+          "list": false,
+          "optional": true
+        },
+        "message": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "message",
+          "list": false,
+          "optional": true
+        },
+        "pageUrl": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "page_url",
+          "list": false,
+          "optional": true
+        },
+        "slug": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "slug",
+          "list": false,
+          "optional": true
+        },
+        "evidenceUrl": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "evidence_url",
+          "list": false,
+          "optional": true
+        },
+        "status": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "status",
+          "list": false,
+          "optional": false,
+          "default": "\"open\""
+        },
+        "rejectedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "rejected_at",
+          "list": false,
+          "optional": true
+        },
+        "capDay": {
+          "kind": "scalar",
+          "type": "String",
+          "column": "cap_day",
+          "list": false,
+          "optional": true
+        },
+        "capSlot": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "cap_slot",
+          "list": false,
+          "optional": true
+        },
+        "grantedLimit": {
+          "kind": "scalar",
+          "type": "Int",
+          "column": "granted_limit",
+          "list": false,
+          "optional": true
+        },
+        "createdAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "created_at",
+          "list": false,
+          "optional": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "kind": "scalar",
+          "type": "DateTime",
+          "column": "updated_at",
+          "list": false,
+          "optional": false,
+          "updatedAt": true
+        },
+        "store": {
+          "kind": "relation",
+          "type": "Store",
+          "list": false,
+          "optional": true,
           "external": false,
           "owner": true,
           "from": ["store_id"],

@@ -1,0 +1,48 @@
+{
+  "id": "platform.trust-requests-review",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-15",
+  "titleAr": "مراجعة طلبات التجار للدعم والثقة",
+  "titleEn": "Review merchant support and trust requests",
+  "screens": ["/trust-requests"],
+  "api": [
+    "GET /admin/trust-requests",
+    "GET /admin/trust-requests/:id",
+    "POST /admin/trust-requests/:id/resolve",
+    "POST /admin/trust-requests/:id/reject",
+    "POST /stores/:id/suspension/appeal/reject"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "irreversible",
+    "note": "a decision is final; the merchant can file a new request (an appeal after a 24 hour cooldown); the audit row stays"
+  },
+  "operatorReason": {
+    "code": "abuse",
+    "text": "staff decide suspension appeals, protected brand address claims and store limit grants; a merchant can file these but never decides them",
+    "validUnderRule": true
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [
+      "مين بيقرر في اعتراضي على الإيقاف؟",
+      "ليه مقدرش أفك الإيقاف بنفسي؟",
+      "مين بيوافق على طلب العنوان المحمي؟"
+    ],
+    "en": ["Who decides my suspension appeal?"]
+  },
+  "steps": [
+    "Super admin: open Support and trust requests, read the request, press Resolve (a store limit request takes the new limit) or Reject"
+  ],
+  "edgeCases": [
+    "A request is decided once",
+    "Rejecting an appeal starts a 24 hour cooldown",
+    "Resolving a store limit request sets the owner cap (3 to 20) and never lifts the paid plan allowance"
+  ],
+  "gaps": []
+}

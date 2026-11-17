@@ -646,5 +646,9 @@
   "CatalogImportItem": {
     "target": "store-do",
     "reason": "storeId-scoped, read only in one store context"
+  },
+  "TrustRequest": {
+    "target": "d1",
+    "reason": "staff review queue spanning stores (support, suspension reason and appeal, slug claim, store cap); the pre-store kinds have no store id"
   }
 }

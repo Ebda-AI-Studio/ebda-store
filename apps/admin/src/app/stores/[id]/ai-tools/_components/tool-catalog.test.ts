@@ -49,15 +49,11 @@ describe('catalog copy', () => {
       }
     }
   );
-  it('the page keeps the request shapes: every tool offers replace and every replace is undoable (AITOOLS-4)', () => {
-    expect(tools.filter(x => !x.canReplace).map(x => x.key)).toEqual([]);
-    // a replace tool that is not undoable must say so on the card; the four AITOOLS-4 tools are
-    const undoable = tools
-      .filter(x => x.undoable)
+  it('the page keeps the request shapes: only server-honoured force tools offer replace', () => {
+    const noReplace = tools
+      .filter(x => !x.canReplace)
       .map(x => x.key)
       .sort();
-    expect(undoable).toEqual(
-      expect.arrayContaining(['categorize', 'image-alt', 'translate-ar', 'translate-en'])
-    );
+    expect(noReplace).toEqual(['categorize', 'image-alt', 'translate-ar', 'translate-en']);
   });
 });

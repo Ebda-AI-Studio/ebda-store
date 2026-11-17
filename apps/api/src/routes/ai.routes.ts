@@ -41,10 +41,26 @@ import {
   undoBackups as undoReplaceBackups,
 } from '../services/catalogue-replace-backup.service';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
+import { sendOnboardingHelpToCi } from '../lib/ci/emit';
 
 const router = Router({ mergeParams: true });
 
 router.use(authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess);
+
+/**
+ * Activation (Ruling ACT-1): a merchant (not a super admin) whose assistant call SUCCEEDED is a "help needed" signal while
+ * a setup step is open. After the response, advisory: the planner names the open step and drops it for an established
+ * store, and its per-(store, step, kind) seed keeps it to one row.
+ */
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === 'POST' && req.user?.role === 'store_admin') {
+    const storeId = req.params.storeId;
+    res.on('finish', () => {
+      if (storeId && res.statusCode < 400) void sendOnboardingHelpToCi(storeId, 'assistant_used');
+    });
+  }
+  next();
+});
 
 /**
  * The merchant's AI switch (`stores.ai_features_enabled`). These two routes are the ONLY ones registered before

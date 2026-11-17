@@ -39,6 +39,8 @@ type InvoiceEmailRequestedEvent = EventPayload & {
     orderId: string;
     storeId: string;
     to: string;
+    /** The invoice goes to the merchant's own configured address, not a customer: kept for a suspended store (Ruling SUSPEND-OUT-1). */
+    toMerchant?: boolean;
   };
 };
 

@@ -140,7 +140,7 @@
       }
     },
     "d1": {
-      "tables": 31,
+      "tables": 32,
       "maxColumns": 38,
       "columnCounts": {
         "store_staff": 4,
@@ -171,6 +171,7 @@
         "provider_verification_events": 10,
         "billing_referrals": 3,
         "billing_grants": 17,
+        "trust_requests": 16,
         "stores": 32,
         "entity_index": 5,
         "platform_audit_log": 8
@@ -449,6 +450,38 @@
       "unique": false,
       "pgCols": "\"status\", \"reviewed_at\"",
       "pgWhere": "\"image_deleted_at\" IS NULL OR \"personal_scrubbed_at\" IS NULL"
+    },
+    {
+      "name": "trust_requests_one_open_appeal",
+      "table": "trust_requests",
+      "db": "d1",
+      "unique": true,
+      "pgCols": "\"store_id\"",
+      "pgWhere": "\"kind\" = 'suspension_appeal' AND \"status\" = 'open'"
+    },
+    {
+      "name": "trust_requests_one_open_slug_claim",
+      "table": "trust_requests",
+      "db": "d1",
+      "unique": true,
+      "pgCols": "\"user_id\", \"slug\"",
+      "pgWhere": "\"kind\" = 'slug_claim' AND \"status\" = 'open'"
+    },
+    {
+      "name": "trust_requests_one_open_store_cap",
+      "table": "trust_requests",
+      "db": "d1",
+      "unique": true,
+      "pgCols": "\"user_id\"",
+      "pgWhere": "\"kind\" = 'store_cap' AND \"status\" = 'open'"
+    },
+    {
+      "name": "trust_requests_support_cap_slot",
+      "table": "trust_requests",
+      "db": "d1",
+      "unique": true,
+      "pgCols": "\"store_id\", \"cap_day\", \"cap_slot\"",
+      "pgWhere": "\"kind\" = 'support' AND \"cap_slot\" IS NOT NULL"
     }
   ],
   "supersededUniques": [
@@ -1308,6 +1341,36 @@
       "disposition": "store-do:catalog_import_items"
     },
     {
+      "kind": "check",
+      "name": "trust_requests_kind_check",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "trust_requests_status_check",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "trust_requests_len_check",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "trust_requests_cap_slot_check",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "trust_requests_granted_limit_check",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
       "kind": "index",
       "name": "users_admin_email_key",
       "table": "users",
@@ -1642,6 +1705,30 @@
       "name": "reorder_rules_one_per_item",
       "table": "reorder_rules",
       "disposition": "store-do:reorder_rules"
+    },
+    {
+      "kind": "index",
+      "name": "trust_requests_one_open_appeal",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "index",
+      "name": "trust_requests_one_open_slug_claim",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "index",
+      "name": "trust_requests_one_open_store_cap",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "index",
+      "name": "trust_requests_support_cap_slot",
+      "table": "trust_requests",
+      "disposition": "d1:trust_requests"
     }
   ],
   "decimals": [

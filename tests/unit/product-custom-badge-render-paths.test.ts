@@ -23,8 +23,10 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ORIGINAL_ROOT } from '../helpers/original-repo-root';
 
-const ROOT = path.resolve(__dirname, '../..');
+// Original checkout, not the Stryker sandbox (instrumented text): tests/helpers/original-repo-root.ts
+const ROOT = ORIGINAL_ROOT;
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 /** The four core product-card render paths, exactly as CLAUDE.md enumerates them. */

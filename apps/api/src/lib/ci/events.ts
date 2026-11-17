@@ -10,3 +10,5 @@ export const CI_CART_REMINDER_EVENT = 'ci/cart-reminder-sent';
 export const CI_CART_RECOVERED_EVENT = 'ci/cart-recovered';
 /** A store-setup milestone was reached (store created, payment methods chosen, went live). */
 export const CI_ONBOARDING_STEP_EVENT = 'ci/onboarding-step';
+/** A merchant needed help while a setup step was open (assistant used, or a super admin wrote to the store before it went live). */
+export const CI_ONBOARDING_HELP_EVENT = 'ci/onboarding-help';
