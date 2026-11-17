@@ -167,7 +167,7 @@ export async function getEntitlements(
 export function automationFlagsFromRows(
   legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE,
   sub: { planCode: string; status: string } | null | undefined,
-  planRows: ReadonlyMap<string, { code: string; limits: unknown }>
+  planRows: ReadonlyMap<string, { code: string; limits: unknown; featureTier?: string }>
 ) {
   const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[legacyPlan];
   const effectiveCode = sub?.status === 'canceled' ? FALLBACK_PLAN_CODE : subscribedPlanCode;
@@ -183,6 +183,8 @@ export function automationFlagsFromRows(
       apiAccess: limits.apiAccess,
       wholesalePricing: limits.wholesalePricing,
       mcpAccess: planIncludesMerchantMcp(plan?.code ?? seed.code, limits),
+      // Same as getEntitlements: the baseline tier follows the effective plan, never stores.plan (#835/#850).
+      featureTier: (plan?.featureTier ?? seed.featureTier) as StorePlan,
     },
   };
 }

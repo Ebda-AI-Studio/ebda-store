@@ -378,7 +378,7 @@ class FeatureService {
         ];
         const planList = (await platform.plan.findMany({
           where: { code: { in: codes } },
-        })) as Array<{ code: string; limits: unknown }>;
+        })) as Array<{ code: string; limits: unknown; featureTier?: string }>;
         const planRows = new Map(planList.map(p => [p.code, p]));
         const featBy = new Map<string, Array<{ featureKey: string; enabled: boolean }>>();
         for (const r of featureRows as Array<{
