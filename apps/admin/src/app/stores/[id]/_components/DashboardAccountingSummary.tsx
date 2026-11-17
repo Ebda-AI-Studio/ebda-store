@@ -7,15 +7,20 @@ import { useT } from '@/i18n/useT';
 import { apiGetQuiet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 
-import { formatMoney, REGION } from '@ebda/shared';
+import { formatPrice } from '../../../../lib/format';
+import { ledgerCostsKnown, stockValueState } from '../../../../lib/money-truth';
 interface FinanceDashboard {
-  thisMonth: { revenue: number; expenses: number; net: number };
+  thisMonth: { revenue: number; expenses: number; net: number; costsKnown?: boolean };
   cash: Array<{ id: string; code: string; nameEn: string; balance: number }>;
   stockValue: number;
+  stockedProducts?: number;
+  uncostedProducts?: number;
 }
 
 interface StockSnapshot {
   stockValue: number;
+  stockedProducts?: number;
+  uncostedProducts?: number;
   openBackorderCount: number;
   backorderedDemandValue: number;
   reorderRulesCount: number;
@@ -41,8 +46,9 @@ interface Props {
   storeId: string;
 }
 
+/** One money format (house style, lib/format.ts) — the symbol is part of the value, not a separate unit line. */
 function fmtMoney(minor: number) {
-  return formatMoney(minor, 'en', { hideSymbol: true, fixedDecimals: true });
+  return formatPrice(minor);
 }
 
 /**
@@ -114,27 +120,48 @@ export function DashboardAccountingSummary({ storeId }: Props) {
   if (!fin && !stock) return null;
 
   const netPositive = (fin?.thisMonth.net ?? 0) >= 0;
+  // Unknown is not zero/revenue (QA 2026-11-17 N1/N2): no booked cost of goods → profit unknown; no cost prices → stock unknown.
+  const netKnown = fin
+    ? ledgerCostsKnown({
+        revenue: fin.thisMonth.revenue,
+        cogs: 0,
+        costsKnown: fin.thisMonth.costsKnown ?? true,
+      })
+    : true;
+  const stockSource = stock ?? fin;
+  const stockState = stockSource
+    ? stockValueState({
+        stockValue: stockSource.stockValue,
+        stockedProducts: stockSource.stockedProducts,
+        uncostedProducts: stockSource.uncostedProducts,
+      })
+    : null;
 
   const tiles = [
     fin && {
       href: `/stores/${storeId}/finance/dashboard`,
       label: t('revenueThisMonth'),
       value: fmtMoney(fin.thisMonth.revenue),
-      unit: REGION.currency,
+      unit: '',
       tone: 'primary' as const,
     },
     fin && {
       href: `/stores/${storeId}/finance/dashboard`,
       label: t('netThisMonth'),
-      value: fmtMoney(fin.thisMonth.net),
-      unit: REGION.currency,
-      tone: netPositive ? ('success' as const) : ('danger' as const),
+      value: netKnown ? fmtMoney(fin.thisMonth.net) : t('unknown'),
+      unit: '',
+      tone: !netKnown
+        ? ('muted' as const)
+        : netPositive
+          ? ('success' as const)
+          : ('danger' as const),
     },
     (fin || stock) && {
       href: `/stores/${storeId}/stock/dashboard`,
       label: t('stockValue'),
-      value: fmtMoney(stock?.stockValue ?? fin?.stockValue ?? 0),
-      unit: REGION.currency,
+      value:
+        !stockState || stockState.kind === 'unknown' ? t('unknown') : fmtMoney(stockState.value),
+      unit: '',
       tone: 'info' as const,
     },
     stock && {

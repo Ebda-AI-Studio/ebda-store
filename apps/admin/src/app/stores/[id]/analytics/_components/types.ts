@@ -1,5 +1,5 @@
 import type { AnalyticsPeriod, SalesGranularity } from '@ebda/shared';
-import { formatMoney } from '@ebda/shared';
+import { formatPrice, intlLocaleForUi } from '@/lib/format';
 
 export type { SalesGranularity };
 
@@ -73,6 +73,8 @@ export interface LowStockProduct {
 }
 
 export interface GlWindow {
+  /** False when the period has revenue but no cost of goods was booked: gross profit and net income are unknown. */
+  costsKnown?: boolean;
   revenue: number;
   cogs: number;
   grossProfit: number;
@@ -81,6 +83,9 @@ export interface GlWindow {
 
 export interface StockSnapshot {
   stockValue: number;
+  /** Products holding on-hand units, and how many of those have no cost price (the value skips them). */
+  stockedProducts?: number;
+  uncostedProducts?: number;
   openBackorderCount: number;
   backorderedDemandValue: number;
   reorderRulesCount: number;
@@ -176,7 +181,7 @@ export type ChartType = 'revenue' | 'orders';
  * Amounts are stored as piastres (1 EGP = 100 piastres); `formatMoney` scales.
  */
 export function formatCurrency(amount: number): string {
-  return formatMoney(amount, 'en', { fixedDecimals: true });
+  return formatPrice(amount);
 }
 
 /** Shortens large integers with K/M suffixes for compact stat display. */
@@ -197,7 +202,7 @@ export function formatNumber(num: number): string {
  */
 export function formatDate(date: string, granularity: SalesGranularity = 'day'): string {
   return new Date(date).toLocaleDateString(
-    'en-US',
+    intlLocaleForUi(),
     granularity === 'month'
       ? { month: 'short', year: 'numeric', timeZone: 'UTC' }
       : { month: 'short', day: 'numeric', timeZone: 'UTC' }

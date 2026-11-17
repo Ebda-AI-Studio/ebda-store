@@ -459,7 +459,7 @@ router.get(
         success: true,
         data: {
           performance,
-          glGrossProfit: glThisMonth.grossProfit,
+          glGrossProfit: glThisMonth.costsKnown ? glThisMonth.grossProfit : null,
         },
       });
     } catch (error) {

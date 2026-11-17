@@ -3,6 +3,7 @@
 import { useT } from '@/i18n/useT';
 import type { StockSnapshot } from './types';
 import { formatCurrency, formatNumber } from './types';
+import { stockValueState } from '@/lib/money-truth';
 
 interface InventorySnapshotCardProps {
   snapshot: StockSnapshot;
@@ -15,16 +16,39 @@ interface InventorySnapshotCardProps {
 export function InventorySnapshotCard({ snapshot }: InventorySnapshotCardProps) {
   const t = useT('analytics.inventorySnapshot');
 
+  // Unknown is not zero (QA 2026-11-17 N2): stock with no cost price is unknown or partial, never "0".
+  const stock = stockValueState(snapshot);
   const rows = [
-    { label: t('stockValue'), value: formatCurrency(snapshot.stockValue), mono: true },
-    { label: t('openBackorders'), value: formatNumber(snapshot.openBackorderCount), mono: false },
+    {
+      label: t('stockValue'),
+      value: stock.kind === 'unknown' ? t('stockValueUnknown') : formatCurrency(stock.value),
+      note:
+        stock.kind === 'unknown'
+          ? t('stockValueMissingCost', { count: snapshot.uncostedProducts ?? 0 })
+          : stock.kind === 'partial'
+            ? t('stockValuePartial', { costed: stock.costed, stocked: stock.stocked })
+            : undefined,
+      mono: true,
+    },
+    {
+      label: t('openBackorders'),
+      value: formatNumber(snapshot.openBackorderCount),
+      note: undefined,
+      mono: false,
+    },
     {
       label: t('backorderedDemandValue'),
       value: formatCurrency(snapshot.backorderedDemandValue),
+      note: undefined,
       mono: true,
     },
-    { label: t('reorderRules'), value: formatNumber(snapshot.reorderRulesCount), mono: false },
-  ] as const;
+    {
+      label: t('reorderRules'),
+      value: formatNumber(snapshot.reorderRulesCount),
+      note: undefined,
+      mono: false,
+    },
+  ];
 
   return (
     <div className="bg-card rounded-xl border p-6 shadow-sm">
@@ -34,6 +58,7 @@ export function InventorySnapshotCard({ snapshot }: InventorySnapshotCardProps) 
           <div key={row.label} className="flex flex-col gap-1">
             <dt className="text-xs text-muted-foreground">{row.label}</dt>
             <dd className="text-base font-semibold text-foreground tabular-nums">{row.value}</dd>
+            {row.note && <dd className="text-xs text-muted-foreground">{row.note}</dd>}
           </div>
         ))}
       </dl>

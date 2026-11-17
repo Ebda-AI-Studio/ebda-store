@@ -7,7 +7,7 @@ import { toCsv } from '@/lib/csv';
 import { useT } from '@/i18n/useT';
 import { DataTable } from '@/components/mobile/DataTable';
 import { apiGet, apiFetch } from '@/lib/api';
-import { minorToMajor } from '@/lib/format';
+import { formatPrice, minorToMajor } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/shared';
@@ -654,7 +654,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
             <p className="text-sm text-green-700">{tbs('balanced')}</p>
           ) : (
             <p className="text-sm text-red-600">
-              {tbs('unbalanced', { amount: major(Math.abs(difference)) })}
+              {tbs('unbalanced', { amount: formatPrice(Math.abs(difference)) })}
             </p>
           )}
         </div>

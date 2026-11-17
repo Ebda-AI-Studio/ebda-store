@@ -201,7 +201,8 @@
         "stockValue": "Stock value",
         "openBackorders": "Open backorders",
         "topRfmSegment": "Top Customer Segment",
-        "error": "Unable to load financial summary"
+        "error": "Unable to load financial summary",
+        "unknown": "Unknown"
       },
       "details": {
         "title": "Store Details",
@@ -1371,7 +1372,7 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} EGP",
+        "totalValue": "{amount}",
         "moreItems": "+{count} more",
         "agentBadge": "Agent"
       },
@@ -2191,6 +2192,9 @@
     "inventorySnapshot": {
       "title": "Inventory snapshot (right now)",
       "stockValue": "Stock value",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
       "openBackorders": "Open backorders",
       "backorderedDemandValue": "Backordered demand value",
       "reorderRules": "Reorder rules"
@@ -4271,7 +4275,7 @@
       "recovered": "Ordered later",
       "recoveryRate": "Ordered-later rate",
       "recoveredRevenue": "Revenue from later orders",
-      "baseValue": "{amount} EGP",
+      "baseValue": "{amount}",
       "recoveryNotTracked": "Not tracked"
     },
     "status": {
@@ -6769,7 +6773,7 @@
       "expenses": "Expenses",
       "net": "Net Income",
       "stockValue": "Stock Value",
-      "disabledVariantStockValue": "Held on disabled variants: {amount} EGP — not counted as stock",
+      "disabledVariantStockValue": "Held on disabled variants: {amount} — not counted as stock",
       "cash": "Cash by Account",
       "balanceSheet": "Balance Sheet",
       "assets": "Assets",
@@ -6785,7 +6789,14 @@
       "salesOrdersCount": "Paid Orders",
       "salesOrdersCountUnit": "orders in period",
       "couldntLoad": "Couldn't load",
-      "loadFailedShort": "Could not load the finance dashboard."
+      "loadFailedShort": "Could not load the finance dashboard.",
+      "netUnknown": "Unknown",
+      "netNoCostsNote": "No cost of goods was booked for this period, so profit cannot be told apart from revenue.",
+      "stockValueUnknown": "Unknown",
+      "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
+      "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",
+      "anomaliesNone": "No open anomalies.",
+      "anomaliesLoadFailed": "Could not load the anomalies."
     },
     "anomalies": {
       "title": "Profit Anomalies",
@@ -6934,7 +6945,7 @@
         "equity": "Equity",
         "totalEquity": "Total Equity",
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity",
-        "unbalanced": "Out of balance by {amount} EGP — Assets ≠ Liabilities + Equity",
+        "unbalanced": "Out of balance by {amount} — Assets ≠ Liabilities + Equity",
         "currentEarnings": "Retained & current earnings",
         "currentEarningsHint": "Revenue minus expenses up to this date (not yet closed to an equity account)"
       },

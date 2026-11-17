@@ -2,7 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import type { CashflowPoint } from './types';
-import { formatCurrency } from './types';
+import { formatCurrency, formatDate } from './types';
 
 interface CashflowChartProps {
   data: CashflowPoint[];
@@ -76,7 +76,7 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
               className={positive ? 'fill-emerald-500 dark:fill-emerald-400' : 'fill-destructive'}
               opacity={0.85}
             >
-              <title>{`${point.day}: ${formatCurrency(point.net)}`}</title>
+              <title>{`${formatDate(point.day.toString().slice(0, 10))}: ${formatCurrency(point.net)}`}</title>
             </rect>
           );
         })}
@@ -84,8 +84,10 @@ export function CashflowChart({ data, periodLabel }: CashflowChartProps) {
 
       {/* Min/Max legend */}
       <div className="flex justify-between mt-1 text-xs text-muted-foreground tabular-nums">
-        <span>{data[0]?.day?.toString().slice(0, 10) ?? ''}</span>
-        <span>{data[data.length - 1]?.day?.toString().slice(0, 10) ?? ''}</span>
+        <span>{data[0] ? formatDate(data[0].day.toString().slice(0, 10)) : ''}</span>
+        <span>
+          {data.length > 0 ? formatDate(data[data.length - 1].day.toString().slice(0, 10)) : ''}
+        </span>
       </div>
     </div>
   );

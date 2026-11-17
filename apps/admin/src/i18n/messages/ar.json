@@ -201,7 +201,8 @@
         "stockValue": "قيمة المخزون",
         "openBackorders": "الطلبات المعلقة",
         "topRfmSegment": "أبرز شريحة عملاء",
-        "error": "معرفناش نحمّل الملخص المالي"
+        "error": "معرفناش نحمّل الملخص المالي",
+        "unknown": "غير معروف"
       },
       "details": {
         "title": "تفاصيل المتجر",
@@ -1371,7 +1372,7 @@
         "status": "الحالة",
         "date": "التاريخ",
         "actions": "الإجراءات",
-        "totalValue": "{amount} ج.م",
+        "totalValue": "{amount}",
         "moreItems": "+{count} أخرى",
         "agentBadge": "وكيل ذكاء اصطناعي"
       },
@@ -2191,6 +2192,9 @@
     "inventorySnapshot": {
       "title": "لقطة المخزون (الآن)",
       "stockValue": "قيمة المخزون",
+      "stockValueUnknown": "غير معروف",
+      "stockValueMissingCost": "{count} منتج في المخزون من غير سعر تكلفة، وعشان كده مش هينفع نحسب قيمته.",
+      "stockValuePartial": "محسوبة لـ {costed} من {stocked} منتج في المخزون — الباقي من غير سعر تكلفة.",
       "openBackorders": "طلبات متأخرة مفتوحة",
       "backorderedDemandValue": "قيمة الطلب المتأخر",
       "reorderRules": "قواعد إعادة الطلب"
@@ -4271,7 +4275,7 @@
       "recovered": "طلبوا لاحقًا",
       "recoveryRate": "نسبة من طلبوا لاحقًا",
       "recoveredRevenue": "إيرادات الطلبات اللاحقة",
-      "baseValue": "{amount} ج.م",
+      "baseValue": "{amount}",
       "recoveryNotTracked": "غير متتبَّع"
     },
     "status": {
@@ -6769,7 +6773,7 @@
       "expenses": "اللي خرج",
       "net": "الربح",
       "stockValue": "قيمة المخزون",
-      "disabledVariantStockValue": "محتجزة في متغيّرات معطّلة: {amount} ج.م — غير محسوبة ضمن المخزون",
+      "disabledVariantStockValue": "محتجزة في متغيّرات معطّلة: {amount} — غير محسوبة ضمن المخزون",
       "cash": "النقدية بحسب الحساب",
       "balanceSheet": "الميزانية العمومية",
       "assets": "الأصول",
@@ -6785,7 +6789,14 @@
       "salesOrdersCount": "الطلبات المدفوعة",
       "salesOrdersCountUnit": "طلب في الفترة",
       "couldntLoad": "معرفناش نحمّل",
-      "loadFailedShort": "معرفناش نحمّل لوحة الأرباح والمصروفات."
+      "loadFailedShort": "معرفناش نحمّل لوحة الأرباح والمصروفات.",
+      "netUnknown": "غير معروف",
+      "netNoCostsNote": "متسجلتش تكلفة بضاعة مباعة للفترة دي، وعشان كده مش هينفع نعرف الربح الحقيقي ونفصله عن الإيرادات.",
+      "stockValueUnknown": "غير معروف",
+      "stockValueMissingCost": "{count} منتج في المخزون من غير سعر تكلفة، وعشان كده مش هينفع نحسب قيمته.",
+      "stockValuePartial": "محسوبة لـ {costed} من {stocked} منتج في المخزون — الباقي من غير سعر تكلفة.",
+      "anomaliesNone": "مفيش شذوذات مفتوحة.",
+      "anomaliesLoadFailed": "معرفناش نحمّل الشذوذات."
     },
     "anomalies": {
       "title": "شذوذات الربحية",
@@ -6934,7 +6945,7 @@
         "equity": "حقوق الملكية",
         "totalEquity": "إجمالي حقوق الملكية",
         "balanced": "الميزانية مثبّتة — الأصول = الالتزامات + حقوق الملكية",
-        "unbalanced": "الميزانية غير متوازنة بفارق {amount} ج.م — الأصول ≠ الالتزامات + حقوق الملكية",
+        "unbalanced": "الميزانية غير متوازنة بفارق {amount} — الأصول ≠ الالتزامات + حقوق الملكية",
         "currentEarnings": "الأرباح المحتجزة والحالية",
         "currentEarningsHint": "الإيرادات ناقص المصروفات حتى هذا التاريخ (لم تُقفل بعد في حساب حقوق الملكية)"
       },

@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import { ledgerCostsKnown, stockValueState } from '../money-truth';
+
+describe('ledgerCostsKnown', () => {
+  it('trusts the API flag when present', () => {
+    expect(ledgerCostsKnown({ revenue: 100, cogs: 0, costsKnown: true })).toBe(true);
+    expect(ledgerCostsKnown({ revenue: 100, cogs: 5, costsKnown: false })).toBe(false);
+  });
+  it('falls back to revenue>0 && cogs==0 for an older API', () => {
+    expect(ledgerCostsKnown({ revenue: 100, cogs: 0 })).toBe(false);
+    expect(ledgerCostsKnown({ revenue: 100, cogs: 40 })).toBe(true);
+    expect(ledgerCostsKnown({ revenue: 0, cogs: 0 })).toBe(true);
+  });
+});
+
+describe('stockValueState', () => {
+  it('unknown when every stocked product is uncosted', () => {
+    expect(stockValueState({ stockValue: 0, stockedProducts: 5, uncostedProducts: 5 })).toEqual({
+      kind: 'unknown',
+    });
+  });
+  it('partial when some are uncosted', () => {
+    expect(stockValueState({ stockValue: 900, stockedProducts: 5, uncostedProducts: 2 })).toEqual({
+      kind: 'partial',
+      value: 900,
+      costed: 3,
+      stocked: 5,
+    });
+  });
+  it('full when all are costed, or when the API predates the coverage fields', () => {
+    expect(stockValueState({ stockValue: 900, stockedProducts: 5, uncostedProducts: 0 }).kind).toBe(
+      'full'
+    );
+    expect(stockValueState({ stockValue: 0 }).kind).toBe('full');
+  });
+  it('an empty shelf is a true 0', () => {
+    expect(stockValueState({ stockValue: 0, stockedProducts: 0, uncostedProducts: 0 }).kind).toBe(
+      'full'
+    );
+  });
+});

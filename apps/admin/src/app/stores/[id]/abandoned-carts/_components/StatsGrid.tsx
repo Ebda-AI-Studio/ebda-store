@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { minorToMajor } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 import type { AbandonedCartStats } from './types';
 
@@ -37,7 +37,7 @@ interface StatsGridProps {
   guestCheckout?: boolean;
 }
 
-const formatMajor = minorToMajor;
+const formatMajor = formatPrice;
 
 /**
  * Four-column summary cards at the top of the abandoned carts page.

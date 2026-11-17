@@ -201,12 +201,12 @@ describe('RefundMethodModal', () => {
       error: null,
     });
     const onConfirm = renderModal();
-    await waitFor(() => expect(screen.getAllByText(/75\.00/).length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getAllByText(/75(?!\d)/).length).toBeGreaterThanOrEqual(1));
 
     fireEvent.click(radio('store_credit')!);
     fireEvent.click(screen.getByRole('button', { name: 'continue' }));
-    expect(screen.getByText(/confirmWallet .*75\.00/)).toBeTruthy();
-    expect(screen.queryByText(/90\.00/), 'never the off-platform figure').toBeNull();
+    expect(screen.getByText(/confirmWallet .*75(?!\d)/)).toBeTruthy();
+    expect(screen.queryByText(/90(?!\d)/), 'never the off-platform figure').toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'refundMethodConfirm' }));
     expect(onConfirm).toHaveBeenCalledWith('store_credit');
@@ -259,9 +259,9 @@ describe('RefundMethodModal: tier adjustment (B2B Task 8b)', () => {
     withLines([LINE]);
     await toConfirm();
     const box = screen.getByTestId('tier-adjustment');
-    expect(box.textContent).toContain('7,200.00'); // standard
-    expect(box.textContent).toContain('200.00'); // adjustment
-    expect(box.textContent).toContain('7,000.00'); // adjusted
+    expect(box.textContent).toContain('7,200'); // standard
+    expect(box.textContent).toContain('200'); // adjustment
+    expect(box.textContent).toContain('7,000'); // adjusted
     expect(box.textContent).toContain('tierAdjustment.reason.kept_below_tier');
     expect(box.textContent).toContain('"kept":10');
     expect(box.textContent).toContain('"tier":100');
@@ -273,9 +273,9 @@ describe('RefundMethodModal: tier adjustment (B2B Task 8b)', () => {
     await toConfirm();
     const box = screen.getByTestId('tier-adjustment');
     expect(box.textContent).toContain('tierAdjustment.carried');
-    expect(box.textContent).toContain('1,000.00');
+    expect(box.textContent).toContain('1,000');
     expect(box.textContent).toContain('tierAdjustment.shortfall');
-    expect(box.textContent).toContain('500.00');
+    expect(box.textContent).toContain('500');
   });
 
   it('is absent when no line is tier-priced (a plain partial return looks exactly as before)', async () => {

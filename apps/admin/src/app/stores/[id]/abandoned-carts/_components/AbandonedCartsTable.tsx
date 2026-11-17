@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@ebda/ui';
-import { minorToMajor } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
@@ -12,7 +12,7 @@ import type { AbandonedCartRecord, ListMeta } from './types';
 import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 
-const formatMajor = minorToMajor;
+const formatMajor = formatPrice;
 
 /** Best-effort display string for the customer column. */
 function customerDisplay(record: AbandonedCartRecord): string {

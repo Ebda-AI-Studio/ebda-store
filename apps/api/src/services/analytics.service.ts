@@ -1,6 +1,10 @@
 import { currentStoreId, prisma, Prisma } from '@ebda/database';
 import { customerRows } from '../lib/customer-directory';
-import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
+import {
+  ON_HAND_SQL,
+  storeStockCostCoverage,
+  storeStockValueFils,
+} from '../lib/effective-inventory-sql';
 import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
@@ -243,6 +247,14 @@ async function doNewAndReturning(
     returning += before.length;
   }
   return { newCustomers: ids.length - returning, returningCustomers: returning };
+}
+
+/**
+ * Whether a ledger window's profit figures can be trusted: false when the period has revenue but no cost of goods was
+ * booked (no cost prices, or COGS deferred), so gross profit and net income are UNKNOWN rather than equal to revenue.
+ */
+export function ledgerCostsKnown(revenue: number, cogs: number): boolean {
+  return !(revenue > 0 && cogs === 0);
 }
 
 export class AnalyticsService {
@@ -1189,6 +1201,9 @@ export class AnalyticsService {
       cogs,
       grossProfit: pnl.totalRevenue - cogs,
       netIncome: pnl.netIncome,
+      // Revenue with no cost of goods booked is not a profit: "revenue − 0" would repeat the revenue as gross profit AND as
+      // net income (QA 2026-11-17 N1). Callers render both as unknown (ruling AN-7) when this is false.
+      costsKnown: ledgerCostsKnown(pnl.totalRevenue, cogs),
     };
   }
 
@@ -1205,15 +1220,18 @@ export class AnalyticsService {
       ]);
       return {
         stockValue: d.stockValue,
+        stockedProducts: d.stockedProducts,
+        uncostedProducts: d.uncostedProducts,
         openBackorderCount: d.backorderCount,
         backorderedDemandValue: d.backorderValue,
         reorderRulesCount: rulesCount,
       };
     }
-    const [stockValue, backorderRow, rulesCount] = await Promise.all([
+    const [stockValue, coverage, backorderRow, rulesCount] = await Promise.all([
       // Variant-aware quantity AND cost, active variants only — the finance
       // dashboard's own query (storeStockValueFils), so the two cannot drift.
       storeStockValueFils(storeId),
+      storeStockCostCoverage(storeId),
       prisma.$queryRaw<{ count: bigint; value: bigint }[]>`
         SELECT
           COUNT(*) AS count,
@@ -1229,6 +1247,7 @@ export class AnalyticsService {
     ]);
     return {
       stockValue,
+      ...coverage,
       openBackorderCount: Number(backorderRow[0]?.count ?? 0),
       backorderedDemandValue: Number(backorderRow[0]?.value ?? 0),
       reorderRulesCount: rulesCount,
