@@ -735,8 +735,8 @@ export function BuilderEditor({
               setFocusRequest(r => ({ ...s, n: (r?.n ?? 0) + 1 }));
             }}
             dispatch={dispatch}
-            onAddSection={list => {
-              setAddAt(undefined);
+            onAddSection={(list, at) => {
+              setAddAt(at);
               setAddTo(list);
             }}
           />
@@ -1232,6 +1232,12 @@ export function BuilderEditor({
           doc={b.doc}
           template={store.template ? normalizeLegacyTemplate(store.template) : undefined}
           look={store.look}
+          theme={effectiveTheme(store.theme, b.doc.theme)}
+          onShowExisting={sectionId => {
+            setSelection({ sectionId });
+            setAddTo(null);
+            setAddAt(undefined);
+          }}
           onClose={() => {
             setAddTo(null);
             setAddAt(undefined);

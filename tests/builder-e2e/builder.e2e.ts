@@ -44,6 +44,15 @@ function locale(): 'ar' | 'en' {
 const narrow = (page: Page) => (page.viewportSize()?.width ?? 1280) < 1024;
 const L = (ar: string, en: string) => (locale() === 'ar' ? ar : en);
 
+/** A row's overflow menu action (Duplicate / Move up / Move down / Delete live there, not on the row). */
+async function rowMenu(page: Page, sectionId: string, item: string) {
+  await page
+    .getByTestId(`tree-row-${sectionId}`)
+    .getByRole('button', { name: /^(خيارات|Options)/ })
+    .click();
+  await page.getByRole('menuitem', { name: item, exact: true }).click();
+}
+
 async function openBuilder(page: Page) {
   await page.request.post(`${API}/__test/reset`);
   await page
@@ -106,29 +115,18 @@ test('add, reorder (keyboard + buttons), duplicate, hide, delete, autosave', asy
   await page.getByTestId('tree-select-image-text-1').press('Alt+ArrowUp');
   expect((await templateIds(page)).indexOf('image-text-1')).toBe(at - 1);
   // button reorder
-  await page
-    .getByRole('button', {
-      name: L('حرّك صورة مع نص لأعلى', 'Move Image with text up'),
-      exact: true,
-    })
-    .click();
+  await rowMenu(page, 'image-text-1', L('تحريك لأعلى', 'Move up'));
   expect((await templateIds(page)).indexOf('image-text-1')).toBe(at - 2);
 
   // duplicate, hide, delete
-  await page
-    .getByRole('button', { name: L('تكرار صورة مع نص', 'Duplicate Image with text'), exact: true })
-    .first()
-    .click();
+  await rowMenu(page, 'image-text-1', L('تكرار', 'Duplicate'));
   await structure(page);
   await expect(page.getByTestId('tree-row-image-text-2')).toBeVisible();
   await page
     .getByTestId('tree-row-image-text-2')
     .getByRole('button', { name: L('إخفاء صورة مع نص', 'Hide Image with text'), exact: true })
     .click();
-  await page
-    .getByTestId('tree-row-image-text-1')
-    .getByRole('button', { name: L('حذف صورة مع نص', 'Remove Image with text'), exact: true })
-    .click();
+  await rowMenu(page, 'image-text-1', L('حذف', 'Delete'));
   await expect(page.getByTestId('tree-row-image-text-1')).toHaveCount(0);
 
   // autosave reaches the API as a validated draft
@@ -711,10 +709,18 @@ test('cart page: sections only, the main block is pinned, the canvas loads /cart
   const main = page.getByTestId('tree-row-cart-main');
   await expect(page.getByTestId('tree-pinned-cart-main')).toBeVisible();
   await expect(main.getByRole('button', { name: /^(إخفاء|Hide) /u })).toHaveCount(0);
-  await expect(main.getByRole('button', { name: /^(حذف|Remove) /u })).toHaveCount(0);
+  await main.getByRole('button', { name: /^(خيارات|Options)/ }).click();
+  await expect(page.getByRole('menuitem', { name: L('حذف', 'Delete'), exact: true })).toHaveCount(
+    0
+  );
+  await page.keyboard.press('Escape');
   const recs = page.getByTestId('tree-row-cart-recommendations');
   await expect(recs.getByRole('button', { name: /^(إخفاء|Hide) /u })).toHaveCount(1);
-  await expect(recs.getByRole('button', { name: /^(حذف|Remove) /u })).toHaveCount(1);
+  await recs.getByRole('button', { name: /^(خيارات|Options)/ }).click();
+  await expect(page.getByRole('menuitem', { name: L('حذف', 'Delete'), exact: true })).toHaveCount(
+    1
+  );
+  await page.keyboard.press('Escape');
   // the theme belongs to the home document only
   // (sections, ai, history: the AI tab exists since #271) and no theme tab
   await expect(page.getByRole('tab')).toHaveCount(3);

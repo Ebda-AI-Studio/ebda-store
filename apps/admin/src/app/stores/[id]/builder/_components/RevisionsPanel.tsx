@@ -7,7 +7,7 @@
  */
 import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useState } from 'react';
-import { useFormatter } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { ConfirmDialog } from './ConfirmDialog';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
@@ -22,6 +22,15 @@ interface Rev {
   publishedByName?: string | null;
 }
 
+const DAY_MS = 86_400_000;
+
+/** Calendar days between `when` and `now` in the viewer's local time (0 = today, 1 = yesterday). */
+function dayDiff(when: Date, now: Date): number {
+  const a = new Date(when.getFullYear(), when.getMonth(), when.getDate()).getTime();
+  const b = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return Math.round((b - a) / DAY_MS);
+}
+
 export function RevisionsPanel({
   storeId,
   pageKey = 'home',
@@ -34,7 +43,7 @@ export function RevisionsPanel({
   onRestored: () => void;
 }) {
   const t = useT('builder.revisions');
-  const format = useFormatter();
+  const locale = useLocale();
   const base = `/api/v1/admin/stores/${storeId}/builder/pages/${pageKey}`;
   const [rows, setRows] = useState<Rev[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -54,6 +63,23 @@ export function RevisionsPanel({
     },
     [base]
   );
+
+  /** "Today 3:40 pm" / "Yesterday 9:10 am" / "3 Nov 2026, 3:40 pm", in the active locale. */
+  const when = (iso: string): string => {
+    const date = new Date(iso);
+    const time = new Intl.DateTimeFormat(locale, {
+      timeStyle: 'short',
+      numberingSystem: 'latn',
+    }).format(date);
+    const diff = dayDiff(date, new Date());
+    if (diff === 0) return `${t('today')} ${time}`;
+    if (diff === 1) return `${t('yesterday')} ${time}`;
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      numberingSystem: 'latn',
+    }).format(date);
+  };
 
   useEffect(() => {
     void load();
@@ -87,7 +113,9 @@ export function RevisionsPanel({
               <span className="font-medium">
                 {t('rev', { rev: r.rev })} ·{' '}
                 <span
-                  className={r.status === 'published' ? 'text-primary' : 'text-muted-foreground'}
+                  className={
+                    r.status === 'published' ? 'text-primary-ink' : 'text-muted-foreground'
+                  }
                 >
                   {t(`status.${r.status}`)}
                 </span>
@@ -105,10 +133,7 @@ export function RevisionsPanel({
               )}
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {format.dateTime(new Date(r.publishedAt ?? r.createdAt), {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              })}
+              {when(r.publishedAt ?? r.createdAt)}
             </p>
             {r.publishedBy && (
               <p className="text-xs text-muted-foreground">
@@ -118,11 +143,14 @@ export function RevisionsPanel({
                   : t('by.removed')}
               </p>
             )}
-            {r.note?.startsWith('rollback to rev ') && (
-              <p className="text-xs text-muted-foreground">
-                {t('restoredFrom', { rev: r.note.slice('rollback to rev '.length) })}
-              </p>
-            )}
+            {/* one-line summary from the row's own data: a restore says which version, else the status */}
+            <p className="text-xs text-foreground" data-testid={`rev-summary-${r.rev}`}>
+              {r.note?.startsWith('rollback to rev ')
+                ? t('restoredFrom', { rev: r.note.slice('rollback to rev '.length) })
+                : r.publishedAt
+                  ? t('summary.published')
+                  : t('summary.draft')}
+            </p>
           </li>
         ))}
       </ol>

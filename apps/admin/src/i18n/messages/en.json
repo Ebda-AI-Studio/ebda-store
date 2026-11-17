@@ -10448,13 +10448,41 @@
       "hide": "Hide {name}",
       "duplicate": "Duplicate {name}",
       "remove": "Remove {name}",
-      "pinned": "{name} is the core of this page, it can move but not be removed"
+      "pinned": "{name} is the core of this page, it can move but not be removed",
+      "options": "Options for {name}",
+      "hiddenTag": "Hidden",
+      "duplicateItem": "Duplicate",
+      "moveUpItem": "Move up",
+      "moveDownItem": "Move down",
+      "removeItem": "Delete",
+      "insertHere": "Add a section here",
+      "empty": {
+        "header": "Nothing in the header yet. Add a section and it shows on every page.",
+        "template": "This page has no sections yet. Add one to start building it.",
+        "footer": "Nothing in the footer yet. Add a section and it shows on every page."
+      }
     },
     "addSection": {
       "title": "Add a section",
       "close": "Close",
       "limitReached": "Limit reached ({max})",
-      "more": "More sections"
+      "more": "More sections",
+      "search": "Search sections",
+      "searchPlaceholder": "Search sections (press / to focus)",
+      "categoryLabel": "Section type",
+      "all": "All",
+      "noResults": "No section matches that search.",
+      "maxReached": "Max {max} reached",
+      "showExisting": "Show existing",
+      "categories": {
+        "hero": "Hero",
+        "products": "Products",
+        "story": "Story",
+        "trust": "Trust",
+        "header": "Header",
+        "footer": "Footer",
+        "other": "More"
+      }
     },
     "ai": {
       "filled": "Added a kicker and subtitle. You can edit or undo them.",
@@ -10647,7 +10675,13 @@
         "named": "by {name}",
         "removed": "Removed user"
       },
-      "restoredFrom": "Restored from version {rev}"
+      "restoredFrom": "Restored from version {rev}",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "summary": {
+        "published": "Went live",
+        "draft": "Saved as a draft"
+      }
     },
     "pages": {
       "label": "Page",
