@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { apiGet } from '@/lib/api';
 import { useT } from '@/i18n/useT';
+import { buttonVariants } from '@/components/ui/Button';
 
 interface BillingPlan {
   plan: { code: string; nameEn: string; nameAr: string; subscribedPlanCode: string };
@@ -44,7 +45,7 @@ export function SubscriptionPlanRow({ storeId }: { storeId: string }) {
       </div>
       <Link
         href={`/stores/${storeId}/billing#assign-plan`}
-        className="inline-flex min-h-11 items-center rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted md:min-h-0"
+        className={buttonVariants({ variant: 'outline', size: 'sm' })}
       >
         {t('assignLink')}
       </Link>
