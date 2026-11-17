@@ -244,6 +244,7 @@
   "GET /stores/:storeId/barcodes/items",
   "GET /stores/:storeId/barcodes/settings",
   "GET /stores/:storeId/billing/",
+  "GET /stores/:storeId/billing/change-plan/quote",
   "GET /stores/:storeId/billing/checkout/return",
   "GET /stores/:storeId/billing/invoices",
   "GET /stores/:storeId/billing/payment-claims",
