@@ -917,15 +917,19 @@ test('look switch: Apply writes the proposal and the editor reloads it; a moved 
   // the page moves under the preview (another editor saved)
   await page.request.post(`${API}/__test/bump`);
   await page.getByTestId('look-bar-apply').click();
+  // Apply asks first (plan F60): the confirm dialog names what happens, then applies
+  await page.getByTestId('confirm-ok').click();
   await expect(page.getByTestId('look-preview-bar')).toHaveCount(0);
   expect((await state(page)).look).toBeNull();
 
-  // the pane stays open for the next preview
+  // the gallery opens again for the next preview
   await expect(page.getByTestId('look-switch-pane')).toBeVisible();
   await page.getByRole('radio', { name: /Vitrine|فاترينة/ }).click();
   await page.getByTestId('look-preview').click();
   await expect(page.getByTestId('look-preview-bar')).toBeVisible();
   await page.getByTestId('look-bar-apply').click();
+  // Apply asks first (plan F60): the confirm dialog names what happens, then applies
+  await page.getByTestId('confirm-ok').click();
   await expect(page.getByTestId('look-preview-bar')).toHaveCount(0);
   await expect.poll(async () => (await state(page)).look).toBe('qamar.vitrine');
 });

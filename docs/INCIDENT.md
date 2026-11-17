@@ -38,6 +38,8 @@ Ebda Chat / WhatsApp is a separate repo and Worker (`ebda-whatsapp`, `wa.ebda.ap
    row** (that one opens the incident at once). Cadence stays 5 min (frugality ruling), never back to 1 min. Constants:
    `DEFAULT_TIMEOUT_MS`, `SLOW_THRESHOLD_MS`, `SLOW_STREAK_FAILS` in `apps/status/src/config.ts`. A lone Degraded storefront in quiet
    hours is a cold render, not an outage: check `x-store-edge` on the page (`MISS` = cold, `STALE`/`HIT` = edge).
+   Storefront probes hit the locale-prefixed URL (`/ar`, `/ar/products/...`), not `/`: the unprefixed URL is a 308 hop (a second
+   Worker round trip, 41 % of probe latency measured 2026-11-15) that is not what the check is for; the redirect has its own unit test.
    Probes: `apps/status/src/config.ts`.
 2. **API alerts → Telegram** (`apps/api/src/services/alerts.service.ts`): P1 alerts from jobs, queues, payment webhooks,
    email/SMS dead letters, `alerts-failure-watch`.
