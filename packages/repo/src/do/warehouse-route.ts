@@ -1,4 +1,4 @@
-import { MoneyError, type SyncSql } from './sync-sql';
+import type { SyncSql } from './sync-sql';
 import { reconcileToAggregate, upsertWarehouseStock } from './stock-ops';
 
 /**
@@ -18,8 +18,8 @@ import { reconcileToAggregate, upsertWarehouseStock } from './stock-ops';
  * A store with fewer than 2 active warehouses is NOT routed at all: `planRoute` returns null and every statement is exactly
  * what it was before this file existed (single / no-warehouse stores keep byte-identical stock math).
  */
-export const ALLOCATED_EVENT = 'warehouse_allocated';
-export const RELEASED_EVENT = 'warehouse_released';
+const ALLOCATED_EVENT = 'warehouse_allocated';
+const RELEASED_EVENT = 'warehouse_released';
 
 export interface Allocation {
   /** the order line this came from (Ruling WAREHOUSE-ROUTE-2: give-backs are keyed per line, not per product) */
@@ -59,7 +59,7 @@ const rowQty = (
     variantId ? [storeId, warehouseId, productId, variantId] : [storeId, warehouseId, productId]
   )[0]?.quantity as number | undefined) ?? 0;
 
-export interface RoutePlan {
+interface RoutePlan {
   /** where the line's units come from, in priority order: one entry when a warehouse holds the whole line, else a greedy split */
   chunks: Array<{ warehouse: WarehouseRow; quantity: number }>;
 }
