@@ -67,13 +67,18 @@ export function RevisionsPanel({
   /** "Today 3:40 pm" / "Yesterday 9:10 am" / "3 Nov 2026, 3:40 pm", in the active locale. */
   const when = (iso: string): string => {
     const date = new Date(iso);
-    const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(date);
+    const time = new Intl.DateTimeFormat(locale, {
+      timeStyle: 'short',
+      numberingSystem: 'latn',
+    }).format(date);
     const diff = dayDiff(date, new Date());
     if (diff === 0) return `${t('today')} ${time}`;
     if (diff === 1) return `${t('yesterday')} ${time}`;
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-      date
-    );
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      numberingSystem: 'latn',
+    }).format(date);
   };
 
   useEffect(() => {

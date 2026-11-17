@@ -184,8 +184,7 @@ export function AddSectionDialog({
         </Button>
       </div>
       <div className="space-y-2 border-b border-border px-5 py-3">
-        <label className="relative block">
-          <span className="sr-only">{t('search')}</span>
+        <div className="relative block">
           <Search
             className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             strokeWidth={1.75}
@@ -198,9 +197,10 @@ export function AddSectionDialog({
             onChange={e => setQuery(e.target.value)}
             placeholder={t('searchPlaceholder')}
             className="h-9 w-full rounded-lg border border-border bg-background ps-9 pe-3 text-sm"
+            aria-label={t('search')}
             data-testid="add-section-search"
           />
-        </label>
+        </div>
         {chips.length > 1 && (
           <div role="group" aria-label={t('categoryLabel')} className="flex flex-wrap gap-1.5">
             {['all', ...chips].map(c => (
