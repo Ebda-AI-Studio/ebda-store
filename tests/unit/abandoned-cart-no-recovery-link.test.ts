@@ -71,6 +71,34 @@ describe('abandoned-cart reminders carry no recovery link (issue 2035)', () => {
     expect(data.cartUrl).not.toMatch(/recover=|sig=/);
   });
 
+  it('the cart total in the message is the real amount: 485000 minor units reads 4,850 (it read 485.000)', async () => {
+    vi.spyOn(abandonedCartService, 'getConfig').mockResolvedValue({
+      step1Enabled: true,
+      step1DelayMinutes: 60,
+      step2Enabled: false,
+      step2DelayMinutes: 240,
+      step3Enabled: false,
+      step3DelayMinutes: 1440,
+      autoCouponEnabled: false,
+    } as never);
+    const send = (cartTotal: number) =>
+      abandonedCartService.sendStep(
+        {
+          id: 'ac-1',
+          storeId: 'store-1',
+          cartTotal,
+          cartItemCount: 1,
+          customer: null,
+          store: { domain: 'shop.example', slug: 'shop', name: 'Shop' },
+        },
+        1
+      );
+    await send(485_000);
+    await send(485_050);
+    expect((h.dispatch.mock.calls[0][2] as { cartTotal: string }).cartTotal).toBe('4,850');
+    expect((h.dispatch.mock.calls[1][2] as { cartTotal: string }).cartTotal).toBe('4,850.50');
+  });
+
   it('the public recovery endpoint is no longer routed', async () => {
     vi.doMock('@api/middleware/auth', () => {
       const pass = (_q: unknown, _r: unknown, n: () => void) => n();
