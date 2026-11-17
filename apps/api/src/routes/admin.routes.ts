@@ -33,7 +33,6 @@ import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { searchProductIds } from '../services/product-search.service';
 import { auditLog } from '../middleware/security';
-import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
 import {
   listLedger,
   listSubscriptionsForAdmin,
@@ -1028,17 +1027,9 @@ router.put(
       // fire the storefront revalidate purge on this writer too — it used
       // to write store.status with no invalidation at all.
       //
-      // A plan change ALSO changes the resolved feature map that the public
-      // payload embeds as `enabledFeatures` — and that map is read from
-      // FeatureService's own `features:store:*` cache (300s). Busting only
-      // the public keys made the very next public request re-seed them from
-      // the STALE feature map (issue 2172), so the feature cache is dropped
-      // FIRST, exactly as `featureService.setStorePlan` does.
-      // Keep the subscription (limits) on the same plan the enum now names.
-      if (plan !== undefined) {
-        await withStore(store.id, tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
-        await featureService.invalidateCache(store.id);
-      }
+      // A plan change no longer happens here (refused above, Ruling B1-PLAN-SOT-1). Its feature-cache-before-public-caches
+      // ordering (issue 2172) lives on the path that changes plans now, `planService.assignPlan`
+      // (tests/unit/admin-store-plan-cache-order.test.ts drives it through PUT /admin/stores/:id/subscription).
       await bustStoreCaches(store.id, store.slug, store.domain, { slug: before?.slug });
       if (before?.slug && before.slug !== store.slug) {
         await invalidateCached(`public:store:${before.slug}`);
