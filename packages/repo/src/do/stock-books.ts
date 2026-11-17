@@ -1125,11 +1125,11 @@ export function importCodRemittances(db: SyncSql, storeId: string, a: Args) {
   };
 }
 
-export interface CodStatementSettled {
+interface CodStatementSettled {
   orderId: string;
   paymentId: string;
 }
-export interface CodStatementFlagged {
+interface CodStatementFlagged {
   orderId: string;
   reason: 'amount_mismatch' | 'suspected_duplicate';
 }
