@@ -59,7 +59,7 @@ function StatCard({
           <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{displayValue}</p>
           {isNew && (
             <div className="mt-2 flex items-center gap-1">
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
                 {newLabel}
               </span>
               <span className="text-xs text-muted-foreground">{vsLastPeriodLabel}</span>
