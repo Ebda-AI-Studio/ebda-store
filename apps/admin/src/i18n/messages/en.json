@@ -1536,6 +1536,7 @@
       },
       "notes": "Order notes",
       "fulfilledFrom": "Fulfilled from",
+      "splitHint": "This order ships from more than one branch. Pick each quantity from its own branch.",
       "customerNotes": "Customer notes",
       "address": {
         "block": "Block",
