@@ -8457,6 +8457,7 @@
       "noTrend": "مفيش بيانات أداء بحث لسه.",
       "topQueriesTitle": "أهم الكلمات المفتاحية (آخر يوم)",
       "noTopQueries": "مفيش بيانات كلمات مفتاحية لسه.",
+      "noImpressionsHint": "لسه مفيش ظهور في جوجل",
       "notConnectedTitle": "Google Search Console مش مربوط لسه",
       "notConnectedBody": "بمجرد إعداد وصول ابدأ ستور إلى Search Console لنطاق متجرك، ستظهر هنا مرات الظهور والنقرات وأهم الكلمات المفتاحية تلقائياً — لا حاجة لأي إجراء من جانبك.",
       "verifyingTitle": "بنتأكد من نطاقك مع Google",

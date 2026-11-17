@@ -8457,6 +8457,7 @@
       "noTrend": "No search performance data yet.",
       "topQueriesTitle": "Top queries (latest day)",
       "noTopQueries": "No query data yet.",
+      "noImpressionsHint": "No impressions on Google yet",
       "notConnectedTitle": "Google Search Console not connected",
       "notConnectedBody": "Once Ebda Store's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end.",
       "verifyingTitle": "Verifying your domain with Google",

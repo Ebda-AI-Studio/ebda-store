@@ -95,6 +95,7 @@ export interface GscDashboard {
   setup?: 'verifying' | 'awaiting_data';
 }
 
-export function formatPosition(position: number): string {
-  return position.toFixed(1);
+/** Average position; `null` (no impressions, so no position at all) is "—", never "0.0". */
+export function formatPosition(position: number | null): string {
+  return position === null ? '—' : position.toFixed(1);
 }

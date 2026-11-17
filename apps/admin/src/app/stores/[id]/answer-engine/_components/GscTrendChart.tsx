@@ -41,7 +41,7 @@ export function GscTrendChart({ trend }: GscTrendChartProps) {
                 data-chart-bar
                 className="relative w-full bg-primary/20 rounded-t transition-all"
                 style={{ height: `${Math.max(impressionsHeight, 2)}%` }}
-                title={`${point.date}: ${point.impressions.toLocaleString(undefined, withNumerals())} ${t('impressions')}, ${point.clicks.toLocaleString(undefined, withNumerals())} ${t('clicks')}, ${formatPercent(point.ctr)} ${t('ctr')}, ${t('avgPosition')} ${formatPosition(point.position)}`}
+                title={`${point.date}: ${point.impressions.toLocaleString(undefined, withNumerals())} ${t('impressions')}, ${point.clicks.toLocaleString(undefined, withNumerals())} ${t('clicks')}, ${formatPercent(point.impressions > 0 ? point.ctr : null)} ${t('ctr')}, ${t('avgPosition')} ${formatPosition(point.impressions > 0 ? point.position : null)}`}
               >
                 <div
                   className="absolute bottom-0 w-full bg-primary rounded-t group-hover:bg-primary/90"

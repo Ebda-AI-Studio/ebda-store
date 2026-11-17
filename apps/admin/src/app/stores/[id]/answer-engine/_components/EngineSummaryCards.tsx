@@ -18,7 +18,7 @@ function EngineCard({ engine }: { engine: AnswerEngineSummaryEngine }) {
         <span className="text-sm font-normal text-muted-foreground"> / {engine.totalChecks}</span>
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
-        {t('citedRate', { rate: formatPercent(engine.citedRate) })}
+        {t('citedRate', { rate: formatPercent(engine.totalChecks > 0 ? engine.citedRate : null) })}
       </p>
       {engine.groundingUnavailable ? (
         <p
@@ -43,11 +43,8 @@ function EngineCard({ engine }: { engine: AnswerEngineSummaryEngine }) {
 
 /** Cited-count-per-engine card grid + the grounded caveat badge (Task 7). */
 export function EngineSummaryCards({ engines }: EngineSummaryCardsProps) {
-  const t = useT('answerEngine.page');
-
-  if (engines.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t('noData')}</p>;
-  }
+  // The page shows ONE empty state for the whole citations area, not one per panel.
+  if (engines.length === 0) return null;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

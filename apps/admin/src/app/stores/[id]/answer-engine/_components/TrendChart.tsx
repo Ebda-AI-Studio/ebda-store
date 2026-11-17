@@ -16,9 +16,8 @@ interface TrendChartProps {
 export function TrendChart({ trend }: TrendChartProps) {
   const t = useT('answerEngine.page');
 
-  if (trend.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t('noData')}</p>;
-  }
+  // The page shows ONE empty state for the whole citations area, not one per panel.
+  if (trend.length === 0) return null;
 
   const maxRate = Math.max(...trend.map(p => p.citedRate), 0.01);
 
@@ -38,7 +37,7 @@ export function TrendChart({ trend }: TrendChartProps) {
                 data-chart-bar
                 className="w-full bg-primary rounded-t transition-all group-hover:bg-primary/90"
                 style={{ height: `${Math.max(height, 2)}%` }}
-                title={`${point.weekStart}: ${formatPercent(point.citedRate)} (${point.citedCount}/${point.totalChecks})`}
+                title={`${point.weekStart}: ${formatPercent(point.totalChecks > 0 ? point.citedRate : null)} (${point.citedCount}/${point.totalChecks})`}
               />
               <span className="text-xs text-muted-foreground -rotate-45 origin-top-left rtl:origin-top-right whitespace-nowrap">
                 {point.weekStart.slice(5)}

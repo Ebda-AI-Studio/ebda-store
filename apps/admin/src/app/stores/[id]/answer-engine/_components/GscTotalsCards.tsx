@@ -13,14 +13,20 @@ interface GscTotalsCardsProps {
 export function GscTotalsCards({ totals }: GscTotalsCardsProps) {
   const t = useT('answerEngine.gsc');
 
+  // No impressions: CTR (0/0) and average position are undefined. Say so instead of "0%" and "0.0".
+  const noImpressions = totals.impressions === 0;
   const cards = [
     {
       label: t('impressions'),
       value: totals.impressions.toLocaleString(undefined, withNumerals()),
     },
     { label: t('clicks'), value: totals.clicks.toLocaleString(undefined, withNumerals()) },
-    { label: t('ctr'), value: formatPercent(totals.ctr) },
-    { label: t('avgPosition'), value: formatPosition(totals.avgPosition) },
+    { label: t('ctr'), value: formatPercent(noImpressions ? null : totals.ctr) },
+    {
+      label: t('avgPosition'),
+      value: formatPosition(noImpressions ? null : totals.avgPosition),
+      hint: noImpressions ? t('noImpressionsHint') : undefined,
+    },
   ];
 
   return (
@@ -29,6 +35,7 @@ export function GscTotalsCards({ totals }: GscTotalsCardsProps) {
         <div key={card.label} className="bg-card rounded-xl border border-border p-5">
           <p className="text-sm font-medium text-foreground">{card.label}</p>
           <p className="mt-2 text-2xl font-bold text-foreground">{card.value}</p>
+          {card.hint && <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p>}
         </div>
       ))}
     </div>
