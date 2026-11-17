@@ -189,6 +189,7 @@ describe('light jobs route to the light runners, heavy jobs never do (Ruling HOS
         'gitleaks.yml:scan',
         'pr-quality.yml:pr-body',
         'pr-quality.yml:slop-baselines',
+        'pr-quality.yml:capability-ratchet',
       ].sort()
     );
   });
