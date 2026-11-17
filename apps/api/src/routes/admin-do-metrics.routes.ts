@@ -16,7 +16,7 @@ import { ALL_METRIC_NAMES, doMetricsEnabled, readMetric } from '../lib/do-metric
  */
 const superAdmin = [authenticate, requireMfaEnrolled, authorize('super_admin')];
 
-export const doMetricsLimiter = rateLimit({
+const doMetricsLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'do-metrics'),
   windowMs: 60_000,
   max: 10,

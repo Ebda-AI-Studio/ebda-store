@@ -12,6 +12,7 @@ import { hubFanout, hubFanoutStoreIds } from './platform-hub';
  * The store-level metric names and docs, mirrored from packages/repo/src/do/do-metrics.ts (the API does not import @ebda/repo; the
  * StoreRepo interfaces are hand-copied in repo-factory.ts). tests/unit/do-metrics-hub.test.ts keeps the two EQUAL.
  */
+// pq-allow(unused-export): read by tests/unit/do-metrics-hub.test.ts, which keeps it equal to the DO allow-list
 export const STORE_METRIC_DOCS = {
   journal_unbalanced: 'Posted journal entries where total debit differs from total credit.',
   journal_unrepaired_in_window:
@@ -24,17 +25,18 @@ export const STORE_METRIC_DOCS = {
 export type DoMetricName = keyof typeof STORE_METRIC_DOCS;
 export const DO_METRIC_NAMES = Object.keys(STORE_METRIC_DOCS) as DoMetricName[];
 
-export const DO_METRICS_CACHE_MS = 60_000;
-export const DO_METRICS_STORE_TIMEOUT_MS = 2_000;
+const DO_METRICS_CACHE_MS = 60_000;
+const DO_METRICS_STORE_TIMEOUT_MS = 2_000;
 
 /** Metrics that are not one SQL statement per store: computed here from a store metric, still numbers only. */
+// pq-allow(unused-export): read by tests/unit/do-metrics-hub.test.ts
 export const DERIVED_METRICS = {
   stores_with_push_enabled: {
     from: 'push_subscriptions_active' as DoMetricName,
     doc: 'Stores with at least one active push subscription.',
   },
 } as const;
-export type DerivedMetricName = keyof typeof DERIVED_METRICS;
+type DerivedMetricName = keyof typeof DERIVED_METRICS;
 export const ALL_METRIC_NAMES: string[] = [...DO_METRIC_NAMES, ...Object.keys(DERIVED_METRICS)];
 
 export interface MetricResult {
@@ -49,6 +51,7 @@ export interface MetricResult {
 }
 
 const cache = new Map<string, { at: number; value: MetricResult }>();
+// pq-allow(unused-export): test hook (cache isolation between tests)
 export const clearDoMetricsCache = () => cache.clear();
 
 export function doMetricsEnabled(): boolean {
