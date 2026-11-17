@@ -1892,7 +1892,6 @@
     "unused-export|apps/api/src/services/warehouse.service.ts|StockAdjustInput",
     "unused-export|apps/api/src/services/warehouse.service.ts|StockSetInput",
     "unused-export|apps/api/src/services/warehouse.service.ts|WarehouseCreateInput",
-    "unused-export|apps/api/src/services/warehouse.service.ts|WarehouseRow",
     "unused-export|apps/api/src/services/warehouse.service.ts|WarehouseStockRow",
     "unused-export|apps/api/src/services/warehouse.service.ts|WarehouseUpdateInput",
     "unused-export|apps/api/src/services/webhook-payload.ts|formatOrderParts",
