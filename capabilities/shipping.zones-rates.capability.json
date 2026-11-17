@@ -1,0 +1,49 @@
+{
+  "id": "shipping.zones-rates",
+  "status": "live",
+  "area": "shipping",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "مناطق واسعار الشحن",
+  "titleEn": "Shipping zones, governorate/area rates, free-shipping rules",
+  "screens": ["/stores/[id]/shipping"],
+  "api": [
+    "GET/POST /stores/:storeId/shipping",
+    "GET/PUT/DELETE .../shipping/:id",
+    "PATCH .../:id/toggle",
+    "PUT .../shipping/reorder",
+    "GET/PUT .../shipping/area-rates...",
+    "POST .../area-rates/import",
+    "GET .../area-rates/export.xlsx"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "shipping",
+  "questions": {
+    "ar": [
+      "ازاي اظبط سعر الشحن؟",
+      "شحن مجاني فوق 1000 جنيه",
+      "سعر الشحن للمحافظات",
+      "القاهرة غير الصعيد"
+    ],
+    "en": ["How do I set shipping rates?", "Free shipping over 1000 EGP"]
+  },
+  "steps": ["Shipping page: zones, area rates (import Excel)."],
+  "edgeCases": [
+    "Area missing: customer cannot checkout",
+    "Rate 0 vs free threshold",
+    "Excel import Arabic governorate names",
+    "Delivery off-days",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

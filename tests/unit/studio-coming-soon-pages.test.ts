@@ -27,7 +27,7 @@ const productLabels = STUDIO_COMING_SOON_LABELS.filter(l => {
 });
 
 describe('coming-soon pages: one template, only the copy differs', () => {
-  it('every BRAND.comingProducts id has a label, and the five public labels are there', () => {
+  it('every BRAND.comingProducts id has a label, and the two public labels are there', () => {
     const products = new Set(
       productLabels.map(l => {
         const p = studioHostPlan(l);
@@ -35,7 +35,9 @@ describe('coming-soon pages: one template, only the copy differs', () => {
       })
     );
     expect([...products].sort()).toEqual(BRAND.comingProducts.map(p => p.id).sort());
-    for (const l of ['crm', 'erp', 'invite', 'ads', 'quote']) expect(productLabels).toContain(l);
+    for (const l of ['crm', 'erp']) expect(productLabels).toContain(l);
+    for (const l of ['invite', 'ads', 'quote', 'quote-studio'])
+      expect(productLabels).not.toContain(l);
   });
 
   it.each(LANGS)('%s: every product label renders the same element list', lang => {

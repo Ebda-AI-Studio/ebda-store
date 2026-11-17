@@ -15,7 +15,8 @@ vi.mock('next/font/google', () => {
   return { Geist: font, Geist_Mono: font, IBM_Plex_Sans_Arabic: font };
 });
 
-const { default: NotFound, metadata } = await import('../../apps/marketing/src/app/not-found');
+const { default: NotFound, metadata } =
+  await import('../../apps/marketing/src/app/global-not-found');
 
 describe('marketing 404', () => {
   const html = renderToStaticMarkup(<NotFound />);

@@ -1,5 +1,5 @@
 # SEARCH-SEMANTIC-ON-1
 
-> Section: 2026-10-26 — Search as you type (plan `docs/plans/2026-10-15-semantic-search.md`)
+> Section: 2026-10-26 — Search as you type (plan `docs/plans/done/2026-10-15-semantic-search.md`)
 
 Ruling SEARCH-SEMANTIC-ON-1 — `SEARCH_SEMANTIC_ENABLED` is `"true"` in `apps/api/wrangler.jsonc` (controller decision under CLOSE-ALL-1, 2026-10-29), superseding the "stays off, STOP-3" line of SEARCH-SEMANTIC-LIVE-1. Evidence: production `product_embeddings` holds 106 rows for 109 products; the 3 without a vector are all `status = 'archived'` (read-only SELECT), which the indexer deliberately skips (`INDEXABLE` needs `active`, not deleted, with text), so there is nothing to backfill and no failure rows. The vector leg is fail-soft: a provider error, timeout or plain throw from the AI binding yields `[]` (keyword results only, `degraded`, never cached as the full answer), proven by `tests/unit/semantic-search-fail-soft.test.ts`. The workerd smoke still forces the flag off because it boots without the `AI` binding. Cost if wrong: the post-deploy probe rolls the deploy back on a bad boot check; a bad ranking is undone by flipping the var back to `"false"` through a PR and `cf-api-deploy.yml`.

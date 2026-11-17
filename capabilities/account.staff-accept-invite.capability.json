@@ -1,0 +1,33 @@
+{
+  "id": "account.staff-accept-invite",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اقبل دعوة الانضمام لفريق المتجر",
+  "titleEn": "Accept a team invitation",
+  "screens": ["/accept-invite"],
+  "api": ["POST /staff-invites/accept"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["public"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["جالي دعوة انضم لمتجر ازاي اقبلها؟", "لينك الدعوة مش شغال"],
+    "en": ["How do I accept a staff invite?"]
+  },
+  "steps": ["Open the emailed link, set password."],
+  "edgeCases": [
+    "Expired invite: owner must re-invite",
+    "Invitee already has an account on another store",
+    "Team seat limit reached on the owner's plan",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}

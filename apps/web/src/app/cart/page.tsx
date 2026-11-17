@@ -13,7 +13,7 @@ import { allowedParentOrigins } from '../../builder/preview/allowed-parent-origi
 // tree by design. Already dynamic today via the root layout's headers()/
 // cookies() calls; this makes it explicit and immune to accidentally
 // becoming static later. Verified no-op — see
-// docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§4/§9.
+// docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.3/§4/§9.
 export const dynamic = 'force-dynamic';
 
 export function generateMetadata(): Promise<Metadata> {

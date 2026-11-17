@@ -11,13 +11,21 @@ function hit(host: string, path = '/', headers: Record<string, string> = {}) {
 }
 
 describe('studio pages on hosts nobody serves', () => {
+  // Public-copy rule (Ahmad 2026-11-11): only CRM and ERP are ever "coming soon". Held labels answer the neutral reserved page.
+  it.each(['invite.ebda.app', 'ads.ebda.app', 'quote.ebda.app'])(
+    '%s: reserved page, never a coming-soon announcement',
+    async host => {
+      const res = hit(host, '/', { 'accept-language': 'en-US,en;q=0.9' });
+      const html = await res.text();
+      expect(html).not.toMatch(/Ebda (Invite|Ads|Quote Studio)|ابدأ (إنفايت|آدز|ستوديو للتسعير)/);
+      expect(html).not.toMatch(/<h1>[^<]*coming soon/i);
+    }
+  );
+
   // Coming-soon PRODUCTS: one template (SUBDOMAIN-SOON-2): name, line, label, notify-me CTA, back to ebda.app; no search box
   it.each([
     ['crm.ebda.app', 'Ebda CRM is coming soon.'],
     ['erp.ebda.app', 'Ebda ERP is coming soon.'],
-    ['invite.ebda.app', 'Ebda Invite is coming soon.'],
-    ['ads.ebda.app', 'Ebda Ads is coming soon.'],
-    ['quote.ebda.app', 'Ebda Quote Studio is coming soon.'],
   ])('%s: 200 coming soon, noindex, notify-me CTA, live links', async (host, line) => {
     const res = hit(host, '/', { 'accept-language': 'en-US,en;q=0.9' });
     expect(res.status).toBe(200);
@@ -40,8 +48,8 @@ describe('studio pages on hosts nobody serves', () => {
 
   // Reserved addresses keep the sentence and the search box
   it.each([
-    ['hub.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
-    ['id.ebda.app', 'This address is held for an upcoming service from Ebda AI Studio.'],
+    ['hub.ebda.app', 'This address is reserved by Ebda AI Studio.'],
+    ['id.ebda.app', 'This address is reserved by Ebda AI Studio.'],
   ])('%s: 200 reserved page, noindex, search box, live links', async (host, line) => {
     const res = hit(host, '/', { 'accept-language': 'en-US,en;q=0.9' });
     expect(res.status).toBe(200);

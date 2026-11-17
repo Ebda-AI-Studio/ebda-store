@@ -5,6 +5,9 @@ section: Selling
 order: 13
 appPath: /stores
 keywords: search suggestions autocomplete type ahead arabic alef yeh hamza search words synonyms keyboard screen reader
+capabilities:
+  - store.seo@1
+  - storefront.shopper-features@1
 ---
 
 Every storefront search box shows matching products while the shopper types, starting from the **first letter**. One Arabic letter is already a word, so there is no minimum length. This works in the header of every template and on the search page.
@@ -18,6 +21,10 @@ Every storefront search box shows matching products while the shopper types, sta
 ## It understands Arabic spellings
 
 The same product is found whichever way it is typed: with or without the dots and the hamza on alef (ا أ إ آ), ي and ى, ة and ه, and with or without diacritics. A shopper typing `شنطه` finds `شنطة`.
+
+## It understands plurals and prefixes
+
+On the storefront, `شنط`, `شنطة`, `الشنط` and `شنطتين` all find the same bags, and `كتب` finds `الكتب`, `كتابين` and `مكتبة`. Products that contain the exact word the shopper typed are always listed first; products found only through another form of the word come after them.
 
 ## Add the words your shoppers really use
 

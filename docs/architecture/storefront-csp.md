@@ -93,7 +93,7 @@ reused, so **a nonce forces dynamic rendering**. Next.js documents this: a route
 using a nonce opts out of the Full Route Cache.
 
 That directly conflicts with `STOREFRONT_TENANT_ROUTING`
-(`docs/plans/2026-07-12-tenant-cacheable-routing.md`), whose entire purpose is
+(`docs/plans/done/2026-07-12-tenant-cacheable-routing.md`), whose entire purpose is
 to make anonymous storefront routes cacheable by resolving the store from route
 params instead of `headers()`. Shipping a nonce would permanently foreclose it.
 
@@ -148,5 +148,13 @@ XSS lives on the anonymous pages, so it would protect the lower-risk half.
 
 - `docs/audits/2026-09-02-adversarial-audit.md` — the finding and the attacks
   that were tried against the escapers.
-- `docs/plans/2026-07-12-tenant-cacheable-routing.md` — the caching work.
+- `docs/plans/done/2026-07-12-tenant-cacheable-routing.md` — the caching work.
 - `apps/web/src/lib/csp.ts` — the policy itself (built per request by `apps/web/middleware.ts`).
+
+## connect-src names exact hosts (S5, 2026-11-12)
+
+`connect-src` no longer carries `https://*.r2.dev`, `https://*.facebook.com` or `https://*.tiktok.com`: a wildcard on a storage or ad domain is an exfiltration channel for any injected script (anyone can host a bucket or page there). It names `https://media.ebda.app` (media + the 3D `.glb` fetch), `https://www.facebook.com` + `https://connect.facebook.net` (Meta Pixel beacons) and `https://analytics.tiktok.com`. An environment that serves media from one specific `pub-<id>.r2.dev` bucket names that exact origin through `NEXT_PUBLIC_MEDIA_ORIGIN`. `media-src` still allows `*.r2.dev` (video elements cannot exfiltrate); narrowing it is a separate change. Guard: `tests/unit/csp-directive-floor.test.ts`.
+
+## Marketing site (ebda.app) CSP (S6, 2026-11-12)
+
+`apps/marketing/public/_headers` now ships `default-src 'self'`, `script-src 'self' 'unsafe-inline'`, `script-src-attr 'none'`, `object-src 'none'`, `base-uri 'self'`, `frame-src 'none'` and a self + `api.ebda.app` `connect-src`, on top of the old `frame-ancestors` / `form-action`. The marketing site is a static export on Workers Static Assets, so the per-request nonce CSP of web/admin/orders is not possible there, and Next's inline flight scripts differ on every page (too many hashes for Cloudflare's 2000-character `_headers` line). Residual: `'unsafe-inline'` for scripts (no `unsafe-eval`, no remote script host); the site renders no user-supplied HTML. Guard: `tests/unit/marketing-contact-page-and-csp.test.tsx`. Not verified live until the marketing deploy runs: check every locale page and the 3D viewer for CSP violations in the console.

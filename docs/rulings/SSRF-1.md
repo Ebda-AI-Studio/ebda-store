@@ -5,7 +5,7 @@
 **Ruling SSRF-1 — the ESLint SSRF selector stays scoped to `routes/**`; the
 carrier class is enforced by a registry test instead.\*\*
 
-`docs/plans/2026-09-02-adversarial-audit-remediation.md` Task 5 Step 4 called
+`docs/plans/done/2026-09-02-adversarial-audit-remediation.md` Task 5 Step 4 called
 for widening the selector to `services/**`. Measured before deciding: widening
 produces **36 errors across 17 files**. All but iCarry's four are a URL built
 from deployment config, not request input —
