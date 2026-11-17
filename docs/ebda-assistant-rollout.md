@@ -2,7 +2,7 @@
 
 Plan 4 Task C4 (Store part). The assistant is OFF everywhere until a super admin switches a store on. Two switches decide the mode of a store, and the lower one wins:
 
-- Per store: `settings.assistantMode` (`off` default, `answer-only`, `suggest`, `act`), set only by a super admin: `PUT /admin/assistant/stores/:storeId/mode`. A merchant cannot raise it.
+- Per store: `settings.assistantMode` (`off` default, `answer-only`, `suggest`, `act`), set only by a super admin: `PUT /admin/assistant/stores/:storeId/mode` (read with `GET` on the same path, which also returns the last `assistant.mode` audit row). The UI is the "Store assistant" card on the super-admin store page (`/stores/[id]`), with a confirm step above `off`. A merchant cannot raise it.
 - Platform: D1 `system_settings` keys `sl.global` (`{ kill, mode, shadow }`), `sl.product.store` (`{ kill }`), `sl.tools` (killed tool names): `PUT /admin/assistant/flags`. `mode` caps every store; an unset cap means OFF. A kill switch is read on every turn and again at apply and confirm time, and an unreadable switch fails closed.
 
 ## Stages
@@ -23,5 +23,5 @@ Never skip a stage and never set a store above the platform cap. To stop everyth
 
 ## Known gaps (tracked, not hidden)
 
-- Ruling SL-C4-1: the vendored engine's keyword secrets rail does not catch a password introduced in Franco ("kelmet el sar ...") nor a Merchant MCP key (`ebdam_...`) introduced by an English or Franco keyword. The fix belongs in `ebda-foundation` (`rails/secrets.ts` + its vectors), then a re-vendor; the red-team test lists the rows (`KNOWN_LEAKS`) and fails the moment the gap closes. Until then those two shapes can sit unmasked for 90 days in that store's own journal.
+- Ruling SL-C4-1 (CLOSED by the foundation v0.3.2 re-vendor): the secrets rail now masks a Franco-introduced password ("kelmet el sar ...") and a Merchant MCP key (`ebdam_...`) on every path; `KNOWN_LEAKS` in the red-team test is empty and the shared vectors in `smart-layer-secrets.json` run in `foundation-parity.test.ts`.
 - Ruling SL-EVAL-PENDING-1: no real-model `last-run.json` exists yet, so stages 2 and 3 are closed.

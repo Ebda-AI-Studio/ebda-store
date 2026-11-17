@@ -593,6 +593,24 @@ jobs:
           else
             node scripts/ci/worker-startup-budget.mjs --runs 5 --record "$RUNNER_TEMP/worker-startup-budget.json"
           fi
+      # Storefront Worker (Ruling WEB-COLD-3): same gate on the OpenNext bundle (apps/web); the PR baseline is main built
+      # with the deploy's own generator + OpenNext build, so the web job pays one extra build on PRs.
+      - name: Web Worker startup budget (startup CPU and bundle size)
+        if: matrix.app == 'web'
+        timeout-minutes: 20
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/ci/worker-startup-budget.mjs --app web --runs 5 --baseline-ref origin/main --record "$RUNNER_TEMP/worker-startup-budget-web.json"
+          else
+            node scripts/ci/worker-startup-budget.mjs --app web --runs 5 --record "$RUNNER_TEMP/worker-startup-budget-web.json"
+          fi
+      - name: Upload the web startup measurement
+        if: matrix.app == 'web' && always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: worker-startup-budget-web
+          path: ${{ runner.temp }}/worker-startup-budget-web.json
+          if-no-files-found: ignore
       - name: Upload the startup measurement
         if: matrix.app == 'api' && always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -1654,7 +1672,8 @@ jobs:
 
   notify-failure:
     name: Notify on failure (main and nightly)
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    # Seconds-long reporting job: runs on the light runner so it never queues behind heavy PR jobs and holds main (2026-11-15).
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 3
     needs:
       [

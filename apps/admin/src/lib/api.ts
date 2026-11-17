@@ -745,7 +745,11 @@ export async function apiRequest<T = unknown>(
       if (options.quietUpsell) {
         // optional widget: no dialog
       } else if (response.status === 402) dispatchUpsell(errCode, message, errObj?.details);
-      else if (response.status === 403 && errCode === 'FEATURE_DISABLED') {
+      else if (response.status === 423 && errCode === 'STORE_NOT_OPERATIONAL') {
+        // Ruling SUSPEND-OUT-1: a suspended store's send / payout is refused; the shell shows the suspension notice + appeal link.
+        if (typeof window !== 'undefined')
+          window.dispatchEvent(new CustomEvent(STORE_NOT_OPERATIONAL_EVENT));
+      } else if (response.status === 403 && errCode === 'FEATURE_DISABLED') {
         // Only when the API says the PLAN withholds it (it names the unlocking sold plan).
         const flat = data as unknown as Record<string, unknown>;
         if (flat.upgradeTo) {
@@ -1052,6 +1056,9 @@ function hasBilingualText(details: Record<string, unknown> | undefined): boolean
   const text = adminUiLocale() === 'ar' ? details?.messageAr : details?.messageEn;
   return typeof text === 'string' && text.length > 0;
 }
+
+/** Fired on a 423 STORE_NOT_OPERATIONAL; `StoreNotOperationalNotice` (mounted in the shell) answers it. */
+export const STORE_NOT_OPERATIONAL_EVENT = 'ebda:store-not-operational';
 
 export interface UpsellEventDetail {
   code: string;
