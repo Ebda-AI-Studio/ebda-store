@@ -23,7 +23,7 @@
   },
   "helpArticle": "3d-models",
   "questions": {
-    "ar": ["ازاي احط موديل 3D؟", "AR بيشتغل ازاي؟"],
+    "ar": ["ازاي احط موديل 3D؟", "AR بيشتغل ازاي؟", "الموديل 3D مش بيظهر في المتجر"],
     "en": ["Add a 3D model to a product"]
   },
   "steps": ["Product > 3D model upload GLB (+USDZ for iOS)."],

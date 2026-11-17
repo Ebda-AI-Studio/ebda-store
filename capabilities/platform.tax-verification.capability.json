@@ -28,7 +28,7 @@
   },
   "helpArticle": null,
   "questions": {
-    "ar": ["اوراق الضريبة لسه بتتراجع"],
+    "ar": ["اوراق الضريبة لسه بتتراجع", "ازاي اوافق على اوراق الضريبة؟", "ازاي ارفض مستند ضريبة؟"],
     "en": ["VAT documents still under review"]
   },
   "steps": ["Super-admin console only."],
