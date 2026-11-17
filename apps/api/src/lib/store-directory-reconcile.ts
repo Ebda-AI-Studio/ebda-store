@@ -172,6 +172,7 @@ function mirrorDrift(
  * drop the cached feature map + public store payloads at once (NEVER-stale class, Ruling B1-PLAN-SOT-1): a repaired plan
  * must not wait out the feature cache TTL.
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/store-mirror-repair-invalidates.test.ts
 export const repairDoMirror: MirrorRepair = async (id, fields) => {
   await copyStoreSettings(id, fields);
   if (!('plan' in fields || 'billingSuspendedReason' in fields)) return;
