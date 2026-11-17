@@ -19,6 +19,10 @@ export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
     secret:
       'provider API keys (the on switch runs a server-side connection test with the saved keys and a single-use, test-run-bound confirmation; chat cannot stand in for that screen)',
   },
+  'onboarding.slug-claim': {
+    secret:
+      'proof-of-ownership evidence (document link) for a protected address; filed before a store exists, so it has no store for the assistant to act in',
+  },
 };
 
 /** Capabilities another plan owns on this same engine, with who owns them. Not a hole: the owning plan registers the tools. */

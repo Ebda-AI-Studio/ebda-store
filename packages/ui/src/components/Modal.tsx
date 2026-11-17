@@ -10,6 +10,8 @@ interface ModalProps {
   title?: string;
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  /** Accessible name of the close button (defaults to English). */
+  closeLabel?: string;
 }
 
 const sizeClasses = {
@@ -22,7 +24,15 @@ const sizeClasses = {
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Modal({ isOpen, onClose, children, title, className, size = 'md' }: ModalProps) {
+export function Modal({
+  isOpen,
+  onClose,
+  children,
+  title,
+  className,
+  size = 'md',
+  closeLabel = 'Close dialog',
+}: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -84,7 +94,8 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
           aria-modal="true"
           aria-labelledby={title ? titleId : undefined}
           className={cn(
-            'relative w-full rounded-lg bg-background shadow-xl',
+            // Never taller than the viewport: header + footer stay put, the body scrolls.
+            'relative flex max-h-[calc(100dvh-2rem)] w-full flex-col rounded-lg bg-background shadow-xl',
             sizeClasses[size],
             className
           )}
@@ -92,13 +103,13 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
           onKeyDown={handleKeyDown}
         >
           {title && (
-            <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b px-6 py-4">
               <h2 id={titleId} className="text-lg font-semibold text-foreground">
                 {title}
               </h2>
               <button
                 onClick={onClose}
-                aria-label="Close dialog"
+                aria-label={closeLabel}
                 className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <svg
@@ -118,7 +129,9 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
               </button>
             </div>
           )}
-          <div className="px-6 py-4">{children}</div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-6 py-4">
+            {children}
+          </div>
         </div>
       </div>
     </Fragment>
@@ -135,6 +148,13 @@ export function ModalBody({ children, className }: { children: ReactNode; classN
 
 export function ModalFooter({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('border-t px-6 py-4 flex justify-end gap-3', className)}>{children}</div>
+    <div
+      className={cn(
+        'sticky bottom-0 z-10 -mx-6 -mb-4 mt-4 flex justify-end gap-3 border-t bg-background px-6 py-4',
+        className
+      )}
+    >
+      {children}
+    </div>
   );
 }
