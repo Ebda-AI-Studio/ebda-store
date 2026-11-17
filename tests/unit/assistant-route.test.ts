@@ -19,6 +19,8 @@ const h = vi.hoisted(() => ({
   },
   hasDo: true,
   setMode: vi.fn(),
+  audit: [] as unknown[],
+  settings: {} as Record<string, unknown>,
   flagsWritten: [] as Array<[string, unknown]>,
 }));
 
@@ -81,10 +83,11 @@ vi.mock('@api/lib/repo-factory', async () => {
 });
 vi.mock('@api/services/store.service', () => ({
   StoreService: {
-    getById: vi.fn(async () => ({ id: 'x' })),
+    getById: vi.fn(async () => ({ id: 'x', settings: h.settings })),
     setAssistantMode: (...a: unknown[]) => h.setMode(...a),
   },
 }));
+vi.mock('@api/lib/audit-read', () => ({ readAuditByResource: vi.fn(async () => h.audit) }));
 vi.mock('@api/smart-layer/controls', async orig => ({
   ...(await orig<typeof import('@api/smart-layer/controls')>()),
   readPlatformFlags: vi.fn(async () => ({ global: {}, product: {}, killedTools: [] })),
@@ -473,8 +476,35 @@ describe('assistant rollout switches (super admin only)', () => {
     expect(
       (await request(app).put(`/admin/assistant/stores/${A}/mode`).send({ mode: 'act' })).status
     ).toBe(403);
+    expect((await request(app).get(`/admin/assistant/stores/${A}/mode`)).status).toBe(403);
     expect(h.setMode).not.toHaveBeenCalled();
     expect(h.flagsWritten).toEqual([]);
+  });
+
+  it('a super admin reads a store mode (absent = off) and the last assistant.mode audit row', async () => {
+    h.user = { userId: 'u-root', role: 'super_admin', storeId: '' };
+    const url = `/admin/assistant/stores/${A}/mode`;
+    h.audit = [];
+    let r = await request(app).get(url);
+    expect(r.body.data).toEqual({ mode: 'off', lastChange: null });
+    h.settings = { assistantMode: 'suggest' };
+    h.audit = [
+      { action: 'assistant.login', createdAt: '2026-11-15T00:00:00.000Z', user: null },
+      {
+        action: 'assistant.mode',
+        createdAt: '2026-11-14T10:00:00.000Z',
+        user: { firstName: 'Ada', lastName: 'Root' },
+      },
+    ];
+    r = await request(app).get(url);
+    expect(r.body.data).toEqual({
+      mode: 'suggest',
+      lastChange: { by: 'Ada Root', at: '2026-11-14T10:00:00.000Z' },
+    });
+    h.settings = { assistantMode: 'bogus' };
+    expect((await request(app).get(url)).body.data.mode).toBe('off');
+    h.settings = {};
+    h.audit = [];
   });
 
   it('a super admin sets the platform switches and a store mode; unknown modes and fields are refused', async () => {
