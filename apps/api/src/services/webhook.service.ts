@@ -1,6 +1,6 @@
 /**
  * Merchant outgoing webhooks: fan-out, one delivery attempt, and endpoint health.
- * Plan: docs/plans/2026-10-21-merchant-webhooks.md. Every function runs in the AMBIENT tenant
+ * Plan: docs/plans/done/2026-10-21-merchant-webhooks.md. Every function runs in the AMBIENT tenant
  * (`runInTenantContext` / a request) and carries `storeId` at the top level of every where/data.
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';

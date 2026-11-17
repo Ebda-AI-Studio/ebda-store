@@ -35,12 +35,18 @@ const SESSION_SET_RES: RegExp[] = [
   /\bSET\s+ROLE\s+[^\s=]/i,
 ];
 
+// `ALTER DATABASE <db> SET <knob> ...` is a catalog DEFAULT applied identically to every new connection, so it cannot
+// carry one tenant's value to another through a pooler (Ruling CI-MAC-TZ-1: CI pins its per-job DB to UTC). Exempt only
+// the plain knobs; a tenant GUC (`app.*`) as a database default is still flagged.
+const DB_DEFAULT_RE = /\bALTER\s+DATABASE\b[^;]*?\bSET\s+(?!app\.)[a-z_][a-z0-9_ ]*\s*(=|\bTO\b)/gi;
+
 /** Findings (line, text) of session-level settings in already comment-stripped source. */
 export function findSessionLevelGucs(src: string): Array<{ line: number; text: string }> {
   const findings: Array<{ line: number; text: string }> = [];
   const lines = src.split('\n');
   lines.forEach((text, i) => {
-    if (SESSION_SET_RES.some(re => re.test(text)))
+    const scan = text.replace(DB_DEFAULT_RE, ' ');
+    if (SESSION_SET_RES.some(re => re.test(scan)))
       findings.push({ line: i + 1, text: text.trim() });
   });
 
@@ -85,6 +91,8 @@ describe('no session-level GUCs (transaction-mode pooler safety)', () => {
       'SET statement_timeout = 5000',
       'SET ROLE ebda_app',
       "SET app.current_store_id TO 'x'",
+      'ALTER DATABASE \\"$DB\\" SET app.current_store_id TO \'x\'',
+      "ALTER DATABASE x SET timezone TO 'UTC'; SET timezone TO 'UTC'",
     ];
     for (const b of bad) {
       expect(findSessionLevelGucs(b), b).not.toHaveLength(0);
@@ -97,6 +105,7 @@ describe('no session-level GUCs (transaction-mode pooler safety)', () => {
       "UPDATE users SET role = 'staff', status = 'active' WHERE id = $1",
       'UPDATE t SET statement = 1',
       '// SET app.x = 1 in a comment',
+      'admin -c "ALTER DATABASE \\"$DB\\" SET timezone TO \'UTC\'"',
     ];
     for (const g of good) {
       expect(findSessionLevelGucs(stripComments(g)), g).toHaveLength(0);

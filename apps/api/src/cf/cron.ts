@@ -27,6 +27,9 @@ import { allJobCronStrings, runScheduledJobs } from '../lib/jobs/schedule';
 import { syncStoreSchedules } from '../lib/jobs/store-schedule';
 import { runEntityIndexHealthCron } from '../lib/entity-index-health';
 import { reconcileStoreDirectory } from '../lib/store-directory-reconcile';
+import { checkSuperAdminInvariant } from '../lib/super-admin-invariant';
+import { ensureHelpIndex, helpDeps } from '../smart-layer/help-index';
+import { weeklyUnanswered } from '../smart-layer/weekly-report';
 import { isSweepCron, writesFrozen } from '../lib/jobs/freeze';
 import type { LegacyCronMessage } from '../lib/jobs/start';
 
@@ -45,6 +48,14 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
     { name: 'store-directory-reconcile', run: () => reconcileStoreDirectory() },
     // Issue 458: StoreDO entity-index dead-letter rows -> one P1 per row per day (the DO cannot call sendAlert).
     { name: 'entity-index-health', run: () => runEntityIndexHealthCron() },
+    // The assistant's help index: re-embed the bundled help corpus when its hash changed (a KV read when nothing changed; never throws into the cron).
+    {
+      name: 'assistant-help-index',
+      run: () =>
+        ensureHelpIndex(helpDeps()).catch(err =>
+          logger.warn({ err }, '[assistant] help index failed')
+        ),
+    },
   ],
   // Abandoned-cart reminder emails (was every 15 min).
   '*/15 * * * *': [
@@ -70,6 +81,14 @@ export const CRON_SCHEDULE: Record<string, CronJob[]> = {
   // Loyalty: birthday bonuses + point expiry (was every 24 h).
   '0 3 * * *': [
     { name: 'loyalty-daily', run: () => loyaltyAutomationService.runDailyAutomation() },
+    // The assistant's weekly digest of questions the help guides could not answer (Monday UTC only, once per ISO week, info level).
+    {
+      name: 'assistant-weekly-unanswered',
+      run: () =>
+        weeklyUnanswered().catch(err => logger.warn({ err }, '[assistant] weekly report failed')),
+    },
+    // Ruling ID-20: P1 when the identity service has no active super_admin, or none that can act (second factor).
+    { name: 'super-admin-invariant', run: () => checkSuperAdminInvariant() },
     // G8: arm StoreDO alarms, check yesterday's backups landed, export D1 to R2 (cf/ops/backup-sweep.ts).
     {
       name: 'backup-sweep',

@@ -48,12 +48,22 @@ describe('closeNonCustomerAccount (M-024)', () => {
     expect(recordRequest).not.toHaveBeenCalled();
   });
 
-  it('flag off: records the request, erases nothing', async () => {
-    const { d, run, recordRequest } = deps({ flag: undefined, owned: ['s1'] });
-    const out = await closeNonCustomerAccount({ userId: 'u', requestId: 'r' }, d);
-    expect(out).toEqual({ status: 'recorded', stores: ['s1'] });
+  it('S3 flag off: records the request, alerts ops, erases nothing, and does NOT claim success (503)', async () => {
+    const alert = vi.fn(async () => undefined);
+    const { d, run, recordRequest } = deps({ flag: undefined, owned: ['s1'], alert });
+    await expect(closeNonCustomerAccount({ userId: 'u', requestId: 'r' }, d)).rejects.toMatchObject(
+      { statusCode: 503, code: 'ERASURE_NOT_ENABLED' }
+    );
     expect(recordRequest).toHaveBeenCalledWith('u', 'r', ['s1']);
+    expect(alert).toHaveBeenCalledOnce();
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it('S3 flag off: the message is honest in Arabic and English', async () => {
+    const { d } = deps({ flag: 'false', owned: [] });
+    const err = await closeNonCustomerAccount({ userId: 'u', requestId: 'r' }, d).catch(e => e);
+    expect(err.message).toMatch(/لسه موجودين/);
+    expect(err.message).toMatch(/your account and data still exist/i);
   });
 
   it('flag on: an owner runs the job once per store with a per-store request id', async () => {

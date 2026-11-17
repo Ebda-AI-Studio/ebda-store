@@ -54,6 +54,11 @@ case "$cmd" in
     done
     dropdb --if-exists --force "$DB"
     createdb -O test "$DB"
+    # The host cluster's default TimeZone is the Mac's (UTC+3), the Linux service container's is UTC. The pg adapter
+    # writes a Date as a UTC wall-clock string that the SESSION zone then reads, so every write made outside a tenant
+    # transaction (which pins UTC itself) shifted by the zone offset: staff-invite-seats fixtures expired 3 h in the past
+    # and every accept answered 400 INVITE_INVALID. Pin the per-job database (never the shared cluster) to UTC.
+    admin -c "ALTER DATABASE \"$DB\" SET timezone TO 'UTC'"
     {
       echo "CI_PG_DB=$DB"
       echo "CI_PG_URL=${PG}/${SU}@localhost:5432/$DB"

@@ -12,7 +12,7 @@ import { hidesFromSearch } from './hide-from-search';
  * params-based `app/tenant-store/[tenant]/[locale]/layout.tsx` (tenant-cacheable
  * routing, dark-launched behind `STOREFRONT_TENANT_ROUTING`) emit identical
  * metadata without duplicating this ~200-line builder. See
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6.
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6.
  *
  * The ONLY thing that differs between callers is how `isOnCustomDomain` is
  * determined (the legacy layout reads the `host` header; the new layout

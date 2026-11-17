@@ -1,13 +1,31 @@
-import { prisma, withStore, runInTenantContext } from '@ebda/database';
-import { storeDb, storeRepo, type StoreReads, type StoreWrites } from '../lib/repo-factory';
-import { isCampaignContentComplete, resolveDefaultLanguage, storefrontOrigin } from '@ebda/shared';
+import { assertStoreOperational } from '../lib/store-operational';
+import { prisma, withStore, runInTenantContext, type Prisma } from '@ebda/database';
+import {
+  storeDb,
+  storeRepo,
+  storeWriter,
+  type StoreReads,
+  type StoreWrites,
+} from '../lib/repo-factory';
+import {
+  CAMPAIGN_MAX_SCHEDULE_DAYS,
+  isCampaignContentComplete,
+  isCampaignSendable,
+  resolveDefaultLanguage,
+  storefrontOrigin,
+  type campaignDraftSchema,
+} from '@ebda/shared';
+import type { z } from 'zod/v3';
+import { AppError } from '../middleware/error-handler';
+import { inngest } from '../lib/inngest/client';
+import logger from '../lib/logger';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
 import { storeBrandTheme } from '../lib/store-brand-theme';
 
 /**
  * Email campaigns (D2) — the pieces the admin routes, the Inngest send job and
- * the public unsubscribe endpoint share. Plan: docs/plans/2026-09-25-email-campaigns.md.
+ * the public unsubscribe endpoint share. Plan: docs/plans/done/2026-09-25-email-campaigns.md.
  *
  * Nothing in this module sends email. Sending happens only in
  * `lib/inngest/functions/campaign-send.ts`, which only runs after a merchant
@@ -335,4 +353,179 @@ export function renderCampaignEmail(args: {
     hidePoweredBy: args.hidePoweredBy,
   });
   return { subject: sanitizeSubject(args.subject), html };
+}
+
+// ─── Admin writes (shared by routes/campaign.routes.ts and the assistant tools) ──────────────────────────────
+
+export const CAMPAIGN_LIST_SELECT = {
+  id: true,
+  name: true,
+  status: true,
+  scheduledAt: true,
+  sentAt: true,
+  recipientCount: true,
+  sentCount: true,
+  failedCount: true,
+  lastError: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+const CAMPAIGN_DETAIL_SELECT = {
+  ...CAMPAIGN_LIST_SELECT,
+  subject: true,
+  subjectAr: true,
+  bodyHtml: true,
+  bodyHtmlAr: true,
+  localeStrategy: true,
+  audience: true,
+} as const;
+
+export async function findCampaignOr404(storeId: string, campaignId: string) {
+  const campaign = await (
+    await storeDb(storeId)
+  ).campaign.findFirst({
+    where: { id: campaignId, storeId },
+    select: CAMPAIGN_DETAIL_SELECT,
+  });
+  if (!campaign) throw new AppError(404, 'NOT_FOUND', 'Campaign not found');
+  return campaign;
+}
+
+/** Sanitize both bodies on write — the stored row never holds active content. */
+export function draftData(input: z.infer<typeof campaignDraftSchema>) {
+  return {
+    name: input.name,
+    subject: input.subject,
+    subjectAr: input.subjectAr?.trim() ? input.subjectAr.trim() : null,
+    bodyHtml: sanitizeNewsletterHtml(input.bodyHtml),
+    bodyHtmlAr: input.bodyHtmlAr?.trim() ? sanitizeNewsletterHtml(input.bodyHtmlAr) : null,
+    localeStrategy: input.localeStrategy,
+    audience: input.audience as Prisma.InputJsonValue,
+  };
+}
+
+/** A draft; sends nothing. */
+export async function createCampaignDraft(
+  storeId: string,
+  input: z.infer<typeof campaignDraftSchema>
+) {
+  return (await storeWriter(storeId)).campaign.create({
+    data: { storeId, ...draftData(input) },
+    select: CAMPAIGN_DETAIL_SELECT,
+  });
+}
+
+/** The queue refused the send request; nothing was sent and the campaign is back to a draft. */
+export class CampaignQueueUnreachable extends Error {}
+
+/**
+ * The ONLY path that can cause subscriber email: flips a draft to `scheduled` and enqueues the send job.
+ * Queue-then-send fails fast: if the enqueue throws, a Postgres store's request transaction rolls back on the 5xx
+ * (Ruling EC-3); a DO store is put back to `draft` here (Ruling CF-R6A-2). Throws `CampaignQueueUnreachable`.
+ */
+export async function requestCampaignSend(
+  storeId: string,
+  campaignId: string,
+  scheduledAtIso?: string
+): Promise<{ status: 'scheduled'; scheduledAt: Date; audience: number }> {
+  // Ruling SUSPEND-OUT-1: a campaign to customers is refused (423) for a store that is not `active`. Here, not in the route:
+  // the admin route and the assistant tool both go through this function.
+  await assertStoreOperational(storeId);
+  const campaign = await findCampaignOr404(storeId, campaignId);
+  if (campaign.status !== 'draft') {
+    throw new AppError(409, 'CAMPAIGN_NOT_DRAFT', 'This campaign has already been sent');
+  }
+  if (!isCampaignSendable(campaign)) {
+    throw new AppError(
+      422,
+      'CAMPAIGN_INCOMPLETE',
+      'Add a subject and a body in at least one language first'
+    );
+  }
+
+  const now = Date.now();
+  let scheduledAt = new Date(now);
+  if (scheduledAtIso) {
+    scheduledAt = new Date(scheduledAtIso);
+    const maxAhead = CAMPAIGN_MAX_SCHEDULE_DAYS * 24 * 60 * 60 * 1000;
+    if (scheduledAt.getTime() <= now || scheduledAt.getTime() - now > maxAhead) {
+      throw new AppError(
+        422,
+        'INVALID_SCHEDULE',
+        `Schedule must be in the future and within ${CAMPAIGN_MAX_SCHEDULE_DAYS} days`
+      );
+    }
+  }
+
+  // #1953: count-only — this pre-check never used the actual rows either (the real materialization happens in the
+  // Inngest job, which still calls buildCampaignAudience for the full rows it needs to send to).
+  const [audienceSize, sent24h, dailyCap] = await Promise.all([
+    audienceCount(storeId),
+    sentInLast24h(storeId),
+    storeCampaignDailyCap(storeId),
+  ]);
+  if (audienceSize === 0) {
+    throw new AppError(422, 'EMPTY_AUDIENCE', 'No subscribers have opted in yet');
+  }
+  const remaining = Math.max(0, dailyCap - sent24h);
+  // Checked here for immediate feedback on a send-now; the job re-checks at send time, which governs a scheduled campaign.
+  if (!scheduledAtIso && audienceSize > remaining) {
+    throw new AppError(
+      422,
+      'DAILY_CAP_EXCEEDED',
+      `This campaign would reach ${audienceSize} people but only ${remaining} more can be sent in the next 24 hours`
+    );
+  }
+
+  const flipped = await (
+    await storeWriter(storeId)
+  ).campaign.updateMany({
+    where: { id: campaignId, storeId, status: 'draft' },
+    data: { status: 'scheduled', scheduledAt, recipientCount: audienceSize },
+  });
+  if (flipped.count === 0) {
+    throw new AppError(409, 'CAMPAIGN_NOT_DRAFT', 'This campaign has already been sent');
+  }
+
+  try {
+    await inngest.send({
+      name: 'campaign/send-requested',
+      data: { campaignId, storeId, scheduledAt: scheduledAt.toISOString() },
+    });
+  } catch (err) {
+    logger.error(
+      { campaignId, storeId, err: err instanceof Error ? err.message : 'unknown' },
+      '[CAMPAIGN] enqueue failed'
+    );
+    // A store on its Durable Object is not in this request's Postgres transaction, so a 5xx cannot undo the flip: put the
+    // campaign back to `draft` here, only if it is still THIS request's `scheduled` row (Ruling CF-R6A-2).
+    if ((await storeRepo(storeId)).backend === 'do')
+      await (
+        await storeWriter(storeId)
+      ).campaign.updateMany({
+        where: { id: campaignId, storeId, status: 'scheduled', scheduledAt },
+        data: { status: 'draft', scheduledAt: null, recipientCount: campaign.recipientCount },
+      });
+    throw new CampaignQueueUnreachable();
+  }
+  return { status: 'scheduled', scheduledAt, audience: audienceSize };
+}
+
+/** Stops a scheduled campaign before it starts, or a sending one before its next batch. */
+export async function cancelCampaign(storeId: string, campaignId: string): Promise<void> {
+  const cancelled = await (
+    await storeWriter(storeId)
+  ).campaign.updateMany({
+    where: { id: campaignId, storeId, status: { in: ['scheduled', 'sending'] } },
+    data: { status: 'cancelled' },
+  });
+  if (cancelled.count === 0) {
+    await findCampaignOr404(storeId, campaignId);
+    throw new AppError(
+      409,
+      'CAMPAIGN_NOT_CANCELLABLE',
+      'Only a scheduled or sending campaign can be cancelled'
+    );
+  }
 }

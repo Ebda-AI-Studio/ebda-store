@@ -1,5 +1,5 @@
 /**
- * BuyerIdentity - who a price is for. docs/plans/2026-10-21-b2b-wholesale.md, design review I7 + Rulings B2B-2c / B2B-2d.
+ * BuyerIdentity - who a price is for. docs/plans/done/2026-10-21-b2b-wholesale.md, design review I7 + Rulings B2B-2c / B2B-2d.
  *
  * A branded type: an object literal such as `{ kind: 'session', userId }` does NOT type-check as a BuyerIdentity, because
  * the brand symbol is not exported. The ONLY ways to obtain one are the three factories below, which are the only places

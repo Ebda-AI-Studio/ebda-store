@@ -30,7 +30,7 @@ import {
   orderNumberFromScanCode,
 } from '@ebda/shared';
 import { FiscalDocumentService } from './fiscal-document.service';
-import { recordPaymentEvent } from './payment-event.service';
+import { recordPaymentEvent, recordPaymentEventForStore } from './payment-event.service';
 
 /** An address JSON with its `phone` in the one stored form (ruling MONEYB-7). */
 function withStoredPhone(addr: Record<string, unknown>): Record<string, unknown> {
@@ -4062,6 +4062,90 @@ export class OrderService {
       });
     void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
     return order;
+  }
+
+  /**
+   * Mark a COD order as paid (the merchant collected the cash). Extracted from
+   * POST /:orderId/mark-paid so the route and the merchant assistant share one path.
+   * Throws AppError with the codes the route used to answer with.
+   */
+  static async markCodPaid(storeId: string, orderId: string, userId: string) {
+    const db = await storeDb(storeId);
+    const order = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { payments: true },
+    });
+    if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+
+    const codPayment = order.payments.find(p => p.provider === 'cod');
+    if (!codPayment)
+      throw new AppError(400, 'NOT_COD', 'This order is not a Cash on Delivery order');
+    if (order.paymentStatus === 'paid')
+      throw new AppError(400, 'ALREADY_PAID', 'Order is already marked as paid');
+    // A cancelled / refunded order (incl. a returned-to-origin COD parcel) collected nothing:
+    // marking it paid would book a sale that never happened (sense audit O8).
+    if (order.status === 'cancelled' || order.status === 'refunded')
+      throw new AppError(
+        409,
+        'ORDER_NOT_PAYABLE',
+        'A cancelled or refunded order cannot be marked paid'
+      );
+
+    // Only advance a still-pending order to `confirmed`; COD cash is collected AT delivery, so a
+    // further-along order keeps its fulfilment progress.
+    const money = await storeMoney(storeId);
+    let flipped = { paymentId: codPayment.id, fromStatus: codPayment.status as string };
+    if (money) {
+      // Durable Object store (Ruling NZ-A-2): the same writes in ONE section there.
+      const done = await money.codMarkPaid({ orderIds: [orderId] });
+      if (done.updated.length === 0)
+        throw new AppError(409, 'ORDER_NOT_PAYABLE', 'The order can no longer be marked paid');
+      flipped = { paymentId: done.updated[0].paymentId, fromStatus: done.updated[0].fromStatus };
+    } else {
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: codPayment.id },
+          data: { status: 'completed', paidAt: new Date() },
+        }),
+        prisma.order.update({
+          where: { id: orderId, storeId },
+          data: {
+            paymentStatus: 'paid',
+            ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
+          },
+        }),
+      ]);
+    }
+
+    // Append-only audit row for the COD completion.
+    await (money ? recordPaymentEventForStore : recordPaymentEvent)({
+      paymentId: flipped.paymentId,
+      storeId: order.storeId,
+      orderId,
+      eventType: 'status_change',
+      fromStatus: flipped.fromStatus as typeof codPayment.status,
+      toStatus: 'completed',
+      provider: 'cod',
+      triggeredByUserId: userId,
+      details: { reason: 'cod_marked_paid', orderNumber: order.orderNumber },
+    });
+
+    // Same post-payment fanout the webhook handler fires: the accounting journal relies on it.
+    inngest
+      .send({
+        name: 'order/created',
+        data: {
+          orderId,
+          storeId: order.storeId,
+          paymentMethod: codPayment.provider,
+          locale: undefined,
+        },
+      })
+      .catch((err: unknown) =>
+        logger.error({ err, orderId }, '[COD] Failed to enqueue order/created')
+      );
+
+    return { orderNumber: order.orderNumber, amount: codPayment.amount };
   }
 
   static async getCustomerOrders(

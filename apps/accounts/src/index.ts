@@ -13,6 +13,7 @@ import {
   isSessionRevoked,
   revokeAllForUser,
   revokeSession,
+  superAdminSummary,
   type UserRow,
 } from './data';
 import { z } from 'zod/v3';
@@ -78,6 +79,14 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
   // NOTE: no `issue(sid, aud)`. A Service Binding does not authenticate the caller, so any Worker in the account holding
   // the binding could mint a token for ANY product audience from a sid. Products get tokens over HTTP (`GET /token`, cookie
   // + allow-listed origin). Bring `issue` back only with a proof of possession (a token for the same sid) and a review.
+
+  /**
+   * Platform-admin invariant (Ruling ID-20): how many super_admins are active, and how many of those can actually act (address
+   * verified = password set through the mailed code, and a second factor enrolled, which is what mints `pa`). Counts only.
+   */
+  async superAdminSummary(): Promise<{ active: number; ready: number }> {
+    return superAdminSummary(this.env.DB);
+  }
 
   /** Revoke every session of a user (suspension, password change by an admin, erasure). */
   async revokeUser(userId: string, reason: string): Promise<void> {

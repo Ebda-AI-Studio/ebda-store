@@ -1,6 +1,6 @@
 /**
  * Unit tests for `heroSlideSchema`'s new `link` field (the "banner link"
- * feature — docs/plans/2026-07-04-hero-banner-link.md).
+ * feature — docs/plans/done/2026-07-04-hero-banner-link.md).
  *
  * `link` mirrors the existing `ctaHref` field verbatim: same optional +
  * safe-URL-scheme-allowlist refine, listed directly in the Zod object (the

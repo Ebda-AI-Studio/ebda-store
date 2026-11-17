@@ -1,6 +1,6 @@
 # Cloudflare schema (`packages/cf-schema`)
 
-Source of the Cloudflare-only migration (Ruling INFRA-CF-1, plan `docs/plans/2026-10-28-store-on-cloudflare.md`, phase 1). Rulings CF-SCHEMA-1 to 5 in `docs/RULINGS.md`.
+Source of the Cloudflare-only migration (Ruling INFRA-CF-1, plan `docs/plans/done/2026-10-28-store-on-cloudflare.md`, phase 1). Rulings CF-SCHEMA-1 to 5 in `docs/RULINGS.md`.
 
 - **What it is:** SQLite DDL for the per-store Durable Object (`migrations/store/*.sql`, 122 tables) and the D1 `ebda-platform` database (`migrations/platform/*.sql`, 25 tables), plus Drizzle table definitions (`src/{store,platform}/schema.generated.ts`). Generated from `packages/database/prisma/schema.prisma` and the raw Postgres migrations by `node packages/cf-schema/scripts/generate.mjs` (`--check` for CI).
 - **Where each model goes:** `model-split.json` (147 models: 23 D1, 113 StoreDO, 6 analytics, 1 dropped, 4 identity owned by the identity track). A new Prisma model fails `model-split.test.ts` until classified.

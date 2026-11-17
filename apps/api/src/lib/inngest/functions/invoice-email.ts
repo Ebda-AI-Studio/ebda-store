@@ -1,3 +1,4 @@
+import { isPaidForReceipt, storeOperational } from '../../store-operational';
 import type { JobDef } from '../../jobs/types';
 import { storeDb } from '../../repo-factory';
 import { runInStoreCtx } from '../../jobs/store-db';
@@ -22,7 +23,7 @@ export const invoiceEmail: JobDef = inngest.createFunction(
     triggers: [{ event: 'order/invoice.email-requested' }],
   },
   async ({ event, step }) => {
-    const { orderId, storeId, to } = event.data;
+    const { orderId, storeId, to, toMerchant } = event.data;
 
     if (!orderId || !storeId || !to) {
       logger.warn({ event: event.name }, 'invoice email-requested fired without ids — skipping');
@@ -41,12 +42,26 @@ export const invoiceEmail: JobDef = inngest.createFunction(
           await storeDb(storeId)
         ).order.findUnique({
           where: { id: orderId, storeId },
-          select: { orderNumber: true, locale: true },
+          select: { orderNumber: true, locale: true, paymentStatus: true },
         });
         if (!row) throw new Error(`Order ${orderId} not found`);
         return row;
       })
     );
+
+    // Ruling SUSPEND-OUT-1: an invoice to a CUSTOMER for an order NOT yet paid is not sent for a store that is not `active`.
+    // Ruling SUSPEND-OUT-1b: the invoice of a PAID order is a receipt and still sends; so does the owner copy (`toMerchant`).
+    if (
+      !toMerchant &&
+      !isPaidForReceipt(order.paymentStatus) &&
+      !(await step.run('check-store-active', () => storeOperational(storeId)))
+    ) {
+      logger.info(
+        { storeId, orderId },
+        '[invoice-email] store not active; unpaid-order invoice not sent'
+      );
+      return;
+    }
 
     const orderLocale = (order.locale ?? undefined) as 'en' | 'ar' | undefined;
 
