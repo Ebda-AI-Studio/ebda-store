@@ -429,7 +429,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { planCode } = z.object({ planCode: z.string().min(1).max(64) }).parse(req.query);
-      const { quote, interval } = await previewChangePlan({
+      const { quote, interval, basis } = await previewChangePlan({
         storeId: req.params.storeId,
         planCode,
       });
@@ -439,6 +439,8 @@ router.get(
           planCode,
           interval,
           kind: quote.kind,
+          /** prorated = the difference for the days left, period kept; full = full price, a fresh period from now. */
+          basis,
           amountMinor: quote.charge.totalMinor,
           netMinor: quote.charge.netMinor,
           vatMinor: quote.charge.vatMinor,

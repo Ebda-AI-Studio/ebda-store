@@ -195,3 +195,19 @@ describe('periodStartFor / wholeDaysCeil', () => {
     expect(wholeDaysCeil(d('2026-11-01T00:00:00Z'), d('2026-11-03T00:00:00Z'))).toBe(2);
   });
 });
+
+describe('paidTotalMinor: never credit more than was paid (money review C3)', () => {
+  const base = {
+    currentPriceMinor: 20000,
+    newPriceMinor: 50000,
+    periodStart: d('2026-11-01T00:00:00Z'),
+    periodEnd: d('2026-12-01T00:00:00Z'),
+    now: d('2026-11-16T00:00:00Z'),
+    vat: PLATFORM_VAT_OFF,
+  };
+  it('a smaller paid amount is the credit; a larger one is capped at the catalogue price', () => {
+    expect(quotePlanChange({ ...base, paidTotalMinor: 10000 }).charge.totalMinor).toBe(20000); // (50000-10000)/2
+    expect(quotePlanChange({ ...base, paidTotalMinor: 99999 }).charge.totalMinor).toBe(15000); // capped at 20000
+    expect(quotePlanChange({ ...base, paidTotalMinor: null }).charge.totalMinor).toBe(15000);
+  });
+});

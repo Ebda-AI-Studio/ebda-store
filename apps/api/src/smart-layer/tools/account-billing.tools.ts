@@ -208,8 +208,9 @@ async function billingState(storeId: string, planCode?: string) {
   // the fingerprint (it moves with the days left), so a card from yesterday refreshes. Null = not a priceable change.
   const changeQuote = planCode
     ? await previewChangePlan({ storeId, planCode })
-        .then(({ quote: q }) => ({
+        .then(({ quote: q, basis }) => ({
           kind: q.kind,
+          basis,
           totalMinor: q.charge.totalMinor,
           netMinor: q.charge.netMinor,
           vatMinor: q.charge.vatMinor,
@@ -295,7 +296,7 @@ const MONEY_WORDS = 'Say: ';
 const planChange = change<{ planCode: string }>({
   name: 'plan_change',
   capabilityId: 'billing.change-plan',
-  description: `Upgrade or downgrade my Ebda Store plan to another plan by its code (get the codes and prices from quote_plan). The price is read from the plan catalogue, never typed. An upgrade starts now and charges the card on file the price difference for the days left in the paid period; a downgrade starts at the end of the paid period. ${MONEY_WORDS}"upgrade me to Growth", "اترقى لباقة Growth", "انزل الباقة".`,
+  description: `Upgrade or downgrade my Ebda Store plan to another plan by its code (get the codes and prices from quote_plan). The price is read from the plan catalogue, never typed. An upgrade starts now and charges the card on file the price difference for the days left in a paid period (the full price and a new period when the current term was not paid for); a downgrade starts at the end of the paid period. ${MONEY_WORDS}"upgrade me to Growth", "اترقى لباقة Growth", "انزل الباقة".`,
   schema: shape<{ planCode: string }>(
     { planCode: f.id('The plan code, exactly as quote_plan returns it.') },
     ['planCode']
@@ -315,10 +316,10 @@ const planChange = change<{ planCode: string }>({
     return {
       summary: pair(
         upgrade
-          ? `الترقية من ${st.planName.ar} إلى ${t.name.ar} بتتأكد من شاشة الدفع: افتح شاشة الدفع عشان تأكد خصم ${egp(total)} جنيه شامل الضريبة، وده فرق السعر للأيام الباقية من الفترة اللي دفعتها (${st.interval === 'yearly' ? 'سنوي' : 'شهري'}). المساعد مش بيخصم من الكارت بنفسه.`
+          ? `الترقية من ${st.planName.ar} إلى ${t.name.ar} بتتأكد من شاشة الدفع: افتح شاشة الدفع عشان تأكد خصم ${egp(total)} جنيه شامل الضريبة، ${st.change?.basis === 'full' ? 'وده سعر الباقة كامل لفترة جديدة بتبدأ النهارده' : 'وده فرق السعر للأيام الباقية من الفترة اللي دفعتها'} (${st.interval === 'yearly' ? 'سنوي' : 'شهري'}). المساعد مش بيخصم من الكارت بنفسه.`
           : `تغيير باقتك من ${st.planName.ar} إلى ${t.name.ar}. الباقة الجديدة هتبدأ في آخر الفترة المدفوعة ومفيش خصم دلوقتي. التغيير ده مش بيترجع بضغطة.`,
         upgrade
-          ? `Upgrading from ${st.planName.en} to ${t.name.en} is confirmed on the payment screen: open it to confirm the charge of ${egp(total)} EGP including VAT, the price difference for the days left in the period you paid (${st.interval}). The assistant never charges your card itself.`
+          ? `Upgrading from ${st.planName.en} to ${t.name.en} is confirmed on the payment screen: open it to confirm the charge of ${egp(total)} EGP including VAT, ${st.change?.basis === 'full' ? 'the full price for a new period starting today' : 'the price difference for the days left in the period you paid'} (${st.interval}). The assistant never charges your card itself.`
           : `Change your plan from ${st.planName.en} to ${t.name.en}. The new plan starts at the end of the paid period and nothing is charged now. This cannot be undone with one press.`
       ),
       rows: [

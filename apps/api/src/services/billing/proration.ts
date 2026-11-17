@@ -73,9 +73,18 @@ export function quotePlanChange(args: {
   periodEnd: Date;
   now: Date;
   vat: PlatformVat;
+  /**
+   * What was actually PAID for the current period (VAT included), when known. The credit for the current plan is
+   * min(catalogue total, paid): a promo or an older price never credits more than the merchant paid (money review C3).
+   */
+  paidTotalMinor?: number | null;
 }): PlanChangeQuote {
   const { currentPriceMinor, newPriceMinor, periodStart, periodEnd, now, vat } = args;
-  const currentTotalMinor = subscriptionChargeAmount(currentPriceMinor, vat).totalMinor;
+  const catalogueCurrentTotal = subscriptionChargeAmount(currentPriceMinor, vat).totalMinor;
+  const currentTotalMinor =
+    args.paidTotalMinor !== undefined && args.paidTotalMinor !== null
+      ? Math.max(0, Math.min(catalogueCurrentTotal, args.paidTotalMinor))
+      : catalogueCurrentTotal;
   const newTotalMinor = subscriptionChargeAmount(newPriceMinor, vat).totalMinor;
   const periodDays = Math.max(
     1,

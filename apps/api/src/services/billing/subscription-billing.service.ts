@@ -295,6 +295,33 @@ async function applyUpgradeSuccess(
     return;
   }
   await applyPlan(tx, row.storeId, row.planCode); // Postgres half first; the subscription write is the commit point
+  if (row.forPeriodEnd === null) {
+    // FULL-price upgrade (a trial or an unpaid term, money review C1): a fresh paid period from now, exactly like a
+    // checkout, plus the free months still unconsumed.
+    const interval = isInterval(row.billingInterval) ? row.billingInterval : 'monthly';
+    await tx.storeSubscription.update({
+      where: { storeId: row.storeId },
+      data: {
+        planCode: row.planCode,
+        status: 'active',
+        billingInterval: interval,
+        currentPeriodStart: now,
+        currentPeriodEnd: new Date(
+          addInterval(now, interval).getTime() + (await grantedCarryMs(tx, row.storeId, now))
+        ),
+        billingAnchorDay: now.getUTCDate(),
+        trialEndsAt: null,
+        pendingPlanCode: null,
+        cancelAtPeriodEnd: false,
+        dunningAttempts: 0,
+        nextRetryAt: null,
+      },
+    });
+    effects.push({ kind: 'plan_changed', storeId: row.storeId });
+    effects.push({ kind: 'payment_recorded', storeId: row.storeId });
+    effects.push({ kind: 'subscription_paid', storeId: row.storeId, billingEventId: row.id });
+    return;
+  }
   await tx.storeSubscription.update({
     where: { storeId: row.storeId },
     data: {
@@ -306,7 +333,7 @@ async function applyUpgradeSuccess(
       nextRetryAt: null,
     },
   });
-  const quotedEnd = row.forPeriodEnd?.getTime() ?? null;
+  const quotedEnd = row.forPeriodEnd.getTime();
   if (quotedEnd !== (sub.currentPeriodEnd?.getTime() ?? null)) {
     void sendAlert({
       level: 'p1',
@@ -1491,12 +1518,60 @@ export interface ChangePlanPreview {
   planCode: string;
   interval: BillingInterval;
   quote: PlanChangeQuote;
+  /**
+   * How an upgrade is priced (money review of #887). `prorated`: the current period was PAID, so the difference for the
+   * days left is charged and the period is kept. `full`: nothing was paid for the current term (a trial, or a plan the
+   * team assigned with no payment), so the new plan's full price is charged and a fresh period starts now.
+   */
+  basis: 'prorated' | 'full';
+}
+
+/**
+ * What was actually paid for the current period (VAT included): succeeded plan payments (checkout, renewal, upgrade,
+ * manual payment naming a catalogue plan, so never an add-on) since the period started (one day of slack), minus the
+ * refunds that succeeded against them. 0 = the term was not paid for (trial, team-assigned).
+ */
+async function paidForCurrentPeriod(
+  storeId: string,
+  periodStart: Date,
+  planCodes: string[]
+): Promise<number> {
+  const since = new Date(periodStart.getTime() - 86_400_000);
+  const charges = await withStore(storeId, tx =>
+    tx.billingEvent.findMany({
+      where: {
+        storeId,
+        status: 'succeeded',
+        amountMinor: { gt: 0 },
+        type: { in: ['checkout', 'renewal', 'upgrade', 'manual_payment'] },
+        planCode: { in: planCodes },
+        createdAt: { gte: since },
+      },
+      select: { id: true, amountMinor: true },
+    })
+  );
+  if (charges.length === 0) return 0;
+  const refunds = await withStore(storeId, tx =>
+    tx.billingEvent.findMany({
+      where: {
+        storeId,
+        type: 'refund',
+        status: 'succeeded',
+        relatedEventId: { in: charges.map(c => c.id) },
+      },
+      select: { amountMinor: true },
+    })
+  );
+  const paid = charges.reduce((n, c) => n + c.amountMinor, 0);
+  return Math.max(0, paid - refunds.reduce((n, r) => n + r.amountMinor, 0));
 }
 
 /**
  * Price a card plan change for a store (Ruling G35-PRORATE-1) without changing anything. Throws the same refusals
- * `changePlan` would (no subscription, comped, same plan, no price). The period is the subscription's current one; a
- * row with no start recorded uses one interval before its end.
+ * `changePlan` would (no subscription, comped, same plan, no price). An upgrade is prorated ONLY for an active, paid,
+ * still-running period, crediting min(catalogue price, what was paid); a trial or an unpaid (team-assigned) term pays
+ * the full new price for a fresh period; an upgrade while the period has already ended is refused (409 RENEW_FIRST),
+ * never priced at zero.
  */
 export async function previewChangePlan(args: {
   storeId: string;
@@ -1514,18 +1589,75 @@ export async function previewChangePlan(args: {
   if (plan.code === sub.planCode && !sub.pendingPlanCode) {
     throw new AppError(400, 'SAME_PLAN', 'Already on this plan');
   }
-  const current = await prisma.plan.findUnique({ where: { code: sub.planCode } });
+  const catalogue = await prisma.plan.findMany();
+  const current = catalogue.find(p => p.code === sub.planCode);
   const currentPrice = (current && priceFor(current, interval)) || 0;
-  const periodEnd = sub.currentPeriodEnd ?? now;
+  const vat = await resolvePlatformVat();
+  const isUpgrade = price > currentPrice;
+  const periodEnd = sub.currentPeriodEnd;
+
+  if (isUpgrade) {
+    const ended = periodEnd !== null && periodEnd.getTime() <= now.getTime();
+    if (!['active', 'trialing'].includes(sub.status) || (sub.status === 'active' && ended)) {
+      // C2: a period that is over (or a store past due) has nothing left to prorate: renewing comes first.
+      throw new AppError(
+        409,
+        'RENEW_FIRST',
+        'The paid period has ended: renew the current plan first, then upgrade'
+      );
+    }
+    const periodStart =
+      sub.currentPeriodStart ?? (periodEnd ? periodStartFor(periodEnd, interval) : now);
+    const paid =
+      sub.status === 'active' && periodEnd
+        ? await paidForCurrentPeriod(
+            args.storeId,
+            periodStart,
+            catalogue.map(p => p.code)
+          )
+        : 0;
+    if (paid === 0 || !periodEnd) {
+      // C1: a trial or a term the team assigned with no payment: the full new price, a fresh period from now.
+      const charge = subscriptionChargeAmount(price, vat);
+      const freshEnd = addInterval(now, interval);
+      return {
+        planCode: plan.code,
+        interval,
+        basis: 'full',
+        quote: {
+          kind: 'upgrade',
+          remainingDays: 0,
+          periodDays: 0,
+          currentTotalMinor: 0,
+          newTotalMinor: charge.totalMinor,
+          charge,
+          effectiveAt: now,
+          periodEnd: freshEnd,
+        },
+      };
+    }
+    const quote = quotePlanChange({
+      currentPriceMinor: currentPrice,
+      newPriceMinor: price,
+      periodStart,
+      periodEnd,
+      now,
+      vat,
+      paidTotalMinor: paid, // C3: never credit more than was paid for this period
+    });
+    return { planCode: plan.code, interval, basis: 'prorated', quote };
+  }
+
+  const end = periodEnd ?? now;
   const quote = quotePlanChange({
     currentPriceMinor: currentPrice,
     newPriceMinor: price,
-    periodStart: sub.currentPeriodStart ?? periodStartFor(periodEnd, interval),
-    periodEnd,
+    periodStart: sub.currentPeriodStart ?? periodStartFor(end, interval),
+    periodEnd: end,
     now,
-    vat: await resolvePlatformVat(),
+    vat,
   });
-  return { planCode: plan.code, interval, quote };
+  return { planCode: plan.code, interval, basis: 'prorated', quote };
 }
 
 export async function changePlan(args: {
@@ -1552,8 +1684,12 @@ export async function changePlan(args: {
       planCode: FREE_PLAN_CODE,
     };
   }
-  const { planCode, interval, quote } = await previewChangePlan({ ...args, now });
-  if (!sub.providerPaymentMethodRef || !sub.provider || sub.status !== 'active') {
+  const { planCode, interval, quote, basis } = await previewChangePlan({ ...args, now });
+  if (
+    !sub.providerPaymentMethodRef ||
+    !sub.provider ||
+    !(sub.status === 'active' || (sub.status === 'trialing' && basis === 'full'))
+  ) {
     throw new AppError(409, 'NO_PAYMENT_METHOD', 'Start a checkout to add a payment method first');
   }
   const plan = (await loadPayablePlan(planCode, interval)).plan;
@@ -1572,7 +1708,11 @@ export async function changePlan(args: {
   }
 
   if (quote.kind === 'upgrade' && quote.charge.totalMinor > 0) {
-    // UPGRADE (Ruling G35-PRORATE-1): immediate, the prorated difference for the days left, same period.
+    // UPGRADE (Ruling G35-PRORATE-1). prorated: the difference for the days left, same period (the row names the period
+    // it was priced for). full: the new plan's full price, a fresh period from the payment (`forPeriodEnd` null).
+    const forPeriodEnd = basis === 'prorated' ? sub.currentPeriodEnd : null;
+    const amount = quote.charge;
+    // C4: ONE upgrade charge per (subscription, period, target plan) at a time. A pending one is returned, not repeated.
     const prior = await withStore(args.storeId, tx =>
       tx.billingEvent.findMany({
         where: {
@@ -1580,29 +1720,50 @@ export async function changePlan(args: {
           subscriptionId: sub.id,
           type: 'upgrade',
           planCode: plan.code,
-          forPeriodEnd: sub.currentPeriodEnd,
+          forPeriodEnd,
         },
-        select: { status: true },
+        select: { id: true, status: true, amountMinor: true },
       })
     );
-    if (prior.some(p => p.status === 'pending')) {
-      throw new AppError(409, 'UPGRADE_IN_PROGRESS', 'An upgrade charge is already in progress');
+    const pending = prior.find(p => p.status === 'pending');
+    if (pending) {
+      return {
+        mode: 'upgraded',
+        status: 'pending',
+        eventId: pending.id,
+        amountMinor: pending.amountMinor,
+      };
     }
-    const amount = quote.charge;
+    const key = upgradeKey(sub.id, plan.code, sub.currentPeriodEnd, prior.length + 1);
     const eventId = await claimEvent({
       storeId: args.storeId,
       subscriptionId: sub.id,
       type: 'upgrade',
       planCode: plan.code,
       billingInterval: interval,
-      forPeriodEnd: sub.currentPeriodEnd,
+      forPeriodEnd,
       amountMinor: amount.totalMinor,
       charge: amount,
       provider: provider.name,
-      idempotencyKey: upgradeKey(sub.id, plan.code, sub.currentPeriodEnd, prior.length + 1),
+      idempotencyKey: key,
     });
-    if (!eventId)
-      throw new AppError(409, 'UPGRADE_IN_PROGRESS', 'An upgrade charge is already in progress');
+    if (!eventId) {
+      // a concurrent submit claimed the same key first: answer with ITS charge, never charge twice
+      const held = await withStore(args.storeId, tx =>
+        tx.billingEvent.findFirst({
+          where: { storeId: args.storeId, idempotencyKey: key },
+          select: { id: true, status: true, amountMinor: true },
+        })
+      );
+      if (!held)
+        throw new AppError(409, 'UPGRADE_IN_PROGRESS', 'An upgrade charge is already in progress');
+      return {
+        mode: 'upgraded',
+        status: held.status === 'succeeded' || held.status === 'failed' ? held.status : 'pending',
+        eventId: held.id,
+        amountMinor: held.amountMinor,
+      };
+    }
     let token: string;
     try {
       token = encryption.decrypt(sub.providerPaymentMethodRef);
@@ -1619,8 +1780,11 @@ export async function changePlan(args: {
       eventId,
       token,
       amountMinor: amount.totalMinor,
-      idempotencyKey: upgradeKey(sub.id, plan.code, sub.currentPeriodEnd, prior.length + 1),
-      description: `${plan.nameEn} upgrade (${interval}, ${quote.remainingDays}/${quote.periodDays} days)`,
+      idempotencyKey: key,
+      description:
+        basis === 'prorated'
+          ? `${plan.nameEn} upgrade (${interval}, ${quote.remainingDays}/${quote.periodDays} days)`
+          : `${plan.nameEn} (${interval})`,
       now,
     });
     return { mode: 'upgraded', status: r.settled, eventId, amountMinor: amount.totalMinor };

@@ -326,6 +326,7 @@ export default function StoreBillingPage() {
       // Ruling G35-PRORATE-1: show what the change costs (the prorated difference) before anything is charged.
       const { data: q, error: qe } = await apiGet<{
         kind: 'upgrade' | 'downgrade' | 'same';
+        basis?: 'prorated' | 'full';
         amountMinor: number;
         remainingDays: number;
         effectiveAt: string;
@@ -341,10 +342,14 @@ export default function StoreBillingPage() {
       const ok = await askConfirm({
         object: t('changePlanObject', { plan: target ? planName(target) : planCode }),
         consequence: chargesNow
-          ? t('confirmUpgradeProrated', {
-              amount: formatMoney(q.amountMinor, locale, { fixedDecimals: true }),
-              days: q.remainingDays,
-            })
+          ? q.basis === 'full'
+            ? t('confirmUpgradeFull', {
+                amount: formatMoney(q.amountMinor, locale, { fixedDecimals: true }),
+              })
+            : t('confirmUpgradeProrated', {
+                amount: formatMoney(q.amountMinor, locale, { fixedDecimals: true }),
+                days: q.remainingDays,
+              })
           : t('confirmChangeAtPeriodEnd', { date: fmtDate(q.effectiveAt) ?? '' }),
         confirmLabel: chargesNow ? t('confirmUpgradeAction') : t('confirmChangeAction'),
         tone: 'default',
