@@ -289,6 +289,29 @@ function buildOptionFilterClause(optionName: string, values: string[]): Prisma.P
  *
  * One query — aggregate via productOption join — no N+1.
  */
+/**
+ * The highest price a shopper can meet in this store's catalogue, in minor units (PL1): the larger of any
+ * public product's price and any variant's own price. The storefront price filter sizes its slider from it,
+ * so a fixed ceiling can no longer hide the dearer products. Variant-aware (a variant overrides the
+ * product's price), store-wide on purpose (not the current filter), and part of the cached list answer,
+ * which every product write already invalidates.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/catalogue-max-price.test.ts
+export async function catalogueMaxPrice(storeId: string): Promise<number> {
+  const db = await storeDb(storeId);
+  const [p, v] = await Promise.all([
+    db.product.aggregate({
+      where: { storeId, status: 'active', deletedAt: null, audience: 'public' },
+      _max: { price: true },
+    }),
+    db.productVariant.aggregate({
+      where: { product: { storeId, status: 'active', deletedAt: null, audience: 'public' } },
+      _max: { price: true },
+    }),
+  ]);
+  return Math.max(p._max.price ?? 0, v._max.price ?? 0);
+}
+
 async function computeFacets(
   storeId: string,
   baseWhere: Prisma.ProductWhereInput
@@ -2042,10 +2065,11 @@ export class ProductService {
       };
       const positionStoreRef = (await listingFor(storeId)).storeRef;
 
-      const [allMatchingFetched, total, facets] = await Promise.all([
+      const [allMatchingFetched, total, facets, priceMax] = await Promise.all([
         (await storeDb(storeId)).product.findMany(positionFindArgs),
         (await storeDb(storeId)).product.count({ where }),
         computeFacets(storeId, whereForFacets),
+        catalogueMaxPrice(storeId),
       ]);
 
       const allMatchingRaw = withStoreRef(allMatchingFetched, positionStoreRef);
@@ -2091,6 +2115,7 @@ export class ProductService {
           totalPages: cursor ? undefined : Math.ceil(total / limit),
           nextCursor,
           skipCapped: skipCapped || undefined,
+          priceMax,
         },
       };
 
@@ -2135,12 +2160,14 @@ export class ProductService {
       : { ...baseFindManyArgs, skip, take: limit };
 
     // The deals strip has no filter sidebar: skip the facet query on this hot homepage path.
-    const [productsFetched, total, facets] = await Promise.all([
+    const [productsFetched, total, facets, priceMax] = await Promise.all([
       (await storeDb(storeId)).product.findMany(findManyArgs),
       (await storeDb(storeId)).product.count({ where }),
       sort === 'on_sale'
         ? Promise.resolve([] as ProductFacet[])
         : computeFacets(storeId, whereForFacets),
+      // The deals strip has no price filter either.
+      sort === 'on_sale' ? Promise.resolve(0) : catalogueMaxPrice(storeId),
     ]);
     const productsRaw = withStoreRef(productsFetched, listStoreRef);
 
@@ -2168,6 +2195,7 @@ export class ProductService {
         totalPages: cursor ? undefined : Math.ceil(total / limit),
         nextCursor,
         skipCapped: skipCapped || undefined,
+        priceMax,
       },
     };
 
