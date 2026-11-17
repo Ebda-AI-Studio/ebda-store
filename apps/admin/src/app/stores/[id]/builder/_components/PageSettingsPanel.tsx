@@ -18,6 +18,7 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Field } from './SettingsPanel';
+import { Disclosure } from '../../../../../components/ui/Disclosure';
 
 /** The value at `a` or `a.b` inside a settings group. */
 function valueAt(group: unknown, path: string): unknown {
@@ -62,16 +63,13 @@ export function PageSettingsPanel({
         {groups.map((g, i) => {
           const group = doc.siteSettings[g.key];
           return (
-            <details
+            <Disclosure
               key={g.key}
-              open={i === 0}
-              className="rounded-lg border border-border"
-              data-testid={`page-settings-${g.key}`}
+              defaultOpen={i === 0}
+              testId={`page-settings-${g.key}`}
+              title={locale === 'ar' ? g.labelAr : g.labelEn}
             >
-              <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">
-                {locale === 'ar' ? g.labelAr : g.labelEn}
-              </summary>
-              <div className="space-y-4 border-t border-border p-3">
+              <div className="space-y-4">
                 {g.settings.map(s => (
                   <Field
                     key={s.id}
@@ -93,7 +91,7 @@ export function PageSettingsPanel({
                   />
                 ))}
               </div>
-            </details>
+            </Disclosure>
           );
         })}
         {pageKey !== 'home' && onSwitchPage && (
