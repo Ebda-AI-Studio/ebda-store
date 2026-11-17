@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { API_URL } from '../../../lib/api';
+import { localizedMetadata } from '../../../lib/seo/localized-metadata';
 
 /**
  * The guest-safe order summary behind the COD WhatsApp button (Ruling WA-COD-V2-2). Server-rendered and read-only:
@@ -11,11 +12,13 @@ import { API_URL } from '../../../lib/api';
  */
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Order status | حالة الطلب',
-  robots: { index: false, follow: false },
-  referrer: 'no-referrer',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return localizedMetadata({
+    title: ['Order status', 'حالة الطلب'],
+    robots: { index: false, follow: false },
+    referrer: 'no-referrer',
+  });
+}
 
 type Summary = {
   orderNumber: string;
