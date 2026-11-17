@@ -201,7 +201,7 @@ export async function claimGraceStage(
     data: [args],
     skipDuplicates: true,
   });
-  return count === 1;
+  return count > 0;
 }
 
 /** InstaPay subscriptions in grace whose suspension is within the next day. */

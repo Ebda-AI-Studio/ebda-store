@@ -1145,7 +1145,7 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
         data: { status: 'past_due', currentPeriodEnd: periodEnd, nextRetryAt: suspendAt },
       });
       const won =
-        upd.count === 1 &&
+        upd.count > 0 &&
         (await claimGraceStage(tx, {
           storeId: sub.storeId,
           subscriptionId: sub.id,
@@ -1182,7 +1182,7 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
       data: { nextRetryAt: null },
     });
     const won =
-      upd.count === 1 &&
+      upd.count > 0 &&
       (await claimGraceStage(tx, {
         storeId: sub.storeId,
         subscriptionId: sub.id,
