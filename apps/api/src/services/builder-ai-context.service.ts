@@ -10,12 +10,13 @@ import { withStore } from '@ebda/database';
 import { storeDb } from '../lib/repo-factory';
 
 /** A page document is small; the catalogue sample must not dwarf it. */
+// pq-allow(unused-export): test seam, imported by tests/unit/builder-ai-context.test.ts
 export const AI_CONTEXT_MAX_PRODUCTS = 40;
-export const AI_CONTEXT_MAX_CATEGORIES = 30;
+const AI_CONTEXT_MAX_CATEGORIES = 30;
 /** Internal pages a section may link to, besides each listed product and category. */
 const STATIC_LINKS = ['/products', '/categories', '/about', '/contact', '/faq'] as const;
 
-export interface BuilderAiCatalogue {
+interface BuilderAiCatalogue {
   store: { name: string; nameAr: string | null; template: string | null; look: string | null };
   categories: Array<{ slug: string; name: string; nameAr: string | null }>;
   products: Array<{
