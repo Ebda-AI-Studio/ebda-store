@@ -6,13 +6,14 @@
  * The classic form builder is retired: its old route and /hero, /navigation, /pages redirect
  * here, keeping the deep link (Ruling VE-6).
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { isPageKind, type PageKind } from '@ebda/shared';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { BuilderEditor } from './_components/BuilderEditor';
 import { parseDeepLink } from './_lib/deeplink';
+import { builderNeedsDocumentReload } from '@/lib/csp';
 
 export default function BuilderPage() {
   const params = useParams();
@@ -37,6 +38,11 @@ export default function BuilderPage() {
     [router, pathname, search]
   );
   const deepLink = useMemo(() => parseDeepLink(search), [search]);
+  // The document CSP (frame-src) is fixed at first load; see builderNeedsDocumentReload.
+  useEffect(() => {
+    const nav = performance.getEntriesByType('navigation')[0];
+    if (builderNeedsDocumentReload(nav?.name, window.location.href)) window.location.reload();
+  }, []);
   const { user, isLoading } = useAuth();
   const t = useT('builder');
   if (isLoading || !user)

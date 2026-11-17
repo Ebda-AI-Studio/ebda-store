@@ -14,7 +14,7 @@ import { BlogPostClient, type BlogDetail } from './BlogPostClient';
  * so the SAME rendering logic serves both `app/blog/[slug]/page.tsx`
  * (legacy, header-based) and
  * `app/tenant-store/[tenant]/[locale]/blog/[slug]/page.tsx` (new, params-based,
- * dark-launched). See docs/plans/2026-07-12-tenant-cacheable-routing.md
+ * dark-launched). See docs/plans/done/2026-07-12-tenant-cacheable-routing.md
  * §3.6/§9 — this is the one Track-A route the plan explicitly calls out as
  * needing the resolver swap (the blog index itself is a pure client shell).
  */
@@ -44,7 +44,7 @@ export async function fetchPost(storeId: string, slug: string): Promise<BlogDeta
   // store was verified from this header and it equals the path id; without it every 404 here is a counted miss.
   const res = await fetch(`${API_URL}/public/${storeId}/blog/${encodeURIComponent(slug)}`, {
     headers: { 'X-Store-ID': storeId },
-    next: { revalidate: 60 },
+    next: { revalidate: 60, tags: [`blog:${storeId}`] },
   });
   if (res.status === 404) return null; // definitive miss → caller resolves redirect / 404s
   if (!res.ok) throw new Error(`blog post fetch failed: ${res.status}`); // transient (5xx) → let it 500

@@ -43,7 +43,7 @@ interface RouteErrorFallbackProps {
  *    not be resolved for a TRANSIENT reason (a 429 from `storeResolveLimiter`,
  *    a 5xx, a dropped connection). That case used to render as a branded 404
  *    telling the shopper the shop does not exist — see
- *    `docs/plans/2026-09-16-store-resolve-transient-not-404.md`.
+ *    `docs/plans/done/2026-09-16-store-resolve-transient-not-404.md`.
  *
  * Keeping the branch here rather than in each boundary is the platform-level
  * rule: the PLP, PDP and bundle PDP each have their own `error.tsx` and catch

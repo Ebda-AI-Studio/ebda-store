@@ -1,5 +1,5 @@
 /**
- * Cache invalidation + entitlement guard for the B2B wholesale write paths (docs/plans/2026-10-21-b2b-wholesale.md Task 4).
+ * Cache invalidation + entitlement guard for the B2B wholesale write paths (docs/plans/done/2026-10-21-b2b-wholesale.md Task 4).
  *
  * Price, MOQ, audience, group membership and approval status are NEVER-stale (cache-invalidate-every-write-path): every
  * writer calls `invalidateB2bPricing` AFTER its transaction commits (it clears the Redis / KV product caches and purges the
@@ -31,4 +31,19 @@ export async function assertWholesaleEntitled(storeId: string): Promise<void> {
       }
     );
   }
+}
+
+/** True when a customer-group body switches a wholesale benefit ON (so the plan gate applies); turning one off never needs the entitlement. */
+export function enablesWholesale(b: {
+  pricingMode?: string;
+  discountBps?: number;
+  requiresApproval?: boolean;
+  isWholesale?: boolean;
+}): boolean {
+  return (
+    (b.pricingMode !== undefined && b.pricingMode !== 'none') ||
+    (b.discountBps !== undefined && b.discountBps > 0) ||
+    b.requiresApproval === true ||
+    b.isWholesale === true
+  );
 }

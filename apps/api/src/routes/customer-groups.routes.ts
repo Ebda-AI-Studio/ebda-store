@@ -12,7 +12,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { tenantContext } from '../middleware/tenant-context';
 import { CustomerGroupService } from '../services/customer-group.service';
-import { assertWholesaleEntitled } from '../lib/b2b-invalidate';
+import { assertWholesaleEntitled, enablesWholesale } from '../lib/b2b-invalidate';
 
 const router = Router();
 
@@ -34,16 +34,6 @@ const createSchema = z.object({
 });
 
 const updateSchema = createSchema.partial();
-
-/** True when the body switches a wholesale benefit ON (so the plan gate applies). */
-function enablesWholesale(b: z.infer<typeof createSchema> | z.infer<typeof updateSchema>): boolean {
-  return (
-    (b.pricingMode !== undefined && b.pricingMode !== 'none') ||
-    (b.discountBps !== undefined && b.discountBps > 0) ||
-    b.requiresApproval === true ||
-    b.isWholesale === true
-  );
-}
 
 const assignSchema = z.object({
   groupId: z.string().uuid().nullable(),

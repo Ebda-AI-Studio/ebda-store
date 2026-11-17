@@ -12,6 +12,7 @@ import { apiGet, apiPut } from '../../../../../../lib/api';
 import { type ProductSummary } from './_components/ProductSearch';
 import { RelationSection } from './_components/RelationSection';
 import { AiSuggestionsPanel } from './_components/AiSuggestionsPanel';
+import { AutoRecommendationsSwitch } from './_components/AutoRecommendationsSwitch';
 
 interface ProductRelation {
   targetProductId: string;
@@ -212,6 +213,8 @@ export default function ProductRecommendationsPage() {
           {error}
         </div>
       )}
+
+      <AutoRecommendationsSwitch storeId={storeId} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <RelationSection

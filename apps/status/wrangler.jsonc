@@ -5,7 +5,7 @@
   "name": "ebda-status",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
-  "triggers": { "crons": ["* * * * *"] },
+  "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   // Workers Trace Events Logpush (G7); the job to R2 is created by scripts/ops/cf-logs-setup.sh
   "logpush": true,
@@ -14,9 +14,10 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StatusStore"] }],
   "vars": {
+    // Probes run every 5 min (was 1 min; frugal-monitoring 2026-11-14): 2 failed rounds open an incident (detected in 5-10 min, was 3-4) and 1 good round resolves.
     // Consecutive failed probes before an incident opens / consecutive successes before it resolves.
-    "FAIL_THRESHOLD": "3",
-    "RECOVER_THRESHOLD": "2",
+    "FAIL_THRESHOLD": "2",
+    "RECOVER_THRESHOLD": "1",
   },
   // STATUS_SECRET (shared secret for POST /api/incidents*) is set with `wrangler secret put`.
   // The route is what beats the storefront wildcard (*.ebda.app/*), which runs BEFORE custom domains (cf-routes.cjs).

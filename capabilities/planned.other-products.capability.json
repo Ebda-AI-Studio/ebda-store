@@ -1,0 +1,28 @@
+{
+  "id": "planned.other-products",
+  "status": "planned",
+  "plan": "register rows 225-229",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "منتجات ابدأ القادمة",
+  "titleEn": "Ebda CRM, ERP, Invites, Ads, Quote Studio",
+  "screens": ["n/a"],
+  "api": ["n/a"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["فيه CRM من ابدأ؟", "ابدأ Ads امتى؟"],
+    "en": ["Is there an Ebda CRM?"]
+  },
+  "steps": ["Not built; reserved pages only."],
+  "edgeCases": [],
+  "gaps": ["whole products NOT BUILT"]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "product.faqs",
+  "status": "live",
+  "area": "products",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اسئلة المنتج",
+  "titleEn": "Product FAQs",
+  "screens": ["/stores/[id]/products/[productId]/edit"],
+  "api": [
+    "GET/POST /stores/:storeId/products/:id/faqs",
+    "PUT/DELETE .../faqs/:faqId",
+    "POST /stores/:storeId/ai/product-faqs/draft"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "compensating",
+    "note": "add: undo deletes the FAQ the assistant just added (deleting is a confirm-class action, so undo asks for a confirmation); deleting an FAQ is irreversible"
+  },
+  "helpArticle": "product-tags-faqs-and-variants",
+  "questions": {
+    "ar": ["اضيف اسئلة شائعة لمنتج"],
+    "en": ["Add FAQs to a product"]
+  },
+  "steps": ["Product edit > FAQs; AI drafts."],
+  "edgeCases": [
+    "AI quota",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

@@ -1,0 +1,48 @@
+{
+  "id": "team.staff",
+  "status": "live",
+  "area": "team",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الموظفين والصلاحيات",
+  "titleEn": "Invite, list, remove staff members",
+  "screens": ["/stores/[id]/staff"],
+  "api": [
+    "GET/POST /stores/:storeId/staff",
+    "GET .../staff/invites",
+    "DELETE .../invites/:inviteId",
+    "DELETE .../staff/:userId"
+  ],
+  "mcpTool": null,
+  "planGate": "staff_accounts (limit maxStaff 2/5/15)",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (remove then re-invite)"
+  },
+  "helpArticle": "staff-accounts",
+  "questions": {
+    "ar": [
+      "ازاي اضيف موظف؟",
+      "الموظف ميشوفش الارباح",
+      "شيل موظف سابني",
+      "عندي فريق عايز صلاحيات مختلفة"
+    ],
+    "en": ["How do I add a team member?", "Limit what a staff member can see"]
+  },
+  "steps": ["Staff page: invite by email; staff role is fixed (no custom roles)."],
+  "edgeCases": [
+    "Seat cap by plan: Basic 2, Growth 5, Business 15",
+    "Staff cannot see finance/settings hubs, refunds, delete products",
+    "Role/MFA change applies on next action",
+    "Invite expired",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No custom roles/permissions editor (one fixed staff role)"],
+  "assistantNote": "grants access: confirm"
+}
