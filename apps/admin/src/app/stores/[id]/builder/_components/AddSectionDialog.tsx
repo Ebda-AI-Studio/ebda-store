@@ -103,14 +103,11 @@ export function AddSectionDialog({
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('all');
-  const [entered, setEntered] = useState(false);
   useRestoreFocus();
   useEffect(() => {
     ref.current?.showModal();
     searchRef.current?.focus();
     setCategory(readLastCategory());
-    const raf = requestAnimationFrame(() => setEntered(true));
-    return () => cancelAnimationFrame(raf);
   }, []);
   const pickCategory = (c: string) => {
     setCategory(c);
@@ -170,9 +167,7 @@ export function AddSectionDialog({
           searchRef.current?.focus();
         }
       }}
-      className={`w-[min(56rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-black/60 transition-[opacity,transform] duration-200 ease-out motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:transition-none ${
-        entered ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-      }`}
+      className="editor-motion-dialog w-[min(56rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
       data-testid="add-section-dialog"
     >
       <div className="flex items-center justify-between border-b border-border px-5 py-3">

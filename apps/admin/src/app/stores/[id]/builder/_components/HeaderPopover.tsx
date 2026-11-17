@@ -90,7 +90,7 @@ export function HeaderPopover({
           data-popover-panel
           role={panelRole}
           aria-label={panelLabel}
-          className={`absolute top-full z-50 mt-1 min-w-48 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-md ${
+          className={`editor-motion-pop absolute top-full z-50 mt-1 min-w-48 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-md ${
             align === 'end' ? 'end-0' : 'start-0'
           } ${panelClassName}`}
         >

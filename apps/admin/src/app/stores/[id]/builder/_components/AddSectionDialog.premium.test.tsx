@@ -118,9 +118,8 @@ describe('AddSectionDialog premium', () => {
     const c = screen.getByTestId('add-section-dialog').className;
     expect(c).toContain('rounded-lg');
     expect(c).not.toContain('rounded-2xl');
-    expect(c).toContain('duration-200');
-    expect(c).toContain('motion-reduce:transition-none');
-    expect(c).toContain('motion-reduce:translate-y-0');
+    // the shared editor recipe (globals.css: 200ms, ease-out token, off under reduced motion)
+    expect(c).toContain('editor-motion-dialog');
   });
 
   it('35: a tile at its limit shows "Max N reached" and Show existing selects the existing section', () => {

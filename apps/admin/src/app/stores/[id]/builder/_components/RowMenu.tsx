@@ -104,7 +104,7 @@ export function RowMenu({ label, items }: { label: string; items: RowMenuItem[] 
           id={menuId}
           role="menu"
           style={{ position: 'fixed', ...pos }}
-          className="z-50 min-w-44 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+          className="editor-motion-pop z-50 min-w-44 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
         >
           {items.map((item, i) => (
             <div key={item.label}>

@@ -10822,7 +10822,19 @@
     "undone": "Undone",
     "redone": "Redone",
     "loadErrorTitle": "We couldn't open the editor",
-    "loadErrorHint": "Check your connection and try again. Everything you saved is safe."
+    "loadErrorHint": "Check your connection and try again. Everything you saved is safe.",
+    "shortcuts": {
+      "title": "Keyboard shortcuts",
+      "undo": "Undo",
+      "redo": "Redo",
+      "move": "Move the selected section up or down",
+      "canvas": "Show the selected section on the page",
+      "tabs": "Switch between the panel tabs",
+      "search": "Search in Add section",
+      "close": "Close",
+      "help": "Show this list",
+      "esc": "Close a menu or window"
+    }
   },
   "instapayReceipt": {
     "form": {

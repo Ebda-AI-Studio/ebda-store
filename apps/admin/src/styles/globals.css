@@ -810,3 +810,101 @@ main > div {
     animation: ebda-alerts-fade 220ms ease-out both;
   }
 }
+
+/* ── Visual editor premium pass (findings 65, 67): scoped to the editor shell, never global ── */
+
+/* One focus ring for every editor control: the gold --ring token. Beats each control's own ring
+   utility (they differ in colour and offset) by silencing the Tailwind ring shadow. */
+.editor-shell :focus-visible {
+  outline: 2px solid hsl(var(--ring)) !important;
+  outline-offset: 2px;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  box-shadow: none !important;
+}
+
+/* Gold selection tint inside the editor panes. */
+.editor-shell ::selection {
+  background: hsl(var(--primary) / 0.28);
+  color: inherit;
+}
+
+/* Thin, themed scrollbars for the editor panes (Firefox + WebKit). */
+.editor-shell * {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+}
+
+/* Numbers line up in steppers and number fields. */
+.editor-shell input[type='number'],
+.editor-shell input[inputmode='numeric'],
+.editor-shell input[inputmode='decimal'],
+.editor-shell [data-ui='stepper'] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ONE enter recipe for popovers, dialogs and drawers: 150-200ms, the project's ease-out, state only. */
+@keyframes editor-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+@keyframes editor-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes editor-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes editor-drawer-in-start {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+@keyframes editor-drawer-in-end {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+.editor-motion-pop {
+  animation: editor-pop-in var(--dur-fast) var(--ease-out) both;
+}
+.editor-motion-dialog[open] {
+  animation: editor-dialog-in var(--dur-base) var(--ease-out) both;
+}
+.editor-motion-dialog[open]::backdrop {
+  animation: editor-backdrop-in var(--dur-base) var(--ease-out) both;
+}
+/* Drawers only exist as overlays below lg; they slide from their own edge (mirrored in RTL). */
+@media (max-width: 1023.98px) {
+  .editor-motion-drawer-start {
+    animation: editor-drawer-in-start var(--dur-base) var(--ease-out) both;
+  }
+  .editor-motion-drawer-end {
+    animation: editor-drawer-in-end var(--dur-base) var(--ease-out) both;
+  }
+  [dir='rtl'] .editor-motion-drawer-start {
+    animation-name: editor-drawer-in-end;
+  }
+  [dir='rtl'] .editor-motion-drawer-end {
+    animation-name: editor-drawer-in-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-motion-pop,
+  .editor-motion-dialog[open],
+  .editor-motion-dialog[open]::backdrop,
+  .editor-motion-drawer-start,
+  .editor-motion-drawer-end {
+    animation: none !important;
+  }
+}

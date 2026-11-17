@@ -64,6 +64,7 @@ import { useDrawerA11y } from '../_lib/use-drawer-a11y';
 import { resolveDeepLink, type DeepLinkParams } from '../_lib/deeplink';
 import { locateAndHighlight } from '../../../../../lib/setting-highlight';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ShortcutSheet } from './ShortcutSheet';
 import type { FontEntry } from '../../../../../components/section-design/FontsCard';
 import { ImageSwapDialog } from './ImageSwapDialog';
 import { Canvas } from './Canvas';
@@ -882,7 +883,11 @@ export function BuilderEditor({
   );
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground" data-testid="builder">
+    <div
+      className="editor-shell flex h-screen flex-col bg-background text-foreground"
+      data-testid="builder"
+    >
+      <ShortcutSheet />
       <div
         role="status"
         aria-live="polite"
@@ -1053,7 +1058,7 @@ export function BuilderEditor({
           label={t('panes.resizeStart')}
           asideRef={startRef}
           aria-label={t('panes.start')}
-          className={`${drawer === 'start' ? 'absolute inset-y-0 start-0 z-20 flex w-80 max-w-[85vw] shadow-xl' : 'hidden'} flex-col border-e border-border bg-card lg:relative lg:flex lg:shadow-none`}
+          className={`${drawer === 'start' ? 'editor-motion-drawer-start absolute inset-y-0 start-0 z-20 flex w-80 max-w-[85vw] shadow-xl' : 'hidden'} flex-col border-e border-border bg-card lg:relative lg:flex lg:shadow-none`}
         >
           {startPane}
         </ResizablePane>
@@ -1085,7 +1090,7 @@ export function BuilderEditor({
           id="builder-settings"
           tabIndex={-1}
           aria-label={t('panes.end')}
-          className={`${drawer === 'end' ? 'absolute inset-y-0 end-0 z-20 flex w-80 max-w-[85vw] shadow-xl' : 'hidden'} flex-col border-s border-border bg-card lg:relative lg:flex lg:shadow-none`}
+          className={`${drawer === 'end' ? 'editor-motion-drawer-end absolute inset-y-0 end-0 z-20 flex w-80 max-w-[85vw] shadow-xl' : 'hidden'} flex-col border-s border-border bg-card lg:relative lg:flex lg:shadow-none`}
         >
           {endPane}
         </ResizablePane>

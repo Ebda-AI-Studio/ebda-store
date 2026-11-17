@@ -9,7 +9,7 @@
  * never wraps: it is `flex-nowrap` and every group shrinks by hiding words, not by dropping a line.
  */
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import {
   ArrowLeft,
   ChevronDown,
@@ -27,6 +27,7 @@ import type { Viewport } from '@ebda/shared';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { rovingKeyDown } from '../_lib/roving';
+import { useIsMac } from '../_lib/use-is-mac';
 import { HeaderPopover } from './HeaderPopover';
 
 type HeaderSaveState = 'loading' | 'saved' | 'dirty' | 'saving' | 'error' | 'conflict';
@@ -48,17 +49,6 @@ const DOT: Record<HeaderSaveState, string> = {
   error: 'bg-destructive',
   conflict: 'bg-destructive',
 };
-
-/** True on Apple platforms, where the shortcut modifier is Cmd. Decided after mount (SSR-safe). */
-function useIsMac(): boolean {
-  const [mac, setMac] = useState(false);
-  useEffect(() => {
-    const nav = window.navigator as Navigator & { userAgentData?: { platform?: string } };
-    const p = nav.userAgentData?.platform ?? nav.platform ?? '';
-    setMac(/mac|iphone|ipad/i.test(p));
-  }, []);
-  return mac;
-}
 
 /** A CSS tooltip: shown on hover and keyboard focus of the wrapping group, never the only name. */
 function Tip({ text, children }: { text: string; children: ReactNode }) {

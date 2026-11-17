@@ -36,7 +36,7 @@ export function ConfirmDialog({
       onClose={onCancel}
       aria-labelledby="confirm-title"
       aria-describedby="confirm-body"
-      className="w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
+      className="editor-motion-dialog w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-0 text-foreground backdrop:bg-black/60"
       data-testid="confirm-dialog"
     >
       <div className="space-y-2 p-5">
