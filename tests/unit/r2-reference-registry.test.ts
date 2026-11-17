@@ -76,6 +76,10 @@ const URL_SHAPED =
  * column, or that is also registered, fails the suite.
  */
 const NOT_R2_REFERENCES: Record<string, string> = {
+  'TrustRequest.pageUrl':
+    'the in-app path or https page a merchant was on when they contacted Ebda Store (starts with / or https://, at most 500 characters); never one of our uploads',
+  'TrustRequest.evidenceUrl':
+    'an https link the merchant pastes as proof for a slug claim or store cap request (validated https, at most 500 characters); an external page, never one of our uploads',
   'CatalogImportItem.fileId':
     'foreign key to catalog_import_files.id (a uuid), never a URL; the stored original lives in CatalogImportFile.storageKey in the private bucket',
   'CatalogImportItem.variants':

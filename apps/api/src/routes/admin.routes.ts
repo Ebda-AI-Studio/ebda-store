@@ -26,7 +26,7 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
 import { bustStoreCaches } from '../services/store.service';
 import { featureService } from '../services/feature.service';
-import { invalidateCached } from '../lib/public-cache';
+import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
 import { listGrants } from '../services/billing/grants.service';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
@@ -123,6 +123,7 @@ import {
   hubUsers,
 } from '../lib/platform-hub';
 import { storeDb } from '../lib/repo-factory';
+import { closeClaimsOnSlugGrant } from '../services/trust-grants';
 import { customerRows } from '../lib/customer-directory';
 
 const router = Router();
@@ -506,6 +507,7 @@ router.post(
         productIds,
       });
       if (report.apply) {
+        if (report.applied.length > 0) await invalidateStoreProductCaches(req.params.id);
         await auditLog({
           action: 'product.names_repaired',
           userId: req.user!.userId,
@@ -1072,6 +1074,7 @@ router.put(
     try {
       const { id } = req.params;
       const { name, slug, plan, status } = updateStoreAdminSchema.parse(req.body);
+      await closeClaimsOnSlugGrant(req.user!.userId, slug);
 
       // Pre-read so a slug change can bust the OLD slug's cache key too.
       // NEON-ZERO (Ruling NZ-C-4): the store row is read and written through its own backend (DO / D1 directory), the

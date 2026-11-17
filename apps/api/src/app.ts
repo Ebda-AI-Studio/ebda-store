@@ -39,6 +39,7 @@ import { lookupStore } from './lib/definer';
 import './services/platform/router';
 import './lib/store-scope-resolver';
 import { redis } from './services/redis.service';
+import { erasureFlagState } from './services/account-closure.wiring';
 import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
 import { SentryService } from './services/sentry.service';
@@ -528,6 +529,10 @@ app.get(
     } catch {
       checks.redis = { status: 'disconnected' };
     }
+
+    // S3: surface the PDPL erasure flag. Informational (does not flip overall health): off = merchant/staff account
+    // closure answers 503 ERASURE_NOT_ENABLED and records the request. Enabling it is an operator decision.
+    checks.pdplErasure = { status: erasureFlagState() };
 
     // Get circuit breaker states
     const circuits = circuitBreaker.getAllStates();

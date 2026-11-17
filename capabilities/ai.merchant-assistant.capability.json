@@ -1,0 +1,50 @@
+{
+  "id": "ai.merchant-assistant",
+  "status": "live",
+  "area": "ai",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "مساعد ابدأ ستور: اسأله ازاي",
+  "titleEn": "Ebda Store assistant: ask how to do it",
+  "screens": ["/stores/[id]"],
+  "api": [
+    "GET /stores/:storeId/assistant/status",
+    "POST /stores/:storeId/assistant/turn",
+    "GET /stores/:storeId/assistant/conversations/:conversationId",
+    "POST /stores/:storeId/assistant/feedback"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none"
+  },
+  "helpArticle": "ebda-assistant",
+  "questions": {
+    "ar": [
+      "ازاي اعمل خصم؟",
+      "فين صفحة الشحن؟",
+      "اعمل ايه عشان اربط دومين؟",
+      "el assistant bey3mal eh"
+    ],
+    "en": ["How do I...?", "Where is the shipping page?"]
+  },
+  "steps": [
+    "Open the assistant panel in the admin (button or Ctrl/Cmd+J) and ask how to do something",
+    "It answers from the help guides and from your own data it may read; it links the screen with \"show me where\"",
+    "Off by default per store; a super admin turns it on (answer-only, then suggest, then act) and can switch it off at once",
+    "It never asks for a password, key or code: it links the secure screen"
+  ],
+  "edgeCases": [
+    "Mode off or AI switched off for the store: the panel is hidden and the route answers status off",
+    "Over 150 turns per store per day: the reply says the limit was reached",
+    "A team member without the permission gets no answer about that area, only where the owner can do it",
+    "The store is not on its Durable Object yet: the route answers 503, never a fallback"
+  ],
+  "gaps": [],
+  "readOnlyPost": {
+    "routes": ["POST /stores/:storeId/assistant/turn", "POST /stores/:storeId/assistant/feedback"],
+    "reason": "The turn route only answers and prepares preview cards; nothing in the store changes from it. The only thing written is the assistant's own masked journal rows. Changes are applied by the separate ai.assistant-actions routes."
+  }
+}

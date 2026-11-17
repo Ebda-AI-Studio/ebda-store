@@ -16,6 +16,8 @@ export type JobDataClass = 'none' | 'ported' | 'unported';
 
 export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'heartbeat',
+  // STORE-EDGE-4: re-sends a storefront cache purge (HTTP to the storefront Worker); no store table
+  'storefront-purge-retry',
   'gmail-alert-poller',
   'alerts-failure-watch',
   'audit-log-archive-weekly',
@@ -45,6 +47,8 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
 ]);
 
 export const PORTED_JOBS: ReadonlySet<string> = new Set([
+  // STORE-EDGE-4: reads the store's bundle windows through withStoreDb (storeDb), then POSTs the storefront purge
+  'storefront-bundle-boundary',
   'wholesale-pending-nudge-cron',
   // reads through storeDb and disarms through the DO money op (Ruling CF-PAY-1)
   'order-status-fanout-stuck-sweep',

@@ -102,6 +102,7 @@ const VALID: Record<string, unknown> = {
   'merchant_api_keys.scopes': '[]',
   'instapay_receipts.kind': 'order',
   'instapay_auto_confirmations.reasons': '[]',
+  'trust_requests.kind': 'support',
 };
 const count = (db: DatabaseSync, table: string, where: string, ...v: unknown[]) =>
   Number(

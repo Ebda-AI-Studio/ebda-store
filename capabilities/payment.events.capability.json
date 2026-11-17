@@ -1,0 +1,43 @@
+{
+  "id": "payment.events",
+  "status": "live",
+  "area": "payments",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "سجل عمليات الدفع",
+  "titleEn": "Payment event log and retry",
+  "screens": ["/stores/[id]/orders/[orderId]"],
+  "api": [
+    "GET /payments/order/:orderId",
+    "GET /payments/:id/events",
+    "GET /payments/events/:eventId/payload",
+    "POST /payments/retry/:paymentId"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "payment-abandonments-and-events",
+  "questions": {
+    "ar": [
+      "العميل بيقول دفع وماوصلنيش",
+      "ايه حالة الدفع؟",
+      "العميل دفع بس الاوردر مش مدفوع",
+      "ايه اللي حصل في دفع الاوردر ده؟"
+    ],
+    "en": ["Customer says they paid but order shows unpaid"]
+  },
+  "steps": ["Order > payments."],
+  "edgeCases": [
+    "Webhook delayed",
+    "Duplicate callbacks idempotent",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

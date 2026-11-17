@@ -8,6 +8,7 @@ import { catalogImportUploadsSweep } from './catalog-import-uploads-sweep';
 import { bulkImportOrphanCleanup } from './bulk-import-orphan-cleanup';
 import { invoiceEmail } from './invoice-email';
 import { heartbeat } from './heartbeat';
+import { storefrontPurgeRetry, storefrontBundleBoundary } from './storefront-purge';
 import { auditLogArchive } from './audit-log-archive';
 import { bulkAiTranslate } from './bulk-ai-translate';
 import { bulkAiSeo } from './bulk-ai-seo';
@@ -114,6 +115,8 @@ const allInngestFunctions: JobDef[] = [
   bulkImportOrphanCleanup,
   invoiceEmail,
   heartbeat,
+  storefrontPurgeRetry,
+  storefrontBundleBoundary,
   auditLogArchive,
   bulkAiTranslate,
   bulkAiSeo,

@@ -58,6 +58,8 @@ export type NavLabels = {
   /** Legal documents + material-change notices (super_admin only, Ruling LEGAL-4) */
   platformPolicyUpdates: string;
   platformCiInsights: string;
+  platformActivation: string;
+  platformTrustRequests: string;
   /** Platform-wide settings, e.g. Ebda's own VAT (super_admin only) */
   platformSettings: string;
   // Super-admin store-scoped item
@@ -142,6 +144,18 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       icon: 'M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2V17h5v-1.1c0-.8.4-1.5 1-2A6 6 0 0012 3z M10 21h4',
     },
     {
+      // Funnel icon — merchant activation: time from signup to first order, help needed, where orders stopped.
+      name: labels.platformActivation,
+      href: '/activation',
+      icon: 'M3 4h18l-7 8v6l-4 2v-8L3 4z',
+    },
+    {
+      // Life-buoy icon — what merchants ask of staff: support, appeals, protected address claims, store limit requests.
+      name: labels.platformTrustRequests,
+      href: '/trust-requests',
+      icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zm0 5a4 4 0 100 8 4 4 0 000-8zM5.6 5.6l3.2 3.2m6.4 6.4l3.2 3.2m0-12.8l-3.2 3.2m-6.4 6.4l-3.2 3.2',
+    },
+    {
       // Cog icon — platform-wide settings (Ebda's own VAT).
       name: labels.platformSettings,
       href: '/platform-settings',
@@ -217,7 +231,11 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       // Trending-up arrow (Heroicons v2 `arrow-trending-up`) — a rising
       // line reads as growth/analytics; visually distinct from the new
       // archive-box on Stock so the two hubs no longer look alike.
-      icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22 M16.106 8.818l5.94 2.281 M22.046 11.099l-2.28 5.941',
+      // Absolute coordinates: the old path's arrowhead was anchored 6px
+      // left of the line tip (a floating "L"). Heroicons v2 geometry, both
+      // arrow barbs now start at the tip (21.86, 8.82). Not directional-RTL
+      // (a rising trend reads the same in both languages).
+      icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519L21.86 8.818 M21.86 8.818L15.92 6.538 M21.86 8.818l-2.28 5.941',
     },
     {
       name: labels.marketing,

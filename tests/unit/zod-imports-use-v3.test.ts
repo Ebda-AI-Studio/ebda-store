@@ -12,7 +12,8 @@ const ALLOWED = new Set([
   // The WhatsApp contract is byte-pinned (sha256) to the Ebda Chat product's copy, which imports bare 'zod':
   // this repo cannot rewrite it alone. Its schemas are plain z.object / z.enum, so v4 behaves the same here.
   'apps/api/src/contracts/wa-v1.ts',
-  // Vendored @ebda/foundation (foundation.lock.json): byte-pinned, schemas are plain z.object / z.enum.
+  // The vendored @ebda/foundation capability schema is byte-pinned (sha256, foundation-parity test) and written against
+  // the zod 4 API on purpose: it is a shared module with Ebda Chat, so this repo cannot rewrite it alone.
   'packages/shared/src/foundation/capability.ts',
   'tests/unit/zod-huge-array-bounds.test.ts',
   'tests/unit/zod-imports-use-v3.test.ts',

@@ -7,6 +7,10 @@ import { gateBackorderPayload } from '../lib/effective-inventory';
 import { featureService } from '../services/feature.service';
 import { recommendationService } from '../services/recommendation.service';
 import logger from '../lib/logger';
+import { StoreService } from '../services/store.service';
+import { auditLog } from '../middleware/security';
+import { getAuthUser } from '../utils/store-helpers';
+import { autoRecommendationsEnabled } from '../lib/recommendations/auto-setting';
 
 // TWO routers, deliberately (#1993): the admin half is mounted ONLY at the
 // bare '/stores' prefix; `publicRouter` is the only thing mounted at
@@ -162,6 +166,63 @@ router.post(
       });
 
       res.json({ success: true, data: { message: 'FBT recalculation started' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET/PUT /:storeId/recommendations/auto-setting — the merchant's switch for automatic recommendations
+// (bought-together, similar items, AI picks; absent = on). Deliberately NOT behind `upsell_crosssell`: turning the
+// automatic part off must stay possible for every store. Curated picks are unaffected either way.
+const autoSettingSchema = z.object({ enabled: z.boolean() });
+
+router.get(
+  '/:storeId/recommendations/auto-setting',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const store = await StoreService.getById(req.params.storeId);
+      res.json({ success: true, data: { enabled: autoRecommendationsEnabled(store.settings) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  '/:storeId/recommendations/auto-setting',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const parsed = autoSettingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_BODY', message: 'enabled must be true or false' },
+        });
+        return;
+      }
+      const { enabled } = parsed.data;
+      await StoreService.setAutoRecommendationsEnabled(storeId, enabled);
+      // The cached product lists were built under the old setting.
+      await recommendationService.invalidateAllProductCaches(storeId);
+      await auditLog({
+        action: 'store.auto_recommendations_switch',
+        userId: getAuthUser(req).userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        storeId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        details: { enabled },
+      });
+      res.json({ success: true, data: { enabled } });
     } catch (error) {
       next(error);
     }

@@ -8,6 +8,10 @@ const send = vi.hoisted(() => vi.fn(async (..._a: unknown[]) => ({ messageId: 's
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+// An operational store: the suspension guard (Ruling SUSPEND-OUT-1) reads it before the placeholder filter runs.
+vi.mock('@api/lib/definer', () => ({
+  lookupStore: async (m: { id?: string }) => ({ id: m.id, status: 'active' }),
+}));
 vi.mock('@ebda/database', () => ({
   prisma: {},
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
