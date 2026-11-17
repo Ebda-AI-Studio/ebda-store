@@ -162,9 +162,6 @@ jobs:
       skip: ${{ steps.decide.outputs.skip }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          sparse-checkout: scripts/ci/tested-tree.mjs
-          sparse-checkout-cone-mode: false
       - name: Private TMPDIR per runner
         # same rule as every Node job here (tests/unit/ci-private-tmpdir.test.ts): two runners on one VM share /tmp
         run: |
