@@ -165,6 +165,11 @@ jobs:
         with:
           sparse-checkout: scripts/ci/tested-tree.mjs
           sparse-checkout-cone-mode: false
+      - name: Private TMPDIR per runner
+        # same rule as every Node job here (tests/unit/ci-private-tmpdir.test.ts): two runners on one VM share /tmp
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
