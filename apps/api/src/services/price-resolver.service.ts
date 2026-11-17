@@ -27,7 +27,13 @@
  */
 import { customerRow, customerRows, isLiveCustomer } from '../lib/customer-directory';
 import { prisma } from '@ebda/database';
-import { resolveUnitPrice, type BuyerGroup, type PriceTierRow, type Resolved } from '@ebda/shared';
+import {
+  isOverrideExpired,
+  resolveUnitPrice,
+  type BuyerGroup,
+  type PriceTierRow,
+  type Resolved,
+} from '@ebda/shared';
 import { featureService } from './feature.service';
 import { getAutomationFlags } from './plan-entitlements';
 import type { BuyerIdentity } from '../lib/buyer-identity';
@@ -44,8 +50,7 @@ export async function wholesaleEntitledUncached(storeId: string): Promise<boolea
     select: { enabled: true, expiresAt: true },
   });
   // An expired override no longer decides (Ruling SF-EXPIRY-1): fall through to the plan limit.
-  if (override && !(override.expiresAt && override.expiresAt.getTime() <= Date.now()))
-    return override.enabled;
+  if (override && !isOverrideExpired(override.expiresAt)) return override.enabled;
   const flags = await getAutomationFlags(storeId);
   return flags?.wholesalePricing ?? false;
 }

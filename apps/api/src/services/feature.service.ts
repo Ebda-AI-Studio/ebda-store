@@ -1,6 +1,12 @@
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { prisma, Prisma, withMoneyTx, withStore } from '@ebda/database';
-import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@ebda/shared';
+import {
+  FeatureKey,
+  FEATURE_KEYS_ARRAY,
+  PLAN_BASELINE,
+  isOverrideExpired,
+  type StorePlan,
+} from '@ebda/shared';
 import { redis } from './redis.service';
 import { bustStoreCaches } from './store.service';
 import logger from '../lib/logger';
@@ -185,7 +191,7 @@ class FeatureService {
     // happens at the expiry instant, so there is nothing to invalidate on; the window is accepted for a grant measured in days).
     const nowMs = Date.now();
     for (const row of rows) {
-      if (row.expiresAt && row.expiresAt.getTime() <= nowMs) continue;
+      if (isOverrideExpired(row.expiresAt, nowMs)) continue;
       if (FEATURE_KEYS_ARRAY.includes(row.featureKey as FeatureKey)) {
         map[row.featureKey as FeatureKey] = row.enabled;
       }
@@ -372,6 +378,14 @@ class FeatureService {
     const freshFeatures = await withStore(storeId, () =>
       withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
         for (const [featureKey, enabled] of Object.entries(updates)) {
+          // A caller that did not send `expiresAt` must not inherit a PAST one: the row would stay ignored by
+          // rowsToMap (200 + toast, nothing changes). Clear it, so the toggle makes a fresh non-expiring override.
+          if (meta?.expiresAt === undefined) {
+            await tx.storeFeature.updateMany({
+              where: { storeId, featureKey, expiresAt: { lte: now } },
+              data: { expiresAt: null },
+            });
+          }
           await tx.storeFeature.upsert({
             where: { storeId_featureKey: { storeId, featureKey } },
             create: {

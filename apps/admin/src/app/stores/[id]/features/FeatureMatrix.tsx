@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Modal, useToast } from '@ebda/ui';
+import { isOverrideExpired } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPut, apiDelete, apiPatch } from '@/lib/api';
@@ -34,8 +35,7 @@ interface OverrideMetadata {
 }
 
 /** An override past its expiry no longer decides anything: the plan default applies. */
-const isExpired = (row: OverrideMetadata | undefined) =>
-  !!row?.expiresAt && new Date(row.expiresAt).getTime() <= Date.now();
+const isExpired = (row: OverrideMetadata | undefined) => isOverrideExpired(row?.expiresAt);
 
 interface FeaturesResponse {
   features: Record<string, boolean>;
@@ -177,8 +177,8 @@ function FeatureRowItem({
           {overrideRow?.expiresAt && (
             <span className="text-xs text-muted-foreground">
               {isExpired(overrideRow)
-                ? tExpiry('expired', { date: formatDate(overrideRow.expiresAt) })
-                : tExpiry('expiresOn', { date: formatDate(overrideRow.expiresAt) })}
+                ? tExpiry('expired', { date: overrideRow.expiresAt.slice(0, 10) })
+                : tExpiry('expiresOn', { date: overrideRow.expiresAt.slice(0, 10) })}
             </span>
           )}
           {overrideRow?.reason && (

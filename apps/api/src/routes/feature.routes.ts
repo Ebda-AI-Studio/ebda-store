@@ -172,7 +172,10 @@ router.put(
         enabled: z.boolean(),
         expiresAt: z.coerce
           .date()
-          .refine(d => d.getTime() > Date.now(), 'expiresAt must be in the future')
+          .refine(
+            d => d.getTime() > Date.now(),
+            'expiresAt must be in the future / يجب أن يكون تاريخ الانتهاء في المستقبل'
+          )
           .nullable()
           .optional(),
         reason: z.string().trim().max(200).nullable().optional(),
@@ -190,8 +193,7 @@ router.put(
       }
       const meta: { expiresAt?: Date | null; reason?: string | null } = {};
       if (bodyParsed.data.expiresAt !== undefined) meta.expiresAt = bodyParsed.data.expiresAt;
-      if (bodyParsed.data.reason !== undefined)
-        meta.reason = bodyParsed.data.reason?.trim() || null;
+      if (bodyParsed.data.reason !== undefined) meta.reason = bodyParsed.data.reason || null;
 
       const features = await featureService.setFeature(
         id,

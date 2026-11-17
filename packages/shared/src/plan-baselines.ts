@@ -251,3 +251,14 @@ export const PLAN_LABELS: Record<StorePlan, { en: string; ar: string }> = {
   professional: { en: 'Professional', ar: 'الاحترافية' },
   enterprise: { en: 'Enterprise', ar: 'المؤسسية' },
 };
+
+/**
+ * True when a StoreFeature override is past its `expiresAt` (Ruling SF-EXPIRY-1). An expired override never decides:
+ * the plan baseline applies. The single predicate for the feature map, the wholesale gate and the admin matrix.
+ */
+export function isOverrideExpired(
+  expiresAt: Date | string | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  return !!expiresAt && new Date(expiresAt).getTime() <= nowMs;
+}

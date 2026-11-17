@@ -55,8 +55,16 @@ const snapshot = (db: DatabaseSync) => ({
   ).map(r => `${r.type}:${r.name}`),
 });
 
-const tableOf = (model: string) =>
-  model === 'Store' ? 'stores' : model === 'StoreFeature' ? 'store_features' : 'billing_events';
+const TABLES: Record<string, string> = {
+  Store: 'stores',
+  StoreFeature: 'store_features',
+  BillingEvent: 'billing_events',
+};
+const tableOf = (model: string) => {
+  const t = TABLES[model];
+  if (!t) throw new Error(`late-columns: no table mapping for model ${model}`);
+  return t;
+};
 
 const late = [
   ...Object.entries(

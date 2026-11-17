@@ -10,6 +10,7 @@ const STORE = '11111111-1111-4111-8111-111111111111';
 const h = vi.hoisted(() => ({
   rows: [] as Array<Record<string, unknown>>,
   upserts: [] as Array<Record<string, any>>,
+  updateManys: [] as Array<Record<string, any>>,
   wholesale: null as null | { enabled: boolean; expiresAt: Date | null },
   wholesaleFlag: false,
 }));
@@ -19,8 +20,24 @@ vi.mock('@ebda/database', async () => {
     storeFeature: {
       findMany: async () => h.rows,
       findFirst: async () => h.wholesale,
+      // Stateful like the table: updateMany clears matching expiries, upsert writes/merges into h.rows.
+      updateMany: async (args: Record<string, any>) => {
+        h.updateManys.push(args);
+        const { featureKey, expiresAt } = args.where;
+        for (const r of h.rows) {
+          const at = r.expiresAt as Date | null;
+          if (r.featureKey === featureKey && at && at.getTime() <= expiresAt.lte.getTime())
+            Object.assign(r, args.data);
+        }
+        return { count: 0 };
+      },
       upsert: async (args: Record<string, any>) => {
         h.upserts.push(args);
+        const existing = h.rows.find(
+          r => r.featureKey === args.where.storeId_featureKey.featureKey
+        );
+        if (existing) Object.assign(existing, args.update);
+        else h.rows.push({ ...args.create });
         return {};
       },
     },
@@ -90,6 +107,7 @@ beforeAll(async () => {
 beforeEach(() => {
   h.rows = [];
   h.upserts.length = 0;
+  h.updateManys.length = 0;
   h.wholesale = null;
   h.wholesaleFlag = false;
 });
@@ -181,5 +199,51 @@ describe('super-admin route', () => {
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(h.upserts[0].update).not.toHaveProperty('expiresAt');
     expect(h.upserts[0].update).not.toHaveProperty('reason');
+  });
+
+  // Critical from the AI review of #859: a stored PAST expiry survived a plain toggle, so the row stayed ignored.
+  it('an EXPIRED override + PUT {enabled:true} (no expiresAt) becomes an active non-expiring override', async () => {
+    h.rows = [row('bundles', true, new Date(Date.now() - DAY))];
+    const res = await request(app).put(`${base}/bundles`).send({ enabled: true });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(h.rows[0].expiresAt).toBeNull();
+    expect(res.body.data.features.bundles ?? res.body.data.bundles).toBe(true);
+    const { featureService } = await import('@api/services/feature.service');
+    expect((await featureService.getStoreFeatures(STORE)).bundles).toBe(true);
+  });
+
+  it('the bulk PUT clears an expired expiry the same way', async () => {
+    h.rows = [row('bundles', false, new Date(Date.now() - DAY))];
+    const res = await request(app).put(base).send({ bundles: true });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(h.rows[0].expiresAt).toBeNull();
+    const { featureService } = await import('@api/services/feature.service');
+    expect((await featureService.getStoreFeatures(STORE)).bundles).toBe(true);
+  });
+
+  it('a toggle on a FUTURE expiry keeps it (only past ones are cleared)', async () => {
+    const at = new Date(Date.now() + DAY);
+    h.rows = [row('bundles', true, at)];
+    await request(app).put(`${base}/bundles`).send({ enabled: false });
+    expect(h.rows[0].expiresAt).toEqual(at);
+  });
+
+  it('a PAST expiresAt is refused with a bilingual 400', async () => {
+    const res = await request(app)
+      .put(`${base}/bundles`)
+      .send({ enabled: true, expiresAt: new Date(Date.now() - DAY).toISOString() });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/future/);
+    expect(res.body.error.message).toMatch(/[\u0600-\u06FF]/);
+  });
+});
+
+describe('isOverrideExpired', () => {
+  it('is the single predicate: inclusive at the boundary, false for null', async () => {
+    const { isOverrideExpired } = await import('@ebda/shared');
+    const now = Date.now();
+    expect(isOverrideExpired(new Date(now), now)).toBe(true);
+    expect(isOverrideExpired(new Date(now + 1), now)).toBe(false);
+    expect(isOverrideExpired(null)).toBe(false);
   });
 });
