@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import path, { join } from 'node:path';
 // @ts-expect-error plain .mjs without types
-import { plan } from '../../scripts/ci/pre-push-plan.mjs';
+import { plan, isLightPush, narrowScanners } from '../../scripts/ci/pre-push-plan.mjs';
 // @ts-expect-error plain .mjs without types
 import { loadWorkspaces } from '../../scripts/ci-affected.mjs';
 
@@ -169,5 +169,36 @@ describe('scanner tests are always in the pre-push run (PREPUSH-3)', () => {
     expect(gate.indexOf('SCANNERS=$(field scanners)')).toBeGreaterThan(
       gate.indexOf('if [ "$MODE" = "affected" ]')
     );
+  });
+});
+
+describe('PREPUSH-6 change class', () => {
+  const all = scannerTests();
+
+  it('docs, workflow, i18n and test-only pushes are light; any source, config or script file is not', () => {
+    expect(isLightPush(['.github/workflows/pr-quality.yml', 'tests/unit/x.test.ts'])).toBe(true);
+    expect(isLightPush(['docs/a.md', 'apps/admin/src/locales/en.json'])).toBe(true);
+    expect(isLightPush(['apps/api/src/x.ts'])).toBe(false);
+    expect(isLightPush(['.github/workflows/ci.yml', 'package.json'])).toBe(false);
+    expect(isLightPush(['scripts/ci/pre-push-gate.sh'])).toBe(false);
+    expect(isLightPush([])).toBe(false);
+  });
+
+  it('a light push narrows the scanners; a code push keeps every one', () => {
+    const light = narrowScanners(all, ['.github/workflows/pr-quality.yml']);
+    expect(light.length).toBeGreaterThan(0);
+    expect(light.length).toBeLessThan(all.length);
+    expect(narrowScanners(all, ['apps/api/src/x.ts'])).toEqual(all);
+  });
+
+  it('a narrowed workflow push still runs the scanners that read workflows', () => {
+    const light = narrowScanners(all, ['.github/workflows/pr-quality.yml']);
+    expect(light).toContain('tests/unit/workflow-hosted-runners-only.test.ts');
+  });
+
+  it('the gate runs tests-only related files in a light slot, not under the heavy lock', () => {
+    const gate = readSrc('scripts/ci/pre-push-gate.sh', 'utf8');
+    expect(gate).toMatch(/lightRelated[^\n]*\n[\s\S]*prepush-slot\.sh npx vitest related/);
+    expect(gate).toMatch(/host-lock\.sh npx vitest related/);
   });
 });
