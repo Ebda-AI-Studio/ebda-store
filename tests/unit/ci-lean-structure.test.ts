@@ -125,7 +125,8 @@ describe('ci.yml triggers', () => {
 
 describe('ci.yml lanes', () => {
   it('every job is declared in exactly one lane (a new job must pick one)', () => {
-    const declared = new Set([...PR_LANE, ...MAIN_LANE, 'notify-failure']);
+    // `merge-queue-gate` (MERGE-QUEUE-1) is its own lane: it reports on pull_request and merge_group only; tests/unit/merge-queue-gate.test.ts pins it
+    const declared = new Set([...PR_LANE, ...MAIN_LANE, 'notify-failure', 'merge-queue-gate']);
     expect(Object.keys(ci.jobs).sort()).toEqual([...declared].sort());
   });
 
@@ -199,7 +200,8 @@ describe('ci.yml lanes', () => {
   };
   const PR_ONLY = ['changes', 'lint', 'typecheck', 'unit', 'unit-gate', 'app-build', 'app-builds'];
   const FULL_LANE = Object.keys(ci.jobs)
-    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation')
+    // merge-queue-gate (MERGE-QUEUE-1) runs on pull_request and merge_group only, never on push / schedule / dispatch
+    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation' && j !== 'merge-queue-gate')
     .sort();
 
   it('a push to main runs the FULL lane except mutation (build, unit, integration, workerd, e2e, audit)', () => {

@@ -1675,6 +1675,41 @@ jobs:
         if: always()
         run: bash scripts/ci/heavy-lock.sh release
 
+  # MERGE-QUEUE-1: the ONE check a queue ruleset requires besides `Repo guards` and `API Worker boots on workerd` (the other full-lane and
+  # pull-request-lane jobs cannot be required: GitHub matches required checks by name on the pull request AND the merge group, and
+  # each lane only reports on its own event). On a pull request it is an instant success; on a merge group it is green only when every
+  # full-lane job it needs succeeded (scripts/ci/merge-queue-gate.mjs; a skipped or cancelled job fails it). Every full-lane job
+  # (one that runs on a merge group) must be listed in `needs`: tests/unit/merge-queue-gate.test.ts fails when one is missing.
+  merge-queue-gate:
+    name: Merge queue gate
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    needs:
+      [
+        guards,
+        api-workerd-smoke,
+        worker-dry-run,
+        workerd-integration,
+        build,
+        test-unit,
+        orphan-tests,
+        test-integration,
+        test-e2e,
+        builder-e2e,
+        security,
+      ]
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'merge_group'
+      - name: Verdict
+        env:
+          EVENT: ${{ github.event_name }}
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then echo "merge-queue-gate: pull request: the full lane runs on the merge group"; exit 0; fi
+          node scripts/ci/merge-queue-gate.mjs
+
   notify-failure:
     name: Notify on failure (main and nightly)
     # Seconds-long reporting job: runs on the light runner so it never queues behind heavy PR jobs and holds main (2026-11-15).
