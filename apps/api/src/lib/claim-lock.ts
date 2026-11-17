@@ -13,18 +13,60 @@ import logger from './logger';
  * runs `fn` anyway (an alert that may duplicate), otherwise 503 and nothing runs. Under vitest with no Redis a process-local
  * map stands in (like `mcp/merchant-confirm-token.ts`). The key expires by itself (`ttlSeconds`) if the holder dies.
  */
-const localHeld = new Map<string, number>();
+const localHeld = new Map<string, { token: string; until: number }>();
+
+/**
+ * Release = ONE atomic compare-and-delete (money review M1): a GET then a DEL could, after the TTL expired between them and
+ * another caller re-acquired, delete THAT caller's lock. The exact script text is the one `CfRedis.eval` runs as the
+ * AuthState DO's single-call `delIfEquals` (a DO is single-threaded) and real Redis runs as Lua.
+ */
+const RELEASE_SCRIPT = `
+      if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+      else
+        return 0
+      end
+    `;
+
+/**
+ * The holder's guard (money review M2): the lock is only trusted until `ttl - margin`. A slow `fn` (a D1 or provider call)
+ * can outlive the TTL, the key expires and a second caller enters, so `fn` calls `assertHeld()` IMMEDIATELY before its
+ * irreversible write (enable + ledger, the verified flip): past the deadline it throws 409 `CLAIM_EXPIRED` and writes
+ * nothing; the caller retries.
+ */
+export interface ClaimGuard {
+  assertHeld(): void;
+}
+
+export function claimDeadlineMs(ttlSeconds: number): number {
+  const margin = Math.min(5, ttlSeconds * 0.2);
+  return Math.max(0, (ttlSeconds - margin) * 1000);
+}
 
 export async function withClaimLock<T>(
   key: string,
   ttlSeconds: number,
-  fn: () => Promise<T>,
+  fn: (guard: ClaimGuard) => Promise<T>,
   opts: { failOpen?: boolean } = {}
 ): Promise<{ acquired: true; value: T } | { acquired: false }> {
   const token = randomUUID();
   const lockKey = `claim-lock:${key}`;
   const client = redis.getClient();
   let release: () => Promise<void> = async () => undefined;
+  const acquiredAt = Date.now();
+  const guard: ClaimGuard = {
+    assertHeld() {
+      if (Date.now() - acquiredAt >= claimDeadlineMs(ttlSeconds)) {
+        throw new AppError(
+          409,
+          'CLAIM_EXPIRED',
+          'This took too long and was stopped before any change; try again'
+        );
+      }
+    },
+  };
+  // fail-open paths run without a lock: the guard never expires there (nothing to protect)
+  const noGuard: ClaimGuard = { assertHeld: () => undefined };
 
   if (client && redis.isAvailable()) {
     let ok: string | null;
@@ -32,29 +74,33 @@ export async function withClaimLock<T>(
       ok = await client.set(lockKey, token, 'EX', ttlSeconds, 'NX');
     } catch (err) {
       logger.error({ err, key }, '[claim-lock] could not claim');
-      if (opts.failOpen) return { acquired: true, value: await fn() };
+      if (opts.failOpen) return { acquired: true, value: await fn(noGuard) };
       throw new AppError(503, 'CLAIM_UNAVAILABLE', 'Try again shortly; nothing was changed');
     }
     if (ok !== 'OK') return { acquired: false };
     release = async () => {
-      // best effort compare-and-delete: the TTL is the real backstop
-      if ((await client.get(lockKey).catch(() => null)) === token) {
-        await client.del(lockKey).catch(() => undefined);
-      }
+      // atomic compare-and-delete (M1); a failure is harmless: the TTL is the backstop
+      await client
+        .eval(RELEASE_SCRIPT, 1, lockKey, token)
+        .catch(err => logger.warn({ err, key }, '[claim-lock] release failed (the TTL clears it)'));
     };
   } else if (process.env.NODE_ENV === 'test') {
     const now = Date.now();
-    if ((localHeld.get(lockKey) ?? 0) > now) return { acquired: false };
-    localHeld.set(lockKey, now + ttlSeconds * 1000);
-    release = async () => void localHeld.delete(lockKey);
+    const held = localHeld.get(lockKey);
+    if (held && held.until > now) return { acquired: false };
+    localHeld.set(lockKey, { token, until: now + ttlSeconds * 1000 });
+    // compare-and-delete, the same rule as the stores (a single synchronous step here)
+    release = async () => {
+      if (localHeld.get(lockKey)?.token === token) localHeld.delete(lockKey);
+    };
   } else if (opts.failOpen) {
-    return { acquired: true, value: await fn() };
+    return { acquired: true, value: await fn(noGuard) };
   } else {
     throw new AppError(503, 'CLAIM_UNAVAILABLE', 'Try again shortly; nothing was changed');
   }
 
   try {
-    return { acquired: true, value: await fn() };
+    return { acquired: true, value: await fn(guard) };
   } finally {
     await release();
   }

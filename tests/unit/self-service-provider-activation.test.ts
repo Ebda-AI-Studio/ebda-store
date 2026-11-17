@@ -113,6 +113,12 @@ vi.mock('@api/services/redis.service', () => {
     },
     get: async (k: string) => m.state.kv.get(k) ?? null,
     del: async (k: string) => void m.state.kv.delete(k),
+    // the claim lock's release: ONE compare-and-delete (KEYS[1], ARGV[1]), as Redis Lua / the AuthState DO run it
+    eval: async (_script: string, _n: number, k: string, token: string) => {
+      if (m.state.kv.get(k) !== token) return 0;
+      m.state.kv.delete(k);
+      return 1;
+    },
   };
   return {
     redis: { getClient: () => client, isAvailable: () => true, get: vi.fn(), set: vi.fn() },

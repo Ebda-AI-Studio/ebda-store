@@ -193,7 +193,8 @@ export async function recordProviderOperation(input: ProviderOperation): Promise
         await withClaimLock(
           `provider-ready:${input.provider}`,
           30,
-          async () => {
+          async guard => {
+            guard.assertHeld();
             const flipped = await prisma.providerVerification.updateMany({
               where: { provider: input.provider, readyAt: null },
               data: { readyAt: new Date() },
@@ -257,12 +258,13 @@ export async function confirmProviderVerification(
   }
   const now = new Date();
   // Serialised (D1 updateMany counts are not atomic): exactly one confirm wins, the rest answer 409, fail closed.
-  const claim = await withClaimLock(`provider-confirm:${provider}`, 30, () =>
-    prisma.providerVerification.updateMany({
+  const claim = await withClaimLock(`provider-confirm:${provider}`, 30, async guard => {
+    guard.assertHeld(); // M2: never flip after the claim could have expired
+    return prisma.providerVerification.updateMany({
       where: { provider, readyAt: { not: null }, verifiedAt: null },
       data: { verifiedAt: now, verifiedById: actorUserId },
-    })
-  );
+    });
+  });
   if (!claim.acquired || claim.value.count !== 1) {
     throw new AppError(
       409,

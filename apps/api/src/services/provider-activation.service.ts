@@ -780,7 +780,7 @@ export async function confirmSelfActivation(
       const locked = await withClaimLock(
         `provider-activate:${storeId}:${provider}`,
         60,
-        async () => {
+        async guard => {
           const again = await withStore(storeId, () =>
             loadConnection(storeId, provider, entry.kind)
           );
@@ -792,6 +792,7 @@ export async function confirmSelfActivation(
             );
           }
           let first: boolean;
+          guard.assertHeld(); // do not burn the merchant's confirmation if the claim is already near expiry
           try {
             first = await consumeConfirmToken(input.confirmToken);
           } catch {
@@ -820,6 +821,8 @@ export async function confirmSelfActivation(
           ).length;
           let enabled = false;
           let requestId: string | null = null;
+          // M2: the enable + ledger write is the irreversible step; refuse it if the claim could have expired
+          guard.assertHeld();
           try {
             await setProviderEnabled(storeId, provider, entry.kind, true, actor);
             enabled = true;
