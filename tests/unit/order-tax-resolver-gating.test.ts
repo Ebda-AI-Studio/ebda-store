@@ -252,9 +252,11 @@ describe('resolveActiveTaxRate is the ONLY resolver — both call sites use it',
   });
 
   it('public.routes.ts derives taxRatePercent AND the effective taxEnabled from the same resolver (ruling TAX-2)', () => {
-    const occurrences =
-      publicRoutes.match(/\.\.\.effectiveTaxFields\(await resolveActiveTaxRate\(store\.id\)\)/g) ??
-      [];
+    // RESOLVE-PARALLEL-1: the resolver runs inside the concurrent fill (`resolveActiveTaxRate(store.id)` as a Promise.all
+    // member) and its result feeds `effectiveTaxFields(taxRate)`. Both halves must be present in BOTH public payloads.
+    const calls = publicRoutes.match(/^\s+resolveActiveTaxRate\(store\.id\),$/gm) ?? [];
+    expect(calls.length).toBe(2);
+    const occurrences = publicRoutes.match(/\.\.\.effectiveTaxFields\(taxRate\)/g) ?? [];
     expect(occurrences.length).toBe(2);
   });
 
