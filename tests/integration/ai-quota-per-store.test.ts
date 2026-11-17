@@ -106,7 +106,9 @@ describe.skipIf(!hasDb)('assertAiQuota — per-store slice + interactive headroo
       code: 'AI_QUOTA_STORE_DAILY_EXCEEDED',
     });
     // The idle store is NOT starved by store A's consumption.
-    await expect(assertAiQuota({ storeId: storeBId })).resolves.toBeUndefined();
+    // (assertAiQuota now returns the reserved-slot handle, #857 — release it as a real caller does.)
+    const slotB = await assertAiQuota({ storeId: storeBId });
+    await slotB.release();
   });
 
   it('the per-store cap error is a stop-the-sweep code', async () => {
@@ -135,6 +137,7 @@ describe.skipIf(!hasDb)('assertAiQuota — per-store slice + interactive headroo
     await expect(assertAiQuota({ storeId: storeBId, bulk: true })).rejects.toMatchObject({
       code: 'AI_QUOTA_DAILY_EXCEEDED',
     });
-    await expect(assertAiQuota({ storeId: storeBId })).resolves.toBeUndefined();
+    const slotB = await assertAiQuota({ storeId: storeBId });
+    await slotB.release();
   });
 });
