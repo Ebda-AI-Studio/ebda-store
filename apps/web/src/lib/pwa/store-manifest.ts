@@ -82,7 +82,7 @@ type Locale = 'en' | 'ar';
  * The home-screen caption: platforms cut it at about 12 characters, so a longer store name becomes its
  * first word when that fits, else its first 12 characters. A merchant's saved short name always wins.
  */
-export function homeScreenName(name: string): string {
+function homeScreenName(name: string): string {
   const n = name.trim();
   if ([...n].length <= 12) return n;
   const first = n.split(/\s+/)[0] ?? n;
