@@ -454,3 +454,4 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-11-11-bootstrap-super-admin.md](plans/done/2026-11-11-bootstrap-super-admin.md) - Password-less platform super-admin bootstrap + daily 0-admin invariant (Ruling ID-20)
 - [plans/done/2026-11-12-storage-limit-enforce.md](plans/done/2026-11-12-storage-limit-enforce.md) - S3-X8: enforce maxStorageMb on the four upload routes, usage from the R2 listing (60 s bounded-stale)
 - [plans/2026-11-12-auto-recommendations.md](plans/2026-11-12-auto-recommendations.md) - Automatic product recommendations: merchant picks, then bought-together, then similar items (Vectorize), cap 8, merchant switch
+- [plans/2026-11-17-merge-train.md](plans/2026-11-17-merge-train.md) - Proposal (no code): fewer CI runs per merge: GitHub merge queue vs our own train vs a light PR lane; numbers, recommendation, spike
