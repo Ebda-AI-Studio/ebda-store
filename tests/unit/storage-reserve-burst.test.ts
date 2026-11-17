@@ -5,7 +5,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const MB = 1024 * 1024;
-const h = vi.hoisted(() => ({ listCalls: 0, listFails: false }));
+const h = vi.hoisted(() => ({
+  listCalls: 0,
+  listFails: false,
+  alert: vi.fn(async () => undefined),
+}));
+vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.alert }));
 vi.mock('@ebda/database', async () => {
   const mock = await import('./helpers/database-mock');
   return mock.databaseMock({
@@ -126,6 +131,19 @@ describe('storage ceiling + usage (QA-STOR-1)', () => {
     h.listFails = true;
     expect((await getUsageSummary(S)).usage.maxStorageMb).toBeNull();
     resetStorageUsageCache();
+    h.alert.mockClear();
     await expect(assertStorageRoom(S, 1 * MB)).resolves.toBeTruthy();
+    // STORAGE-FAILOPEN-1: the fail-open is never silent
+    expect(h.alert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'storage_usage_unreadable',
+        context: { storeId: S },
+      })
+    );
+  });
+  it('a readable counter raises no fail-open alert', async () => {
+    h.alert.mockClear();
+    await assertStorageRoom(S, 1 * MB);
+    expect(h.alert).not.toHaveBeenCalled();
   });
 });

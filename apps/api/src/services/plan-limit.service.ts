@@ -64,6 +64,7 @@ import { EmailService } from './email.service';
 import { config } from '../config';
 import { ownerStores } from '../lib/store-create-do';
 import logger from '../lib/logger';
+import { sendAlert } from './alerts.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -81,8 +82,21 @@ async function readStorageUsageMb(storeId: string): Promise<number | null> {
 /** The gate's read: a plan ceiling is not worth refusing an upload because OUR bucket listing failed, so it fails OPEN. */
 async function storageUsageMb(storeId: string): Promise<number> {
   const mb = await readStorageUsageMb(storeId);
-  if (mb === null)
-    logger.warn({ storeId }, '[plan-limit] storage usage unavailable, allowing the upload');
+  if (mb === null) {
+    // Ruling STORAGE-FAILOPEN-1: every fail-open is visible. One log line per upload, one alert per 5 minutes (the
+    // alert service throttles by level + title; an R2 listing outage is platform-wide, so the title carries no store).
+    logger.warn(
+      { event: 'storage_usage_unreadable', storeId },
+      '[plan-limit] storage usage unavailable, allowing the upload'
+    );
+    void sendAlert({
+      level: 'info',
+      source: 'storage_usage_unreadable',
+      title: 'storage_usage_unreadable: the storage ceiling is failing open',
+      body: 'The R2 usage listing failed, so uploads are admitted without the plan storage check (Ruling STORAGE-FAILOPEN-1). Bounded by the upload rate limiters and the file size caps.',
+      context: { storeId },
+    }).catch(() => undefined);
+  }
   return mb ?? 0;
 }
 
