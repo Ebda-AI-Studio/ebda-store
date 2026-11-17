@@ -103,9 +103,15 @@ describe('abandoned-cart steps: consent per channel', () => {
     expect(h.sendToStore).not.toHaveBeenCalled();
   });
 
-  it('a transactional event is unchanged: it still pushes with no recipient filter', async () => {
+  it('a transactional event is shopper-facing too: own devices with an id, nothing without one', async () => {
     await notificationDispatcher.dispatch('s1', 'order_shipped', { ...cart, orderNumber: 'ORD-1' });
+    expect(h.sendToStore).not.toHaveBeenCalled();
+    await notificationDispatcher.dispatch('s1', 'order_shipped', {
+      ...cart,
+      orderNumber: 'ORD-1',
+      customerId: 'u1',
+    });
     expect(h.sendToStore).toHaveBeenCalledTimes(1);
-    expect(h.sendToStore.mock.calls[0][4]).toBeUndefined();
+    expect(h.sendToStore.mock.calls[0][4]).toEqual({ customerId: 'u1' });
   });
 });

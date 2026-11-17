@@ -50,7 +50,7 @@ if (config.vapidPublicKey && config.vapidPrivateKey) {
 
 class PushService {
   /**
-   * Send a web-push notification to all subscribed devices for a store.
+   * Send a web-push notification to ONE shopper's own storefront devices (Ruling PUSH-AUDIENCE-1).
    * Cleans up expired (410 Gone / 404) subscriptions automatically.
    * Logs the result to NotificationLog.
    */
@@ -58,10 +58,15 @@ class PushService {
     storeId: string,
     title: string,
     body: string,
-    data?: Record<string, unknown>,
-    /** One shopper's own storefront devices only (a message addressed to a person, never a store-wide broadcast). */
-    recipient?: { customerId: string }
+    data: Record<string, unknown> | undefined,
+    /** Ruling PUSH-AUDIENCE-1: the ONE shopper this message is for. Required; without it nothing is sent. */
+    recipient: { customerId: string }
   ): Promise<void> {
+    // Fail closed: a shopper message with no addressee is never a store-wide broadcast.
+    if (!recipient?.customerId) {
+      logger.warn({ storeId }, '[PushService] sendToStore refused: no recipient customerId');
+      return;
+    }
     // 1. VAPID must be configured platform-wide
     if (!vapidConfigured) {
       if (!vapidWarnLogged) {
@@ -93,9 +98,7 @@ class PushService {
     // proxy threw PostgresRemovedError there on the Worker, so every dispatched push failed (Ruling NZ-D23).
     const subscriptions = await withStoreRw(storeId, tx =>
       tx.pushSubscription.findMany({
-        where: recipient
-          ? { storeId, customerId: recipient.customerId, audience: 'storefront' }
-          : { storeId },
+        where: { storeId, customerId: recipient.customerId, audience: 'storefront' },
         select: { id: true, endpoint: true, p256dh: true, auth: true },
       })
     );
