@@ -415,6 +415,38 @@ describe('a store on its Durable Object is never mirrored from Postgres (plan N-
       ).deleted_at
     ).not.toBeNull();
   });
+  it('RESOLVE-SWR-1: every store a repair CORRECTED has its read caches cleared (a repaired suspension must not keep resolving as active)', async () => {
+    sqlite.prepare("UPDATE stores SET status='active' WHERE id=?").run(A);
+    const busted: string[][] = [];
+    const r = await reconcileStoreDirectory({
+      pgAll: async () => [
+        {
+          id: A,
+          slug: 'alpha',
+          status: 'suspended',
+          plan: 'starter',
+          hasDomain: false,
+          hasPendingDomain: false,
+        },
+      ],
+      pgLive: async () => [],
+      alert: () => undefined,
+      bust: async ids => void busted.push(ids),
+    });
+    expect(r.corrected.map(c => c.id)).toEqual([A]);
+    expect(busted).toEqual([[A]]);
+    // nothing corrected, nothing busted
+    busted.length = 0;
+    await reconcileStoreDirectory({
+      pgAll: async () => [],
+      pgLive: async () => [],
+      doRecord: async () => ({ slug: 'alpha', status: 'suspended' }),
+      alert: () => undefined,
+      bust: async ids => void busted.push(ids),
+    });
+    expect(busted.flat()).toEqual([]);
+  });
+
   it('a do store ABSENT from Postgres: D1 untouched, alert only (never a delete)', async () => {
     const alerts: string[] = [];
     const r = await reconcileStoreDirectory({

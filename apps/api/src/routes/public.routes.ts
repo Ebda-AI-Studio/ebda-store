@@ -71,6 +71,7 @@ import { WhatsAppConsentService } from '../lib/wa/consent';
 import {
   boundedCacheKey,
   getCached,
+  getCachedSwr,
   invalidateStoreProductCachesAfterOrder,
 } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
@@ -128,6 +129,9 @@ function guestViewTokenFor(orderId: string): string | undefined {
     return undefined;
   }
 }
+
+/** Hard max age of the stale-while-revalidate window of the resolved store (Ruling RESOLVE-SWR-1): matches the edge SWR 600. */
+const RESOLVE_HARD_SECONDS = 600;
 
 const router = Router();
 
@@ -2670,8 +2674,17 @@ router.get(
         return;
       }
 
-      const result = await getCached(`public:store:resolve:${lookup.cacheHost}`, 120, () =>
-        loadPayload(['active', 'suspended'])
+      // RESOLVE-SWR-1: served stale for up to RESOLVE_HARD_SECONDS past the 120 s soft age while ONE background refresh
+      // runs, so a shopper after an idle gap (and the 5-minute status probe) stops paying the 3-8 s miss.
+      // STALENESS CLASS: BOUNDED-stale for anything that changed without an event (the window above); NEVER-stale for
+      // store status / suspension, plan (-> enabledFeatures), slug, domain and deletion: `bustStoreCaches` deletes this key
+      // and bumps its generation on every write of those, so a stale copy never outlives its bust and a refresh that was in
+      // flight during the write cannot republish the old payload. See getCachedSwr and RESOLVE-SWR-1.
+      const result = await getCachedSwr(
+        `public:store:resolve:${lookup.cacheHost}`,
+        120,
+        RESOLVE_HARD_SECONDS,
+        () => loadPayload(['active', 'suspended'])
       );
 
       if (!result) {

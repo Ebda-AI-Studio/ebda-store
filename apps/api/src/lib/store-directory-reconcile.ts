@@ -29,6 +29,8 @@ import { sendAlert } from '../services/alerts.service';
 import { cfBindings } from '../cf/bindings';
 import { syncStoreDirectoryFromPg } from './store-directory-sync';
 import { copyStoreSettings, storeDb } from './repo-factory';
+import { invalidateStoreDirectory } from './store-directory';
+import { bustStoreCaches } from '../services/store.service';
 
 interface D1Row {
   id: string;
@@ -215,7 +217,7 @@ async function reconcileDoSide(
   }
 }
 
-export async function reconcileStoreDirectory(
+async function reconcileStoreDirectoryCore(
   deps: {
     d1?: D1Like;
     pgAll?: () => Promise<
@@ -237,6 +239,8 @@ export async function reconcileStoreDirectory(
     doRecord?: DoRecord;
     /** Test seam: push D1's mirror values to the store's DO (default: `copyStoreSettings`). */
     repairMirror?: MirrorRepair;
+    /** Test seam: clear the read caches of every corrected store (default: `bustAfterRepair`). */
+    bust?: (ids: string[]) => Promise<void>;
   } = {}
 ): Promise<ReconcileReport> {
   const d1 =
@@ -408,4 +412,33 @@ async function finish(
       )
     ).catch(err => logger.error({ err }, '[store-directory] drift alert could not be sent'));
   }
+}
+
+/**
+ * A repair writes `stores.status` / slug / plan / deleted_at straight into D1, so it is a write path like any other
+ * (Ruling RESOLVE-SWR-1): the public store payload and the directory entry it came from must be cleared, in every layer,
+ * the same way every other writer does (`bustStoreCaches`: KV entry + generation, per-isolate memory, storefront/edge purge).
+ * Without it a store the repair just SUSPENDED would keep resolving as active until the cache aged out.
+ */
+async function bustAfterRepair(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  for (const id of ids) {
+    try {
+      const row = await (
+        await storeDb(id)
+      ).store.findUnique({ where: { id }, select: { slug: true, domain: true } });
+      if (row) await bustStoreCaches(id, row.slug, row.domain);
+      else await invalidateStoreDirectory(id, null);
+    } catch (err) {
+      logger.warn({ err, storeId: id }, '[store-directory] cache bust after repair failed');
+    }
+  }
+}
+
+export async function reconcileStoreDirectory(
+  deps: Parameters<typeof reconcileStoreDirectoryCore>[0] = {}
+): Promise<ReconcileReport> {
+  const report = await reconcileStoreDirectoryCore(deps);
+  await (deps.bust ?? bustAfterRepair)([...new Set(report.corrected.map(c => c.id))]);
+  return report;
 }
