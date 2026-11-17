@@ -1,6 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
-import { cfBindings } from '../cf/bindings';
+import { cfBindings, type CfBindings } from '../cf/bindings';
+import logger from '../lib/logger';
 import { recordRateLimited } from '../lib/rate-limit-telemetry';
 import { skipPublicLimiters } from './public-limiter-keys';
 
@@ -96,3 +97,32 @@ export async function countStoreMiss(req: Request, res: Response): Promise<boole
   res.status(429).json(BODY_MISS);
   return true;
 }
+
+let warnedMissing = false;
+/**
+ * One WARN per isolate when a store-resolve limiter binding is missing, so the silent fall back to the Durable Object limiters
+ * (3-6 serial AuthState round trips on a cold resolve, Ruling PERF-AUTHSTATE-2) is visible in the logs (multi-service env drift
+ * rule: a binding declared in one config and absent in the deployed one must not degrade quietly). Called from `prepare` in worker.ts.
+ */
+export function warnMissingStoreResolveBindings(
+  env: Pick<CfBindings, 'PUBLIC_IP_LIMITER' | 'STORE_RESOLVE_LIMITER' | 'STORE_MISS_LIMITER'>,
+  log: Pick<typeof logger, 'warn'> = logger
+): boolean {
+  if (warnedMissing) return false;
+  const missing = (
+    ['PUBLIC_IP_LIMITER', 'STORE_RESOLVE_LIMITER', 'STORE_MISS_LIMITER'] as const
+  ).filter(k => !env[k]);
+  if (missing.length === 0) return false;
+  warnedMissing = true;
+  log.warn(
+    { missingBindings: missing },
+    'store-resolve limiter bindings missing: GET /public/store/resolve falls back to the AuthState Durable Object limiters (slow cold path)'
+  );
+  return true;
+}
+
+// pq-allow(unused-export): test hook, imported by tests/unit/store-resolve-native.test.ts
+/** Test hook: forget that the warning was logged. */
+export const resetStoreResolveBindingWarning = (): void => {
+  warnedMissing = false;
+};

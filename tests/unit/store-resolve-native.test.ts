@@ -19,6 +19,8 @@ import {
   isAnonymousStoreResolve,
   storeResolveIsNative,
   storeResolveLimit,
+  warnMissingStoreResolveBindings,
+  resetStoreResolveBindingWarning,
 } from '../../apps/api/src/middleware/store-resolve-native';
 import { publicReadLimit } from '../../apps/api/src/middleware/public-read-limit';
 import { plannedPublicHits } from '../../apps/api/src/middleware/public-limit-prefetch';
@@ -231,5 +233,38 @@ describe('wiring', () => {
     const sec = src('apps/api/src/middleware/security.ts');
     expect(sec).toMatch(/storeResolveLimiter = rateLimit\(\{[\s\S]*?max: 30,/);
     expect(sec).toMatch(/const max = opts\?\.max \?\? 20;/);
+  });
+});
+
+describe('boot warning when a binding is missing (multi-service env drift)', () => {
+  beforeEach(() => resetStoreResolveBindingWarning());
+  it('warns ONCE per isolate, naming the missing bindings', () => {
+    const warn = vi.fn();
+    expect(
+      warnMissingStoreResolveBindings({ PUBLIC_IP_LIMITER: counter(1) }, { warn } as any)
+    ).toBe(true);
+    expect(warnMissingStoreResolveBindings({}, { warn } as any)).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toEqual({
+      missingBindings: ['STORE_RESOLVE_LIMITER', 'STORE_MISS_LIMITER'],
+    });
+    expect(String(warn.mock.calls[0][1])).toContain(
+      'falls back to the AuthState Durable Object limiters'
+    );
+  });
+  it('is silent when all three are present', () => {
+    const warn = vi.fn();
+    const c = counter(1);
+    expect(
+      warnMissingStoreResolveBindings(
+        { PUBLIC_IP_LIMITER: c, STORE_RESOLVE_LIMITER: c, STORE_MISS_LIMITER: c },
+        { warn } as any
+      )
+    ).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+  });
+  it('prepare() in worker.ts calls it with the deployed env', () => {
+    const w = readFileSync(join(__dirname, '../../apps/api/src/worker.ts'), 'utf8');
+    expect(w).toContain('warnMissingStoreResolveBindings(env);');
   });
 });
