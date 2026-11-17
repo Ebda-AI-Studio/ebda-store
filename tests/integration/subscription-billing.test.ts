@@ -904,20 +904,33 @@ describe.skipIf(!hasDb)('B2: term basis and the renewal window', () => {
     );
     const sub = await getSub(storeId);
     expect(await termBasisOf(storeId, sub)).toBe('assigned');
-    // an add-on purchase never counts as paying for the plan term
+    // add-on purchases (21 of them, more than any page cap) and a row with no plan never count as paying for the term
     await withRlsBypass(tx =>
-      tx.billingEvent.create({
-        data: {
-          storeId,
-          subscriptionId: subId,
-          type: 'upgrade',
-          planCode: 'addon:feature:loyalty',
-          amountMinor: 9900,
-          currency: 'EGP',
-          provider: 'stub',
-          idempotencyKey: `b2-addon-${crypto.randomUUID()}`,
-          status: 'succeeded',
-        },
+      tx.billingEvent.createMany({
+        data: [
+          ...Array.from({ length: 21 }, () => ({
+            storeId,
+            subscriptionId: subId,
+            type: 'upgrade',
+            planCode: 'addon:feature:loyalty',
+            amountMinor: 9900,
+            currency: 'EGP',
+            provider: 'stub',
+            idempotencyKey: `b2-addon-${crypto.randomUUID()}`,
+            status: 'succeeded' as const,
+          })),
+          {
+            storeId,
+            subscriptionId: subId,
+            type: 'checkout',
+            planCode: null,
+            amountMinor: 49900,
+            currency: 'EGP',
+            provider: 'stub',
+            idempotencyKey: `b2-noplan-${crypto.randomUUID()}`,
+            status: 'succeeded' as const,
+          },
+        ],
       })
     );
     expect(await termBasisOf(storeId, sub)).toBe('assigned');

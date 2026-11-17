@@ -2287,7 +2287,8 @@ export type TermBasis = 'paid' | 'assigned' | 'comped' | 'trial';
 
 /**
  * What the current term rests on (B2). `comped`/`trial` come from the status. Otherwise the term is `paid` when a
- * succeeded payment for a plan (checkout, renewal, upgrade, manual payment; an add-on purchase never counts) was made
+ * succeeded payment naming a catalogue plan (checkout, renewal, upgrade, manual payment; an add-on purchase or a row
+ * with no plan never counts) was made
  * since the current period started (one day of slack), else `assigned`: a super admin set the plan with no payment.
  */
 export async function termBasisOf(
@@ -2300,20 +2301,23 @@ export async function termBasisOf(
   const since = sub.currentPeriodStart
     ? new Date(sub.currentPeriodStart.getTime() - 86_400_000)
     : new Date(0);
-  const rows = await withStore(storeId, tx =>
-    tx.billingEvent.findMany({
+  // A plan payment names a real plan: `planCode IN (the plan catalogue)` excludes add-on purchases (`addon:<sku>`) and
+  // rows with no plan in the WHERE, so no cap on add-on rows can push the plan payment out (money review of #896).
+  const planCodes = (await prisma.plan.findMany({ select: { code: true } })).map(p => p.code);
+  const paid = await withStore(storeId, tx =>
+    tx.billingEvent.findFirst({
       where: {
         storeId,
         status: 'succeeded',
         amountMinor: { gt: 0 },
         type: { in: ['checkout', 'renewal', 'upgrade', 'manual_payment'] },
+        planCode: { in: planCodes },
         createdAt: { gte: since },
       },
-      select: { planCode: true },
-      take: 20,
+      select: { id: true },
     })
   );
-  return rows.some(r => !r.planCode?.startsWith('addon')) ? 'paid' : 'assigned';
+  return paid ? 'paid' : 'assigned';
 }
 
 /** Billing-cycle facts the merchant Billing page needs beyond the entitlements. */
