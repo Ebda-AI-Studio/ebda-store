@@ -368,7 +368,7 @@ export class PWAService {
     const existing = await withStoreRead(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, pwaSettings: true },
+        select: { name: true, pwaSettings: true, slug: true, domain: true },
       })
     );
 
@@ -409,7 +409,14 @@ export class PWAService {
     // same pattern as invalidateStoreProductCaches's revalidateStorefront
     // call — so a merchant doesn't have to wait out the 300s TTL to see a
     // new icon or app name.
-    revalidateStorefront({ tags: [`pwa:${storeId}`] });
+    // PW1: the switch itself decides whether the page links a manifest at all, and that lives in the store record the
+    // layout resolves (and the edge HTML copy): purge by slug/domain too, not only the manifest tag. NEVER-stale class:
+    // an install link that outlives the switch is the bug, so a TTL alone is not enough.
+    revalidateStorefront({
+      slug: existing.slug,
+      domain: existing.domain,
+      tags: [`pwa:${storeId}`],
+    });
 
     return {
       pwaEnabled: store.pwaEnabled,

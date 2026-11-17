@@ -3,6 +3,7 @@ import { getStore } from '../store-resolver';
 import { API_URL } from '../api';
 import { pickMetaDescription } from '../seo/meta-description';
 import { resolveStorefrontLocale } from '../seo/resolve-locale';
+import { isStorefrontPwaActive } from './pwa-active';
 import { hslToHex, BRAND, storePwaManifestSchema, type StorePwaManifest } from '@ebda/shared';
 
 type ManifestIconPurpose = 'any' | 'maskable' | 'monochrome';
@@ -77,6 +78,17 @@ async function fetchStoreManifest(storeId: string): Promise<ApiManifest | null> 
 type ResolvedStore = Awaited<ReturnType<typeof getStore>>;
 type Locale = 'en' | 'ar';
 
+/**
+ * The home-screen caption: platforms cut it at about 12 characters, so a longer store name becomes its
+ * first word when that fits, else its first 12 characters. A merchant's saved short name always wins.
+ */
+export function homeScreenName(name: string): string {
+  const n = name.trim();
+  if ([...n].length <= 12) return n;
+  const first = n.split(/\s+/)[0] ?? n;
+  return [...first].length <= 12 ? first : [...n].slice(0, 12).join('').trim();
+}
+
 /** The store's Arabic name, when it has one. */
 const arabicStoreName = (store: ResolvedStore) => store.nameAr?.trim() || undefined;
 
@@ -90,6 +102,7 @@ function genericManifest(store: ResolvedStore, locale: Locale): MetadataRoute.Ma
   const fallbackThemeColor = hslToHex(primaryColor);
   // `DEFAULT_STORE` sentinel (store-resolver.ts): no merchant resolved → platform.
   const isPlatformDefault = store.id === 'demo' && !store.favicon;
+  const merchantIcon = store.favicon || (store.id === 'demo' ? undefined : store.logo) || undefined;
   // Arabic locale reads the merchant's Arabic name when present (issue
   // #1857) — else this fallback description interpolates the English name
   // under `<html lang="ar">`.
@@ -101,7 +114,7 @@ function genericManifest(store: ResolvedStore, locale: Locale): MetadataRoute.Ma
     // Localized like the description below (#2195): an Arabic storefront's
     // home-screen caption must not read English next to an Arabic description.
     name: localizedStoreName,
-    short_name: localizedStoreName,
+    short_name: homeScreenName(localizedStoreName),
     description: pickMetaDescription(store, locale) || localizedStoreDescriptionFallback,
     start_url: '/',
     display: 'standalone',
@@ -110,11 +123,12 @@ function genericManifest(store: ResolvedStore, locale: Locale): MetadataRoute.Ma
     // their own colours and icons.
     background_color: isPlatformDefault ? BRAND.colors.night : '#ffffff',
     theme_color: isPlatformDefault ? BRAND.colors.night : fallbackThemeColor,
+    // PW2: the merchant's own picture first (favicon, else logo), the platform icons only when they set none.
     icons: [
-      ...(store.favicon
+      ...(merchantIcon
         ? [
-            { src: store.favicon, sizes: '192x192', type: 'image/png' },
-            { src: store.favicon, sizes: '512x512', type: 'image/png' },
+            { src: merchantIcon, sizes: '192x192', type: 'image/png' },
+            { src: merchantIcon, sizes: '512x512', type: 'image/png' },
           ]
         : [
             { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -184,8 +198,10 @@ function withSavedSettings(
  * from a `/ar` or `/en` page; the middleware carries that language here as `x-locale-path`, which
  * `resolveStorefrontLocale` reads first.
  */
-export async function buildStoreManifest(): Promise<MetadataRoute.Manifest> {
+export async function buildStoreManifest(): Promise<MetadataRoute.Manifest | null> {
   const store = await getStore();
+  // PW1: a store whose phone-app switch is off has no manifest at all, so nothing can install it.
+  if (!isStorefrontPwaActive(store)) return null;
   const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
     ?.defaultLanguage as string | undefined;
   const locale = await resolveStorefrontLocale(storeDefaultLanguage);

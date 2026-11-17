@@ -12,7 +12,14 @@ import { buildStoreManifest } from '../../lib/pwa/store-manifest';
  * `application/manifest+json`, revalidate on every use), so the bare URL's answer does not change.
  */
 export async function GET(): Promise<Response> {
-  return new Response(JSON.stringify(await buildStoreManifest()), {
+  const manifest = await buildStoreManifest();
+  // PW1: the merchant's phone-app switch is off (or the feature is): there is no manifest to install from.
+  if (!manifest)
+    return new Response('Not found', {
+      status: 404,
+      headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' },
+    });
+  return new Response(JSON.stringify(manifest), {
     headers: {
       'Content-Type': 'application/manifest+json',
       'Cache-Control': 'public, max-age=0, must-revalidate',

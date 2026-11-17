@@ -45,6 +45,7 @@ import { buildThemeStyleTag } from '../lib/theme-css';
 import { lookHead } from '../lib/look-head';
 import { DemoLookBar } from '../components/demo/DemoLookBar';
 import { jsonLdScriptContent } from '../lib/json-ld-script';
+import { isStorefrontPwaActive } from '../lib/pwa/pwa-active';
 import '../styles/globals.css';
 import { RenderClockProvider } from '../contexts/RenderClockContext';
 
@@ -96,7 +97,9 @@ export async function generateMetadata(): Promise<Metadata> {
   // without cookies, so a `/en` page that linked the shared URL got the store-default (Arabic) manifest. Every
   // return below names it, because there is no `app/manifest.ts` any more to add the link by itself.
   const urlLocale = requestHeaders.get(LOCALE_PATH_HEADER);
-  const manifest = manifestHref(urlLocale === 'ar' || urlLocale === 'en' ? urlLocale : null);
+  const manifestUrl = manifestHref(urlLocale === 'ar' || urlLocale === 'en' ? urlLocale : null);
+  // PW1: a store with the phone-app switch off links no manifest (nothing to install from).
+  const manifest = isStorefrontPwaActive(store) ? manifestUrl : undefined;
 
   // A store WAS named but the API could not be reached (429/5xx/network), so
   // the resolver handed back the flagged fallback. The page below this layout
@@ -111,7 +114,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: 'Temporarily unavailable — please try again',
       description: 'This store is busy right now. Please try again in a moment.',
       robots: { index: false, follow: false },
-      manifest,
+      manifest: manifestUrl,
     };
   }
 
@@ -127,7 +130,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: `Page not found — ${BRAND.product.nameEn}`,
       description: `This page does not exist. ${BRAND.product.nameEn} builds online stores for merchants.`,
       robots: { index: false, follow: false },
-      manifest,
+      manifest: manifestUrl,
     };
   }
 
@@ -699,10 +702,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                         {/* PWA is active only when BOTH the store toggle AND the
                     platform feature flag are on. Without this gate, flipping
                     the per-store feature off had no observable effect. */}
-                        {store.pwaEnabled === true &&
-                          (store.enabledFeatures?.includes('pwa') ?? true) && (
-                            <ServiceWorkerRegistration />
-                          )}
+                        {isStorefrontPwaActive(store) && <ServiceWorkerRegistration />}
                         <Suspense fallback={null}>
                           <AffiliateTracker />
                         </Suspense>
