@@ -58,7 +58,7 @@ beforeEach(() => {
 describe('order-created-stuck-sweep', () => {
   it('no stuck orders → no re-send, no alert', async () => {
     const r = await handleOrderCreatedStuckSweep(stepStub);
-    expect(r).toEqual({ swept: 0, resent: 0, alerted: 0 });
+    expect(r).toEqual({ swept: 0, resent: 0, alerted: 0, journalsRepaired: 0 });
     expect(mockSend).not.toHaveBeenCalled();
     expect(mockSendAlert).not.toHaveBeenCalled();
   });

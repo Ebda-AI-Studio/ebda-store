@@ -766,6 +766,11 @@ export interface MoneyClient {
     a: { orderId: string },
     key?: string
   ): Promise<{ posted: boolean; skipped?: string; entries: number }>;
+  /** Post the missing sale entries of orders paid in the window (Ruling JOURNAL-RECONCILE-1); idempotent per order. */
+  journalRepairSales(a: { paidAfterMs: number; paidBeforeMs: number; take?: number }): Promise<{
+    repaired: Array<{ orderId: string; orderNumber: string; entries: number }>;
+    failed: Array<{ orderId: string; orderNumber: string; error: string }>;
+  }>;
   journalRefund(
     a: { orderId: string; reason?: string },
     key?: string
@@ -1595,6 +1600,7 @@ export function makeMoneyClient(
     goldBulkSwitchMode: (a, key) => call('goldBulkSwitchMode', a, key),
     goldCreateVariant: (a, key) => call('goldCreateVariant', a, key),
     fanoutDisarm: (a, key) => call('fanoutDisarm', a, key),
+    journalRepairSales: a => call('journalRepairSales', a),
     paymentEventRecord: a => call('paymentEventRecord', a),
     abandonStamp: a => call('abandonStamp', a),
     codMarkPaid: a => call('codMarkPaid', a),
