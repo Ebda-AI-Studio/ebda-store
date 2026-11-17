@@ -10610,9 +10610,26 @@
         },
         "resetDefault": "Back to default",
         "resetInherit": "Same as desktop",
-        "hint": "The gap between two sections is the bottom of one plus the top of the next."
+        "hint": "The gap between two sections is the bottom of one plus the top of the next.",
+        "quick": "Whole section",
+        "quickPreset": {
+          "compact": "Compact",
+          "normal": "Normal",
+          "roomy": "Roomy"
+        },
+        "preview": "How the section sits between its neighbours"
       },
-      "advanced": "Advanced: text styles and dividers"
+      "advanced": "Advanced: text styles and dividers",
+      "edited": "Edited",
+      "resetField": "Reset to default",
+      "errorsTitle": "{count} to fix in this section. Tap one to jump to it.",
+      "dropImage": "Drop an image here, or click to choose one",
+      "uploadingImage": "Uploading…",
+      "emptyTitle": "Click anything on the page to edit it",
+      "emptyHint": "Texts, pictures and whole sections open here. Until then, these are the settings for the whole page.",
+      "emptyAdd": "Add a section",
+      "emptyTheme": "Change colours and fonts",
+      "emptyTemplate": "Change the template"
     },
     "theme": {
       "smartPalette": "Smart Palette",

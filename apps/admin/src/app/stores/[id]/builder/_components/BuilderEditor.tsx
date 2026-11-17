@@ -825,6 +825,20 @@ export function BuilderEditor({
       theme={effectiveTheme(store.theme, b.doc.theme)}
       dispatch={dispatch}
       onSwitchPage={next => void switchPage(next)}
+      emptyActions={{
+        onAddSection: () => {
+          setTab('sections');
+          setAddAt(undefined);
+          setAddTo('template');
+        },
+        onOpenTheme: isHome
+          ? () => {
+              setTab('theme');
+              setDrawer('start');
+            }
+          : undefined,
+        onOpenTemplates: isHome ? () => setGalleryOpen(true) : undefined,
+      }}
     />
   ) : (
     <SettingsPanel
