@@ -526,13 +526,17 @@ async function appendActivationLedger(e: {
   });
 }
 
-/** Newest-first activation ledger rows (one read site: the prisma-sites ratchet). */
-function readLedger(where: Prisma.ProviderVerificationEventWhereInput, take: number) {
+/** Activation ledger rows, newest first by default (one read site: the prisma-sites ratchet). */
+function readLedger(
+  where: Prisma.ProviderVerificationEventWhereInput,
+  take: number,
+  order: 'asc' | 'desc' = 'desc'
+) {
   return prisma.providerVerificationEvent.findMany({
     where,
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: [{ createdAt: order }, { id: order }],
     take,
-    select: { op: true },
+    select: { op: true, createdAt: true },
   });
 }
 
@@ -584,16 +588,104 @@ export async function recordAdminEnable(args: {
       ref: null,
     });
   } catch (err) {
-    await args
-      .revert()
-      .catch(e =>
-        logger.error(
-          { e, storeId: args.storeId, provider: args.provider },
-          '[ACTIVATION] could not switch off after a failed ledger write'
-        )
+    await args.revert().catch(async e => {
+      // money review M3: the provider stays ON with no ledger row. Never silent: page ops at once, and the daily
+      // `reconcileUnledgeredEnables` keeps reporting it until someone acts.
+      logger.error(
+        { e, storeId: args.storeId, provider: args.provider },
+        '[ACTIVATION] could not switch off after a failed ledger write'
       );
+      await sendAlert({
+        level: 'p1',
+        source: 'provider.activation.unledgered_enable',
+        title: `Provider ${args.provider} is ON with no activation ledger row`,
+        body: `Store ${args.storeId}: a super-admin enable of ${args.provider} could not write its activation ledger row, and switching it back off failed too. The provider is enabled for checkout without its audit row. Switch it off or record the activation from /provider-activation.`,
+        context: { storeId: args.storeId, provider: args.provider },
+      }).catch(() => undefined);
+    });
     throw err;
   }
+}
+
+/**
+ * Money review M3 (the sweep half): every enabled API provider of every store must have an activation ledger row
+ * (`activated_self` / `activated_admin`). A config CREATED after the ledger went live (its first row ever) cannot be
+ * enabled without one by any path, so one without is reported (P1, one alert per run listing them). Configs created
+ * before the ledger existed were enabled by the old paths and are not flagged. Report only: switching a live gateway off
+ * is an operator's decision.
+ */
+export async function reconcileUnledgeredEnables(): Promise<
+  Array<{ storeId: string; provider: string }>
+> {
+  const first = await readLedger(
+    {
+      op: {
+        in: [
+          `${ACTIVATION_LEDGER_PREFIX}activated_self`,
+          `${ACTIVATION_LEDGER_PREFIX}activated_admin`,
+        ],
+      },
+    },
+    1,
+    'asc'
+  );
+  const liveSince = first[0]?.createdAt;
+  if (!liveSince) return []; // the ledger has no row yet: nothing can be measured against it
+  const onD1 = await platformHubOnD1();
+  const directory = onD1 ? await listDirectoryStores() : await storeDirectory();
+  const missing: Array<{ storeId: string; provider: string }> = [];
+  for (const store of directory) {
+    try {
+      const db = await storeDb(store.id);
+      const rows = await withStore(store.id, async () => [
+        ...(
+          await db.paymentConfig.findMany({
+            where: { storeId: store.id, isEnabled: true },
+            select: { provider: true, createdAt: true },
+          })
+        ).map(r => ({ provider: r.provider, createdAt: r.createdAt })),
+        ...(
+          await db.shippingCarrierConfig.findMany({
+            where: { storeId: store.id, enabled: true },
+            select: { carrier: true, createdAt: true },
+          })
+        ).map(r => ({ provider: r.carrier, createdAt: r.createdAt })),
+      ]);
+      for (const r of rows) {
+        const entry = getProviderEntry(r.provider);
+        if (!entry || entry.manual || r.createdAt < liveSince) continue;
+        const has = await readLedger(
+          {
+            provider: r.provider,
+            sourceStoreId: store.id,
+            op: {
+              in: [
+                `${ACTIVATION_LEDGER_PREFIX}activated_self`,
+                `${ACTIVATION_LEDGER_PREFIX}activated_admin`,
+              ],
+            },
+          },
+          1
+        );
+        if (has.length === 0) missing.push({ storeId: store.id, provider: r.provider });
+      }
+    } catch (err) {
+      logger.warn({ err, storeId: store.id }, '[ACTIVATION] ledger reconcile skipped a store');
+    }
+  }
+  if (missing.length > 0) {
+    await sendAlert({
+      level: 'p1',
+      source: 'provider.activation.unledgered_enable',
+      title: `${missing.length} enabled provider(s) have no activation ledger row`,
+      body: `Enabled for checkout without the activation row every enable path writes: ${missing
+        .slice(0, 20)
+        .map(m => `${m.storeId}/${m.provider}`)
+        .join(', ')}. Switch each off or record its activation from /provider-activation.`,
+      context: { count: missing.length },
+    }).catch(() => undefined);
+  }
+  return missing;
 }
 
 /** Switch the provider on/off FOR CHECKOUT. Enabling goes through the exact gate of the settings routes. */
