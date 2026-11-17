@@ -27,6 +27,7 @@ import {
   type NotificationConfigs,
   type NotificationLog,
   type TestStatus,
+  type WhatsAppStatus,
 } from './_components/types';
 
 const CHANNEL_NAME_KEYS: Record<ChannelKey, string> = {
@@ -49,6 +50,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [configs, setConfigs] = useState<NotificationConfigs>(DEFAULT_CONFIGS);
   const [events, setEvents] = useState<EventConfig[]>(DEFAULT_EVENTS);
+  const [whatsapp, setWhatsapp] = useState<WhatsAppStatus>({ kind: 'loading' });
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [logsTotal, setLogsTotal] = useState(0);
   const [logsPage, setLogsPage] = useState(1);
@@ -101,6 +103,19 @@ export default function NotificationsPage() {
     }
   }, [storeId]);
 
+  // Read-only link state (Ruling NT1-A-DEFAULT). A failed read is `error`, never "not connected".
+  const fetchWhatsApp = useCallback(async () => {
+    try {
+      const { data, error } = await apiGet<{ active: boolean }>(
+        `/api/v1/stores/${storeId}/whatsapp-link`
+      );
+      if (error || typeof data?.active !== 'boolean') setWhatsapp({ kind: 'error' });
+      else setWhatsapp({ kind: 'ready', active: data.active });
+    } catch {
+      setWhatsapp({ kind: 'error' });
+    }
+  }, [storeId]);
+
   const fetchLogs = useCallback(async () => {
     const qs = new URLSearchParams({
       limit: String(logsLimit),
@@ -118,9 +133,9 @@ export default function NotificationsPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchConfigs(), fetchEvents(), fetchLogs()]);
+    await Promise.all([fetchConfigs(), fetchEvents(), fetchLogs(), fetchWhatsApp()]);
     setLoading(false);
-  }, [fetchConfigs, fetchEvents, fetchLogs]);
+  }, [fetchConfigs, fetchEvents, fetchLogs, fetchWhatsApp]);
 
   useEffect(() => {
     fetchAll();
@@ -284,6 +299,7 @@ export default function NotificationsPage() {
             events={events}
             smsEnabled={smsEnabled}
             pushEnabled={pushEnabled}
+            whatsapp={whatsapp}
             saving={savingEvents}
             onToggleEventChannel={toggleEventChannel}
             onSave={handleSaveEvents}

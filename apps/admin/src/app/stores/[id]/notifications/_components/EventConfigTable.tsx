@@ -3,7 +3,12 @@
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import type { EventConfig } from './types';
+import { BRAND, brandUrl } from '@ebda/shared';
+import { CHAT_SENT_EVENTS, type EventConfig, type WhatsAppStatus } from './types';
+
+const CHAT_URL = brandUrl(BRAND.domains.whatsappApp);
+
+const chipBase = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
 
 // Event keys that have a translation entry in notifications.events.labels.
 // Any event key outside this set falls back to the server-provided label.
@@ -28,6 +33,7 @@ interface EventConfigTableProps {
   events: EventConfig[];
   smsEnabled: boolean;
   pushEnabled: boolean;
+  whatsapp: WhatsAppStatus;
   saving: boolean;
   onToggleEventChannel: (eventIndex: number, channel: 'sms' | 'push_notifications') => void;
   onSave: () => void;
@@ -43,6 +49,7 @@ export function EventConfigTable({
   events,
   smsEnabled,
   pushEnabled,
+  whatsapp,
   saving,
   onToggleEventChannel,
   onSave,
@@ -95,6 +102,10 @@ export function EventConfigTable({
           },
         ]
       : []),
+    {
+      header: t('whatsapp.header'),
+      cell: (ev: EventConfig) => <WhatsAppCell eventKey={ev.event} status={whatsapp} />,
+    },
   ];
 
   return (
@@ -108,6 +119,9 @@ export function EventConfigTable({
             {t('title')}
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">{t('subtitle')}</p>
+          <p data-testid="whatsapp-explainer" className="text-xs text-muted-foreground mt-2">
+            {t('whatsapp.explainer')}
+          </p>
         </div>
       </div>
 
@@ -132,5 +146,56 @@ export function EventConfigTable({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Read-only WhatsApp status for one event. There is deliberately no control here: the messages come from Ebda
+ * Chat (Ruling NT1-A-DEFAULT), so the chip only says who sends it.
+ */
+function WhatsAppCell({ eventKey, status }: { eventKey: string; status: WhatsAppStatus }) {
+  const t = useT('notifications.events.whatsapp');
+  const link = 'text-xs font-medium text-primary-ink underline underline-offset-2';
+  if (status.kind === 'loading') {
+    return <span className="text-xs text-muted-foreground">{t('loading')}</span>;
+  }
+  if (status.kind === 'error') {
+    return (
+      <span data-whatsapp-status="unknown" className={`${chipBase} bg-muted text-muted-ink`}>
+        {t('unknown')}
+      </span>
+    );
+  }
+  if (!CHAT_SENT_EVENTS.has(eventKey)) {
+    return (
+      <span data-whatsapp-status="none" className={`${chipBase} bg-muted text-muted-ink`}>
+        {t('none')}
+      </span>
+    );
+  }
+  if (!status.active) {
+    return (
+      <span className="flex flex-wrap items-center gap-2">
+        <span
+          data-whatsapp-status="not-connected"
+          className={`${chipBase} bg-muted text-muted-ink`}
+        >
+          {t('notConnected')}
+        </span>
+        <a href={CHAT_URL} target="_blank" rel="noopener noreferrer" className={link}>
+          {t('connect')}
+        </a>
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span data-whatsapp-status="sent" className={`${chipBase} bg-success/10 text-success-ink`}>
+        {t('sent')}
+      </span>
+      <a href={CHAT_URL} target="_blank" rel="noopener noreferrer" className={link}>
+        {t('open')}
+      </a>
+    </span>
   );
 }
