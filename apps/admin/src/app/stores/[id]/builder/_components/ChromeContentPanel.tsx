@@ -14,6 +14,7 @@
  * that is not a relative path or http(s)/mailto/tel stays in the field with an
  * inline error and is never dispatched (the API schema rejects it too).
  */
+import { fieldControlClasses } from '../../../../../components/ui/Field';
 import { Button } from '@/components/ui/Button';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
@@ -123,8 +124,7 @@ function LinkList({
     update(next);
   };
 
-  const input =
-    'w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm';
+  const input = fieldControlClasses();
   return (
     <fieldset className="space-y-2" data-testid={testId}>
       <legend className="text-sm font-semibold text-foreground">{title}</legend>

@@ -3,8 +3,8 @@ import { resolveOrderInvoiceRecipient } from '@api/lib/inngest/functions/order-c
 
 describe('resolveOrderInvoiceRecipient — opt-in per-store owner invoice', () => {
   it('returns the trimmed email when settings.orderInvoiceEmail is a non-empty string', () => {
-    expect(resolveOrderInvoiceRecipient({ orderInvoiceEmail: 'naief2@yahoo.com' })).toBe(
-      'naief2@yahoo.com'
+    expect(resolveOrderInvoiceRecipient({ orderInvoiceEmail: 'buyer@example.com' })).toBe(
+      'buyer@example.com'
     );
     expect(resolveOrderInvoiceRecipient({ orderInvoiceEmail: '  owner@store.com  ' })).toBe(
       'owner@store.com'

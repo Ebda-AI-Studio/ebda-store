@@ -31,6 +31,8 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Toggle } from '../../../../../components/Toggle';
+import { Disclosure } from '../../../../../components/ui/Disclosure';
+import { fieldControlClasses } from '../../../../../components/ui/Field';
 import { ColorField } from '../../../../../components/ColorField';
 import { SmartPaletteModal } from '../../../../../components/SmartPaletteModal';
 import type { FontEntry } from '../../../../../components/section-design/FontsCard';
@@ -48,7 +50,6 @@ import {
   presetPatch,
   type Tier2Id,
 } from './theme-panel-model';
-import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface EffectiveTypography {
   fonts: FontEntry[];
@@ -147,6 +148,10 @@ export function ThemeSettingsPanel({
   const lookBase = look ? (lookTheme(look) as Record<string, unknown>) : {};
   const changed = (id: string) => overridden.has(id) || id in patch;
   const hasChanges = Object.keys(patch).length > 0 || overridden.size > 0;
+  const isChanged = (s: Setting) => changed(String(s.id));
+  const changedDot = (
+    <span aria-label={t('changedDot')} className="h-1.5 w-1.5 rounded-full bg-primary" />
+  );
 
   const resetAll = async () => {
     setConfirmAll(false);
@@ -193,7 +198,11 @@ export function ThemeSettingsPanel({
       return (
         <label key={s.id} className="block text-sm">
           <span className="mb-1 block text-xs font-semibold">{label}</span>
-          <select value={shown} onChange={e => set(s.id, e.target.value)} className={FIELD_CLASSES}>
+          <select
+            value={shown}
+            onChange={e => set(s.id, e.target.value)}
+            className={fieldControlClasses()}
+          >
             {shown === '' &&
               (s.trait || s.id === 'headerLogoPlacement' || s.id === 'headerSearch') && (
                 <option value="" disabled>
@@ -230,7 +239,7 @@ export function ThemeSettingsPanel({
             dir="ltr"
             value={typeof v === 'string' ? v : ''}
             onChange={e => set(s.id, e.target.value)}
-            className={FIELD_CLASSES}
+            className={fieldControlClasses()}
           />
         </label>
       );
@@ -465,6 +474,7 @@ export function ThemeSettingsPanel({
         />
         <TypographyZonesField
           zones={typography.zones}
+          fonts={typography.fonts}
           theme={theme}
           onChange={(zone, next) =>
             onTypography({ zones: { [zone]: { ...(typography.zones[zone] ?? {}), ...next } } })
@@ -477,25 +487,18 @@ export function ThemeSettingsPanel({
   const tierGroup = (id: Tier2Id) => {
     const items = inTier(id);
     if (items.length === 0) return null;
+    const anyChanged = items.some(isChanged);
     return (
-      <details
+      <Disclosure
         key={id}
-        data-testid={`tier2-${id}`}
+        testId={`tier2-${id}`}
         open={openTier === id}
-        onToggle={e => {
-          const isOpen = (e.currentTarget as HTMLDetailsElement).open;
-          setOpenTier(prev => (isOpen ? id : prev === id ? null : prev));
-        }}
-        className="rounded-lg border border-border"
+        onOpenChange={isOpen => setOpenTier(prev => (isOpen ? id : prev === id ? null : prev))}
+        title={t(`tier.${id}`)}
+        badge={anyChanged ? changedDot : undefined}
       >
-        <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 text-sm font-semibold">
-          <span>{t(`tier.${id}`)}</span>
-          {items.some(s => changed(String(s.id))) && (
-            <span aria-label={t('changedDot')} className="h-1.5 w-1.5 rounded-full bg-primary" />
-          )}
-        </summary>
-        <div className="space-y-3 border-t border-border p-3">{items.map(s => renderBlock(s))}</div>
-      </details>
+        <div className="space-y-3">{items.map(s => renderBlock(s))}</div>
+      </Disclosure>
     );
   };
 
@@ -510,7 +513,7 @@ export function ThemeSettingsPanel({
             placeholder={t('search')}
             aria-label={t('search')}
             data-testid="theme-search"
-            className={FIELD_CLASSES}
+            className={fieldControlClasses()}
           />
         </div>
         {hasChanges && (
@@ -614,15 +617,12 @@ export function ThemeSettingsPanel({
               <div className="space-y-4">{renderFeel()}</div>
             </section>
             <div className="space-y-2">{TIER2_ORDER.map(tierGroup)}</div>
-            <details data-testid="theme-advanced" className="rounded-lg border border-border">
-              <summary className="flex min-h-11 cursor-pointer items-center px-3 text-sm font-semibold">
-                {t('advanced')}
-              </summary>
-              <div className="space-y-3 border-t border-border p-3">
+            <Disclosure testId="theme-advanced" title={t('advanced')}>
+              <div className="space-y-3">
                 {advanced.map(s => renderBlock(s))}
                 {fontTools}
               </div>
-            </details>
+            </Disclosure>
           </>
         )}
       </div>

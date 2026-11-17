@@ -10,7 +10,7 @@
  * Growth plan") instead, same pattern as `bundles/page.tsx`.
  *
  * Audience is always "active newsletter subscribers who opted in" — there is
- * no other source (Ruling EC-1, docs/plans/2026-09-25-email-campaigns.md) —
+ * no other source (Ruling EC-1, docs/plans/done/2026-09-25-email-campaigns.md) —
  * so the header states that plainly rather than implying "customers".
  */
 

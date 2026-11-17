@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import type { GscDashboard } from './types';
 
 /**
  * Empty state shown when `hasData:false` — the store has ZERO
@@ -10,16 +11,28 @@ import { useT } from '@/i18n/useT';
  * reads a flat zero-line chart as "your store gets zero search traffic" —
  * see gsc-dashboard.service.ts's file header for the full rationale.
  */
-export function GscNotConnected() {
+export function GscNotConnected({ setup }: { setup?: GscDashboard['setup'] }) {
   const t = useT('answerEngine.gsc');
 
   return (
     <div className="bg-card rounded-md border border-dashed border-border p-6 text-center">
       <p className="text-sm font-medium text-foreground" dir="auto">
-        {t('notConnectedTitle')}
+        {t(
+          setup === 'verifying'
+            ? 'verifyingTitle'
+            : setup === 'awaiting_data'
+              ? 'awaitingDataTitle'
+              : 'notConnectedTitle'
+        )}
       </p>
       <p className="mt-1.5 text-xs text-muted-foreground max-w-md mx-auto" dir="auto">
-        {t('notConnectedBody')}
+        {t(
+          setup === 'verifying'
+            ? 'verifyingBody'
+            : setup === 'awaiting_data'
+              ? 'awaitingDataBody'
+              : 'notConnectedBody'
+        )}
       </p>
     </div>
   );

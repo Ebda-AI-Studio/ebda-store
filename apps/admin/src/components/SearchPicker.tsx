@@ -30,7 +30,7 @@ const INPUT =
  * Admin search-as-you-type picker (orders new, bundle items, promotion scope): results from the 1st
  * character after 150 ms, the superseded request aborted, only results for the current text shown,
  * ARIA combobox (arrows / Home / End / Enter / Escape), Arabic-folded highlight, and loading / empty /
- * error rows. Spec: docs/plans/2026-10-26-search-as-you-type.md.
+ * error rows. Spec: docs/plans/done/2026-10-26-search-as-you-type.md.
  */
 export function SearchPicker<T>({
   search,

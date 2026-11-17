@@ -6,18 +6,15 @@ export function StoreLoadingSkeleton() {
   return (
     <AdminLayout title={t('loadingTitle')} subtitle={t('loadingSubtitle')}>
       <div className="space-y-6">
-        {/* Skeleton stat cards */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Skeleton: sales hero + four KPI tiles, same shape as the loaded page */}
+        <div className="rounded-md border bg-card p-6 shadow-sm space-y-3">
+          <div className="h-4 w-28 force-skeleton" />
+          <div className="h-10 w-48 force-skeleton" />
+          <div className="h-4 w-64 max-w-full force-skeleton" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="force-stat-card">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 space-y-3">
-                  <div className="h-3 w-20 force-skeleton" />
-                  <div className="h-8 w-28 force-skeleton" />
-                </div>
-                <div className="h-12 w-12 rounded-lg force-skeleton" />
-              </div>
-            </div>
+            <div key={i} className="h-24 rounded-md force-skeleton" />
           ))}
         </div>
         {/* Skeleton content */}

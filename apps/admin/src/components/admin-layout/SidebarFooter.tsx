@@ -4,6 +4,7 @@ import { Button, buttonVariants } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useFocusMode } from '@/contexts/FocusModeContext';
 import { useT } from '@/i18n/useT';
+import { ContactEbdaButton } from '@/components/support/ContactEbdaDialog';
 
 interface SidebarFooterUser {
   firstName?: string | null;
@@ -32,6 +33,11 @@ export function SidebarFooter({
 
   return (
     <>
+      {storeId && (
+        <div className="px-4 pb-2">
+          <ContactEbdaButton className="w-full justify-start text-muted-foreground" />
+        </div>
+      )}
       {/* Focus Mode Entry — only shown when a store is in scope */}
       {storeId && (
         <div className="px-4 pb-2">

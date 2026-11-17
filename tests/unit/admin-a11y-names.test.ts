@@ -1,6 +1,6 @@
 /**
  * WCAG 4.1.2 guard (admin audit P1-4): every switch in apps/admin/src has an accessible name.
- *   - `<Toggle>` / `<ToggleSwitch>` must pass `label=` (also enforced by its required prop type).
+ *   - `<Toggle>` / `<ToggleSwitch>` must pass `label=` (or `aria-label` / `aria-labelledby`).
  *   - any other `role="switch"` element needs `aria-label` / `aria-labelledby`, or must sit inside a `<label>` that names it.
  * No baseline: the audit found 45 nameless switches on 8 pages, all fixed; this keeps it at zero.
  */
@@ -26,7 +26,7 @@ export function unnamedSwitches(file: string, raw: string): string[] {
   const open = /<(?:Toggle|ToggleSwitch)(?=[\s>/])/g;
   let m: RegExpExecArray | null;
   while ((m = open.exec(src)))
-    if (!/\blabel=/.test(openingTag(src, m.index))) out.push(at(m.index));
+    if (!/\blabel=|aria-label(?:ledby)?=/.test(openingTag(src, m.index))) out.push(at(m.index));
   const re = /<[A-Za-z.]+(?=[\s>])/g;
   while ((m = re.exec(src))) {
     const tag = openingTag(src, m.index);

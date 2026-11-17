@@ -21,7 +21,7 @@ export const FEATURE_KEYS_ARRAY = [
   // wallet that touches the payment amount of an order. NOT in any plan
   // baseline: OFF for every store until a super-admin turns it on, and it is
   // inert unless `customer_wallet` is ALSO on. See
-  // docs/plans/2026-09-25-customer-wallet.md.
+  // docs/plans/done/2026-09-25-customer-wallet.md.
   'customer_wallet_checkout',
   'upsell_crosssell',
   'whatsapp',
@@ -91,7 +91,7 @@ export const FEATURE_KEYS_ARRAY = [
   // PLAN (`brandingRemoval` limit: Growth + Business) via FeatureService's plan
   // layer — in NO PLAN_BASELINE; a super-admin StoreFeature override still wins.
   'remove_branding',
-  // B2B wholesale pricing (2026-10-21, Ruling B2B-1; docs/plans/2026-10-21-b2b-wholesale.md).
+  // B2B wholesale pricing (2026-10-21, Ruling B2B-1; docs/plans/done/2026-10-21-b2b-wholesale.md).
   // Decided by the PLAN (`wholesalePricing` limit: Business + comped) via FeatureService's plan
   // layer, in NO PLAN_BASELINE; a super-admin StoreFeature override wins both ways.
   'b2b.wholesale',

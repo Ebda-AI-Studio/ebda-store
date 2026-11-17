@@ -46,6 +46,7 @@ export const RADIUS = {
   surface: 'rounded-lg',
   pill: 'rounded-full',
 } as const;
+// pq-allow(unused-export): asserted equal to the foundation RADIUS by tests/unit/admin-design-tokens-sync.test.ts
 export const RADIUS_PX = FDN_RADIUS;
 
 /** Heights in px: every interactive control (button, input, select, nav item) sits on one of these. */
@@ -59,6 +60,7 @@ export const ELEVATION = {
   menu: 'shadow-md',
   modal: 'shadow-xl',
 } as const;
+// pq-allow(unused-export): asserted equal to the foundation ELEVATION by tests/unit/admin-design-tokens-sync.test.ts
 export const ELEVATION_VALUES = FDN_ELEVATION;
 
 /**

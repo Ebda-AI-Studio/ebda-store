@@ -98,10 +98,13 @@ describe('ci.yml triggers', () => {
     expect(ci.concurrency.group).toMatch(/^ci-/);
     // PR runs group per ref, every main push has a group per merge sha, anything else is alone (run_id)
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || github.run_id) }}"
+      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
     );
     // Ruling CI-MAIN-SHA-1: only PR runs are cancelled; a main push (own group per sha) always completes.
-    expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}");
+    // CI-SLIM-1: a pre-merge full-tier dispatch on a PR branch (group per branch) is superseded by the next one too.
+    expect(ci.concurrency['cancel-in-progress']).toBe(
+      "${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}"
+    );
   });
 
   it('uses Node 22 (wrangler >= 4.110) and caches npm (hosted runners only) in every setup-node that installs', () => {
@@ -609,7 +612,10 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     expect(steps.some(s => s.run === 'bash scripts/ci/heavy-lock.sh acquire')).toBe(true);
     const rel = steps[steps.length - 1];
     expect(rel.run).toBe('bash scripts/ci/heavy-lock.sh release');
-    expect(rel.if).toBe('always()');
+    // PR-CI-CHEAP-1: released whenever the lock was taken (the scope step skips it for a PR that cannot move the API Worker)
+    expect(rel.if).toBe(
+      name === 'api-workerd-smoke' ? "always() && steps.scope.outputs.run == 'true'" : 'always()'
+    );
   });
   it('Chromium installs through scripts/ci/install-chromium.sh (no apt/--with-deps on the Mac)', () => {
     const code = ci

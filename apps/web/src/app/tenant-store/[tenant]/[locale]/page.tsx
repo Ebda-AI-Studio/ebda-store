@@ -5,7 +5,7 @@ import { HomePageBody } from '@/app/HomePageBody';
 
 // NOTE: no `generateStaticParams` here — deliberate, see the layout's
 // `dynamicParams` comment and
-// docs/plans/2026-07-12-tenant-cacheable-routing.md §3.4 (explicit ban).
+// docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.4 (explicit ban).
 
 // See the identical comment in `app/page.tsx` — the parent `[locale]/layout.tsx`'s
 // `generateMetadata` deliberately does not set `alternates`, or it leaks the

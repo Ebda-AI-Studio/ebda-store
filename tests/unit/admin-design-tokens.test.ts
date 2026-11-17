@@ -9,7 +9,7 @@
  *   G4  the bare `rounded` class (4px): control = rounded-md, surface = rounded-lg, pill = rounded-full.
  *   G5  letter-spacing (`tracking-*` other than tracking-normal): it breaks Arabic letter joining.
  *   G7  a raw <input>/<select>/<textarea> (not checkbox/radio/hidden/file/range/color) that does not use FIELD_CLASSES /
- *       TEXTAREA_CLASSES (or an explicit h-10/h-11): fields sit on the 44/40 control scale.
+ *       TEXTAREA_CLASSES / the editor's fieldControlClasses() (or an explicit h-10/h-11): fields sit on the 44/40 control scale.
  *   G8  `text-xs` (12px) on a content element (<p> <th> <td> <label> <li> <dt> <dd> <legend> <h3-6>): content is 14px or more;
  *       12px is for counters and badges (<span>, <Badge>), never the sole carrier of meaning.
  *   G9  `rounded-xl/2xl/3xl`: xl duplicates control (12px), 2xl/3xl are off-scale. Control = rounded-md, surface = rounded-lg, pill = rounded-full.
@@ -99,7 +99,7 @@ export function countFields(src: string): number {
     const tag = openingTag(code, m.index);
     if (
       FIELD_SKIP.test(tag) ||
-      /\b(?:FIELD_CLASSES|TEXTAREA_CLASSES)\b/.test(tag) ||
+      /\b(?:FIELD_CLASSES|TEXTAREA_CLASSES|fieldControlClasses)\b/.test(tag) ||
       /(?<![\w-])h-1[01](?![\w-])/.test(tag)
     )
       continue;
@@ -181,6 +181,7 @@ describe('admin design tokens', () => {
     expect(countFields('<input type="text" className={FIELD_CLASSES} />')).toBe(0);
     expect(countFields('<input type="checkbox" className="h-4 w-4" />')).toBe(0);
     expect(countFields('<select className={`${FIELD_CLASSES} w-40`}>')).toBe(0);
+    expect(countFields('<input type="text" className={fieldControlClasses()} />')).toBe(0);
     expect(countFields('<textarea className="rounded border" />')).toBe(1);
     expect(countFields('<Input label="x" />')).toBe(0);
   });

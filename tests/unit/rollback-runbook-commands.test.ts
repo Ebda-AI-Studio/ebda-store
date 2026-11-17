@@ -68,7 +68,7 @@ describe('restore/rollback runbooks only reference real npm scripts', () => {
  * pending and reports success having run zero SQL, regardless of whether
  * RLS policies actually survived the restore. Both runbooks must MEASURE
  * policy state (query pg_policies + the deny-all detector from
- * docs/plans/2026-07-02-rls-cutover.md Phase 0) rather than infer it from a
+ * docs/plans/done/2026-07-02-rls-cutover.md Phase 0) rather than infer it from a
  * clean `migrate deploy` exit code — and must never again narrate that
  * `migrate deploy` alone is what re-creates the policies.
  */
