@@ -43,7 +43,7 @@ import {
 import { idempotencyKeyOf } from '../lib/money-idempotency';
 import { postManualEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
-import { ledgerCostsKnown } from '../services/analytics.service';
+import { AnalyticsService, cogsFromPnl, ledgerCostsFields } from '../services/analytics.service';
 import { dashboardStockValues } from '../services/accounting/dashboard-stock';
 import { generateTaxReport } from '../services/accounting/tax-report.service';
 import { streamXlsxResponse, summarizeExportFilters } from '../lib/exports/xlsx';
@@ -646,17 +646,19 @@ router.get(
           dashboardStockValues(req.params.storeId),
         ]);
         const { stockValue, disabledVariantStockValue, stockedProducts, uncostedProducts } = stock;
-        const cogs = pnl.expenses
-          .filter(e => e.code.startsWith('50'))
-          .reduce((sum, e) => sum + e.balance, 0);
+        const costs = ledgerCostsFields(
+          pnl.totalRevenue,
+          cogsFromPnl(pnl),
+          await AnalyticsService.soldLineCostCoverage(req.params.storeId, from, to)
+        );
 
         return {
           thisMonth: {
             revenue: pnl.totalRevenue,
             expenses: pnl.totalExpenses,
             net: pnl.netIncome,
-            // false = revenue with no cost of goods booked: `net` is not a real profit (QA 2026-11-17 N1).
-            costsKnown: ledgerCostsKnown(pnl.totalRevenue, cogs),
+            // unknown/partial: `net` is not a real profit (QA 2026-11-17 N1, M1); missing/total = sold lines without a cost.
+            ...costs,
           },
           cash: bs.assets.filter(a => a.code.startsWith('10')),
           stockValue,

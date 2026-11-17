@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { ledgerCostsKnown, stockValueState } from '../money-truth';
+import { ledgerCostsStatus, stockValueState } from '../money-truth';
 
-describe('ledgerCostsKnown', () => {
-  it('trusts the API flag when present', () => {
-    expect(ledgerCostsKnown({ revenue: 100, cogs: 0, costsKnown: true })).toBe(true);
-    expect(ledgerCostsKnown({ revenue: 100, cogs: 5, costsKnown: false })).toBe(false);
+describe('ledgerCostsStatus', () => {
+  it('trusts the API status when present', () => {
+    expect(ledgerCostsStatus({ revenue: 100, cogs: 0, costsStatus: 'known' })).toBe('known');
+    expect(ledgerCostsStatus({ revenue: 100, cogs: 5, costsStatus: 'partial' })).toBe('partial');
+    expect(ledgerCostsStatus({ revenue: 100, cogs: 5, costsStatus: 'unknown' })).toBe('unknown');
   });
   it('falls back to revenue>0 && cogs==0 for an older API', () => {
-    expect(ledgerCostsKnown({ revenue: 100, cogs: 0 })).toBe(false);
-    expect(ledgerCostsKnown({ revenue: 100, cogs: 40 })).toBe(true);
-    expect(ledgerCostsKnown({ revenue: 0, cogs: 0 })).toBe(true);
+    expect(ledgerCostsStatus({ revenue: 100, cogs: 0 })).toBe('unknown');
+    expect(ledgerCostsStatus({ revenue: 100, cogs: 40 })).toBe('known');
+    expect(ledgerCostsStatus({ revenue: 0, cogs: 0 })).toBe('known');
   });
 });
 

@@ -4,14 +4,26 @@
  * a profit, and stock with no cost price is not worth 0.
  */
 
-/** Ledger window figures: false when the period has revenue but no cost of goods was booked (ruling AN-7). */
-export function ledgerCostsKnown(gl: {
+export type LedgerCostsStatus = 'known' | 'partial' | 'unknown';
+
+export interface LedgerCostsInput {
   revenue: number;
   cogs: number;
-  costsKnown?: boolean;
-}): boolean {
-  if (typeof gl.costsKnown === 'boolean') return gl.costsKnown;
-  return !(gl.revenue > 0 && gl.cogs === 0);
+  /** From the API: known = every sold line has a cost, partial = some do not, unknown = none does. */
+  costsStatus?: LedgerCostsStatus;
+  /** Sold lines without a cost / all sold lines in the window (for the partial note). */
+  costsMissing?: number;
+  costsTotal?: number;
+}
+
+/**
+ * Ledger window figures (ruling AN-7 + money review M1): unknown when revenue has no cost of goods at all, partial
+ * when only some sold lines have a cost (the profit is then overstated). Trusts the API status; an older API without
+ * it falls back to revenue>0 && cogs==0.
+ */
+export function ledgerCostsStatus(gl: LedgerCostsInput): LedgerCostsStatus {
+  if (gl.costsStatus) return gl.costsStatus;
+  return gl.revenue > 0 && gl.cogs === 0 ? 'unknown' : 'known';
 }
 
 export type StockValueState =

@@ -38,6 +38,45 @@ describe('N1 net income is unknown when cost of goods is unknown', () => {
     expect(screen.getAllByText(/4,850/)).toHaveLength(1);
   });
 
+  it('partial: COGS booked but some sold items have no cost shows the figure AND says it is overstated (M1)', () => {
+    render(
+      <GlKpiCards
+        gl={{
+          revenue: 485000,
+          cogs: 100000,
+          grossProfit: 385000,
+          netIncome: 300000,
+          costsStatus: 'partial',
+          costsMissing: 2,
+          costsTotal: 5,
+        }}
+        periodLabel="p"
+      />
+    );
+    expect(screen.queryByText('grossProfitUnknown')).toBeNull();
+    expect(screen.getByText(/3,000/)).toBeTruthy(); // net income figure is still shown
+    expect(screen.getAllByText('costsPartial:2,5')).toHaveLength(2); // gross profit + net income
+  });
+
+  it('known: refunds reverse COGS to 0 but every sold item had a cost, so it is NOT unknown (M1)', () => {
+    render(
+      <GlKpiCards
+        gl={{
+          revenue: 485000,
+          cogs: 0,
+          grossProfit: 485000,
+          netIncome: 485000,
+          costsStatus: 'known',
+          costsMissing: 0,
+          costsTotal: 4,
+        }}
+        periodLabel="p"
+      />
+    );
+    expect(screen.queryByText('grossProfitUnknown')).toBeNull();
+    expect(screen.queryByText('noCogsBooked')).toBeNull();
+  });
+
   it('shows the figures when cost of goods is booked', () => {
     render(
       <GlKpiCards

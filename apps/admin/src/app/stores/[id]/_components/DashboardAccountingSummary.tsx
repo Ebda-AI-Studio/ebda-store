@@ -8,9 +8,16 @@ import { apiGetQuiet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 
 import { formatPrice } from '../../../../lib/format';
-import { ledgerCostsKnown, stockValueState } from '../../../../lib/money-truth';
+import { ledgerCostsStatus, stockValueState } from '../../../../lib/money-truth';
 interface FinanceDashboard {
-  thisMonth: { revenue: number; expenses: number; net: number; costsKnown?: boolean };
+  thisMonth: {
+    revenue: number;
+    expenses: number;
+    net: number;
+    costsStatus?: 'known' | 'partial' | 'unknown';
+    costsMissing?: number;
+    costsTotal?: number;
+  };
   cash: Array<{ id: string; code: string; nameEn: string; balance: number }>;
   stockValue: number;
   stockedProducts?: number;
@@ -121,13 +128,14 @@ export function DashboardAccountingSummary({ storeId }: Props) {
 
   const netPositive = (fin?.thisMonth.net ?? 0) >= 0;
   // Unknown is not zero/revenue (QA 2026-11-17 N1/N2): no booked cost of goods → profit unknown; no cost prices → stock unknown.
-  const netKnown = fin
-    ? ledgerCostsKnown({
+  const costsStatus = fin
+    ? ledgerCostsStatus({
         revenue: fin.thisMonth.revenue,
         cogs: 0,
-        costsKnown: fin.thisMonth.costsKnown ?? true,
+        costsStatus: fin.thisMonth.costsStatus ?? 'known',
       })
-    : true;
+    : 'known';
+  const netKnown = costsStatus !== 'unknown';
   const stockSource = stock ?? fin;
   const stockState = stockSource
     ? stockValueState({
@@ -150,6 +158,13 @@ export function DashboardAccountingSummary({ storeId }: Props) {
       label: t('netThisMonth'),
       value: netKnown ? fmtMoney(fin.thisMonth.net) : t('unknown'),
       unit: '',
+      note:
+        costsStatus === 'partial'
+          ? t('netPartial', {
+              missing: fin.thisMonth.costsMissing ?? 0,
+              total: fin.thisMonth.costsTotal ?? 0,
+            })
+          : undefined,
       tone: !netKnown
         ? ('muted' as const)
         : netPositive
@@ -183,6 +198,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
     label: string;
     value: string;
     unit: string;
+    note?: string;
     tone: 'primary' | 'success' | 'danger' | 'info' | 'warning' | 'muted';
   }>;
 
@@ -214,6 +230,7 @@ export function DashboardAccountingSummary({ storeId }: Props) {
                 <span className="ms-1 text-sm font-medium text-muted-foreground">{tile.unit}</span>
               )}
             </p>
+            {tile.note && <p className="mt-1 text-xs text-muted-foreground">{tile.note}</p>}
           </Link>
         ))}
       </div>

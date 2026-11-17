@@ -11,7 +11,7 @@ import type { Period, ResolvedDateRange } from '../../analytics/_components/type
 import { resolveDateRange } from '../../analytics/_components/types';
 import { reportRangeQueryString, withNumerals } from '@ebda/shared';
 import { formatPrice } from '@/lib/format';
-import { ledgerCostsKnown, stockValueState } from '@/lib/money-truth';
+import { ledgerCostsStatus, stockValueState } from '@/lib/money-truth';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -30,8 +30,10 @@ interface DashboardData {
     revenue: number;
     expenses: number;
     net: number;
-    /** False: revenue with no cost of goods booked, so `net` is not a real profit. */
-    costsKnown?: boolean;
+    /** unknown: no cost of goods booked; partial: some sold lines have no cost. `net` is then not a real profit. */
+    costsStatus?: 'known' | 'partial' | 'unknown';
+    costsMissing?: number;
+    costsTotal?: number;
   };
   cash: CashAccountRow[];
   stockValue: number;
@@ -212,11 +214,12 @@ export default function FinanceDashboardPage() {
   };
   const netPositive = thisMonth.net >= 0;
   // Net income built on a missing cost of goods is unknown, not the revenue (QA 2026-11-17 N1).
-  const netKnown = ledgerCostsKnown({
+  const costsStatus = ledgerCostsStatus({
     revenue: thisMonth.revenue,
     cogs: 0,
-    costsKnown: data?.thisMonth?.costsKnown ?? true,
+    costsStatus: data?.thisMonth?.costsStatus ?? 'known',
   });
+  const netKnown = costsStatus !== 'unknown';
   const stockState = stockValueState({
     stockValue,
     stockedProducts: data?.stockedProducts,
@@ -356,8 +359,16 @@ export default function FinanceDashboardPage() {
                     </>
                   )}
                 </p>
-                {!dashboardErr && !netKnown && (
+                {!dashboardErr && costsStatus === 'unknown' && (
                   <p className="text-xs text-muted-foreground">{t('netNoCostsNote')}</p>
+                )}
+                {!dashboardErr && costsStatus === 'partial' && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('netPartialNote', {
+                      missing: data?.thisMonth?.costsMissing ?? 0,
+                      total: data?.thisMonth?.costsTotal ?? 0,
+                    })}
+                  </p>
                 )}
                 {dashboardErr ? (
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>

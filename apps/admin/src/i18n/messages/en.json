@@ -202,7 +202,8 @@
         "openBackorders": "Open backorders",
         "topRfmSegment": "Top Customer Segment",
         "error": "Unable to load financial summary",
-        "unknown": "Unknown"
+        "unknown": "Unknown",
+        "netPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower."
       },
       "details": {
         "title": "Store Details",
@@ -2187,6 +2188,7 @@
       "netIncome": "Net income (GL)",
       "grossProfitUnknown": "Unknown",
       "noCogsBooked": "No cost of goods was booked for this period, so gross profit cannot be told apart from revenue. Cost is booked for orders whose products had a cost price when sold.",
+      "costsPartial": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
       "window": "General-ledger figures for: {period}"
     },
     "inventorySnapshot": {
@@ -6792,6 +6794,7 @@
       "loadFailedShort": "Could not load the finance dashboard.",
       "netUnknown": "Unknown",
       "netNoCostsNote": "No cost of goods was booked for this period, so profit cannot be told apart from revenue.",
+      "netPartialNote": "Partly calculated: {missing} of {total} sold items have no cost, so the real profit is lower.",
       "stockValueUnknown": "Unknown",
       "stockValueMissingCost": "{count} stocked products have no cost price, so their value cannot be calculated.",
       "stockValuePartial": "Calculated for {costed} of {stocked} stocked products — the rest have no cost price.",

@@ -49,7 +49,7 @@ import {
   profitAndLoss,
   type TrialBalanceRow,
 } from '../../services/accounting/reports.service';
-import { ledgerCostsKnown } from '../../services/analytics.service';
+import { AnalyticsService, cogsFromPnl, ledgerCostsFields } from '../../services/analytics.service';
 import { dashboardStockValues } from '../../services/accounting/dashboard-stock';
 import { generateTaxReport } from '../../services/accounting/tax-report.service';
 import {
@@ -641,10 +641,6 @@ const rangeShape = shape<{ from?: string; to?: string }>({
   to: { z: ymd.z, js: { ...ymd.js, description: 'End day, YYYY-MM-DD (default: today).' } },
 });
 
-function cogsOf(pnl: { expenses: Array<{ code: string; balance: number }> }): number {
-  return pnl.expenses.filter(e => e.code.startsWith('50')).reduce((sum, e) => sum + e.balance, 0);
-}
-
 const financeOverview = readTool<{ from?: string; to?: string }>({
   name: 'finance_overview',
   capabilityId: 'finance.overview-reports',
@@ -654,19 +650,24 @@ const financeOverview = readTool<{ from?: string; to?: string }>({
   gate: FINANCE_READ,
   read: async (ctx, a) => {
     const { from, to } = await window(ctx.storeId, a, {});
-    const [pnl, bs, stock] = await Promise.all([
+    const [pnl, bs, stock, coverage] = await Promise.all([
       profitAndLoss(ctx.storeId, from, to),
       balanceSheet(ctx.storeId, to),
       dashboardStockValues(ctx.storeId),
+      AnalyticsService.soldLineCostCoverage(ctx.storeId, from, to),
     ]);
+    const costs = ledgerCostsFields(pnl.totalRevenue, cogsFromPnl(pnl), coverage);
     return {
       revenueEgp: money(pnl.totalRevenue),
       expensesEgp: money(pnl.totalExpenses),
-      // Revenue with no cost of goods booked is not a profit: the assistant must say "unknown", not repeat the revenue.
-      netProfitEgp: ledgerCostsKnown(pnl.totalRevenue, cogsOf(pnl)) ? money(pnl.netIncome) : null,
-      netProfitNote: ledgerCostsKnown(pnl.totalRevenue, cogsOf(pnl))
-        ? undefined
-        : 'Unknown: no cost of goods is booked for this period, so net profit cannot be stated.',
+      // Revenue with no (or only some) cost of goods is not a real profit: say "unknown" / "partial", never the revenue.
+      netProfitEgp: costs.costsStatus === 'unknown' ? null : money(pnl.netIncome),
+      netProfitNote:
+        costs.costsStatus === 'unknown'
+          ? 'Unknown: no cost of goods is booked for this period, so net profit cannot be stated.'
+          : costs.costsStatus === 'partial'
+            ? `Partial: ${costs.costsMissing} of ${costs.costsTotal} sold items have no cost price, so the real profit is lower than stated.`
+            : undefined,
       cash: top(bs.assets.filter(x => x.code.startsWith('10')).map(bsRow)),
       stockValueEgp:
         stock.stockedProducts > 0 && stock.uncostedProducts === stock.stockedProducts

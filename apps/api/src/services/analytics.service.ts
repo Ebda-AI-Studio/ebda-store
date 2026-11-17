@@ -250,11 +250,49 @@ async function doNewAndReturning(
 }
 
 /**
- * Whether a ledger window's profit figures can be trusted: false when the period has revenue but no cost of goods was
- * booked (no cost prices, or COGS deferred), so gross profit and net income are UNKNOWN rather than equal to revenue.
+ * Cost of goods sold in a ledger P&L: the account-code rule (50xx = COGS) lives HERE and nowhere else, so the finance
+ * dashboard, the assistant tool and the analytics GL window cannot drift apart.
  */
-export function ledgerCostsKnown(revenue: number, cogs: number): boolean {
-  return !(revenue > 0 && cogs === 0);
+export function cogsFromPnl(pnl: { expenses: Array<{ code: string; balance: number }> }): number {
+  return pnl.expenses.filter(e => e.code.startsWith('50')).reduce((sum, e) => sum + e.balance, 0);
+}
+
+/** How far a ledger window's profit can be trusted (QA 2026-11-17 N1, money review M1). */
+export type LedgerCostsStatus = 'known' | 'partial' | 'unknown';
+
+/** The three response fields every ledger-profit surface carries: status, and the missing/total sold lines. */
+export function ledgerCostsFields(
+  revenue: number,
+  cogs: number,
+  coverage: { soldLines: number; missingLines: number }
+) {
+  return {
+    costsStatus: ledgerCostsStatus({ revenue, cogs, ...coverage }),
+    costsMissing: coverage.missingLines,
+    costsTotal: coverage.soldLines,
+  };
+}
+
+/**
+ * Whether a ledger window's profit figures can be trusted. The primary signal is the sold-line cost coverage (order
+ * lines in the window with / without a cost snapshot, the same count behind the analytics "cost not entered" note):
+ * - `known`: every sold line has a cost (also when refunds reverse COGS to exactly 0);
+ * - `partial`: some sold lines have no cost, so the profit includes the full margin of those lines and is overstated;
+ * - `unknown`: nothing sold has a cost, so profit cannot be told apart from revenue.
+ * With no sold lines at all the ledger alone decides: revenue with no cost of goods booked is `unknown`.
+ */
+export function ledgerCostsStatus(input: {
+  revenue: number;
+  cogs: number;
+  soldLines: number;
+  missingLines: number;
+}): LedgerCostsStatus {
+  if (input.revenue <= 0) return 'known';
+  if (input.soldLines > 0) {
+    if (input.missingLines <= 0) return 'known';
+    return input.missingLines >= input.soldLines ? 'unknown' : 'partial';
+  }
+  return input.cogs === 0 ? 'unknown' : 'known';
 }
 
 export class AnalyticsService {
@@ -471,6 +509,7 @@ export class AnalyticsService {
         orders: d.orders,
         customers: d.customers,
         profit: d.costedLines === 0 ? (d.missingLines > 0 ? null : 0) : (d.profit ?? 0),
+        costedLines: d.costedLines,
         itemsMissingCost: d.missingLines,
         revenueMissingCost: d.missingRevenue,
       };
@@ -529,6 +568,7 @@ export class AnalyticsService {
       orders: aggregate._count.id,
       customers: customerCount,
       profit,
+      costedLines,
       itemsMissingCost,
       revenueMissingCost: Number(p?.missing_revenue ?? 0),
     };
@@ -1192,19 +1232,29 @@ export class AnalyticsService {
    * Refund-aware and deferred-COGS-aware (journal lines are the source of truth).
    */
   static async glRevenueWindow(storeId: string, from: Date, to: Date) {
-    const pnl = await profitAndLoss(storeId, from, to);
-    const cogs = pnl.expenses
-      .filter(e => e.code.startsWith('50'))
-      .reduce((s, e) => s + e.balance, 0);
+    const [pnl, coverage] = await Promise.all([
+      profitAndLoss(storeId, from, to),
+      this.soldLineCostCoverage(storeId, from, to),
+    ]);
+    const cogs = cogsFromPnl(pnl);
     return {
       revenue: pnl.totalRevenue,
       cogs,
       grossProfit: pnl.totalRevenue - cogs,
       netIncome: pnl.netIncome,
-      // Revenue with no cost of goods booked is not a profit: "revenue − 0" would repeat the revenue as gross profit AND as
-      // net income (QA 2026-11-17 N1). Callers render both as unknown (ruling AN-7) when this is false.
-      costsKnown: ledgerCostsKnown(pnl.totalRevenue, cogs),
+      // Revenue with no (or only some) cost of goods is not a profit: "revenue − 0" would repeat the revenue as gross
+      // profit AND net income (N1), and a partly costed period overstates it (M1). Callers render unknown / partial.
+      ...ledgerCostsFields(pnl.totalRevenue, cogs, coverage),
     };
+  }
+
+  /**
+   * Sold order lines in the window and how many have no cost snapshot: the shared "is the profit built on missing
+   * costs" signal (same predicate as the analytics profit card, both backends via getPeriodStats).
+   */
+  static async soldLineCostCoverage(storeId: string, from: Date, to: Date) {
+    const s = await this.getPeriodStats(storeId, from, to);
+    return { soldLines: s.costedLines + s.itemsMissingCost, missingLines: s.itemsMissingCost };
   }
 
   /**

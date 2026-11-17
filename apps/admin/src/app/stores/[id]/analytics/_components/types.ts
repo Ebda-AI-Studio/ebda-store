@@ -73,8 +73,10 @@ export interface LowStockProduct {
 }
 
 export interface GlWindow {
-  /** False when the period has revenue but no cost of goods was booked: gross profit and net income are unknown. */
-  costsKnown?: boolean;
+  /** unknown: no cost of goods for the period's revenue; partial: some sold lines have no cost (profit overstated). */
+  costsStatus?: 'known' | 'partial' | 'unknown';
+  costsMissing?: number;
+  costsTotal?: number;
   revenue: number;
   cogs: number;
   grossProfit: number;
