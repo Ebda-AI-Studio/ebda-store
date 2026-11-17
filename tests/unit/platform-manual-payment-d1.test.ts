@@ -314,10 +314,12 @@ describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VA
       periodEnd: new Date(Date.UTC(2026, 0 + months, 15)),
     });
 
+    const at = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
     it('one month price + a 12-month explicit period is refused, nothing written', async () => {
       const db = world();
       await expect(
-        recordManualPayment(input(A, { amountMinor: 5000, ...span(12) }))
+        recordManualPayment(input(A, { amountMinor: 5000, now: start, ...span(12) }))
       ).rejects.toMatchObject({ statusCode: 409, code: 'AMOUNT_BELOW_PRICE' });
       expect(ledgerRows(db)).toEqual({ n: 0 });
       expect(h.storeUpdate).not.toHaveBeenCalled();
@@ -328,6 +330,7 @@ describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VA
       const out = await recordManualPayment(
         input(A, {
           amountMinor: 5000,
+          now: start,
           ...span(12),
           allowUnderpay: true,
           underpayReason: 'annual deal agreed by phone',
@@ -344,7 +347,9 @@ describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VA
 
     it('12 intervals paid in full needs no flag and reports no underpay (service outcome)', async () => {
       const db = world();
-      const out = await recordManualPayment(input(A, { amountMinor: 60000, ...span(12) }));
+      const out = await recordManualPayment(
+        input(A, { amountMinor: 60000, now: start, ...span(12) })
+      );
       expect(out.underpay).toBeUndefined();
       const row = db.prepare('SELECT raw FROM billing_events').get() as { raw: string };
       expect(JSON.parse(row.raw).underpay).toBeUndefined();
@@ -362,7 +367,9 @@ describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VA
 
     it('an explicit period of exactly one interval at the plain price still works', async () => {
       world();
-      expect(await recordManualPayment(input(A, { amountMinor: 5000, ...span(1) }))).toMatchObject({
+      expect(
+        await recordManualPayment(input(A, { amountMinor: 5000, now: start, ...span(1) }))
+      ).toMatchObject({
         duplicate: false,
       });
     });
@@ -373,6 +380,7 @@ describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VA
         recordManualPayment(
           input(A, {
             amountMinor: 5000,
+            now: start,
             periodStart: start,
             periodEnd: new Date(Date.UTC(2026, 1, 15, 0, 0, 1)),
           })
@@ -386,12 +394,61 @@ describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VA
         recordManualPayment(
           input(A, {
             amountMinor: 100_000_000,
+            now: start,
             ...span(121),
             allowUnderpay: true,
             underpayReason: 'whatever',
           })
         )
       ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_PERIOD' });
+    });
+
+    it('a future-start one-month period is charged for the whole span until paid time resumes', async () => {
+      const db = world();
+      const far = { periodStart: at('2026-07-15'), periodEnd: at('2026-08-15') };
+      await expect(
+        recordManualPayment(input(A, { amountMinor: 5000, now: start, ...far }))
+      ).rejects.toMatchObject({ statusCode: 409, code: 'AMOUNT_BELOW_PRICE' });
+      expect(ledgerRows(db)).toEqual({ n: 0 });
+      // 15 Jan -> 15 Aug = 7 months
+      await recordManualPayment(input(A, { amountMinor: 35000, now: start, ...far }));
+      expect(ledgerRows(db)).toEqual({ n: 1 });
+    });
+
+    it('a gap after the paid-through date is charged; renewal from the paid end is one month', async () => {
+      world();
+      await recordManualPayment(input(A, { now: start })); // paid through 15 Feb
+      const gap = { periodStart: at('2026-03-15'), periodEnd: at('2026-04-15') };
+      await expect(
+        recordManualPayment(
+          input(A, { reference: 'REF-GAP-1', amountMinor: 5000, now: start, ...gap })
+        )
+      ).rejects.toMatchObject({ code: 'AMOUNT_BELOW_PRICE' }); // 15 Feb -> 15 Apr = 2 months
+      await expect(
+        recordManualPayment(
+          input(A, { reference: 'REF-GAP-1', amountMinor: 10000, now: start, ...gap })
+        )
+      ).resolves.toMatchObject({ duplicate: false });
+      await expect(
+        recordManualPayment(
+          input(A, {
+            reference: 'REF-RENEW-1',
+            amountMinor: 5000,
+            now: start,
+            periodStart: at('2026-04-15'),
+            periodEnd: at('2026-05-15'),
+          })
+        )
+      ).resolves.toMatchObject({ duplicate: false });
+    });
+
+    it('a replay of a recorded payment returns it even after the plan price went up', async () => {
+      const db = world();
+      const first = await recordManualPayment(input(A));
+      db.prepare(`UPDATE plans SET price_monthly_minor = 9000`).run();
+      const again = await recordManualPayment(input(A));
+      expect(again).toMatchObject({ duplicate: true, billingEventId: first.billingEventId });
+      expect(ledgerRows(db)).toEqual({ n: 1 });
     });
   });
 });

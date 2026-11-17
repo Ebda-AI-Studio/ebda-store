@@ -957,32 +957,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     throw new AppError(400, 'INVALID_PERIOD', 'The period must end after it starts');
   }
   const { plan, price } = await loadPayablePlan(input.planCode, input.interval);
-  // R-MANUAL-UNDERPAY-1: the money recorded must cover the plan price, VAT included (chargeFor = the amount a card
-  // would be charged today), for EVERY interval the paid period spans. An explicit operator period is priced by the
-  // intervals it covers (rounded up), so one month's price cannot buy a 12-month term. Over-payment is fine; an
-  // underpayment needs the explicit override and a reason.
-  const periodIntervals = explicit
-    ? intervalsCovered(input.periodStart!, input.periodEnd!, input.interval)
-    : 1;
-  if (periodIntervals > MAX_MANUAL_PERIOD_INTERVALS) {
-    throw new AppError(400, 'INVALID_PERIOD', 'The period is too long for a manual payment');
-  }
   const unitMinor = (await chargeFor(price)).totalMinor;
-  const expectedMinor = unitMinor * periodIntervals;
-  const underpaid = input.amountMinor < expectedMinor;
-  if (underpaid) {
-    if (!input.allowUnderpay) {
-      throw new AppError(
-        409,
-        'AMOUNT_BELOW_PRICE',
-        `The amount is below the price for this period (${expectedMinor} piastres, VAT included, ${periodIntervals} ${input.interval === 'yearly' ? 'year' : 'month'}${periodIntervals > 1 ? 's' : ''})`,
-        { expectedMinor, periodIntervals }
-      );
-    }
-    if ((input.underpayReason ?? '').trim().length < 3) {
-      throw new AppError(400, 'REASON_REQUIRED', 'Write why the underpayment is accepted');
-    }
-  }
   let key = manualPaymentKey(input.method, reference);
   if (input.replacesVoidedEventId) {
     const vStore = await getEntityStoreId('billing_event', input.replacesVoidedEventId);
@@ -1083,9 +1058,37 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     // period computed below is never from a read a grant is about to change.
     await lockSubscription(tx, input.storeId);
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
+    const rule = manualPeriodFor(sub, input.interval, now);
     const { periodStart, periodEnd } = explicit
       ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
-      : manualPeriodFor(sub, input.interval, now);
+      : rule;
+    // R-MANUAL-UNDERPAY-1: the money recorded must cover the plan price, VAT included (chargeFor = the amount a card
+    // would be charged today), for EVERY interval of paid time this payment buys. Paid time is what access and
+    // renewal read: the store stays active until `periodEnd`, so the span is counted from where paid time RESUMES
+    // (`rule.periodStart` = max(now, current paid end, trial end), read under the row lock above) to `periodEnd`,
+    // never from the operator's own `periodStart` (a future start or a gap would otherwise be free). Done AFTER the
+    // idempotency lookup, so a replay of a recorded payment returns it instead of being re-priced.
+    const periodIntervals = explicit
+      ? intervalsCovered(rule.periodStart, periodEnd, input.interval, MAX_MANUAL_PERIOD_INTERVALS)
+      : 1;
+    if (periodIntervals > MAX_MANUAL_PERIOD_INTERVALS) {
+      throw new AppError(400, 'INVALID_PERIOD', 'The period is too long for a manual payment');
+    }
+    const expectedMinor = unitMinor * periodIntervals;
+    const underpaid = input.amountMinor < expectedMinor;
+    if (underpaid) {
+      if (!input.allowUnderpay) {
+        throw new AppError(
+          409,
+          'AMOUNT_BELOW_PRICE',
+          `The amount is below the price for this period (${expectedMinor} piastres, VAT included, ${periodIntervals} ${input.interval === 'yearly' ? 'year' : 'month'}${periodIntervals > 1 ? 's' : ''})`,
+          { expectedMinor, periodIntervals }
+        );
+      }
+      if ((input.underpayReason ?? '').trim().length < 3) {
+        throw new AppError(400, 'REASON_REQUIRED', 'Write why the underpayment is accepted');
+      }
+    }
     // D1: the event id is derived from the idempotency key, so a retry after a partial run reuses it; the D1 write is the
     // FIRST change (fail closed), the idempotent Postgres half follows (Ruling NZ-10-2).
     const d1 = await onD1();
