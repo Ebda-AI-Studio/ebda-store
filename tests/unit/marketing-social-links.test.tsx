@@ -79,7 +79,8 @@ describe('social links (parity with the foundation list)', () => {
   });
   it('the CSP stays closed: no third-party origin is added for icons', () => {
     const h = read('apps/marketing/public/_headers');
-    for (const d of ['instagram', 'facebook', 'tiktok', 'linkedin', 'wa.me'])
+    // facebook hosts are legitimately present for the consented Meta Pixel (main); icons add no origin of their own.
+    for (const d of ['instagram', 'tiktok', 'linkedin', 'wa.me', 'youtube', 'simpleicons'])
       expect(h).not.toContain(d);
   });
 });
