@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyChromePatch,
+  chromeLogoColumns,
   chromePreviewSettings,
   draftChromeSchema,
   layoutToDefinition,
@@ -44,7 +45,7 @@ describe('draftChromeSchema', () => {
   });
 
   it('is strict: unknown keys and over-long lists are rejected', () => {
-    expect(draftChromeSchema.safeParse({ logo: 'https://x/y.png' }).success).toBe(false);
+    expect(draftChromeSchema.safeParse({ favicon: 'https://x/y.png' }).success).toBe(false);
     expect(
       draftChromeSchema.safeParse({ navMenu: [{ label: 'a', href: '/', onclick: 'x' }] }).success
     ).toBe(false);
@@ -209,5 +210,29 @@ describe('rebaseDraftOntoLive (classic save vs pending visual draft)', () => {
     expect(pageDefinitionSchema.safeParse(rebaseDraftOntoLive(draft, BASE, next)).success).toBe(
       true
     );
+  });
+});
+
+describe('draft logo (chrome.logo / chrome.logoAr)', () => {
+  it.each(['/media/logo.png', 'https://media.ebda.app/a.png', ''])('accepts %j', logo => {
+    expect(draftChromeSchema.safeParse({ logo, logoAr: logo }).success).toBe(true);
+  });
+  it.each([
+    'javascript:alert(1)',
+    'data:image/png;base64,AAAA',
+    'mailto:a@b.co',
+    'tel:+20100',
+    'logo.png',
+    'x'.repeat(501),
+  ])('rejects %j', logo => {
+    expect(draftChromeSchema.safeParse({ logo }).success).toBe(false);
+    expect(draftChromeSchema.safeParse({ logoAr: logo }).success).toBe(false);
+  });
+  it('chromeLogoColumns returns only non-blank safe keys; applyChromePatch never touches settings for it', () => {
+    expect(chromeLogoColumns({ logo: ' https://m.ebda.app/a.png ', logoAr: '' })).toEqual({
+      logo: 'https://m.ebda.app/a.png',
+    });
+    expect(chromeLogoColumns(undefined)).toEqual({});
+    expect(applyChromePatch({ a: 1 }, { logo: 'https://m.ebda.app/a.png' })).toEqual({ a: 1 });
   });
 });

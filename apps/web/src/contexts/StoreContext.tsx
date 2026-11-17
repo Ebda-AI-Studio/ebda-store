@@ -13,6 +13,7 @@ import {
 } from 'react';
 import {
   applyThemePatch,
+  chromeLogoColumns,
   chromePreviewSettings,
   type DraftChrome,
   type DraftTheme,
@@ -470,16 +471,28 @@ export function PreviewThemeOverride({
     // ShopChrome prefers it over `store.settings`, and runs every href through
     // its scheme allowlist (sanitizeUrl) before rendering.
     const previewSettings = chromePreviewSettings(ctx.store.settings, chrome);
-    if (!hasTheme && !previewSettings) return ctx;
+    // the draft logo is a store column, not a setting: override it on the canvas copy only
+    const previewLogos = chromeLogoColumns(chrome);
+    const hasLogo = Object.keys(previewLogos).length > 0;
+    if (!hasTheme && !previewSettings && !hasLogo) return ctx;
     return {
       ...ctx,
-      store: hasTheme
-        ? {
-            ...ctx.store,
-            // a `null` in the patch is a reset: the key is removed so the look default shows
-            theme: applyThemePatch(ctx.store.theme, theme as DraftTheme) as StoreData['theme'],
-          }
-        : ctx.store,
+      store:
+        hasTheme || hasLogo
+          ? {
+              ...ctx.store,
+              ...previewLogos,
+              // a `null` in the patch is a reset: the key is removed so the look default shows
+              ...(hasTheme
+                ? {
+                    theme: applyThemePatch(
+                      ctx.store.theme,
+                      theme as DraftTheme
+                    ) as StoreData['theme'],
+                  }
+                : {}),
+            }
+          : ctx.store,
       draftSettings: previewSettings
         ? { ...(ctx.draftSettings ?? {}), ...previewSettings }
         : ctx.draftSettings,

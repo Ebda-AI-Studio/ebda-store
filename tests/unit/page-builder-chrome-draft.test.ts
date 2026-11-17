@@ -255,6 +255,111 @@ describe('header/footer edits ride the draft, not the live store (E3)', () => {
   });
 });
 
+describe('the header logo rides the same publish update (logo draft)', () => {
+  const LOGO = 'https://media.ebda.app/stores/store-1/builder/logo.png';
+  const LOGO_AR = 'https://media.ebda.app/stores/store-1/builder/logo-ar.png';
+  const LOGO_DOC = { ...BASE, chrome: { logo: LOGO, logoAr: LOGO_AR } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.store.findUnique.mockResolvedValue({
+      ...STORE,
+      logo: 'https://media.ebda.app/old.png',
+      logoAr: null,
+    });
+    m.store.update.mockResolvedValue({});
+    m.bustStoreCaches.mockResolvedValue(undefined);
+    m.rev.aggregate.mockResolvedValue({ _max: { rev: 3 } });
+    m.rev.updateMany.mockResolvedValue({ count: 1 });
+    m.rev.create.mockResolvedValue({});
+    rows({ draft: { id: 'd1', rev: 3, status: 'draft', document: LOGO_DOC } });
+  });
+
+  it('saving a draft with a logo writes no live column and purges nothing', async () => {
+    const res = await request(app())
+      .put('/admin/stores/store-1/builder/pages/home/draft')
+      .send({ baseRev: 3, definition: LOGO_DOC });
+    expect(res.status).toBe(200);
+    expect(m.store.update).not.toHaveBeenCalled();
+    expect(m.bustStoreCaches).not.toHaveBeenCalled();
+    expect(m.rev.updateMany.mock.calls[0][0].data.document.chrome).toEqual(LOGO_DOC.chrome);
+  });
+
+  it.each(['javascript:alert(1)', 'data:image/svg+xml,<svg/>', 'mailto:a@b.co'])(
+    'a logo %j is rejected with a 422',
+    async logo => {
+      const res = await request(app())
+        .put('/admin/stores/store-1/builder/pages/home/draft')
+        .send({ baseRev: 3, definition: { ...BASE, chrome: { logo } } });
+      expect(res.status).toBe(422);
+      expect(m.rev.updateMany).not.toHaveBeenCalled();
+    }
+  );
+
+  it('a logo outside our media origin is rejected unless it is already the live logo', async () => {
+    const ext = 'https://evil.example.com/x.png';
+    const bad = await request(app())
+      .put('/admin/stores/store-1/builder/pages/home/draft')
+      .send({ baseRev: 3, definition: { ...BASE, chrome: { logo: ext } } });
+    expect(bad.status).toBe(422);
+    m.store.findUnique.mockResolvedValue({ ...STORE, logo: ext, logoAr: null });
+    const ok = await request(app())
+      .put('/admin/stores/store-1/builder/pages/home/draft')
+      .send({ baseRev: 3, definition: { ...BASE, chrome: { logo: ext } } });
+    expect(ok.status).toBe(200);
+  });
+
+  it('publish writes logo + logoAr in the SAME stores update and purges', async () => {
+    const res = await request(app())
+      .post('/admin/stores/store-1/builder/pages/home/publish')
+      .send({ baseRev: 3 });
+    expect(res.status).toBe(200);
+    expect(m.store.update).toHaveBeenCalledTimes(1);
+    const data = m.store.update.mock.calls[0][0].data;
+    expect(data.logo).toBe(LOGO);
+    expect(data.logoAr).toBe(LOGO_AR);
+    expect(data.layoutSettings).toBeDefined();
+    expect(m.bustStoreCaches).toHaveBeenCalledWith('store-1', 'acme', 'acme.example.com');
+  });
+
+  it('a blank logo key and a draft without the key leave the live logo alone', async () => {
+    rows({
+      draft: {
+        id: 'd1',
+        rev: 3,
+        status: 'draft',
+        document: { ...BASE, chrome: { logo: '', navMenu: CHROME.navMenu } },
+      },
+    });
+    await request(app())
+      .post('/admin/stores/store-1/builder/pages/home/publish')
+      .send({ baseRev: 3 });
+    expect(m.store.update.mock.calls[0][0].data).not.toHaveProperty('logo');
+    m.store.update.mockClear();
+    rows({ draft: { id: 'd1', rev: 3, status: 'draft', document: { ...BASE, chrome: CHROME } } });
+    await request(app())
+      .post('/admin/stores/store-1/builder/pages/home/publish')
+      .send({ baseRev: 3 });
+    expect(m.store.update.mock.calls[0][0].data).not.toHaveProperty('logo');
+    expect(m.store.update.mock.calls[0][0].data).not.toHaveProperty('logoAr');
+  });
+
+  it('rollback re-applies the revision logo; a revision without one leaves it alone', async () => {
+    rows({ byRev: { 1: { document: LOGO_DOC }, 2: { document: BASE } } });
+    const a = await request(app())
+      .post('/admin/stores/store-1/builder/pages/home/rollback')
+      .send({ baseRev: 3, targetRev: 1 });
+    expect(a.status).toBe(200);
+    expect(m.store.update.mock.calls[0][0].data.logo).toBe(LOGO);
+    m.store.update.mockClear();
+    const b = await request(app())
+      .post('/admin/stores/store-1/builder/pages/home/rollback')
+      .send({ baseRev: 3, targetRev: 2 });
+    expect(b.status).toBe(200);
+    expect(m.store.update.mock.calls[0][0].data).not.toHaveProperty('logo');
+  });
+});
+
 describe('classic builder save keeps a pending visual draft (E2)', () => {
   const section = (doc: PageDefinition, type: string) => doc.sections.find(s => s.type === type)!;
   const PUBLISHED = { id: 'p1', rev: 3, status: 'published', document: BASE };

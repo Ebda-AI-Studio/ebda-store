@@ -21,7 +21,7 @@
  * panel); announcement / brand-story keep their pointer notices.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { PageDefinition } from '@ebda/shared';
 
 const localeState = vi.hoisted(() => ({ value: 'en' }));
@@ -67,6 +67,18 @@ vi.mock('../../../../../lib/api', () => ({
   })),
   apiPut: vi.fn(),
   apiPost: vi.fn(),
+}));
+
+vi.mock('./MediaPicker', () => ({
+  MediaPicker: ({ onPick }: { onPick: (url: string) => void }) => (
+    <button
+      type="button"
+      data-testid="media-pick"
+      onClick={() => onPick('https://media.ebda.app/l.png')}
+    >
+      pick
+    </button>
+  ),
 }));
 
 import { SettingsPanel } from './SettingsPanel';
@@ -124,6 +136,18 @@ describe('SettingsPanel — header/footer Content tab edits the draft (bug 3, E3
     expect(onChange).toHaveBeenLastCalledWith({
       navMenu: [{ label: 'Store', labelAr: 'تسوق', href: '/products' }],
     });
+  });
+
+  it('header: picking a logo sends ONLY that logo key as a draft patch; footer has no logo field', async () => {
+    const { onChange } = renderPanel('header', 'header');
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(within(await screen.findByTestId('chrome-logo-ar')).getByRole('button'));
+    fireEvent.click(screen.getByTestId('media-pick'));
+    expect(onChange).toHaveBeenLastCalledWith({ logoAr: 'https://media.ebda.app/l.png' });
+    cleanup();
+    renderPanel('footer', 'footer');
+    await screen.findByTestId('chrome-footer-shop');
+    expect(screen.queryByTestId('chrome-logo')).toBeNull();
   });
 
   it('header: add and remove a link', async () => {

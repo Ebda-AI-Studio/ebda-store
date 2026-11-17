@@ -48,6 +48,7 @@ import { prisma, withStore } from '@ebda/database';
 import { getAccountsBrief } from '../lib/identity-client';
 import { gateRead, onAccessD1 } from './platform/access-d1';
 import { AppError } from '../middleware/error-handler';
+import { config as appConfig } from '../config';
 import {
   BUILDER_LIMITS,
   PAGE_DEFINITION_SCHEMA_VERSION,
@@ -62,6 +63,8 @@ import {
   hasTypographyPatch,
   snapshotTypography,
   applyChromePatch,
+  chromeLogoColumns,
+  isEbdaMediaUrl,
   applyTemplateFamily,
   NEW_STORE_LAYOUT_SETTINGS,
   hasChromePatch,
@@ -402,6 +405,35 @@ async function validateForWrite(storeId: string, input: unknown) {
         ],
       };
   }
+  // A draft logo is fetched server-side later (OG cards, packing slips): it must be on our media
+  // origin, or equal what is live already (SEC-6, same rule as the Branding save).
+  const chromeLogos = chromeLogoColumns(result.definition?.chrome);
+  if (Object.keys(chromeLogos).length > 0) {
+    const live = await readInStoreContext(storeId, async () =>
+      (await storeDb(storeId)).store.findUnique({
+        where: { id: storeId },
+        select: { logo: true, logoAr: true },
+      })
+    );
+    const bad = (['logo', 'logoAr'] as const).filter(k => {
+      const url = chromeLogos[k];
+      return !!url && url !== live?.[k] && !isEbdaMediaUrl(url, appConfig.storagePublicUrl);
+    });
+    if (bad.length > 0)
+      return {
+        ...result,
+        ok: false,
+        errors: [
+          ...result.errors,
+          ...bad.map(k => ({
+            code: 'SCHEMA' as const,
+            path: `/chrome/${k}`,
+            messageEn: 'The logo must be an image uploaded through the media library.',
+            messageAr: 'الشعار لازم يكون صورة مرفوعة من مكتبة الوسائط.',
+          })),
+        ],
+      };
+  }
   return result;
 }
 
@@ -713,7 +745,11 @@ async function applyPublishedLayout(
           : {}),
         ...(nextTypography ? { typography: nextTypography as unknown as object } : {}),
         ...(chromePatch
-          ? { settings: applyChromePatch(live?.settings, chromePatch) as unknown as object }
+          ? {
+              settings: applyChromePatch(live?.settings, chromePatch) as unknown as object,
+              // the logo is a `stores` column, not a setting: same statement, same purge below
+              ...chromeLogoColumns(chromePatch),
+            }
           : {}),
       },
     });
