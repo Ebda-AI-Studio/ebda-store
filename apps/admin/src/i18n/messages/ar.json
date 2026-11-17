@@ -1802,8 +1802,8 @@
         "fileLabel": "ملف الخط (.woff2 / .woff / .ttf / .otf — حد أقصى 5 ميغابايت)",
         "uploading": "جارٍ الرفع…",
         "uploadFont": "رفع الخط",
-        "addGoogleFont": "+ إضافة خط من Google",
-        "uploadCustomFont": "↥ رفع خط مخصص",
+        "addGoogleFont": "ضيف خط من جوجل",
+        "uploadCustomFont": "ارفع خط بتاعك",
         "uploadFailed": "فشل الرفع."
       },
       "paddingBlock": {
@@ -1844,7 +1844,13 @@
       },
       "fontFamilyExample": "مثال: Cairo, Inter, \"Open Sans\"",
       "fontNameExample": "مثال: \"My Brand Sans\"",
-      "uploadFileSize": "{name} ({kb} ك.ب)"
+      "uploadFileSize": "{name} ({kb} ك.ب)",
+      "zoneGroups": {
+        "top": "أعلى الصفحة",
+        "headings": "عناوين الأقسام",
+        "products": "المنتجات والأقسام",
+        "footer": "الفوتر"
+      }
     },
     "devices": {
       "title": "أجهزة الإشعارات",
@@ -6530,20 +6536,26 @@
     },
     "colorField": {
       "tokens": {
-        "primary": "العلامة: اللون الأساسي",
-        "secondary": "العلامة: اللون الثانوي",
-        "accent": "العلامة: اللون المميّز",
-        "card": "السطح: خلفية البطاقة",
-        "muted": "السطح: لون خافت",
-        "foreground": "النص: اللون الافتراضي",
-        "border": "لون الحدود"
+        "primary": "اللون الأساسي",
+        "secondary": "خلفية هادية",
+        "accent": "لون التمييز",
+        "card": "خلفية الكروت",
+        "muted": "خلفية خافتة",
+        "foreground": "لون النص",
+        "border": "الخطوط والحدود"
       },
-      "customHex": "لون مخصص…",
-      "themeDefault": "— افتراضي القالب —",
-      "inheritedLabel": "العلامة: {token} ({hex})",
-      "colorPickerAriaLabel": "منتقي اللون",
-      "hexValueAriaLabel": "قيمة اللون السداسية",
-      "clear": "مسح"
+      "themeDefault": "زي القالب",
+      "themeDefaultShort": "لون القالب",
+      "inheritedLabel": "زي {token}",
+      "brandColours": "ألوان براندك",
+      "anyColour": "أي لون تاني",
+      "notAColour": "ده مش لون لسه. جرّب حاجة زي #B08D57.",
+      "alphaIgnored": "الشفافية مش مدعومة فاتجاهلناها.",
+      "recent": "استخدمته قريب",
+      "done": "تمام",
+      "colorPickerAriaLabel": "اختار لون",
+      "hexValueAriaLabel": "كود اللون",
+      "hexExample": "مثال: B08D57"
     },
     "bottomSheet": {
       "close": "إغلاق"
@@ -6557,14 +6569,25 @@
       "samplePrice": "50.00 ج.م"
     },
     "colorContrastPreview": {
-      "backgroundLabel": "الخلفية: {label}",
-      "roles": {
+      "preview": {
         "heading": "العنوان",
-        "subtitle": "العنوان الفرعي",
-        "bodyCta": "النص / زر الإجراء"
+        "subtitle": "سطر تحت العنوان",
+        "body": "النص هيظهر كده.",
+        "button": "زرار"
       },
-      "autoFixedLabel": "تصحيح تلقائي:",
-      "pickedTextWarning": "النص المختار {ratio} : 1 — تحتاج AA إلى {min} : 1"
+      "verdict": {
+        "easy": "سهل في القراءة",
+        "large": "مناسب للخط الكبير بس",
+        "hard": "صعب في القراءة"
+      },
+      "cannotCheck": "مش قادرين نقيس اللون ده لسه. اختار لون عشان تشوف النص هيظهر إزاي عليه.",
+      "details": "التفاصيل",
+      "colourName": "اللون",
+      "background": "الخلفية",
+      "text": "النص",
+      "ratioLabel": "التباين",
+      "ratio": "{ratio} لـ 1",
+      "pickedTextWarning": "لون النص بتاعك صعب يتقرأ هنا"
     },
     "guestCheckout": {
       "notTracked": "غير متتبَّع للدفع كضيف",
@@ -9038,7 +9061,46 @@
     "textAlignAriaLabel": "{label} — {title}",
     "textColorLabel": "لون النص",
     "colorInheriting": "موروث: {value}",
-    "colorHint": "اتركه فارغًا للوراثة من السمة الحالية."
+    "colorHint": "اتركه فارغًا للوراثة من السمة الحالية.",
+    "same": "زي باقي الموقع",
+    "specimen": "Aa أبجد",
+    "moreOptions": "خيارات أكتر",
+    "sizeNames": {
+      "small": "صغير",
+      "normal": "عادي",
+      "large": "كبير",
+      "title": "عنوان"
+    },
+    "weightNames": {
+      "regular": "عادي",
+      "medium": "متوسط",
+      "semibold": "عريض",
+      "bold": "عريض جدًا"
+    },
+    "caseNames": {
+      "upper": "كبير ABC",
+      "lower": "صغير abc",
+      "capitalize": "أول حرف Abc",
+      "none": "بدون"
+    },
+    "decoNames": {
+      "none": "بدون",
+      "underline": "خط تحته",
+      "overline": "خط فوقه",
+      "strikethrough": "خط في النص"
+    },
+    "alignNames": {
+      "auto": "زي باقي الموقع",
+      "start": "البداية",
+      "center": "المنتصف",
+      "end": "النهاية"
+    },
+    "exactSizeLabel": "المقاس بالظبط",
+    "exactSizeHint": "اكتب رقم زي 16، أو مقاس زي 1.25rem.",
+    "fontBuiltinSans": "سانس نظيف",
+    "fontBuiltinSerif": "سيريف كلاسيك",
+    "searchFonts": "دوّر على خط",
+    "noFontMatch": "مفيش خط بالاسم ده."
   },
   "answerEngineProviders": {
     "pageTitle": "محركات الإجابة",
@@ -10339,11 +10401,13 @@
     },
     "panes": {
       "start": "الهيكل",
-      "end": "الإعدادات"
+      "end": "الإعدادات",
+      "resizeStart": "غيّر عرض اللوحة الجانبية الأولى",
+      "resizeEnd": "غيّر عرض اللوحة الجانبية التانية"
     },
     "tabs": {
       "sections": "الأقسام",
-      "theme": "الألوان والخطوط",
+      "theme": "المظهر",
       "history": "السجل",
       "ai": "اسأل الذكاء"
     },
@@ -10625,7 +10689,21 @@
       "previewFailed": "معرفناش نجهّز المعاينة. جرّب تاني.",
       "saveFirst": "صلّح الأخطاء في الصفحة دي الأول وبعدين غيّر الستايل.",
       "applied": "الستايل اتطبّق.",
-      "current": "الستايل الحالي"
+      "current": "الستايل الحالي",
+      "galleryTitle": "اختار قالب",
+      "galleryIntro": "اختار واحد وشوفه على صفحتك انت. مفيش حاجة بتتغير إلا لما تأكد.",
+      "currentBadge": "الحالي",
+      "families": "عائلات القوالب",
+      "detailLabel": "تفاصيل القالب",
+      "previewCta": "شوفه على صفحتي",
+      "alreadyCurrent": "ده القالب الحالي بتاعك.",
+      "previewNote": "هتشوفه على صفحتك قبل ما أي حاجة تتغير.",
+      "pickPrompt": "اختار قالب عشان تشوف تفاصيله.",
+      "close": "إغلاق",
+      "confirmTitle": "تطبّق القالب ده؟",
+      "confirmBody": "{look} هيغيّر تصميم صفحاتك. محتواك هيفضل زي ما هو. تقدر ترجّع النسخة اللي قبلها من السجل.",
+      "confirmApply": "طبّق القالب",
+      "appliedHint": "اتطبّق كمسودة. تقدر ترجّع النسخة القديمة في أي وقت من السجل."
     },
     "search": {
       "fonts": "الخطوط",
