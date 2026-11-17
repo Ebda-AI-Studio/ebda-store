@@ -536,6 +536,21 @@ describe('stuck leases and tier reconciliation', () => {
     });
     expect(vi.mocked(sendAlert).mock.calls[0][0]).toMatchObject({ level: 'p1' });
   });
+
+  it('a CANCELED paid subscription is drift while stores.plan keeps the paid tier (#835: repaired to free)', async () => {
+    const db = rig();
+    // the prod qa-merchant-test shape: status canceled, plan_code growth, stores.plan professional
+    db.prepare(
+      `INSERT INTO store_subscriptions (id, store_id, plan_code, status) VALUES ('s1', ?, 'growth', 'canceled')`
+    ).run(STORE);
+    db.prepare(`UPDATE stores SET plan = 'professional' WHERE id = ?`).run(STORE);
+    expect(await planTierDriftD1(10)).toEqual([
+      { storeId: STORE, current: 'professional', tier: 'free' },
+    ]);
+    // and an already-free directory row of a canceled subscription is NOT drift
+    db.prepare(`UPDATE stores SET plan = 'free' WHERE id = ?`).run(STORE);
+    expect(await planTierDriftD1(10)).toEqual([]);
+  });
 });
 
 // built at runtime: a literal that looks like a credential trips the secret scanner

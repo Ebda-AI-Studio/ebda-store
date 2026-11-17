@@ -1,0 +1,41 @@
+{
+  "stores": {
+    "dashboard": {
+      "assistantMode": {
+        "title": "Store assistant",
+        "subtitle": "Per-store rollout. Off by default; only a super admin can change it.",
+        "modeLabel": "Assistant mode",
+        "loading": "Loading…",
+        "loadFailed": "Could not load the assistant mode.",
+        "retry": "Retry",
+        "save": "Save mode",
+        "cancel": "Cancel",
+        "confirm": "Yes, change the mode",
+        "confirmTitle": "Turn the assistant on for this store?",
+        "confirmBody": "This store's team will get the assistant in mode \"{mode}\".",
+        "saveFailed": "Could not save the mode. Nothing was changed.",
+        "lastChanged": "Last changed by {by} at {at}",
+        "neverChanged": "Never changed (default: off).",
+        "unknownActor": "an unknown user",
+        "modes": {
+          "off": {
+            "label": "Off",
+            "meaning": "The assistant is hidden and never runs for this store."
+          },
+          "answer-only": {
+            "label": "Answer only",
+            "meaning": "It answers questions and explains screens. It never changes anything in the store."
+          },
+          "suggest": {
+            "label": "Suggest",
+            "meaning": "It can prepare changes as a preview, but nothing is applied unless the merchant confirms."
+          },
+          "act": {
+            "label": "Act",
+            "meaning": "The merchant can apply changes with one press; sensitive ones still need their confirmation."
+          }
+        }
+      }
+    }
+  }
+}

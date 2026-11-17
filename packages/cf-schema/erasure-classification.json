@@ -1341,6 +1341,18 @@
       "decided_by_id": null
     }
   },
+  "d1:trust_requests": {
+    "db": "d1",
+    "class": "merchant-pii",
+    "action": "scrub",
+    "piiColumns": ["user_id"],
+    "subjectKeys": ["userId"],
+    "note": "requester user id nulled on user erasure (OFFBOARD-1); the request text is a business record the merchant wrote to Ebda staff",
+    "userIdColumns": ["user_id"],
+    "actorScrub": {
+      "user_id": null
+    }
+  },
   "d1:stores": {
     "db": "d1",
     "class": "merchant-pii",
