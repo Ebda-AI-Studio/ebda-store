@@ -37,7 +37,7 @@ import sitemap from '../../apps/web/src/app/sitemap';
 
 type MockWorld = {
   /** null → host is not a custom domain (master branch). */
-  tenant: { id: string; slug: string; isDemo?: boolean } | null;
+  tenant: { id: string; slug: string; isDemo?: boolean; status?: string } | null;
   stores: Array<{ id: string; slug: string; createdAt: string }>;
   /** productCounts[storeId] = published product count for that store. */
   productCounts: Record<string, number>;
@@ -188,6 +188,17 @@ describe('sitemap — host routing', () => {
       productCounts: { s1: 3 },
     });
     await expect(sitemap()).rejects.toBe(NOT_FOUND);
+  });
+
+  it('S3: a suspended store (resolved with its status for the maintenance page) is a 404 sitemap and asks for no products', async () => {
+    hostRef.host = 'paused.ebda.app';
+    const fetchMock = installFetchMock({
+      tenant: { id: 's9', slug: 'paused', status: 'suspended' },
+      stores: [],
+      productCounts: { s9: 3 },
+    });
+    await expect(sitemap()).rejects.toBe(NOT_FOUND);
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/public/products'))).toBe(false);
   });
 
   it('B1-14: the demo showroom host lists nothing and asks for no products', async () => {

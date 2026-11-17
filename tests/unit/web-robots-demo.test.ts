@@ -18,7 +18,9 @@ vi.mock('../../apps/web/src/lib/api', () => ({ API_URL: 'https://api.test' }));
 
 import robots from '../../apps/web/src/app/robots';
 
-function stubResolve(answer: { ok: boolean; status?: number; isDemo?: boolean } | 'throw') {
+function stubResolve(
+  answer: { ok: boolean; status?: number; isDemo?: boolean; storeStatus?: string } | 'throw'
+) {
   const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
     if (answer === 'throw') throw new Error('network');
     expect(new URL(String(input)).pathname).toBe('/public/store/resolve');
@@ -26,7 +28,11 @@ function stubResolve(answer: { ok: boolean; status?: number; isDemo?: boolean } 
     return {
       ok: answer.ok,
       status: answer.status ?? (answer.ok ? 200 : 404),
-      json: async () => ({ data: { store: { id: 's1', isDemo: answer.isDemo } } }),
+      json: async () => ({
+        data: {
+          store: { id: 's1', isDemo: answer.isDemo, status: answer.storeStatus ?? 'active' },
+        },
+      }),
     };
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -62,14 +68,30 @@ describe('robots.txt and the demo showroom', () => {
     expect(await robots()).toEqual({ ...NORMAL, sitemap: 'https://shop.ebda.app/sitemap.xml' });
   });
 
-  it('an unresolved host, an API error or a network failure keep the normal rules', async () => {
-    for (const a of [{ ok: false, status: 404 }, { ok: false, status: 503 }, 'throw'] as const) {
+  it('an API error or a network failure keep the normal rules (a blip must not tell crawlers to leave)', async () => {
+    for (const a of [{ ok: false, status: 503 }, { ok: false, status: 500 }, 'throw'] as const) {
       stubResolve(a);
       expect(await robots(), JSON.stringify(a)).toEqual({
         ...NORMAL,
         sitemap: 'https://shop.ebda.app/sitemap.xml',
       });
     }
+  });
+
+  // Ruling ROBOTS-CLOSED-1 (S3): qa-walk-store-1010.ebda.app is inactive, its storefront 404s, and robots.txt still said
+  // "Allow: /" plus a Sitemap line.
+  it('a host the resolver 404s (inactive, deleted, unknown) is Disallow: / with no sitemap', async () => {
+    stubResolve({ ok: false, status: 404 });
+    const r = await robots();
+    expect(r).toEqual({ rules: [{ userAgent: '*', disallow: '/' }] });
+    expect(r.sitemap).toBeUndefined();
+  });
+
+  it('a suspended store (served with its status for the maintenance page) is Disallow: / with no sitemap', async () => {
+    stubResolve({ ok: true, storeStatus: 'suspended' });
+    const r = await robots();
+    expect(r).toEqual({ rules: [{ userAgent: '*', disallow: '/' }] });
+    expect(r.sitemap).toBeUndefined();
   });
 
   it('a platform host (no x-store-domain) asks the API nothing', async () => {
