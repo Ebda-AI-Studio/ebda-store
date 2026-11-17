@@ -2043,7 +2043,7 @@ export async function resolveHeldBillingWebhook(args: {
       }),
     },
   });
-  if (done.count !== 1)
+  if (done.count < 1)
     throw new AppError(
       409,
       'HELD_PAYMENT_NOT_OPEN',
