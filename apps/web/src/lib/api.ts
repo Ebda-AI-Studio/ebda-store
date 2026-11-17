@@ -22,7 +22,11 @@
  * authenticates via 'accessToken' with session/store headers, while the
  * admin app uses a simpler 'authToken' approach.
  */
-import { rememberOrderViewToken, readOrderViewToken } from './order-view-token';
+import {
+  rememberOrderViewToken,
+  readOrderViewToken,
+  readOrderStatusLink,
+} from './order-view-token';
 import {
   isIosWebkit,
   moveSearchToHeader,
@@ -910,6 +914,11 @@ class ApiClient {
     )?.[1];
     const viewToken = orderId ? readOrderViewToken(orderId) : null;
     if (viewToken) headers['X-Order-View-Token'] = viewToken;
+    // G54: opened from the signed order-status link (WhatsApp button) with no view token: the link opens this order's
+    // InstaPay flow only (the API checks order + store).
+    const statusLink = orderId && !viewToken ? readOrderStatusLink(orderId) : null;
+    if (statusLink && /\/payments\/instapay\//.test(endpoint))
+      headers['X-Order-Status-Link'] = statusLink;
 
     // 45s request timeout — long enough for cold-start + complex order
     // creation, short enough to surface a real error before the user
