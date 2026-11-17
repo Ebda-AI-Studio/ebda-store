@@ -998,6 +998,26 @@ describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
     expect((await ledger(storeId)).filter(r => r.type === 'upgrade')).toHaveLength(1);
   });
 
+  it('C4: a DECLINED prorated upgrade frees the slot: the retry is a new charge, one succeeded upgrade in the end', async () => {
+    const { storeId, subId } = await subscribedStore({
+      planCode: LITE,
+      periodEnd: addDays(T0, 20),
+    });
+    await paidPeriod(storeId, subId, 19999);
+    stub.failNextCharges(1);
+    const first = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(first).toMatchObject({ mode: 'upgraded', status: 'failed' });
+    const retry = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(retry).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 19291 });
+    if (first.mode === 'upgraded' && retry.mode === 'upgraded')
+      expect(retry.eventId).not.toBe(first.eventId);
+    expect(stub.chargeCalls).toHaveLength(2);
+    const ups = (await ledger(storeId)).filter(r => r.type === 'upgrade');
+    expect(ups.map(r => r.status)).toEqual(['failed', 'succeeded']);
+    expect(new Set(ups.map(r => r.idempotencyKey)).size).toBe(2);
+    expect((await getSub(storeId)).planCode).toBe(PRO);
+  });
+
   it('a declined upgrade leaves the plan untouched and can be retried', async () => {
     const { storeId } = await subscribedStore({ planCode: LITE, periodEnd: addDays(T0, 20) });
     stub.failNextCharges(1);
