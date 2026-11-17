@@ -1,0 +1,38 @@
+{
+  "id": "platform.scans-rollups",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تشغيل الفحوصات الان",
+  "titleEn": "Run reorder/low-stock/deadstock scans and insight rollups now",
+  "screens": ["(none)"],
+  "api": [
+    "POST /stores/:id/stock/reorder-scan|low-stock-scan|deadstock-scan/run-now",
+    "POST .../insights/rollup/run-now"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "operatorReason": {
+    "code": null,
+    "text": "ops convenience",
+    "validUnderRule": false
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [],
+    "en": []
+  },
+  "steps": ["Super-admin console only."],
+  "edgeCases": [
+    "Assistant must refuse and offer a handoff request with context",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
+  ],
+  "gaps": ["Gap 15"]
+}

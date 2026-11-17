@@ -34,6 +34,7 @@ import {
   STORE_PLAN_TO_PLAN_CODE,
   planLimitsSchema,
   type PlanLimits,
+  type StorePlan,
   type SubscriptionStatus,
 } from '@ebda/shared';
 import logger from '../lib/logger';
@@ -49,6 +50,11 @@ export interface Entitlements {
   subscribedPlanCode: string;
   status: SubscriptionStatus | 'none';
   limits: PlanLimits;
+  /**
+   * The feature-baseline tier of the EFFECTIVE plan (`planCode`): what FeatureService's PLAN_BASELINE layer reads.
+   * A canceled subscription resolves to the free plan's tier here, whatever `stores.plan` still says (#835).
+   */
+  featureTier: StorePlan;
   planNameEn: string;
   planNameAr: string;
   /** True when no subscription row exists and the legacy enum decided the plan. */
@@ -138,6 +144,7 @@ export async function getEntitlements(
       subscribedPlanCode,
       status,
       limits: plan ? parseLimits(plan.limits, effectiveCode) : seed.limits,
+      featureTier: (plan?.featureTier ?? seed.featureTier) as StorePlan,
       planNameEn: plan?.nameEn ?? seed.nameEn,
       planNameAr: plan?.nameAr ?? seed.nameAr,
       derivedFromLegacyPlan: !sub,
@@ -171,7 +178,7 @@ export async function getAutomationFlags(
       | 'brandingRemoval'
       | 'apiAccess'
       | 'wholesalePricing'
-    > & { mcpAccess: boolean })
+    > & { mcpAccess: boolean; featureTier: StorePlan })
   | null
 > {
   const e = await getEntitlements(storeId, tx, known);
@@ -185,6 +192,8 @@ export async function getAutomationFlags(
     // Merchant MCP (keys + read + write tools): Growth + Business (Ahmad 2026-10-14),
     // decided on the EFFECTIVE plan (a canceled Growth store falls back to free => off).
     mcpAccess: planIncludesMerchantMcp(e.planCode, e.limits),
+    // The tier PLAN_BASELINE is read for: the effective plan's, never the stale `stores.plan` column (#835).
+    featureTier: e.featureTier,
   };
 }
 

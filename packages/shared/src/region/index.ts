@@ -435,6 +435,17 @@ export function regionDayStartOffset(d: Date, n: number, timeZone: string = REGI
   return regionDayStart(new Date(noon), timeZone);
 }
 
+/**
+ * Ruling ANALYTICS-DAY-1: the key of the per-day analytics counters (`product_daily_views.date`, `qr_scan_daily.date`) for the
+ * region day containing `d`: the UTC midnight (epoch ms) of the UTC date of that day's start instant. Cairo midnight is
+ * 22:00Z (winter) / 21:00Z (summer) of the PREVIOUS UTC date, so the key of Cairo day D is the UTC midnight of D-1. This is
+ * what the Postgres `date` columns held (the Date was cast to its UTC date), so copied history joins without a rewrite; it is
+ * injective and monotone across DST. Writers and readers MUST both use it; never pass `regionDayStart(...)` to a DO op.
+ */
+export function regionDayKey(d: Date = new Date(), timeZone: string = REGION.timezone): number {
+  return Math.floor(regionDayStart(d, timeZone).getTime() / DAY_MS) * DAY_MS;
+}
+
 /** `YYYY-MM` of the month containing `d` in `REGION.timezone`. */
 export function regionYearMonth(d: Date, timeZone: string = REGION.timezone): string {
   return zonedIsoDay(d, timeZone).slice(0, 7);

@@ -1449,7 +1449,12 @@ export interface StoreRepo {
   db: StoreReads;
   /** The write client (see StoreWrites). Resolved with the repo, so one flag read serves both. */
   writer: StoreWrites;
+  /** The assistant's journal on the store's own Durable Object. Present ONLY on 'do' (see `storeSmartLayer`). */
+  smartLayer?: SmartLayerClient;
 }
+
+/** One named journal operation of the Smart Layer (packages/repo do/smart-layer.ts). A refusal is an AppError; `args` is a plain JSON list. */
+export type SmartLayerClient = (op: string, args: unknown[]) => Promise<unknown>;
 
 type RequestLike = Pick<Request, 'headers'>;
 interface Scope {
@@ -1494,6 +1499,13 @@ interface QueryStub {
   ): Promise<
     | { ok: true; json: string }
     | { ok: false; code: string; status: number; message: string; meta?: Record<string, unknown> }
+  >;
+  smartLayerOp(
+    storeId: string,
+    op: string,
+    argsJson: string
+  ): Promise<
+    { ok: true; json: string } | { ok: false; code: string; status: number; message: string }
   >;
   query(
     storeId: string,
@@ -1790,9 +1802,13 @@ export function doStoreDelegate(
   };
 }
 
-async function doClients(
-  storeId: string
-): Promise<{ db: StoreReads; writer: StoreWrites; stock: StockClient; money: MoneyClient }> {
+async function doClients(storeId: string): Promise<{
+  db: StoreReads;
+  writer: StoreWrites;
+  stock: StockClient;
+  money: MoneyClient;
+  smartLayer: SmartLayerClient;
+}> {
   const stub = storeDo(storeId) as unknown as QueryStub; // 503 here when the binding is absent
   // Dynamic: the Node build cannot resolve the @ebda-src alias (apps/api/src/cf/repo-modules.d.ts); only a Worker with a
   // bound StoreDO ever reaches this line.
@@ -1811,6 +1827,11 @@ async function doClients(
       void sendMoneyAlerts(storeId, op, alerts as Parameters<typeof sendMoneyAlerts>[2]);
     return out;
   };
+  const callSmartLayer: SmartLayerClient = async (op, args) => {
+    const r = await stub.smartLayerOp(storeId, op, JSON.stringify(args));
+    if (!r.ok) throw new AppError(r.status, r.code, r.message);
+    return JSON.parse(r.json) as unknown;
+  };
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);
   return {
     // `db` has NO write delegates at all (the read-only guarantee of CF-REPO-1 is runtime, not just types)
@@ -1824,6 +1845,7 @@ async function doClients(
     ) as unknown as StoreWrites,
     stock: makeStockClient(call),
     money: makeMoneyClient(callMoney),
+    smartLayer: callSmartLayer,
   };
 }
 
@@ -2014,6 +2036,22 @@ export async function storeWriter(storeId: string): Promise<StoreWrites> {
  */
 export async function storeStock(storeId: string): Promise<StockClient | null> {
   return (await storeRepo(storeId)).stock ?? null;
+}
+
+/**
+ * The assistant's journal of a store, kept in the store's own Durable Object (Ruling SL-STORE-1). A store that is not on its DO has no
+ * journal: the assistant refuses it with a 503, the same fail-closed behaviour as `lib/store-backend.ts`; it never falls back to Postgres.
+ */
+// pq-allow(unused-export): the assistant adapter (next PR of the stack) and the assistant routes import it
+export async function storeSmartLayer(storeId: string): Promise<SmartLayerClient> {
+  const repo = await storeRepo(storeId);
+  if (!repo.smartLayer)
+    throw new AppError(
+      503,
+      'ASSISTANT_UNAVAILABLE',
+      'The assistant is not available for this store yet'
+    );
+  return repo.smartLayer;
 }
 
 /**

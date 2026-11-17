@@ -63,6 +63,7 @@ import {
   getReconciliationSummary,
   getReconciliationDifference,
 } from '../services/accounting/bank-reconcile.service';
+import { recordFxRate } from '../services/accounting/fx-rate.service';
 import { runInStoreCtx } from '../lib/jobs/store-db';
 
 const router = Router({ mergeParams: true });
@@ -1370,17 +1371,12 @@ router.post(
       const { currency, rate, rateDate } = parsed.data;
       const rateDateValue = rateDate ? new Date(rateDate) : new Date();
 
-      const w = await storeWriter(req.params.storeId);
       const entry = await runInStoreCtx(req.params.storeId, () =>
-        w.fxRateEntry.create({
-          data: {
-            storeId: req.params.storeId,
-            currency: currency.toUpperCase(),
-            rate,
-            rateDate: rateDateValue,
-            recordedBy: req.user?.userId ?? null,
-          },
-          select: { id: true, currency: true, rate: true, rateDate: true, createdAt: true },
+        recordFxRate(req.params.storeId, {
+          currency,
+          rate,
+          rateDate: rateDateValue,
+          recordedBy: req.user?.userId ?? null,
         })
       );
       res.status(201).json({ data: entry });

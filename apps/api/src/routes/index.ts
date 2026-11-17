@@ -47,10 +47,12 @@ import pwaRoutes from './pwa.routes';
 import qrRoutes from './qr.routes';
 import ciRoutes from './ci.routes';
 import adminCiRoutes from './admin-ci.routes';
+import adminTrustRequestsRoutes from './admin-trust-requests.routes';
 import barcodeLabelRoutes from './barcode-labels.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
 import catalogImportRoutes from './catalog-import.routes';
+import supportRoutes from './support.routes';
 import variantRoutes from './variant.routes';
 import productModelRoutes from './product-model.routes';
 import categoryRoutes from './category.routes';
@@ -58,6 +60,7 @@ import tagRoutes from './tag.routes';
 import sizeChartRoutes from './size-chart.routes';
 import goldRateRoutes from './gold-rate.routes';
 import aiRoutes from './ai.routes';
+import { assistantAdminRoutes, assistantRoutes } from './assistant.routes';
 import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
 import featureRoutes from './feature.routes';
@@ -207,6 +210,7 @@ router.use('/admin', adminLegalPolicyRoutes);
 // Customer Intelligence insights + hint kill switches (CI-2/CI-3, Rulings CI-9/CI-10). Same reachability
 // rule: before adminRoutes' catch-all MFA gate; it carries its own authenticate -> MFA -> super_admin chain.
 router.use('/admin', adminCiRoutes);
+router.use('/admin', adminTrustRequestsRoutes);
 
 // Provider activation queue (PROVIDERS-ACTIVATION). Same reachability rule as the tax routes: before
 // adminRoutes' catch-all MFA gate; it carries its own authenticate → MFA → super_admin chain.
@@ -311,6 +315,9 @@ router.use('/stores/:storeId/gold-rates', tenantContext, goldRateRoutes);
 // the `/results/*` endpoints at once — enough to exhaust `connection_limit=15`
 // and make unrelated requests on the pod fail P2024. See `aiRouteContext`.
 router.use('/stores/:storeId/ai', aiRouteContext, aiRoutes);
+// The Ebda assistant: same reason as /ai (a model call must not sit inside a request transaction). Above the bare `/stores/:storeId` mounts below.
+router.use('/stores/:storeId/assistant', aiRouteContext, assistantRoutes);
+router.use('/admin/assistant', assistantAdminRoutes);
 router.use('/stores/:storeId/typography', tenantContext, typographyRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
 // Context per request (SP6b): the admin payment link calls a payment gateway, so it runs
@@ -375,6 +382,8 @@ router.use('/stores', tenantContext, barcodeLabelRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);
 router.use('/stores', tenantContext, catalogImportRoutes);
+// Merchant to Ebda staff: support request, suspension reason + appeal (SELF-SERVICE A13/A14)
+router.use('/stores', tenantContext, supportRoutes);
 router.use('/stores', tenantContext, variantRoutes);
 
 // Loyalty routes. Pulled out of the bare-'/stores'-only block above (fixed

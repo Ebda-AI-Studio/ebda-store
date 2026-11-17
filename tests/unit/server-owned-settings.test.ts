@@ -28,11 +28,28 @@ describe('server-owned settings keys: the MCP switch and the gold flag (BE:S-8, 
   it('the flags a stale whole copy echoes back are listed as silently dropped', () => {
     expect([...ECHOED_SERVER_OWNED_KEYS].sort()).toEqual([
       'accountingLock',
+      'assistantMode',
+      'autoRecommendationsEnabled',
       'goldAllowDeferredPayment',
       'mcpWriteEnabled',
     ]);
     for (const k of ECHOED_SERVER_OWNED_KEYS) expect(SERVER_OWNED_SETTINGS_KEYS).toContain(k);
     expect(ECHOED_SERVER_OWNED_KEYS).not.toContain('ebdaWhatsApp'); // a planted platform link still answers 400
+  });
+});
+
+describe('server-owned settings keys: the assistant rollout mode (Smart Layer review, High)', () => {
+  it('a merchant can neither raise, plant nor erase assistantMode through the generic settings writers', () => {
+    expect(SERVER_OWNED_SETTINGS_KEYS).toContain('assistantMode');
+    expect(reservedSettingsKeys({ assistantMode: 'act' })).toEqual(['assistantMode']);
+    expect(stripServerOwnedSettings({ assistantMode: 'act', a: 1 })).toEqual({ a: 1 });
+    expect(
+      mergeClientSettings({ assistantMode: 'off', a: 1 }, { assistantMode: 'act', a: 2 })
+    ).toEqual({ assistantMode: 'off', a: 2 });
+    expect(mergeClientSettings({ a: 1 }, { assistantMode: 'act' })).toEqual({ a: 1 });
+    expect(mergeClientSettings({ assistantMode: 'answer-only' }, { assistantMode: null })).toEqual({
+      assistantMode: 'answer-only',
+    });
   });
 });
 

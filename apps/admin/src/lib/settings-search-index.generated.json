@@ -663,7 +663,7 @@
     "kind": "page",
     "route": "/ai-tools",
     "access": "staff",
-    "en": "AI Tools",
+    "en": "AI tools",
     "ar": "أدوات الذكاء الاصطناعي",
     "synEn": "ai gemini translate seo autofill bulk",
     "synAr": "ذكاء اصطناعي ترجمة تعبئة تلقائية",
