@@ -339,31 +339,34 @@ export function noticeableVersions(
  */
 export function baselineMissing(
   policies: LegalPolicies,
-  accepted: readonly LegalDocRef[]
+  accepted: readonly LegalDocRef[],
+  docs: readonly LegalDocKey[] = LEGAL_DOC_KEYS
 ): Array<{ docKey: LegalDocKey; version: string }> {
-  return LEGAL_DOC_KEYS.filter(k => !accepted.some(r => r.docKey === k)).map(docKey => ({
-    docKey,
-    version: currentLegalVersion(policies, docKey).version,
-  }));
+  return docs
+    .filter(k => !accepted.some(r => r.docKey === k))
+    .map(docKey => ({
+      docKey,
+      version: currentLegalVersion(policies, docKey).version,
+    }));
 }
 
 /**
  * The notices a merchant still has to see: each noticeable current version (isNoticeable) this
  * user has not accepted yet (a `legal_acceptances` row), plus every document with no record at all
- * (baselineMissing) when `requireBaseline` is set.
+ * (baselineMissing) among `baselineDocs` when given.
  */
 export function computePendingNotices(
   policies: LegalPolicies,
   sent: readonly LegalDocRef[],
   accepted: readonly LegalDocRef[],
-  /** `requireBaseline`: also ask for every document the party has no record of (a merchant account). */
-  opts: { requireBaseline?: boolean } = {}
+  /** `baselineDocs`: also ask for each of these documents the party has no record of at any version. */
+  opts: { baselineDocs?: readonly LegalDocKey[] } = {}
 ): PendingLegalNotice[] {
   const out: PendingLegalNotice[] = [];
   const seen = new Set<string>();
   const wanted = [
     ...noticeableVersions(policies, sent),
-    ...(opts.requireBaseline ? baselineMissing(policies, accepted) : []),
+    ...(opts.baselineDocs ? baselineMissing(policies, accepted, opts.baselineDocs) : []),
   ];
   for (const { docKey: key, version } of wanted) {
     if (seen.has(key)) continue;

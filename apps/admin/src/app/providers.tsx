@@ -15,6 +15,7 @@ import { UpsellDialog } from '../components/billing/UpsellDialog';
 import { PushClickListener } from '../components/PushClickListener';
 import { EbdaFunnelTracking } from '../components/EbdaFunnelTracking';
 import { FlashToast } from '../components/FlashToast';
+import { OwnerConsentGate } from '../components/legal/OwnerConsentGate';
 
 function AuthenticatedProviders({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -36,6 +37,7 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
               <StoreNotOperationalNotice />
               <PushClickListener />
               <FlashToast />
+              <OwnerConsentGate />
               {children}
             </ToastProvider>
           </FocusModeProvider>

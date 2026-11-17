@@ -194,7 +194,7 @@ describe('computePendingNotices', () => {
 
 describe('baseline acceptance (a merchant invited by staff never clicked the wrap)', () => {
   it('a party with no record at all is pending every document at its current version', () => {
-    const out = computePendingNotices(LEGAL_POLICIES, [], [], { requireBaseline: true });
+    const out = computePendingNotices(LEGAL_POLICIES, [], [], { baselineDocs: LEGAL_DOC_KEYS });
     expect(out.map(n => n.docKey).sort()).toEqual(
       ['acceptableUse', 'legal', 'merchant', 'privacy', 'terms'].sort()
     );
@@ -204,10 +204,16 @@ describe('baseline acceptance (a merchant invited by staff never clicked the wra
   });
   it('a document with ANY recorded version is not a missing baseline', () => {
     const out = computePendingNotices(LEGAL_POLICIES, [], [{ docKey: 'terms', version: '1.0' }], {
-      requireBaseline: true,
+      baselineDocs: LEGAL_DOC_KEYS,
     });
     expect(out.map(n => n.docKey)).not.toContain('terms');
     expect(out.length).toBe(4);
+  });
+  it('only the asked-for documents count (staff are shown privacy and acceptable use only)', () => {
+    const out = computePendingNotices(LEGAL_POLICIES, [], [], {
+      baselineDocs: ['privacy', 'acceptableUse'],
+    });
+    expect(out.map(n => n.docKey).sort()).toEqual(['acceptableUse', 'privacy']);
   });
   it('is off unless asked for, so non-merchant callers see only material notices', () => {
     expect(computePendingNotices(LEGAL_POLICIES, [], [])).toEqual([]);

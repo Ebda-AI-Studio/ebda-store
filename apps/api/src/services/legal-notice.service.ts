@@ -54,7 +54,7 @@ function truncateByCodePoints(value: string, max: number): string {
   return Array.from(value).slice(0, max).join('');
 }
 
-export type LegalAcceptanceSource = 'signup' | 'notice_ack';
+export type LegalAcceptanceSource = 'signup' | 'notice_ack' | 'consent_gate';
 
 let activePolicies: LegalPolicies = LEGAL_POLICIES;
 
@@ -111,6 +111,11 @@ export function signupAcceptanceRows(
 
 /** Only the merchant account (store owner) is a party to the merchant documents. */
 const NOTICE_ROLE = 'store_admin';
+/**
+ * Invited staff are shown the privacy notice and the acceptable-use policy and their acceptance is recorded,
+ * but nothing is blocked on it (Ruling CONSENT-ADMIN-1). The owner's Terms/Privacy consent gate is separate.
+ */
+const STAFF_NOTICE_DOCS: readonly LegalDocKey[] = ['privacy', 'acceptableUse'];
 
 export const ackItemsSchema = z
   .object({
@@ -141,18 +146,84 @@ async function sentAndAccepted(
 }
 
 /**
- * Notices this user still has to see. Computed live on every call, never cached
- * (NEVER-stale). A user with zero acceptance rows (staff-provisioned) simply has
- * every sent material current version pending.
+ * Notices this user still has to see. Computed live on every call, never cached (NEVER-stale).
+ * Owner: each sent material current version they have not accepted (a CHANGE to a document they accepted).
+ * Staff: the privacy and acceptable-use documents they have no record of. Never blocks anything.
  */
 export async function pendingNoticesFor(
   userId: string,
   role: string
 ): Promise<PendingLegalNotice[]> {
-  if (role !== NOTICE_ROLE) return [];
+  if (role !== NOTICE_ROLE && role !== 'staff') return [];
   return inUserScope(userId, async tx => {
     const { sent, accepted } = await sentAndAccepted(tx, userId);
-    return computePendingNotices(activePolicies, sent, accepted, { requireBaseline: true });
+    return role === NOTICE_ROLE
+      ? computePendingNotices(activePolicies, sent, accepted)
+      : computePendingNotices(activePolicies, [], accepted, { baselineDocs: STAFF_NOTICE_DOCS });
+  });
+}
+
+interface ConsentStatus {
+  /** True when this owner has no record of the Terms or the Privacy policy: admin writes are refused until they accept. */
+  required: boolean;
+  documents: Array<{
+    docKey: LegalDocKey;
+    version: string;
+    title: PendingLegalNotice['title'];
+    url: PendingLegalNotice['url'];
+  }>;
+}
+
+const CONSENT_DOCS: readonly LegalDocKey[] = ['terms', 'privacy'];
+
+/** The documents the blocking consent modal shows (the owner's own record decides `required`). */
+export async function consentStatusFor(userId: string, role: string): Promise<ConsentStatus> {
+  if (role !== NOTICE_ROLE) return { required: false, documents: [] };
+  const missing = await inUserScope(userId, async tx => {
+    const { accepted } = await sentAndAccepted(tx, userId);
+    return baselineMissing(activePolicies, accepted, CONSENT_DOCS);
+  });
+  const pending = computePendingNotices(activePolicies, [], [], { baselineDocs: CONSENT_DOCS });
+  return {
+    required: missing.length > 0,
+    documents: pending.map(p => ({
+      docKey: p.docKey,
+      version: p.version,
+      title: p.title,
+      url: p.url,
+    })),
+  };
+}
+
+/**
+ * The owner's affirmative click-wrap: records the Terms and Privacy policy at their CURRENT versions in the
+ * same table, with the same evidence (time, IP, user agent) as the signup click-wrap, source `consent_gate`.
+ * Idempotent. A version already accepted is left alone.
+ */
+export async function acceptOwnerConsent(
+  userId: string,
+  role: string,
+  request: { ip?: string; userAgent?: string }
+): Promise<{ recorded: number }> {
+  if (role !== NOTICE_ROLE) {
+    throw new AppError(403, 'FORBIDDEN', 'Only a store owner accepts the merchant policies');
+  }
+  return inUserScope(userId, async tx => {
+    const now = new Date();
+    const r = await tx.legalAcceptance.createMany({
+      data: CONSENT_DOCS.map(docKey =>
+        buildAcceptanceRow(
+          userId,
+          docKey,
+          currentLegalVersion(activePolicies, docKey).version,
+          'consent_gate',
+          request,
+          now
+        )
+      ),
+      skipDuplicates: true,
+    });
+    return { recorded: r.count };
   });
 }
 
@@ -160,6 +231,7 @@ export async function pendingNoticesFor(
  * Record "Got it". Every item must be SENT + MATERIAL + CURRENT (A6); one that is already
  * acknowledged is a harmless no-op. Anything else (a version accepted at signup, a
  * superseded or unsent one) refuses the whole request with 422 NOT_PENDING, writing nothing.
+ * Staff may acknowledge the baseline documents they are shown (STAFF_NOTICE_DOCS).
  */
 export async function ackNotices(
   userId: string,
@@ -167,7 +239,7 @@ export async function ackNotices(
   items: Array<{ docKey: string; version: string }>,
   request: { ip?: string; userAgent?: string }
 ): Promise<{ acknowledged: number }> {
-  if (role !== NOTICE_ROLE) {
+  if (role !== NOTICE_ROLE && role !== 'staff') {
     throw new AppError(403, 'FORBIDDEN', 'Only a store owner acknowledges policy notices');
   }
   return inUserScope(userId, async tx => {
@@ -175,11 +247,10 @@ export async function ackNotices(
     const same = (a: LegalDocRef, b: LegalDocRef) =>
       a.docKey === b.docKey && a.version === b.version;
     // The same rule the banner uses (isNoticeable in @ebda/shared): sent + material + current.
-    const eligible: LegalDocRef[] = [
-      ...noticeableVersions(activePolicies, sent),
-      // No record at all for a document: its current version is pending too (baselineMissing).
-      ...baselineMissing(activePolicies, accepted),
-    ];
+    const eligible: LegalDocRef[] =
+      role === NOTICE_ROLE
+        ? noticeableVersions(activePolicies, sent)
+        : baselineMissing(activePolicies, accepted, STAFF_NOTICE_DOCS);
     const bad = items.filter(i => !eligible.some(e => same(e, i)));
     if (bad.length > 0) {
       throw new AppError(422, 'NOT_PENDING', 'These notices are not pending for this account', {

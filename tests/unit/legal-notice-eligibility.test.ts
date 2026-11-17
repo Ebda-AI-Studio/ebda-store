@@ -49,20 +49,21 @@ describe('maskIp (super-admin acceptance evidence, I6)', () => {
   });
 });
 
-describe('baseline acceptance gate (Ruling LEGAL-BASELINE-1)', () => {
-  it('a merchant with no acceptance rows (staff-invited, never through the signup wrap) is asked for every document', () => {
-    const out = computePendingNotices(LEGAL_POLICIES, [], [], { requireBaseline: true });
-    expect(out.map(n => n.docKey).sort()).toEqual(
-      ['acceptableUse', 'legal', 'merchant', 'privacy', 'terms'].sort()
-    );
+describe('baseline acceptance (Ruling CONSENT-ADMIN-1)', () => {
+  it('baselineDocs asks only for the listed documents the party has no record of', () => {
+    const out = computePendingNotices(LEGAL_POLICIES, [], [], {
+      baselineDocs: ['privacy', 'acceptableUse'],
+    });
+    expect(out.map(n => n.docKey).sort()).toEqual(['acceptableUse', 'privacy']);
   });
 
-  it('the API asks for the baseline AND lets "Got it" record it (fails if either wire is cut)', async () => {
+  it('wiring: the owner modal reads Terms + Privacy, staff see privacy + acceptable use (fails if cut)', async () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync('apps/api/src/services/legal-notice.service.ts', 'utf8');
+    expect(src).toMatch(/CONSENT_DOCS: readonly LegalDocKey\[\] = \['terms', 'privacy'\]/);
     expect(src).toMatch(
-      /computePendingNotices\(activePolicies, sent, accepted, \{\s*requireBaseline: true/
+      /STAFF_NOTICE_DOCS: readonly LegalDocKey\[\] = \['privacy', 'acceptableUse'\]/
     );
-    expect(src).toMatch(/\.\.\.baselineMissing\(activePolicies, accepted\)/);
+    expect(src).toMatch(/'consent_gate'/);
   });
 });
