@@ -71,13 +71,8 @@ describe('marketing CSP (public/_headers)', () => {
   });
 });
 
-describe('marketing Meta Pixel and the CSP', () => {
-  const headers = readFileSync(path.join(MK, 'public/_headers'), 'utf8');
-  const csp = /Content-Security-Policy:\s*(.+)/.exec(headers)![1];
-  it('the CSP sets no script-src/img-src/connect-src, so Meta needs no allow-list entry and none is added', () => {
-    expect(csp).toBe("frame-ancestors 'none'; form-action 'self' " + BRAND_API_URL);
-    expect(csp).not.toMatch(/facebook/);
-  });
+describe('marketing Meta Pixel has no noscript fallback', () => {
+  // main allow-lists the consented tracker hosts (guarded by marketing-csp-trackers.test.ts), so the old 'no CSP entry' assertion is gone.
   it('no noscript <img> pixel fallback anywhere in the marketing source (it fires without consent)', () => {
     const walk = (d: string): string[] =>
       readdirSync(d, { withFileTypes: true }).flatMap(e =>
