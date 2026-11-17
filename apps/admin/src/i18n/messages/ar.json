@@ -11393,7 +11393,7 @@
         "ip_literal_not_allowed": "استخدم اسم دومين مش عنوان IP.",
         "public_hostname_required": "اكتب اسم دومين كامل زي hooks.example.com.",
         "internal_hostname_not_allowed": "الأسماء المحلية زي localhost مش مقبولة. استخدم دومين عام.",
-        "platform_host_not_allowed": "مينفعش تبعت الـ webhook لعنوان تابع لابدأ.",
+        "platform_host_not_allowed": "مينفعش تبعت الـ webhook لعنوان تابع للمنصة دي. استخدم السيرفر بتاعك.",
         "dns_unresolved": "ملقيناش الدومين ده. اتأكد من الكتابة.",
         "private_address": "الدومين ده بيشاور على عنوان خاص. استخدم عنوان عام.",
         "rejected": "العنوان ده مينفعش يتستخدم. استخدم عنوان HTTPS عام."

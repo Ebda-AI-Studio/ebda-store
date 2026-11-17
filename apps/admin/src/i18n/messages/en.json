@@ -11393,7 +11393,7 @@
         "ip_literal_not_allowed": "Use a domain name, not an IP address.",
         "public_hostname_required": "Use a full domain name like hooks.example.com.",
         "internal_hostname_not_allowed": "Local and internal names like localhost are not accepted. Use a public domain.",
-        "platform_host_not_allowed": "You cannot send webhooks to an Ebda address.",
+        "platform_host_not_allowed": "You cannot send webhooks to an address on this platform. Use your own server.",
         "dns_unresolved": "We could not find this domain. Check the spelling.",
         "private_address": "This domain points to a private address. Use a public one.",
         "rejected": "This address cannot be used. Use a public HTTPS address."
