@@ -24,7 +24,7 @@ import { createResend, createTestDelivery, newWebhookSecret } from '../services/
 
 /**
  * Merchant outgoing webhooks - admin API. Mounted at `/stores/:storeId/webhooks` with
- * `tenantContext` (routes/index.ts). Plan: docs/plans/2026-10-21-merchant-webhooks.md.
+ * `tenantContext` (routes/index.ts). Plan: docs/plans/done/2026-10-21-merchant-webhooks.md.
  *
  * Every route: authenticate -> authorize(store_admin, super_admin) -> requireStoreAccess (the
  * store's OWNER; staff are refused: they hold no store:settings) -> plan gate (Growth + Business,

@@ -103,7 +103,7 @@ jobs:
             echo "::error::flash-sale against prod ($host) needs allow_prod=true"; exit 1
           fi
           echo "target=$host prod=$prod scenario=$SCENARIO"
-      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+      - uses: grafana/setup-k6-action@c47136d33d365efbeb9ae7266908b5dcf98cdece # v1.3.0
         with:
           k6-version: '2.3.0'
       - name: Run k6
@@ -124,10 +124,15 @@ jobs:
           echo "k6_exit=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
       - name: Job summary
         if: always()
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+          BASE_URL: ${{ inputs.base_url }}
+          P95_MS: ${{ inputs.p95_ms }}
+          ERROR_RATE: ${{ inputs.error_rate }}
         run: |
           {
-            echo "### k6 ${{ inputs.scenario }} on ${{ inputs.base_url }}"
-            echo "Thresholds: p95 < ${{ inputs.p95_ms }} ms, error rate <= ${{ inputs.error_rate }}. k6 exit: ${k6_exit:-n/a}"
+            echo "### k6 ${SCENARIO} on ${BASE_URL}"
+            echo "Thresholds: p95 < ${P95_MS} ms, error rate <= ${ERROR_RATE}. k6 exit: ${k6_exit:-n/a}"
             echo '```'; tail -n 40 k6-output.txt 2>/dev/null; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

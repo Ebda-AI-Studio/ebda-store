@@ -12,16 +12,7 @@ import { PaymentService } from '../services/payment.service';
 import { getAuthUser } from '../utils/store-helpers';
 import { paymentSettingsRouteContext } from '../middleware/tenant-context';
 
-import {
-  REGION,
-  PAYMENT_PROVIDER_CODES,
-  getProviderEntry,
-  codSettingsSchema,
-  fawrySettingsSchema,
-  instapaySettingsBaseSchema,
-  instapaySettingsSchema,
-  kashierSettingsSchema,
-} from '@ebda/shared';
+import { REGION, PAYMENT_PROVIDER_CODES, getProviderEntry } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { providerHealth } from '../services/payment-providers/provider-health';
 import { reportConnectionCheck } from '../services/provider-verification.service';
@@ -34,6 +25,14 @@ import {
   publicPaymentConfig,
   runConnectionTest,
 } from '../services/payment-providers/provider-connection.service';
+import {
+  applyStorePaymentConfigUpdate,
+  normalizeProviderSettings,
+} from '../services/store-payment-config.service';
+
+// Re-exported: the settings normaliser moved to the service the assistant tools share (tests and callers keep this import path).
+export { normalizeProviderSettings };
+
 const router = Router();
 
 // Mounted bare at '/payment-settings' in routes/index.ts — the global
@@ -123,59 +122,6 @@ export function maskCredentials(config: {
     apiKeyFingerprintMissing: Boolean(config.apiKey) && !config.apiKeyLast4,
     merchantIdFingerprintMissing: Boolean(config.merchantId) && !config.merchantIdLast4,
   };
-}
-
-/**
- * Validate and normalise the NON-secret `settings` JSON of one provider config.
- * InstaPay needs a handle or a phone once it is enabled (a disabled draft may be
- * partial); COD takes an optional percentage. Anything else carries no settings.
- */
-export function normalizeProviderSettings(
-  provider: string,
-  settings: Record<string, unknown> | undefined,
-  isEnabled: boolean
-): Record<string, unknown> {
-  const raw = settings ?? {};
-  if (provider === 'instapay') {
-    const parsed = (isEnabled ? instapaySettingsSchema : instapaySettingsBaseSchema).safeParse(raw);
-    if (!parsed.success) {
-      throw new AppError(
-        422,
-        'INVALID_PAYMENT_SETTINGS',
-        parsed.error.issues.map(i => `${i.path.join('.') || 'settings'}: ${i.message}`).join('; ')
-      );
-    }
-    return parsed.data;
-  }
-  if (provider === 'cod') {
-    const parsed = codSettingsSchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new AppError(422, 'INVALID_PAYMENT_SETTINGS', 'percentBps must be 0-5000');
-    }
-    return parsed.data;
-  }
-  // The Egyptian gateways: only their mode-independent, NON-secret settings live here. Paymob's
-  // public key and integration ids differ between sandbox and live, so they are credential fields
-  // of the catalog (encrypted blob, per mode) and Paymob keeps nothing in this column.
-  if (provider === 'paymob') return {};
-  const gatewaySchema =
-    provider === 'kashier'
-      ? kashierSettingsSchema
-      : provider === 'fawry'
-        ? fawrySettingsSchema
-        : null;
-  if (gatewaySchema) {
-    const parsed = gatewaySchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new AppError(
-        422,
-        'INVALID_PAYMENT_SETTINGS',
-        parsed.error.issues.map(i => `${i.path.join('.') || 'settings'}: ${i.message}`).join('; ')
-      );
-    }
-    return parsed.data;
-  }
-  return {};
 }
 
 const LEGACY_CREDENTIAL_KEYS = ['apiKey', 'secretKey', 'merchantId', 'webhookSecret'] as const;
@@ -554,41 +500,13 @@ router.put(
       }
 
       refuseLegacyGatewayCredentials(provider, req.body ?? {});
-      // The enable gate on the RESULTING state: enabling, or switching the mode of an enabled
-      // gateway (the other mode's credentials were never tested), needs a current test.
-      const resultingEnabled = data.isEnabled ?? existing.isEnabled;
-      if (resultingEnabled) {
-        assertEnableAllowed({
-          provider,
-          testMode: data.testMode ?? existing.testMode,
-          isEnabled: true,
-          credentials: existing.credentials,
-          connectionTest: existing.connectionTest,
-        });
-      }
-
-      if (data.settings !== undefined || data.isEnabled !== undefined) {
-        updateData.settings = normalizeProviderSettings(
-          provider,
-          {
-            ...((existing.settings as Record<string, unknown> | null) ?? {}),
-            ...(data.settings ?? {}),
-          },
-          data.isEnabled ?? existing.isEnabled
-        );
-      }
-
-      // Unsetting the other default and updating this row are ONE atomic unit (see the create route).
-      const w = await storeWriter(storeId);
-      const [, config] = await w.$transaction([
-        w.paymentConfig.updateMany({
-          where: data.isDefault
-            ? { storeId, isDefault: true, id: { not: existing.id } }
-            : { storeId, id: { in: [] } },
-          data: { isDefault: false },
-        }),
-        w.paymentConfig.update({ where: { id: existing.id, storeId }, data: updateData }),
-      ]);
+      const config = await applyStorePaymentConfigUpdate(
+        storeId,
+        provider,
+        existing,
+        data,
+        updateData
+      );
 
       await auditLog({
         action: 'store_payment_config.updated',
@@ -599,9 +517,6 @@ router.put(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-
-      // Clear provider cache for this store
-      PaymentService.clearCache(storeId);
 
       res.json({
         success: true,

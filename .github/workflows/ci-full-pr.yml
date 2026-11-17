@@ -1,0 +1,47 @@
+name: CI full tier (pre-merge)
+
+# CI-SLIM-1. Pull requests run the SLIM lane in ci.yml (lint, typecheck, build of changed apps, affected unit tests,
+# planner-selected integration, repo guards). The heavy tiers (Build, full unit + coverage, Integration, E2E, Builder E2E,
+# workerd suite, orphan check, security audit) run on a PR only when asked: add the label `full-ci` (money, auth, data,
+# migration or risky-path PRs, before merge). This dispatches ci.yml's existing workflow_dispatch (the full lane) on the
+# PR branch; its checks attach to the PR head sha, so ops/merge-gate.sh sees them (a failing one refuses the merge).
+# A new commit while `full-ci` is on the PR re-dispatches; ci.yml cancels the superseded full run of that branch.
+# Mutation is not part of it (Sunday cron / manual dispatch with the `mutation` input).
+# Why a label and not automatic on `ai-review-passed`: that label is added with GITHUB_TOKEN, which raises no event, and a
+# full run is ~2 h of heavy-runner time (measured), so it is a deliberate pre-merge step, not a default. Same-repo PRs only.
+on:
+  pull_request:
+    types: [labeled, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-full-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    name: Dispatch full CI tier
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && ((github.event.action == 'labeled' && github.event.label.name == 'full-ci')
+          || (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'full-ci')))
+    steps:
+      - name: Dispatch ci.yml (full lane) on the PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          # branch names are user text: bound through env, never interpolated into the script
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          [ -n "$PR_BRANCH" ] && [ "$PR_BRANCH" != main ] || { echo "not a PR branch; nothing to do"; exit 1; }
+          gh workflow run ci.yml --ref "$PR_BRANCH"
+          echo "dispatched ci.yml full lane on $PR_BRANCH"

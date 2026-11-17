@@ -2,6 +2,9 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
+    "storeNotOperational": "This store is suspended, so Ebda AI Studio has paused messages to customers and payouts. Contact support to get it reactivated.",
+    "storeNotOperationalTitle": "Store suspended",
+    "storeNotOperationalAppeal": "Contact support to appeal",
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close",
@@ -343,6 +346,85 @@
         "allClear": "Nothing is waiting for you right now.",
         "loadFailed": "We could not load what needs your attention right now.",
         "retry": "Try again"
+      },
+      "pulse": {
+        "title": "Store pulse",
+        "periodLabel": "Time period",
+        "period": {
+          "today": "Today",
+          "last_7": "7 days",
+          "last_30": "30 days",
+          "this_month": "This month"
+        },
+        "salesLabel": "Sales",
+        "vsPrevious": "vs the previous period",
+        "deltaSr": {
+          "up": "Up {percent}%",
+          "down": "Down {percent}%",
+          "flat": "No change"
+        },
+        "sentence": {
+          "up": "Up {percent}% on the previous period, from {orders} orders.",
+          "down": "Down {percent}% on the previous period, from {orders} orders.",
+          "flat": "Same as the previous period, from {orders} orders.",
+          "unknown": "From {orders} orders."
+        },
+        "sparkLabel": "Sales per day across this period, latest day highlighted",
+        "emptyBody": "No sales in this period yet. Share your store link with your customers to get the first order.",
+        "emptyCta": "Copy store link",
+        "linkCopied": "Store link copied",
+        "linkCopyFailed": "Could not copy the link. Copy it from the address bar.",
+        "statsFailed": "We could not load your sales right now.",
+        "retry": "Try again",
+        "orders": "Orders",
+        "avgOrder": "Average order",
+        "avgOrderHint": "per order",
+        "conversion": "Conversion",
+        "conversionHint": "visits that became orders",
+        "conversionNone": "Not enough visits yet",
+        "unpaid": "Waiting for payment",
+        "unpaidNone": "All paid",
+        "unpaidFailed": "Could not load",
+        "topProducts": "Best sellers",
+        "topProductsFailed": "We could not load your best sellers.",
+        "topProductsEmpty": "Your best sellers show up here after the first sale.",
+        "topProductsEmptyCta": "Add a product",
+        "sold": "{count} sold"
+      },
+      "assistantMode": {
+        "title": "Store assistant",
+        "subtitle": "Per-store rollout. Off by default; only a super admin can change it.",
+        "modeLabel": "Assistant mode",
+        "loading": "Loading…",
+        "loadFailed": "Could not load the assistant mode.",
+        "retry": "Retry",
+        "save": "Save mode",
+        "cancel": "Cancel",
+        "confirm": "Yes, change the mode",
+        "confirmTitle": "Turn the assistant on for this store?",
+        "confirmBody": "This store's team will get the assistant in mode \"{mode}\".",
+        "saveFailed": "Could not save the mode. Nothing was changed.",
+        "lastChanged": "Last changed by {by} at {at}",
+        "neverChanged": "Never changed (default: off).",
+        "unknownActor": "an unknown user",
+        "modes": {
+          "off": {
+            "label": "Off",
+            "meaning": "The assistant is hidden and never runs for this store."
+          },
+          "answer-only": {
+            "label": "Answer only",
+            "meaning": "It answers questions and explains screens. It never changes anything in the store."
+          },
+          "suggest": {
+            "label": "Suggest",
+            "meaning": "It can prepare changes as a preview, but nothing is applied unless the merchant confirms."
+          },
+          "act": {
+            "label": "Act",
+            "meaning": "The merchant can apply changes with one press; sensitive ones still need their confirmation."
+          }
+        }
       }
     },
     "list": {
@@ -920,6 +1002,13 @@
       "loading": "Loading...",
       "title": "Recommendations: {productName}",
       "fallbackProductName": "Product",
+      "auto": {
+        "title": "Automatic recommendations",
+        "body": "Besides the products you pick, the store adds items that are often bought together and similar products, up to 8 in total. Your picks always come first. Turn this off to show only your picks.",
+        "on": "On",
+        "off": "Off",
+        "saveFailed": "Could not change the setting"
+      },
       "subtitle": "Manage cross-sell and upsell product relationships",
       "actions": {
         "save": "Save Recommendations",
@@ -1178,7 +1267,7 @@
     "model3d": {
       "title": "3D model",
       "intro": "Let shoppers rotate the product, see it in each colour or metal, and place it in their room (AR). One self-contained .glb file, up to {mb} MB.",
-      "disabled": "3D models are switched off for this store. Contact support to turn them on. You can still remove an existing model.",
+      "disabled": "Ebda Store staff switched 3D models off for this store. They are on by default, so this only happens when we turn them off for a reason, for example a problem with your models or your storage. Use Contact Ebda Store to ask why, or to ask us to turn them back on. You can still remove an existing model.",
       "chooseGlb": "Upload .glb model",
       "formatHint": "A .glb file with its textures inside. Special compression (Draco or KTX2) is not supported yet: export without it, or with meshopt, and use WebP images.",
       "replace": "Replace model",
@@ -1713,8 +1802,8 @@
         "fileLabel": "Font file (.woff2 / .woff / .ttf / .otf — max 5MB)",
         "uploading": "Uploading…",
         "uploadFont": "Upload font",
-        "addGoogleFont": "+ Add Google Font",
-        "uploadCustomFont": "↥ Upload custom font",
+        "addGoogleFont": "Add a Google font",
+        "uploadCustomFont": "Upload your own font",
         "uploadFailed": "Upload failed."
       },
       "paddingBlock": {
@@ -1755,7 +1844,13 @@
       },
       "fontFamilyExample": "e.g. Cairo, Inter, \"Open Sans\"",
       "fontNameExample": "e.g. \"My Brand Sans\"",
-      "uploadFileSize": "{name} ({kb} KB)"
+      "uploadFileSize": "{name} ({kb} KB)",
+      "zoneGroups": {
+        "top": "Top of the page",
+        "headings": "Section headings",
+        "products": "Products and categories",
+        "footer": "Footer"
+      }
     },
     "devices": {
       "title": "Notification devices",
@@ -1840,7 +1935,7 @@
       "countSingular": "{count} customer",
       "countPlural": "{count} customers",
       "paginationShowing": "Showing {from} to {to} of {total} customers",
-      "truncatedNotice": "This store is very large — the customer list is partial: it covers the most recent orders and the newest sign-ups who have not ordered yet. Use the export for a fuller picture, or contact support.",
+      "truncatedNotice": "This store is very large — the customer list is partial: it covers the most recent orders and the newest sign-ups who have not ordered yet. Use the export for a fuller picture, or use Contact Ebda Store.",
       "searchTruncatedNotice": "This search matches more customers than can be listed. Showing the first {shown} — narrow it by typing more of the name, phone or email.",
       "previous": "Previous",
       "next": "Next",
@@ -2997,7 +3092,7 @@
           "wrong_mode": "These look like credentials for the other mode (sandbox vs live). Check the mode.",
           "incomplete": "Some required fields are missing. Fill them in and save.",
           "unreachable": "Could not reach the carrier. Try again in a minute.",
-          "unknown": "The test did not give a clear answer. Try again, or contact support.",
+          "unknown": "The test did not give a clear answer. Try again, or use Contact Ebda Store.",
           "latency": "{ms} ms"
         },
         "messages": {
@@ -4365,7 +4460,7 @@
         "REFUND_EXCEEDS_ORDER": "This would refund more than the customer paid for the order. Earlier refunds (card, InstaPay, store credit or a cash return) already cover part of it, so nothing was changed.",
         "ORDER_ALREADY_REFUNDED": "This order is already refunded in full, so this return cannot refund the customer again.",
         "INVALID_REFUND_AMOUNT": "This return has no refund amount. Set the refund amount before completing it.",
-        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support.",
+        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and use Contact Ebda Store.",
         "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\".",
         "OVERRIDE_NOT_APPLICABLE": "A refund override only applies to a partial return of a tier-priced item. Complete the return without it.",
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
@@ -5146,7 +5241,7 @@
         "wrong_mode": "These look like credentials for the other mode (sandbox vs live). Check the mode.",
         "incomplete": "Some required fields are missing. Fill them in and save.",
         "unreachable": "Could not reach the provider. Try again in a minute.",
-        "unknown": "The test did not give a clear answer. Try again, or contact support.",
+        "unknown": "The test did not give a clear answer. Try again, or use Contact Ebda Store.",
         "latency": "{ms} ms"
       },
       "messages": {
@@ -6274,7 +6369,9 @@
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)",
       "wholesalePendingBadge": "{count} wholesale applications waiting",
-      "navPlatformCiInsights": "Customer Intelligence"
+      "navPlatformCiInsights": "Customer Intelligence",
+      "navPlatformActivation": "Merchant activation",
+      "navPlatformTrustRequests": "Support and trust requests"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -6440,20 +6537,26 @@
     },
     "colorField": {
       "tokens": {
-        "primary": "Brand: Primary",
-        "secondary": "Brand: Secondary",
-        "accent": "Brand: Accent",
-        "card": "Surface: Card",
-        "muted": "Surface: Muted",
-        "foreground": "Text: Foreground",
-        "border": "Border"
+        "primary": "Main colour",
+        "secondary": "Soft background",
+        "accent": "Highlight",
+        "card": "Card background",
+        "muted": "Quiet background",
+        "foreground": "Main text",
+        "border": "Lines and borders"
       },
-      "customHex": "Custom hex…",
-      "themeDefault": "— Theme default —",
-      "inheritedLabel": "Brand: {token} ({hex})",
-      "colorPickerAriaLabel": "Color picker",
-      "hexValueAriaLabel": "Hex color value",
-      "clear": "Clear"
+      "themeDefault": "Same as the template",
+      "themeDefaultShort": "Template colour",
+      "inheritedLabel": "Same as {token}",
+      "brandColours": "Your brand colours",
+      "anyColour": "Any other colour",
+      "notAColour": "That is not a colour yet. Try something like #B08D57.",
+      "alphaIgnored": "Transparency is not supported, so it was ignored.",
+      "recent": "Recently used",
+      "done": "Done",
+      "colorPickerAriaLabel": "Pick a colour",
+      "hexValueAriaLabel": "Colour code",
+      "hexExample": "e.g. B08D57"
     },
     "bottomSheet": {
       "close": "Close"
@@ -6467,14 +6570,25 @@
       "samplePrice": "50.00 EGP"
     },
     "colorContrastPreview": {
-      "backgroundLabel": "Background: {label}",
-      "roles": {
+      "preview": {
         "heading": "Heading",
-        "subtitle": "Subtitle",
-        "bodyCta": "Body / CTA"
+        "subtitle": "A line under the heading",
+        "body": "Body text looks like this.",
+        "button": "Button"
       },
-      "autoFixedLabel": "Auto-fixed:",
-      "pickedTextWarning": "Picked text {ratio} : 1 — AA needs {min} : 1"
+      "verdict": {
+        "easy": "Easy to read",
+        "large": "Fine for big text only",
+        "hard": "Hard to read"
+      },
+      "cannotCheck": "We can't check this colour yet. Pick a colour to see how text reads on it.",
+      "details": "Details",
+      "colourName": "Colour",
+      "background": "Background",
+      "text": "Text",
+      "ratioLabel": "Contrast",
+      "ratio": "{ratio} to 1",
+      "pickedTextWarning": "your text colour is hard to read here"
     },
     "guestCheckout": {
       "notTracked": "Not tracked for guest checkout",
@@ -6519,6 +6633,60 @@
     },
     "confirm": {
       "cancel": "Cancel"
+    },
+    "support": {
+      "open": "Contact Ebda Store",
+      "title": "Contact Ebda Store",
+      "topic": "What is it about?",
+      "send": "Send",
+      "cancel": "Cancel",
+      "messageRequired": "Write a few words so we can help.",
+      "limit": "You can send 5 requests a day. Please try again tomorrow.",
+      "alreadyOpen": "You already sent this one and it is being reviewed.",
+      "failed": "We could not send it. Please try again.",
+      "slug": "Address you want",
+      "evidenceUrl": "Link to proof (optional, https)",
+      "intro": {
+        "support": "Tell us what you need. A person at Ebda Store reads it and replies by email.",
+        "appeal": "Explain why your store should be switched back on. A person at Ebda Store reviews it and decides.",
+        "slug": "Tell us why this address is yours, for example a trademark or your registered business name. A person at Ebda Store reviews it.",
+        "cap": "Tell us why you need more stores and how you can prove it. A person at Ebda Store reviews it."
+      },
+      "message": {
+        "support": "Your message",
+        "appeal": "Your appeal",
+        "slug": "Proof that this brand is yours",
+        "cap": "Why you need a higher limit"
+      },
+      "sent": {
+        "support": "Sent. We will reply to your email.",
+        "appeal": "Appeal sent. We will review it and reply by email.",
+        "slug": "Claim sent. We will review it and reply by email.",
+        "cap": "Request sent. We will review it and reply by email."
+      },
+      "topics": {
+        "billing": "Billing",
+        "plan": "Plan or upgrade",
+        "orders": "Orders",
+        "products": "Products",
+        "payments": "Payments",
+        "shipping": "Shipping",
+        "domain": "Domain",
+        "three_d_models": "3D models",
+        "account": "My account",
+        "other": "Something else"
+      },
+      "suspended": {
+        "title": "Your store is suspended",
+        "noReason": "No reason was recorded. Send an appeal and we will explain.",
+        "reason": {
+          "policy": "Reason: {reason}",
+          "billing": "Reason: billing ({reason})."
+        },
+        "billingHint": "Settle your invoice to switch the store back on, or use Contact Ebda Store.",
+        "appealOpen": "Your appeal is under review. We will reply by email.",
+        "appeal": "Appeal this decision"
+      }
     }
   },
   "finance": {
@@ -6535,7 +6703,7 @@
       "system": "System",
       "code": "Code",
       "name": "Name",
-      "noAccountsHint": "No accounts seeded yet. Refresh or contact support.",
+      "noAccountsHint": "No accounts seeded yet. Refresh, or use Contact Ebda Store.",
       "seedButton": "Seed default accounts",
       "seeding": "Seeding…",
       "seedSuccess": "Seeded {count} account(s).",
@@ -7013,7 +7181,7 @@
       "orderNumberPlaceholder": "Order number (e.g. ORD-0001)…",
       "loadOrder": "Load Order",
       "orderNotFound": "Order not found",
-      "featureNotOnPlan": "Barcode scanning is not included in your current plan. Contact support or upgrade your plan to use it.",
+      "featureNotOnPlan": "Barcode scanning is not included in your current plan. Upgrade your plan, or use Contact Ebda Store to ask about it.",
       "barcodeNotFound": "Barcode not found in this store",
       "ambiguousWarning": "Barcode matches both a product and a variant — using variant.",
       "receiving": {
@@ -7812,227 +7980,246 @@
     "alsoIncluded": "Also included in this plan"
   },
   "aiTools": {
-    "title": "AI Tools",
-    "subtitle": "Catalogue-wide translation, SEO, AEO, and GEO sweeps",
+    "title": "AI tools",
+    "subtitle": "Let AI fill in your catalogue: translations, search text and product details. It only fills blanks unless you tell it to replace.",
     "backToStore": "Back to store",
-    "replaceExisting": "Replace existing",
+    "replaceExisting": "Replace what's already there",
     "starting": "Starting…",
     "viewResults": "View results",
     "confirmReplace": "This will REPLACE existing content for this sweep. Continue?",
     "confirmCancel": "Cancel this sweep? Already-processed items keep their changes.",
-    "errorFailedToStart": "Failed to start sweep",
-    "errorNetwork": "Network error",
-    "errorFailed": "Failed",
+    "errorFailedToStart": "We couldn't start that. Try again in a moment.",
+    "errorNetwork": "We couldn't reach the server. Check your connection and try again.",
+    "errorFailed": "That didn't work. Try again in a moment.",
     "sections": {
-      "translation": "Translation",
-      "descriptionBalance": "Language balance",
-      "seo": "SEO",
-      "aeo": "AEO — Answer Engine Optimization",
-      "geo": "GEO — Generative Engine Optimization",
+      "translation": "Translate your catalogue",
+      "descriptionBalance": "Fix mixed-up languages",
+      "seo": "Search and suggestions",
+      "aeo": "Answers for AI assistants",
+      "geo": "Help AI assistants know your store",
       "geoDescription": "Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing Copilot.",
       "descriptionRevert": "Revert language balance",
-      "catalogueFields": "Catalogue fields"
+      "catalogueFields": "Product details"
     },
     "cards": {
       "balanceDescriptions": {
-        "title": "Balance languages",
-        "body": "For each product, makes the English field English and the Arabic field Arabic — for the name AND the description. If both slots hold the same language it translates the missing one (Arabic is the source of truth); if a slot has the wrong language it is corrected.",
-        "button": "Run balance",
-        "forceTooltip": "Re-balance even products that already look correct (translate again)."
+        "title": "Match each field to its language",
+        "body": "If both fields are in the same language, the missing one is translated from the Arabic. A field in the wrong language is corrected. Your originals are saved, so you can undo.",
+        "button": "Fix languages",
+        "forceTooltip": "Redo every product, even the ones that already look right.",
+        "outcome": "English text in the English fields and Arabic text in the Arabic fields, for names and descriptions."
       },
       "revertBalance": {
-        "title": "Revert balance",
-        "body": "Undo the last balance run — restores the original name and description fields (both languages) before balancing was applied.",
-        "button": "Revert",
-        "forceTooltip": "Restores the pre-balance originals even if fields were edited since."
+        "title": "Undo the language fix",
+        "body": "Restores both languages on the products changed by the last language fix. Uses no AI.",
+        "button": "Undo last fix",
+        "forceTooltip": "Restore the saved originals even if you edited the text after the fix.",
+        "outcome": "Your original names and descriptions, back as they were."
       },
       "fillMissingArabic": {
-        "title": "Fill missing Arabic",
-        "body": "Walks every product, category, and the store row. Translates the English value into Arabic only when the Arabic field is empty.",
-        "button": "Run sweep"
+        "title": "Add missing Arabic text",
+        "body": "Checks every product, category and your store page. It only translates when the Arabic field is empty, so nothing you wrote is touched.",
+        "button": "Translate to Arabic",
+        "outcome": "Arabic names and descriptions wherever only English exists."
       },
       "fillMissingEnglish": {
-        "title": "Fill missing English",
-        "body": "Reverse direction. For every Arabic-only field, fills the English side. Skips already-bilingual entities.",
-        "button": "Run sweep"
+        "title": "Add missing English text",
+        "body": "Checks every product, category and your store page. Items that already have both languages are skipped.",
+        "button": "Translate to English",
+        "outcome": "English names and descriptions wherever only Arabic exists."
       },
       "seoMeta": {
-        "title": "Generate missing SEO meta",
-        "body": "For the store row and every product, generates meta title + description in EN and AR when those fields are empty. Skips entities that already have SEO.",
-        "button": "Run sweep",
-        "forceTooltip": "Overwrites existing SEO meta on all entities."
+        "title": "Google titles and descriptions",
+        "body": "Fills the empty ones only. Pages that already have them are skipped.",
+        "button": "Write search text",
+        "forceTooltip": "Replace the search text you already have on every page.",
+        "outcome": "A search title and description in English and Arabic for your store and every product."
       },
       "recommendations": {
-        "title": "AI product recommendations",
-        "body": "Generate AI-driven cross-sell recommendations across your catalogue. Fills the storefront \"You might also like\" section on each product page. Re-running updates existing suggestions.",
-        "button": "Run sweep",
-        "forceTooltip": "Re-generates recommendations for every product, replacing existing AI picks."
+        "title": "\"You might also like\" suggestions",
+        "body": "Picks products that go well together. Running it again refreshes the earlier suggestions.",
+        "button": "Suggest related products",
+        "forceTooltip": "Replace the suggestions already set on every product.",
+        "outcome": "Related products shown under each product in your store."
       },
       "draftFaqs": {
-        "title": "Draft FAQs with AI",
-        "body": "Generates up to 8 store-level FAQ items covering delivery, payments, returns, product care, and more — bilingual (EN + AR). Skips questions a merchant has already edited.",
-        "button": "Draft FAQs",
-        "forceTooltip": "Deletes all existing AI-drafted FAQs and regenerates from scratch. Manually-edited FAQs are preserved.",
-        "resultsLabel": "View FAQs on SEO page"
+        "title": "Store questions and answers",
+        "body": "Skips any question you have already edited yourself.",
+        "button": "Write store FAQs",
+        "forceTooltip": "Delete the questions the AI wrote earlier and write new ones. Questions you edited are kept.",
+        "resultsLabel": "See them on the search page",
+        "outcome": "Up to 8 common questions about delivery, payment, returns and care, in English and Arabic."
       },
       "draftHowtos": {
-        "title": "Draft How-To Guides with AI",
-        "body": "Drafts up to 3 step-by-step HowTo guides relevant to the store's product mix (e.g. how to place an order, how to return an item). Bilingual EN + AR.",
-        "button": "Draft HowTos",
-        "forceTooltip": "Deletes all existing AI-drafted HowTos and regenerates from scratch. Manually-edited guides are preserved.",
-        "resultsLabel": "View HowTos on SEO page"
+        "title": "Step-by-step guides",
+        "body": "Written for the kind of products you sell, in English and Arabic.",
+        "button": "Write guides",
+        "forceTooltip": "Delete the guides the AI wrote earlier and write new ones. Guides you edited are kept.",
+        "resultsLabel": "See them on the search page",
+        "outcome": "Up to 3 short guides, such as how to order or how to return an item."
       },
       "metaAeo": {
-        "title": "Rewrite Meta Descriptions (AEO)",
-        "body": "Rewrites empty store, product, and category meta descriptions in a conversational, direct-answer style suited for AI answer engines. Only fills blank AEO fields — never overwrites existing content.",
-        "button": "Rewrite meta",
-        "forceTooltip": "Overwrites existing AEO meta descriptions on all entities.",
-        "resultsLabel": "View meta on SEO page"
+        "title": "Descriptions that answer a question",
+        "body": "Fills the empty ones only. A description you already have is never changed.",
+        "button": "Write descriptions",
+        "forceTooltip": "Replace the descriptions you already have.",
+        "resultsLabel": "See them on the search page",
+        "outcome": "Page descriptions that answer a shopper's question directly, for your store, products and categories."
       },
       "productFaqs": {
-        "title": "Draft Product FAQs with AI",
-        "body": "Generates up to 5 bilingual (EN + AR) FAQ pairs for every product — the same drafting used by the per-product button, run across your whole catalogue. Skips products that already have FAQs.",
-        "button": "Draft product FAQs",
-        "forceTooltip": "Re-drafts FAQs for every product, replacing AI-drafted FAQs. Manually-edited FAQs are preserved."
+        "title": "Questions and answers for every product",
+        "body": "The same writing as the button on each product page, run for your whole catalogue. Products that already have FAQs are skipped.",
+        "button": "Write product FAQs",
+        "forceTooltip": "Rewrite the FAQs the AI wrote earlier on every product. FAQs you edited are kept.",
+        "outcome": "Up to 5 questions and answers on each product, in English and Arabic."
       },
       "llmsTxt": {
-        "title": "Generate LLMs.txt",
-        "body": "Creates a /llms.txt file listing your store's categories, example product URLs, and key info. AI crawlers use this to understand your catalogue without scraping every page.",
-        "button": "Generate",
-        "forceTooltip": "Overwrites existing LLMs.txt with a freshly generated version."
+        "title": "Summary for AI assistants",
+        "body": "Lists your categories, example products and key details, so assistants do not have to read every page.",
+        "button": "Create summary",
+        "forceTooltip": "Replace the existing summary with a new one.",
+        "outcome": "A short summary of your store that AI assistants read to understand what you sell."
       },
       "citationCopy": {
-        "title": "Product citation copy",
-        "body": "Rewrites product descriptions in \"definitive first sentence + key specs\" format — the exact style AI assistants quote when answering product questions. Fills empty products only.",
-        "button": "Run sweep",
-        "forceTooltip": "Overwrites existing citation copy on all products."
+        "title": "Product descriptions AI can quote",
+        "body": "This is the style AI assistants quote when shoppers ask about a product. Only products with an empty description are filled.",
+        "button": "Write descriptions",
+        "forceTooltip": "Replace the descriptions already written this way.",
+        "outcome": "Each product description opens with a clear one-line answer, followed by the key details."
       },
       "brandFacts": {
-        "title": "Brand facts JSON",
-        "body": "Generates structured brand facts (location, categories, languages, contact methods) as a JSON-LD Organization block. Emitted on every storefront page to improve AI knowledge-graph entries.",
-        "button": "Generate",
-        "forceTooltip": "Overwrites existing brand facts JSON with freshly generated data."
+        "title": "Store facts for AI assistants",
+        "body": "Added to your store pages behind the scenes. Nothing changes in how your store looks.",
+        "button": "Create store facts",
+        "forceTooltip": "Replace the existing store facts.",
+        "outcome": "Your location, categories, languages and contact methods, in a form AI assistants can read."
       },
       "categorize": {
-        "title": "Assign categories",
-        "body": "For every uncategorized product, picks the single best-matching category from your store's own category list — never invents a new one. Products that already have a category are always left alone.",
-        "button": "Run sweep",
-        "forceTooltip": "Categories are never reassigned once set — this sweep only ever fills products with zero categories."
+        "title": "Put products in categories",
+        "body": "Picks the best match from your own categories and never creates a new one. Products that already have a category are left alone.",
+        "button": "Assign categories",
+        "forceTooltip": "Categories are never reassigned once set — this sweep only ever fills products with zero categories.",
+        "outcome": "A category on every product that has none."
       },
       "imageAlt": {
-        "title": "Generate image alt-text",
-        "body": "Uses Gemini Vision to write concise, descriptive alt-text (SEO + accessibility) for product images that don't have any yet. Checks up to 4 images per product to protect your AI quota.",
-        "button": "Run sweep",
-        "forceTooltip": "Images that already have alt-text are never overwritten — this sweep only fills images missing one."
+        "title": "Describe product images",
+        "body": "Checks up to 4 images per product so your AI allowance goes further. Descriptions you already have are never changed.",
+        "button": "Describe images",
+        "forceTooltip": "Images that already have alt-text are never overwritten — this sweep only fills images missing one.",
+        "outcome": "A short description on each product image that has none. It helps Google and screen readers."
       },
       "excerpt": {
-        "title": "Draft product excerpts",
-        "body": "Summarises each product's full description into a punchy 1-2 sentence excerpt, bilingual EN + AR. Skips products that already have an excerpt.",
-        "button": "Run sweep",
-        "forceTooltip": "Re-drafts excerpts the AI previously wrote. A manually-written excerpt is never overwritten."
+        "title": "Short product summaries",
+        "body": "Shortened from the full description. Products that already have one are skipped.",
+        "button": "Write summaries",
+        "forceTooltip": "Rewrite the summaries the AI wrote earlier. Ones you wrote yourself are kept.",
+        "outcome": "A one or two sentence summary on each product, in English and Arabic."
       },
       "productTags": {
-        "title": "Suggest product tags",
-        "body": "Suggests up to 5 relevant tags per product from its name and description, reusing your store's existing tags wherever they fit. Skips products that already have at least one tag.",
-        "button": "Run sweep",
-        "forceTooltip": "Also tops up already-tagged products with newly-suggested tags (up to 5 total). Existing tags are never removed."
+        "title": "Product tags",
+        "body": "Reuses your existing tags where they fit. Products that already have a tag are skipped.",
+        "button": "Suggest tags",
+        "forceTooltip": "Also add new tags to products that already have some, up to 5 in total. Existing tags are never removed.",
+        "outcome": "Up to 5 tags on each product, to help shoppers search and filter."
       },
-      "defaultForceTooltip": "Replaces existing content with a fresh AI generation."
+      "defaultForceTooltip": "Replaces what is already there with a fresh AI version."
     },
     "masterSweep": {
-      "runAllAeo": "Run all AEO sweeps",
-      "runAllGeo": "Run all GEO sweeps",
-      "aeoForceTooltip": "Overwrites existing AEO content. Without this, sweeps skip entities that already have content.",
-      "geoForceTooltip": "Overwrites existing GEO content. Without this, sweeps skip entities that already have content."
+      "runAllAeo": "Run all answer tools",
+      "runAllGeo": "Run all AI-assistant tools",
+      "aeoForceTooltip": "Everything these tools wrote before is overwritten.",
+      "geoForceTooltip": "Everything these tools wrote before is overwritten.",
+      "aeoNote": "Runs store questions, guides and descriptions together.",
+      "geoNote": "Runs the summary, descriptions and store facts together."
     },
     "jobKind": {
-      "translateToAr": "Translate to AR",
-      "translateToEn": "Translate to EN",
-      "seo": "SEO meta",
-      "faqAeo": "Draft FAQs",
-      "howtoAeo": "Draft HowTos",
-      "metaAeo": "Meta AEO rewrite",
+      "translateToAr": "Translate to Arabic",
+      "translateToEn": "Translate to English",
+      "seo": "Google titles and descriptions",
+      "faqAeo": "Store FAQs",
+      "howtoAeo": "Guides",
+      "metaAeo": "Descriptions that answer a question",
       "productFaqs": "Product FAQs",
-      "recommendations": "AI recommendations",
-      "llmsTxt": "LLMs.txt",
-      "citationCopy": "Citation copy",
-      "brandFacts": "Brand facts",
-      "descriptionBalance": "Language balance",
-      "categoryAssign": "Category assignment",
-      "imageAlt": "Image alt-text",
-      "excerpt": "Product excerpts",
+      "recommendations": "Related-product suggestions",
+      "llmsTxt": "Summary for AI assistants",
+      "citationCopy": "Quotable descriptions",
+      "brandFacts": "Store facts",
+      "descriptionBalance": "Language fix",
+      "categoryAssign": "Categories",
+      "imageAlt": "Image descriptions",
+      "excerpt": "Product summaries",
       "productTags": "Product tags",
-      "descriptionRevert": "Revert description balance"
+      "descriptionRevert": "Undo language fix"
     },
     "activeJob": {
       "sweepSuffix": "sweep",
       "statusCancelled": "Cancelled",
       "statusCompleted": "Completed",
-      "statusCompletedAt": "Completed {date}",
+      "statusCompletedAt": "Finished {date}",
       "statusStartedAt": "Started {date}",
-      "statusQueued": "Queued",
-      "cancel": "Cancel",
-      "cancelling": "Cancelling…",
-      "cancelAll": "Cancel all",
-      "dismiss": "Dismiss",
+      "statusQueued": "Waiting to start",
+      "cancel": "Stop",
+      "cancelling": "Stopping…",
+      "cancelAll": "Stop all",
+      "dismiss": "Close",
       "hide": "Hide",
-      "viewFailures": "View {count} failure",
-      "viewFailuresPlural": "View {count} failures",
-      "viewFilled": "View {count} filled product",
-      "viewFilledPlural": "View {count} filled products"
+      "viewFailures": "{count, plural, one {See the {count, number, latn} item that failed} other {See the {count, number, latn} items that failed}}",
+      "viewFailuresPlural": "{count, plural, one {See the {count, number, latn} item that failed} other {See the {count, number, latn} items that failed}}",
+      "viewFilled": "{count, plural, one {See the {count, number, latn} product it changed} other {See the {count, number, latn} products it changed}}",
+      "viewFilledPlural": "{count, plural, one {See the {count, number, latn} product it changed} other {See the {count, number, latn} products it changed}}"
     },
     "stats": {
-      "filled": "Filled",
-      "skipped": "Skipped",
-      "failed": "Failed"
+      "filled": "Added",
+      "skipped": "Left as is",
+      "failed": "Could not do"
     },
     "recentRuns": {
-      "title": "Recent runs",
-      "empty": "No sweeps yet.",
+      "title": "Run history",
+      "empty": "Nothing has run yet. Pick a tool above to start.",
       "colStarted": "Started",
-      "colKind": "Kind",
+      "colKind": "Tool",
       "colStatus": "Status",
-      "colFilled": "Filled",
-      "colSkipped": "Skipped",
-      "colFailed": "Failed",
+      "colFilled": "Added",
+      "colSkipped": "Left as is",
+      "colFailed": "Could not do",
       "details": "Details"
     },
     "status": {
-      "queued": "queued",
-      "running": "running",
-      "completed": "completed",
-      "failed": "failed",
-      "cancelled": "cancelled"
+      "queued": "Waiting",
+      "running": "Running",
+      "completed": "Done",
+      "failed": "Failed",
+      "cancelled": "Stopped"
     },
     "sweepResults": {
-      "header": "Sweep results",
+      "header": "What your store has now",
       "refreshing": "Refreshing…",
       "refresh": "Refresh",
       "lastFetched": "Last fetched: {time}",
       "panels": {
         "translate": {
-          "title": "Translation fill rate"
+          "title": "Translation coverage"
         },
         "seo": {
-          "title": "SEO meta fill rate"
+          "title": "Search text coverage"
         },
         "faq": {
-          "title": "FAQ AEO"
+          "title": "Store questions and answers"
         },
         "howto": {
-          "title": "HowTo guides AEO"
+          "title": "Step-by-step guides"
         },
         "metaAeo": {
-          "title": "Meta AEO rewrites"
+          "title": "Descriptions that answer a question"
         },
         "categorize": {
-          "title": "Category assignment"
+          "title": "Categories"
         },
         "imageAlt": {
-          "title": "Image alt-text"
+          "title": "Image descriptions"
         },
         "excerpt": {
-          "title": "Product excerpts"
+          "title": "Product summaries"
         },
         "tags": {
           "title": "Product tags"
@@ -8057,17 +8244,17 @@
       "descLabel": "Desc:",
       "copied": "Copied!",
       "copy": "Copy",
-      "openSeoPage": "Open SEO page",
+      "openSeoPage": "Open the search page",
       "faqUnit": "{count, plural, one {FAQ} other {FAQs}}",
       "lastUpdated": "Last updated: {time}",
-      "noFaqsYet": "No FAQs yet. Run the FAQ sweep above.",
+      "noFaqsYet": "No questions yet. Run “Store questions and answers” above.",
       "aiBadge": "AI",
       "editedBadge": "edited",
-      "viewFaqsOnSeoPage": "View FAQs on SEO page",
+      "viewFaqsOnSeoPage": "See them on the search page",
       "guideUnit": "{count, plural, one {guide} other {guides}}",
-      "noHowtosYet": "No HowTo guides yet. Run the HowTo sweep above.",
+      "noHowtosYet": "No guides yet. Run “Step-by-step guides” above.",
       "stepCount": "{count, plural, one {{count, number, latn} step} other {{count, number, latn} steps}}",
-      "viewHowtosOnSeoPage": "View HowTos on SEO page",
+      "viewHowtosOnSeoPage": "See them on the search page",
       "storeAeoDescriptionLabel": "Store AEO description:",
       "recentlyRewritten": "Recently rewritten",
       "recentlyCategorized": "Recently categorized",
@@ -8075,13 +8262,13 @@
       "loading": "Loading…"
     },
     "geoResults": {
-      "title": "GEO sweep results",
+      "title": "What AI assistants can read",
       "refresh": "Refresh",
       "loading": "Loading GEO results…",
       "errorFailed": "Failed to load GEO results",
       "empty": "empty",
       "view": "View",
-      "notGenerated": "Not yet generated. Click <b>Generate</b> above to run the sweep.",
+      "notGenerated": "Not created yet. Run the matching tool above.",
       "copy": "Copy",
       "copyJson": "Copy JSON",
       "copiedToast": "{label} copied",
@@ -8100,12 +8287,50 @@
         "hint": "Per-product values are visible on each product's edit page under <b>Citation copy</b>."
       }
     },
-    "replaceObject": "Forced AI sweep",
-    "replaceConsequence": "The content this sweep covers is replaced with new results.",
+    "replaceObject": "Replace existing content",
+    "replaceConsequence": "What is already there will be overwritten with new AI text. This can't be undone, except the language fix.",
     "replaceAction": "Replace content",
-    "cancelObject": "The running sweep",
-    "cancelConsequence": "It stops. Items already processed keep their changes.",
-    "cancelAction": "Stop sweep"
+    "cancelObject": "The running tool",
+    "cancelConsequence": "It stops. Items already done keep their changes.",
+    "cancelAction": "Stop it",
+    "replaceNoUndo": "This can't be undone.",
+    "nav": {
+      "label": "Tool groups"
+    },
+    "sectionsDesc": {
+      "translation": "Fill the missing Arabic or English text on products, categories and your store page.",
+      "descriptionBalance": "Make sure each name and description is in the right language. You can undo a run.",
+      "seo": "Help shoppers find your products on Google and discover more of them in your store.",
+      "aeo": "Write questions, guides and short descriptions that assistants like ChatGPT can quote about your store.",
+      "geo": "Give assistants like ChatGPT, Perplexity and Google AI a clear, accurate picture of your store.",
+      "catalogueFields": "Fill in categories, image descriptions, short summaries and tags."
+    },
+    "cost": {
+      "one": "Uses 1 AI call",
+      "few": "Uses a few AI calls",
+      "perProduct": "Uses about 1 AI call for each product that needs it",
+      "perItem": "Uses about 1 AI call for each product, category and store page that needs it",
+      "perImage": "Uses 1 AI call per image, up to 4 images per product",
+      "none": "Uses no AI calls"
+    },
+    "blocked": {
+      "running": "Another tool is running. Wait for it to finish, or stop it above.",
+      "daily": "Today's AI limit is used up. It renews at midnight UTC.",
+      "monthly": "This month's AI limit is used up. It renews next month.",
+      "off": "AI is switched off for your store. Turn it on above to use this tool.",
+      "dailyBanner": "You've used all of today's AI calls, so tools are paused until midnight UTC.",
+      "monthlyBanner": "You've used all of this month's AI calls, so tools are paused until next month.",
+      "seeUsage": "See your usage"
+    },
+    "progress": {
+      "running": "Working through your catalogue. You can leave this page; it keeps running.",
+      "stopped": "Stopped. Items already done keep their changes.",
+      "doneSummary": "Done. {filled} added, {skipped} left as they were, {failed} could not be done.",
+      "failedSummary": "This run failed. Nothing more was changed; see the details below.",
+      "seeResults": "See what your store has now",
+      "undoHint": "Not happy? Undo the language fix"
+    },
+    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote."
   },
   "account": {
     "security": {
@@ -8234,7 +8459,11 @@
       "topQueriesTitle": "Top queries (latest day)",
       "noTopQueries": "No query data yet.",
       "notConnectedTitle": "Google Search Console not connected",
-      "notConnectedBody": "Once Ebda Store's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
+      "notConnectedBody": "Once Ebda Store's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end.",
+      "verifyingTitle": "Verifying your domain with Google",
+      "verifyingBody": "We're verifying your domain with Google Search Console automatically. This usually finishes within a day; your search data will appear here after that. No action needed.",
+      "awaitingDataTitle": "Waiting for first search data",
+      "awaitingDataBody": "Your store is connected to Google Search Console. Data appears here a few days after it starts coming in."
     }
   },
   "lifecycleEmails": {
@@ -8559,7 +8788,7 @@
     },
     "hatch": {
       "title": "Open writes are ON for this store",
-      "body": "A platform administrator has switched off the key requirement here, so any agent can add to a cart and place orders WITHOUT presenting a key. Whether a key is issued below makes no difference while this is on. Ask support to switch it back off once your agent is using its key."
+      "body": "A platform administrator has switched off the key requirement here, so any agent can add to a cart and place orders WITHOUT presenting a key. Whether a key is issued below makes no difference while this is on. Use Contact Ebda Store to ask us to switch it back on once your agent is using its key."
     },
     "actions": {
       "mint": "Issue key",
@@ -8833,7 +9062,46 @@
     "textAlignAriaLabel": "{label} — {title}",
     "textColorLabel": "Text color",
     "colorInheriting": "Inheriting: {value}",
-    "colorHint": "Leave empty to inherit from active theme."
+    "colorHint": "Leave empty to inherit from active theme.",
+    "same": "Same as site",
+    "specimen": "Aa Abc",
+    "moreOptions": "More options",
+    "sizeNames": {
+      "small": "Small",
+      "normal": "Normal",
+      "large": "Large",
+      "title": "Title"
+    },
+    "weightNames": {
+      "regular": "Regular",
+      "medium": "Medium",
+      "semibold": "Semibold",
+      "bold": "Bold"
+    },
+    "caseNames": {
+      "upper": "Capitals",
+      "lower": "Small letters",
+      "capitalize": "First letters",
+      "none": "None"
+    },
+    "decoNames": {
+      "none": "None",
+      "underline": "Underline",
+      "overline": "Overline",
+      "strikethrough": "Strikethrough"
+    },
+    "alignNames": {
+      "auto": "Same as site",
+      "start": "Start",
+      "center": "Centre",
+      "end": "End"
+    },
+    "exactSizeLabel": "Exact size",
+    "exactSizeHint": "Type a number like 16, or a size like 1.25rem.",
+    "fontBuiltinSans": "Clean sans",
+    "fontBuiltinSerif": "Classic serif",
+    "searchFonts": "Search fonts",
+    "noFontMatch": "No font matches that."
   },
   "answerEngineProviders": {
     "pageTitle": "Answer-engine providers",
@@ -8874,7 +9142,7 @@
     "walletsWithBalance": "Customers with a balance",
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
-    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda Store support to turn it on.",
+    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Use Contact Ebda Store to ask us to turn it on.",
     "colCustomer": "Customer",
     "colContact": "Contact",
     "colBalance": "Balance",
@@ -8919,7 +9187,7 @@
     "hidden": "Hidden",
     "unlimited": "Unlimited",
     "priceNotSet": "Not set",
-    "priceHint": "Prices are in EGP (stored as piastres). A blank price means not set yet, not free.",
+    "priceHint": "Prices are in EGP. An empty price is not free: it means no price has been set for that period yet.",
     "save": "Save plan",
     "saving": "Saving…",
     "table": {
@@ -8935,10 +9203,21 @@
       "nameAr": "Name (Arabic)",
       "sort": "Sort order",
       "isPublic": "Shown on the public pricing page",
-      "priceMonthly": "Monthly price (EGP)",
-      "priceYearly": "Yearly price (EGP)",
-      "limitsTitle": "Limits",
-      "bpsHint": "Fees are in basis points (100 = 1%). Online and cash-on-delivery fees are set separately."
+      "priceMonthly": "Monthly price",
+      "priceYearly": "Yearly price",
+      "priceMonthlyHelp": "Leave empty if there is no monthly price yet. The plan then shows \"price soon\" and merchants cannot subscribe monthly.",
+      "priceYearlyHelp": "Leave empty if there is no yearly price yet. The plan then shows \"price soon\" and merchants cannot subscribe yearly.",
+      "currency": "EGP",
+      "feesHelp": "Percentage of each order value kept by the platform, from 0 to 100 with up to 2 decimals (for example 2.5).",
+      "invalidFee": "Enter a percentage from 0 to 100 with up to 2 decimals.",
+      "sectionVisibility": "Visibility and order",
+      "sectionPrices": "Prices",
+      "sectionLimits": "Limits",
+      "sectionFees": "Fees",
+      "sectionFeatures": "Features",
+      "sectionTiers": "Analytics and support",
+      "isPublicHelp": "Off hides the plan from the public pricing page.",
+      "close": "Close"
     },
     "limits": {
       "maxProducts": "Products",
@@ -8946,8 +9225,8 @@
       "maxOrdersPerMonth": "Orders per month",
       "maxStorageMb": "Storage (MB)",
       "customDomain": "Custom domain",
-      "platformFeeBps": "Platform fee, online orders (bps)",
-      "codPlatformFeeBps": "Platform fee, cash on delivery (bps)",
+      "platformFeeBps": "Platform fee on online orders (%)",
+      "codPlatformFeeBps": "Platform fee on cash on delivery (%)",
       "abandonedCartAutomation": "Abandoned-cart recovery",
       "whatsappAutomation": "WhatsApp automation",
       "maxStores": "Stores per owner",
@@ -8966,7 +9245,7 @@
       "priority": "Priority"
     },
     "errors": {
-      "invalidNumber": "Enter valid numbers for the price and sort order.",
+      "invalidNumber": "Enter valid numbers for the prices and sort order.",
       "saveFailed": "Could not save the plan."
     },
     "toasts": {
@@ -9009,7 +9288,7 @@
     "upgradeTitle": "Upgrade",
     "upgradeBody": "Move to a bigger plan for more products, staff and orders, a custom domain and automation.",
     "upgradeCta": "Upgrade plan",
-    "upgradeSoon": "Online upgrade is coming soon. Contact support to change your plan now.",
+    "upgradeSoon": "Online upgrade is coming soon. Use Contact Ebda Store to change your plan now.",
     "priceTbd": "Price to be announced",
     "perMonth": "/ month",
     "adminTitle": "Platform admin",
@@ -9315,7 +9594,7 @@
         "available": "{host} is available",
         "taken": "This address is already taken",
         "reserved": "This address is reserved. Choose another one.",
-        "protected": "This address matches a protected brand name. Contact support to claim it, or choose another one.",
+        "protected": "This address matches a protected brand name. If it is your brand, claim it below with proof. Otherwise choose another address.",
         "tooShort": "Use at least 3 characters",
         "tooLong": "Use at most 40 characters",
         "invalid": "Use lowercase letters, digits and single hyphens only",
@@ -9323,8 +9602,9 @@
         "create": "Create my store",
         "creating": "Creating…",
         "createFailed": "We could not create the store. Please try again.",
-        "dailyLimit": "You have created several stores today. Please try again tomorrow or contact support.",
-        "limit": "You have reached the store limit for this account."
+        "dailyLimit": "You have created several stores today. Try again tomorrow.",
+        "limit": "You have reached the store limit for this account. Ask for a higher limit below.",
+        "claimAddress": "Claim this address"
       },
       "template": {
         "title": "Pick a look",
@@ -9873,7 +10153,7 @@
       "rejected": "Your submission was rejected: {reason}. Fix the details and submit again.",
       "revoked": "Your VAT verification was revoked: {reason}. VAT is switched off until you are verified again."
     },
-    "verifiedNote": "To change these details, contact Ebda Store support.",
+    "verifiedNote": "To change these details, use Contact Ebda Store.",
     "form": {
       "trn": "Tax registration number",
       "trnHint": "9 digits, as printed on your tax card. Spaces and dashes are fine.",
@@ -10122,11 +10402,13 @@
     },
     "panes": {
       "start": "Structure",
-      "end": "Settings"
+      "end": "Settings",
+      "resizeStart": "Resize the left panel",
+      "resizeEnd": "Resize the right panel"
     },
     "tabs": {
       "sections": "Sections",
-      "theme": "Colours and fonts",
+      "theme": "Style",
       "history": "History",
       "ai": "Ask AI"
     },
@@ -10408,7 +10690,21 @@
       "previewFailed": "Could not prepare the preview. Try again.",
       "saveFirst": "Fix the errors on this page before changing the look.",
       "applied": "The look is applied.",
-      "current": "Current look"
+      "current": "Current look",
+      "galleryTitle": "Choose a template",
+      "galleryIntro": "Pick one to see it on your own page. Nothing changes until you apply it.",
+      "currentBadge": "Current",
+      "families": "Template families",
+      "detailLabel": "Template details",
+      "previewCta": "Preview on my page",
+      "alreadyCurrent": "This is your current template.",
+      "previewNote": "You will see it on your own page before anything changes.",
+      "pickPrompt": "Pick a template to see more about it.",
+      "close": "Close",
+      "confirmTitle": "Apply this template?",
+      "confirmBody": "{look} will change the design of your pages. Your content stays. You can bring the previous version back from History.",
+      "confirmApply": "Apply template",
+      "appliedHint": "Applied as a draft. You can bring the previous version back anytime from History."
     },
     "search": {
       "fonts": "Fonts",
@@ -11658,5 +11954,191 @@
     "savedTitle": "Shipping saved",
     "savedBody": "The return policy was updated.",
     "saveLabel": "Save shipping"
+  },
+  "trustRequests": {
+    "title": "Support and trust requests",
+    "subtitle": "Everything merchants send to Ebda Store staff: support requests, suspension appeals, protected address claims and store limit requests.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "No requests match.",
+    "loadMore": "Show more",
+    "filter": {
+      "title": "Filters",
+      "kind": "Type",
+      "status": "Status",
+      "store": "Store id",
+      "storePlaceholder": "Store id (UUID)",
+      "from": "Created from",
+      "to": "Created to",
+      "all": "All"
+    },
+    "kind": {
+      "support": "Support request",
+      "suspension_appeal": "Suspension appeal",
+      "slug_claim": "Protected address claim",
+      "store_cap": "Store limit request"
+    },
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved",
+      "rejected": "Rejected"
+    },
+    "list": {
+      "title": "Requests"
+    },
+    "col": {
+      "kind": "Type",
+      "status": "Status",
+      "store": "Store",
+      "summary": "Request",
+      "created": "Created",
+      "open": "Open"
+    },
+    "detail": {
+      "title": "Request",
+      "open": "Open",
+      "message": "Message",
+      "requester": "Requester id",
+      "topic": "Topic",
+      "slug": "Address",
+      "page": "Page",
+      "evidence": "Evidence",
+      "resolve": "Resolve",
+      "reject": "Reject",
+      "close": "Close",
+      "decided": "This request was already decided.",
+      "newLimit": "New store limit",
+      "newLimitHelp": "Whole number from 3 to 20. It is the owner's cap on stores (the latest decision wins) and never goes above their paid plan.",
+      "failed": "Could not save the decision. It may already be decided; reload the list."
+    }
+  },
+  "activation": {
+    "title": "Merchant activation",
+    "subtitle": "How long each store takes from signup to its first order and its first delivered order, and where help was needed.",
+    "loadFailed": "Could not load.",
+    "loading": "Loading",
+    "empty": "No stores yet.",
+    "unavailable": "Activation data is not available in this environment.",
+    "loadMore": "Show more stores",
+    "helpNeeded": "Help needed",
+    "steps": {
+      "store_created": "Store created",
+      "payment_methods": "Payment methods",
+      "went_live": "Went live",
+      "first_order": "First order",
+      "first_fulfilled_order": "First delivered order"
+    },
+    "col": { "step": "Step", "store": "Store", "stopped": "Where the order stopped" },
+    "funnel": {
+      "title": "Funnel by signup date",
+      "body": "Stores that signed up in the range: how many reached each step and the median time from signup. Updated once a day.",
+      "from": "From",
+      "to": "To",
+      "stores": "{n} stores signed up in this range.",
+      "truncated": "Only the first stores were read; narrow the range.",
+      "count": "Reached",
+      "median": "Median time from signup",
+      "help": "Stores that needed help"
+    },
+    "stores": { "title": "Stores" },
+    "channel": { "storefront": "Storefront", "whatsapp": "WhatsApp", "admin": "Merchant admin" },
+    "helpKind": {
+      "assistant_used": "used the Ebda AI Studio assistant",
+      "super_admin_action": "support changed the store",
+      "support_contact": "wrote to Ebda Store from the dashboard"
+    },
+    "fact": {
+      "placed": "Order placed, not paid or confirmed",
+      "payment_failed": "Payment failed",
+      "paid": "Paid, not shipped",
+      "cod_confirmed": "COD confirmed, shipment not booked",
+      "cod_unconfirmed": "COD never confirmed",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded",
+      "booked": "Shipment booked, not picked up",
+      "picked_up": "Picked up, not delivered",
+      "attempted": "Delivery attempted, not delivered",
+      "delivered": "Delivered",
+      "returned": "Returned"
+    },
+    "duration": { "minutes": "{n} min", "hours": "{n} h", "days": "{n} d" }
+  },
+  "assistant": {
+    "title": "Assistant",
+    "open": "Open the assistant",
+    "close": "Close the assistant",
+    "newChat": "New chat",
+    "log": "Assistant conversation",
+    "emptyTitle": "Ask me anything about your store",
+    "intro": "I tell you how to do something and show you the screen. I only answer; I never change anything in your store.",
+    "suggestions": {
+      "s1": "How do I connect a domain to my store?",
+      "s2": "Where is the shipping page?",
+      "s3": "How do I add a new product?"
+    },
+    "placeholder": "Type your question here",
+    "send": "Send",
+    "hint": "Enter to send, Shift + Enter for a new line",
+    "tooLong": "The message is too long (over 2000 characters). Please shorten it.",
+    "thinking": "Looking for the answer…",
+    "error": "I could not answer just now. Please try again in a moment.",
+    "retry": "Try again",
+    "off": "The assistant is not turned on for your store right now. It appears by itself when it is.",
+    "showMe": "Show me where",
+    "source": "Source",
+    "you": "You",
+    "rateGroup": "Rate the answer",
+    "thumbUp": "This answer helped",
+    "thumbDown": "This answer did not help",
+    "thanks": "Thank you, we got your feedback.",
+    "card": {
+      "label": "Proposed change",
+      "before": "Before",
+      "after": "After",
+      "apply": "Apply change",
+      "applying": "Applying…",
+      "undo": "Undo ({hours}h left)",
+      "applied": "Done. You can undo it for 24 hours.",
+      "appliedNoUndo": "Done. The undo window has ended.",
+      "undone": "I put it back the way it was.",
+      "stale": "The data changed, this is the new version. Review it before you apply.",
+      "untrusted": "This text came from a customer or from a source outside your store.",
+      "suggestionMode": "The assistant is in suggestion mode: it prepares the preview but does not apply. Applying opens later.",
+      "needsConfirm": "This change needs your explicit confirmation before it is applied.",
+      "failed": {
+        "forbidden": "Your role does not allow this change. Ask the store owner.",
+        "expired": "This preview expired. Ask the assistant to prepare it again.",
+        "killed": "The assistant is paused right now. Nothing was changed.",
+        "error": "I could not apply it. Nothing was changed, try again."
+      }
+    },
+    "introDo": "I tell you how to do something, show you the screen and prepare the change as a preview. You review and apply it, and you can undo it.",
+    "confirm": {
+      "label": "A change that needs your confirmation",
+      "why": "Why it needs a yes",
+      "reasons": {
+        "money": "Money",
+        "delete": "Deleting",
+        "customer_message": "Message to customers",
+        "bulk": "More than 20 items",
+        "checkout": "Visible at checkout",
+        "price": "Price change",
+        "irreversible": "Cannot be undone"
+      },
+      "cost": "Cost: {credits} AI credits.",
+      "irreversible": "You will not be able to undo this once it is done.",
+      "yes": "Yes, do it",
+      "no": "No",
+      "appliedFinal": "Done. This change cannot be undone.",
+      "rejected": "Okay, nothing was changed.",
+      "noToken": "This confirmation is no longer available (the page was refreshed or it timed out). Ask the assistant to prepare it again.",
+      "failed": {
+        "forbidden": "Your role no longer allows this change. Nothing was changed.",
+        "expired": "This confirmation expired (15 minutes). Ask the assistant to prepare it again.",
+        "used": "This confirmation was already used or is no longer valid. Nothing was changed.",
+        "killed": "The assistant is paused right now. Nothing was changed.",
+        "error": "I could not apply it. Nothing was changed, try again."
+      }
+    }
   }
 }

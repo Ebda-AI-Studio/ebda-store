@@ -84,6 +84,7 @@ const SALT_ROUNDS = 12;
 // resend path and the existing-address signup path both spend a bcrypt so timing is
 // uniform. Not computed at import: bcrypt needs random bytes, which workerd forbids in
 // global scope (R-EBDA-001).
+// nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash -- dummy hash for timing equalisation (random plaintext discarded), not a credential
 const DUMMY_HASH = '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 
 /** Same address, unverified in the identity service, and no Store profile row under that id. */

@@ -6,6 +6,10 @@
 import { storefrontOrigin } from '@ebda/shared';
 import { storeRepo, storeMoney, storeWriter, type CreateOrderArgs } from '../../repo-factory';
 import { lookupStore } from '../../definer';
+import { readInStoreContext } from '../../store-scoped-read';
+import { rankedSearchWithMode } from '../../../services/product-search.service';
+import { queryBudgetSpent } from '../../search/embed-budget';
+import { codFeeConfigFromRow } from '../../../services/payment-providers/cod.provider';
 import { isWhatsAppLinked } from '../link';
 import { applyCodOutcome } from '../store-events-consumer';
 import { createHash } from 'crypto';
@@ -24,11 +28,14 @@ import {
   type BridgePort,
   type CatalogRow,
   type ChatPaymentMethod,
+  type CustomerProfileFacts,
+  type StorePolicyFacts,
   type OrderStatus,
   type OrderSummary,
   type StoreProfile,
 } from './service';
 import type { Currency } from '../../../services/payment-providers/types';
+import { proofRef } from './proof-ref';
 
 type Db = any; // the repo's Prisma-shaped read/write client; rows are narrowed below by explicit selects
 const LINK_TTL_MS = 24 * 3600 * 1000;
@@ -65,6 +72,71 @@ const methodOf = (
   if (!p && walletAmount >= total && total > 0) return 'wallet';
   return 'card';
 };
+
+/** How many ranked ids the chat search expands into rows (the caller's `limit` is at most 20). */
+const SEARCH_CANDIDATES = 60;
+
+/** A product row as the chat search reads it (PRODUCT_SELECT); passed on to rowsForProducts. */
+type ChatSearchProductRow = { id: string } & Record<string, unknown>;
+/** One active shipping area rate, as the policy fold reads it. */
+type ChatAreaRateRow = {
+  governorate: string;
+  governorateAr: string;
+  deliveryFee: number;
+  freeShippingThreshold: number | null;
+};
+/** One active shipping zone, as the policy answer reads it. */
+type ChatZoneRow = {
+  name: string;
+  nameAr: string | null;
+  areas: unknown;
+  deliveryFee: number;
+  freeShippingThreshold: number | null;
+  estimatedDays: number | null;
+  estimatedDaysMin: number | null;
+  estimatedDaysMax: number | null;
+};
+/** One recent order for the chat customer profile (the `select` below). */
+type ChatRecentOrderRow = {
+  orderNumber: string;
+  status: string;
+  paymentStatus: string;
+  total: number;
+  walletAmount: number;
+  currency: string;
+  createdAt: Date | string;
+  items: Array<{ productName: string; variantName: string | null; quantity: number }>;
+  payments: Array<{ provider: string }>;
+};
+
+/** Per-governorate rates folded from the area rates: cheapest and dearest fee, and the lowest free-shipping threshold. */
+// pq-allow(unused-export): test seam, imported by tests/unit/wa-bridge/wa-bridge-do-port-chat-context.test.ts
+export function governoratesOf(
+  rates: ChatAreaRateRow[]
+): StorePolicyFacts['shipping']['governorates'] {
+  const by = new Map<string, StorePolicyFacts['shipping']['governorates'][number]>();
+  for (const r of rates) {
+    const cur = by.get(r.governorate);
+    if (!cur) {
+      by.set(r.governorate, {
+        governorate: r.governorate,
+        governorateAr: r.governorateAr,
+        feeMinor: r.deliveryFee,
+        feeMaxMinor: r.deliveryFee,
+        freeOverMinor: r.freeShippingThreshold ?? null,
+      });
+      continue;
+    }
+    cur.feeMinor = Math.min(cur.feeMinor, r.deliveryFee);
+    cur.feeMaxMinor = Math.max(cur.feeMaxMinor, r.deliveryFee);
+    if (r.freeShippingThreshold != null)
+      cur.freeOverMinor =
+        cur.freeOverMinor === null
+          ? r.freeShippingThreshold
+          : Math.min(cur.freeOverMinor, r.freeShippingThreshold);
+  }
+  return [...by.values()].slice(0, 30);
+}
 
 const PRODUCT_SELECT = {
   id: true,
@@ -302,6 +374,8 @@ export function createDoPort(): BridgePort {
       };
     },
 
+    // Only ACTIVE products (Ruling BRIDGE-ACTIVE-1): same rule as `catalogPage`. A draft or archived product is "not there" for the cart check
+    // and the event sync, so Ebda Chat neither accepts it in a cart nor pushes it back into Meta.
     async catalogByIds(storeId, ids) {
       const d = await db(storeId);
       const variants: any[] = await d.productVariant.findMany({
@@ -310,10 +384,151 @@ export function createDoPort(): BridgePort {
       });
       const productIds = [...new Set([...variants.map(v => v.productId as string), ...ids])];
       const products: any[] = await d.product.findMany({
-        where: { storeId, id: { in: productIds }, deletedAt: null },
+        where: { storeId, id: { in: productIds }, status: 'active', deletedAt: null },
         select: PRODUCT_SELECT,
       });
       return rowsForProducts(storeId, d, products, new Set(ids));
+    },
+
+    // The storefront's own ranked search (Arabic stemming, AI Franco/dialect search terms, meaning leg: Ruling SEARCH-SEMANTIC-ON-1),
+    // so Chat and the website can never disagree on what "فستان احمر" matches. Active public products only, rank order kept,
+    // the price ceiling applied per sellable row (a variant can be cheaper than its product).
+    async searchProducts(storeId, query, o) {
+      const { ids, degraded } = await readInStoreContext(storeId, () =>
+        rankedSearchWithMode(storeId, query, { searcher: o.searcher })
+      );
+      // Chat only: once the store's daily query-embed budget is spent the meaning leg is skipped and the storefront calls that
+      // "not degraded" (it is a budget, not a failure). For Chat an empty answer then rests on keyword search alone, so it is
+      // reported degraded and the agent says it will check instead of "we don't have it" (Ruling CHAT-AGENT-6).
+      if (ids.length === 0) return { items: [], degraded: degraded || queryBudgetSpent(storeId) };
+      const top = ids.slice(0, SEARCH_CANDIDATES);
+      const d = await db(storeId);
+      const products: ChatSearchProductRow[] = await d.product.findMany({
+        where: { storeId, id: { in: top }, status: 'active', deletedAt: null, audience: 'public' },
+        select: PRODUCT_SELECT,
+      });
+      const byId = new Map(products.map(p => [p.id, p]));
+      const ranked = top
+        .map(id => byId.get(id))
+        .filter((p): p is ChatSearchProductRow => p !== undefined);
+      const rows = await rowsForProducts(storeId, d, ranked);
+      return {
+        items: rows
+          .filter(r => o.maxPriceMinor === undefined || r.priceMinor <= o.maxPriceMinor)
+          .slice(0, o.limit),
+        degraded,
+      };
+    },
+
+    async storePolicies(storeId): Promise<StorePolicyFacts> {
+      const d = await db(storeId);
+      const s = await d.store.findUnique({
+        where: { id: storeId },
+        select: {
+          nameAr: true,
+          businessHours: true,
+          address: true,
+          addressAr: true,
+          googleMapsUrl: true,
+          returnWindowDays: true,
+          returnFeesPaidBy: true,
+        },
+      });
+      const zones: ChatZoneRow[] = await d.shippingZone.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { position: 'asc' },
+        take: 30,
+      });
+      const areaRates: ChatAreaRateRow[] = await d.shippingAreaRate.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { position: 'asc' },
+        take: 2000,
+      });
+      const cod = await d.paymentConfig.findFirst({
+        where: { storeId, provider: 'cod', isEnabled: true },
+        select: { fixedFee: true, settings: true },
+      });
+      const codCfg = cod ? codFeeConfigFromRow(cod) : null;
+      const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+      const loc = {
+        address: text(s?.address),
+        addressAr: text(s?.addressAr),
+        mapsUrl: text(s?.googleMapsUrl),
+      };
+      return {
+        nameAr: text(s?.nameAr),
+        shipping: {
+          zones: zones.map(z => ({
+            name: z.name,
+            nameAr: text(z.nameAr),
+            areas: Array.isArray(z.areas) ? (z.areas as unknown[]).map(String).slice(0, 40) : [],
+            feeMinor: z.deliveryFee,
+            freeOverMinor: z.freeShippingThreshold ?? null,
+            etaDaysMin: z.estimatedDaysMin ?? z.estimatedDays ?? null,
+            etaDaysMax: z.estimatedDaysMax ?? z.estimatedDays ?? null,
+          })),
+          governorates: governoratesOf(areaRates),
+        },
+        returns: {
+          windowDays: typeof s?.returnWindowDays === 'number' ? s.returnWindowDays : null,
+          feesPaidBy:
+            s?.returnFeesPaidBy === 'merchant' || s?.returnFeesPaidBy === 'customer'
+              ? s.returnFeesPaidBy
+              : null,
+        },
+        // 0 = "no fee declared", reported as null: the agent must not say "COD fee is 0" for a merchant who never set one
+        cod: {
+          fixedFeeMinor: codCfg && codCfg.fixedFee > 0 ? codCfg.fixedFee : null,
+          percentBps: codCfg && codCfg.percentBps > 0 ? codCfg.percentBps : null,
+        },
+        hours: text(s?.businessHours),
+        location: loc.address || loc.addressAr || loc.mapsUrl ? loc : null,
+      };
+    },
+
+    async customerProfile(storeId, buyerKey): Promise<CustomerProfileFacts | null> {
+      const base = (await (
+        await storeWriter(storeId)
+      ).$proc('waCustomerProfile', { storeId, buyerKey })) as {
+        firstName: string | null;
+        preferredLocale: 'ar' | 'en' | null;
+        defaultAddress: CustomerProfileFacts['defaultAddress'];
+        known: boolean;
+      };
+      const d = await db(storeId);
+      const orders: ChatRecentOrderRow[] = await d.order.findMany({
+        where: { storeId, buyerKey, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        select: {
+          orderNumber: true,
+          status: true,
+          paymentStatus: true,
+          total: true,
+          walletAmount: true,
+          currency: true,
+          createdAt: true,
+          items: { select: { productName: true, variantName: true, quantity: true }, take: 10 },
+          payments: { select: { provider: true }, take: 1 },
+        },
+      });
+      if (!base.known && orders.length === 0) return null;
+      return {
+        firstName: base.firstName,
+        preferredLocale: base.preferredLocale,
+        defaultAddress: base.defaultAddress,
+        recentOrders: orders.map(o => ({
+          orderNumber: o.orderNumber,
+          status: orderStatus(o, methodOf(o.payments, o.walletAmount, o.total)),
+          totalMinor: o.total,
+          currency: o.currency,
+          at: new Date(o.createdAt).getTime(),
+          items: o.items.map(i => ({
+            name: i.variantName ? `${i.productName} - ${i.variantName}` : i.productName,
+            quantity: i.quantity,
+          })),
+        })),
+      };
     },
 
     async placeOrder(storeId, a) {
@@ -545,9 +760,19 @@ export function createDoPort(): BridgePort {
         resourceType: 'order',
         resourceId: orderId,
         storeId,
-        details: { mediaUrl, source: 'whatsapp' },
+        details: { mediaRef: proofRef(mediaUrl), source: 'whatsapp' },
       });
       return true;
+    },
+
+    async orderBuyerKey(storeId, orderId) {
+      const o = await (
+        await db(storeId)
+      ).order.findFirst({
+        where: { id: orderId, storeId, deletedAt: null },
+        select: { buyerKey: true },
+      });
+      return o ? (o.buyerKey ?? null) : undefined;
     },
 
     async addresses(storeId, buyerKey) {

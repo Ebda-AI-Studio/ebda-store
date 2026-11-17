@@ -1,0 +1,43 @@
+{
+  "id": "onboarding.payment-methods-and-go-live",
+  "status": "live",
+  "area": "onboarding",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "حدد وسائل الدفع وافتح المتجر للناس",
+  "titleEn": "Choose payment methods and go live",
+  "screens": ["/onboarding", "/stores/[id]/payment-settings"],
+  "api": ["PUT /onboarding/:storeId/payment-methods", "POST /onboarding/:storeId/go-live"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "yes: store can be set back via settings; going live is reversible by super-admin status only"
+  },
+  "helpArticle": "create-your-store",
+  "questions": {
+    "ar": [
+      "ازاي أفتح المتجر للزباين؟",
+      "ليه مش قادر اعمل go live؟",
+      "محتاج اعمل ايه قبل ما انشر المتجر",
+      "go live عايزة إيه؟"
+    ],
+    "en": ["How do I publish my store?", "Why can't I go live?"]
+  },
+  "steps": ["Finish the setup guide items, pick COD/InstaPay/cards, press go-live."],
+  "edgeCases": [
+    "Go-live gate refuses until required setup items pass or (InstaPay subscription path) a super-admin confirmed payment (EBDA-FUNNEL-9)",
+    "Store suspended: read-only",
+    "No payment method configured",
+    "Card provider still pending activation",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [
+    "InstaPay subscription payment requires super-admin confirmation today (audit gap 3, BLOCKER); AI auto-confirm is designed (self-service spec 7.4) but NOT BUILT"
+  ]
+}

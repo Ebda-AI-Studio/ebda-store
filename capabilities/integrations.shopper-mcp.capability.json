@@ -1,0 +1,30 @@
+{
+  "id": "integrations.shopper-mcp",
+  "status": "live",
+  "area": "integrations",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "MCP للمتسوقين",
+  "titleEn": "Store MCP for shopping agents (search, cart, order status)",
+  "screens": [],
+  "api": ["POST /mcp/:storeSlug"],
+  "mcpTool": "get_store_info; search_products; get_product; view_cart; add_to_cart; place_order; get_order_status",
+  "planGate": "agent_checkout",
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["هل AI agent يقدر يشتري من متجري؟"],
+    "en": ["Can AI agents buy from my store?"]
+  },
+  "steps": ["Enabled by feature; X-Agent-Key required for writes."],
+  "edgeCases": [
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Not an assistant tool; shopper-facing", "No help article"]
+}
