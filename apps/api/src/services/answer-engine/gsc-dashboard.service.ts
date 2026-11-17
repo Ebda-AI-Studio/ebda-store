@@ -28,6 +28,9 @@
 import { analyticsRead } from '../../lib/analytics-backend';
 import { prisma } from '@ebda/database';
 import { getCachedAnalytics } from '../analytics.service';
+import { storeDb } from '../../lib/repo-factory';
+import logger from '../../lib/logger';
+import { isGscConfigured, listAccessibleGscSites, pickGscTarget } from './gsc-client';
 
 export interface GscTrendPoint {
   /** `YYYY-MM-DD`. */
@@ -68,6 +71,35 @@ export interface GscDashboard {
   totals: GscDashboardTotals | null;
   topQueries: GscTopQuery[];
   lastUpdatedAt: string | null;
+  /**
+   * Only on an empty (no rows) response, and only when GSC is configured:
+   * - `verifying`: the store is on a custom domain the platform service account
+   *   cannot see yet (the daily job verifies it automatically via a meta tag on
+   *   the storefront, then adds it to Search Console);
+   * - `awaiting_data`: a property covers the store; the first daily run has not
+   *   written a row yet (GSC data lags 2-3 days).
+   * Absent = unknown/unconfigured (UI keeps the generic not-connected state).
+   */
+  setup?: 'verifying' | 'awaiting_data';
+}
+
+/** Empty-state diagnosis. Fail-soft: any lookup failure => undefined (generic empty state). */
+async function diagnoseSetup(storeId: string): Promise<GscDashboard['setup']> {
+  if (!isGscConfigured()) return undefined;
+  try {
+    const store = await (
+      await storeDb(storeId)
+    ).store.findUnique({ where: { id: storeId }, select: { domain: true } });
+    if (!store?.domain) return 'awaiting_data'; // <slug>.ebda.app: covered by the platform property
+    const target = pickGscTarget(store.domain, await listAccessibleGscSites());
+    return target && !target.pageHost ? 'awaiting_data' : 'verifying';
+  } catch (err) {
+    logger.warn(
+      { storeId, err: err instanceof Error ? err.message : String(err) },
+      'gsc-dashboard: setup diagnosis failed'
+    );
+    return undefined;
+  }
 }
 
 // Bounds the query cost for a single-store read. The daily cron writes at
@@ -133,7 +165,8 @@ async function computeGscDashboard(storeId: string): Promise<GscDashboard> {
   );
 
   if (rows.length === 0) {
-    return EMPTY_DASHBOARD;
+    const setup = await diagnoseSetup(storeId);
+    return setup ? { ...EMPTY_DASHBOARD, setup } : EMPTY_DASHBOARD;
   }
 
   const trend: GscTrendPoint[] = rows
