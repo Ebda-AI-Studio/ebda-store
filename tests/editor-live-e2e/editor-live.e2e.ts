@@ -169,6 +169,7 @@ test.describe.serial('visual builder on the real stack', () => {
 
   test('publish: the public storefront serves the published page', async ({ page, context }) => {
     await openBuilder(page);
+    await page.getByTestId('publish-open').click();
     await page.getByTestId('publish').click();
     await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'saved', {
       timeout: 30_000,

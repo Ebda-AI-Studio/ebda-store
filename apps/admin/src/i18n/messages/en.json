@@ -10383,7 +10383,15 @@
       "dirty": "Unsaved changes",
       "saving": "Saving…",
       "error": "Not saved — fix the highlighted fields",
-      "conflict": "Changed elsewhere"
+      "conflict": "Changed elsewhere",
+      "short": {
+        "loading": "Loading",
+        "saved": "Saved",
+        "dirty": "Unsaved",
+        "saving": "Saving…",
+        "error": "Not saved",
+        "conflict": "Conflict"
+      }
     },
     "rejected": {
       "cardinality": "This page already has the maximum number of these sections.",
@@ -10418,9 +10426,10 @@
       "mobile": "Mobile"
     },
     "conflict": {
-      "message": "This page was changed in another tab or by another editor. Choose which version to keep.",
+      "message": "It happened in another tab or by another editor. Choose which version to keep.",
       "takeTheirs": "Discard my changes, load the latest",
-      "keepMine": "Keep mine"
+      "keepMine": "Keep mine",
+      "title": "Someone else saved a newer version."
     },
     "live": {
       "added": "Added {name}, now {pos} of {total}",
@@ -10687,7 +10696,9 @@
       "label": "Page",
       "previewProduct": "Preview with product",
       "noProducts": "Add a product to preview this page",
-      "saveFirst": "Fix the errors on this page before switching."
+      "saveFirst": "Fix the errors on this page before switching.",
+      "searchProduct": "Search your products",
+      "noMatch": "No product matches that search."
     },
     "pageSettings": {
       "title": "{page} page settings",
@@ -10780,7 +10791,19 @@
       "bar": "This is a suggestion on a read-only preview. Apply it to your draft or discard it.",
       "on": "on",
       "off": "off"
-    }
+    },
+    "more": "More actions",
+    "publishPopover": {
+      "pending": "You have changes that are not live yet.",
+      "live": "Everything on the page is already live.",
+      "count": "{count} edits since you opened the editor",
+      "confirm": "Publish now"
+    },
+    "publishedView": "View store",
+    "undone": "Undone",
+    "redone": "Redone",
+    "loadErrorTitle": "We couldn't open the editor",
+    "loadErrorHint": "Check your connection and try again. Everything you saved is safe."
   },
   "instapayReceipt": {
     "form": {

@@ -487,6 +487,7 @@ test('fonts and typography zones are draft edits: they reach the draft, and noth
   expect((await state(page)).liveWrites).toEqual([]);
 
   // publish promotes the draft; still no direct write to the live theme/typography endpoints
+  await page.getByTestId('publish-open').click();
   await page.getByTestId('publish').click();
   await expect.poll(async () => (await state(page)).publishes, { timeout: 15_000 }).toBe(1);
   expect((await state(page)).liveWrites).toEqual([]);
@@ -512,6 +513,7 @@ test('publish flushes the draft and publishes it', async ({ page }) => {
     .getByTestId('tree-row-hero')
     .getByRole('button', { name: L('إخفاء البانر الرئيسي', 'Hide Hero banner'), exact: true })
     .click();
+  await page.getByTestId('publish-open').click();
   await page.getByTestId('publish').click();
   await expect.poll(async () => (await state(page)).publishes).toBe(1);
   const s = await state(page);
@@ -546,6 +548,7 @@ test('publish keeps the latest edit made while an earlier autosave is pending', 
     await title.fill('First catalogue');
     await started;
     await title.fill('Second catalogue');
+    await page.getByTestId('publish-open').click();
     await page.getByTestId('publish').click();
     await title.fill('Latest catalogue');
     // Let the latest edit debounce while the first HTTP response stays held.
@@ -586,6 +589,7 @@ test('autosave waits for an in-flight publish and keeps later edits as a draft',
     await route.continue();
   });
   try {
+    await page.getByTestId('publish-open').click();
     await page.getByTestId('publish').click();
     await started;
     await title.fill('Next draft catalogue');
@@ -661,7 +665,7 @@ test('no horizontal document overflow on any editor panel (EDITOR-MOBILE-1)', as
     expect(m.sw, `${what}: scrollWidth ${m.sw} > clientWidth ${m.cw}`).toBeLessThanOrEqual(m.cw);
   };
   await noOverflow('top bar + canvas');
-  await expect(page.getByTestId('publish')).toBeInViewport();
+  await expect(page.getByTestId('publish-open')).toBeInViewport();
   await expect(page.getByTestId('builder-canvas')).toBeVisible();
 
   await structure(page);
@@ -690,7 +694,8 @@ test('no horizontal document overflow on any editor panel (EDITOR-MOBILE-1)', as
 // ---- Product, collection and cart pages are section documents (Ruling VE-3 amended, VE-12) ----
 
 async function openPage(page: Page, kind: 'product' | 'collection' | 'cart') {
-  await page.getByTestId('page-switcher').selectOption(kind);
+  await page.getByTestId('page-switcher').click();
+  await page.getByTestId(`page-option-${kind}`).click();
   await expect(page).toHaveURL(new RegExp(`[?&]page=${kind}`));
   await expect(page.getByTestId('builder')).toBeVisible();
   await structure(page);
@@ -761,6 +766,8 @@ test('product page: the picker offers what belongs here, reorder autosaves and p
   // the home document was never touched
   expect((await state(page, 'home')).saves).toBe(0);
 
+  await page.getByTestId('publish-open').click();
+
   await page.getByTestId('publish').click();
   await expect.poll(async () => (await state(page, 'product')).publishes).toBe(1);
   expect((await state(page, 'home')).publishes).toBe(0);
@@ -773,7 +780,8 @@ test('switching page saves the unsaved edit first, and the URL carries the page'
   await openPage(page, 'product');
   await page.getByTestId('tree-select-product-related').press('Alt+ArrowUp');
   // do not wait for the autosave debounce: the switch itself must flush it
-  await page.getByTestId('page-switcher').selectOption('home');
+  await page.getByTestId('page-switcher').click();
+  await page.getByTestId('page-option-home').click();
   await expect(page).not.toHaveURL(/page=/);
   await expect.poll(async () => (await state(page, 'product')).saves).toBe(1);
   expect((await state(page, 'product')).draft!.definition.sections[4].id).toBe('product-related');

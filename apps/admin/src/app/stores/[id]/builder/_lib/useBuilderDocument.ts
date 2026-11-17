@@ -305,6 +305,8 @@ export function useBuilderDocument(storeId: string, pageKey: string = HOME_PAGE)
     loadError,
     dataEpoch,
     dirty,
+    /** Undo steps taken in this session: the publish popover's "N edits". */
+    editCount: history?.past.length ?? 0,
     canUndo: (history?.past.length ?? 0) > 0,
     canRedo: (history?.future.length ?? 0) > 0,
     dispatch,

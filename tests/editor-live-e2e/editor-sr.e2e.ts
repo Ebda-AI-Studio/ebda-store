@@ -557,6 +557,7 @@ test.describe('phone 390, ar: drawers, inline edit, publish', () => {
       .toBe(text);
 
     // a fresh section still holds placeholder text: Publish refuses, and says so as an alert
+    await page.getByTestId('publish-open').click();
     await page.getByTestId('publish').click();
     await expect(page.getByRole('alert').filter({ hasText: /لسه ماتنشرش/ })).toBeVisible();
     // the settings drawer: the body text, both languages, replaces the placeholder
@@ -571,6 +572,7 @@ test.describe('phone 390, ar: drawers, inline edit, publish', () => {
     await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'saved', {
       timeout: 30_000,
     });
+    await page.getByTestId('publish-open').click();
     await page.getByTestId('publish').click();
     // the published revision catches up with the draft: Publish really went through
     await expect
@@ -593,6 +595,7 @@ test.describe('phone 390, ar: drawers, inline edit, publish', () => {
     await drawer.click();
     await removeSection(page, sid);
     await page.keyboard.press('Escape');
+    await page.getByTestId('publish-open').click();
     await page.getByTestId('publish').click();
     await expect
       .poll(async () => (await read()).publishedRev >= (await read()).draftRev, { timeout: 30_000 })
