@@ -16,7 +16,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "shopping-agents-mcp-endpoint",
   "questions": {
     "ar": ["هل AI agent يقدر يشتري من متجري؟"],
     "en": ["Can AI agents buy from my store?"]

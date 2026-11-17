@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "sms-offers-consent",
   "questions": {
     "ar": ["وقف رسايل SMS عني"],
     "en": ["Stop SMS to my number"]
