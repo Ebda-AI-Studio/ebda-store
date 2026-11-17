@@ -506,6 +506,14 @@ export function isCsrfExemptAuthPath(path: string): boolean {
   return CSRF_EXEMPT_AUTH_PATHS.has(path.toLowerCase().replace(/\/+$/, ''));
 }
 
+/**
+ * True only when cookies were parsed AND neither auth cookie is present. An unparsed `req.cookies` is NOT "no
+ * cookie": that case must fall through to the token verifier (the safe direction), never skip it.
+ */
+function hasNoAuthCookie(req: Request): boolean {
+  return !!req.cookies && !req.cookies.token && !req.cookies.refresh_token;
+}
+
 export function csrfProtection(req: Request, res: Response, next: NextFunction) {
   // Skip for safe methods
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
@@ -549,7 +557,12 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // apply, contact form, cart operations, etc.) that don't use cookies or
   // sessions, so they are not vulnerable to CSRF. They have their own
   // rate limiting for abuse protection.
-  if (req.path.includes('/public/')) {
+  //
+  // S2 (2026-11-12 audit): "don't use cookies" is only true when no auth cookie is attached. A signed-in shopper's
+  // browser attaches the SameSite=None cookie to `POST /public/orders` from any page, so the skip holds ONLY for
+  // a request with no auth cookie (nothing ambient to ride). With a cookie present the request falls through to
+  // the Bearer / platform-origin / CSRF-token checks below like any other cookie-authenticated write.
+  if (req.path.includes('/public/') && hasNoAuthCookie(req)) {
     return next();
   }
 

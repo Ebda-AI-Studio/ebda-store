@@ -21,7 +21,7 @@ import { recordTiming } from '../lib/request-timing';
  * against the non-bypass `ebda_app` role. Production currently connects
  * as the `neondb_owner` BYPASSRLS role (see `apps/api/src/index.ts` boot
  * guard), so today this is inert: it is correct-but-inert plumbing ahead
- * of the RLS cutover (see `docs/plans/2026-07-02-rls-cutover.md`), not a
+ * of the RLS cutover (see `docs/plans/done/2026-07-02-rls-cutover.md`), not a
  * live backstop. Tenant isolation today rests entirely on the application
  * layer (`requireStoreAccess` + explicit `where: { storeId }`). Once the
  * cutover flips `DATABASE_URL` to `ebda_app` and drops
@@ -417,7 +417,7 @@ export function billingRouteContext(req: Request, res: Response, next: NextFunct
 }
 
 /**
- * RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — user-scoped
+ * RLS cutover Phase 1c (docs/plans/done/2026-07-02-rls-cutover.md) — user-scoped
  * context wrapper for routers that never pass through `tenantContext`.
  *
  * `tenantContext` reads `req.params.storeId || req.params.id`, but Express

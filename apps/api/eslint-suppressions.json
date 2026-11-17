@@ -61,7 +61,7 @@
   },
   "src/lib/repo-factory.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 32
+      "count": 31
     }
   },
   "src/lib/wa/bridge/do-port.ts": {
@@ -130,11 +130,6 @@
     }
   },
   "src/routes/mfa.routes.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/routes/newsletter.routes.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
@@ -251,7 +246,7 @@
   },
   "src/services/recommendation.service.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 4
+      "count": 2
     }
   },
   "src/services/shipping-carrier.service.ts": {

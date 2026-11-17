@@ -69,7 +69,7 @@ describe('maskPhone / maskEmail', () => {
     expect(maskPhone('123')).toBe('****');
     expect(maskPhone('')).toBeNull();
     expect(maskPhone(null)).toBeNull();
-    expect(maskEmail('ahmad@gmail.com')).toBe('a***@gmail.com');
+    expect(maskEmail('jane@example.com')).toBe('j***@example.com');
     expect(maskEmail('no-at-sign')).toBe('***');
     expect(maskEmail(undefined)).toBeNull();
   });

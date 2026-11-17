@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 /**
  * Unit tests for `getStoreByTenantParam()` — the params-based sibling of
  * `getStoreOrNotFound()` added for the tenant-cacheable routing Phase 1
- * work (see docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6). Does
+ * work (see docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6). Does
  * NOT exercise `getStore()`/`getStoreOrNotFound()` — those are unchanged.
  */
 
@@ -57,7 +57,7 @@ describe('getStoreByTenantParam', () => {
           // response — a 429 from storeResolveLimiter, a 5xx — is transient and
           // must NOT become a 404. A statusless `{ok:false}` stub no longer
           // describes anything the API can actually return.
-          // See docs/plans/2026-09-16-store-resolve-transient-not-404.md.
+          // See docs/plans/done/2026-09-16-store-resolve-transient-not-404.md.
           return {
             ok: false,
             status: 404,

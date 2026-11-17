@@ -27,7 +27,7 @@ Brand line (2026-10-07): «ابدأ — بابك لبدء مشروعك.» / "Ebd
 
 > **ابدأ متجرك أونلاين في دقايق.** / **Open your online store in minutes.**
 
-Superseded 2026-10-14 by `docs/plans/2026-10-14-marketing-levelup.md` (MKT-1..5): light canvas, one cycling looks phone as the hero, looks first, the story scroll kept with Dahab-look frames, no break-out/device frames/how band, product name in the header, WhatsApp contact. The paragraph below is the history before that.
+Superseded 2026-10-14 by `docs/plans/done/2026-10-14-marketing-levelup.md` (MKT-1..5): light canvas, one cycling looks phone as the hero, looks first, the story scroll kept with Dahab-look frames, no break-out/device frames/how band, product name in the header, WhatsApp contact. The paragraph below is the history before that.
 
 Sections (then, R-EBDA-COPY-5/8/10/11), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): Story (pinned scroll: the real Dahab storefront scrolls inside a phone, then a stream of four notifications) · How it works (four numbered cards, a gold line draws each in) · Devices (one real store, Dahab, on laptop, tablet and phone; no switcher until the Phase 3 templates, R-EBDA-COPY-14) · Break-out (pinned: the Dahab ring leaves the phone while gold wipes up and giant outlined «ابدأ / متجرك / دلوقتي» drift) · Dahab (live three.js ring, drag + scroll, metal and stone swatches) · Features · Payments and shipping (provider marks) · The Ebda story («حكاية ابدأ», the open-door mark animates: the light comes up, the person steps through) · Pricing (cards + full comparison table from the shared plan catalogue) · FAQ · Closing call to action. Footer: contact (ahlan@, security@) and "Ebda by Whisky 11" linked to whisky11.com.
 

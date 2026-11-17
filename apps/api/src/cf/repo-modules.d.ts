@@ -131,6 +131,16 @@ declare module '@ebda-src/repo' {
   export function answerAuthOp(db: SyncSql, op: string, argsJson: string): Promise<AuthAnswer>;
   export const AUTH_OP_NAMES: readonly string[];
   export function ensureCustomerAuthSchema(db: SyncSql): void;
+  /** The assistant's journal on the StoreDO (Smart Layer, do/smart-layer.ts). */
+  export type SmartLayerAnswer =
+    | { ok: true; json: string }
+    | { ok: false; code: string; status: number; message: string };
+  export function answerSmartLayerOp(db: SyncSql, op: string, argsJson: string): SmartLayerAnswer;
+  export function runSmartLayerOp(db: SyncSql, op: string, args: unknown): unknown;
+  export function ensureSmartLayerSchema(db: SyncSql): void;
+  export const SMART_LAYER_OPS: readonly string[];
+  export const SMART_LAYER_TABLES: readonly string[];
+  export const SMART_LAYER_RETENTION_MS: number;
   export function purgeCustomerAuth(db: SyncSql, now?: number): number;
   export function scrubReceiptsForOrders(
     db: SyncSql,

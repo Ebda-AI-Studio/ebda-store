@@ -647,7 +647,16 @@ export interface MoneyClient {
   }): Promise<{ products: number; variants: number; remaining: number }>;
   barcodeEnsure(a: { productId?: string; variantId?: string }): Promise<{ code: string | null }>;
   cancel(
-    a: { orderId: string; restoreInventory?: boolean; note?: string; unpaidOnly?: boolean },
+    a: {
+      orderId: string;
+      restoreInventory?: boolean;
+      note?: string;
+      unpaidOnly?: boolean;
+      /** Cancel only while the order is in one of these states (checked in the DO's section, Fixes #614); otherwise the
+       * order is untouched, `exceptionNote` is appended to its notes and the result says `skipped: 'status_moved'`. */
+      onlyFrom?: string[];
+      exceptionNote?: string;
+    },
     key?: string
   ): Promise<CancelResult>;
   expireHold(
@@ -715,6 +724,12 @@ export interface MoneyClient {
     actorUserId: string;
     orderId?: string;
   }): Promise<{ result: 'matched' | 'already_matched' }>;
+  manualRefundRecord(a: {
+    orderId: string;
+    method: string;
+    reference: string | null;
+    actorUserId: string | null;
+  }): Promise<{ recorded: number; payments: number }>;
   instapayRefundRecord(a: {
     orderId: string;
     referenceKey: string;
@@ -1408,6 +1423,8 @@ export interface CancelResult {
   walletReversed: number;
   loyalty: { earnedReversed: number; redeemedRecredited: number };
   backorderLinesCancelled: number;
+  /** Set when an `onlyFrom` cancel found the order already past those states: nothing was changed but its note. */
+  skipped?: 'status_moved';
 }
 
 export interface StoreRepo {
@@ -1420,7 +1437,12 @@ export interface StoreRepo {
   db: StoreReads;
   /** The write client (see StoreWrites). Resolved with the repo, so one flag read serves both. */
   writer: StoreWrites;
+  /** The assistant's journal on the store's own Durable Object. Present ONLY on 'do' (see `storeSmartLayer`). */
+  smartLayer?: SmartLayerClient;
 }
+
+/** One named journal operation of the Smart Layer (packages/repo do/smart-layer.ts). A refusal is an AppError; `args` is a plain JSON list. */
+export type SmartLayerClient = (op: string, args: unknown[]) => Promise<unknown>;
 
 type RequestLike = Pick<Request, 'headers'>;
 interface Scope {
@@ -1465,6 +1487,13 @@ interface QueryStub {
   ): Promise<
     | { ok: true; json: string }
     | { ok: false; code: string; status: number; message: string; meta?: Record<string, unknown> }
+  >;
+  smartLayerOp(
+    storeId: string,
+    op: string,
+    argsJson: string
+  ): Promise<
+    { ok: true; json: string } | { ok: false; code: string; status: number; message: string }
   >;
   query(
     storeId: string,
@@ -1553,6 +1582,7 @@ export function makeMoneyClient(
     refundRelease: (a, key) => call('refundRelease', a, key),
     refundMatchClaim: a => call('refundMatchClaim', a),
     instapayRefundRecord: a => call('instapayRefundRecord', a),
+    manualRefundRecord: a => call('manualRefundRecord', a),
     refundIndeterminate: (a, key) => call('refundIndeterminate', a, key),
     refundBook: (a, key) => call('refundBook', a, key),
     journalSale: (a, key) => call('journalSale', a, key),
@@ -1757,9 +1787,13 @@ export function doStoreDelegate(
   };
 }
 
-async function doClients(
-  storeId: string
-): Promise<{ db: StoreReads; writer: StoreWrites; stock: StockClient; money: MoneyClient }> {
+async function doClients(storeId: string): Promise<{
+  db: StoreReads;
+  writer: StoreWrites;
+  stock: StockClient;
+  money: MoneyClient;
+  smartLayer: SmartLayerClient;
+}> {
   const stub = storeDo(storeId) as unknown as QueryStub; // 503 here when the binding is absent
   // Dynamic: the Node build cannot resolve the @ebda-src alias (apps/api/src/cf/repo-modules.d.ts); only a Worker with a
   // bound StoreDO ever reaches this line.
@@ -1772,7 +1806,16 @@ async function doClients(
   const callMoney = async (op: string, args: unknown, key?: string) => {
     const r = await stub.moneyOp(storeId, op, encodeRpc(args), key);
     if (!r.ok) throw new AppError(r.status, r.code, r.message, r.meta);
-    return decodeRpc<any>(r.json);
+    const out = decodeRpc<unknown>(r.json);
+    const alerts = (out as { moneyAlerts?: unknown } | null)?.moneyAlerts;
+    if (Array.isArray(alerts) && alerts.length > 0)
+      void sendMoneyAlerts(storeId, op, alerts as Parameters<typeof sendMoneyAlerts>[2]);
+    return out;
+  };
+  const callSmartLayer: SmartLayerClient = async (op, args) => {
+    const r = await stub.smartLayerOp(storeId, op, JSON.stringify(args));
+    if (!r.ok) throw new AppError(r.status, r.code, r.message);
+    return JSON.parse(r.json) as unknown;
   };
   const send = (queries: unknown[]) => stub.query(storeId, queries as never);
   return {
@@ -1787,6 +1830,7 @@ async function doClients(
     ) as unknown as StoreWrites,
     stock: makeStockClient(call),
     money: makeMoneyClient(callMoney),
+    smartLayer: callSmartLayer,
   };
 }
 
@@ -1903,6 +1947,34 @@ function pgWriter(storeId: string): StoreWrites {
   return scopedPg(storeId, true) as unknown as StoreWrites;
 }
 
+/**
+ * Money alerts a DO operation raised and COMMITTED (a wallet give-back trimmed by the one refundable balance, #659 B2):
+ * a store-scoped P1 to the platform channel. The merchant sees the same fact on the order's payment timeline. Never
+ * throws into the caller: the money state is already committed and recorded for review.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/money-alerts-dispatch.test.ts
+export async function sendMoneyAlerts(
+  storeId: string,
+  op: string,
+  alerts: Array<{ kind: string; orderId: string; body: string; context?: Record<string, unknown> }>
+): Promise<void> {
+  try {
+    const { sendAlert } = await import('../services/alerts.service.js');
+    for (const a of alerts)
+      await sendAlert({
+        level: 'p1',
+        scope: 'store',
+        store: { id: storeId, name: storeId },
+        source: `money.${op}.${a.kind}`,
+        title: `Refund needs review: ${a.kind}`,
+        body: a.body,
+        context: { storeId, orderId: a.orderId, ...(a.context ?? {}) },
+      }).catch(() => undefined);
+  } catch {
+    /* the review event is already on the payment timeline */
+  }
+}
+
 async function resolve(storeId: string, _req: RequestLike): Promise<StoreRepo> {
   const backend = await backendFor(storeId); // server-side flag only: the request never chooses (Ruling CF-BACKEND-1)
   if (backend === 'do') {
@@ -1949,6 +2021,22 @@ export async function storeWriter(storeId: string): Promise<StoreWrites> {
  */
 export async function storeStock(storeId: string): Promise<StockClient | null> {
   return (await storeRepo(storeId)).stock ?? null;
+}
+
+/**
+ * The assistant's journal of a store, kept in the store's own Durable Object (Ruling SL-STORE-1). A store that is not on its DO has no
+ * journal: the assistant refuses it with a 503, the same fail-closed behaviour as `lib/store-backend.ts`; it never falls back to Postgres.
+ */
+// pq-allow(unused-export): the assistant adapter (next PR of the stack) and the assistant routes import it
+export async function storeSmartLayer(storeId: string): Promise<SmartLayerClient> {
+  const repo = await storeRepo(storeId);
+  if (!repo.smartLayer)
+    throw new AppError(
+      503,
+      'ASSISTANT_UNAVAILABLE',
+      'The assistant is not available for this store yet'
+    );
+  return repo.smartLayer;
 }
 
 /**

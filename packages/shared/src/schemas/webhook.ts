@@ -4,7 +4,7 @@ import { isBrandHost } from '../brand';
 /**
  * Merchant OUTGOING webhooks: the contracts shared by the API
  * (`apps/api/src/routes/merchant-webhooks.routes.ts`) and the admin page
- * (`apps/admin/src/app/stores/[id]/webhooks`). Plan: docs/plans/2026-10-21-merchant-webhooks.md.
+ * (`apps/admin/src/app/stores/[id]/webhooks`). Plan: docs/plans/done/2026-10-21-merchant-webhooks.md.
  * Receiver documentation: apps/docs/content/merchant-webhooks.mdx.
  */
 

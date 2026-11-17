@@ -58,6 +58,9 @@ export const COMPLETE_ERROR_CODES = new Set([
   'PAYMENT_NOT_REFUNDABLE',
   'ALREADY_REFUNDED',
   'REFUND_EXCEEDS_REMAINING',
+  // One refundable balance per order across every channel (#624): refused before any money moves.
+  'REFUND_EXCEEDS_ORDER',
+  'ORDER_ALREADY_REFUNDED',
   'INVALID_REFUND_AMOUNT',
   'AMBIGUOUS_PAYMENT',
   // InstaPay has no provider to refund through (SP6a): the merchant sends the money

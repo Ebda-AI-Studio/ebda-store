@@ -115,10 +115,13 @@ export async function acrossStoresDb(
     await fn(only, repo.db);
     return;
   }
-  await acrossStores(storeId => fn(storeId, prisma as unknown as StoreReads), {
+  const res = await acrossStores(storeId => fn(storeId, prisma as unknown as StoreReads), {
     ...opts,
     ...(only ? { storeIds: [only] } : {}),
   });
+  // Every other store was visited (isolation, #619); fail the run LOUDLY after the sweep so the failure watch sees it.
+  if ((res.failures?.length ?? 0) > 0)
+    throw new Error(`${res.failures.length} store(s) failed in the sweep; see the per-store log`);
 }
 
 /**

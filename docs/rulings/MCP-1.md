@@ -18,5 +18,5 @@ Friday. It needs its own change, its own probe, and its own rollback.
 
 Cost if wrong: `store_usage_snapshots` stays outside the RLS cutover's coverage
 until someone sweeps it, and the cutover's own inventory
-(`docs/plans/2026-07-02-rls-cutover.md`) is the thing that has to catch it. It
+(`docs/plans/done/2026-07-02-rls-cutover.md`) is the thing that has to catch it. It
 is recorded here so it does not read as fixed.

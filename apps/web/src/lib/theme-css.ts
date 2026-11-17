@@ -6,7 +6,7 @@ import { LEGACY_STATUS_INK_VALUE, themeToCssVars, type StoreTheme } from '@ebda/
  * zero behavior change) so the new tenant-cacheable Track-A layout
  * (`app/tenant-store/[tenant]/[locale]/layout.tsx`) can inject the identical theme
  * CSS without duplicating security-sensitive sanitization logic in two
- * places. See `docs/plans/2026-07-12-tenant-cacheable-routing.md` §3.6.
+ * places. See `docs/plans/done/2026-07-12-tenant-cacheable-routing.md` §3.6.
  */
 
 /**

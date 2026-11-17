@@ -524,7 +524,7 @@ export class StoreService {
             products: await (await storeDb(storeId)).product.count({ where: { storeId } }),
             orders: await prisma.order.count({ where: { storeId } }),
           }),
-          { storeIds: stores.map(st => st.id) }
+          { storeIds: stores.map(st => st.id), abortOnError: true }
         )
       ).map(r => [r.storeId, r.value])
     );
@@ -1907,6 +1907,24 @@ export class StoreService {
   static async setMcpWriteEnabled(storeId: string, enabled: boolean) {
     await this.setSettingsKey(storeId, 'mcpWriteEnabled', enabled);
     return enabled;
+  }
+
+  /**
+   * Merchant's switch for AUTOMATIC product recommendations (`settings.autoRecommendationsEnabled`, absent = on).
+   * Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
+   */
+  static async setAutoRecommendationsEnabled(storeId: string, enabled: boolean) {
+    await this.setSettingsKey(storeId, 'autoRecommendationsEnabled', enabled);
+    return enabled;
+  }
+
+  /**
+   * The Smart Layer assistant's per-store rollout mode (`settings.assistantMode`, absent = off). Set ONLY by a super admin (routes/assistant.routes.ts):
+   * a merchant can never raise it. Surgical splice into the `settings` JSON like `setMcpWriteEnabled`; no migration.
+   */
+  static async setAssistantMode(storeId: string, mode: 'off' | 'answer-only' | 'suggest' | 'act') {
+    await this.setSettingsKey(storeId, 'assistantMode', mode);
+    return mode;
   }
 
   /**

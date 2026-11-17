@@ -60,6 +60,10 @@ function pinoLogger(): pino.Logger {
         '*.secret',
         '*.cvv',
         '*.cardNumber',
+        // Signed, bearer-style URLs from the Chat bridge (WA-1): never in a log line.
+        '*.mediaUrl',
+        '*.checkoutUrl',
+        '*.paymentUrl',
       ],
     },
     pino.transport({ targets })

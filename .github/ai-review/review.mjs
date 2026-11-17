@@ -8,13 +8,19 @@
 // unreviewed money/auth/data change can never be labelled ai-review-passed; unset keeps the old
 // fail-open behaviour for advisory use (Ruling AIR-1, ci/ai-review/README.md).
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// The job's own RUNNER_TEMP, never a fixed /tmp path: two runners share one Mac host and a fixed path let one PR's
+// review read another's verdict (Ruling CI-MAC-RUNNER-1).
+const SCRATCH = process.env.RUNNER_TEMP || tmpdir();
 
 const {
   GITHUB_TOKEN,
   GITHUB_REPOSITORY, // owner/repo
   PR_NUMBER,
   HEAD_SHA,
-  CLAUDE_OUTPUT = '/tmp/claude-out.json',
+  CLAUDE_OUTPUT = join(SCRATCH, 'claude-out.json'),
   AI_FIX_ENABLED = 'false', // 'true' only when the AI_FIX_PAT secret is present
   HEAD_IS_AI_FIX = 'false', // 'true' when HEAD is already an [ai-fix] commit
   GITHUB_OUTPUT,
@@ -156,7 +162,7 @@ if (critical.length === 0) {
 
 if (willFix) {
   try {
-    writeFileSync('/tmp/ai-fix-findings.json', JSON.stringify(critical, null, 2));
+    writeFileSync(join(SCRATCH, 'ai-fix-findings.json'), JSON.stringify(critical, null, 2));
     if (GITHUB_OUTPUT) appendFileSync(GITHUB_OUTPUT, 'should_fix=true\n');
     console.log(`${critical.length} critical finding(s) — handing off to the auto-fix step.`);
     process.exit(0);
@@ -166,6 +172,7 @@ if (willFix) {
   }
 }
 
+if (GITHUB_OUTPUT) appendFileSync(GITHUB_OUTPUT, 'verdict=critical\n');
 console.error(
   `${critical.length} critical finding(s) — blocking (auto-fix disabled or already attempted on this HEAD).`
 );

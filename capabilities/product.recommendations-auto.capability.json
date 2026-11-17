@@ -1,0 +1,35 @@
+{
+  "id": "product.recommendations-auto",
+  "status": "in-pr",
+  "pr": "ebda-store#742",
+  "area": "marketing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اقتراحات تلقائية للمنتجات",
+  "titleEn": "Automatic similar and bought-together recommendations",
+  "screens": [],
+  "api": [
+    "GET /stores/:storeId/recommendations/auto-setting",
+    "PUT /stores/:storeId/recommendations/auto-setting"
+  ],
+  "mcpTool": null,
+  "planGate": "upsell_crosssell",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["المنتجات المقترحة هتتحدد لوحدها؟"],
+    "en": ["Will recommendations be automatic?"]
+  },
+  "steps": ["Assistant today: you can curate by hand; automatic is coming."],
+  "edgeCases": [
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
+  ],
+  "gaps": ["not merged"]
+}
