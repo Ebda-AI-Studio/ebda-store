@@ -2,10 +2,10 @@
   "id": "builder.ai-patch",
   "status": "live",
   "area": "ai",
-  "version": 1,
-  "versionDate": "2026-11-14",
+  "version": 2,
+  "versionDate": "2026-11-17",
   "titleAr": "اسال الذكاء يعدل الصفحة",
-  "titleEn": "Ask the editor AI to restyle/reorder/hide sections",
+  "titleEn": "Ask the editor AI to change the page: restyle, reorder, hide, add or move blocks, link products, set images and links, fix the phone view",
   "screens": ["/stores/[id]/builder"],
   "api": ["POST /stores/:storeId/ai/builder-patch"],
   "mcpTool": null,
@@ -21,16 +21,19 @@
     "ar": ["خلي الذكاء يغير ترتيب الاقسام", "اطلب من الAI يخلي الهيرو اكبر", "الAI مش بيفهم طلبي"],
     "en": ["Ask the AI to change my page"]
   },
-  "steps": ["Editor > Ask AI, 500 chars, max 12 ops, preview then Apply."],
+  "steps": [
+    "Editor > Ask AI, 500 chars, max 12 ops, preview then Apply. The AI sees your products, categories, look, language and the screen size you are looking at; it fills empty places and never replaces words, pictures or links you wrote or chose."
+  ],
   "edgeCases": [
     "Daily cap 150 requests / 200k tokens per store",
     "Merchant AI switch off",
-    "Cannot set images/links/products or add pages (page-builder AI v2 = project 3)",
+    "Fill-only: existing merchant text, images and links are kept (the preview says how many parts were left as they are); only empty or placeholder places are filled",
+    "Products, categories, images and links must be ones this store has: anything else is refused, not saved. Cannot create new pages yet",
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Builder AI v2 (context-aware, add blocks, link products) PARTIAL/not built"]
+  "gaps": ["Create a page from a request (new landing page) is not built"]
 }

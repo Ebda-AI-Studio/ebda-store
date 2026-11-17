@@ -104,3 +104,46 @@ describe('AiPatchPane', () => {
     expect(screen.queryByTestId('ai-patch-apply')).toBeNull();
   });
 });
+
+describe('AiPatchPane: v2 ops and fill-only note', () => {
+  const v2: AiPatchProposal = {
+    baseRev: 1,
+    summaryEn: 'Show bracelets',
+    summaryAr: 'اعرض الإسورات',
+    ops: [],
+    rejected: [
+      { index: 2, reason: 'OVERWRITE_PROTECTED' },
+      { index: 3, reason: 'NOT_ALLOWED' },
+    ],
+    changes: [
+      {
+        op: 'setRef',
+        id: 'c',
+        key: 'manualProductIds',
+        before: undefined,
+        after: ['p-1', 'p-2'],
+        labelEn: 'Carousel: Products',
+        labelAr: 'الكاروسيل: المنتجات',
+      },
+      { op: 'addBlock', id: 'hero', labelEn: 'Hero: add Slide', labelAr: 'البانر: إضافة شريحة' },
+    ],
+  };
+
+  it("shows a product list as a count, a new block as added, and says what was kept as the merchant's own", () => {
+    render(
+      <AiPatchPane
+        busy={null}
+        proposal={v2}
+        error={null}
+        onAsk={vi.fn()}
+        onApply={vi.fn()}
+        onDiscard={vi.fn()}
+      />
+    );
+    expect(screen.getByText('products_count')).toBeTruthy();
+    expect(screen.getByText('added_block')).toBeTruthy();
+    // one part kept (fill-only), one skipped: two separate lines, never merged into one count
+    expect(screen.getByText('kept')).toBeTruthy();
+    expect(screen.getByText('skipped')).toBeTruthy();
+  });
+});

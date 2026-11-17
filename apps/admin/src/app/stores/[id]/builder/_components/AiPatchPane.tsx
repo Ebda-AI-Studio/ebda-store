@@ -38,7 +38,11 @@ function show(
 ): string {
   if (v === undefined || v === null || v === '') return '-';
   if (typeof v === 'boolean')
-    return op === 'setSectionHidden' ? t(v ? 'hidden' : 'shown') : t(v ? 'on' : 'off');
+    return op === 'setSectionHidden' || op === 'setViewportHidden'
+      ? t(v ? 'hidden' : 'shown')
+      : t(v ? 'on' : 'off');
+  // A product list is shown as a count: the ids mean nothing to a merchant.
+  if (Array.isArray(v)) return t('products_count', { count: v.length });
   return String(v);
 }
 
@@ -60,6 +64,7 @@ export function AiPatchPane({
   const t = useT('builder.aiPatch');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [text, setText] = useState('');
+  const kept = proposal?.rejected.filter(r => r.reason === 'OVERWRITE_PROTECTED').length ?? 0;
 
   return (
     <div
@@ -95,7 +100,10 @@ export function AiPatchPane({
                       {c.op === 'setSectionSetting' ||
                       c.op === 'setBlockSetting' ||
                       c.op === 'setTheme' ||
-                      c.op === 'setSectionHidden' ? (
+                      c.op === 'setSectionHidden' ||
+                      c.op === 'setRef' ||
+                      c.op === 'setViewportSetting' ||
+                      c.op === 'setViewportHidden' ? (
                         <span className="mt-1 flex flex-wrap items-center gap-1 text-muted-foreground">
                           <span>{t('from')}</span>
                           <bdi className="rounded bg-muted px-1 line-through decoration-muted-foreground/60">
@@ -112,7 +120,13 @@ export function AiPatchPane({
                             ? t('added')
                             : c.op === 'removeSection'
                               ? t('removed')
-                              : t('moved_to', { pos: Number(c.after ?? 0) + 1 })}
+                              : c.op === 'addBlock'
+                                ? t('added_block')
+                                : c.op === 'removeBlock'
+                                  ? t('removed_block')
+                                  : c.op === 'moveBlock'
+                                    ? t('moved_block', { pos: Number(c.after ?? 0) + 1 })
+                                    : t('moved_to', { pos: Number(c.after ?? 0) + 1 })}
                         </span>
                       )}
                     </li>
@@ -120,9 +134,12 @@ export function AiPatchPane({
                 </ul>
               </>
             )}
-            {proposal.rejected.length > 0 && (
+            {kept > 0 && (
+              <p className="text-xs text-muted-foreground">{t('kept', { count: kept })}</p>
+            )}
+            {proposal.rejected.length - kept > 0 && (
               <p className="text-xs text-muted-foreground">
-                {t('skipped', { count: proposal.rejected.length })}
+                {t('skipped', { count: proposal.rejected.length - kept })}
               </p>
             )}
             {proposal.changes.length > 0 && (
