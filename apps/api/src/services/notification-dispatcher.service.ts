@@ -9,6 +9,7 @@
  * IMPORTANT: dispatch() NEVER throws — all errors are caught and logged.
  */
 
+import { storeMayMessageCustomers } from '../lib/store-operational';
 import { featureService } from './feature.service';
 import { notificationConfigService } from './notification-config.service';
 import { smsQueue } from './sms-queue.service';
@@ -231,6 +232,14 @@ class NotificationDispatcherService {
     event: NotificationEvent,
     data: NotificationData
   ): Promise<void> {
+    // Ruling SUSPEND-OUT-1: every channel here reaches a CUSTOMER (shopper SMS, storefront push), so a store that is not
+    // `active` sends none of it. The refund notice is the one kept: the money already went back to the customer.
+    if (
+      event !== 'refund_processed' &&
+      !(await storeMayMessageCustomers(storeId, `dispatch:${event}`))
+    ) {
+      return;
+    }
     // 1. Check feature flags in parallel
     const [smsEnabled, pushEnabled] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'sms'),

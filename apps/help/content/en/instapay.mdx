@@ -5,6 +5,9 @@ section: Selling
 order: 4
 appPath: /stores
 keywords: instapay transfer receipt screenshot approve reject refund shopper payment
+capabilities:
+  - order.instapay-review@1
+  - payment.instapay-merchant@1
 ---
 
 InstaPay has no merchant API, so Ebda Store cannot see a transfer on its own. The shopper transfers to your InstaPay address or mobile number and uploads a screenshot of the receipt. **You** review it and confirm the payment. Ebda Store's team does not see or approve your shoppers' payments.

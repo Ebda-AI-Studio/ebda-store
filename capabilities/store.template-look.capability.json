@@ -1,0 +1,45 @@
+{
+  "id": "store.template-look",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اختار قالب وستايل المتجر",
+  "titleEn": "Choose template (Dahab/Qamar/Souq/Jasmine/Lamma) and look",
+  "screens": ["/stores/[id]/template", "/stores/[id]/builder"],
+  "api": [
+    "PUT /stores/:storeId/template",
+    "POST /stores/:storeId/look/preview",
+    "PUT /stores/:storeId/look",
+    "PUT /admin/stores/:storeId/layout"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (switch back; look switch dialog shows what will change)"
+  },
+  "helpArticle": "store-look-controls",
+  "questions": {
+    "ar": [
+      "ازاي اغير شكل المتجر؟",
+      "القوالب المتاحة ايه؟",
+      "لو غيرت القالب هتضيع تعديلاتي؟",
+      "عايز ستايل اغمق"
+    ],
+    "en": ["How do I change my store's look?", "Will changing the template lose my edits?"]
+  },
+  "steps": ["Template page or editor > Change the look; preview first (look/preview)."],
+  "edgeCases": [
+    "Look switch rebases the draft: custom section edits may be reset (look-diff)",
+    "Retired templates (modern/classic/minimal/bold/elegant) map to new ones",
+    "Published vs draft: nothing live until Publish",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}
