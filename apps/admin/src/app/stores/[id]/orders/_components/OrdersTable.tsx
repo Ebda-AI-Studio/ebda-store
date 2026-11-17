@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { localizedName } from '@/lib/localized-name';
+import { orderActionKey } from './order-action';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { EmptyOrdersState } from './EmptyOrdersState';
@@ -62,7 +64,11 @@ export function summarizeItems(
       const name = locale === 'ar' && row.nameAr ? row.nameAr : row.name;
       return `${row.quantity}x ${name}`;
     }
-    return `${row.item.quantity}x ${row.item.productName}`;
+    const name = localizedName(locale, {
+      name: row.item.productName,
+      nameAr: row.item.productNameAr,
+    });
+    return `${row.item.quantity}x ${name}`;
   });
   const remaining = rows.length - MAX_SHOWN;
   const summary = shown.join(', ');
@@ -82,6 +88,8 @@ export function OrdersTable({
   onToggleSelected,
 }: OrdersTableProps) {
   const t = useT('orders.list');
+  const tAction = useT('orders.action');
+  const tStatus = useT('orders.status');
   const locale = useLocale();
   const params = useParams();
   const router = useRouter();
@@ -198,7 +206,7 @@ export function OrdersTable({
             {agentBadge}
             <select
               aria-label={t('actions.updateStatusLabel')}
-              className="rounded-lg border border-border px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="min-w-[8.5rem] rounded-lg border border-border px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               disabled={isUpdating}
               defaultValue=""
               onChange={e => {
@@ -214,7 +222,7 @@ export function OrdersTable({
               </option>
               {transitions.map(s => (
                 <option key={s} value={s}>
-                  {t(`status.${s}`)}
+                  {orderActionKey(s) ? tAction(s) : tStatus(s)}
                 </option>
               ))}
             </select>

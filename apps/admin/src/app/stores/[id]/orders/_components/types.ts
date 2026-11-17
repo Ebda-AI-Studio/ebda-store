@@ -23,6 +23,8 @@ export interface OrderPayment {
 export interface OrderLineItem {
   id: string;
   productName: string;
+  /** Looked up by the list API (the line only snapshots the English name). */
+  productNameAr?: string | null;
   variantName?: string | null;
   quantity: number;
   price?: number;

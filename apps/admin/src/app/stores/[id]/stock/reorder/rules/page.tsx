@@ -11,6 +11,7 @@ import { RowActions } from '@/components/RowActions';
 import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useT } from '@/i18n/useT';
+import { localizedName } from '@/lib/localized-name';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 
 interface Rule {
@@ -30,6 +31,7 @@ interface Rule {
 interface ProductOption {
   id: string;
   name: string;
+  nameAr?: string | null;
   sku: string | null;
 }
 interface VariantOption {
@@ -321,7 +323,7 @@ export default function ReorderRulesPage() {
                   {products.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.sku ? `[${p.sku}] ` : ''}
-                      {p.name}
+                      {localizedName(isAr ? 'ar' : 'en', p)}
                     </option>
                   ))}
                 </select>

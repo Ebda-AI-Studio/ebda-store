@@ -7,6 +7,7 @@ import { RowActions } from '@/components/RowActions';
 import Image from 'next/image';
 import { formatPrice } from '../../../../../lib/format';
 import { useT } from '@/i18n/useT';
+import { localizedName } from '@/lib/localized-name';
 import { useLocale } from 'next-intl';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { StatusBadge } from './StatusBadge';
@@ -148,7 +149,7 @@ export function ProductsTable({
           onChange={() => onToggleSelect(product.id)}
           onClick={e => e.stopPropagation()}
           className="rounded border-border accent-primary cursor-pointer"
-          aria-label={t('selectProduct', { name: product.name })}
+          aria-label={t('selectProduct', { name: localizedName(locale, product) })}
         />
       ),
     },
@@ -187,7 +188,9 @@ export function ProductsTable({
       cell: product => (
         <span className="text-sm font-medium">
           {product.hasVariants && (
-            <span className="text-xs text-muted-foreground me-1">{t('priceFrom')}</span>
+            <>
+              <span className="text-xs text-muted-foreground">{t('priceFrom')}</span>{' '}
+            </>
           )}
           {formatPrice(product.price)}
         </span>
@@ -249,7 +252,7 @@ export function ProductsTable({
       cell: product => (
         <div className="flex items-center gap-2 md:justify-end">
           <RowActions
-            menuLabel={t('actions.menu', { name: product.name })}
+            menuLabel={t('actions.menu', { name: localizedName(locale, product) })}
             primary={
               <Link
                 href={`/stores/${storeId}/products/${product.id}/edit?returnTo=${encodeURIComponent(listUrl)}`}

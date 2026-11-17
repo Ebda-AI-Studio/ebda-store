@@ -6,6 +6,7 @@ import { useLocale } from 'next-intl';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { localizedName } from '@/lib/localized-name';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice, minorToMajor } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
@@ -21,7 +22,7 @@ interface POItem {
   productId: string;
   // getPurchaseOrder includes these relations; there is no flat
   // `productName` on the row (reading one rendered an empty cell).
-  product?: { name: string; sku: string | null } | null;
+  product?: { name: string; nameAr?: string | null; sku: string | null } | null;
   variant?: { id: string; title: string; titleAr: string | null } | null;
   qty: number;
   qtyReceived: number;
@@ -179,7 +180,7 @@ export default function PurchaseOrderDetailPage() {
       primaryOnMobile: true,
       cell: item => (
         <span className="truncate max-w-[12rem] block">
-          {item.product?.name ?? '—'}
+          {item.product ? localizedName(isAr ? 'ar' : 'en', item.product) : '—'}
           {item.variant && (
             <span className="block text-xs text-muted-foreground truncate">
               {(isAr && item.variant.titleAr) || item.variant.title}

@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { localizedName } from '@/lib/localized-name';
 import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
@@ -16,6 +18,7 @@ import { Button } from '@/components/ui/Button';
 interface DeadstockProduct {
   id: string;
   name: string;
+  nameAr?: string | null;
   sku: string | null;
 }
 
@@ -49,12 +52,14 @@ const NEVER_SOLD_DAYS = 9999;
 
 function FlagCard({
   item,
+  locale,
   onClearance,
   onDismiss,
   t,
   tc,
 }: {
   item: DeadStockFlag;
+  locale: string;
   onClearance: (id: string) => void;
   onDismiss: (id: string) => void;
   t: (k: string, p?: Record<string, string | number>) => string;
@@ -82,7 +87,7 @@ function FlagCard({
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       {/* Header */}
       <div className="space-y-0.5">
-        <p className="font-medium text-sm">{item.product.name}</p>
+        <p className="font-medium text-sm">{localizedName(locale, item.product)}</p>
         {item.product.sku && (
           <p className="text-xs text-muted-foreground font-mono">{item.product.sku}</p>
         )}
@@ -151,6 +156,7 @@ function FlagCard({
 export default function DeadstockPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const locale = useLocale();
   const t = useT('stock.deadstock');
   const tc = useT('common');
   const { user } = useAuth();
@@ -274,6 +280,7 @@ export default function DeadstockPage() {
           <div className="space-y-4">
             {items.map(item => (
               <FlagCard
+                locale={locale}
                 key={item.id}
                 item={item}
                 onClearance={handleClearance}

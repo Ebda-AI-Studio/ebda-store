@@ -6,6 +6,8 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { HelpTip } from '@/components/HelpTip';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { localizedName } from '@/lib/localized-name';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -18,6 +20,7 @@ import type { StockAdjustParseResult, StockAdjustParsedRow } from '@ebda/shared'
 interface ProductOption {
   id: string;
   name: string;
+  nameAr?: string | null;
   sku: string | null;
 }
 
@@ -472,6 +475,7 @@ export default function NewStockAdjustmentPage() {
   const storeId = params?.id as string;
   const router = useRouter();
   const searchParams = useSearchParams();
+  const locale = useLocale();
   const t = useT('stock.adjustments');
   const tNew = useT('stock.adjustments.new');
   const askConfirm = useConfirm();
@@ -527,7 +531,7 @@ export default function NewStockAdjustmentPage() {
           {products.map(p => (
             <option key={p.id} value={p.id}>
               {p.sku ? `[${p.sku}] ` : ''}
-              {p.name}
+              {localizedName(locale, p)}
             </option>
           ))}
         </select>

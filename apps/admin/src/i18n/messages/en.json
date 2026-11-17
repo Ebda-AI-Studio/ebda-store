@@ -1377,7 +1377,7 @@
       },
       "actions": {
         "updateStatusLabel": "Update order status",
-        "updatePlaceholder": "Update...",
+        "updatePlaceholder": "Change status",
         "selectOrderLabel": "Select order {order}",
         "markPaid": "Mark Paid",
         "markPaidTitle": "Mark COD payment as received",
@@ -1456,6 +1456,18 @@
       "agentBadge": "Agent",
       "newOrder": "New phone order",
       "moreMenu": "More order options"
+    },
+    "action": {
+      "pending": "Move back to pending",
+      "awaiting_payment_confirmation": "Wait for payment confirmation",
+      "confirmed": "Confirm order",
+      "processing": "Start processing",
+      "shipped": "Mark as shipped",
+      "delivered": "Mark as delivered",
+      "cancelled": "Cancel order",
+      "refunded": "Mark as refunded",
+      "paid": "Mark as paid",
+      "unpaid": "Mark as unpaid"
     },
     "status": {
       "pending": "Pending",

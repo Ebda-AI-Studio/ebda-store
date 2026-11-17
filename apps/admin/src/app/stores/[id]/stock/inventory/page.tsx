@@ -6,6 +6,8 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { localizedName } from '@/lib/localized-name';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
@@ -48,6 +50,7 @@ function IndeterminateCheckbox({
 interface ProductRow {
   id: string;
   name: string;
+  nameAr?: string | null;
   sku: string | null;
   inventory: number;
   /** Variant-aware stock total from the API (variant sum for variant products, else `inventory`). */
@@ -98,6 +101,7 @@ export default function StockInventoryPage() {
   const storeId = params?.id as string;
   const router = useRouter();
   const searchParams = useSearchParams();
+  const locale = useLocale();
   const t = useT('stock.inventory');
   const tc = useT('common');
 
@@ -442,7 +446,7 @@ export default function StockInventoryPage() {
                       checked={selectedIds.includes(p.id)}
                       onChange={() => toggleSelection(p.id)}
                       onClick={e => e.stopPropagation()}
-                      aria-label={p.name}
+                      aria-label={localizedName(locale, p)}
                       className="rounded border-border"
                     />
                   ),
@@ -462,7 +466,7 @@ export default function StockInventoryPage() {
                     const hasDead = deadSet.has(p.id);
                     return (
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate max-w-[10rem]">{p.name}</span>
+                        <span className="truncate max-w-[10rem]">{localizedName(locale, p)}</span>
                         {hasReorder && (
                           <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 shrink-0">
                             {t('badgeReorder')}
