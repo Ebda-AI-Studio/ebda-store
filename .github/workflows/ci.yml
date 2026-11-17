@@ -147,6 +147,35 @@ jobs:
 
   # Always-on, cheap repo guards. Runs on every PR (docs-only included) and on
   # every main push, so it has no `needs` and no `if`.
+  # MERGE-QUEUE-1 part B: on a push to main, decide whether a merge group already proved this exact TREE (scripts/ci/tested-tree.mjs: git tree ids, a
+  # completed merge_group run of this workflow with conclusion success AND a succeeded `Merge queue gate` job, fail closed on any doubt). The full-lane
+  # ROOT jobs (build, unit shards, security, workerd, dry-run, the API boot smoke) skip when it says so, and everything downstream of them follows.
+  # On every other event it answers `skip=false` at once, so a pull request still runs `API Worker boots on workerd` unconditionally.
+  tested-tree:
+    name: Tested tree check
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/ci/tested-tree.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: ${{ (!contains(github.event.pull_request.labels.*.name, 'ci-umbra') && vars.EBDA_RUNS_ON == '') && 'npm' || '' }}
+      - id: decide
+        name: Decide
+        env:
+          EVENT: ${{ github.event_name }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/tested-tree.mjs
+
   guards:
     name: Repo guards
     # Ruling CI-HOSTED-1: deliberately NO `if` here (the always-on PR check; tests/unit/ci-lean-structure and
@@ -482,11 +511,11 @@ jobs:
   # adapter or `next` bump that breaks the DO/tag-cache overrides fails here.
   worker-dry-run:
     name: Worker dry-run (${{ matrix.app }})
-    needs: [changes]
+    needs: [changes, tested-tree]
     # PR: only the Workers the PR touched. Full lane (main push, nightly, dispatch; `changes` is skipped there, hence
     # always()): marketing, so its page-weight budget is proven on main too. It broke unseen on main on 2026-11-10
     # because no main run measured it (Ruling MKT-LEGAL-HTML-BUDGET-2); the other Workers build in their deploy workflows.
-    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true')
+    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     strategy:
@@ -704,6 +733,8 @@ jobs:
   # (no Postgres, N-17), then /health + the store-directory reads must not 5xx.
   api-workerd-smoke:
     name: API Worker boots on workerd
+    needs: [tested-tree]
+    if: needs.tested-tree.outputs.skip != 'true'
     # No `if`: a required PR check (scripts/ci/merge-gate-required.mjs) AND part of the full lane, where it runs the
     # WHOLE workers-test suite (route-sweep included) instead of the PR slice below.
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
@@ -800,9 +831,9 @@ jobs:
   # a Worker is affected. No remote Actions cache on the self-hosted runner (see the header of this file).
   workerd-integration:
     name: Integration on local workerd (DO + D1 + R2)
-    needs: [changes]
+    needs: [changes, tested-tree]
     # PR: only when a Worker changed. Full lane: always (`changes` is skipped there, hence always()).
-    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true')
+    if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true') && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 30, not 15: the job timeout also covers the Umbra throttle-slot wait (775s on #322, tests then took 6s).
     timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
@@ -844,7 +875,8 @@ jobs:
     name: Build
     # FULL lane: every push to main, every cron, manual dispatch (Ruling CI-FULL-MAIN-1; supersedes CI-HOSTED-1's
     # scheduled no-op: schedules run on hosted runners when EBDA_RUNS_ON is unset).
-    if: github.event_name != 'pull_request'
+    needs: [tested-tree]
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
     env:
@@ -901,7 +933,8 @@ jobs:
   # vitest blob report with coverage; `test-unit` below merges them and enforces the coverage threshold once.
   test-unit-shard:
     name: ${{ format('Unit shard {0}/3', matrix.shard) }}
-    if: github.event_name != 'pull_request'
+    needs: [tested-tree]
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -1010,8 +1043,8 @@ jobs:
 
   test-unit:
     name: Unit Tests
-    needs: [test-unit-shard]
-    if: always() && github.event_name != 'pull_request'
+    needs: [test-unit-shard, tested-tree]
+    if: always() && github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     steps:
@@ -1533,7 +1566,8 @@ jobs:
     name: Security Audit
     # FULL lane: every push to main, every cron, manual dispatch (Ruling CI-FULL-MAIN-1; supersedes CI-HOSTED-1's
     # scheduled no-op: schedules run on hosted runners when EBDA_RUNS_ON is unset).
-    if: github.event_name != 'pull_request'
+    needs: [tested-tree]
+    if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 18: the budget is the SUM of the worst cases, not the audit alone — 3
     # bounded audit attempts (~5.8 min, #1520) + a COLD `npm ci` + checkout and
@@ -1722,6 +1756,7 @@ jobs:
     timeout-minutes: 3
     needs:
       [
+        tested-tree,
         guards,
         build,
         security,

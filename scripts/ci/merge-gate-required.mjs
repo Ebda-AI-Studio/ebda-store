@@ -14,6 +14,9 @@ import { join } from 'node:path';
 const ALWAYS_IF = /^github\.event_name == 'pull_request'$/;
 // An aggregator that runs even when the jobs it needs were (legitimately) skipped: always required on a PR. It may skip a
 // CANCELLED run (`&& !cancelled()`): a superseded run's aggregators would otherwise wait for a scarce Mac runner slot.
+// MERGE-QUEUE-1 part B: `needs.tested-tree.outputs.skip != 'true'` gates the full-lane root jobs on a PUSH to main only. The `tested-tree` job answers
+// skip=false at once on every other event (scripts/ci/tested-tree.mjs), so on a pull request such a job always runs: it counts as always-on there.
+const TESTED_TREE_IF = /^needs\.tested-tree\.outputs\.skip != 'true'$/;
 const ALWAYS_RUN_IF = /^always\(\) (&& !cancelled\(\) )?&& github\.event_name == 'pull_request'$/;
 
 export function parseWorkflow(text) {
@@ -79,7 +82,7 @@ export function requiredChecks(dir) {
       const j = jobs[id];
       if (!j) return false;
       if (j.if !== null && ALWAYS_RUN_IF.test(j.if)) return true;
-      if (j.if !== null && !ALWAYS_IF.test(j.if)) return false;
+      if (j.if !== null && !ALWAYS_IF.test(j.if) && !TESTED_TREE_IF.test(j.if)) return false;
       return j.needs.every(always);
     };
     for (const j of Object.values(jobs))
