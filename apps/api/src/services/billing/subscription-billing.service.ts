@@ -1514,7 +1514,7 @@ export type ChangePlanResult =
   | { mode: 'scheduled'; effectiveAt: Date; planCode: string };
 
 /** What a plan change would do and cost right now: the change-plan screen, the assistant card and `changePlan` itself. */
-export interface ChangePlanPreview {
+interface ChangePlanPreview {
   planCode: string;
   interval: BillingInterval;
   quote: PlanChangeQuote;

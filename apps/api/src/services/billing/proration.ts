@@ -23,7 +23,7 @@ import type { BillingInterval } from './period';
 
 const DAY_MS = 86_400_000;
 
-export type PlanChangeKind = 'upgrade' | 'downgrade' | 'same';
+type PlanChangeKind = 'upgrade' | 'downgrade' | 'same';
 
 export interface PlanChangeQuote {
   kind: PlanChangeKind;
@@ -57,6 +57,7 @@ export function periodStartFor(periodEnd: Date, interval: BillingInterval): Date
 }
 
 /** Whole days between two instants, a started day counting as one (never negative). */
+// pq-allow(unused-export): test seam, imported by tests/unit/billing-proration.test.ts
 export function wholeDaysCeil(from: Date, to: Date): number {
   const ms = to.getTime() - from.getTime();
   return ms <= 0 ? 0 : Math.ceil(ms / DAY_MS);
