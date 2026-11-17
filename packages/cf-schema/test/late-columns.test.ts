@@ -312,16 +312,16 @@ describe('0007 / 0008 FOLD-VAT: ETA document fields and the seller snapshot', ()
   });
 });
 
-describe('0014 StoreFeature expiry (Ruling SF-EXPIRY-1)', () => {
-  it('an upgraded database (0013 applied, rows present) gains nullable expires_at and reason; old rows stay "never expires"', () => {
-    const upTo13 = files.filter(f => Number(path.basename(f).slice(0, 4)) <= 13);
-    expect(upTo13.length).toBeLessThan(files.length);
-    const db = apply(upTo13);
+describe('0017 StoreFeature expiry (renumbered from 0014, Ruling D1-0013-2) Ruling SF-EXPIRY-1', () => {
+  it('an upgraded database (every earlier migration applied, rows present) gains nullable expires_at and reason; old rows stay "never expires"', () => {
+    const before = files.filter(f => Number(path.basename(f).slice(0, 4)) < 17);
+    expect(before.length).toBeLessThan(files.length);
+    const db = apply(before);
     db.exec(`INSERT INTO stores (id, name, slug, owner_id) VALUES ('s', 's', 's', 'o')`);
     db.exec(
       `INSERT INTO store_features (id, store_id, feature_key, enabled) VALUES ('f', 's', 'bundles', 1)`
     );
-    db.exec(read(byName('0014')));
+    db.exec(read(byName('0017')));
     const row = db
       .prepare(`SELECT enabled, expires_at e, reason r FROM store_features WHERE id = 'f'`)
       .get();

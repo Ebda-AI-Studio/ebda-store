@@ -275,6 +275,6 @@ Ruling SKIN-DEL-9. Data step: rows on a retired skin are moved to the template t
 
 SKIN-DEL-10 supersedes the rule step: `platform/0011_template_expand_only` and `store/0006_template_expand_only` DROP those triggers (expand-only; a rollback or the previous release's isolates can write a retired value without an abort). The remap stays; `stores.template_original` (0010) holds the pre-remap value where known. The triggers are parked in `packages/cf-schema/migrations-pending/` until one release after the code stops writing retired values (gate in `docs/rulings/SKIN-DEL-10.md`).
 
-## StoreFeature override expiry (Postgres `20261116000200_store_feature_expiry`, D1 `platform/0014_store_feature_expiry`)
+## StoreFeature override expiry (Postgres `20261116000200_store_feature_expiry`, D1 `platform/0017_store_feature_expiry`)
 
 Ruling SF-EXPIRY-1. Adds nullable `store_features.expires_at` and `reason` (NULL = never expires, the behaviour of every existing row), so the previous release keeps working against the new schema. Rollback of the code needs no schema change (old code ignores both columns, so every override then lasts until cleared). Rollback of the schema: Postgres `20261116000200_store_feature_expiry/rollback.sql`; D1 `ALTER TABLE store_features DROP COLUMN expires_at; ALTER TABLE store_features DROP COLUMN reason;` (data loss: expiry dates; re-check sold overrides such as `bundles` by hand afterwards).
