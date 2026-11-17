@@ -1,3 +1,4 @@
+import { assertStoreOperational } from '../lib/store-operational';
 import { randomBytes, randomUUID } from 'crypto';
 import { prisma, Prisma, hasTenantContext, withMoneyTx } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
@@ -789,6 +790,9 @@ class AffiliateService {
     /** The client's Idempotency-Key, already validated: same key -> the same payout, never a second (review M-6). */
     idempotencyKey?: string
   ) {
+    // Ruling SUSPEND-OUT-1: money OUT is refused (423) for a store that is not `active`. Checked before the idempotent
+    // replay on purpose: a replay of a pre-suspension payout is a no-op for the caller, but a NEW payout must not start.
+    await assertStoreOperational(storeId);
     // A store on its Durable Object (NEON-ZERO): the affiliate row, the debit, the payout and its event are ONE section there;
     // the balance is re-checked inside it, so the refusals are the same (404 / INVALID_AMOUNT / INSUFFICIENT_BALANCE).
     const money = await storeMoney(storeId);

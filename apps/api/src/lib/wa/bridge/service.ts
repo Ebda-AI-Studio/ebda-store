@@ -12,6 +12,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { z } from 'zod/v3';
 import { args } from './schemas';
+import { chatSearcherId } from './searcher';
 import { buyerKeyFor } from '@ebda/shared';
 import { signCheckoutToken, storeBuyerId } from './checkout-token';
 
@@ -48,6 +49,59 @@ export interface CatalogRow {
   imageUrl: string | null;
   link: string;
   brand: string | null;
+}
+/** Facts a shopper asks about. Every field is what the merchant DECLARED; absent = null / empty, never a default. */
+interface ShippingZoneFact {
+  name: string;
+  nameAr: string | null;
+  areas: string[];
+  feeMinor: number;
+  freeOverMinor: number | null;
+  etaDaysMin: number | null;
+  etaDaysMax: number | null;
+}
+interface GovernorateRateFact {
+  governorate: string;
+  governorateAr: string;
+  /** Cheapest and dearest area fee inside the governorate (equal when it has one rate). */
+  feeMinor: number;
+  feeMaxMinor: number;
+  freeOverMinor: number | null;
+}
+export interface StorePolicyFacts {
+  nameAr: string | null;
+  shipping: { zones: ShippingZoneFact[]; governorates: GovernorateRateFact[] };
+  returns: { windowDays: number | null; feesPaidBy: 'merchant' | 'customer' | null };
+  cod: { fixedFeeMinor: number | null; percentBps: number | null };
+  hours: string | null;
+  location: { address: string | null; addressAr: string | null; mapsUrl: string | null } | null;
+}
+// pq-allow(unused-export): named by the emitted declarations of waBridge (index.ts) and the worker RPC getStorePolicies return type (TS4023/TS4053 without it)
+export interface StorePolicies extends StorePolicyFacts {
+  name: string;
+  currency: string;
+  locale: 'ar' | 'en';
+  paymentMethods: ChatPaymentMethod[];
+  instapay: boolean;
+  cod: { available: boolean; fixedFeeMinor: number | null; percentBps: number | null };
+}
+interface FullAddress extends Address {
+  governorate: string | null;
+  buildingNumber: string | null;
+  notes: string | null;
+}
+export interface CustomerProfileFacts {
+  firstName: string | null;
+  preferredLocale: 'ar' | 'en' | null;
+  defaultAddress: FullAddress | null;
+  recentOrders: Array<OrderSummaryLite & { items: Array<{ name: string; quantity: number }> }>;
+}
+interface OrderSummaryLite {
+  orderNumber: string;
+  status: OrderStatus;
+  totalMinor: number;
+  currency: string;
+  at: number;
 }
 export interface Address {
   id: string;
@@ -97,6 +151,15 @@ export interface BridgePort {
     limit: number
   ): Promise<{ items: CatalogRow[]; nextCursor: string | null }>;
   catalogByIds(storeId: string, ids: string[]): Promise<CatalogRow[]>;
+  /** The storefront's own ranked search (stemming, Franco/dialect search terms, meaning leg), active products only, best first. */
+  searchProducts(
+    storeId: string,
+    query: string,
+    o: { maxPriceMinor?: number; limit: number; searcher: string }
+  ): Promise<{ items: CatalogRow[]; degraded: boolean }>;
+  storePolicies(storeId: string): Promise<StorePolicyFacts>;
+  /** The CRM row + last orders of the buyer key; null = no such buyer in this store. */
+  customerProfile(storeId: string, buyerKey: string): Promise<CustomerProfileFacts | null>;
   /** Replay-safe on `idempotencyKey`. Throws PortError('out_of_stock' | 'invalid' | 'not_found'). */
   placeOrder(
     storeId: string,
@@ -293,6 +356,49 @@ export function createBridge(deps: BridgeDeps) {
       run('getProducts', storeId, args.getProducts, { ids }, async (s, a) =>
         ok({ items: await port.catalogByIds(s, a.ids) })
       ),
+
+    searchProducts: (
+      storeId: string,
+      query: string,
+      opts: { maxPriceMinor?: number; limit: number; searcher?: string }
+    ) =>
+      run('searchProducts', storeId, args.searchProducts, { query, ...opts }, async (s, a) => {
+        // `degraded` = the meaning leg was wanted but skipped (budget/limit/outage): an empty list is then NOT a real negative
+        const r = await port.searchProducts(s, a.query, {
+          ...(a.maxPriceMinor !== undefined ? { maxPriceMinor: a.maxPriceMinor } : {}),
+          limit: a.limit,
+          searcher: chatSearcherId(s, a.searcher),
+        });
+        return ok({ items: r.items, degraded: r.degraded });
+      }),
+
+    getStorePolicies: (storeId: string) =>
+      run('getStorePolicies', storeId, args.getStorePolicies, undefined, async (s, _a, p) => {
+        const f = await port.storePolicies(s);
+        const policies: StorePolicies = {
+          ...f,
+          name: p.name,
+          currency: p.currency,
+          locale: p.locale,
+          paymentMethods: p.paymentMethods,
+          instapay: p.instapay !== null,
+          // a fee is only quoted when COD is on; a store with COD off has no COD fee to state
+          cod: {
+            available: p.codEnabled,
+            fixedFeeMinor: p.codEnabled ? f.cod.fixedFeeMinor : null,
+            percentBps: p.codEnabled ? f.cod.percentBps : null,
+          },
+        };
+        return ok(policies);
+      }),
+
+    /** Buyer proof is the phone itself (always, regardless of WA_BRIDGE_REQUIRE_BUYER_PROOF): the key is rebuilt, never accepted. */
+    getCustomerProfile: (storeId: string, phoneE164: string) =>
+      run('getCustomerProfile', storeId, args.getCustomerProfile, { phoneE164 }, async (s, a) => {
+        const key = await buyerKeyFor(deps.buyerKeySecret(), a.phoneE164);
+        if (key === null) return fail('invalid', 'phoneE164');
+        return ok(await port.customerProfile(s, key));
+      }),
 
     createCheckoutLink: (storeId: string, req: unknown) =>
       run('createCheckoutLink', storeId, args.createCheckoutLink, req, async (s, a, p) => {

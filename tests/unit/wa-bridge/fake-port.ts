@@ -10,6 +10,9 @@ export const S_UNLINKED = '22222222-2222-4222-8222-222222222222';
 export const S_UNKNOWN = '33333333-3333-4333-8333-333333333333';
 export const BK = 'e8771d4105457e95d06a8589827d6c09043f73bb1750f2ef525bccbc22d67edd';
 export const BK_OTHER = '6ceb45953633dabff779c18ba4035a9fe58480c8383c822f93684a541a5c7cf5';
+/** Obviously synthetic phone for the Chat-context fixture (review M3); its HMAC under the test secret is BK_PROFILE. */
+export const PROFILE_PHONE = '+201000000000';
+export const BK_PROFILE = '942bf1edc6e21e31560ab5cc61e908efe24a40d1c6f262378e893ad42df6527c';
 export const BUYER = {
   buyerKey: BK,
   phoneE164: '+201001234567',
@@ -133,6 +136,74 @@ export function makeFakePort() {
       return { orderNumber: o.orderNumber };
     },
     attachProof: async (_s, id) => orders.get(id)?.method === 'instapay',
+    searchProducts: async (_s, q, o) => {
+      // stands in for the Store hybrid search: meaning, not only words ("gift" finds the bracelet)
+      const hit = (r: CatalogRow) =>
+        q === 'هدية' ? r.retailerId === 'v2' || r.retailerId === 'v1' : r.title.includes(q);
+      // 'dg' stands in for a query whose meaning leg was skipped (budget / searcher limit / outage): nothing found, but not a real negative
+      if (q === 'dg') return { items: [], degraded: true };
+      return {
+        items: CATALOG.filter(hit)
+          .filter(r => o.maxPriceMinor === undefined || r.priceMinor <= o.maxPriceMinor)
+          .slice(0, o.limit),
+        degraded: false,
+      };
+    },
+    storePolicies: async () => ({
+      nameAr: 'دار منى',
+      shipping: {
+        zones: [
+          {
+            name: 'Cairo',
+            nameAr: 'القاهرة',
+            areas: ['Maadi', 'Nasr City'],
+            feeMinor: 6000,
+            freeOverMinor: 100000,
+            etaDaysMin: 1,
+            etaDaysMax: 2,
+          },
+        ],
+        governorates: [
+          {
+            governorate: 'Giza',
+            governorateAr: 'الجيزة',
+            feeMinor: 6000,
+            feeMaxMinor: 8000,
+            freeOverMinor: null,
+          },
+        ],
+      },
+      returns: { windowDays: 14, feesPaidBy: 'customer' as const },
+      cod: { fixedFeeMinor: 2500, percentBps: null },
+      hours: 'Sat-Thu 10am-10pm',
+      location: { address: '9 Road 233, Maadi', addressAr: null, mapsUrl: null },
+    }),
+    customerProfile: async (_s, k) =>
+      k === BK || k === BK_PROFILE
+        ? {
+            firstName: 'Mona',
+            preferredLocale: 'ar' as const,
+            defaultAddress: {
+              id: 'a1',
+              label: 'Home',
+              area: 'Maadi',
+              street: '9 Road 233',
+              governorate: 'Cairo',
+              buildingNumber: '4',
+              notes: null,
+            },
+            recentOrders: [
+              {
+                orderNumber: 'EB-900',
+                status: 'delivered' as const,
+                totalMinor: 25000,
+                currency: 'EGP',
+                at: 1_762_000_000_000,
+                items: [{ name: 'Item v1', quantity: 1 }],
+              },
+            ],
+          }
+        : null,
     addresses: async (_s, k) => addresses.get(k) ?? [],
     saveAddress: async (_s, k, a) => {
       if (!addresses.has(k)) addresses.set(k, []);

@@ -96,6 +96,8 @@ const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
     'reorder batches (product.update) over existing rows; no prior write in the request',
   'routes/payment-settings.routes.ts':
     'unset-other-default + create/update batch over this store payment_configs rows only; no prior write in the request (Ruling NEON-ZERO-2: one atomic RPC on a DO store)',
+  'services/store-payment-config.service.ts':
+    'the unset-other-default + create/update batch moved here verbatim from routes/payment-settings.routes.ts so the assistant tool and the route share it; payment_configs rows of this store only; no prior write in the request',
   'routes/shipping.routes.ts':
     'area-rate upsert batches keyed on (storeId, country, governorate, area); reference only storeId; no prior write in the request',
   'services/accounting/bank-reconcile.service.ts':

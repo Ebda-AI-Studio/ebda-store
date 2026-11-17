@@ -24,7 +24,10 @@ describe('order view token', () => {
     expect(verifyOrderViewToken(t, A, Date.now() + ORDER_VIEW_TTL_MS + 5000)).toBe(false); // expired
     const [id, exp, sig] = t.split('.');
     expect(verifyOrderViewToken(`${id}.${Number(exp) + 100000}.${sig}`, A)).toBe(false); // exp edited
-    expect(verifyOrderViewToken(`${id}.${exp}.${sig.slice(0, -2)}AA`, A)).toBe(false); // sig edited
+    // sig edited: flip the FIRST char (always 6 significant bits) to a different one; editing the tail could leave the
+    // decoded bytes unchanged (base64url padding bits / the tail already being 'AA'), a ~1-in-1000 false failure.
+    const flipped = (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1);
+    expect(verifyOrderViewToken(`${id}.${exp}.${flipped}`, A)).toBe(false); // sig edited
     for (const bad of [undefined, null, '', 'x', `${A}.1.2`, 42, `${B}.${exp}.${sig}`]) {
       expect(verifyOrderViewToken(bad, A)).toBe(false);
     }
@@ -204,5 +207,123 @@ describe('route wiring', () => {
   it('POST /orders hands a guest the token', () => {
     expect(src).toContain('viewToken: guestViewTokenFor(order.id)');
     expect(src).toContain('return signOrderViewToken(orderId);');
+  });
+});
+
+describe('TEN-5: InstaPay receipt upload + submit need the order view token', () => {
+  const run = async (orderId: string, header?: string) => {
+    const { requireOrderAccess } = await import('@api/lib/order-view-token');
+    let status = 0;
+    let body: { error?: { code?: string } } = {};
+    let nexted = false;
+    await requireOrderAccess(async () => false)(
+      {
+        get: (n: string) => (n.toLowerCase() === 'x-order-view-token' ? header : undefined),
+        params: { orderId },
+      },
+      {
+        status(c: number) {
+          status = c;
+          return { json: (b: unknown) => void (body = b as typeof body) };
+        },
+      },
+      () => {
+        nexted = true;
+      }
+    );
+    return { status, body, nexted };
+  };
+
+  it('403s with no token, a wrong-order token, and passes with the order token', async () => {
+    const { signOrderViewToken } = await import('@api/lib/order-view-token');
+    const none = await run(A);
+    expect(none.status).toBe(403);
+    expect(none.body.error?.code).toBe('ORDER_VIEW_TOKEN_REQUIRED');
+    expect(none.nexted).toBe(false);
+    expect((await run(A, signOrderViewToken(B))).nexted).toBe(false);
+    expect((await run(A, signOrderViewToken(A))).nexted).toBe(true);
+  });
+
+  describe('INSTAPAY-UPLOAD-1: the owning signed-in customer is accepted too', () => {
+    const call = async (
+      orderId: string,
+      opts: {
+        header?: string;
+        user?: { role?: string; userId?: string };
+        owns?: (c: string, o: string) => Promise<boolean>;
+      }
+    ) => {
+      const { requireOrderAccess } = await import('@api/lib/order-view-token');
+      let status = 0;
+      let nexted = false;
+      await requireOrderAccess(opts.owns ?? (async () => false))(
+        {
+          get: (n: string) => (n.toLowerCase() === 'x-order-view-token' ? opts.header : undefined),
+          params: { orderId },
+          user: opts.user,
+        },
+        {
+          status(c: number) {
+            status = c;
+            return { json: () => undefined };
+          },
+        },
+        () => {
+          nexted = true;
+        }
+      );
+      return { status, nexted };
+    };
+    const owner = { role: 'customer', userId: 'cust-1' };
+    const ownsA = async (c: string, o: string) => c === 'cust-1' && o === A;
+
+    it('lets the owning customer through with no token', async () => {
+      expect((await call(A, { user: owner, owns: ownsA })).nexted).toBe(true);
+    });
+    it("refuses another customer's order, a guest, a non-customer role and an unowned order", async () => {
+      expect((await call(B, { user: owner, owns: ownsA })).status).toBe(403);
+      expect(
+        (await call(A, { user: { role: 'customer', userId: 'cust-2' }, owns: ownsA })).status
+      ).toBe(403);
+      expect((await call(A, { owns: ownsA })).status).toBe(403);
+      expect(
+        (await call(A, { user: { role: 'store_admin', userId: 'cust-1' }, owns: ownsA })).status
+      ).toBe(403);
+    });
+    it('fails closed when the ownership lookup throws', async () => {
+      const r = await call(A, {
+        user: owner,
+        owns: async () => {
+          throw new Error('db down');
+        },
+      });
+      expect(r).toEqual({ status: 403, nexted: false });
+    });
+    it('the view token still passes without any lookup', async () => {
+      const { signOrderViewToken } = await import('@api/lib/order-view-token');
+      let looked = false;
+      const r = await call(A, {
+        header: signOrderViewToken(A),
+        owns: async () => {
+          looked = true;
+          return false;
+        },
+      });
+      expect(r.nexted).toBe(true);
+      expect(looked).toBe(false);
+    });
+  });
+
+  it('both write routes mount the guard before the handler (and upload before multer)', () => {
+    const pay = fs.readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/routes/payment.routes.ts'),
+      'utf8'
+    );
+    expect(pay).toMatch(
+      /'\/instapay\/:orderId\/receipt',\s*optionalAuthenticate,\s*rejectImpersonated,\s*paymentLimiter,\s*requireInstapayOrderAccess[^\n]*\n\s*uploadLimiter/
+    );
+    expect(pay).toMatch(
+      /'\/instapay\/:orderId\/receipt\/:receiptId\/submit',\s*optionalAuthenticate,\s*rejectImpersonated,\s*paymentLimiter,\s*requireInstapayOrderAccess/
+    );
   });
 });
