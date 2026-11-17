@@ -174,11 +174,25 @@ function mirrorDrift(
  */
 export const repairDoMirror: MirrorRepair = async (id, fields) => {
   await copyStoreSettings(id, fields);
-  if ('plan' in fields || 'billingSuspendedReason' in fields) {
+  if (!('plan' in fields || 'billingSuspendedReason' in fields)) return;
+  const invalidate = async () => {
     const { featureService } = await import('../services/feature.service.js');
     await featureService.invalidateCache(id); // feature cache first, then the public payloads (issue 2172's order)
     const { bustStoreCachesById } = await import('../services/store.service.js');
     await bustStoreCachesById(id);
+  };
+  // The copy already landed, so the next tick sees no drift: a failed invalidation would leave a stale entitlement in the
+  // cache until its TTL with nothing raised. Retry once, then throw: the reconciler reports it (P1 alert-only row).
+  try {
+    await invalidate();
+  } catch {
+    try {
+      await invalidate();
+    } catch (err) {
+      throw new Error(
+        `DO copy re-pushed but the entitlement caches could not be cleared (2 tries): ${(err as Error).message}`
+      );
+    }
   }
 };
 

@@ -48,4 +48,18 @@ describe('repairDoMirror', () => {
     expect(h.invalidate).not.toHaveBeenCalled();
     expect(h.bust).not.toHaveBeenCalled();
   });
+  it('an invalidation that fails once is retried; failing twice throws so the reconciler raises it', async () => {
+    h.invalidate.mockRejectedValueOnce(new Error('kv down'));
+    await repairDoMirror('s1', { plan: 'enterprise' });
+    expect(h.invalidate).toHaveBeenCalledTimes(2);
+    expect(h.bust).toHaveBeenCalledTimes(1);
+    vi.clearAllMocks();
+    h.invalidate
+      .mockRejectedValueOnce(new Error('kv down'))
+      .mockRejectedValueOnce(new Error('kv down'));
+    await expect(repairDoMirror('s1', { plan: 'enterprise' })).rejects.toThrow(
+      /entitlement caches could not be cleared \(2 tries\): kv down/
+    );
+    expect(h.copy).toHaveBeenCalledTimes(1);
+  });
 });
