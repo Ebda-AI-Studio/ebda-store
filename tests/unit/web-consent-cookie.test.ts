@@ -4,7 +4,7 @@ import { readMarketingConsentFromCookie } from '@web/lib/consent-cookie';
 /**
  * Unit tests for the cookie-parsing helper backing `ConsentGatedMarketingPixels`
  * (tenant-cacheable routing Phase 1, dormant — see
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6). No jsdom/
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6). No jsdom/
  * testing-library in this repo, so this suite stubs `document.cookie` (a
  * getter) directly rather than rendering the component — the component
  * itself is a thin `useEffect` wrapper with no logic of its own to test.

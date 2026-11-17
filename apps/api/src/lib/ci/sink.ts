@@ -1,7 +1,7 @@
 /**
  * The CI sink: Queue `ebda-ci-events` -> R2 `ebda-ci` (source of truth, with `buyerKey`) + Analytics Engine
  * `ebda_commerce_outcomes` (dashboards, NO buyer key, NO order id). Layout and erasure contract:
- * docs/plans/2026-10-28-customer-intelligence.md 1.5, 1.6 and cf/erasure/surfaces.ts (`ciSurface` reads
+ * docs/plans/done/2026-10-28-customer-intelligence.md 1.5, 1.6 and cf/erasure/surfaces.ts (`ciSurface` reads
  * exactly what this writes: gzip NDJSON with a top-level `buyerKey`, and `index/buyer/xx/<key>.json`).
  *
  * Delivery is at-least-once. Duplicates are dropped here by a best-effort KV marker (written AFTER the

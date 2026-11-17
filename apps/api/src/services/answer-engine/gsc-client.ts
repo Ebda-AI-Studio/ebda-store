@@ -43,6 +43,8 @@ import { fetchWithTimeout } from '../../lib/fetch-timeout';
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const GSC_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
+const SITE_VERIFICATION_SCOPE = 'https://www.googleapis.com/auth/siteverification';
+const GSC_WRITE_SCOPE = 'https://www.googleapis.com/auth/webmasters';
 const SITES_API_BASE = 'https://www.googleapis.com/webmasters/v3/sites';
 const TOP_QUERIES_ROW_LIMIT = 10;
 const ACCESS_TOKEN_TTL_SECONDS = 3600;
@@ -79,6 +81,12 @@ export class GscNoAccessError extends Error {
   }
 }
 
+/** Anchored RE2 regex matching only pages served on exactly `host` (dots and other metacharacters escaped). */
+// pq-allow(unused-export): test seam, imported by __tests__/gsc-target.test.ts (cross-store leak proof)
+export function gscPageHostRegex(host: string): string {
+  return `^https?://${host.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`;
+}
+
 /** Parses + validates GSC_SERVICE_ACCOUNT_JSON. Never logs the raw value (may contain the private key). Returns null on anything unset/malformed/incomplete. */
 function parseServiceAccount(): ServiceAccountCreds | null {
   const raw = process.env.GSC_SERVICE_ACCOUNT_JSON;
@@ -113,21 +121,129 @@ export function isGscConfigured(): boolean {
   return parseServiceAccount() !== null;
 }
 
-/** Normalizes a domain (lowercase, strip leading www.) and returns both GSC property URL forms the cron should try in order: the domain-property form and the URL-prefix form. */
-export function gscSiteUrlsForDomain(domain: string): string[] {
-  const normalized = domain
+/** A resolved GSC query target: the property to query, plus (parent-domain-property match only) the store host the `page` dimension must be restricted to. */
+export interface GscTarget {
+  siteUrl: string;
+  /** Set only when `siteUrl` is a PARENT `sc-domain:` property of the store host: Search Analytics then needs a `page` filter so the store only sees its own host's rows. */
+  pageHost?: string;
+}
+
+function normalizeHost(host: string): string {
+  return host
     .trim()
     .toLowerCase()
     .replace(/^www\./, '');
-  return [`sc-domain:${normalized}`, `https://${normalized}/`];
 }
 
-async function mintAccessToken(creds: ServiceAccountCreds): Promise<string> {
+/**
+ * Pure: chooses the most specific accessible property that covers `host`.
+ * Order: (1) exact `sc-domain:<host>`, (2) exact URL-prefix `https://<host>/`
+ * (or http), (3) the LONGEST parent `sc-domain:<d>` where host ends with
+ * `.<d>` — returned with `pageHost` so the caller filters by page. A sibling
+ * label (`ab.ebda.app` vs `b.ebda.app`) never matches a parent because the
+ * suffix test includes the dot. No match → null (caller skips, never throws).
+ */
+export function pickGscTarget(host: string, accessibleSiteUrls: string[]): GscTarget | null {
+  const h = normalizeHost(host);
+  if (!h) return null;
+  const byLower = new Map(accessibleSiteUrls.map(u => [u.toLowerCase(), u] as const));
+
+  for (const candidate of [`sc-domain:${h}`, `https://${h}/`, `http://${h}/`]) {
+    const hit = byLower.get(candidate);
+    if (hit) return { siteUrl: hit };
+  }
+
+  let best: { domain: string; siteUrl: string } | null = null;
+  for (const [lower, original] of byLower) {
+    if (!lower.startsWith('sc-domain:')) continue;
+    const domain = lower.slice('sc-domain:'.length);
+    if (!domain || !h.endsWith(`.${domain}`)) continue;
+    if (!best || domain.length > best.domain.length) best = { domain, siteUrl: original };
+  }
+  return best ? { siteUrl: best.siteUrl, pageHost: h } : null;
+}
+
+/**
+ * A token for the WRITE calls of domain verification (Site Verification API +
+ * Search Console `sites.add`). Separate from the read-only ingest token so
+ * the daily ingest never holds write scopes. Throws when unconfigured.
+ */
+export async function mintGscWriteToken(): Promise<string> {
+  const creds = parseServiceAccount();
+  if (!creds) {
+    throw new Error('GSC is not configured (GSC_SERVICE_ACCOUNT_JSON missing/invalid)');
+  }
+  return mintAccessToken(creds, `${SITE_VERIFICATION_SCOPE} ${GSC_WRITE_SCOPE}`);
+}
+
+const SITES_CACHE_TTL_MS = 10 * 60 * 1000;
+let sitesCache: { at: number; sites: string[] } | null = null;
+let sitesInflight: Promise<string[]> | null = null;
+
+/** Test hook: drop the cached `sites.list` result. */
+export function resetGscSitesCache(): void {
+  sitesCache = null;
+  sitesInflight = null;
+}
+
+async function fetchAccessibleSites(): Promise<string[]> {
+  const creds = parseServiceAccount();
+  if (!creds) {
+    throw new Error('GSC is not configured (GSC_SERVICE_ACCOUNT_JSON missing/invalid)');
+  }
+  const accessToken = await mintAccessToken(creds);
+  const res = await fetchWithTimeout(SITES_API_BASE, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`GSC sites.list failed with status ${res.status}`);
+  const data: unknown = await res.json().catch(() => null);
+  const entries = (data as { siteEntry?: unknown } | null)?.siteEntry;
+  if (!Array.isArray(entries)) return [];
+  const out: string[] = [];
+  for (const e of entries) {
+    const siteUrl = (e as { siteUrl?: unknown } | null)?.siteUrl;
+    const level = (e as { permissionLevel?: unknown } | null)?.permissionLevel;
+    // An unverified property answers 403 on every query — never a target.
+    if (typeof siteUrl === 'string' && level !== 'siteUnverifiedUser') out.push(siteUrl);
+  }
+  return out;
+}
+
+/**
+ * The properties the service account can query (`sites.list`), cached for 10
+ * minutes so one cron run (one store per Inngest step) issues ONE list call,
+ * not one per store. A failed list is NOT cached and throws (the per-store
+ * wrapper isolates it).
+ */
+export async function listAccessibleGscSites(): Promise<string[]> {
+  if (sitesCache && Date.now() - sitesCache.at < SITES_CACHE_TTL_MS) return sitesCache.sites;
+  if (!sitesInflight) {
+    sitesInflight = fetchAccessibleSites()
+      .then(sites => {
+        sitesCache = { at: Date.now(), sites };
+        return sites;
+      })
+      .finally(() => {
+        sitesInflight = null;
+      });
+  }
+  return sitesInflight;
+}
+
+/** Resolves the GSC property (+ optional page filter) for a store host, or null when no accessible property covers it. */
+export async function resolveGscTarget(host: string): Promise<GscTarget | null> {
+  return pickGscTarget(host, await listAccessibleGscSites());
+}
+
+async function mintAccessToken(
+  creds: ServiceAccountCreds,
+  scope: string = GSC_SCOPE
+): Promise<string> {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const assertion = jwt.sign(
     {
       iss: creds.client_email,
-      scope: GSC_SCOPE,
+      scope,
       aud: TOKEN_ENDPOINT,
       iat: nowSeconds,
       exp: nowSeconds + ACCESS_TOKEN_TTL_SECONDS,
@@ -241,13 +357,13 @@ function parseTopQueries(data: unknown): GscTopQuery[] {
 }
 
 /**
- * Queries Search Analytics for one GSC property (siteUrl — one of the two
- * forms from `gscSiteUrlsForDomain`) over [startDate, endDate] (YYYY-MM-DD).
+ * Queries Search Analytics for one GSC property (siteUrl, from `resolveGscTarget`) over [startDate, endDate] (YYYY-MM-DD).
  * Issues one `dimensions:['date']` call (daily rows) and one
  * `dimensions:['query']` call (top queries, capped at
  * `TOP_QUERIES_ROW_LIMIT`).
  *
- * Callers MUST guard on `isGscConfigured()` first — this throws a generic
+ * `opts.pageHost` (parent-domain property only, from `resolveGscTarget`) adds
+ * the `page` filter. Callers MUST guard on `isGscConfigured()` first — this throws a generic
  * Error if called while unconfigured (defense in depth, not the primary
  * guard). Throws `GscNoAccessError` on a 403 from either call (service
  * account not granted access to the property) so the cron can catch it
@@ -257,7 +373,8 @@ function parseTopQueries(data: unknown): GscTopQuery[] {
 export async function querySearchAnalytics(
   siteUrl: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  opts: { pageHost?: string } = {}
 ): Promise<GscResult> {
   const creds = parseServiceAccount();
   if (!creds) {
@@ -266,17 +383,42 @@ export async function querySearchAnalytics(
 
   const accessToken = await mintAccessToken(creds);
 
+  // Parent-domain property: restrict to this store's host. An ANCHORED RE2
+  // regex on the `page` dimension (`^https?://<escaped host>/`) — a plain
+  // `contains` would also match another store's page whose path or query
+  // carries this host (e.g. `https://x.ebda.app/?r=https://b.ebda.app/`),
+  // leaking that store's clicks into this one. Anchoring at `^` also keeps
+  // `ab.ebda.app` from matching `b.ebda.app`.
+  const filter = opts.pageHost
+    ? {
+        dimensionFilterGroups: [
+          {
+            groupType: 'and',
+            filters: [
+              {
+                dimension: 'page',
+                operator: 'includingRegex',
+                expression: gscPageHostRegex(opts.pageHost),
+              },
+            ],
+          },
+        ],
+      }
+    : {};
+
   const [dateResult, queryResult] = await Promise.all([
     postSearchAnalytics(siteUrl, accessToken, {
       startDate,
       endDate,
       dimensions: ['date'],
+      ...filter,
     }),
     postSearchAnalytics(siteUrl, accessToken, {
       startDate,
       endDate,
       dimensions: ['query'],
       rowLimit: TOP_QUERIES_ROW_LIMIT,
+      ...filter,
     }),
   ]);
 

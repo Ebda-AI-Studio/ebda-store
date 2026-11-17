@@ -15,7 +15,8 @@ import { useDashboardData } from './_hooks/useDashboardData';
 // The setup guide (SetupGuideCard) replaces the old static OnboardingChecklist:
 // every row derives from real store data and the merchant can hide it.
 import { SetupGuideCard } from './_components/SetupGuideCard';
-import { StatsGrid } from './_components/StatsGrid';
+import { StorePulseBlock, TopProductsCard } from './_components/StorePulse';
+import { useStorePulse, type PulsePeriod } from './_hooks/useStorePulse';
 import { NeedsAction } from './_components/NeedsAction';
 import { NextStepSlot } from './_components/NextStepSlot';
 import { OrderAlertsPromptCard } from '../../../components/OrderAlertsPromptCard';
@@ -23,6 +24,7 @@ import { DashboardAccountingSummary } from './_components/DashboardAccountingSum
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
 import { AcquisitionCard } from './_components/AcquisitionCard';
+import { AssistantModeCard } from './_components/AssistantModeCard';
 import { QuickActions } from './_components/QuickActions';
 import { SettingsLink } from './_components/SettingsLink';
 import { SuspendStoreModal } from './_components/SuspendStoreModal';
@@ -65,6 +67,8 @@ export default function StoreDetailPage() {
   } = useDashboardData(storeId);
 
   const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [period, setPeriod] = useState<PulsePeriod>('last_7');
+  const { pulse, reload: reloadPulse } = useStorePulse(storeId, period);
   const { requestDelete, dialog: deleteDialog } = useDeleteStore(
     useCallback(() => router.push('/stores'), [router])
   );
@@ -119,7 +123,20 @@ export default function StoreDetailPage() {
         <GoldRateBanner storeId={store.id} />
       </NextStepSlot>
 
-      <StatsGrid storeId={store.id} />
+      <StorePulseBlock
+        pulse={pulse}
+        period={period}
+        onPeriod={setPeriod}
+        onRetry={reloadPulse}
+        storeId={store.id}
+        storeUrl={getStoreHref(store)}
+      />
+
+      {/* Top products + the jobs to start: side by side on desktop, stacked on a phone. */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <TopProductsCard products={pulse.topProducts} storeId={store.id} onRetry={reloadPulse} />
+        <QuickActions store={store} isSuperAdmin={isSuperAdmin} />
+      </div>
 
       <div className="mt-8">
         <DashboardAccountingSummary storeId={storeId} />
@@ -145,14 +162,13 @@ export default function StoreDetailPage() {
         <div className="space-y-6">
           <StoreOwnerCard owner={store.owner} />
           {isSuperAdmin && <AcquisitionCard acquisition={store.owner.acquisition} />}
+          {isSuperAdmin && <AssistantModeCard storeId={store.id} />}
         </div>
       </div>
 
       {/* Custom Domain panel lives at /stores/[id]/domain — removed from the
           dashboard 2026-05-14 to avoid duplicating the surface and to keep
           the dashboard focused on quick-glance store overview + actions. */}
-
-      <QuickActions store={store} isSuperAdmin={isSuperAdmin} />
 
       <SettingsLink storeId={store.id} />
 

@@ -8,7 +8,7 @@
  * deploy-generated open-next config, so its own tag purges work; the committed local config has none.) This module
  * is therefore the ONE owner of resolve caching, checked against the purge epochs, and the resolve fetch is no-store.
  *
- * LAYERS (docs/plans/2026-11-10-resolve-bulletproof.md):
+ * LAYERS (docs/plans/done/2026-11-10-resolve-bulletproof.md):
  *   L1 per-isolate memory of hits AND definitive misses (hit 60 s / miss 30 s; without R2 8 s / 15 s).
  *   L2 durable last-known-good in R2 (`resolve-lkg/<host>`), shared by every isolate: fresh 60 s / 30 s, stale-if-error 24 h.
  *   L3 concurrent misses for one key in one isolate share one API call.

@@ -1,8 +1,8 @@
 # PDPL erasure and export on Cloudflare storage (G10)
 
-Law: Egypt Personal Data Protection Law 151/2020 (article numbers not yet counsel-verified, see `docs/RETENTION.md`). Code: `apps/api/src/cf/erasure/`. Plan lineage: `business/ebda/plans/2026-10-28-store-on-cloudflare-detailed.md` addendum G10, `docs/plans/2026-10-28-customer-intelligence.md` section 1.7.
+Law: Egypt Personal Data Protection Law 151/2020 (article numbers not yet counsel-verified, see `docs/RETENTION.md`). Code: `apps/api/src/cf/erasure/`. Plan lineage: `business/ebda/plans/2026-10-28-store-on-cloudflare-detailed.md` addendum G10, `docs/plans/done/2026-10-28-customer-intelligence.md` section 1.7.
 
-**Status: built and tested, flag-gated.** `PDPL_CF_ERASURE_ENABLED` is unset everywhere, so `runErasure` / `runExport` throw `ErasureDisabledError`. Until the Store cuts over to StoreDO the Postgres path (`POST /auth/me/erase` -> `AuthService.eraseAccount` + `privacy-propagation.service.ts`) stays the one that runs. At cutover: set the var, wire the trigger (below), and delete the Postgres path with the rest of Neon.
+**Status: built and tested, flag-gated.** `PDPL_CF_ERASURE_ENABLED` is unset everywhere, so `runErasure` / `runExport` throw `ErasureDisabledError`. While the flag is off the merchant/staff closure API (`POST /auth/me/close-account`) is honest about it: it records an `account.closure.requested` audit row, sends a P1 alert and returns `503 ERASURE_NOT_ENABLED` (bilingual message, nothing erased), and the flag state is reported as `checks.pdplErasure` in the super-admin deep health check (S3, 2026-11-12). Until the Store cuts over to StoreDO the Postgres path (`POST /auth/me/erase` -> `AuthService.eraseAccount` + `privacy-propagation.service.ts`) stays the one that runs. At cutover: set the var, wire the trigger (below), and delete the Postgres path with the rest of Neon.
 
 ## One job, five surfaces
 

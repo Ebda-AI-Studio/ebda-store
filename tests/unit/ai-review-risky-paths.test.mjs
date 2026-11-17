@@ -37,7 +37,8 @@ describe('ai-review classifier (fail closed: only docs, markdown and NEWLY ADDED
   });
   it('the workflow: base checkout, 400 KB fails, name-status, fork-gate red until labelled', () => {
     const wf = readFileSync('.github/workflows/ai-review.yml', 'utf8');
-    expect((wf.match(/ref: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/g) ?? []).length).toBe(4);
+    expect((wf.match(/ref: \$\{\{ github\.base_ref \}\}/g) ?? []).length).toBe(2);
+    expect((wf.match(/ref: \$\{\{ github\.event\.pull_request\.base\.ref \}\}/g) ?? []).length).toBe(2);
     expect(wf).not.toMatch(/head -c/);
     expect(wf).toMatch(/-ge 400000/);
     expect(wf).toMatch(/git diff --name-status --no-renames/);
@@ -46,20 +47,36 @@ describe('ai-review classifier (fail closed: only docs, markdown and NEWLY ADDED
     expect(fork).toMatch(/exit 1/);
     expect(fork).not.toMatch(/CLAUDE_CODE_OAUTH_TOKEN/);
   });
+  it('Ruling AI-REVIEW-LABEL-1: only a real critical verdict may remove ai-review-passed; refusal/infra paths leave labels alone', () => {
+    const wf = readFileSync('.github/workflows/ai-review.yml', 'utf8');
+    const removals = [...wf.matchAll(/--remove-label ai-review-passed/g)].map((m) => m.index);
+    const classify = wf.slice(wf.indexOf('  classify:'), wf.indexOf('  review:'));
+    const sizeStep = wf.slice(wf.indexOf('- name: Build the diff'), wf.indexOf('- name: Review the diff'));
+    expect(classify).not.toMatch(/remove-label ai-review-passed/);
+    expect(sizeStep).not.toMatch(/--remove-label|--add-label|gh pr edit/);
+    const review = wf.slice(wf.indexOf('  review:'), wf.indexOf('  manual-pass:'));
+    // the review job's single removal is gated on the verdict output
+    const step = review.slice(review.indexOf('- name: Drop ai-review-passed'), review.indexOf('- name: Label ai-review-passed'));
+    expect(step).toMatch(/if: always\(\) && steps\.gate\.outputs\.verdict == 'critical'/);
+    expect(step).toMatch(/--remove-label ai-review-passed/);
+    // the only other removal is the fork-gate (fork PRs never get a bot review)
+    expect(removals.length).toBe(2);
+    expect(readFileSync('.github/ai-review/review.mjs', 'utf8')).toMatch(/verdict=critical/);
+  });
 });
 
-describe('approval is never carried across pushes by automation (Ruling AIR-6)', () => {
+describe('classify never strips ai-review-passed (main Ruling AI-REVIEW-LABEL-1 / RF-710)', () => {
   const wf2 = readFileSync('.github/workflows/ai-review.yml', 'utf8');
   const classify2 = wf2.slice(wf2.indexOf('  classify:'), wf2.indexOf('  review:'));
   const fork2 = wf2.slice(wf2.indexOf('  fork-gate:'));
   const BASE_CHANGED = /github\.event\.action != 'edited' \|\| github\.event\.changes\.base\.ref\.from != null/;
-  it('every non-label event strips ai-review-passed unconditionally in classify, with no marker or diff comparison', () => {
-    expect(classify2).toMatch(/gh pr edit "\$PR" --remove-label ai-review-passed/);
+  it('classify has no label removal and no marker or diff comparison', () => {
+    expect(classify2).not.toMatch(/remove-label ai-review-passed/);
     expect(wf2).not.toMatch(/pass-marker|patch-id|REVIEWED_DIFF/);
   });
-  it('a base-branch change (edited event with changes.base) re-runs classify; a title/body edit does not strip', () => {
+  it('a base-branch change (edited event with changes.base) re-runs classify; the fork gate decides itself whether to strip', () => {
     expect(classify2).toMatch(BASE_CHANGED);
-    expect(fork2).not.toMatch(BASE_CHANGED); // the fork gate runs on EVERY event and decides itself whether to strip
+    expect(fork2).not.toMatch(BASE_CHANGED);
     expect(fork2).toMatch(/BASE_FROM: \$\{\{ github\.event\.changes\.base\.ref\.from \}\}/);
   });
 });
@@ -112,7 +129,7 @@ describe('every subscribed event yields a non-skipped "AI review" check', () => 
       expect(running.length, `no "AI review" job runs for ${JSON.stringify(e)} (classify ${classifyRuns ? 'ran, risky=' + risky : 'skipped'})`).toBeGreaterThan(0);
     }
   });
-  it('a title/body edit and an unrelated label never strip the label', () => {
+  it('a title/body edit and an unrelated label never strip the label (fork gate) and state-check never strips', () => {
     const classify = all.find((j) => j.id === 'classify');
     for (const e of EVENTS.filter((x) => (x.action === 'edited' && !x.baseFrom) || (x.action === 'labeled' && x.label !== 'ai-review-passed'))) {
       expect(evalIf(classify.cond, ghContext(e, '')), JSON.stringify(e)).toBe(false);
@@ -123,18 +140,18 @@ describe('every subscribed event yields a non-skipped "AI review" check', () => 
   });
 });
 
-describe('push-like events strip the label, draft or not (Ruling AIR-6)', () => {
+describe('push-like events re-run classify, draft or not (the label is never stripped there)', () => {
   const wf4 = readFileSync('.github/workflows/ai-review.yml', 'utf8');
   const all4 = jobs(wf4);
   const classify = all4.find((j) => j.id === 'classify');
-  it('classify (the job that strips) runs for opened / synchronize / reopened / ready_for_review on a DRAFT PR, and for a base-change edit', () => {
+  it('classify runs for opened / synchronize / reopened / ready_for_review on a DRAFT PR, and for a base-change edit', () => {
     for (const action of ['opened', 'synchronize', 'reopened', 'ready_for_review']) {
       expect(evalIf(classify.cond, ghContext({ action, draft: true, fork: false }, '')), `draft ${action}`).toBe(true);
     }
     expect(evalIf(classify.cond, ghContext({ action: 'edited', baseFrom: 'main', draft: true, fork: false }, ''))).toBe(true);
     expect(evalIf(classify.cond, ghContext({ action: 'edited', draft: true, fork: false }, ''))).toBe(false);
   });
-  it('a draft is stripped but never reviewed (the review job is skipped for drafts)', () => {
+  it('a draft is classified but never reviewed (the review job is skipped for drafts)', () => {
     const review = all4.find((j) => j.id === 'review');
     expect(evalIf(review.cond, ghContext({ action: 'synchronize', draft: true, fork: false }, 'true'))).toBe(false);
     expect(evalIf(review.cond, ghContext({ action: 'synchronize', draft: false, fork: false }, 'true'))).toBe(true);

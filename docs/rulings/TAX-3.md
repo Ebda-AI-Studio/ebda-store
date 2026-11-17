@@ -1,5 +1,5 @@
 # TAX-3
 
-> Section: 2026-10-07 — Egypt VAT gate, phase 1 (branch `feat/vat-gate`; design `docs/plans/2026-10-07-egypt-vat-and-eta.md`)
+> Section: 2026-10-07 — Egypt VAT gate, phase 1 (branch `feat/vat-gate`; design `docs/plans/done/2026-10-07-egypt-vat-and-eta.md`)
 
 Ruling TAX-3 — NO data rewrite for existing stores; new stores start with VAT OFF and no active rate. A store with `taxEnabled = true` and no verified profile keeps its row and its rates; the resolver treats it as off, so the migration is expand-only (CF-MIGRATE-1) and nothing is lost if the merchant later verifies. A super-admin REVOKE also sets `taxEnabled = false`, so a later re-verification never restarts VAT without the merchant choosing it. `store.service.ts` and `provisioning.service.ts` seed the 14% "VAT" rate as `isActive: false`. Production state NOT re-read in this change (no Neon access in this session); TAX-1 recorded 0 `tax_rates` rows and `taxEnabled: false` on every live store on 2026-10-01. Settle it before deploy with a read-only `SELECT count(*) FROM stores WHERE tax_enabled` and `SELECT count(*) FROM orders WHERE tax > 0`. Cost if wrong: a store that was actually charging VAT stops at deploy (by design) and its merchant must submit documents to resume.

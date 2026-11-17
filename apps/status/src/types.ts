@@ -22,6 +22,8 @@ export interface ProbeResult {
   /** HTTP status, or null when no response arrived (timeout / network error). */
   status: number | null;
   latencyMs: number;
+  /** True when the probe SUCCEEDED but took longer than SLOW_THRESHOLD_MS (degraded, not down). */
+  slow?: boolean;
   /** Short machine-readable reason, null when ok. */
   error: string | null;
 }
@@ -69,6 +71,8 @@ export interface ComponentSnapshot {
   status: ComponentStatus;
   lastChecked: number | null;
   latencyMs: number | null;
+  /** The latest successful probe was slow (8 s < t <= 15 s). */
+  slow: boolean;
   lastError: string | null;
   /** Percentage over the shown history, or null with no data. */
   uptime: number | null;

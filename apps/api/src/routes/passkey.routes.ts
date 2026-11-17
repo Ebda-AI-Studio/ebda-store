@@ -23,7 +23,7 @@ import { PasskeyService, assertPasskeyOrigin } from '../services/passkey.service
 import { setSessionCookies } from './auth.routes';
 
 /**
- * Passkeys (WebAuthn). Mounted at `/auth/passkeys`. Design + rulings: docs/plans/2026-10-21-passkeys.md.
+ * Passkeys (WebAuthn). Mounted at `/auth/passkeys`. Design + rulings: docs/plans/done/2026-10-21-passkeys.md.
  *
  *   POST /authenticate/begin    public   discoverable-credential options (takes NO account input)
  *   POST /authenticate/finish   public   verify the assertion, mint the session (satisfies MFA, PASSKEY-4)

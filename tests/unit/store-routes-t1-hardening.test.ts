@@ -210,7 +210,7 @@ describe('PUT /stores/:id/branding-bundle (BE:F-3)', () => {
 });
 
 describe('echoed server-owned flags (BE:S-8, Ruling FP-1)', () => {
-  it.each(['mcpWriteEnabled', 'goldAllowDeferredPayment'])(
+  it.each(['mcpWriteEnabled', 'goldAllowDeferredPayment', 'assistantMode'])(
     'PUT /stores/:id with settings.%s from a stale whole copy is accepted (the service drops it)',
     async key => {
       const res = await request(app)

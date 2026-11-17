@@ -1,5 +1,5 @@
 /**
- * The NEVER-stale ledger (docs/plans/2026-10-21-b2b-wholesale.md Task 4; rule: every cached read declares a staleness class and
+ * The NEVER-stale ledger (docs/plans/done/2026-10-21-b2b-wholesale.md Task 4; rule: every cached read declares a staleness class and
  * EVERY write path invalidates). Price, MOQ, audience, group membership and approval status are NEVER-stale. This test lists
  * every writer and requires its body to call the invalidator; it also fails if the invalidator has no callers (an `invalidate*`
  * with zero call-sites is the same bug inverted). There is no per-buyer cache anywhere (group prices are computed per request
