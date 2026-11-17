@@ -279,6 +279,7 @@ describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VA
     expect(row.a).toBe(100);
     expect(JSON.parse(row.raw).underpay).toEqual({
       expectedMinor: 5000,
+      periodIntervals: 1,
       reason: 'agreed discount',
     });
   });
@@ -304,5 +305,93 @@ describe('R-MANUAL-UNDERPAY-1: the recorded amount must cover the plan price (VA
     });
     await recordManualPayment(input(A, { amountMinor: 5700 }));
     expect(ledgerRows(db)).toEqual({ n: 1 });
+  });
+
+  describe('an explicit period is priced by the intervals it covers (audit CRITICAL, PR #860)', () => {
+    const start = new Date('2026-01-15T00:00:00.000Z');
+    const span = (months: number) => ({
+      periodStart: start,
+      periodEnd: new Date(Date.UTC(2026, 0 + months, 15)),
+    });
+
+    it('one month price + a 12-month explicit period is refused, nothing written', async () => {
+      const db = world();
+      await expect(
+        recordManualPayment(input(A, { amountMinor: 5000, ...span(12) }))
+      ).rejects.toMatchObject({ statusCode: 409, code: 'AMOUNT_BELOW_PRICE' });
+      expect(ledgerRows(db)).toEqual({ n: 0 });
+      expect(h.storeUpdate).not.toHaveBeenCalled();
+    });
+
+    it('the same with the override + reason is accepted and recorded as an underpay (12 intervals expected)', async () => {
+      const db = world();
+      const out = await recordManualPayment(
+        input(A, {
+          amountMinor: 5000,
+          ...span(12),
+          allowUnderpay: true,
+          underpayReason: 'annual deal agreed by phone',
+        })
+      );
+      expect(out.underpay).toEqual({ expectedMinor: 60000, periodIntervals: 12 });
+      const row = db.prepare('SELECT raw FROM billing_events').get() as { raw: string };
+      expect(JSON.parse(row.raw).underpay).toEqual({
+        expectedMinor: 60000,
+        periodIntervals: 12,
+        reason: 'annual deal agreed by phone',
+      });
+    });
+
+    it('12 intervals paid in full needs no flag and reports no underpay (service outcome)', async () => {
+      const db = world();
+      const out = await recordManualPayment(input(A, { amountMinor: 60000, ...span(12) }));
+      expect(out.underpay).toBeUndefined();
+      const row = db.prepare('SELECT raw FROM billing_events').get() as { raw: string };
+      expect(JSON.parse(row.raw).underpay).toBeUndefined();
+    });
+
+    it('allowUnderpay sent but the amount already covers the price: no underpay is recorded', async () => {
+      const db = world();
+      const out = await recordManualPayment(
+        input(A, { amountMinor: 5000, allowUnderpay: true, underpayReason: 'stale form flag' })
+      );
+      expect(out.underpay).toBeUndefined();
+      const row = db.prepare('SELECT raw FROM billing_events').get() as { raw: string };
+      expect(JSON.parse(row.raw).underpay).toBeUndefined();
+    });
+
+    it('an explicit period of exactly one interval at the plain price still works', async () => {
+      world();
+      expect(await recordManualPayment(input(A, { amountMinor: 5000, ...span(1) }))).toMatchObject({
+        duplicate: false,
+      });
+    });
+
+    it('a period a second past one interval is 2 intervals (rounded up)', async () => {
+      world();
+      await expect(
+        recordManualPayment(
+          input(A, {
+            amountMinor: 5000,
+            periodStart: start,
+            periodEnd: new Date(Date.UTC(2026, 1, 15, 0, 0, 1)),
+          })
+        )
+      ).rejects.toMatchObject({ code: 'AMOUNT_BELOW_PRICE' });
+    });
+
+    it('a period longer than 120 intervals is refused outright, override or not', async () => {
+      world();
+      await expect(
+        recordManualPayment(
+          input(A, {
+            amountMinor: 100_000_000,
+            ...span(121),
+            allowUnderpay: true,
+            underpayReason: 'whatever',
+          })
+        )
+      ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_PERIOD' });
+    });
   });
 });

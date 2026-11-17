@@ -752,8 +752,11 @@ router.post(
           periodEnd: (out.periodEnd ?? input.periodEnd)?.toISOString() ?? null,
           periodOverride: !!input.periodStart,
           claimId: input.claimId ?? null,
-          allowUnderpay: input.allowUnderpay === true,
-          underpayReason: input.allowUnderpay ? (input.underpayReason ?? null) : null,
+          // the SERVICE's outcome, not the client's flag: set only when an underpayment was actually recorded
+          underpaid: !!out.underpay,
+          expectedMinor: out.underpay?.expectedMinor ?? null,
+          periodIntervals: out.underpay?.periodIntervals ?? null,
+          underpayReason: out.underpay ? (input.underpayReason ?? null) : null,
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

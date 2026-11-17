@@ -9908,10 +9908,11 @@
       "useAutoPeriod": "Use the automatic period",
       "advanced": "Advanced",
       "replacesVoided": "Replaces voided payment (ID)",
-      "amountBelowPrice": "The amount is below the plan price (VAT included). Fix the amount, or approve the underpayment with a reason.",
+      "amountBelowPrice": "The amount is below the plan price for the whole paid period (VAT included). Fix the amount or the period, or approve the underpayment with a reason.",
       "allowUnderpay": "Approve this underpayment anyway",
       "underpayReason": "Why is the underpayment accepted?",
       "reasonRequired": "Write the reason.",
+      "underpayReasonRequired": "Write a reason (at least 3 characters) to approve the underpayment, or fix the amount.",
       "referenceUsedElsewhere": "This reference was recorded for another store. If that payment was voided, paste its ID in 'Replaces voided payment'.",
       "notAVoided": "That payment was not voided or has a different reference."
     },

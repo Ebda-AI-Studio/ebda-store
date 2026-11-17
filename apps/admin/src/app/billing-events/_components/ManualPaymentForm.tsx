@@ -115,6 +115,15 @@ export function ManualPaymentForm({
     };
   }, [interval, prefill.interval, prefill.storeId, claimSuggestsInterval]);
 
+  // The override only applies to the amount/plan/interval/period the server refused: changing anything the price
+  // depends on drops it (hides the box, forgets the reason), so a corrected amount never goes out as an underpay.
+  function resetUnderpay() {
+    setUnderpayAsked(false);
+    setAllowUnderpay(false);
+    setUnderpayReason('');
+    setErrors(prev => ({ ...prev, underpayReason: '' }));
+  }
+
   function startEditing() {
     if (suggestion) {
       setPeriodStart(dayOf(suggestion.start));
@@ -130,8 +139,8 @@ export function ManualPaymentForm({
     if (amountMinor === null || amountMinor <= 0) found.amount = t('amountInvalid');
     if (!reference.trim()) found.reference = t('referenceRequired');
     if (!paidAt) found.paidAt = t('dateRequired');
-    if (allowUnderpay && underpayReason.trim().length < 3)
-      found.underpayReason = t('reasonRequired');
+    const overriding = underpayAsked && allowUnderpay;
+    if (overriding && underpayReason.trim().length < 3) found.underpayReason = t('reasonRequired');
     if (editPeriod) {
       if (!periodStart) found.periodStart = t('dateRequired');
       if (!periodEnd) found.periodEnd = t('dateRequired');
@@ -155,7 +164,7 @@ export function ManualPaymentForm({
         ...(editPeriod ? { periodStart: toIso(periodStart), periodEnd: toIso(periodEnd) } : {}),
         ...(prefill.claimId ? { claimId: prefill.claimId } : {}),
         ...(replacesVoided.trim() ? { replacesVoidedEventId: replacesVoided.trim() } : {}),
-        ...(allowUnderpay ? { allowUnderpay: true, underpayReason: underpayReason.trim() } : {}),
+        ...(overriding ? { allowUnderpay: true, underpayReason: underpayReason.trim() } : {}),
       }
     );
     setSaving(false);
@@ -164,11 +173,13 @@ export function ManualPaymentForm({
       setFormError(
         error?.code === 'AMOUNT_BELOW_PRICE'
           ? t('amountBelowPrice')
-          : error?.code === 'REFERENCE_USED_ELSEWHERE'
-            ? t('referenceUsedElsewhere')
-            : error?.code === 'NOT_A_VOIDED_PAYMENT'
-              ? t('notAVoided')
-              : t('failed')
+          : error?.code === 'REASON_REQUIRED'
+            ? t('underpayReasonRequired')
+            : error?.code === 'REFERENCE_USED_ELSEWHERE'
+              ? t('referenceUsedElsewhere')
+              : error?.code === 'NOT_A_VOIDED_PAYMENT'
+                ? t('notAVoided')
+                : t('failed')
       );
       return;
     }
@@ -195,7 +206,10 @@ export function ManualPaymentForm({
           <Select
             label={t('plan')}
             value={planCode}
-            onChange={e => setPlanCode(e.target.value)}
+            onChange={e => {
+              setPlanCode(e.target.value);
+              resetUnderpay();
+            }}
             options={PLAN_CODES.map(c => ({ value: c, label: planLabel(c, locale) }))}
           />
           <Select
@@ -204,6 +218,7 @@ export function ManualPaymentForm({
             onChange={e => {
               const next = e.target.value as 'monthly' | 'yearly';
               setInterval(next);
+              resetUnderpay();
               if (editPeriod) setPeriodEnd(addPeriod(periodStart || today, next));
             }}
             options={[
@@ -218,7 +233,10 @@ export function ManualPaymentForm({
           inputMode="decimal"
           label={t('amount')}
           value={amount}
-          onChange={e => setAmount(e.target.value)}
+          onChange={e => {
+            setAmount(e.target.value);
+            resetUnderpay();
+          }}
           error={errors.amount}
         />
         {underpayAsked && (
@@ -278,6 +296,7 @@ export function ManualPaymentForm({
                 value={periodStart}
                 onChange={e => {
                   setPeriodStart(e.target.value);
+                  resetUnderpay();
                   if (e.target.value) setPeriodEnd(addPeriod(e.target.value, interval));
                 }}
                 error={errors.periodStart}
@@ -288,7 +307,10 @@ export function ManualPaymentForm({
                 dir="ltr"
                 label={t('periodEnd')}
                 value={periodEnd}
-                onChange={e => setPeriodEnd(e.target.value)}
+                onChange={e => {
+                  setPeriodEnd(e.target.value);
+                  resetUnderpay();
+                }}
                 error={errors.periodEnd}
               />
             </div>

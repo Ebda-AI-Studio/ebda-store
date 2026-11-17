@@ -30,6 +30,7 @@ import {
   isInterval,
   type BillingInterval,
   addIntervalAnchored,
+  intervalsCovered,
 } from './period';
 import { normalizeInstapayReference, type InstapayReceiptFields } from '@ebda/shared';
 import {
@@ -918,9 +919,14 @@ export type ManualPaymentResult = {
   billingEventId: string;
   periodStart?: Date;
   periodEnd?: Date;
+  /** Set only when THIS call recorded an underpayment (the override was used); the route audits it from here. */
+  underpay?: { expectedMinor: number; periodIntervals: number };
   /** @internal receipts approved by this payment; consumed (and stripped) by recordManualPayment */
   approvedReceiptIds?: string[];
 };
+
+/** An explicit manual period longer than this many intervals is refused outright (a typo or abuse, not a prepay). */
+const MAX_MANUAL_PERIOD_INTERVALS = 120;
 
 /** The idempotency key of a manual payment: one per (method, payer reference). */
 export const manualPaymentKey = (method: ManualMethod, reference: string) =>
@@ -951,15 +957,26 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     throw new AppError(400, 'INVALID_PERIOD', 'The period must end after it starts');
   }
   const { plan, price } = await loadPayablePlan(input.planCode, input.interval);
-  // R-MANUAL-UNDERPAY-1: the money recorded must cover the plan price for the interval, VAT included
-  // (chargeFor = the amount a card would be charged today). Over-payment is fine; an underpayment needs a reason.
-  const expectedMinor = (await chargeFor(price)).totalMinor;
-  if (input.amountMinor < expectedMinor) {
+  // R-MANUAL-UNDERPAY-1: the money recorded must cover the plan price, VAT included (chargeFor = the amount a card
+  // would be charged today), for EVERY interval the paid period spans. An explicit operator period is priced by the
+  // intervals it covers (rounded up), so one month's price cannot buy a 12-month term. Over-payment is fine; an
+  // underpayment needs the explicit override and a reason.
+  const periodIntervals = explicit
+    ? intervalsCovered(input.periodStart!, input.periodEnd!, input.interval)
+    : 1;
+  if (periodIntervals > MAX_MANUAL_PERIOD_INTERVALS) {
+    throw new AppError(400, 'INVALID_PERIOD', 'The period is too long for a manual payment');
+  }
+  const unitMinor = (await chargeFor(price)).totalMinor;
+  const expectedMinor = unitMinor * periodIntervals;
+  const underpaid = input.amountMinor < expectedMinor;
+  if (underpaid) {
     if (!input.allowUnderpay) {
       throw new AppError(
         409,
         'AMOUNT_BELOW_PRICE',
-        `The amount is below the plan price (${expectedMinor} piastres, VAT included)`
+        `The amount is below the price for this period (${expectedMinor} piastres, VAT included, ${periodIntervals} ${input.interval === 'yearly' ? 'year' : 'month'}${periodIntervals > 1 ? 's' : ''})`,
+        { expectedMinor, periodIntervals }
       );
     }
     if ((input.underpayReason ?? '').trim().length < 3) {
@@ -1084,8 +1101,14 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
       previousStatus: sub?.status ?? null,
       recordedBy: input.actorId,
-      ...(input.amountMinor < expectedMinor
-        ? { underpay: { expectedMinor, reason: input.underpayReason!.trim().slice(0, 500) } }
+      ...(underpaid
+        ? {
+            underpay: {
+              expectedMinor,
+              periodIntervals,
+              reason: (input.underpayReason ?? '').trim().slice(0, 500),
+            },
+          }
         : {}),
     };
     const hasCard = !!sub?.provider && !!sub?.providerPaymentMethodRef;
@@ -1222,6 +1245,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       periodStart,
       periodEnd,
       approvedReceiptIds,
+      ...(underpaid ? { underpay: { expectedMinor, periodIntervals } } : {}),
     };
   });
 
