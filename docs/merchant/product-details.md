@@ -63,3 +63,5 @@ Nothing to set up: a sticky add-to-cart bar on phones, a sticky total bar in the
 
 - **منتج جديد** بيطلب الأساسيات بس: الاسم (بلغة المتجر الأساسية الأول، واللغة التانية اختيارية تحت "تفاصيل أكتر")، السعر (لازم أكتر من صفر)، الكمية، القسم، الحالة والصور. الوصف والخصم والتكلفة وكلمات البحث والشارة تحت **تفاصيل أكتر**. بعد **ضيف المنتج** بتروح لصفحة تعديل المنتج وفيها **ضيف المتغيرات**، والزرار بيفضل مقفول لحد ما الصفحة تتغير فمنتج واحد بس بيتعمل.
 - **التعديل:** شريط **احفظ المنتج** بيظهر تحت بس لما يكون فيه تغييرات (مع **تراجع**). **شوف في المتجر** بيفتح المنتج في متجرك، والمتغيرات والمقترحات في قايمة **...**. مسح سؤال من الأسئلة الشائعة بيظهر زرار تراجع 6 ثواني.
+
+- **Search words written by the AI** always include the Latin-letter (Franco) spellings of your product's Arabic name, for example إسورة also answers to "eswera" and "aswara". They are added from the name itself, so two similar products get the same spellings, and older AI-written words are topped up by the daily sweep. Words you typed yourself are never changed.

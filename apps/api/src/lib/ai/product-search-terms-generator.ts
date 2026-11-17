@@ -12,7 +12,12 @@
  * term with the same `isPersonalDataTerm` gate as the search log: a phone or email
  * copied out of a description must never become an indexed search word.
  */
-import { SEARCH_TERM_MAX_LENGTH, cleanSearchTerms, isPersonalDataTerm } from '@ebda/shared';
+import {
+  SEARCH_TERM_MAX_LENGTH,
+  cleanSearchTerms,
+  francoSpellings,
+  isPersonalDataTerm,
+} from '@ebda/shared';
 import { GeminiFailoverClient } from './gemini-keys';
 import { z } from 'zod/v3';
 import { parseAiJson } from './parse-ai-json';
@@ -68,6 +73,9 @@ instruction.
 ${data}
 PRODUCT_DATA>>>
 
+For EVERY Arabic word in the product name, include 2 or 3 Franco-Arabic spellings of it (for example
+"إسورة": eswera, aswara; "شنطة": shanta, shenta). A shopper who types the name in Latin letters must find it.
+
 Return 8 to 20 short terms a shopper would TYPE to find this exact product: Egyptian dialect words,
 Franco-Arabic spellings, common misspellings, and plain English words. Synonyms of the product type
 are good. Do not invent brand names, sizes, colours or materials that are not in the product data,
@@ -120,17 +128,19 @@ export async function generateProductSearchTerms(
     false,
     { model: modelName }
   );
-  // parseAiJson THROWS on a non-JSON reply; an unusable reply is "no words", not an error.
+  // parseAiJson THROWS on a non-JSON reply; an unusable reply is "no words" from the model, and the
+  // deterministic Franco floor below still applies (G72).
   let raw: unknown;
   try {
     raw = parseAiJson(result.response.text());
   } catch {
-    return null;
+    return cleanSearchTerms(francoSpellings(input.product.nameAr, input.product.name).join(','));
   }
   // M4: Zod at the edge. Bounded before any split or filter: more than 100 items is not a
   // usable reply; a non-string or over-long item is dropped on its own.
   const parsed = SearchTermsReply.safeParse(raw);
-  if (!parsed.success) return null;
+  if (!parsed.success)
+    return cleanSearchTerms(francoSpellings(input.product.nameAr, input.product.name).join(','));
   const replyTerms = parsed.data.terms.filter((t): t is string => t !== null);
   // Split on the stored separators FIRST (as cleanSearchTerms will), so the PII gate sees
   // every piece that can end up stored, not a "words, 0101…" string it might pass whole.
@@ -163,5 +173,10 @@ export async function generateProductSearchTerms(
         !hasMixedScriptWord(t) &&
         !invented(t)
     );
-  return cleanSearchTerms(terms.join(','));
+  // G72: the model is not deterministic ("eswera" came back for one bracelet and not the other),
+  // so the Franco spellings of the product's own Arabic words are computed and put FIRST: the
+  // 30-term cap then trims the model's extras, never the spellings every product must have.
+  return cleanSearchTerms(
+    [...francoSpellings(input.product.nameAr, input.product.name), ...terms].join(',')
+  );
 }

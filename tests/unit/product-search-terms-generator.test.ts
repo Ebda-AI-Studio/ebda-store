@@ -5,6 +5,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// The deterministic Franco floor (G72) has its own tests (franco-floor below + packages/shared franco.test.ts);
+// these tests pin the MODEL-reply filters, so the floor is switched off here.
+vi.mock('@ebda/shared', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/shared')>()),
+  francoSpellings: () => [],
+}));
+
 const generateContent = vi.fn();
 vi.mock('../../apps/api/src/lib/ai/gemini-keys', () => ({
   // A plain function, not an arrow: the generator calls it with `new`.

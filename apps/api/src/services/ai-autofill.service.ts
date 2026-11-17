@@ -1,5 +1,12 @@
 import { isArabicText, isLatinText, isNamePlaceholder } from '../lib/product-name-pair';
-import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@ebda/shared';
+import {
+  AI_AUTOFILL_FIELD_NAMES,
+  cleanSearchTerms,
+  fieldsNeedingRefresh,
+  francoSpellings,
+  normalizeArabicSearch,
+  type AiFieldSources,
+} from '@ebda/shared';
 import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
 import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
 import { AIService } from './ai.service';
@@ -932,8 +939,42 @@ export interface SweepStoreResult {
   rateLimitStopped: boolean;
 }
 
+/**
+ * G72 backfill, zero AI spend: a product whose search words were written by the AI (provenance
+ * 'ai') before the Franco floor existed gets the deterministic Franco spellings of its own Arabic
+ * name put first. NEVER touches a merchant's words (provenance 'human', or legacy words with no
+ * provenance: NEVER-OVERWRITE-1); a row with no words is left to the normal fill. Idempotent: it
+ * writes only when a spelling is missing. Returns true when it wrote.
+ */
+export async function topUpFrancoSearchTerms(storeId: string, productId: string): Promise<boolean> {
+  const product = await (
+    await storeDb(storeId)
+  ).product.findFirst({
+    where: { id: productId, storeId, deletedAt: null },
+    select: { name: true, nameAr: true, searchTerms: true, aiFieldSources: true },
+  });
+  if (!product?.searchTerms?.trim()) return false;
+  if (((product.aiFieldSources as AiFieldSources | null) ?? {}).searchTerms !== 'ai') return false;
+  const have = new Set(
+    product.searchTerms.split(/[,،\n]/).map(t => normalizeArabicSearch(t.trim()))
+  );
+  const wanted = francoSpellings(product.nameAr, product.name);
+  if (wanted.every(w => have.has(normalizeArabicSearch(w)))) return false;
+  const next = cleanSearchTerms([...wanted, ...product.searchTerms.split(/[,،\n]/)].join(','));
+  if (!next || next === product.searchTerms) return false;
+  const { written } = await writeAiFieldsGuarded(
+    storeId,
+    productId,
+    { searchTerms: product.searchTerms },
+    { searchTerms: next },
+    { overwrite: true, reindexReason: 'franco-backfill' }
+  );
+  return written.length > 0;
+}
+
 interface SweepDeps {
   fill?: typeof fillProductFields;
+  topUp?: typeof topUpFrancoSearchTerms;
   balance?: (
     storeId: string,
     productId: string,
@@ -957,6 +998,7 @@ interface SweepDeps {
  */
 export async function sweepStore(storeId: string, deps: SweepDeps = {}): Promise<SweepStoreResult> {
   const fill = deps.fill ?? fillProductFields;
+  const topUp = deps.topUp ?? topUpFrancoSearchTerms;
   const balance = deps.balance ?? balanceProductLanguages;
   const sleep = deps.sleep ?? sweepSleep;
   const throttleMs = deps.throttleMs ?? SWEEP_THROTTLE_MS;
@@ -1002,6 +1044,14 @@ export async function sweepStore(storeId: string, deps: SweepDeps = {}): Promise
   const staleBefore = new Date(Date.now() - STALE_TTL_DAYS * 24 * 60 * 60 * 1000);
   for (const p of products) {
     const refreshStale = p.updatedAt < staleBefore;
+    try {
+      if (await topUp(storeId, p.id)) out.filled += 1;
+    } catch (err) {
+      logger.warn(
+        { err, storeId, productId: p.id },
+        '[ai-autofill] franco top-up failed, skipping'
+      );
+    }
     const res = await fill(storeId, p.id, { op: 'sweep', refreshStale });
     out.filled += res.filled;
     out.calls += res.calls;
