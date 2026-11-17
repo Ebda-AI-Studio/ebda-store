@@ -736,9 +736,9 @@ jobs:
   api-workerd-smoke:
     name: API Worker boots on workerd
     needs: [tested-tree]
-    if: needs.tested-tree.outputs.skip != 'true'
-    # No `if`: a required PR check (scripts/ci/merge-gate-required.mjs) AND part of the full lane, where it runs the
-    # WHOLE workers-test suite (route-sweep included) instead of the PR slice below.
+    # No job-level `if`: a required PR check (scripts/ci/merge-gate-required.mjs; a skipped required job would read as a PASS) AND part of the full
+    # lane, where it runs the WHOLE workers-test suite (route-sweep included) instead of the PR slice below. The MERGE-QUEUE-1 tested-tree skip is
+    # therefore decided at STEP level (the `scope` step below): the job always runs and reports.
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 85 # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
@@ -768,8 +768,14 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          TREE_SKIP: ${{ needs.tested-tree.outputs.skip }}
         run: |
           set -euo pipefail
+          # MERGE-QUEUE-1 part B: a push whose TREE a merge group already proved (Tested tree check) skips the boot and the tests; the job still reports
+          if [ "$TREE_SKIP" = "true" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::API Worker boots on workerd: SKIPPED (a green merge group run already proved this exact tree: Tested tree check)"; exit 0
+          fi
           if [ "$EVENT" != "pull_request" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"; echo "full lane: running the whole workerd smoke"; exit 0
           fi

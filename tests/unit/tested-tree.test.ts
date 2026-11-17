@@ -121,7 +121,6 @@ describe('ci.yml wiring', () => {
     'test-unit',
     'workerd-integration',
     'worker-dry-run',
-    'api-workerd-smoke',
   ])('%s respects the skip decision and needs tested-tree', id => {
     const j = job(id);
     expect(j, id).toMatch(/needs: \[[^\]]*tested-tree[^\]]*\]/);
@@ -132,7 +131,18 @@ describe('ci.yml wiring', () => {
       expect(job(id), id).toMatch(/needs: \[build\]/);
     expect(job('test-integration')).toContain("needs.build.result == 'success'");
   });
-  it('API Worker boots on workerd stays a REQUIRED pull request check (derivation extended), and so does the tested-tree check', () => {
+  it('API Worker boots on workerd: NO job-level if (a skipped required job reads as a PASS), the tested-tree skip is decided at STEP level, and it needs tested-tree', () => {
+    const j = job('api-workerd-smoke');
+    expect(j).toMatch(/needs: \[tested-tree\]/);
+    expect(j).not.toMatch(/\n {4}if:/);
+    expect(j).toContain('TREE_SKIP: ${{ needs.tested-tree.outputs.skip }}');
+    // the scope step turns the skip into run=false BEFORE any other decision, and every heavy step is already gated on that output
+    expect(j).toMatch(
+      /if \[ "\$TREE_SKIP" = "true" \]; then\n\s+echo "run=false" >> "\$GITHUB_OUTPUT"/
+    );
+    expect(j).toContain("if: steps.scope.outputs.run == 'true'");
+  });
+  it('API Worker boots on workerd stays a REQUIRED pull request check, and so does the always-reporting tested-tree check', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'wf-'));
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, 'ci.yml'), ci);
@@ -148,7 +158,7 @@ describe('ci.yml wiring', () => {
     ])
       expect(required).not.toContain(n);
   });
-  it('the derivation only trusts the skip condition when tested-tree itself is always-on', () => {
+  it('if tested-tree itself were conditional, the smoke job would drop out of the required list (the derivation notices)', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'wf-'));
     const gated = ci.replace(
       /(\n {2}tested-tree:\n {4}name: Tested tree check\n)/,
