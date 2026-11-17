@@ -14,8 +14,10 @@ import { hubFanout, hubFanoutStoreIds } from './platform-hub';
  */
 export const STORE_METRIC_DOCS = {
   journal_unbalanced: 'Posted journal entries where total debit differs from total credit.',
-  journal_unrepaired:
-    "Paid orders that have no 'order' sale journal entry (the reconcile has not repaired them yet).",
+  journal_unrepaired_in_window:
+    "Paid orders (paid 10 min to 72 h ago) with no 'order' sale journal entry: the hourly repair will post them.",
+  journal_unrepaired_stale:
+    "Paid orders (paid over 72 h ago, after the store's first journal entry) with no 'order' sale entry: needs a person.",
   push_subscriptions_active:
     'Rows in push_subscriptions (devices that can currently receive a push).',
 } as const;

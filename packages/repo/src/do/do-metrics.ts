@@ -12,6 +12,18 @@ export interface DoMetricDef {
   doc: string;
 }
 
+const NOW_MS = "CAST(unixepoch('subsec') * 1000 AS INTEGER)";
+/** #926's candidate set (count only) filtered by `paidWhere`; `t` has store_id and paid_at. One statement, no parameters. */
+const UNREPAIRED_SQL = (paidWhere: string): string =>
+  `SELECT COUNT(*) AS n FROM (
+     SELECT o.id, o.store_id,
+            COALESCE((SELECT MAX(p.paid_at) FROM payments p WHERE p.order_id = o.id AND p.status = 'completed'), o.created_at) AS paid_at
+       FROM store_config c JOIN orders o ON o.store_id = c.store_id
+      WHERE c.accounting_enabled = 1 AND o.deleted_at IS NULL AND o.payment_status = 'paid'
+        AND o.status NOT IN ('cancelled', 'refunded') AND o.total > 0
+        AND NOT EXISTS (SELECT 1 FROM journal_entries e WHERE e.store_id = o.store_id AND e.source = 'order' AND e.source_id = o.id)
+   ) t WHERE ${paidWhere.replaceAll('NOW_MS', NOW_MS)}`;
+
 export const DO_METRICS = {
   /** Posted journal entries whose debits and credits differ: the books do not balance (track 1). */
   journal_unbalanced: {
@@ -20,11 +32,25 @@ export const DO_METRICS = {
             SELECT e.id FROM journal_entries e JOIN journal_lines l ON l.entry_id = e.id
             WHERE e.status = 'posted' GROUP BY e.id HAVING SUM(l.debit) <> SUM(l.credit))`,
   },
-  /** Paid orders with no sale entry: the journal reconcile has not (yet) repaired them (track 1). */
-  journal_unrepaired: {
-    doc: "Paid orders that have no 'order' sale journal entry (the reconcile has not repaired them yet).",
-    sql: `SELECT COUNT(*) AS n FROM orders o WHERE o.payment_status = 'paid'
-            AND NOT EXISTS (SELECT 1 FROM journal_entries e WHERE e.source = 'order' AND e.source_id = o.id)`,
+  /**
+   * Paid orders with no sale entry that the hourly repair WILL fix: paid between 72 h and 10 min ago (Ruling JOURNAL-RECONCILE-1, PR #926).
+   * Exactly #926's candidate rules: accounting on for the store, order total > 0, not cancelled/refunded/deleted, "paid at" = the latest
+   * completed payment's paid_at (else the order's created_at), no `order` sale entry of this store. The 72 h mirrors the default of
+   * JOURNAL_REPAIR_MAX_AGE_HOURS (a DO has no env: change both together; do-metrics.test.ts pins the number).
+   */
+  journal_unrepaired_in_window: {
+    doc: "Paid orders (paid 10 min to 72 h ago) with no 'order' sale journal entry: the hourly repair will post them.",
+    sql: UNREPAIRED_SQL('t.paid_at >= (NOW_MS - 259200000) AND t.paid_at < (NOW_MS - 600000)'),
+  },
+  /**
+   * Same rules, paid MORE than 72 h ago and not before the store's first journal entry (the floor of journal.reconcile.stale: a store that
+   * turned accounting on later is not "missing" its history). The repair no longer reaches these: a person must look.
+   */
+  journal_unrepaired_stale: {
+    doc: "Paid orders (paid over 72 h ago, after the store's first journal entry) with no 'order' sale entry: needs a person.",
+    sql: UNREPAIRED_SQL(
+      't.paid_at < (NOW_MS - 259200000) AND t.paid_at >= (SELECT MIN(created_at) FROM journal_entries WHERE store_id = t.store_id)'
+    ),
   },
   /** Active push subscriptions of the store (track 4). */
   push_subscriptions_active: {

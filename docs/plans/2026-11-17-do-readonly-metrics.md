@@ -44,7 +44,7 @@ One endpoint that executes caller-supplied read-only SQL in every DO. Maximum fl
 
 ## Recommendation
 
-A, with B as a later add-on only if someone needs history (the allow-list and its tests are shared, so B is a thin extra). Ship with the two metric families that unblock today: track 1 (journal repair counts: `journal_unbalanced`, `journal_repaired`, `journal_unrepaired`) and track 4 (push exposure: `push_subscriptions_active`, `stores_with_push_enabled`), each added by a PR that carries its own SQL, its EXPLAIN assertion and a ruling line (the allow-list is code: adding a metric is a reviewed change, never data). Start with a spike to settle the one unknown below, then build.
+A, with B as a later add-on only if someone needs history (the allow-list and its tests are shared, so B is a thin extra). Ship with the two metric families that unblock today: track 1 (journal repair counts: `journal_unbalanced`, `journal_repaired`, `journal_unrepaired_in_window`, `journal_unrepaired_stale`) and track 4 (push exposure: `push_subscriptions_active`, `stores_with_push_enabled`), each added by a PR that carries its own SQL, its EXPLAIN assertion and a ruling line (the allow-list is code: adding a metric is a reviewed change, never data). Start with a spike to settle the one unknown below, then build.
 
 ## Decisions (made 2026-11-17, Ruling DO-METRICS-1)
 
@@ -65,7 +65,7 @@ A, with B as a later add-on only if someone needs history (the allow-list and it
 
 ## First five metrics
 
-`journal_unbalanced`, `journal_repaired`, `journal_unrepaired` (track 1: journal repair counts); `push_subscriptions_active`, `stores_with_push_enabled` (track 4: push exposure counts). Each carries its constant SQL, its EXPLAIN assertion and a ruling line.
+`journal_unbalanced`, `journal_repaired`, `journal_unrepaired_in_window`, `journal_unrepaired_stale` (track 1: journal repair counts); `push_subscriptions_active`, `stores_with_push_enabled` (track 4: push exposure counts). Each carries its constant SQL, its EXPLAIN assertion and a ruling line.
 
 ## Unknowns (original list; the first is settled, see the spike result above)
 

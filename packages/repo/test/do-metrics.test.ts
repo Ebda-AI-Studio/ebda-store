@@ -12,10 +12,15 @@ function rig() {
   ensureMoneyOpsSchema(db);
   return { raw, db };
 }
-const FIVE_NAMED = ['journal_unbalanced', 'journal_unrepaired', 'push_subscriptions_active'];
+const FIVE_NAMED = [
+  'journal_unbalanced',
+  'journal_unrepaired_in_window',
+  'journal_unrepaired_stale',
+  'push_subscriptions_active',
+];
 
 describe('static guard over the allow-list', () => {
-  it('has exactly the metrics the ruling names for the store DB (journal_repaired / stores_with_push_enabled are not store SQL)', () => {
+  it('has exactly the store-SQL metrics of the ruling (stores_with_push_enabled is derived in the hub; journal_repaired has no persisted marker yet)', () => {
     expect([...DO_METRIC_NAMES].sort()).toEqual([...FIVE_NAMED].sort());
   });
   for (const name of DO_METRIC_NAMES) {
@@ -88,6 +93,125 @@ describe('values on seeded data', () => {
     >;
     expect(Object.keys(r)).toEqual(['n']);
     expect(typeof r.n).toBe('number');
+  });
+});
+
+describe('journal_unrepaired_* apply PR #926 candidate rules exactly', () => {
+  const H = 3_600_000;
+  function books(accounting = 1) {
+    const { raw, db } = rig();
+    const now = Date.now();
+    raw.exec(`INSERT INTO store_config (store_id, accounting_enabled) VALUES ('s1', ${accounting});
+      INSERT INTO accounts (id, store_id, code, name_en, type) VALUES ('a','s1','1000','Cash','asset');`);
+    let n = 0;
+    // `paidAgoMs` is the payment time (a completed payments row) unless `noPayment`, then the order's created_at.
+    const order = (o: {
+      paidAgoMs: number;
+      status?: string;
+      pay?: string;
+      total?: number;
+      entry?: boolean;
+      noPayment?: boolean;
+      deleted?: boolean;
+      store?: string;
+    }) => {
+      const id = `o${++n}`;
+      const at = now - o.paidAgoMs;
+      raw
+        .prepare(
+          `INSERT INTO orders (id, store_id, order_number, status, payment_status, subtotal, total, shipping_address, billing_address, created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, 1, ?, '{}', '{}', ?, ?, ?)`
+        )
+        .run(
+          id,
+          o.store ?? 's1',
+          `N${n}`,
+          o.status ?? 'confirmed',
+          o.pay ?? 'paid',
+          o.total ?? 100,
+          o.noPayment ? at : at - 5 * H,
+          at,
+          o.deleted ? at : null
+        );
+      if (!o.noPayment)
+        raw
+          .prepare(
+            "INSERT INTO payments (id, order_id, provider, status, amount, paid_at) VALUES (?, ?, 'cod', 'completed', 1, ?)"
+          )
+          .run(`p${n}`, id, at);
+      if (o.entry)
+        raw
+          .prepare(
+            "INSERT INTO journal_entries (id, store_id, entry_number, posted_at, source, source_id, status, created_at) VALUES (?, 's1', ?, 1, 'order', ?, 'posted', ?)"
+          )
+          .run(`e${n}`, `E${n}`, id, now);
+      return id;
+    };
+    const first = (agoMs: number) =>
+      raw
+        .prepare(
+          "INSERT INTO journal_entries (id, store_id, entry_number, posted_at, source, source_id, status, created_at) VALUES ('first','s1','F1',1,'expense','x','posted',?)"
+        )
+        .run(now - agoMs);
+    const m = (name: string) => runDoMetric(db, { name }).n;
+    return { order, first, m };
+  }
+
+  it('in window = paid 10 min..72 h ago; stale = older than 72 h and not before the first journal entry', () => {
+    const { order, first, m } = books();
+    first(200 * H);
+    order({ paidAgoMs: 5 * 60_000 }); // too fresh: the enqueue path may still be running
+    order({ paidAgoMs: 2 * H }); // in window
+    order({ paidAgoMs: 71 * H }); // in window
+    order({ paidAgoMs: 80 * H }); // stale
+    order({ paidAgoMs: 150 * H }); // stale
+    expect(m('journal_unrepaired_in_window')).toBe(2);
+    expect(m('journal_unrepaired_stale')).toBe(2);
+  });
+  it('stale ignores orders paid before the store first journal entry (accounting turned on later)', () => {
+    const { order, first, m } = books();
+    first(100 * H);
+    order({ paidAgoMs: 120 * H }); // before the books started
+    order({ paidAgoMs: 90 * H }); // after: a real gap
+    expect(m('journal_unrepaired_stale')).toBe(1);
+  });
+  it('a store with no journal entry at all has no stale gap', () => {
+    const { order, m } = books();
+    order({ paidAgoMs: 120 * H });
+    expect(m('journal_unrepaired_stale')).toBe(0);
+  });
+  it('skips: already booked, zero total, cancelled, refunded, unpaid, deleted', () => {
+    const { order, first, m } = books();
+    first(200 * H);
+    order({ paidAgoMs: 2 * H, entry: true });
+    order({ paidAgoMs: 2 * H, total: 0 });
+    order({ paidAgoMs: 2 * H, status: 'cancelled' });
+    order({ paidAgoMs: 2 * H, status: 'refunded' });
+    order({ paidAgoMs: 2 * H, pay: 'unpaid' });
+    order({ paidAgoMs: 2 * H, deleted: true });
+    expect(m('journal_unrepaired_in_window')).toBe(0);
+    order({ paidAgoMs: 2 * H }); // the one real gap
+    expect(m('journal_unrepaired_in_window')).toBe(1);
+  });
+  it('paid time is the latest completed payment, else created_at (store credit with no payment row)', () => {
+    const { order, first, m } = books();
+    first(200 * H);
+    order({ paidAgoMs: 2 * H, noPayment: true });
+    expect(m('journal_unrepaired_in_window')).toBe(1);
+  });
+  it('accounting off (or no store_config row) counts 0 for both', () => {
+    const off = books(0);
+    off.first(200 * H);
+    off.order({ paidAgoMs: 2 * H });
+    off.order({ paidAgoMs: 100 * H });
+    expect(off.m('journal_unrepaired_in_window')).toBe(0);
+    expect(off.m('journal_unrepaired_stale')).toBe(0);
+  });
+  it('an order of another store does not count, and a sale entry of another store does not hide a gap', () => {
+    const { order, first, m } = books();
+    first(200 * H);
+    order({ paidAgoMs: 2 * H, store: 's2' });
+    expect(m('journal_unrepaired_in_window')).toBe(0);
   });
 });
 

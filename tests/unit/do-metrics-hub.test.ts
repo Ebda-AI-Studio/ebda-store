@@ -98,12 +98,12 @@ describe('readMetric', () => {
   it('caches for 60 s: a second read within the window asks no store, one after it asks again', async () => {
     Object.assign(counts, { a: 1 });
     let t = 1_000_000;
-    await readMetric('journal_unrepaired', () => t);
+    await readMetric('journal_unrepaired_stale', () => t);
     t += 59_000;
-    await readMetric('journal_unrepaired', () => t);
+    await readMetric('journal_unrepaired_stale', () => t);
     expect(calls).toHaveLength(1);
     t += 2_000;
-    await readMetric('journal_unrepaired', () => t);
+    await readMetric('journal_unrepaired_stale', () => t);
     expect(calls).toHaveLength(2);
   });
   it('stores_with_push_enabled counts stores with at least one subscription, asking the store metric', async () => {
