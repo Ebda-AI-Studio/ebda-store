@@ -43,6 +43,7 @@ export interface RedirectCache {
  * round trip: a cold API + AuthState Durable Object chain, measured 1.4-2.3 s on the hop alone.
  */
 const REDIRECT_CACHE_TTL_S = 60;
+// pq-allow(unused-export): test seam, imported by apps/web/locale-redirect-edge.test.ts
 export const REDIRECT_CACHE_STALE_S = 21_600;
 
 export type DefaultLanguageOf = (host: string) => Promise<'ar' | 'en' | null>;
