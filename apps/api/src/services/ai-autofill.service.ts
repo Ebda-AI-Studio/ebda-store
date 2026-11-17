@@ -946,6 +946,7 @@ export interface SweepStoreResult {
  * provenance: NEVER-OVERWRITE-1); a row with no words is left to the normal fill. Idempotent: it
  * writes only when a spelling is missing. Returns true when it wrote.
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/ai-autofill-franco-topup.test.ts
 export async function topUpFrancoSearchTerms(storeId: string, productId: string): Promise<boolean> {
   const product = await (
     await storeDb(storeId)

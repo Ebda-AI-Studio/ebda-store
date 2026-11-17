@@ -142,6 +142,7 @@ function spell(word: string, p: Profile): string {
 }
 
 /** Common Latin spellings of one Arabic word (definite article dropped), at most `max` (default MAX_VARIANTS). */
+// pq-allow(unused-export): test seam, imported by packages/shared/src/search/__tests__/franco.test.ts
 export function francoWordVariants(word: string, max = MAX_VARIANTS): string[] {
   const bare = word.replace(TASHKEEL, '').replace(/^ال(?=[ء-ي]{3})/, '');
   if ([...bare].length < MIN_WORD_LETTERS) return [];
