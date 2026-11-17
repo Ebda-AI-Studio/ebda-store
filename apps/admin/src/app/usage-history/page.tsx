@@ -17,6 +17,7 @@
  * Route guard: super_admin only (RequireSuperAdmin + the API's requireRole).
  */
 
+import { intlLocaleForUi } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
@@ -143,8 +144,8 @@ function UsageHistoryInner() {
       alignEnd: true,
       cell: r => (
         <span className="tabular-nums">
-          {r.productsActive.toLocaleString(undefined, withNumerals())} /{' '}
-          {r.products.toLocaleString(undefined, withNumerals())}
+          {r.productsActive.toLocaleString(intlLocaleForUi(), withNumerals())} /{' '}
+          {r.products.toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -152,7 +153,9 @@ function UsageHistoryInner() {
       header: t('table.orders'),
       alignEnd: true,
       cell: r => (
-        <span className="tabular-nums">{r.orders.toLocaleString(undefined, withNumerals())}</span>
+        <span className="tabular-nums">
+          {r.orders.toLocaleString(intlLocaleForUi(), withNumerals())}
+        </span>
       ),
     },
     {
@@ -166,7 +169,7 @@ function UsageHistoryInner() {
       hideOnMobile: true,
       cell: r => (
         <span className="tabular-nums">
-          {r.customers.toLocaleString(undefined, withNumerals())}
+          {r.customers.toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -176,7 +179,7 @@ function UsageHistoryInner() {
       hideOnMobile: true,
       cell: r => (
         <span className="tabular-nums">
-          {Number(r.productViews).toLocaleString(undefined, withNumerals())}
+          {Number(r.productViews).toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -186,7 +189,7 @@ function UsageHistoryInner() {
       hideOnMobile: true,
       cell: r => (
         <span className="tabular-nums">
-          {r.cartsWithItems.toLocaleString(undefined, withNumerals())}
+          {r.cartsWithItems.toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -195,12 +198,12 @@ function UsageHistoryInner() {
       alignEnd: true,
       cell: r => (
         <div className="tabular-nums">
-          <div>{r.aiCalls.toLocaleString(undefined, withNumerals())}</div>
+          <div>{r.aiCalls.toLocaleString(intlLocaleForUi(), withNumerals())}</div>
           <div className="text-xs text-muted-foreground">{formatSpend(Number(r.aiCostMicros))}</div>
           {r.aiUnpricedCalls > 0 && (
             <div className="text-xs text-warning-ink">
               {t('table.aiUnpriced', {
-                count: r.aiUnpricedCalls.toLocaleString(undefined, withNumerals()),
+                count: r.aiUnpricedCalls.toLocaleString(intlLocaleForUi(), withNumerals()),
               })}
             </div>
           )}

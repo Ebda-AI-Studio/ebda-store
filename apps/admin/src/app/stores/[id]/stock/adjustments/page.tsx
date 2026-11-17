@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -110,7 +111,7 @@ export default function StockAdjustmentsPage() {
       className: 'w-32',
       cell: adj => (
         <span className="text-muted-foreground">
-          {new Date(adj.createdAt).toLocaleDateString(undefined, withNumerals())}
+          {new Date(adj.createdAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

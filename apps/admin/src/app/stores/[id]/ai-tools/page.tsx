@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -253,7 +254,7 @@ export default function AiToolsPage() {
       primaryOnMobile: true,
       cell: j => (
         <span className="text-muted-foreground">
-          {new Date(j.createdAt).toLocaleString(undefined, withNumerals())}
+          {new Date(j.createdAt).toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

@@ -1,3 +1,4 @@
+import { intlLocaleForUi } from '@/lib/format';
 import type { AnalyticsPeriod, SalesGranularity } from '@ebda/shared';
 import { formatMoney } from '@ebda/shared';
 
@@ -197,7 +198,7 @@ export function formatNumber(num: number): string {
  */
 export function formatDate(date: string, granularity: SalesGranularity = 'day'): string {
   return new Date(date).toLocaleDateString(
-    'en-US',
+    intlLocaleForUi('en-US'),
     granularity === 'month'
       ? { month: 'short', year: 'numeric', timeZone: 'UTC' }
       : { month: 'short', day: 'numeric', timeZone: 'UTC' }

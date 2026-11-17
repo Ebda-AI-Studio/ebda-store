@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -234,7 +235,7 @@ export default function InsightsFunnelPage() {
                             </span>
                           ) : (
                             <span className="font-mono font-semibold">
-                              {step.value.toLocaleString(undefined, withNumerals())}
+                              {step.value.toLocaleString(intlLocaleForUi(), withNumerals())}
                             </span>
                           )}
                         </div>

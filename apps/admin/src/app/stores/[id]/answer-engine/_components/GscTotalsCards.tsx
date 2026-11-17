@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { formatPercent, formatPosition, type GscDashboardTotals } from './types';
 import { withNumerals } from '@ebda/shared';
@@ -16,9 +17,9 @@ export function GscTotalsCards({ totals }: GscTotalsCardsProps) {
   const cards = [
     {
       label: t('impressions'),
-      value: totals.impressions.toLocaleString(undefined, withNumerals()),
+      value: totals.impressions.toLocaleString(intlLocaleForUi(), withNumerals()),
     },
-    { label: t('clicks'), value: totals.clicks.toLocaleString(undefined, withNumerals()) },
+    { label: t('clicks'), value: totals.clicks.toLocaleString(intlLocaleForUi(), withNumerals()) },
     { label: t('ctr'), value: formatPercent(totals.ctr) },
     { label: t('avgPosition'), value: formatPosition(totals.avgPosition) },
   ];

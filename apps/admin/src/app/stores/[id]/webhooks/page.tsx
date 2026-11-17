@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -7,6 +8,7 @@ import { Modal, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { WEBHOOK_EVENT_TYPES, withNumerals, type WebhookEventType } from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { webhookUrlErrorKey } from './url-error';
 import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
@@ -69,6 +71,7 @@ export default function WebhooksPage() {
   const [editing, setEditing] = useState<Endpoint | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   const [secret, setSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -136,6 +139,7 @@ export default function WebhooksPage() {
   const save = async () => {
     setBusy('save');
     setFormError(null);
+    setUrlError(null);
     const body = {
       url: form.url.trim(),
       description: form.description.trim() || null,
@@ -147,7 +151,10 @@ export default function WebhooksPage() {
       : await apiPost<{ endpoint: Endpoint; secret: string }>(base, body);
     setBusy(null);
     if (res.error) {
-      setFormError(errText(res.error));
+      // A refused URL is explained under the URL field, in words; anything else stays the form-level message.
+      const urlKey = webhookUrlErrorKey(res.error);
+      if (urlKey) setUrlError(t(`form.urlErrors.${urlKey}`));
+      else setFormError(errText(res.error));
       return;
     }
     setFormOpen(false);
@@ -237,7 +244,7 @@ export default function WebhooksPage() {
     }));
 
   const fmt = (v: string | null) =>
-    v ? new Date(v).toLocaleString(undefined, withNumerals()) : t('table.never');
+    v ? new Date(v).toLocaleString(intlLocaleForUi(), withNumerals()) : t('table.never');
   const badge = 'rounded px-1.5 py-0.5 text-xs font-medium';
 
   return (
@@ -413,12 +420,26 @@ export default function WebhooksPage() {
             <input
               className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
               value={form.url}
-              onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
+              onChange={e => {
+                setUrlError(null);
+                setForm(f => ({ ...f, url: e.target.value }));
+              }}
               placeholder={t('form.urlPlaceholder')}
               maxLength={2048}
               dir="ltr"
               inputMode="url"
+              aria-invalid={urlError ? true : undefined}
+              aria-describedby={urlError ? 'webhook-url-error' : undefined}
             />
+            {urlError && (
+              <span
+                id="webhook-url-error"
+                role="alert"
+                className="mt-1 block text-xs font-normal text-destructive-ink"
+              >
+                {urlError}
+              </span>
+            )}
             <span className="mt-1 block text-xs font-normal text-muted-foreground">
               {t('form.urlHelp')}
             </span>

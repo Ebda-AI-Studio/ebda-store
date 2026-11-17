@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -366,7 +367,7 @@ export default function FinanceDashboardPage() {
                     {t('salesOrdersCount')}
                   </p>
                   <p className="text-2xl font-semibold font-mono text-foreground">
-                    {salesStats.totalOrders.toLocaleString(undefined, withNumerals())}
+                    {salesStats.totalOrders.toLocaleString(intlLocaleForUi(), withNumerals())}
                   </p>
                   <p className="text-xs text-muted-foreground">{t('salesOrdersCountUnit')}</p>
                 </div>

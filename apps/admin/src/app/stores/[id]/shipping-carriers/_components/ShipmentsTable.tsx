@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
@@ -89,7 +90,7 @@ export function ShipmentsTable({
       header: t('columns.created'),
       cell: shipment => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(shipment.createdAt).toLocaleDateString(undefined, withNumerals())}
+          {new Date(shipment.createdAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

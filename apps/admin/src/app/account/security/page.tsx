@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useState, useEffect, useCallback } from 'react';
 import { Input, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
@@ -596,7 +597,7 @@ export default function SecurityPage() {
                     {status?.mfaEnabled && status.mfaEnrolledAt && (
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {new Date(status.mfaEnrolledAt).toLocaleDateString(
-                          undefined,
+                          intlLocaleForUi(),
                           withNumerals({
                             year: 'numeric',
                             month: 'long',

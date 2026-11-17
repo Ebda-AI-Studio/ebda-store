@@ -9563,10 +9563,10 @@
         "store": "الاسم",
         "template": "الشكل",
         "product": "المنتج",
-        "payment": "الدفع",
+        "payment": "دفع عملائك",
         "live": "الإطلاق",
         "plan": "الباقة",
-        "billing": "الدفع"
+        "billing": "دفع الباقة"
       },
       "back": "رجوع",
       "next": "متابعة",
@@ -11384,6 +11384,20 @@
       "urlLabel": "العنوان (HTTPS)",
       "urlPlaceholder": "مثال: https://example.com/ebda-webhook",
       "urlHelp": "لازم يكون عنوان HTTPS عام. العناوين المحلية والخاصة مش مقبولة.",
+      "urlErrors": {
+        "invalid": "ده مش عنوان نقدر نبعتله. اكتب عنوان HTTPS كامل زي https://example.com/hook.",
+        "not_a_url": "ده مش عنوان ويب. اكتب عنوان كامل زي https://example.com/hook.",
+        "https_required": "لازم العنوان يبدأ بـ https://. عنوان http:// العادي مش مقبول.",
+        "credentials_not_allowed": "شيل اسم المستخدم وكلمة السر من العنوان.",
+        "port_not_allowed": "شيل رقم المنفذ من العنوان. المنفذ العادي لـ HTTPS بس هو المقبول.",
+        "ip_literal_not_allowed": "استخدم اسم دومين مش عنوان IP.",
+        "public_hostname_required": "اكتب اسم دومين كامل زي hooks.example.com.",
+        "internal_hostname_not_allowed": "الأسماء المحلية زي localhost مش مقبولة. استخدم دومين عام.",
+        "platform_host_not_allowed": "مينفعش تبعت الـ webhook لعنوان تابع لابدأ.",
+        "dns_unresolved": "ملقيناش الدومين ده. اتأكد من الكتابة.",
+        "private_address": "الدومين ده بيشاور على عنوان خاص. استخدم عنوان عام.",
+        "rejected": "العنوان ده مينفعش يتستخدم. استخدم عنوان HTTPS عام."
+      },
       "descriptionLabel": "ملاحظة (اختياري)",
       "eventsLabel": "الأحداث المطلوب إرسالها",
       "customerLabel": "إضافة اسم العميل وإيميله وتليفونه في أحداث الطلبات",

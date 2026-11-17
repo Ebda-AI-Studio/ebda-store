@@ -9563,10 +9563,10 @@
         "store": "Name",
         "template": "Look",
         "product": "Product",
-        "payment": "Payment",
+        "payment": "Customer payments",
         "live": "Launch",
         "plan": "Plan",
-        "billing": "Billing"
+        "billing": "Your plan payment"
       },
       "back": "Back",
       "next": "Continue",
@@ -11384,6 +11384,20 @@
       "urlLabel": "Address (HTTPS)",
       "urlPlaceholder": "https://example.com/ebda-webhook",
       "urlHelp": "It must be a public HTTPS address. Local and private addresses are not accepted.",
+      "urlErrors": {
+        "invalid": "This is not a web address we can send to. Use a full HTTPS address like https://example.com/hook.",
+        "not_a_url": "This is not a web address. Use a full address like https://example.com/hook.",
+        "https_required": "The address must start with https://. Plain http:// is not accepted.",
+        "credentials_not_allowed": "Remove the username and password from the address.",
+        "port_not_allowed": "Remove the port number. Only the standard HTTPS port is accepted.",
+        "ip_literal_not_allowed": "Use a domain name, not an IP address.",
+        "public_hostname_required": "Use a full domain name like hooks.example.com.",
+        "internal_hostname_not_allowed": "Local and internal names like localhost are not accepted. Use a public domain.",
+        "platform_host_not_allowed": "You cannot send webhooks to an Ebda address.",
+        "dns_unresolved": "We could not find this domain. Check the spelling.",
+        "private_address": "This domain points to a private address. Use a public one.",
+        "rejected": "This address cannot be used. Use a public HTTPS address."
+      },
       "descriptionLabel": "Note (optional)",
       "eventsLabel": "Events to send",
       "customerLabel": "Include customer name, email and phone in order events",

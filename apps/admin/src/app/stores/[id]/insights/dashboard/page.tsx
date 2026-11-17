@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -294,7 +295,7 @@ export default function InsightsDashboardPage() {
               {data.velocityAsOf && (
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
                   {t('asOf')}:{' '}
-                  {new Date(data.velocityAsOf).toLocaleString(undefined, withNumerals())}
+                  {new Date(data.velocityAsOf).toLocaleString(intlLocaleForUi(), withNumerals())}
                 </span>
               )}
             </div>

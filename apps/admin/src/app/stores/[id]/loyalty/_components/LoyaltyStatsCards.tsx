@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { TIER_COLORS, type LoyaltyStats } from './types';
 import { withNumerals } from '@ebda/shared';
@@ -25,19 +26,19 @@ export function LoyaltyStatsCards({ stats }: LoyaltyStatsCardsProps) {
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('pointsIssued')}</p>
         <p className="text-2xl font-bold text-success-ink">
-          {stats.totalPointsIssued.toLocaleString(undefined, withNumerals())}
+          {stats.totalPointsIssued.toLocaleString(intlLocaleForUi(), withNumerals())}
         </p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('pointsRedeemed')}</p>
         <p className="text-2xl font-bold text-primary">
-          {stats.totalPointsRedeemed.toLocaleString(undefined, withNumerals())}
+          {stats.totalPointsRedeemed.toLocaleString(intlLocaleForUi(), withNumerals())}
         </p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('outstanding')}</p>
         <p className="text-2xl font-bold text-info-ink">
-          {stats.outstandingPoints.toLocaleString(undefined, withNumerals())}
+          {stats.outstandingPoints.toLocaleString(intlLocaleForUi(), withNumerals())}
         </p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">

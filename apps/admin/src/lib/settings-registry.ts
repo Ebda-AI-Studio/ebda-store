@@ -397,8 +397,8 @@ export const PAGES: PageEntry[] = [
   page('/seo', 'seo.page.title', 'owner', {
     feature: 'seo',
     syn: {
-      en: 'google search engine meta title description keywords',
-      ar: 'سيو جوجل محركات البحث عنوان وصف',
+      en: 'seo google search engine optimization meta title description keywords',
+      ar: 'سيو جوجل محركات البحث تحسين محركات البحث عنوان وصف',
     },
   }),
   page('/seo/redirects', 'seo.page.redirectsTitle', 'owner', {
@@ -734,8 +734,8 @@ export const SETTINGS: SettingEntry[] = [
     'seo.page.metaTitle',
     'owner',
     {
-      en: 'page title google title browser tab title',
-      ar: 'عنوان الصفحة عنوان جوجل عنوان الميتا',
+      en: 'seo page title google title browser tab title',
+      ar: 'سيو عنوان الصفحة عنوان جوجل عنوان الميتا',
     },
     { feature: 'seo' }
   ),
@@ -745,8 +745,8 @@ export const SETTINGS: SettingEntry[] = [
     'seo.page.hideFromSearchTitle',
     'owner',
     {
-      en: 'hide store from google search engines noindex private draft not live launch',
-      ar: 'اخفاء المتجر من جوجل محركات البحث مخفي قبل الاطلاق',
+      en: 'seo hide store from google search engines noindex private draft not live launch',
+      ar: 'سيو اخفاء المتجر من جوجل محركات البحث مخفي قبل الاطلاق',
     },
     { feature: 'seo' }
   ),
@@ -756,8 +756,8 @@ export const SETTINGS: SettingEntry[] = [
     'seo.page.aeoTitle',
     'owner',
     {
-      en: 'ai search chatgpt answer engine optimization description',
-      ar: 'محركات الذكاء الاصطناعي تحسين الاجابة وصف',
+      en: 'seo aeo ai search chatgpt answer engine optimization description',
+      ar: 'سيو محركات الذكاء الاصطناعي تحسين الاجابة وصف',
     },
     { feature: 'seo' }
   ),

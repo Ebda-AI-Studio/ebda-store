@@ -479,7 +479,10 @@ export default function StatementDetailPage() {
           ))}
           <span className="ml-auto text-xs text-muted-foreground self-center">
             {tx_t('totalCount', {
-              total: (txMeta?.total ?? txs.length).toLocaleString(undefined, withNumerals()),
+              total: (txMeta?.total ?? txs.length).toLocaleString(
+                intlLocaleForUi(),
+                withNumerals()
+              ),
             })}
           </span>
         </div>

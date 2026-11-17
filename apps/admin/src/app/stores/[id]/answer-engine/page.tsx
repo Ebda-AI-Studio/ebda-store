@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -62,7 +63,10 @@ export default function AnswerEnginePage() {
           {summary.lastRunAt && (
             <p className="text-xs text-muted-foreground">
               {t('lastRunAt', {
-                date: new Date(summary.lastRunAt).toLocaleDateString(undefined, withNumerals()),
+                date: new Date(summary.lastRunAt).toLocaleDateString(
+                  intlLocaleForUi(),
+                  withNumerals()
+                ),
               })}
             </p>
           )}

@@ -253,7 +253,7 @@ export default function BankReconciliationPage() {
               >
                 {t('totalCount', {
                   total: (meta?.total ?? statements.length).toLocaleString(
-                    undefined,
+                    intlLocaleForUi(),
                     withNumerals()
                   ),
                 })}

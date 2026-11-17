@@ -138,7 +138,7 @@ export default function AiUsagePage() {
       cell: row => (
         <span className="text-muted-foreground tabular-nums">
           {row.inputTokens + row.outputTokens > 0
-            ? (row.inputTokens + row.outputTokens).toLocaleString(undefined, withNumerals())
+            ? (row.inputTokens + row.outputTokens).toLocaleString(intlLocaleForUi(), withNumerals())
             : '—'}
         </span>
       ),

@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { TIER_COLORS, TIER_KEYS, type LoyaltyMember, type TierKey } from './types';
@@ -62,7 +63,7 @@ export function MembersTable({
       header: t('columns.balance'),
       cell: member => (
         <span className="font-medium text-foreground">
-          {member.points.toLocaleString(undefined, withNumerals())}
+          {member.points.toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -70,7 +71,7 @@ export function MembersTable({
       header: t('columns.totalEarned'),
       cell: member => (
         <span className="text-success-ink">
-          +{member.totalEarned.toLocaleString(undefined, withNumerals())}
+          +{member.totalEarned.toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -78,7 +79,7 @@ export function MembersTable({
       header: t('columns.totalRedeemed'),
       cell: member => (
         <span className="text-primary">
-          -{member.totalRedeemed.toLocaleString(undefined, withNumerals())}
+          -{member.totalRedeemed.toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

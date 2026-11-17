@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
@@ -95,7 +96,7 @@ export function AbandonedCartsTable({
       header: t('columns.date'),
       cell: record => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(record.createdAt).toLocaleDateString(undefined, withNumerals())}
+          {new Date(record.createdAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

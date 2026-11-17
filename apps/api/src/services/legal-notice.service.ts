@@ -19,6 +19,7 @@ import {
   currentLegalVersion,
   feeNoticeTooLate,
   noticeableVersions,
+  baselineMissing,
   findLegalVersion,
   formatLegalDate,
   isLegalDocKey,
@@ -151,7 +152,7 @@ export async function pendingNoticesFor(
   if (role !== NOTICE_ROLE) return [];
   return inUserScope(userId, async tx => {
     const { sent, accepted } = await sentAndAccepted(tx, userId);
-    return computePendingNotices(activePolicies, sent, accepted);
+    return computePendingNotices(activePolicies, sent, accepted, { requireBaseline: true });
   });
 }
 
@@ -174,7 +175,11 @@ export async function ackNotices(
     const same = (a: LegalDocRef, b: LegalDocRef) =>
       a.docKey === b.docKey && a.version === b.version;
     // The same rule the banner uses (isNoticeable in @ebda/shared): sent + material + current.
-    const eligible: LegalDocRef[] = noticeableVersions(activePolicies, sent);
+    const eligible: LegalDocRef[] = [
+      ...noticeableVersions(activePolicies, sent),
+      // No record at all for a document: its current version is pending too (baselineMissing).
+      ...baselineMissing(activePolicies, accepted),
+    ];
     const bad = items.filter(i => !eligible.some(e => same(e, i)));
     if (bad.length > 0) {
       throw new AppError(422, 'NOT_PENDING', 'These notices are not pending for this account', {

@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
@@ -81,7 +82,7 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
   }
 
   const rotatedLabel = status.rotatedAt
-    ? new Date(status.rotatedAt).toLocaleString(undefined, withNumerals())
+    ? new Date(status.rotatedAt).toLocaleString(intlLocaleForUi(), withNumerals())
     : null;
 
   return (

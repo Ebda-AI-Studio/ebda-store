@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -194,7 +195,7 @@ export default function NewsletterPage() {
       header: tTable('subscribedAt'),
       cell: s => (
         <span className="text-muted-foreground">
-          {new Date(s.subscribedAt).toLocaleDateString(undefined, withNumerals())}
+          {new Date(s.subscribedAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

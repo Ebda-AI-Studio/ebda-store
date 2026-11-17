@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
@@ -59,7 +60,7 @@ export function NotificationsLog({
       header: t('columns.timestamp'),
       cell: log => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(log.createdAt).toLocaleString(undefined, withNumerals())}
+          {new Date(log.createdAt).toLocaleString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

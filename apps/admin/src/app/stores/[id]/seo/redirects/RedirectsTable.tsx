@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { withNumerals } from '@ebda/shared';
 import { Button } from '@/components/ui/Button';
@@ -46,7 +47,7 @@ export function RedirectsTable({ rows, deletingId, onDelete, t, ariaLabel }: Red
       className: 'w-32',
       cell: row => (
         <span className="text-xs text-muted-foreground">
-          {new Date(row.createdAt).toLocaleDateString(undefined, withNumerals())}
+          {new Date(row.createdAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },

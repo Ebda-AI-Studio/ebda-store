@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -133,7 +134,7 @@ export default function JournalListPage() {
       header: t('postedAt'),
       cell: entry => (
         <span className="text-muted-foreground">
-          {new Date(entry.postedAt).toLocaleDateString(undefined, withNumerals())}
+          {new Date(entry.postedAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
         </span>
       ),
     },
@@ -233,7 +234,9 @@ export default function JournalListPage() {
             <>
               {meta && (
                 <p className="text-sm text-muted-foreground" data-testid="journal-total">
-                  {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
+                  {t('totalCount', {
+                    total: meta.total.toLocaleString(intlLocaleForUi(), withNumerals()),
+                  })}
                 </p>
               )}
               <DataTable<JournalEntry>

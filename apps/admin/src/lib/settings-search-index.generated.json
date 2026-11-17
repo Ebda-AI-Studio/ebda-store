@@ -802,8 +802,8 @@
     "access": "owner",
     "en": "Search appearance",
     "ar": "ظهور في جوجل",
-    "synEn": "google search engine meta title description keywords",
-    "synAr": "سيو جوجل محركات البحث عنوان وصف",
+    "synEn": "seo google search engine optimization meta title description keywords",
+    "synAr": "سيو جوجل محركات البحث تحسين محركات البحث عنوان وصف",
     "feature": "seo"
   },
   {
@@ -1384,8 +1384,8 @@
     "access": "owner",
     "en": "Meta Title",
     "ar": "عنوان الميتا",
-    "synEn": "page title google title browser tab title",
-    "synAr": "عنوان الصفحة عنوان جوجل عنوان الميتا",
+    "synEn": "seo page title google title browser tab title",
+    "synAr": "سيو عنوان الصفحة عنوان جوجل عنوان الميتا",
     "feature": "seo",
     "pageEn": "Search appearance",
     "pageAr": "ظهور في جوجل"
@@ -1397,8 +1397,8 @@
     "access": "owner",
     "en": "Hide my store from search engines",
     "ar": "إخفاء متجري من محركات البحث",
-    "synEn": "hide store from google search engines noindex private draft not live launch",
-    "synAr": "اخفاء المتجر من جوجل محركات البحث مخفي قبل الاطلاق",
+    "synEn": "seo hide store from google search engines noindex private draft not live launch",
+    "synAr": "سيو اخفاء المتجر من جوجل محركات البحث مخفي قبل الاطلاق",
     "feature": "seo",
     "pageEn": "Search appearance",
     "pageAr": "ظهور في جوجل"
@@ -1410,8 +1410,8 @@
     "access": "owner",
     "en": "The answers shown in ChatGPT",
     "ar": "الإجابات اللي بتظهر في ChatGPT",
-    "synEn": "ai search chatgpt answer engine optimization description",
-    "synAr": "محركات الذكاء الاصطناعي تحسين الاجابة وصف",
+    "synEn": "seo aeo ai search chatgpt answer engine optimization description",
+    "synAr": "سيو محركات الذكاء الاصطناعي تحسين الاجابة وصف",
     "feature": "seo",
     "pageEn": "Search appearance",
     "pageAr": "ظهور في جوجل"

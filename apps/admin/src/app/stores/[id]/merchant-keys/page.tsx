@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Modal, useToast } from '@ebda/ui';
@@ -207,7 +208,7 @@ export default function MerchantKeysPage() {
   }, []);
 
   const fmt = (v: string | null) =>
-    v ? new Date(v).toLocaleString(undefined, withNumerals()) : t('table.never');
+    v ? new Date(v).toLocaleString(intlLocaleForUi(), withNumerals()) : t('table.never');
 
   const keyColumns: DataTableColumn<KeyRow>[] = [
     {

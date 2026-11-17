@@ -48,3 +48,21 @@ describe('maskIp (super-admin acceptance evidence, I6)', () => {
     expect(maskIp(null)).toBeNull();
   });
 });
+
+describe('baseline acceptance gate (Ruling LEGAL-BASELINE-1)', () => {
+  it('a merchant with no acceptance rows (staff-invited, never through the signup wrap) is asked for every document', () => {
+    const out = computePendingNotices(LEGAL_POLICIES, [], [], { requireBaseline: true });
+    expect(out.map(n => n.docKey).sort()).toEqual(
+      ['acceptableUse', 'legal', 'merchant', 'privacy', 'terms'].sort()
+    );
+  });
+
+  it('the API asks for the baseline AND lets "Got it" record it (fails if either wire is cut)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('apps/api/src/services/legal-notice.service.ts', 'utf8');
+    expect(src).toMatch(
+      /computePendingNotices\(activePolicies, sent, accepted, \{\s*requireBaseline: true/
+    );
+    expect(src).toMatch(/\.\.\.baselineMissing\(activePolicies, accepted\)/);
+  });
+});

@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -302,13 +303,19 @@ export default function PurchaseOrderDetailPage() {
                 {po.expectedDate && (
                   <span>
                     {t('expectedDate')}:{' '}
-                    {new Date(po.expectedDate).toLocaleDateString(undefined, withNumerals())}
+                    {new Date(po.expectedDate).toLocaleDateString(
+                      intlLocaleForUi(),
+                      withNumerals()
+                    )}
                   </span>
                 )}
                 {po.receivedDate && (
                   <span>
                     {t('receivedDate')}:{' '}
-                    {new Date(po.receivedDate).toLocaleDateString(undefined, withNumerals())}
+                    {new Date(po.receivedDate).toLocaleDateString(
+                      intlLocaleForUi(),
+                      withNumerals()
+                    )}
                   </span>
                 )}
                 <span>

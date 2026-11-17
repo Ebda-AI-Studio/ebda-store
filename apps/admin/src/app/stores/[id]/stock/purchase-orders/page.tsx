@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -118,7 +119,9 @@ export default function PurchaseOrdersPage() {
 
           {meta && (
             <p className="text-sm text-muted-foreground" data-testid="po-total">
-              {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
+              {t('totalCount', {
+                total: meta.total.toLocaleString(intlLocaleForUi(), withNumerals()),
+              })}
             </p>
           )}
 
@@ -157,7 +160,10 @@ export default function PurchaseOrdersPage() {
                 cell: po => (
                   <span className="text-muted-foreground">
                     {po.expectedDate
-                      ? new Date(po.expectedDate).toLocaleDateString(undefined, withNumerals())
+                      ? new Date(po.expectedDate).toLocaleDateString(
+                          intlLocaleForUi(),
+                          withNumerals()
+                        )
                       : '—'}
                   </span>
                 ),
@@ -178,7 +184,7 @@ export default function PurchaseOrdersPage() {
                 className: 'w-28',
                 cell: po => (
                   <span className="text-muted-foreground">
-                    {new Date(po.createdAt).toLocaleDateString(undefined, withNumerals())}
+                    {new Date(po.createdAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
                   </span>
                 ),
               },

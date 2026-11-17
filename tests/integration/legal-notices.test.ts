@@ -129,6 +129,16 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
         source: 'signup',
       })),
     });
+    // `merchant` has a recorded baseline (v1.0 of every document), so the notice tests below are about
+    // CHANGES. A merchant with no record at all is asked for the baseline: see the ZERO-rows test.
+    await owner.legalAcceptance.createMany({
+      data: ['legal', 'privacy', 'terms', 'acceptableUse', 'merchant'].map(docKey => ({
+        userId: merchant,
+        docKey,
+        version: '1.0',
+        source: 'signup',
+      })),
+    });
     for (const n of [1, 2]) {
       const s = await owner.store.create({
         data: {
@@ -239,19 +249,22 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     expect((await get(signedUp)).body.data.notices).toEqual([]);
   });
 
-  it('a staff-provisioned owner with ZERO acceptance rows gets the pending list and can ack', async () => {
+  it('a staff-provisioned owner with ZERO acceptance rows is asked for every document, and can ack them all', async () => {
     const provisioned = await mkUser('pv', 'store_admin');
     try {
       expect(await owner.legalAcceptance.count({ where: { userId: provisioned } })).toBe(0);
-      await owner.legalNoticeSend.create({
-        data: { docKey: 'terms', version: V, sentBy: operator },
-      });
+      // Nothing was SENT, yet the missing baseline is pending (Ruling LEGAL-BASELINE-1).
       const res = await get(provisioned);
       expect(res.status).toBe(200);
-      expect(res.body.data.notices).toHaveLength(1);
-      expect((await ack(provisioned, [{ docKey: 'terms', version: V }])).body.data).toEqual({
-        acknowledged: 1,
-      });
+      const notices = res.body.data.notices as Array<{ docKey: string; version: string }>;
+      expect(notices.map(n => n.docKey).sort()).toEqual(
+        ['acceptableUse', 'legal', 'merchant', 'privacy', 'terms'].sort()
+      );
+      const acked = await ack(
+        provisioned,
+        notices.map(n => ({ docKey: n.docKey, version: n.version }))
+      );
+      expect(acked.body.data).toEqual({ acknowledged: 5 });
       expect((await get(provisioned)).body.data.notices).toEqual([]);
     } finally {
       await owner.legalAcceptance.deleteMany({ where: { userId: provisioned } });
@@ -284,7 +297,9 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     const res = await ack(merchant, [{ docKey: 'privacy', version: '1.0' }]);
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('NOT_PENDING');
-    expect(await owner.legalAcceptance.count({ where: { userId: merchant } })).toBe(0);
+    expect(
+      await owner.legalAcceptance.count({ where: { userId: merchant, source: 'notice_ack' } })
+    ).toBe(0);
     // ...and it never shows as a banner either (the same shared rule).
     expect((await get(merchant)).body.data.notices).toEqual([]);
   });

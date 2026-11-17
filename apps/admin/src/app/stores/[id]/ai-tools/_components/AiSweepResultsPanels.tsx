@@ -7,6 +7,7 @@
  * Placed below the existing sweep action cards on the AI Tools page.
  */
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { apiGet } from '../../../../../lib/api';
@@ -186,7 +187,9 @@ export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
       </div>
       {lastFetched && (
         <p className="mb-3 text-xs text-muted-foreground">
-          {t('lastFetched', { time: lastFetched.toLocaleTimeString(undefined, withNumerals()) })}
+          {t('lastFetched', {
+            time: lastFetched.toLocaleTimeString(intlLocaleForUi(), withNumerals()),
+          })}
         </p>
       )}
 

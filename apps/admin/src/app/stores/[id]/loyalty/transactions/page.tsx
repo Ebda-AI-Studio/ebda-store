@@ -337,7 +337,7 @@ export default function LoyaltyTransactionsPage() {
               {t('pageOf', {
                 page: meta.page,
                 totalPages: meta.totalPages,
-                total: meta.total.toLocaleString(undefined, withNumerals()),
+                total: meta.total.toLocaleString(intlLocaleForUi(), withNumerals()),
               })}
             </p>
             <div className="flex gap-2">

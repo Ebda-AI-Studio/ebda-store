@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -100,7 +101,7 @@ function AnomalyRow({
             <span className="text-xs text-muted-foreground capitalize">{item.scope}</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {new Date(item.detectedAt).toLocaleDateString(undefined, withNumerals())}
+            {new Date(item.detectedAt).toLocaleDateString(intlLocaleForUi(), withNumerals())}
           </p>
         </div>
         <div className="flex items-center gap-2">

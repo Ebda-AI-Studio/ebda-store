@@ -1,5 +1,6 @@
 'use client';
 
+import { intlLocaleForUi } from '@/lib/format';
 import { useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
 import { useToast } from '@ebda/ui';
@@ -293,7 +294,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                         <p className="mt-1 text-xs text-muted-foreground">
                           /{post.slug} ·{' '}
                           {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
-                            undefined,
+                            intlLocaleForUi(),
                             withNumerals()
                           )}
                         </p>

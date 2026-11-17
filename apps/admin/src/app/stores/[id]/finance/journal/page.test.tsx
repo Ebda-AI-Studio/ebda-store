@@ -31,7 +31,10 @@ vi.mock('@/contexts/NotificationContext', () => ({
   useUiRefresh: vi.fn(),
 }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
-vi.mock('@/lib/format', () => ({ minorToMajor: (n: number) => String(n) }));
+vi.mock('@/lib/format', () => ({
+  minorToMajor: (n: number) => String(n),
+  intlLocaleForUi: () => 'en-US',
+}));
 vi.mock('../../../../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
