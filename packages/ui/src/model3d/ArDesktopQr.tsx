@@ -13,6 +13,7 @@ export interface ArDesktopQrLabels {
   close: string;
 }
 
+/** A non-modal popover (role=group, Escape closes), not a dialog: the page stays usable (R-04). */
 export function ArDesktopQr({ url, labels }: { url: string; labels: ArDesktopQrLabels }) {
   const [open, setOpen] = useState(false);
   const [img, setImg] = useState<string | null>(null);
@@ -41,7 +42,8 @@ export function ArDesktopQr({ url, labels }: { url: string; labels: ArDesktopQrL
       </button>
       {open && (
         <div
-          role="dialog"
+          role="group"
+          onKeyDown={e => e.key === 'Escape' && setOpen(false)}
           aria-label={labels.title}
           className="absolute bottom-16 end-3 z-10 w-56 rounded-xl border border-input bg-background p-3 text-center shadow-lg"
         >

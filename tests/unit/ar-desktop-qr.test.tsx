@@ -26,14 +26,17 @@ describe('ArDesktopQr', () => {
       <ArDesktopQr url="https://shop.ebda.app/p/ring" labels={labels} />
     );
     expect(toDataURL).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('group')).toBeNull();
     fireEvent.click(screen.getByText('View in your space'));
-    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByRole('group')).toBeTruthy();
     await waitFor(() =>
       expect(container.querySelector('img')?.getAttribute('src')).toMatch(/^data:image/)
     );
     expect(toDataURL.mock.calls[0]![0]).toBe('https://shop.ebda.app/p/ring');
+    fireEvent.keyDown(screen.getByRole('group'), { key: 'Escape' });
+    expect(screen.queryByRole('group')).toBeNull();
+    fireEvent.click(screen.getByText('View in your space'));
     fireEvent.click(screen.getByText('Close'));
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('group')).toBeNull();
   });
 });
