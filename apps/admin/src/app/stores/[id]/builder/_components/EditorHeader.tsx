@@ -29,10 +29,10 @@ import { useT } from '@/i18n/useT';
 import { rovingKeyDown } from '../_lib/roving';
 import { HeaderPopover } from './HeaderPopover';
 
-export type HeaderSaveState = 'loading' | 'saved' | 'dirty' | 'saving' | 'error' | 'conflict';
+type HeaderSaveState = 'loading' | 'saved' | 'dirty' | 'saving' | 'error' | 'conflict';
 
 /** The device widths the canvas uses (BuilderEditor sizes the frame the same way). */
-export const VIEWPORT_WIDTH: Record<Viewport, number> = { desktop: 1280, tablet: 820, mobile: 390 };
+const VIEWPORT_WIDTH: Record<Viewport, number> = { desktop: 1280, tablet: 820, mobile: 390 };
 
 const VIEWPORT_ICON: Record<Viewport, ReactNode> = {
   desktop: <Monitor className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />,
@@ -50,7 +50,7 @@ const DOT: Record<HeaderSaveState, string> = {
 };
 
 /** True on Apple platforms, where the shortcut modifier is Cmd. Decided after mount (SSR-safe). */
-export function useIsMac(): boolean {
+function useIsMac(): boolean {
   const [mac, setMac] = useState(false);
   useEffect(() => {
     const nav = window.navigator as Navigator & { userAgentData?: { platform?: string } };

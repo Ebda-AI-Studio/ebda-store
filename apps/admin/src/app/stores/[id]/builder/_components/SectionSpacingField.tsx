@@ -47,6 +47,7 @@ export function spacingValues(node: SectionNode): Values {
 const AXES: readonly SpacingAxis[] = ['Top', 'Bottom'];
 
 /** The three whole-section presets and the existing scale step each one writes to both sides. */
+// pq-allow(unused-export): test seam, imported by SectionSpacingField.quick.test.tsx
 export const QUICK_PRESETS: ReadonlyArray<{
   key: 'compact' | 'normal' | 'roomy';
   value: SectionSpacingPreset;
@@ -57,6 +58,7 @@ export const QUICK_PRESETS: ReadonlyArray<{
 ];
 
 /** Preview height of one side: half the real padding, capped so a wide step still fits the card. */
+// pq-allow(unused-export): test seam, imported by SectionSpacingField.quick.test.tsx
 export const previewHeight = (px: number) => Math.min(48, Math.round(px / 2));
 
 export function SectionSpacingField({

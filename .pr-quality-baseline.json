@@ -2037,7 +2037,6 @@
     "unused-export|apps/web/src/app/search/search-sort.ts|sortValues",
     "unused-export|apps/web/src/builder/preview/CanvasToolbar.tsx|ToolbarLocale",
     "unused-export|apps/web/src/builder/preview/CanvasToolbar.tsx|ToolbarProps",
-    "unused-export|apps/web/src/builder/preview/EditorOverlay.tsx|chipTopFor",
     "unused-export|apps/web/src/builder/preview/editor-inert.ts|EDITOR_OWN",
     "unused-export|apps/web/src/builder/preview/editor-inert.ts|EDITOR_REFUSED",
     "unused-export|apps/web/src/builder/preview/inline-edit.ts|InlineEditOptions",

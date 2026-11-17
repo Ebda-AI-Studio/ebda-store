@@ -11,13 +11,14 @@ export interface FieldIssue {
   messageAr: string;
 }
 
-export interface ErrorTarget {
+interface ErrorTarget {
   /** Index in the section's `blocks`, or null for a section-level setting. */
   blockIndex: number | null;
   /** The setting key the issue is about, or null when the path names no setting. */
   key: string | null;
 }
 
+// pq-allow(unused-export): test seam, imported by field-errors.test.ts
 export function parseErrorTarget(path: string, sectionPath: string): ErrorTarget | null {
   if (!path.startsWith(sectionPath)) return null;
   const rest = path.slice(sectionPath.length);
@@ -27,7 +28,7 @@ export function parseErrorTarget(path: string, sectionPath: string): ErrorTarget
   return { blockIndex: null, key: setting ? setting[1] : null };
 }
 
-export interface FieldErrorGroups {
+interface FieldErrorGroups {
   /** Issues keyed by the setting definition id they belong to. */
   byDef: Record<string, FieldIssue[]>;
   /** Issues about this selection that no rendered field owns (still listed in the summary). */

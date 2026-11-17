@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
-export interface HeaderPopoverApi {
+interface HeaderPopoverApi {
   open: boolean;
   close: () => void;
   triggerProps: {
