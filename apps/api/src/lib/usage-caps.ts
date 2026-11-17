@@ -5,11 +5,13 @@
 // Override via AI_DAILY_REQUEST_CAP / AI_MONTHLY_REQUEST_CAP; raise only when Google billing is enabled.
 const DEFAULT_DAILY_REQUEST_CAP = 1800;
 const DEFAULT_MONTHLY_REQUEST_CAP = 54000;
-// Per-store slice BENEATH the platform cap: without it one merchant's bulk sweep drains the shared cap and denies
-// AI to every other tenant. Default = half the platform daily cap (900 at 1800; top-ups are sellable within this
-// share). An explicit AI_STORE_DAILY_REQUEST_CAP is honoured but never exceeds the platform daily cap, so no
-// store can be granted more than the ceiling.
-const STORE_SHARE_OF_DAILY_CAP = 0.5;
+// Per-store BASE slice beneath the platform cap: without it one merchant's bulk sweep drains the shared cap and
+// denies AI to every other tenant. The base stays 150/day; the room between it and a store's MAXIMUM share (50% of the
+// platform day, 900 at 1800, `maxStoreDailyRequests` in the add-ons stack) is what AI top-ups sell (Ruling PLANS-1,
+// register G36 "top-ups sellable within store share"). A base AT the share would leave no top-up the platform can back
+// (every pack refused AI_CAPACITY_UNAVAILABLE). An explicit AI_STORE_DAILY_REQUEST_CAP is honoured but never exceeds
+// the platform daily cap.
+const DEFAULT_STORE_DAILY_REQUEST_CAP = 150;
 
 function envInt(name: string): number | null {
   const n = parseInt(process.env[name] ?? '', 10);
@@ -21,7 +23,7 @@ export function resolveAiCaps(): { dailyCap: number; monthlyCap: number; storeDa
   const dailyCap = envInt('AI_DAILY_REQUEST_CAP') ?? DEFAULT_DAILY_REQUEST_CAP;
   const monthlyCap = envInt('AI_MONTHLY_REQUEST_CAP') ?? DEFAULT_MONTHLY_REQUEST_CAP;
   const storeDailyCap = Math.min(
-    envInt('AI_STORE_DAILY_REQUEST_CAP') ?? Math.floor(dailyCap * STORE_SHARE_OF_DAILY_CAP),
+    envInt('AI_STORE_DAILY_REQUEST_CAP') ?? DEFAULT_STORE_DAILY_REQUEST_CAP,
     dailyCap
   );
   return { dailyCap, monthlyCap, storeDailyCap };
