@@ -1,6 +1,6 @@
 # Read-only, count-only metrics across stores' Durable Objects (design, no code yet)
 
-Status: proposal for the main controller's decision. Author: track 3. Date: 2026-11-17.
+Status: DECIDED (Ruling DO-METRICS-1, 2026-11-17): option A. Decisions: the CLI uses the controller's existing super_admin + MFA session (no new credential or identity now; a scoped service credential can be added later with Ahmad's OK); per-store counts (numbers only); 60 s cache and 10 calls per minute per user. The runtime read-only spike is done (below). Build next, with the five named metrics; every later metric is its own PR and ruling. Author: track 3. Date: 2026-11-17.
 
 ## The gap
 
@@ -46,13 +46,28 @@ One endpoint that executes caller-supplied read-only SQL in every DO. Maximum fl
 
 A, with B as a later add-on only if someone needs history (the allow-list and its tests are shared, so B is a thin extra). Ship with the two metric families that unblock today: track 1 (journal repair counts: `journal_unbalanced`, `journal_repaired`, `journal_unrepaired`) and track 4 (push exposure: `push_subscriptions_active`, `stores_with_push_enabled`), each added by a PR that carries its own SQL, its EXPLAIN assertion and a ruling line (the allow-list is code: adding a metric is a reviewed change, never data). Start with a spike to settle the one unknown below, then build.
 
-## Open decisions for the controller
+## Decisions (made 2026-11-17, Ruling DO-METRICS-1)
 
-1. Credential for the CLI. A full super_admin session (MFA) cannot be used from a script. Options: (a) a dedicated service credential with a single scope `ops:metrics`, stored in `OS_SERVICES_ENV`, accepted only by this route (recommended: least privilege, revocable, its own audit identity); (b) a short-lived super_admin token minted per run by the identity service; (c) the controller's browser session (no CLI). Recommend (a).
-2. Per-store counts or totals only? Recommend per-store (needed to find WHICH stores to repair), with no per-user output at all.
-3. Cache TTL (60 s proposed) and the rate limit (10/min/user proposed).
+1. CLI credential: the controller's existing super_admin + MFA session. No dedicated service credential now (a new identity or key needs Ahmad's OK); the route and the audit row are written so a scoped credential can be added later without changing the metrics.
+2. Per-store counts: yes, numbers only, no per-user output.
+3. 60 s result cache and 10 calls per minute per user: yes.
 
-## Unknowns (to settle in a one-day spike, before the build)
+## Spike result: runtime read-only enforcement (done, measured on local workerd)
+
+`apps/api/workers-do/do-readonly-guard.test.ts` pins these facts (6 tests, CI lane `workerd-integration`):
+
+- No runtime read-only mode: `PRAGMA query_only` (get/on/off), `PRAGMA writable_schema` and `ATTACH` are refused (`SQLITE_AUTH`).
+- `sql.exec` runs EVERY statement of a multi-statement string: `SELECT 1; DELETE ...` deleted the rows. The allow-list must forbid `;`.
+- `EXPLAIN QUERY PLAN` works, so the per-metric index test can run on workerd.
+- `cursor.rowsRead` / `rowsWritten` are readable (a SELECT writes 0, an INSERT writes 1).
+- Rollback guard works for DML: running the statement inside `transactionSync` and throwing when `rowsWritten > 0` undid an INSERT and a multi-statement DELETE. DDL under the guard is unverified (SQLITE_LOCKED in the harness), so DDL is excluded by the static guard alone.
+  Conclusion: the API cannot enforce read-only at runtime, so enforcement is the constant allow-list + the static guard + the EXPLAIN index test + the numbers-only return type, with the rollback guard as defence in depth for DML. Still unmeasured: per-store latency of the counts on a large store, and the cold-start cost of a hibernated StoreDO in the fan-out (both settled by the first build's measurement).
+
+## First five metrics
+
+`journal_unbalanced`, `journal_repaired`, `journal_unrepaired` (track 1: journal repair counts); `push_subscriptions_active`, `stores_with_push_enabled` (track 4: push exposure counts). Each carries its constant SQL, its EXPLAIN assertion and a ruling line.
+
+## Unknowns (original list; the first is settled, see the spike result above)
 
 - Whether the DO SQLite API lets a method enforce read-only at runtime (an authorizer or `PRAGMA query_only`). If not, the guarantee is the constant allow-list plus the static test, which is enough for correctness but weaker as defence in depth.
 - The real per-store latency of the proposed counts on a large store (measure, then set the per-store timeout).
