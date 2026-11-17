@@ -55,9 +55,35 @@ describe('alerts bridge token', () => {
     const app = await appWith('a'.repeat(64), 'production');
     expect((await request(app).post('/hooks/generic').send({ title: 'x' })).status).toBe(401);
     const ok = await request(app)
-      .post(`/hooks/generic?token=${'a'.repeat(64)}`)
+      .post('/hooks/generic')
+      .set('x-alerts-token', 'a'.repeat(64))
       .send({ title: 'x', body: 'y' });
     expect(ok.status).toBe(200);
+  });
+
+  it('S7: refuses ?token= (header only), even with the right value', async () => {
+    const app = await appWith('a'.repeat(64), 'production');
+    const res = await request(app)
+      .post(`/hooks/generic?token=${'a'.repeat(64)}`)
+      .send({ title: 'x', body: 'y' });
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('token_in_query_refused');
+    expect(m.sendAlert).not.toHaveBeenCalled();
+  });
+
+  it('S7: reads the secret per request (rotation needs no redeploy)', async () => {
+    const app = await appWith('a'.repeat(64), 'production');
+    process.env.ALERTS_WEBHOOK_TOKEN = 'c'.repeat(64);
+    const old = await request(app)
+      .post('/hooks/generic')
+      .set('x-alerts-token', 'a'.repeat(64))
+      .send({ title: 'x' });
+    expect(old.status).toBe(401);
+    const fresh = await request(app)
+      .post('/hooks/generic')
+      .set('x-alerts-token', 'c'.repeat(64))
+      .send({ title: 'x' });
+    expect(fresh.status).toBe(200);
   });
 });
 
@@ -73,7 +99,8 @@ describe('sentry issue webhook actions', () => {
   it.each(['resolved', 'assigned', 'archived', 'unresolved'])('ignores action %s', async action => {
     const app = await appWith(T, 'production');
     const res = await request(app)
-      .post(`/hooks/sentry?token=${T}`)
+      .post('/hooks/sentry')
+      .set('x-alerts-token', T)
       .send({ action, data: { issue } });
     expect(res.status).toBe(200);
     expect(m.sendAlert).not.toHaveBeenCalled();
@@ -82,7 +109,8 @@ describe('sentry issue webhook actions', () => {
   it('alerts on a created issue', async () => {
     const app = await appWith(T, 'production');
     await request(app)
-      .post(`/hooks/sentry?token=${T}`)
+      .post('/hooks/sentry')
+      .set('x-alerts-token', T)
       .send({ action: 'created', data: { issue } });
     expect(m.sendAlert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -96,7 +124,8 @@ describe('sentry issue webhook actions', () => {
   it('alerts on a triggered alert rule (data.event)', async () => {
     const app = await appWith(T, 'production');
     await request(app)
-      .post(`/hooks/sentry?token=${T}`)
+      .post('/hooks/sentry')
+      .set('x-alerts-token', T)
       .send({ action: 'triggered', data: { event: { ...issue, title: 'Spike' } } });
     expect(m.sendAlert).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'sentry.ebda-api', title: 'sentry: Spike' })

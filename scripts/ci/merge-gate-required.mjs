@@ -12,8 +12,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ALWAYS_IF = /^github\.event_name == 'pull_request'$/;
-// An aggregator that runs even when the jobs it needs were (legitimately) skipped: always required on a PR.
-const ALWAYS_RUN_IF = /^always\(\) && github\.event_name == 'pull_request'$/;
+// An aggregator that runs even when the jobs it needs were (legitimately) skipped: always required on a PR. It may skip a
+// CANCELLED run (`&& !cancelled()`): a superseded run's aggregators would otherwise wait for a scarce Mac runner slot.
+const ALWAYS_RUN_IF = /^always\(\) (&& !cancelled\(\) )?&& github\.event_name == 'pull_request'$/;
 
 export function parseWorkflow(text) {
   const lines = text.split('\n');

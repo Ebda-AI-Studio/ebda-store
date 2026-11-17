@@ -392,6 +392,39 @@ describe('audit trail is append-only on the DO write path (N-10d security review
     expect(r.count('audit_logs')).toBe(3); // nothing is that old
   });
 
+  it('waCustomerProfile reads ONLY the buyer key inside the store; a placeholder name is no name; default address wins', async () => {
+    const r = rig();
+    const BK = 'a'.repeat(64);
+    const T = Date.now();
+    const cust = r.db.prepare(
+      'INSERT INTO customers (id, store_id, first_name, last_name, buyer_key, preferred_locale, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    cust.run('c1', STORE, 'Mona', 'Adel', BK, 'ar', T, T);
+    cust.run('c2', 'other', 'Intruder', 'X', BK, 'en', T, T); // same key, another store
+    cust.run('c3', STORE, 'WhatsApp', 'customer', 'b'.repeat(64), null, T, T);
+    const adr = r.db.prepare(
+      'INSERT INTO customer_addresses (id, customer_id, label, street, area, governorate, building_number, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    adr.run('a-new', 'c1', 'Work', '1 Tahrir', 'Dokki', 'Giza', '2', 0, T + 10, T + 10);
+    adr.run('a-def', 'c1', 'Home', '9 Road 233', 'Maadi', 'Cairo', '4', 1, T, T);
+    const raw = (buyerKey: string, storeId = STORE) =>
+      r.run({
+        ops: [{ model: '$proc', op: 'waCustomerProfile', args: { storeId, buyerKey } } as never],
+      });
+    const proc = async (buyerKey: string, storeId = STORE) =>
+      decodeRpc<any[]>(((await raw(buyerKey, storeId)) as any).json)[0];
+    expect(await proc(BK)).toMatchObject({
+      known: true,
+      firstName: 'Mona',
+      preferredLocale: 'ar',
+      defaultAddress: { id: 'a-def', governorate: 'Cairo', buildingNumber: '4' },
+    });
+    expect(await proc('b'.repeat(64))).toMatchObject({ known: true, firstName: null });
+    expect(await proc('c'.repeat(64))).toMatchObject({ known: false, firstName: null });
+    expect((await proc(BK, 'other')).firstName).toBe('Intruder');
+    expect(await raw('not-a-key')).toMatchObject({ ok: false });
+  });
+
   it('customerSetGroup / customerCreateInGroup move ONLY the group, inside the store, and roll back with the batch', async () => {
     const r = rig();
     const T = Date.now();

@@ -1,0 +1,32 @@
+{
+  "id": "storefront.contact-enquiry",
+  "status": "live",
+  "area": "storefront",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "رسايل تواصل من العملاء",
+  "titleEn": "Contact form enquiries from shoppers",
+  "screens": ["storefront /contact"],
+  "api": ["POST /public/contact/enquiry"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["فين رسايل التواصل بتاعة العملاء؟"],
+    "en": ["Where do customer contact messages go?"]
+  },
+  "steps": ["Delivered by email to the store contact; no inbox UI (inferred)."],
+  "edgeCases": [
+    "Spam",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No merchant inbox for enquiries (inferred)", "No help article"]
+}

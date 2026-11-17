@@ -49,9 +49,11 @@ const T = {
       resolved: 'اتحلّت',
     },
     checked: 'آخر فحص',
+    respTime: (ms: number, slow: boolean) =>
+      `زمن الاستجابة: ${(ms / 1000).toFixed(1)} ث${slow ? ' (بطيء: أكتر من 8 ثواني)' : ''}`,
     generated: 'آخر تحديث للصفحة',
     explain:
-      'بنفحص كل خدمة كل دقيقة من برّه منصتنا. لو كذا فحص ورا بعض فشلوا بنفتح مشكلة لوحدها، وبنقفلها أول ما الخدمة ترجع.',
+      'بنفحص كل خدمة كل 5 دقايق من برّه منصتنا. لو كذا فحص ورا بعض فشلوا بنفتح مشكلة لوحدها، وبنقفلها أول ما الخدمة ترجع.',
     bars: 'كل شريط يوم واحد (بتوقيت جرينتش)، من الأقدم للأحدث.',
     days: 'الأيام',
     otherLang: { href: '/en', label: 'English', lang: 'en' },
@@ -87,9 +89,11 @@ const T = {
       resolved: 'Resolved',
     },
     checked: 'Last checked',
+    respTime: (ms: number, slow: boolean) =>
+      `Response time: ${(ms / 1000).toFixed(1)} s${slow ? ' (slow: over 8 s)' : ''}`,
     generated: 'Page generated',
     explain:
-      'Every service is probed once a minute from outside our platform. An incident opens automatically after several consecutive failed probes and resolves after the service recovers.',
+      'Every service is probed every 5 minutes from outside our platform. An incident opens automatically after several consecutive failed probes and resolves after the service recovers.',
     bars: 'Each bar is one UTC day, oldest to newest.',
     days: 'days',
     otherLang: { href: '/', label: 'العربية', lang: 'ar' },
@@ -130,10 +134,11 @@ function component(c: ComponentSnapshot, lang: Lang): string {
   const checked = c.lastChecked
     ? ` · ${t.checked}: <time datetime="${new Date(c.lastChecked).toISOString()}">${fmt(c.lastChecked)}</time>`
     : '';
+  const resp = c.latencyMs === null ? '' : ` · ${esc(t.respTime(c.latencyMs, c.slow))}`;
   return `<li class="comp" id="c-${esc(c.id)}">
 <div class="comp-head"><h3>${esc(name)}</h3><span class="pill ${c.status}"><span class="dot" aria-hidden="true"></span>${esc(t.status[c.status])}</span></div>
 ${bars(c, lang)}
-<p class="muted small">${esc(t.uptime(up, HISTORY_DAYS))}${checked}</p>
+<p class="muted small">${esc(t.uptime(up, HISTORY_DAYS))}${checked}${resp}</p>
 </li>`;
 }
 

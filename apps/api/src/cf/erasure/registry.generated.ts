@@ -481,6 +481,27 @@ export const GENERATED_STORE_DO_REGISTRY: Record<string, TableClass> = {
   size_charts: {
     kind: 'no-pii',
   },
+  sl_applied: {
+    kind: 'store-owned',
+  },
+  sl_approvals: {
+    kind: 'store-owned',
+  },
+  sl_audit: {
+    kind: 'store-owned',
+  },
+  sl_counters: {
+    kind: 'store-owned',
+  },
+  sl_decisions: {
+    kind: 'store-owned',
+  },
+  sl_previews: {
+    kind: 'store-owned',
+  },
+  sl_turns: {
+    kind: 'store-owned',
+  },
   sms_marketing_consents: {
     kind: 'customer-pii',
     match: {

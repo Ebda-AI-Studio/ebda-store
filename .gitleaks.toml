@@ -97,3 +97,49 @@ regexes = [
 # is the point: it forces a human/reviewer to look at it once instead of
 # blanket-exempting the whole tree forever.
 
+
+# Ruling CI-MAC-TRUFFLE-1 (2026-11-11): a Postgres URL with an inline password whose host is a real host. The built-in
+# ruleset has no such rule (measured: a committed Neon-shaped `postgresql://user:pass@ep-...neon.tech/db` URL gave
+# "no leaks found"), and trufflehog only fails on URLs it can VERIFY from the runner, so an unverifiable real URL passed
+# both. Silent for loopback hosts (localhost, 127.0.0.1, ::1), the reserved example/test domains (RFC 2606/6761) and
+# shell/template placeholders. Pinned by tests/unit/gitleaks-postgres-url-rule.test.ts (known-bad + known-good fixtures).
+[[rules]]
+id = "ebda-postgres-url-password"
+description = "Postgres connection URL with an inline password and a non-loopback host"
+regex = '''postgres(?:ql)?://[^:@\s/'"`]+:[^@\s/'"`]+@[^/:\s'"`?,)]+'''
+keywords = ["postgres://", "postgresql://"]
+
+[[rules.allowlists]]
+description = "loopback hosts, reserved example/test domains, and placeholders"
+regexTarget = "match"
+regexes = [
+  '''@(?:localhost|127\.0\.0\.1|\[::1\]|::1)$''',
+  '''@(?:[A-Za-z0-9-]+\.)*(?:example\.(?:com|org|net)|example|test|invalid|localhost)$''',
+  '''[$%{}<>\[\]]''',
+  '''\.\.\.''',
+  # placeholder passwords: 1-2 chars, the usual words, all-x, or an UPPER_CASE token (PASSWORD, USER_PASS)
+  '''://[^:@\s]+:(?:[^@\s]{1,2}|pass|password|pwd|secret|test|changeme|x+|X+|[A-Z][A-Z0-9_]*)@''',
+]
+
+# Ruling SEC-SCAN-2 (2026-11-11): the Supabase project `avvugheaifhfrskwcrlq` is deleted. Evidence:
+# `dig @8.8.8.8 avvugheaifhfrskwcrlq.supabase.co` returns NXDOMAIN while `supabase.co` resolves, and test-db.js is not in
+# the main tree. Cost if wrong: a live leaked DB password in private-repo history goes unflagged.
+# Scoped to exactly the two historical commits AND the path test-db.js (never the password literal, never a broad regex):
+# the same URL in any other commit or file still fires.
+[[rules.allowlists]]
+description = "Ruling SEC-SCAN-2: deleted Supabase project, two historical commits of test-db.js only"
+condition = "AND"
+commits = ["d83b18988f7231f5522ae8ea2b190eb269a21eed", "acdd9ebb0c18542e6762f91c687bc85a2faea6f8"]
+paths = ['''^test-db\.js$''']
+
+# Ruling SEC-SCAN-3 (2026-11-11): gitleaks' built-in generic-api-key flags docs/DEPLOYMENT.md:362 in commit d63861efa.
+# That line is a list of resource names (an R2 bucket name and an Axiom dataset name), not a key. Scoped to exactly that
+# commit AND that path, appended to the built-in rule (same id merges into the default ruleset); anything else still fires.
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Ruling SEC-SCAN-3: resource-name list in one historical commit of docs/DEPLOYMENT.md"
+condition = "AND"
+commits = ["d63861efa81416e7f7b37c8e4c8ec057351d83e3"]
+paths = ['''^docs/DEPLOYMENT\.md$''']

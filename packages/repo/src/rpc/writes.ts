@@ -284,6 +284,43 @@ export const DO_PROCS: Record<string, Proc> = {
       )
       .map(r => ({ id: r.id, label: r.label ?? null, area: r.area, street: r.street }));
   },
+  /**
+   * Ebda Chat's customer context (read-only, by `buyerKey`): the first name the shopper gave (the placeholder 'WhatsApp' row name is NOT a
+   * name), sticky locale, and the default (else newest) saved address with every field the Store holds. `known` is false when no CRM row
+   * carries the key. `customers.buyer_key` is not a Prisma field, so it is a named op like `waAddresses`.
+   */
+  waCustomerProfile(sql, a) {
+    const { storeId, buyerKey } = a as Record<string, unknown>;
+    if (typeof storeId !== 'string' || !storeId) throw procErr('storeId');
+    if (typeof buyerKey !== 'string' || !/^[0-9a-f]{64}$/.test(buyerKey)) throw procErr('buyerKey');
+    const c = sql.all(
+      'SELECT id, first_name, preferred_locale FROM customers WHERE store_id = ? AND buyer_key = ? ORDER BY created_at, id LIMIT 1',
+      [storeId, buyerKey]
+    )[0];
+    if (!c) return { known: false, firstName: null, preferredLocale: null, defaultAddress: null };
+    const ad = sql.all(
+      'SELECT id, label, area, street, governorate, building_number, notes FROM customer_addresses WHERE customer_id = ? ORDER BY is_default DESC, created_at DESC, id LIMIT 1',
+      [c.id]
+    )[0];
+    const name = typeof c.first_name === 'string' ? c.first_name.trim() : '';
+    return {
+      known: true,
+      firstName: name && name !== 'WhatsApp' ? name.slice(0, 60) : null,
+      preferredLocale:
+        c.preferred_locale === 'ar' || c.preferred_locale === 'en' ? c.preferred_locale : null,
+      defaultAddress: ad
+        ? {
+            id: ad.id,
+            label: ad.label ?? null,
+            area: ad.area,
+            street: ad.street,
+            governorate: ad.governorate ?? null,
+            buildingNumber: ad.building_number ?? null,
+            notes: ad.notes ?? null,
+          }
+        : null,
+    };
+  },
   /** The wholesale-approval / identity-assign insert of a CRM row that is born inside a group. Same contract as above. */
   customerCreateInGroup(sql, a) {
     const r = a as Record<string, unknown>;

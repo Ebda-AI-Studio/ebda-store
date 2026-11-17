@@ -50,7 +50,7 @@ const passkeyItem = (r: DoPasskey) => ({
 
 /**
  * Passkeys (WebAuthn) for merchants/staff (admin) and shoppers (one store). Plan:
- * docs/plans/2026-10-21-passkeys.md. The rulings that shape this file:
+ * docs/plans/done/2026-10-21-passkeys.md. The rulings that shape this file:
  *
  *  PASSKEY-1  Credentials are user-keyed under strict RLS (no store_id column): the user row is the tenant.
  *  PASSKEY-2  Challenges live in Redis for 300s (floor is 120s), keyed by sha256(challenge), consumed with

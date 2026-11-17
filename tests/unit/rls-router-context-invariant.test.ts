@@ -1,5 +1,5 @@
 /**
- * RLS Phase 1a regression guard (audit F2 / docs/plans/2026-07-02-rls-cutover.md).
+ * RLS Phase 1a regression guard (audit F2 / docs/plans/done/2026-07-02-rls-cutover.md).
  *
  * Background: `apps/api/src/routes/index.ts` mounts ~30 store-scoped
  * routers at BARE prefixes (`/stores`, `/`, `/admin`) rather than

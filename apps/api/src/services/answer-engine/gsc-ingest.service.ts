@@ -8,23 +8,19 @@
  * upserts.
  *
  * Flow, per store:
- *   1. Load `store.domain`. No domain → `{ skipped: 'no_domain' }` (GSC
- *      properties are keyed by domain; nothing to query).
+ *   1. Resolve the store host: verified `store.domain`, else
+ *      `<slug>.ebda.app`. No host → `{ skipped: 'no_domain' }`.
  *   2. Resolve the target date — defaults to YESTERDAY (UTC, `YYYY-MM-DD`).
  *      GSC data typically lags 2-3 days behind real-time, so "yesterday"
  *      will often come back thin/zeroed for the first day or two after a
  *      query hits a freshly-indexed property; this is expected for v1 and
  *      self-corrects as the upsert re-runs on subsequent days.
- *   3. Try each GSC property URL form from `gscSiteUrlsForDomain(domain)` in
- *      order (`sc-domain:` then `https://.../`) — Search Console access is
- *      granted per-property-form, so a service account may have access to
- *      one form and not the other. On `GscNoAccessError` for a given form,
- *      try the next; if EVERY form is inaccessible → `{ skipped: 'no_access'
- *      }` (recorded via a log line, no DB row written). Any OTHER error
- *      (network, auth, config) propagates to the caller — the Inngest cron's
- *      per-store wrapper (`ingestStoreGsc`) catches it and isolates the
- *      failure to that one store (fail-soft contract), it is not swallowed
- *      here.
+ *   3. `client.resolveGscTarget(host)` picks the most specific property the
+ *      service account can see (sites.list, cached): exact `sc-domain:` /
+ *      URL-prefix first, else a parent `sc-domain:` property plus a `page`
+ *      filter restricted to the host. No match → `{ skipped: 'no_access' }`
+ *      (also on a 403 at query time). Any OTHER error propagates to the cron's
+ *      per-store wrapper (`ingestStoreGsc`), which isolates it (fail-soft).
  *   4. UPSERT one `GscDailyMetric` row on `(storeId, date)` — idempotent:
  *      re-running the same day overwrites the existing row instead of
  *      creating a duplicate (enforced by the `@@unique([storeId, date])`
@@ -38,22 +34,30 @@ import { prisma, Prisma } from '@ebda/database';
 import { storeDb } from '../../lib/repo-factory';
 import { analyticsWrite } from '../../lib/analytics-backend';
 import logger from '../../lib/logger';
+import { storeHost } from '@ebda/shared';
 import {
-  gscSiteUrlsForDomain,
+  resolveGscTarget,
   querySearchAnalytics,
   GscNoAccessError,
   type GscResult,
+  type GscTarget,
 } from './gsc-client';
 
 /** The subset of the gsc-client module `runGscIngest` depends on — narrowed
  * to an interface so tests can inject a mock without importing the real
  * module's internals. */
 export interface GscClientLike {
-  gscSiteUrlsForDomain: (domain: string) => string[];
-  querySearchAnalytics: (siteUrl: string, startDate: string, endDate: string) => Promise<GscResult>;
+  /** Most specific accessible property covering the host, or null. */
+  resolveGscTarget: (host: string) => Promise<GscTarget | null>;
+  querySearchAnalytics: (
+    siteUrl: string,
+    startDate: string,
+    endDate: string,
+    opts?: { pageHost?: string }
+  ) => Promise<GscResult>;
 }
 
-const defaultClient: GscClientLike = { gscSiteUrlsForDomain, querySearchAnalytics };
+const defaultClient: GscClientLike = { resolveGscTarget, querySearchAnalytics };
 
 /** Yesterday, UTC, as `YYYY-MM-DD` — the default ingestion target date. */
 function yesterdayUtc(): string {
@@ -93,41 +97,41 @@ export async function runGscIngest(
     await storeDb(storeId)
   ).store.findUnique({
     where: { id: storeId },
-    select: { domain: true },
+    select: { domain: true, slug: true },
   });
 
-  if (!store?.domain) {
-    logger.info({ storeId, date }, 'gsc-ingest: store has no domain configured, skipping');
+  // The store's public host: its VERIFIED custom domain, else `<slug>.ebda.app`.
+  const host = store?.domain || (store?.slug ? storeHost(store.slug) : null);
+  if (!host) {
+    logger.info({ storeId, date }, 'gsc-ingest: store has no public host, skipping');
     return { skipped: 'no_domain', date };
   }
 
-  const siteUrls = client.gscSiteUrlsForDomain(store.domain);
-
-  let result: GscResult | undefined;
-  for (const siteUrl of siteUrls) {
-    try {
-      // Properties are tried in order; we stop at the first that succeeds,
-      // so this is intentionally sequential rather than a parallel
-      // Promise.all.
-      result = await client.querySearchAnalytics(siteUrl, date, date);
-      break;
-    } catch (err) {
-      if (err instanceof GscNoAccessError) {
-        // Try the next property URL form.
-        continue;
-      }
-      // Any other error (network/auth/config) is not this function's to
-      // swallow — the cron's per-store wrapper isolates it.
-      throw err;
-    }
-  }
-
-  if (!result) {
+  const target = await client.resolveGscTarget(host);
+  if (!target) {
     logger.info(
-      { storeId, date, siteUrls },
-      'gsc-ingest: no GSC property access for any site URL form, skipping'
+      { storeId, date },
+      'gsc-ingest: no accessible GSC property covers this host, skipping'
     );
     return { skipped: 'no_access', date };
+  }
+
+  let result: GscResult;
+  try {
+    result = await client.querySearchAnalytics(
+      target.siteUrl,
+      date,
+      date,
+      target.pageHost ? { pageHost: target.pageHost } : undefined
+    );
+  } catch (err) {
+    if (err instanceof GscNoAccessError) {
+      // Listed but 403 on query (revoked between list and query): skip.
+      logger.info({ storeId, date }, 'gsc-ingest: GSC property no longer accessible, skipping');
+      return { skipped: 'no_access', date };
+    }
+    // Any other error (network/auth/config) is isolated by the cron wrapper.
+    throw err;
   }
 
   const dateRow = result.dateRows.find(row => row.date === date) ?? result.dateRows[0];

@@ -1,0 +1,55 @@
+{
+  "id": "shipping.book-shipment",
+  "status": "live",
+  "area": "shipping",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اطلب شحنة واطبع البوليصة",
+  "titleEn": "Book a shipment, print label, schedule pickup, cancel, track",
+  "screens": ["/stores/[id]/orders/[orderId]"],
+  "api": [
+    "POST .../orders/:orderId/ship",
+    "POST .../ship/cancel",
+    "GET .../orders/:orderId/shipment",
+    "GET .../shipments",
+    "GET .../shipments/:id/label",
+    "POST/GET .../shipments/:id/pickup",
+    "GET .../pickup/windows",
+    "POST .../shipments/:id/track",
+    "POST .../shipments/:id/status"
+  ],
+  "mcpTool": null,
+  "planGate": "shipping_carriers",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "compensating",
+    "note": "a shipment can be cancelled until the carrier collects it"
+  },
+  "helpArticle": "shipping-providers",
+  "questions": {
+    "ar": [
+      "ازاي ابعت الاوردر مع بوسطة؟",
+      "اطبع البوليصة",
+      "الغي الشحنة",
+      "العميل مش بيرد على الكوريير"
+    ],
+    "en": ["How do I ship an order with Bosta?", "Cancel a shipment"]
+  },
+  "steps": ["Order > Ship with carrier."],
+  "edgeCases": [
+    "Address missing governorate code",
+    "COD amount mismatch",
+    "Carrier API down: retry",
+    "Partial shipment not supported (inferred)",
+    "Carrier pickup window",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [],
+  "assistantNote": "costs money and notifies: confirm"
+}

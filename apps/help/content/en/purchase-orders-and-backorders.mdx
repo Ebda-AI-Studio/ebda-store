@@ -1,0 +1,23 @@
+---
+title: 'Suppliers, purchase orders and backorders'
+description: 'Add suppliers, order stock from them, record what arrived, and cancel a backorder you cannot fulfil.'
+section: Selling
+order: 40
+appPath: /stores
+keywords: supplier purchase order po backorder مورد امر شراء
+capabilities:
+  - inventory.suppliers-po@1
+  - inventory.backorders@1
+---
+
+## Suppliers and purchase orders
+1. Open **Stock** then **Suppliers** and add the supplier with its phone, payment terms and usual delivery time.
+2. Open **Purchase orders** and create an order: pick the supplier, the products, the quantity and the unit cost in EGP. It starts as a draft; nothing is paid or received yet.
+3. When goods arrive, open the order and **Receive** the quantities. Stock goes up at the order's unit cost, waiting backorders are cleared first, and what you owe the supplier is booked. A partial delivery is fine.
+4. An order that is not fully received can be cancelled. A received or cancelled order cannot be reopened.
+
+## Backorders
+A backorder is a customer order line for an item that was out of stock. Open **Stock** then **Backorders** to see the open lines. When you decide you will not fulfil one, cancel it with a reason: the sale for the unfulfilled units is reversed in your accounts and the customer is notified. This cannot be undone.
+
+## Ask the assistant
+The assistant can prepare this for you. It always shows a preview first, and you press the button yourself. The assistant previews every purchase order, receipt and cancellation with the exact quantities and amounts. Receiving, cancelling and backorder cancellation cannot be undone.

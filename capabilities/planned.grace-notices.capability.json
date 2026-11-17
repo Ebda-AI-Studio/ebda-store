@@ -1,0 +1,30 @@
+{
+  "id": "planned.grace-notices",
+  "status": "in-pr",
+  "pr": "ebda-store#604 #674 #683",
+  "area": "billing",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اشعارات فترة السماح والايقاف",
+  "titleEn": "Grace-period and suspension notices to merchants at each stage; suspended store read-only",
+  "screens": ["/stores/[id]/billing"],
+  "api": ["(PRs)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ليه المتجر read-only؟", "جالي اشعار فترة سماح"],
+    "en": ["Why is my store read-only?"]
+  },
+  "steps": ["In review: billing suspension makes a store read-only until payment."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)"
+  ],
+  "gaps": ["not merged"]
+}

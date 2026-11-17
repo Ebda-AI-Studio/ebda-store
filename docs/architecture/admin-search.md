@@ -1,6 +1,6 @@
 # Admin search (⌘K palette, Settings search box)
 
-Search program P2 (Tasks 15 to 18, amendment E23). Plan: `docs/plans/2026-10-15-semantic-search.md`.
+Search program P2 (Tasks 15 to 18, amendment E23). Plan: `docs/plans/done/2026-10-15-semantic-search.md`.
 
 ## What a merchant can find
 

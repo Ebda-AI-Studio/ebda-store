@@ -1,0 +1,30 @@
+{
+  "id": "self.chat-templates",
+  "status": "planned",
+  "plan": "register SELF-SERVICE Chat rows",
+  "area": "chat",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "قوالب واتساب في ابدأ شات",
+  "titleEn": "Ebda Chat: create, edit, submit Meta templates; starter set on connect; rejection reasons",
+  "screens": ["(Chat web) templates screen"],
+  "api": ["(Chat) /templates submit|sync|install-defaults"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "edit and resubmit"
+  },
+  "helpArticle": "whatsapp/templates-and-the-24-hour-window",
+  "questions": {
+    "ar": ["ازاي اعمل قالب رسالة؟", "القالب اترفض ليه؟"],
+    "en": ["How do I create a WhatsApp template?"]
+  },
+  "steps": ["Today: no screen; help doc describes one that does not exist."],
+  "edgeCases": [
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
+  ],
+  "gaps": ["Chat blockers 1,2,17; NOT BUILT"]
+}

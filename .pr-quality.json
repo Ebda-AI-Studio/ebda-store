@@ -2,5 +2,13 @@
   "roots": ["apps", "packages"],
   "locales": ["apps/admin/src/i18n/messages"],
   "baseline": ".pr-quality-baseline.json",
+  "ruleExemptions": [
+    {
+      "rule": "unused-export",
+      "path": "packages/shared/src/foundation",
+      "reason": "Ruling SLOP-VENDORED-1: vendored @ebda/foundation is byte-pinned by foundation.lock.json; its exports are the shared API, consumed unevenly by each product. Only this rule, only this folder, only while the lock matches.",
+      "requires": "tests/unit/foundation-parity.test.ts"
+    }
+  ],
   "bodyCheckEnforceFrom": "2026-11-19"
 }

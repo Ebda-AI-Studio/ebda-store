@@ -1,6 +1,6 @@
 /**
  * Abandoned-cart recovery EMAIL (cart-email-campaigns, 2026-10-21).
- * Plan: docs/plans/2026-10-21-cart-email-campaigns.md.
+ * Plan: docs/plans/done/2026-10-21-cart-email-campaigns.md.
  *
  * The service runs against a tiny in-memory Prisma that EVALUATES `where`
  * clauses (reusing the campaign fake's matcher), so removing a predicate from
@@ -8,6 +8,15 @@
  * once-per-cart claim and the converted-cart stop are mutation-checkable.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+vi.mock('@api/lib/store-operational', () => ({
+  STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
+  isStoreOperational: (s: unknown) => s === 'active',
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+  activeStoreIds: async () => ({ has: () => true }) as unknown as Set<string>,
+  requireOperationalStore: (_q: unknown, _r: unknown, next: () => void) => next(),
+}));
 import { matches, uuid, STORE_A, STORE_B } from '../helpers/campaign-fake-db';
 
 type Row = Record<string, any>;
