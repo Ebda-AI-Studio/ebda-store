@@ -296,6 +296,32 @@ function buildOptionFilterClause(optionName: string, values: string[]): Prisma.P
  * product's price), store-wide on purpose (not the current filter), and part of the cached list answer,
  * which every product write already invalidates.
  */
+/**
+ * The price filter's match rule (PL1): a product is in the range when ANY active variant is (a variant's own
+ * price, else the product price it inherits), or, with no active variants, when the product's own price is.
+ * So a ring at 4,850 whose only variant is 6,000 is out of a "max 5,000" filter and in a 5,500-7,000 one.
+ * Prices are minor units.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/catalogue-max-price.test.ts
+export function priceRangeWhere(min?: number, max?: number): Prisma.ProductWhereInput {
+  const range: { gte?: number; lte?: number } = {};
+  if (min !== undefined) range.gte = min;
+  if (max !== undefined) range.lte = max;
+  return {
+    OR: [
+      { variants: { none: { isActive: true } }, price: range },
+      {
+        variants: {
+          some: {
+            isActive: true,
+            OR: [{ price: range }, { price: null, product: { price: range } }],
+          },
+        },
+      },
+    ],
+  };
+}
+
 // pq-allow(unused-export): test seam, imported by tests/unit/catalogue-max-price.test.ts
 export async function catalogueMaxPrice(storeId: string): Promise<number> {
   const db = await storeDb(storeId);
@@ -1838,11 +1864,12 @@ export class ProductService {
       where.tags = { some: { tag: { storeId, name: tag } } };
     }
 
-    if (minPrice !== undefined) {
-      where.price = { ...((where.price as object) || {}), gte: minPrice };
-    }
-    if (maxPrice !== undefined) {
-      where.price = { ...((where.price as object) || {}), lte: maxPrice };
+    // PL1: match on the price a shopper can actually buy at (see priceRangeWhere), not the base price alone.
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        priceRangeWhere(minPrice, maxPrice),
+      ];
     }
 
     // Snapshot the where clause BEFORE option filters for facet computation.
