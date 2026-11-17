@@ -5,6 +5,7 @@ import {
   orderAddressLines,
   orderLineVariantTitle,
   renderBarcodeSvg,
+  scanCodeFor,
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { escapeHtml } from './email-templates/_util';
@@ -60,6 +61,7 @@ const CSS = (size: PackingSlipSize) => `
     .store { font-size: ${size === 'a4' ? '20px' : '15px'}; font-weight: 700; }
     .doc { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
     .barcode { text-align: center; margin: 10px 0 4px; }
+    .barcode-digits { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 9px; letter-spacing: 0.12em; color: #444; margin-top: 2px; }
     .barcode svg { width: 100%; max-width: ${size === 'a4' ? BARCODE_DISPLAY_PX.packingSlipA4 : BARCODE_DISPLAY_PX.packingSlipLabel}px; height: auto; color: #111; }
     .num { text-align: center; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; letter-spacing: .12em; font-weight: 700; margin-bottom: 8px; }
     .meta { display: flex; gap: 16px; justify-content: space-between; margin: 8px 0; }
@@ -169,7 +171,11 @@ function slipHtml(order: SlipOrder, ar: boolean, size: PackingSlipSize): string 
         idSuffix: order.id,
         displayPx:
           size === 'a4' ? BARCODE_DISPLAY_PX.packingSlipA4 : BARCODE_DISPLAY_PX.packingSlipLabel,
-      })}</bdi></div>`;
+      })}</bdi>${
+        scanCodeFor(order.orderNumber) !== order.orderNumber
+          ? `<div class="barcode-digits" dir="ltr">${escapeHtml(scanCodeFor(order.orderNumber))}</div>`
+          : ''
+      }</div>`;
     } catch {
       barcode = ''; // a number Code 128 cannot carry: the printed number stays
     }

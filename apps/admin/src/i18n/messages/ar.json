@@ -7492,7 +7492,7 @@
         "qtyLabel": "الكمية المقترحة",
         "supplierLabel": "المورد المقترح",
         "urgency": "الاستعجالية",
-        "urgencyDays": "{days} أيام",
+        "urgencyDays": "{days, plural, one {يوم واحد} two {يومين} few {{days, number, latn} أيام} many {{days, number, latn} يوم} other {{days, number, latn} يوم}}",
         "draftPo": "إنشاء أمر شراء",
         "dismiss": "تجاهل",
         "variantLabel": "المتغير"

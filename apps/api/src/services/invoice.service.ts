@@ -10,6 +10,7 @@ import {
   taxInvoiceInfo,
   renderBarcodeSvg,
   BARCODE_DISPLAY_PX,
+  scanCodeFor,
 } from '@ebda/shared';
 import { emailMoney } from './email-templates/_util';
 import {
@@ -147,6 +148,14 @@ const INVOICE_LABELS = {
 
 type InvoiceLocale = keyof typeof INVOICE_LABELS;
 
+/** RC1: the variant as the document's language shows it (the Arabic title the order saved, else the canonical one). */
+function variantLabel(
+  item: { variantName?: string | null; variantNameAr?: string | null },
+  ar: boolean
+): string {
+  return (ar && item.variantNameAr) || item.variantName || '';
+}
+
 function isArabic(locale: string): locale is 'ar' {
   return locale === 'ar';
 }
@@ -172,7 +181,11 @@ function orderBarcodeBlock(orderNumber: string, rawShape: unknown): string {
       label: false,
       displayPx: BARCODE_DISPLAY_PX.invoice,
     });
-    return `<div class="doc-barcode"><bdi dir="ltr">${svg}</bdi><div class="doc-barcode-num" dir="ltr">${escapeHtml(orderNumber)}</div></div>`;
+    return `<div class="doc-barcode"><bdi dir="ltr">${svg}</bdi><div class="doc-barcode-num" dir="ltr">${escapeHtml(orderNumber)}</div>${
+      scanCodeFor(orderNumber) !== orderNumber
+        ? `<div class="doc-barcode-digits" dir="ltr">${escapeHtml(scanCodeFor(orderNumber))}</div>`
+        : ''
+    }</div>`;
   } catch {
     return '';
   }
@@ -350,7 +363,7 @@ export class InvoiceService {
     const taxInfo = taxInvoiceInfo(order);
     const heading = documentHeading(order, docs, labels, !!taxInfo);
     const docTitle = heading.title;
-    const formatPrice = (minor: number) => emailMoney(minor, currency, 'en');
+    const formatPrice = (minor: number) => emailMoney(minor, currency, lang);
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
     // Bill To should reflect the buyer info entered in checkout, not the
     // authenticated account (a logged-in admin testing checkout would otherwise
@@ -470,7 +483,7 @@ export class InvoiceService {
                     : '<div class="item-thumb item-thumb-placeholder"></div>'
                 }
                 <div class="item-meta">
-                  <div class="item-name">${escapeHtml(displayName)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}</div>
+                  <div class="item-name">${escapeHtml(displayName)}${variantLabel(item, ar) ? ` &middot; ${escapeHtml(variantLabel(item, ar))}` : ''}</div>
                   ${item.personalisation ? `<div class="item-note">&#9998; <bdi>${escapeHtml(item.personalisation)}</bdi></div>` : ''}
                   ${(() => {
                     // Gold-rate line: karat, weight and the per-gram rate it was priced at (B5).
@@ -690,6 +703,8 @@ export class InvoiceService {
     /* Order barcode: ink on paper, always LTR, kept together when printing */
     .doc-barcode { margin-top: 28px; text-align: center; color: var(--ink); break-inside: avoid; }
     .doc-barcode svg { width: 100%; max-width: 360px; height: auto; }
+    .doc-barcode-digits { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--ink-soft); margin-top: 2px; }
+    .doc-barcode-digits { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--ink-soft); margin-top: 2px; }
     .doc-barcode-num { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 0.2em; color: var(--ink-soft); margin-top: 4px; }
 
     /* Footer */
@@ -973,7 +988,7 @@ export function renderInvoiceEmailContent(
   // Amounts stay an LTR run on the Arabic invoice so a leading minus stays in
   // front of the figure (same rule as the printable page).
   const money = (minor: number) =>
-    `<span dir="ltr" style="unicode-bidi:embed;white-space:nowrap;">${emailMoney(minor, currency, 'en')}</span>`;
+    `<span dir="ltr" style="unicode-bidi:embed;white-space:nowrap;">${emailMoney(minor, currency, ar ? 'ar' : 'en')}</span>`;
   const taxPlacement = orderTaxPlacement(order);
   const taxInfo = taxInvoiceInfo(order);
   const heading = documentHeading(order, docs, labels, !!taxInfo);
@@ -1098,7 +1113,7 @@ export function renderInvoiceEmailContent(
               radius: 8,
             })
           : thumbPlaceholder,
-        `${escapeHtml(name)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}`,
+        `${escapeHtml(name)}${variantLabel(item, ar) ? ` &middot; ${escapeHtml(variantLabel(item, ar))}` : ''}`,
         (item.sku
           ? `<div style="font-size:11px;line-height:16px;color:${c.inkMute};">${escapeHtml(item.sku)}</div>`
           : '') + qtyLine(item.quantity, money(item.price)),

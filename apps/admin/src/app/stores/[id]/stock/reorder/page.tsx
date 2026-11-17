@@ -9,7 +9,7 @@ import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
 import { VariantText, useToast } from '@ebda/ui';
-import { withNumerals } from '@ebda/shared';
+import { intlLocale, withNumerals } from '@ebda/shared';
 
 import { Button, buttonVariants } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -59,6 +59,11 @@ interface ListMeta {
 }
 
 // ─── Urgency badge ────────────────────────────────────────────────────────────
+
+/** The reasoning in the UI language; the Arabic text may be absent (dropped by the post-check), then English. */
+function reasoningFor(item: { reasoningEn: string; reasoningAr: string | null }, isAr: boolean) {
+  return (isAr && item.reasoningAr) || item.reasoningEn;
+}
 
 function UrgencyBadge({
   days,
@@ -141,13 +146,10 @@ function SuggestionCard({
         <UrgencyBadge days={item.urgencyDays} t={t} />
       </div>
 
-      {/* Bilingual reasoning */}
-      <p className="text-sm text-muted-foreground leading-relaxed">{item.reasoningEn}</p>
-      {item.reasoningAr && (
-        <p className="text-sm text-muted-foreground leading-relaxed" dir="rtl">
-          {item.reasoningAr}
-        </p>
-      )}
+      {/* RO1: both texts are stored, only the UI language renders (Arabic falls back to English when it was dropped) */}
+      <p className="text-sm text-muted-foreground leading-relaxed" dir="auto">
+        {reasoningFor(item, isAr)}
+      </p>
 
       {/* Details row */}
       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -197,6 +199,7 @@ export default function ReorderPage() {
   const storeId = params?.id as string;
   const t = useT('stock.reorder');
   const tc = useT('common');
+  const locale = useLocale();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
   const { success: toastSuccess, error: toastError } = useToast();
@@ -276,7 +279,10 @@ export default function ReorderPage() {
             {lastScanned && (
               <p className="text-xs text-muted-foreground">
                 {t('lastScanned', {
-                  time: new Date(lastScanned).toLocaleString(undefined, withNumerals()),
+                  time: new Intl.DateTimeFormat(
+                    intlLocale(locale),
+                    withNumerals({ dateStyle: 'medium', timeStyle: 'short' })
+                  ).format(new Date(lastScanned)),
                 })}
               </p>
             )}

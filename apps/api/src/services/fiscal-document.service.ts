@@ -174,7 +174,8 @@ export function buildSaleLines(order: {
       kind: 'item' as const,
       description: `${it.productName}${it.variantName ? ` · ${it.variantName}` : ''}`,
       descriptionAr: it.product?.nameAr
-        ? `${it.product.nameAr}${it.variantName ? ` · ${it.variantName}` : ''}`
+        ? // RC1: the Arabic line carries the Arabic variant title the order saved (falls back to the canonical one)
+          `${it.product.nameAr}${it.variantNameAr || it.variantName ? ` · ${it.variantNameAr || it.variantName}` : ''}`
         : null,
       sku: it.sku ?? null,
       quantity: it.quantity,
