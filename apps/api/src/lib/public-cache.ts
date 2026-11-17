@@ -64,6 +64,9 @@ const GEN_MAX_DEPTH = 3;
 const GEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 /** The generations a fill of `key` must watch: root, `seg:` prefixes (≤ depth), the key. */
+
+/** The ONE name of the durable order-purge event (sender here, `storefront-order-purge.ts` listens). */
+export const ORDER_PURGE_EVENT = 'storefront/order-purge-requested' as const;
 export function generationNamesFor(key: string): string[] {
   const names = [''];
   let idx = -1;
@@ -464,7 +467,7 @@ export function purgeStorefrontProductsNow(storeId: string) {
 async function requestTrailingOrderPurge(storeId: string): Promise<void> {
   try {
     const { inngest } = await import('./inngest/client.js');
-    await inngest.send({ name: 'storefront/order-purge-requested', data: { storeId } });
+    await inngest.send({ name: ORDER_PURGE_EVENT, data: { storeId } });
   } catch (err) {
     logger.error({ err, storeId }, '[order-purge] could not enqueue the durable trailing purge');
   }

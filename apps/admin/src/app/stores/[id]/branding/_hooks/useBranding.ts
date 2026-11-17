@@ -70,8 +70,6 @@ export function useBranding(storeId: string, messages: ToastMessages) {
   const [loadedTheme, setLoadedTheme] = useState<StoreTheme | null>(null);
   // The branding as last loaded/saved: the sticky Save bar shows while the page differs from it.
   const [baseline, setBaseline] = useState<string | null>(null);
-  // `settings.contact` as stored. The bundle replaces that one top-level key, so the keys we do not edit in it
-  // (anything besides addressUrl/addressLink) are carried through from here, not from a fresh GET of ALL settings.
 
   const fetchBranding = useCallback(async () => {
     try {

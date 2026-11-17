@@ -9,14 +9,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 
 type Pending = { url: string; resolve: (v: unknown) => void };
 
-const { apiGetPage, apiPost, calls, posts } = vi.hoisted(() => ({
+const { apiGetPage, apiPost, apiFetch, calls, posts } = vi.hoisted(() => ({
   apiGetPage: vi.fn(),
   apiPost: vi.fn(),
+  apiFetch: vi.fn(),
   calls: [] as Array<{ url: string; resolve: (v: unknown) => void }>,
   posts: [] as Array<{ url: string; resolve: (v: unknown) => void }>,
 }));
 
-vi.mock('@/lib/api', () => ({ apiGetPage, apiPost }));
+vi.mock('@/lib/api', () => ({ apiGetPage, apiPost, apiFetch }));
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'store-1' }),
   useRouter: () => ({ push: vi.fn() }),
@@ -110,5 +111,51 @@ describe('expenses — post-action refetch reads the CURRENT page (issue 2443)',
     expect(screen.getByText('EXP-PAGE-2')).toBeTruthy();
     expect(screen.queryByText('EXP-PAGE-1')).toBeNull();
     expect(pageOf(calls[calls.length - 1].url)).toBe(2);
+  });
+});
+
+describe('expense receipts (private bucket, #739 review)', () => {
+  const row = (receiptImageUrl: string | null) => ({
+    data: [
+      {
+        id: 'e1',
+        expenseNumber: 'EXP-1',
+        expenseDate: '2026-02-01',
+        supplier: null,
+        expenseAccount: null,
+        amount: 1,
+        taxAmount: 0,
+        totalAmount: 1,
+        status: 'posted',
+        receiptImageUrl,
+      },
+    ],
+    meta: { page: 1, perPage: 50, total: 1, totalPages: 1 },
+    error: null,
+  });
+  it('an uploaded (private) receipt opens through the authorised receipt endpoint, never as a public URL', async () => {
+    apiGetPage.mockResolvedValue(row('private:stores/store-1/receipts/r.jpg'));
+    apiFetch.mockResolvedValue(
+      new Response(new Blob(['x'], { type: 'image/jpeg' }), { status: 200 })
+    );
+    const tab = { location: { href: '' }, close: vi.fn() };
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => tab)
+    );
+    (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => 'blob:receipt';
+    render(<ExpensesPage />);
+    fireEvent.click(await screen.findByText('actions.receipt'));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith('/api/v1/stores/store-1/expenses/e1/receipt')
+    );
+    await waitFor(() => expect(tab.location.href).toBe('blob:receipt'));
+    vi.unstubAllGlobals();
+  });
+  it('no receipt: no Receipt button', async () => {
+    apiGetPage.mockResolvedValue(row(null));
+    render(<ExpensesPage />);
+    await screen.findByText('EXP-1');
+    expect(screen.queryByText('actions.receipt')).toBeNull();
   });
 });

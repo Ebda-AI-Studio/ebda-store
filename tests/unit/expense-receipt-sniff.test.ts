@@ -119,3 +119,15 @@ describe('expense receipt upload is judged by its bytes', () => {
     }
   );
 });
+
+describe('the admin create form sends the field the API reads (#739 review)', () => {
+  it('posts receiptImageUrl (the old `receiptUrl` key was silently dropped by the schema)', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync(
+      'apps/admin/src/app/stores/[id]/finance/expenses/new/page.tsx',
+      'utf8'
+    );
+    expect(src).toMatch(/receiptImageUrl: receiptUrl\.trim\(\) \|\| undefined/);
+    expect(src).not.toMatch(/^\s*receiptUrl: receiptUrl/m);
+  });
+});

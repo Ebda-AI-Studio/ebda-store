@@ -170,7 +170,9 @@ export async function requireStoreAccess(
       user.role !== 'super_admin' &&
       store.billingSuspendedReason === 'over_store_limit' &&
       !READ_METHODS.includes(req.method) &&
-      !isStoreBillingRoute(`${req.baseUrl}${req.path}`)
+      !isStoreBillingRoute(`${req.baseUrl}${req.path}`) &&
+      // SUSPEND-REFUND-1: money going back to customers is never blocked by a billing gate
+      !isCustomerMoneyBackRoute(req.method, `${req.baseUrl}${req.path}`, req.body)
     ) {
       const messageEn =
         'This store is read-only: your plan covers fewer stores. Upgrade to Business to edit it again.';

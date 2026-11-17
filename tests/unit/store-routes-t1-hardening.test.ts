@@ -184,6 +184,31 @@ describe('PUT /stores/:id/branding-bundle (BE:F-3)', () => {
     expect(parts.social).toEqual({ set: { instagram: 'https://instagram.com/x' }, remove: [] });
   });
 
+  it.each([
+    ['theme only, empty branding', { branding: {}, theme: { primaryColor: '#112233' } }],
+    [
+      'settings.contact clears the map link (addressUrl: null)',
+      { settings: { contact: { addressUrl: null, addressLink: false } } },
+    ],
+    [
+      'a map link only',
+      { settings: { contact: { addressUrl: 'https://maps.app.goo.gl/x', addressLink: true } } },
+    ],
+    ['contact/social/settings omitted', { branding: { nameAr: 'متجر' } }],
+  ])('accepts the partial bundle the page sends: %s (#739 review)', async (_n, body) => {
+    const res = await request(app).put(`/stores/${STORE_ID}/branding-bundle`).send(body);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const parts = svc.updateBrandingBundle.mock.calls.at(-1)![1];
+    const sentContact = (body as { settings?: { contact?: Record<string, unknown> } }).settings
+      ?.contact;
+    // a cleared map URL reaches the service as an explicit null (the merge then deletes it), never stripped
+    if (sentContact && 'addressUrl' in sentContact)
+      expect((parts.settings as { contact: Record<string, unknown> }).contact.addressUrl).toBe(
+        sentContact.addressUrl
+      );
+    if (!('contact' in body)) expect(parts.contact).toBeUndefined();
+  });
+
   it('a failing bundle is one error response', async () => {
     svc.updateBrandingBundle.mockRejectedValueOnce(new Error('boom'));
     const res = await request(app)

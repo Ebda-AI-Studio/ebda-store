@@ -4,7 +4,7 @@
 
 **Decision:** `apps/api/wrangler.jsonc` keeps no `placement` block. The A/B the neon-zero plan (N-21) asked for after the Hyperdrive removal could only be half run: the "off" arm was measured live (read-only), the "on" arm needs a Worker with `"placement": { "mode": "smart" }` and there is no staging or preview API (docs/DEPLOYMENT.md "Environments & staging posture": none exists) and deploys were out of scope for this task. A Worker's placement is a deploy-time setting, so it cannot be toggled on the live Worker for a test.
 
-**Evidence (measured 2026-11-11, 90 s, 3 req/s, 1 in 3 cache-hit read, 1 in 3 cache-miss read with a unique query string, `GET /api/v1/public/products?limit=12`, demo store `storedemo`, k6 `hosts` override to a Cloudflare IP, client in Egypt, 180 requests, 0 failed):**
+**Evidence (measured 2026-11-11, 90 s, 3 iterations/s (2 requests/s: 1 in 3 a cache-hit read, 1 in 3 a cache-miss read, the third an idle pacing slot) with a unique query string, `GET /api/v1/public/products?limit=12`, demo store `storedemo`, k6 `hosts` override to a Cloudflare IP, client in Egypt, 180 requests, 0 failed):**
 
 | arm                                  | path       | p50          | p95          |
 | ------------------------------------ | ---------- | ------------ | ------------ |

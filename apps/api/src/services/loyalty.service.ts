@@ -952,7 +952,8 @@ export class LoyaltyService {
       ...(store.loyaltySettings as Partial<LoyaltySettings>),
     };
 
-    return { settings, availablePoints: loyalty.points };
+    // a refund can leave a loyalty DEBT (MONEY-LOYALTY-LOTS-1): nothing is redeemable until it is paid back
+    return { settings, availablePoints: Math.max(0, loyalty.points) };
   }
 
   /**

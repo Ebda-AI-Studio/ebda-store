@@ -184,6 +184,21 @@ describe("SUSPEND-REFUND-1: a suspension never strands a customer's money", () =
       code: 'STORE_SUSPENDED',
     });
   });
+  it('over-store-limit store (the 402 gate runs first): refunds and cancels still pass, other writes get the upsell', async () => {
+    for (const sub of [
+      '/o1/refund-via-provider',
+      '/o1/instapay-refund',
+      '/o1/refund-match-claim',
+      '/o1/refresh-refund-status',
+    ])
+      expect(await call(OVER, 'POST', `${O}|${sub}`), sub).toBeUndefined();
+    expect(
+      await call(OVER, 'PUT', `${O}|/o1/status`, 'store_admin', 'u1', { status: 'cancelled' })
+    ).toBeUndefined();
+    expect(
+      await call(OVER, 'PUT', `${O}|/o1/status`, 'store_admin', 'u1', { status: 'shipped' })
+    ).toMatchObject({ statusCode: 402, code: 'STORE_OVER_PLAN_LIMIT' });
+  });
   it('platform suspension: the merchant cannot refund or cancel', async () => {
     expect(await call(PLATFORM, 'POST', `${O}|/o1/refund-via-provider`)).toMatchObject({
       statusCode: 403,

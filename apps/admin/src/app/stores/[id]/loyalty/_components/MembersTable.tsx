@@ -60,7 +60,7 @@ export function MembersTable({
     },
     {
       header: t('columns.balance'),
-      // #631: a refund can leave a debt; show 0 plus "owes N", never a bare negative (RTL-safe <bdi>)
+      // #631: a refund can leave a debt; show 0 plus "owes N", never a bare negative
       cell: member =>
         member.points < 0 ? (
           <span className="flex flex-col">

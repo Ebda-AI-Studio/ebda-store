@@ -492,3 +492,35 @@ describe('pixel URL gate scrubs by key AND by value', () => {
     Object.defineProperty(document, 'referrer', { value: '', configurable: true });
   });
 });
+
+describe('pixel URL gate precision (#739 review)', () => {
+  it('Meta campaign ids and utm values with long numbers do not silence the pixel', async () => {
+    const { pixelQuerySensitive } = await import('../../packages/shared/src/tracking/browser');
+    for (const q of [
+      '?utm_id=120212345678901&utm_source=fb',
+      '?ad_id=23851234567890123&adset_id=23851234567890124&campaign_id=23851234567890125',
+      '?utm_content=23851234567890126',
+      '?fbclid=IwAR1234567890abc',
+    ])
+      expect(pixelQuerySensitive(q), q).toBe(false);
+  });
+  it('short personal keys match only as a whole segment; long ones anywhere', async () => {
+    const { pixelQuerySensitive } = await import('../../packages/shared/src/tracking/browser');
+    for (const q of ['?faq=1', '?quote=yes', '?hotel=x', '?sequence=2'])
+      expect(pixelQuerySensitive(q), q).toBe(false);
+    for (const q of [
+      '?q=shirt',
+      '?tel=0100',
+      '?search=x',
+      '?contact[tel]=1',
+      '?first_name=a',
+      '?contact[email]=x',
+    ])
+      expect(pixelQuerySensitive(q), q).toBe(true);
+  });
+  it('a phone in a non-id key, or an @ even in a utm value, still silences it', async () => {
+    const { pixelQuerySensitive } = await import('../../packages/shared/src/tracking/browser');
+    expect(pixelQuerySensitive('?ref=01001234567')).toBe(true);
+    expect(pixelQuerySensitive('?utm_content=a%40b.co')).toBe(true);
+  });
+});

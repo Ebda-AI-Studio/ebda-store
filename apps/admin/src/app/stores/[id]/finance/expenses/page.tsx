@@ -10,7 +10,7 @@ import { useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { useConfirm } from '@/hooks/useConfirm';
-import { apiGetPage, apiPost, type PageMeta } from '@/lib/api';
+import { apiFetch, apiGetPage, apiPost, type PageMeta } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
@@ -39,6 +39,8 @@ interface ExpenseRow {
   totalAmount: number;
   status: ExpenseStatus;
   createdById: string;
+  /** A public URL (older receipts, or a link typed by hand) or `private:...` (an uploaded receipt in the private bucket). */
+  receiptImageUrl?: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -163,6 +165,27 @@ export default function ExpensesPage() {
     }
   }
 
+  // An uploaded receipt lives in the PRIVATE bucket: fetched with the admin's credentials (Bearer for the iOS PWA) and
+  // opened as a blob, never a public URL. A public URL (older receipts, a typed link) opens directly.
+  async function openReceipt(exp: ExpenseRow) {
+    const ref = exp.receiptImageUrl ?? '';
+    if (!/^\s*private:/i.test(ref)) {
+      window.open(ref, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const tab = window.open('', '_blank');
+    try {
+      const res = await apiFetch(`/api/v1/stores/${storeId}/expenses/${exp.id}/receipt`);
+      if (!res.ok) throw new Error(String(res.status));
+      const url = URL.createObjectURL(await res.blob());
+      if (tab) tab.location.href = url;
+      else window.open(url, '_blank', 'noopener');
+    } catch {
+      tab?.close();
+      toastError(t('receiptOpenFailed'));
+    }
+  }
+
   const columns: DataTableColumn<ExpenseRow>[] = [
     {
       header: t('number'),
@@ -218,6 +241,11 @@ export default function ExpensesPage() {
         const isActing = actionLoading?.startsWith(exp.id + ':');
         return (
           <div className="flex items-center justify-end gap-1">
+            {exp.receiptImageUrl && (
+              <Button size="sm" variant="ghost" onClick={() => openReceipt(exp)}>
+                {t('actions.receipt')}
+              </Button>
+            )}
             {(exp.status === 'draft' || exp.status === 'pending') && (
               <Button
                 size="sm"

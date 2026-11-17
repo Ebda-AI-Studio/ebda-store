@@ -6850,7 +6850,8 @@
         "rejectObject": "This expense",
         "rejectConsequence": "It is marked rejected and does not enter the accounts.",
         "failed": "The action did not go through. Try again.",
-        "menu": "Options for expense {number}"
+        "menu": "Options for expense {number}",
+        "receipt": "Receipt"
       },
       "new": {
         "title": "New Expense",
@@ -6893,7 +6894,8 @@
         "totalInBaseConverted": "Total in EGP (converted @ {rate} rate):",
         "minorUnitsSuffix": "({currency} minor units)"
       },
-      "loadFailed": "Could not load expenses. Try again."
+      "loadFailed": "Could not load expenses. Try again.",
+      "receiptOpenFailed": "The receipt could not be opened. Try again."
     },
     "reports": {
       "title": "Financial Reports",

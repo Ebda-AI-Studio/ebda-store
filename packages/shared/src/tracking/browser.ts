@@ -97,9 +97,19 @@ export function posthogAssetsHost(apiHost: string): string {
   return apiHost.replace('.i.posthog.com', '-assets.i.posthog.com');
 }
 
-const PIXEL_SENSITIVE_KEY = /e[-_]?mail|phone|mobile|tel|whats(app)?|name|address|q|search/i;
-/** Ad click ids are long opaque tokens that may contain a digit run; they are not personal data. */
-const CLICK_ID_KEY = /^(fbclid|gclid|ttclid|msclkid|wbraid|gbraid)$/i;
+/**
+ * Personal-data keys. The long words match anywhere in the key (`first_name`, `contact[email]`); the short ones (`q`, `tel`,
+ * `search`) only as a whole segment, so `faq`, `quote`, `hotel` or `sequence` no longer silence the pixel (#739 review).
+ */
+const PIXEL_SENSITIVE_KEY =
+  /e[-_]?mail|phone|mobile|whats(app)?|name|address|(?:^|[[\]._-])(?:q|tel|search)(?:$|[[\]._-])/i;
+/**
+ * Keys whose VALUE is a long opaque or numeric id, never personal data, so the 7+ digit rule skips them: ad click ids, and the
+ * campaign ids Meta's own URL parameters carry (`utm_id={{campaign.id}}`, `ad_id`, `adset_id`, `campaign_id`, utm_*). Without
+ * this every paid Meta visit was untracked. The `@` and personal-key rules still apply to them.
+ */
+const CLICK_ID_KEY =
+  /^(fbclid|gclid|ttclid|msclkid|wbraid|gbraid|utm_[a-z_]+|ad_id|adset_id|campaign_id|placement|site_source_name)$/i;
 
 function safeDecode(v: string): string {
   // Decode until stable (max 3 passes): `%2540` is a double-encoded `@`.
@@ -189,7 +199,8 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
    */
   const urlBlockedForPixel = () => {
     if (pixelQuerySensitive(win.location.search)) return true;
-    // fbevents also reads the referrer (`rl`): same rule.
+    // fbevents also reads the referrer (`rl`) and sends it on EVERY event, including later SPA routes (document.referrer
+    // does not change on pushState), so a sensitive landing referrer keeps the pixel silent for the whole visit: on purpose.
     try {
       const ref = doc.referrer;
       return !!ref && pixelQuerySensitive(new URL(ref).search);

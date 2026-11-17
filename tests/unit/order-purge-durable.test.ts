@@ -77,6 +77,9 @@ describe('durable trailing purge (#663)', () => {
 
   it('is debounced per store and mapped to a Cloudflare runner', () => {
     expect(storefrontOrderPurge.options.debounce?.key).toBe('event.data.storeId');
+    // NEVER-stale bound (#739 review): under sustained traffic the trailing purge fires at the timeout, so it is 20 s
+    expect(storefrontOrderPurge.options.debounce?.period).toBe('10s');
+    expect(storefrontOrderPurge.options.debounce?.timeout).toBe('20s');
     expect(JOBS_MAP['storefront-order-purge']).toMatchObject({ kind: 'queue', trigger: 'event' });
   });
 });

@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
 
 // Smart Placement A/B for ebda-api (PERF-PLACEMENT-1, docs/rulings/PERF-PLACEMENT-1.md).
@@ -44,6 +44,8 @@ const hit = new Trend('ab_hit_ms', true);
 const miss = new Trend('ab_miss_ms', true);
 const placed = new Counter('ab_placed_responses');
 
+// RATE is ITERATIONS per second, not requests: of every three iterations one is a cache hit, one a cache miss and the third
+// is an idle pacing slot by design, so the request rate is 2/3 of RATE (90 s at 3/s = 270 iterations = 180 requests).
 export default function () {
   const headers = { 'x-store-id': STORE_ID };
   const n = __ITER % 3;
@@ -63,5 +65,4 @@ export default function () {
     miss.add(r.timings.duration);
     check(r, { 'miss 200': x => x.status === 200 });
   }
-  sleep(0);
 }
