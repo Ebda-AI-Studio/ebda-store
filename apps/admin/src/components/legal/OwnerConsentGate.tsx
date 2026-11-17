@@ -85,7 +85,7 @@ export function OwnerConsentGate() {
   if (!docs) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/60 p-4">
       <div
         ref={dialogRef}
         role="dialog"
@@ -121,7 +121,7 @@ export function OwnerConsentGate() {
             type="checkbox"
             checked={ticked}
             onChange={e => setTicked(e.target.checked)}
-            className="mt-0.5 h-5 w-5 shrink-0 rounded border-border"
+            className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-border"
           />
           <span>{t('checkbox')}</span>
         </label>

@@ -176,6 +176,14 @@ interface ConsentStatus {
 
 const CONSENT_DOCS: readonly LegalDocKey[] = ['terms', 'privacy'];
 
+/** True when the user has a record of EVERY consent document (Terms, Privacy) at any version. */
+export async function ownerHasConsent(userId: string): Promise<boolean> {
+  return inUserScope(userId, async tx => {
+    const { accepted } = await sentAndAccepted(tx, userId);
+    return baselineMissing(activePolicies, accepted, CONSENT_DOCS).length === 0;
+  });
+}
+
 /** The documents the blocking consent modal shows (the owner's own record decides `required`). */
 export async function consentStatusFor(userId: string, role: string): Promise<ConsentStatus> {
   if (role !== NOTICE_ROLE) return { required: false, documents: [] };

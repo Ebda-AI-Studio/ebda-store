@@ -11,11 +11,6 @@
  * the user), so a cached `true` cannot go stale; a negative is re-read every time so accepting takes effect
  * on the next request, on every isolate.
  */
-import { prisma } from '@ebda/database';
-import { withPlatformUser } from './platform-scope';
-
-/** The documents an owner must have accepted (at any version) before admin writes. */
-const CONSENT_DOC_KEYS = ['terms', 'privacy'] as const;
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 /** Never gated: signing in/out, MFA, and the consent + notice endpoints themselves. */
@@ -40,14 +35,9 @@ export function isGatedRequest(method: string, originalUrl: string): boolean {
 
 export async function consentGiven(userId: string): Promise<boolean> {
   if (accepted.has(userId)) return true;
-  const rows = await withPlatformUser(userId, () =>
-    prisma.legalAcceptance.findMany({
-      where: { userId, docKey: { in: [...CONSENT_DOC_KEYS] } },
-      select: { docKey: true },
-    })
-  );
-  const have = new Set(rows.map(r => r.docKey));
-  const ok = CONSENT_DOC_KEYS.every(k => have.has(k));
+  // Loaded on first use: the notice service pulls in the mailer and queue clients, which every request need not.
+  const { ownerHasConsent } = await import('../services/legal-notice.service.js');
+  const ok = await ownerHasConsent(userId);
   if (ok) {
     if (accepted.size >= MAX_CACHED) accepted.clear();
     accepted.add(userId);
