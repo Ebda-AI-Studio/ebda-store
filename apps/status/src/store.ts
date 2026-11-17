@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { COMPONENTS, HISTORY_DAYS, SLOW_STREAK_FAILS } from './config';
-import { probeErrorAr } from './probe';
+import { probeErrorAr, probesAr, probesEn } from './probe';
 import type {
   ComponentSnapshot,
   ComponentStatus,
@@ -128,8 +128,8 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
             impact: 'outage',
             source: 'auto',
             status: 'investigating',
-            body: `${fail} consecutive probes failed (${r.error ?? 'unknown error'}).`,
-            bodyAr: `${fail} فحوصات ورا بعض فشلوا (${probeErrorAr(r.error)}).`,
+            body: `${probesEn(fail)} failed (${r.error ?? 'unknown error'}).`,
+            bodyAr: `${probesAr(fail)} فشلوا (${probeErrorAr(r.error)}).`,
             now,
           });
           outcome.opened.push(id);
@@ -148,8 +148,8 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
           this.addUpdate(
             inc.id,
             'resolved',
-            `Recovered: ${ok} consecutive probes succeeded.`,
-            `رجع اشتغل: ${ok} فحوصات ورا بعض نجحوا.`,
+            `Recovered: ${probesEn(ok)} succeeded.`,
+            `رجع اشتغل: ${probesAr(ok)} نجحوا.`,
             now
           );
           outcome.resolved.push(inc.id);
