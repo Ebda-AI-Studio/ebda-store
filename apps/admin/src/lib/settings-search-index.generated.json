@@ -1346,7 +1346,7 @@
     "route": "/pwa",
     "access": "owner",
     "en": "Short Name (max 12 chars)",
-    "ar": "الاسم المختصر (12 حرفًا كحد أقصى)",
+    "ar": "الاسم المختصر (لحد 12 حرف)",
     "synEn": "short name icon label",
     "synAr": "الاسم المختصر اسم الايقونة",
     "feature": "pwa",
