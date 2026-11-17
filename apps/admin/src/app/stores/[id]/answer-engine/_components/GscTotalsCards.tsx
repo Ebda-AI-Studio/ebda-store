@@ -13,8 +13,9 @@ interface GscTotalsCardsProps {
 export function GscTotalsCards({ totals }: GscTotalsCardsProps) {
   const t = useT('answerEngine.gsc');
 
-  // No impressions: CTR (0/0) and average position are undefined. Say so instead of "0%" and "0.0".
-  const noImpressions = totals.impressions === 0;
+  // No impressions: CTR (0/0) and average position are undefined (the API sends null; an older payload that sent 0 is
+  // treated the same). Say so instead of "0%" and "0.0".
+  const noImpressions = totals.impressions === 0 || totals.ctr === null;
   const cards = [
     {
       label: t('impressions'),

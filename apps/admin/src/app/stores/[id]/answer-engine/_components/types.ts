@@ -19,7 +19,8 @@ export interface AnswerEngineTrendPoint {
   weekStart: string;
   totalChecks: number;
   citedCount: number;
-  citedRate: number;
+  /** `null` for a week with no checks. */
+  citedRate: number | null;
 }
 
 export interface AnswerEngineSummaryPrompt {
@@ -67,8 +68,9 @@ export interface GscTrendPoint {
   date: string;
   impressions: number;
   clicks: number;
-  ctr: number;
-  position: number;
+  /** `null` when the day had no impressions. */
+  ctr: number | null;
+  position: number | null;
 }
 
 export interface GscTopQuery {
@@ -80,8 +82,9 @@ export interface GscTopQuery {
 export interface GscDashboardTotals {
   impressions: number;
   clicks: number;
-  ctr: number;
-  avgPosition: number;
+  /** `null` with no impressions: unknown, not 0%. */
+  ctr: number | null;
+  avgPosition: number | null;
 }
 
 export interface GscDashboard {

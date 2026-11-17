@@ -21,6 +21,12 @@ describe('GSC totals with no impressions (GS1: unknown is not zero)', () => {
     expect(screen.getByText('noImpressionsHint')).toBeTruthy();
   });
 
+  it('the API sends null for both with no impressions: still "—" and the hint', () => {
+    render(<GscTotalsCards totals={{ impressions: 0, clicks: 0, ctr: null, avgPosition: null }} />);
+    expect(screen.getAllByText('—').length).toBe(2);
+    expect(screen.getByText('noImpressionsHint')).toBeTruthy();
+  });
+
   it('with impressions it shows the real figures and no hint', () => {
     render(
       <GscTotalsCards totals={{ impressions: 200, clicks: 10, ctr: 0.05, avgPosition: 7.25 }} />
