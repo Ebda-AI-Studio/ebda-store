@@ -45,7 +45,13 @@ if [ "$MODE" = "affected" ]; then
       echo "! vitest related skipped: $NREL changed files > ${PREPUSH_RELATED_MAX:-6}; CI runs it, sharded"
     else
       echo "-> vitest related (changed source files only, $NREL files)"
-      bash scripts/ci/host-lock.sh npx vitest related --run --passWithNoTests --maxWorkers=50% "${EXCLUDE_ARGS[@]}" $RELATED
+      if [ "$(field lightRelated)" = "true" ]; then
+        # PREPUSH-6: a tests/docs/workflow/i18n-only push relates only to the test files it touched: run them in a light slot
+        # (2 workers), not behind the host-wide heavy lock that CI jobs and integration suites hold for 10+ minutes.
+        bash scripts/ci/prepush-slot.sh npx vitest related --run --passWithNoTests --maxWorkers=2 "${EXCLUDE_ARGS[@]}" $RELATED
+      else
+        bash scripts/ci/host-lock.sh npx vitest related --run --passWithNoTests --maxWorkers=50% "${EXCLUDE_ARGS[@]}" $RELATED
+      fi
     fi
   else
     echo "! related tests skipped (nothing related, or packages not built); CI runs them"
