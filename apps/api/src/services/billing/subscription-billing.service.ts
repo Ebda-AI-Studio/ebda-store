@@ -2293,7 +2293,9 @@ export type TermBasis = 'paid' | 'assigned' | 'comped' | 'trial';
  */
 export async function termBasisOf(
   storeId: string,
-  sub: { status: string; planCode: string; currentPeriodStart: Date | null }
+  sub: { status: string; planCode: string; currentPeriodStart: Date | null },
+  /** The plan catalogue's codes (the caller already read the plans). */
+  planCodes: string[]
 ): Promise<TermBasis | null> {
   if (sub.status === 'comped' || isGrantedPlan(sub.planCode)) return 'comped';
   if (sub.status === 'trialing') return 'trial';
@@ -2303,7 +2305,6 @@ export async function termBasisOf(
     : new Date(0);
   // A plan payment names a real plan: `planCode IN (the plan catalogue)` excludes add-on purchases (`addon:<sku>`) and
   // rows with no plan in the WHERE, so no cap on add-on rows can push the plan payment out (money review of #896).
-  const planCodes = (await prisma.plan.findMany({ select: { code: true } })).map(p => p.code);
   const paid = await withStore(storeId, tx =>
     tx.billingEvent.findFirst({
       where: {
@@ -2353,7 +2354,13 @@ export async function getSubscriptionBillingState(storeId: string) {
   const next = nextChargeOf(sub, plans, vat);
   const now = Date.now();
   const daysLeft = next ? Math.ceil((next.at.getTime() - now) / 86_400_000) : null;
-  const termBasis = sub ? await termBasisOf(storeId, sub) : null;
+  const termBasis = sub
+    ? await termBasisOf(
+        storeId,
+        sub,
+        plans.map(p => p.code)
+      )
+    : null;
   const handle = instapayHandle();
   const support = supportContact();
   return {

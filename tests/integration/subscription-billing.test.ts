@@ -888,6 +888,9 @@ describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
   });
 });
 
+const planCodes = async () =>
+  (await prisma.plan.findMany({ select: { code: true } })).map(p => p.code);
+
 describe.skipIf(!hasDb)('B2: term basis and the renewal window', () => {
   it('a plan set with no payment is "assigned"; a succeeded plan payment this period makes it "paid"; comped is comped', async () => {
     const now = new Date();
@@ -903,7 +906,7 @@ describe.skipIf(!hasDb)('B2: term basis and the renewal window', () => {
       })
     );
     const sub = await getSub(storeId);
-    expect(await termBasisOf(storeId, sub)).toBe('assigned');
+    expect(await termBasisOf(storeId, sub, await planCodes())).toBe('assigned');
     // add-on purchases (21 of them, more than any page cap) and a row with no plan never count as paying for the term
     await withRlsBypass(tx =>
       tx.billingEvent.createMany({
@@ -933,7 +936,7 @@ describe.skipIf(!hasDb)('B2: term basis and the renewal window', () => {
         ],
       })
     );
-    expect(await termBasisOf(storeId, sub)).toBe('assigned');
+    expect(await termBasisOf(storeId, sub, await planCodes())).toBe('assigned');
     await withRlsBypass(tx =>
       tx.billingEvent.create({
         data: {
@@ -949,9 +952,11 @@ describe.skipIf(!hasDb)('B2: term basis and the renewal window', () => {
         },
       })
     );
-    expect(await termBasisOf(storeId, sub)).toBe('paid');
+    expect(await termBasisOf(storeId, sub, await planCodes())).toBe('paid');
     const comped = await subscribedStore({ planCode: 'comped', status: 'comped', token: null });
-    expect(await termBasisOf(comped.storeId, await getSub(comped.storeId))).toBe('comped');
+    expect(await termBasisOf(comped.storeId, await getSub(comped.storeId), await planCodes())).toBe(
+      'comped'
+    );
   });
 
   it('inRenewalWindow is false a year before the due date and true within 7 days', async () => {
