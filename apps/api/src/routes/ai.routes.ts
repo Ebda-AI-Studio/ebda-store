@@ -270,6 +270,8 @@ const builderPatchSchema = z
   .object({
     pageKey: z.string().refine(k => BUILDER_PAGE_KEYS.has(k), 'Unknown page'),
     instruction: z.string().trim().min(2).max(500),
+    viewport: z.enum(['desktop', 'tablet', 'mobile']).optional(),
+    locale: z.enum(['ar', 'en']).optional(),
   })
   .strict();
 

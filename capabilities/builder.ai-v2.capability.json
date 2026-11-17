@@ -1,10 +1,10 @@
 {
   "id": "builder.ai-v2",
-  "status": "planned",
+  "status": "in-pr",
   "plan": "self-service spec 2026-11-14 section 8 (project 3)",
   "area": "ai",
-  "version": 1,
-  "versionDate": "2026-11-14",
+  "version": 2,
+  "versionDate": "2026-11-17",
   "titleAr": "ذكاء المحرر الجديد",
   "titleEn": "Page-builder AI v2: knows products, brand, look; adds blocks, links products, fixes mobile, creates pages",
   "screens": ["/stores/[id]/builder"],
@@ -27,7 +27,7 @@
     "en": ["Build me a landing page for my new collection"]
   },
   "steps": [
-    "Not available yet. Assistant should say: for now it can reorder, hide, restyle; adding blocks/pages is coming."
+    "Editor > Ask AI. It adds, moves and removes blocks, points sections at your products, categories, images and links, and fixes the phone view as a preview you apply to the draft. Creating whole new pages is not available yet."
   ],
   "edgeCases": [
     "Preview must show one combined plan",
@@ -35,5 +35,8 @@
     "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
   ],
-  "gaps": ["NOT BUILT: spec section 8; register row Page-builder AI context-aware"]
+  "gaps": [
+    "Create pages from a request not built; new block cannot be filled in the same request (the model does not know its id yet)"
+  ],
+  "pr": "branch feat/page-builder-ai-v2"
 }

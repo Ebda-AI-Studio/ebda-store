@@ -526,7 +526,7 @@ export function BuilderEditor({
       if (!(await settleDraft())) return void setPatchError(t('aiPatch.saveFirst'));
       const r = await apiPost<AiPatchProposal & { candidate: PageDefinition }>(
         `/api/v1/stores/${storeId}/ai/builder-patch`,
-        { pageKey, instruction }
+        { pageKey, instruction, viewport, locale: locale === 'ar' ? 'ar' : 'en' }
       );
       if (r.error || !r.data) {
         const code = r.error?.code ?? '';
