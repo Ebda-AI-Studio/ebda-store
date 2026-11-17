@@ -1,0 +1,49 @@
+{
+  "id": "platform.settings-policies",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اعدادات المنصة",
+  "titleEn": "Platform settings, legal policy notices, answer-engine providers, CI insights, platform AI usage",
+  "screens": [
+    "/platform-settings",
+    "/policy-updates",
+    "/answer-engine-providers",
+    "/ci-insights",
+    "/ai-usage",
+    "/usage-history"
+  ],
+  "api": [
+    "/admin/answer-engine/providers",
+    "/admin/ci/*",
+    "/admin/legal-policy*",
+    "/admin/super-admin/ai-usage/summary",
+    "/admin/super-admin/usage-history"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "operatorReason": {
+    "code": "platform-config",
+    "text": "platform-wide config",
+    "validUnderRule": true
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [],
+    "en": []
+  },
+  "steps": ["Super-admin console only."],
+  "edgeCases": [
+    "Assistant must refuse and offer a handoff request with context",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
+  ],
+  "gaps": []
+}

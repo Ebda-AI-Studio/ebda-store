@@ -10,6 +10,7 @@
  *     └─ processReminders()       — send scheduled reminder steps
  */
 
+import { activeStoreIds, isStoreOperational } from '../lib/store-operational';
 import { customerRow, customerRows, isLiveCustomer, pickSelected } from '../lib/customer-directory';
 import { primeCustomerAuthRoutes } from '../lib/customer-auth';
 import { withBackendBatch } from '../lib/store-backend';
@@ -125,7 +126,8 @@ async function primeAllMarkers(ids: readonly string[]): Promise<void> {
  * (stores is under RLS); the feature map is cached 5 min per store (BOUNDED-stale).
  */
 async function storeIdsWithFeature(feature: 'abandoned_cart'): Promise<string[]> {
-  const stores = await storeDirectory();
+  // A store that is not `active` (suspended / inactive) gets no recovery message (Ruling SUSPEND-OUT-1).
+  const stores = await storeDirectory(s => isStoreOperational(s.status));
   // Selection only: one batched entitlement prefetch for the run (no `store_features` / `store_subscriptions` read per store).
   // `processReminders` re-reads the entitlement live (once per store) just before it sends.
   return featureService.selectEnabled(
@@ -400,7 +402,10 @@ class AbandonedCartService {
   async processReminders(correlationId?: string): Promise<void> {
     const now = new Date();
 
+    const operational = await activeStoreIds();
     const due = await acrossStoresFlat(async storeId => {
+      // Suspended / inactive store: no reminder is due for it (Ruling SUSPEND-OUT-1).
+      if (!operational.has(storeId)) return [];
       const where = {
         storeId,
         status: { in: ['pending', 'step1_sent', 'step2_sent'] },

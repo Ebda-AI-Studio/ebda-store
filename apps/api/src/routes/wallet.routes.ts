@@ -18,7 +18,7 @@ import {
 /**
  * Customer wallet (store credit) routes. Every route is behind
  * `requireFeature('customer_wallet')`, which is OFF for every store until a
- * super-admin override turns it on (docs/plans/2026-09-25-customer-wallet.md).
+ * super-admin override turns it on (docs/plans/done/2026-09-25-customer-wallet.md).
  *
  * Mounted at the bare '/stores' prefix, so every path declares its own
  * '/:storeId/…' and RLS context comes from `router.param` (same shape as

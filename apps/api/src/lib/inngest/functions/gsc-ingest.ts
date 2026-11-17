@@ -5,7 +5,7 @@
  *
  *   gscIngestCron    — daily cron (04:00 UTC) that ingests Google Search
  *                      Console Search Analytics for every AI-eligible store
- *                      with a domain and the `answer_engine_insights`
+ *                      (custom domain or `<slug>.ebda.app`) and the `answer_engine_insights`
  *                      feature enabled.
  *
  *   gscIngestOnDemand — event-driven, triggered by `gsc/ingest-requested`
@@ -32,12 +32,18 @@ import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
 import { isAiEligiblePlan } from '../../ai-plan-eligibility';
 import type { StorePlan } from '@ebda/shared';
+import { StoreService } from '../../../services/store.service';
 import { featureService } from '../../../services/feature.service';
 import { isGscConfigured } from '../../../services/answer-engine/gsc-client';
 import {
   runGscIngest,
   type RunGscIngestOptions,
 } from '../../../services/answer-engine/gsc-ingest.service';
+import {
+  ensureGscDomainProperty,
+  realGscVerificationDeps,
+  type GscVerificationDeps,
+} from '../../../services/answer-engine/gsc-domain-verification.service';
 
 // ---------------------------------------------------------------------------
 // Per-store ingest body — isolated so ONE store can never abort the cron
@@ -65,9 +71,44 @@ export interface GscIngestStoreResult {
  * cron's `for` loop simply continues to the next store instead of Inngest
  * exhausting this step's retries and failing the WHOLE cron run.
  */
+/**
+ * Custom-domain stores get their own GSC property automatically (META
+ * verification served by the storefront, then sites.add — GAP 2). FAIL-SOFT and
+ * isolated from the ingest: any failure is logged and tomorrow's run retries.
+ */
+async function ensureDomainPropertySoft(
+  storeId: string,
+  deps?: GscVerificationDeps
+): Promise<void> {
+  try {
+    const d: GscVerificationDeps = deps ?? {
+      ...realGscVerificationDeps,
+      readStore: id =>
+        withStoreDb(id, db =>
+          db.store.findUnique({
+            where: { id },
+            select: { domain: true, googleSiteVerification: true },
+          })
+        ),
+      publishToken: async (id, token) => {
+        await StoreService.updateSeo(id, { googleSiteVerification: token });
+      },
+    };
+    const status = await ensureGscDomainProperty(storeId, d);
+    if (status !== 'no_domain' && status !== 'already_connected') {
+      logger.info({ storeId, status }, 'gsc-ingest: custom-domain property check');
+    }
+  } catch (err) {
+    logger.warn(
+      { storeId, err: err instanceof Error ? err.message : String(err) },
+      'gsc-ingest: custom-domain property setup failed, continuing with ingest'
+    );
+  }
+}
+
 export async function ingestStoreGsc(
   storeId: string,
-  opts: RunGscIngestOptions = {}
+  opts: RunGscIngestOptions & { verifyDeps?: GscVerificationDeps } = {}
 ): Promise<GscIngestStoreResult> {
   try {
     const enabled = await featureService.isFeatureEnabled(storeId, 'answer_engine_insights');
@@ -79,7 +120,11 @@ export async function ingestStoreGsc(
     // runGscIngest uses bare prisma internally. Wrap in runInTenantContext
     // so FORCE RLS policies see the correct store GUC for the
     // GscDailyMetric read/upsert.
-    const result = await runInStoreCtx(storeId, () => runGscIngest(storeId, opts));
+    const { verifyDeps, ...ingestOpts } = opts;
+    const result = await runInStoreCtx(storeId, async () => {
+      await ensureDomainPropertySoft(storeId, verifyDeps);
+      return runGscIngest(storeId, ingestOpts);
+    });
     if (result.skipped) {
       return { storeId, skipped: result.skipped, date: result.date };
     }
@@ -132,7 +177,7 @@ const gscIngestCronFn = inngest.createFunction(
         event,
         s =>
           s.status === 'active' &&
-          s.hasDomain &&
+          // every active store has a public host: its custom domain or <slug>.ebda.app
           s.aiFeaturesEnabled &&
           // free (lapsed-payment / demo) plans are excluded from AI spend.
           isAiEligiblePlan(s.plan as StorePlan)

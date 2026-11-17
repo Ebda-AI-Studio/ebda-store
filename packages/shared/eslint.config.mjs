@@ -14,7 +14,7 @@ export default [
     },
   },
   {
-    // The B2B price resolver is a PURE function (docs/plans/2026-10-21-b2b-wholesale.md, Task 2): no imports at all,
+    // The B2B price resolver is a PURE function (docs/plans/done/2026-10-21-b2b-wholesale.md, Task 2): no imports at all,
     // so it cannot reach Prisma, the clock, the network or any other module.
     files: ['src/pricing/**/*.ts'],
     ignores: ['src/pricing/index.ts'], // the barrel only re-exports

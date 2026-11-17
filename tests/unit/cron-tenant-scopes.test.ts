@@ -1,4 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@api/lib/store-operational', () => ({
+  STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
+  isStoreOperational: (s: unknown) => s === 'active',
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+  activeStoreIds: async () => ({ has: () => true }) as unknown as Set<string>,
+  requireOperationalStore: (_q: unknown, _r: unknown, next: () => void) => next(),
+}));
 const m = vi.hoisted(() => ({
   scope: '',
   stores: ['store-a', 'store-b'],
@@ -56,7 +65,9 @@ vi.mock('@ebda/database', () => ({
   },
   // `stores` is under RLS: crons list stores through the directory definer.
   storeDirectory: async (filter?: (s: Record<string, unknown>) => boolean) =>
-    m.stores.map(id => ({ id, loyaltyEnabled: true })).filter(s => (filter ? filter(s) : true)),
+    m.stores
+      .map(id => ({ id, status: 'active', loyaltyEnabled: true }))
+      .filter(s => (filter ? filter(s) : true)),
   withStore: async (id: string, fn: (tx: unknown) => Promise<unknown>) => {
     m.scope = id;
     try {

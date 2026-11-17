@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Ruling RESOLVE-BULLETPROOF-1 — each test fails without the layer it names
- * (docs/plans/2026-11-10-resolve-bulletproof.md).
+ * (docs/plans/done/2026-11-10-resolve-bulletproof.md).
  */
 
 const hoisted = vi.hoisted(() => {

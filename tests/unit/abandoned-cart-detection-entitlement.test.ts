@@ -14,7 +14,11 @@ const m = vi.hoisted(() => ({
   findManyArgs: [] as any[],
   created: [] as any[],
   due: [] as Record<string, any>[],
-  directory: [{ id: 'baseline-only' }, { id: 'row-only' }, { id: 'free-no-entitlement' }],
+  directory: [
+    { id: 'baseline-only', status: 'active' },
+    { id: 'row-only', status: 'active' },
+    { id: 'free-no-entitlement', status: 'active' },
+  ],
 }));
 
 vi.mock('@ebda/database', () => ({

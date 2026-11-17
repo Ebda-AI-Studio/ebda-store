@@ -60,6 +60,7 @@ export const FAMILY_MODELS: Record<PlatformFamily, readonly string[]> = {
     'providerVerification',
     'providerVerificationEvent',
     'providerActivationRequest',
+    'trustRequest',
     'merchantApiKey',
     'slugRedirect',
   ],

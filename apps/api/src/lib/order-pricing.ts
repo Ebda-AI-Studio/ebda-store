@@ -1,6 +1,6 @@
 /**
  * Shared glue between the price resolver and the paths that CREATE money rows (checkout, admin manual order, payment
- * links, WhatsApp bridge). docs/plans/2026-10-21-b2b-wholesale.md Task 3, Rulings B2B-5 / B2B-9.
+ * links, WhatsApp bridge). docs/plans/done/2026-10-21-b2b-wholesale.md Task 3, Rulings B2B-5 / B2B-9.
  */
 import type { Resolved, TierLadderSnapshot } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
