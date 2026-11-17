@@ -30,6 +30,7 @@ import { startInlineEdit } from './inline-edit';
 import { installEditorInert } from './editor-inert';
 import { cycleIndex, cycleTargets, focusTarget } from './keyboard-logic';
 import { CanvasToolbar } from './CanvasToolbar';
+import { OVERLAY_SCALE } from './overlay-scale';
 import { InsertLine, InsertLineStyles } from './InsertLine';
 import {
   dropTargetFor,
@@ -149,7 +150,7 @@ function imagesOf(target: CanvasTarget | null): ImageHandle[] {
 
 /** Where the name chip goes: 24px above the box, or just under it when there is no room above. */
 export function chipTopFor(box: { top: number; height: number }): number {
-  return box.top >= 24 ? box.top - 24 : box.top + box.height + 4;
+  return box.top >= OVERLAY_SCALE.chip ? box.top - OVERLAY_SCALE.chip : box.top + box.height + 4;
 }
 
 const COPY = {
@@ -530,8 +531,12 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
             height: box.height,
             pointerEvents: 'none',
             zIndex: 2147483000,
-            outline: `2px ${kind === 'selected' ? 'solid' : 'dashed'} ${BRAND.colors.gold}`,
-            outlineOffset: -2,
+            outline: `${
+              kind === 'selected' ? OVERLAY_SCALE.outlineSelected : OVERLAY_SCALE.outlineHover
+            }px solid ${BRAND.colors.gold}`,
+            outlineOffset: -(kind === 'selected'
+              ? OVERLAY_SCALE.outlineSelected
+              : OVERLAY_SCALE.outlineHover),
           }}
         />
         {label && (
@@ -545,10 +550,11 @@ export default function EditorOverlay({ allowedOrigins, locale, definition, onRe
               maxWidth: Math.max(120, box.width),
               pointerEvents: 'none',
               zIndex: 2147483001,
-              padding: '2px 8px',
+              height: OVERLAY_SCALE.chip,
+              padding: '0 8px',
               borderRadius: 6,
               fontSize: 12,
-              lineHeight: '20px',
+              lineHeight: `${OVERLAY_SCALE.chip}px`,
               fontWeight: 600,
               whiteSpace: 'nowrap',
               overflow: 'hidden',

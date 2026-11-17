@@ -18,11 +18,10 @@ import { navItemClasses } from '@/components/ui/tokens';
 import { ResizablePane } from './ResizablePane';
 import { PANE_BOUNDS } from '../_lib/pane-width';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { useToast } from '@ebda/ui';
+import { AlertTriangle } from 'lucide-react';
 import {
-  BRAND,
   effectiveTheme,
   getLook,
   type LookId,
@@ -56,7 +55,7 @@ import {
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
-import { getBuilderPreviewOrigin } from '../../../../../lib/store-url';
+import { getBuilderPreviewOrigin, getStoreHref } from '../../../../../lib/store-url';
 import { useBuilderDocument } from '../_lib/useBuilderDocument';
 import { setCanvasHover } from '../_lib/canvas-hover-store';
 import { describeMove, describeStructure } from '../_lib/announce-move';
@@ -75,6 +74,8 @@ import { ThemeSettingsPanel } from './ThemeSettingsPanel';
 import { RevisionsPanel } from './RevisionsPanel';
 import { AiPatchPane, type AiPatchProposal } from './AiPatchPane';
 import { PageSwitcher, type PreviewProduct } from './PageSwitcher';
+import { EditorHeader } from './EditorHeader';
+import { EditorLoadError, EditorSkeleton } from './EditorStates';
 import { PageSettingsPanel } from './PageSettingsPanel';
 import { TemplateGallery } from './TemplateGallery';
 import { LookSwitchPane, type LookDesignChoice, type LookPreviewResult } from './LookSwitchPane';
@@ -122,7 +123,7 @@ export function BuilderEditor({
 }) {
   const t = useT('builder');
   const locale = useLocale();
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError, addToast } = useToast();
   const b = useBuilderDocument(storeId, pageKey);
   const isHome = pageKey === 'home';
   const [store, setStore] = useState<StoreInfo | null>(null);
@@ -447,6 +448,16 @@ export function BuilderEditor({
     [dispatch, locale, runAiFill]
   );
 
+  // One polite announcement per undo / redo, whether from the button or the shortcut (F41).
+  const undoNow = useCallback(() => {
+    b.undo();
+    setAnnouncement(a => (a.endsWith('\u00a0') ? t('undone') : `${t('undone')}\u00a0`));
+  }, [b, t]);
+  const redoNow = useCallback(() => {
+    b.redo();
+    setAnnouncement(a => (a.endsWith('\u00a0') ? t('redone') : `${t('redone')}\u00a0`));
+  }, [b, t]);
+
   // Undo / redo shortcuts (leave native text undo alone inside inputs).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -457,15 +468,15 @@ export function BuilderEditor({
       const k = e.key.toLowerCase();
       if (k === 'z' && !e.shiftKey) {
         e.preventDefault();
-        b.undo();
+        undoNow();
       } else if ((k === 'z' && e.shiftKey) || k === 'y') {
         e.preventDefault();
-        b.redo();
+        redoNow();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [b]);
+  }, [undoNow, redoNow]);
 
   // Never lose an unsaved edit by closing the tab.
   useEffect(() => {
@@ -486,7 +497,21 @@ export function BuilderEditor({
   const publish = async () => {
     const r = await b.publish();
     if (r === 'ok') {
-      toastSuccess(t('published'));
+      // The success moment names the next step: open the page the merchant just published (F45).
+      const viewUrl = store
+        ? `${getStoreHref(store)}${canvasPath === '/' ? '' : canvasPath}`
+        : null;
+      addToast({
+        type: 'success',
+        title: t('published'),
+        action: viewUrl
+          ? {
+              label: t('publishedView'),
+              onClick: () => window.open(viewUrl, '_blank', 'noopener,noreferrer'),
+            }
+          : undefined,
+        duration: 8000,
+      });
       void refreshStore();
       void refreshTypography();
       // The header/footer and typography patches are live now; re-open the page so the next edit
@@ -632,42 +657,10 @@ export function BuilderEditor({
       );
   }, [b.doc, locale, t]);
 
-  if (b.loadError)
-    return (
-      <div className="grid h-screen place-items-center bg-background p-6 text-center">
-        <div>
-          <p className="text-sm text-destructive-ink">{t('loadError')}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            onClick={() => void b.reload()}
-            className="mt-3"
-          >
-            {t('retry')}
-          </Button>
-        </div>
-      </div>
-    );
-  if (!b.doc || !store || !token)
-    return (
-      <div
-        role="status"
-        className="grid h-screen place-items-center bg-background text-sm text-muted-foreground"
-      >
-        {t('loading')}
-      </div>
-    );
+  if (b.loadError) return <EditorLoadError onRetry={() => void b.reload()} />;
+  if (!b.doc || !store || !token) return <EditorSkeleton />;
 
   const storeName = locale === 'ar' && store.nameAr ? store.nameAr : store.name;
-  const statusText: Record<string, string> = {
-    loading: t('status.loading'),
-    saved: t('status.saved'),
-    dirty: t('status.dirty'),
-    saving: t('status.saving'),
-    error: t('status.error'),
-    conflict: t('status.conflict'),
-  };
 
   // Fonts + zones as the theme pane shows them: the live typography with the draft patch on top.
   const effectiveTypo = applyTypographyPatch(liveTypography, b.doc.typography);
@@ -735,8 +728,8 @@ export function BuilderEditor({
               setFocusRequest(r => ({ ...s, n: (r?.n ?? 0) + 1 }));
             }}
             dispatch={dispatch}
-            onAddSection={list => {
-              setAddAt(undefined);
+            onAddSection={(list, at) => {
+              setAddAt(at);
               setAddTo(list);
             }}
           />
@@ -832,6 +825,20 @@ export function BuilderEditor({
       theme={effectiveTheme(store.theme, b.doc.theme)}
       dispatch={dispatch}
       onSwitchPage={next => void switchPage(next)}
+      emptyActions={{
+        onAddSection: () => {
+          setTab('sections');
+          setAddAt(undefined);
+          setAddTo('template');
+        },
+        onOpenTheme: isHome
+          ? () => {
+              setTab('theme');
+              setDrawer('start');
+            }
+          : undefined,
+        onOpenTemplates: isHome ? () => setGalleryOpen(true) : undefined,
+      }}
     />
   ) : (
     <SettingsPanel
@@ -901,123 +908,35 @@ export function BuilderEditor({
         </Button>
       </div>
       <h1 className="sr-only">{`${t('title')}: ${storeName}`}</h1>
-      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-1 lg:h-14 lg:flex-nowrap lg:py-0">
-        <Link
-          href={`/stores/${storeId}`}
-          className="flex items-center justify-center gap-2 max-lg:min-h-11 max-lg:min-w-11"
-          aria-label={t('back')}
-        >
-          {}
-          <img src="/logo.svg" alt={BRAND.product.nameEn} width={15} height={28} />
-        </Link>
-        <span className="hidden truncate text-sm font-semibold sm:inline">{storeName}</span>
-        <PageSwitcher
-          pageKey={pageKey}
-          onChange={next => void switchPage(next)}
-          products={previewProducts}
-          previewSlug={previewSlug}
-          onPreviewSlug={setPreviewSlug}
-        />
-        <div className="ms-2 flex lg:hidden">
-          <Button
-            variant="ghost"
-            size="sm"
-            type="button"
-            onClick={() => setDrawer(d => (d === 'start' ? null : 'start'))}
-            aria-expanded={drawer === 'start'}
-          >
-            {t('panes.start')}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            type="button"
-            onClick={() => setDrawer(d => (d === 'end' ? null : 'end'))}
-            aria-expanded={drawer === 'end'}
-          >
-            {t('panes.end')}
-          </Button>
-        </div>
-        <div
-          role="radiogroup"
-          aria-label={t('viewport.label')}
-          onKeyDown={e => rovingKeyDown(e, 'radio')}
-          className="order-last mx-auto inline-flex gap-0.5 rounded-md bg-muted p-0.5 max-lg:max-w-full lg:order-none"
-        >
-          {(['desktop', 'tablet', 'mobile'] as const).map(v => (
-            <Button
-              key={v}
-              type="button"
-              role="radio"
-              size="sm"
-              variant={viewport === v ? 'soft' : 'ghost'}
-              aria-checked={viewport === v}
-              tabIndex={viewport === v ? 0 : -1}
-              onClick={() => setViewport(v)}
-              className={viewport === v ? '' : 'text-muted-ink'}
-              data-testid={`viewport-${v}`}
-            >
-              {t(`viewport.${v}`)}
-            </Button>
-          ))}
-        </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          type="button"
-          onClick={b.undo}
-          disabled={!b.canUndo}
-          aria-label={t('undo')}
-          title={t('undo')}
-          className="max-lg:ms-auto"
-          data-testid="undo"
-        >
-          ↶
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          type="button"
-          onClick={b.redo}
-          disabled={!b.canRedo}
-          aria-label={t('redo')}
-          title={t('redo')}
-          data-testid="redo"
-        >
-          ↷
-        </Button>
-        <span
-          role="status"
-          className="hidden w-24 text-xs text-muted-foreground md:inline"
-          data-testid="save-status"
-          data-state={b.saveState}
-        >
-          {statusText[b.saveState]}
-        </span>
-        {isHome && (
-          <Button
-            variant={galleryOpen ? 'soft' : 'outline'}
-            size="sm"
-            type="button"
-            onClick={() => setGalleryOpen(true)}
-            aria-haspopup="dialog"
-            data-testid="open-look-switch"
-            data-setting-id="builder.look-switch"
-          >
-            {t('look.open')}
-          </Button>
-        )}
-        <Button
-          size="sm"
-          type="button"
-          onClick={() => void publish()}
-          disabled={b.publishing || b.saveState === 'conflict'}
-          className="font-semibold"
-          data-testid="publish"
-        >
-          {b.publishing ? t('publishing') : t('publish')}
-        </Button>
-      </header>
+      <EditorHeader
+        storeId={storeId}
+        storeName={storeName}
+        pageSwitcher={
+          <PageSwitcher
+            pageKey={pageKey}
+            onChange={next => void switchPage(next)}
+            products={previewProducts}
+            previewSlug={previewSlug}
+            onPreviewSlug={setPreviewSlug}
+          />
+        }
+        viewport={viewport}
+        onViewport={setViewport}
+        canUndo={b.canUndo}
+        canRedo={b.canRedo}
+        onUndo={undoNow}
+        onRedo={redoNow}
+        saveState={b.saveState}
+        publishing={b.publishing}
+        unpublished={b.dirty || b.publishedRev === null || b.rev !== b.publishedRev}
+        editCount={b.editCount}
+        onPublish={() => void publish()}
+        showLook={isHome}
+        lookOpen={galleryOpen}
+        onOpenLook={() => setGalleryOpen(true)}
+        drawer={drawer}
+        onToggleDrawer={side => setDrawer(d => (d === side ? null : side))}
+      />
 
       {patchPreview && !lookPreview && (
         <div
@@ -1104,7 +1023,14 @@ export function BuilderEditor({
           className="flex flex-wrap items-center gap-2 border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm"
           data-testid="conflict-banner"
         >
-          <span className="flex-1">{t('conflict.message')}</span>
+          <AlertTriangle
+            className="h-4 w-4 shrink-0 text-destructive-ink"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
+          <span className="flex-1">
+            <span className="font-semibold">{t('conflict.title')}</span> {t('conflict.message')}
+          </span>
           <Button variant="outline" size="sm" type="button" onClick={b.takeTheirs}>
             {t('conflict.takeTheirs')}
           </Button>
@@ -1232,6 +1158,12 @@ export function BuilderEditor({
           doc={b.doc}
           template={store.template ? normalizeLegacyTemplate(store.template) : undefined}
           look={store.look}
+          theme={effectiveTheme(store.theme, b.doc.theme)}
+          onShowExisting={sectionId => {
+            setSelection({ sectionId });
+            setAddTo(null);
+            setAddAt(undefined);
+          }}
           onClose={() => {
             setAddTo(null);
             setAddAt(undefined);

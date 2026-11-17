@@ -6,19 +6,36 @@
  */
 import { BRAND } from '@ebda/shared';
 
-const GOLD = BRAND.colors.gold;
-const LIFT = BRAND.colors.lift;
-const INK = 'currentColor';
+const DEFAULT_GOLD = BRAND.colors.gold;
+const DEFAULT_LIFT = BRAND.colors.lift;
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+/** Corner radius token -> wireframe corner (viewBox units). */
+const RX: Record<string, number> = { none: 0, sm: 1, md: 2, lg: 4, xl: 6 };
+
+/** A theme value only paints when it is a plain hex colour (never an arbitrary string into `style`). */
+function hex(v: unknown): string | undefined {
+  return typeof v === 'string' && HEX.test(v) ? v : undefined;
+}
 
 export function SectionThumb({
   type,
   settings,
+  theme,
 }: {
   type: string;
   settings: Record<string, unknown>;
+  /** The store's own theme tokens (colours, corner radius): the wireframe is drawn in the store's look. */
+  theme?: object;
 }) {
+  const tk = (theme ?? {}) as Record<string, unknown>;
+  const GOLD = hex(tk.primaryColor) ?? hex(tk.accentColor) ?? DEFAULT_GOLD;
+  const LIFT = hex(tk.cardColor) ?? DEFAULT_LIFT;
+  const bg = hex(tk.backgroundColor);
+  const fg = hex(tk.foregroundColor);
+  const INK = 'currentColor';
+  const rx = typeof tk.borderRadius === 'string' ? (RX[tk.borderRadius] ?? 2) : 2;
   const box = (x: number, y: number, w: number, h: number, fill: string, op = 1) => (
-    <rect x={x} y={y} width={w} height={h} rx={2} fill={fill} opacity={op} />
+    <rect x={x} y={y} width={w} height={h} rx={rx} fill={fill} opacity={op} />
   );
   const line = (x: number, y: number, w: number) => box(x, y, w, 3, INK, 0.35);
   let body: React.ReactNode;
@@ -161,6 +178,8 @@ export function SectionThumb({
       viewBox="0 0 120 60"
       aria-hidden="true"
       className="block h-auto w-full rounded-lg bg-muted/50 text-foreground rtl:-scale-x-100"
+      style={bg || fg ? { backgroundColor: bg, color: fg } : undefined}
+      data-themed={bg || fg || hex(tk.primaryColor) ? 'true' : undefined}
     >
       {body}
     </svg>
