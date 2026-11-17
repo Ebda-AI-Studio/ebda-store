@@ -23,6 +23,7 @@ import {
   pickCampaignContent,
   renderCampaignEmail,
   resolveRecipientLocale,
+  normalizeEmail,
   sentInLast24h,
   storeDefaultLanguage,
   storefrontBaseUrl,
@@ -313,15 +314,21 @@ const campaignSendFn = inngest.createFunction(
         return reason;
       };
       if (audience.length === 0) return { aborted: await abort('EMPTY_AUDIENCE') };
-      // Arithmetic (cap 10): `remaining` = cap - EVERY send in 24h, this campaign's own included. A resume needs only the
-      // recipients not yet sent, so need = audience - ownSent; compare need to `remaining`, never audience to it.
-      //   own 5 sent, others 0, audience 8: remaining 5, need 3 -> go.   others 4 + own 5: remaining 1, need 3 -> refuse.
-      // A RESUME (a campaign paused when its store was suspended) rebuilds the whole audience, but this campaign's own
-      // already-sent recipients are in `alreadySent` too: compare only the recipients still to send, never count them twice.
-      const ownSent = await inCampaignStore(storeId, db =>
-        db.campaignRecipient.count({ where: { campaignId, storeId, status: 'sent' } })
+      // Arithmetic (cap 10): `remaining` = cap - EVERY send in the last 24h, this campaign's own included. need = the
+      // CURRENT audience members (same normalised email the audience and the send loop use) with no `sent` row for this
+      // campaign yet; compare need to `remaining`, never audience to it, and never count a recipient twice.
+      //   own 5 sent today, others 0, audience 8 (incl. those 5): remaining 5, need 3 -> go.   others 4: remaining 1 -> refuse.
+      // Sends that are not in the rebuilt audience (unsubscribed since) or fell outside the 24h window (a resume next day)
+      // must NOT shrink need: own 5 sent yesterday, audience 8, remaining 2 -> need 3 -> refuse (a bare count would say 3 - 5 < 2).
+      const sentRows = await inCampaignStore(storeId, db =>
+        db.campaignRecipient.findMany({
+          where: { campaignId, storeId, status: 'sent' },
+          select: { email: true },
+        })
       );
-      if (Math.max(0, audience.length - ownSent) > remaining) {
+      const sentEmails = new Set(sentRows.map(r => normalizeEmail(r.email ?? '')));
+      const need = audience.filter(a => !sentEmails.has(a.email)).length;
+      if (need > remaining) {
         return { aborted: await abort('DAILY_CAP_EXCEEDED') };
       }
 

@@ -412,6 +412,43 @@ describe('campaign-send', () => {
     expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
   });
 
+  const sentRow = (cid: string, email: string, ago = 0) => ({
+    id: uuid(),
+    campaignId: cid,
+    storeId: STORE_A,
+    email,
+    status: 'sent',
+    sentAt: new Date(Date.now() - ago),
+  });
+  const DAY = 25 * 3600 * 1000;
+
+  it('a resume NEXT DAY: sends outside the 24h window (and one no longer in the audience) never shrink need', async () => {
+    // cap 2, audience 8 of which 5 were sent yesterday; a 6th sent-yesterday recipient has left the audience.
+    // need = 3 > remaining 2 -> refuse. A bare count of own sent (6) gave need 2 -> go.
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '2';
+    const emails = Array.from({ length: 8 }, (_, i) => `u${i}@x.test`);
+    seed(emails);
+    for (const e of emails.slice(0, 5)) db.recipients.push(sentRow(campaignId, e, DAY));
+    db.recipients.push(sentRow(campaignId, 'gone@x.test', DAY));
+    await runJob();
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
+  });
+
+  it('sent recipients that unsubscribed and left the audience do not reduce need', async () => {
+    // 5 sent, 3 of them since unsubscribed (not in the audience); audience 6 incl. 2 already sent -> need 4 > remaining 3.
+    // (cap 10, own 2 sent today in-audience + 3 gone = alreadySent 5, remaining 5? use cap 8 -> remaining 3.)
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '8';
+    const emails = Array.from({ length: 6 }, (_, i) => `u${i}@x.test`);
+    seed(emails);
+    for (const e of emails.slice(0, 2)) db.recipients.push(sentRow(campaignId, e));
+    for (const e of ['g0@x.test', 'g1@x.test', 'g2@x.test'])
+      db.recipients.push(sentRow(campaignId, e));
+    await runJob();
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
+  });
+
   it('skips a subscriber who unsubscribed after the campaign was queued', async () => {
     seed(['a@x.test', 'b@x.test']);
     // Unsubscribe b between materialize and the batch.
