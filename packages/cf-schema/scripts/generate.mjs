@@ -836,7 +836,7 @@ function main() {
       onlyTables(out.d1, TRUST_PLATFORM_TABLES),
       'D1 trust_requests (A13/A14/A16), for a D1 that already ran 0001'
     ),
-    'migrations/platform/0013_instapay_auto_confirm.sql': emitSql(
+    'migrations/platform/0014_instapay_auto_confirm.sql': emitSql(
       onlyTables(out.d1, INSTAPAY_AUTO_PLATFORM_TABLES),
       'D1 instapay_auto_confirmations (Ruling INSTAPAY-AUTO-1), for a D1 that already ran 0001'
     ),

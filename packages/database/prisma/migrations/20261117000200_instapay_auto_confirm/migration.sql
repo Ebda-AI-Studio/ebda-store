@@ -1,5 +1,5 @@
 -- InstaPay auto-confirm (Ruling INSTAPAY-AUTO-1): one row per receipt the auto path decided on. Production reads and writes the D1 twin
--- (packages/cf-schema migrations/platform 0013); this Postgres table keeps Node/tests and the Prisma model in step.
+-- (packages/cf-schema migrations/platform 0014); this Postgres table keeps Node/tests and the Prisma model in step.
 CREATE TABLE "instapay_auto_confirmations" (
   "id" TEXT NOT NULL,
   "store_id" TEXT NOT NULL,

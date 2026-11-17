@@ -10,9 +10,9 @@ const manifest = readJson<Manifest>('generated/manifest.json');
 describe('D1 platform schema', () => {
   const db = openDb('platform', 2);
 
-  it('creates the manifest tables only: 30 models + entity_index + platform_audit_log, no identity table', () => {
+  it('creates the manifest tables only: 31 models + entity_index + platform_audit_log, no identity table', () => {
     expect(tableNames(db)).toEqual(Object.keys(manifest.databases.d1.columnCounts).sort());
-    expect(tableNames(db).length).toBe(32);
+    expect(tableNames(db).length).toBe(33);
     for (const t of ['users', 'refresh_tokens', 'verification_tokens', 'passkey_credentials'])
       expect(tableNames(db)).not.toContain(t);
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);

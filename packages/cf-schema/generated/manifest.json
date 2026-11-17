@@ -1342,12 +1342,6 @@
     },
     {
       "kind": "check",
-      "name": "instapay_auto_confirmations_state_check",
-      "table": "instapay_auto_confirmations",
-      "disposition": "d1:instapay_auto_confirmations"
-    },
-    {
-      "kind": "check",
       "name": "trust_requests_kind_check",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
@@ -1375,6 +1369,12 @@
       "name": "trust_requests_granted_limit_check",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "instapay_auto_confirmations_state_check",
+      "table": "instapay_auto_confirmations",
+      "disposition": "d1:instapay_auto_confirmations"
     },
     {
       "kind": "index",
