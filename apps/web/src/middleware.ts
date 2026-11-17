@@ -8,5 +8,5 @@
 export { middleware } from '../middleware';
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|sw\\.js|api/|public/|\\.well-known/security\\.txt).*)'],
+  matcher: ['/((?!_next/static|_next/image|api/|public/|\\.well-known/security\\.txt).*)'],
 };
