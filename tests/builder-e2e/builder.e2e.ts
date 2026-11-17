@@ -46,9 +46,13 @@ const L = (ar: string, en: string) => (locale() === 'ar' ? ar : en);
 
 async function openBuilder(page: Page) {
   await page.request.post(`${API}/__test/reset`);
-  await page
-    .context()
-    .addCookies([{ name: 'admin-lang', value: locale(), url: 'http://localhost:3101' }]);
+  await page.context().addCookies([
+    {
+      name: 'admin-lang',
+      value: locale(),
+      url: test.info().project.use.baseURL ?? 'http://localhost:3101',
+    },
+  ]);
   await page.addInitScript(() => localStorage.setItem('accessToken', 'e2e'));
   await page.route(`${CANVAS_ORIGIN}/**`, r =>
     r.fulfill({ contentType: 'text/html', body: FAKE_CANVAS })
