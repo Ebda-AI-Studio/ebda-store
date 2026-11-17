@@ -129,11 +129,27 @@ const run = async (s: Parameters<typeof seedClaim>[1] = {}, store = A) => {
   const c = seedClaim(w, { storeId: store, ...s });
   return { c, out: await decideAndActivate({ storeId: store, claimId: c.claimId }) };
 };
+// the receipt is read as Africa/Cairo wall time: one hour ago in Cairo (a fixed '12:00' was in the FUTURE before ~13:00 Cairo time -> DATE_FUTURE)
+const cairoHourAgo = () => {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Cairo',
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+      .formatToParts(new Date(Date.now() - HOUR))
+      .map(x => [x.type, x.value])
+  );
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+};
 const rawAnswer = (over: Record<string, unknown> = {}) => ({
   amount: '50.00',
   recipientHandle: 'ebda@instapay',
-  date: new Date(Date.now() - HOUR).toISOString().slice(0, 10),
-  time: '12:00',
+  ...cairoHourAgo(),
   reference: '123456789012',
   looksEdited: false,
   confidence: 0.95,

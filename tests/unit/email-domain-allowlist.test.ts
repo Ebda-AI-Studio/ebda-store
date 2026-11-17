@@ -19,8 +19,6 @@ const ROOT = path.resolve(__dirname, '../..');
 const ALLOWED_DOMAINS: Record<string, string> = {
   'ebda.app': 'our own domain',
   'example.com': 'RFC 2606 documentation domain',
-  'evil.com': 'vendored foundation smart-layer link vector: a deliberately hostile sample address',
-  'example.co.uk': 'vendored foundation smart-layer PII-masking vector sample',
   'gmail.com': 'free-mail provider named in PII-masking examples and domain lists',
   'sub.mailinator.com': 'disposable-email blocklist entry',
   'demostore.com': 'demo seed data (never delivered: demo stores send nothing)',
