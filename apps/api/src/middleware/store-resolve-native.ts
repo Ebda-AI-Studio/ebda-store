@@ -32,6 +32,7 @@ const BODY_MISS = {
 };
 
 /** An anonymous GET/HEAD of exactly `/store/resolve` (relative to the `/public` mount) with no query. */
+// pq-allow(unused-export): the request predicate is unit-tested directly (tests/unit/store-resolve-native.test.ts)
 export function isAnonymousStoreResolve(req: Request): boolean {
   const m = req.method.toUpperCase();
   return (
@@ -121,8 +122,8 @@ export function warnMissingStoreResolveBindings(
   return true;
 }
 
-// pq-allow(unused-export): test hook, imported by tests/unit/store-resolve-native.test.ts
 /** Test hook: forget that the warning was logged. */
+// pq-allow(unused-export): test hook, imported by tests/unit/store-resolve-native.test.ts
 export const resetStoreResolveBindingWarning = (): void => {
   warnedMissing = false;
 };
