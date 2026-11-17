@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Input } from '@ebda/ui';
+import { Input, PasswordRules } from '@ebda/ui';
+import { useLocale } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { PASSWORD_RESET_TTL_MINUTES } from '@ebda/shared';
 import { PublicShell } from '../../components/onboarding/PublicShell';
@@ -28,6 +29,7 @@ const CODE_SHAPE = /^\d{6}$/;
  */
 export default function ResetPasswordPage() {
   const t = useT('auth.reset');
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('loading');
   const [email, setEmail] = useState('');
@@ -148,7 +150,13 @@ export default function ResetPasswordPage() {
             placeholder={t('passwordPlaceholder')}
             error={errors.password}
           />
-          <p className="mt-1 text-xs text-muted-foreground">{t('passwordHelp')}</p>
+          <PasswordRules
+            value={password}
+            locale={locale}
+            title={t('passwordRulesTitle')}
+            progressLabel={(met, total) => t('passwordRulesProgress', { met, total })}
+            className="mt-1.5"
+          />
         </div>
         <Input
           id="reset-password-confirm"

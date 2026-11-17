@@ -1,18 +1,11 @@
 // Client-side mirrors of the signup rules the API enforces
 // (apps/api/src/services/merchant-signup.service.ts), so the form can answer
 // instantly. The API stays the authority; these only avoid a round trip.
-import { isValidEgyptianMobile, isValidEmail, slugify } from '@ebda/shared';
+import { isPasswordPolicyMet, isValidEgyptianMobile, isValidEmail, slugify } from '@ebda/shared';
 
-/** Same policy as the API: 8+ chars, upper, lower, digit, symbol. */
+/** The shared policy (@ebda/shared password-policy) plus the API's 128-character ceiling. */
 export function isStrongPassword(password: string): boolean {
-  return (
-    password.length >= 8 &&
-    password.length <= 128 &&
-    /[A-Z]/.test(password) &&
-    /[a-z]/.test(password) &&
-    /[0-9]/.test(password) &&
-    /[^A-Za-z0-9]/.test(password)
-  );
+  return password.length <= 128 && isPasswordPolicyMet(password);
 }
 
 export interface SignupFields {

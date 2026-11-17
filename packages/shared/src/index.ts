@@ -13,6 +13,7 @@ export * from './auth/session-hint-cookie';
 export * from './search';
 export * from './catalogue';
 export * from './auth-policy';
+export * from './password-policy';
 export * from './hosts';
 export * from './abuse';
 export * from './types';

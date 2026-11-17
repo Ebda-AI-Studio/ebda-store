@@ -21,6 +21,7 @@ export * from './components/ProductBadge';
 export * from './components/Rating';
 export * from './components/Breadcrumb';
 export * from './components/VariantText';
+export * from './components/PasswordRules';
 
 // Theme System
 export * from './theme';

@@ -12,6 +12,8 @@ import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { authRefusalText } from '../../../lib/auth-refusal';
 import { readTypedBeforeHydration } from '../../../lib/adopt-typed-before-hydration';
+import { PasswordChecklist } from '../../../components/PasswordChecklist';
+import { isPasswordPolicyMet } from '@ebda/shared';
 import { PENDING_VERIFICATION_EMAIL_KEY } from '../../../components/ResendVerification';
 
 export default function RegisterClient() {
@@ -166,7 +168,9 @@ export default function RegisterClient() {
                 value={formData.password}
                 onChange={setField('password')}
                 required
+                aria-describedby="register-password-rules"
               />
+              <PasswordChecklist id="register-password-rules" value={formData.password} />
 
               <Input
                 label={t('Confirm password', 'تأكيد كلمة المرور')}
@@ -208,7 +212,7 @@ export default function RegisterClient() {
                 className="w-full"
                 size="lg"
                 isLoading={isLoading}
-                disabled={!hydrated}
+                disabled={!hydrated || !isPasswordPolicyMet(formData.password)}
               >
                 {t('Create account', 'إنشاء حساب')}
               </Button>

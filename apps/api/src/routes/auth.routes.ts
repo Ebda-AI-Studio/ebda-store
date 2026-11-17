@@ -56,7 +56,12 @@ import {
   OWNER_HAS_BILLED_STORE_MESSAGE_AR,
 } from '../services/account-closure-guard';
 
-import { JWT_AUDIENCES_ACCEPTED, JWT_ISSUERS_ACCEPTED } from '@ebda/shared';
+import {
+  JWT_AUDIENCES_ACCEPTED,
+  JWT_ISSUERS_ACCEPTED,
+  addPasswordPolicyIssues,
+  failedPasswordRules,
+} from '@ebda/shared';
 const router = Router();
 
 // LAUNCH-RL: IP-wide bucket in front of the per-IP+email authLimiter (email rotation cannot bypass it).
@@ -145,13 +150,7 @@ function clearSessionCookies(res: Response): void {
 const registerSchema = z
   .object({
     email: z.string().email('Invalid email address'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-      .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-      .regex(/[0-9]/, 'Password must contain at least one number')
-      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+    password: z.string().superRefine(addPasswordPolicyIssues),
     name: z.string().min(1).optional(),
     firstName: z.string().min(1).optional(),
     lastName: z.string().optional(),
@@ -1159,13 +1158,7 @@ router.post(
     try {
       const changePasswordSchema = z.object({
         currentPassword: z.string().min(1, 'Current password is required'),
-        newPassword: z
-          .string()
-          .min(8, 'Password must be at least 8 characters')
-          .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-          .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-          .regex(/[0-9]/, 'Password must contain at least one number')
-          .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+        newPassword: z.string().superRefine(addPasswordPolicyIssues),
       });
 
       const data = changePasswordSchema.parse(req.body);
@@ -1303,6 +1296,13 @@ router.post(
             code: 'VALIDATION_ERROR',
             message:
               'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
+            // Same `details` shape the zod error handler emits, so the reset form names each unmet rule too.
+            details: {
+              password:
+                typeof password === 'string'
+                  ? failedPasswordRules(password).map(r => r.apiMessage)
+                  : [],
+            },
           },
         });
         return;

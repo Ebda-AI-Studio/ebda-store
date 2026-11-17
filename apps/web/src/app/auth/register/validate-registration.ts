@@ -1,3 +1,5 @@
+import { passwordUnmetSentence } from '@ebda/shared';
+
 /**
  * Client-side registration validation.
  *
@@ -17,8 +19,9 @@ export function validateRegistration(
   if (formData.password !== formData.confirmPassword) {
     return t('Passwords do not match', 'كلمة المرور وتأكيدها مش زي بعض');
   }
-  if (formData.password.length < 8) {
-    return t('Password must be at least 8 characters', 'كلمة المرور لازم تكون 8 حروف على الأقل');
-  }
+  // Every rule of the shared policy (the API enforces the same five), named in the shopper's language.
+  const en = passwordUnmetSentence(formData.password, 'en');
+  const ar = passwordUnmetSentence(formData.password, 'ar');
+  if (en && ar) return t(en, ar);
   return null;
 }
