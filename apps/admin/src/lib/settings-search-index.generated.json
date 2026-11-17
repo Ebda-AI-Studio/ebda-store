@@ -312,7 +312,7 @@
     "route": "/payment-abandonments",
     "access": "staff",
     "en": "Payment Abandonments",
-    "ar": "التخلي عن بوابة الدفع",
+    "ar": "اللي سابوا بوابة الدفع",
     "synEn": "failed payment abandoned checkout",
     "synAr": "دفع فاشل تخلي",
     "feature": "payment_abandonment"
