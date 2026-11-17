@@ -261,6 +261,10 @@ export async function getCached<T>(
  * pre-write value (it captured the generation first and skips its write when the generation moved, exactly as a fill does).
  * `tests/unit/store-directory-bust-coverage.test.ts` fails when a writer of those columns has no bust.
  *
+ * RESIDUAL (Ruling RESOLVE-SWR-1b, accepted): a KV delete takes up to ~60 s to reach other data centres, so a just-busted
+ * entry can still be READ elsewhere for that long, with or without a stale window. Reads only; writes never use this cache.
+ * Cost if wrong: a suspended store's pages stay browsable for ~60 s; no sale can complete.
+ *
  * Entries written before this shape existed (a bare value, no envelope) are read as an ordinary TTL entry.
  * A failed background refresh keeps serving the stale copy until the hard max, then the synchronous fill surfaces the error.
  */

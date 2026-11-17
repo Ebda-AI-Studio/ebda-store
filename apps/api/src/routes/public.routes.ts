@@ -2680,6 +2680,9 @@ router.get(
       // store status / suspension, plan (-> enabledFeatures), slug, domain and deletion: `bustStoreCaches` deletes this key
       // and bumps its generation on every write of those, so a stale copy never outlives its bust and a refresh that was in
       // flight during the write cannot republish the old payload. See getCachedSwr and RESOLVE-SWR-1.
+      // RESIDUAL (Ruling RESOLVE-SWR-1b, accepted): a KV delete reaches other data centres within ~60 s, so a just-suspended
+      // or downgraded store can still RENDER for <= 60 s on storefront reads. Cart / checkout / order / payment never read this
+      // cache (D1 / StoreDO, they refuse a suspended store). Cost if wrong: pages browsable for ~60 s, no sale completes.
       const result = await getCachedSwr(
         `public:store:resolve:${lookup.cacheHost}`,
         120,

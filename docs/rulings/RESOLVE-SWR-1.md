@@ -35,3 +35,13 @@ Two gaps found by this audit and fixed here: the plan-tier repair wrote `stores.
 Guard: `tests/unit/store-directory-bust-coverage.test.ts` scans every source file for a Store write funnel (`storeUpdate`, `storeUpdateMany`, `updateStoreThrough`, `storeUpdateOnDo`, `.store.update*`, raw `UPDATE/DELETE/INSERT stores`) that writes one of those columns and fails unless the file calls `bustStoreCaches` / `invalidateStoreDirectory` or is listed as delegating to a file that does (checked). It also fails when the bust stops reaching a layer or a helper has no call site.
 
 Not verified: production p90 / p99 after deploy and 24 h of status data. Cost if wrong: a store whose NEVER-stale column is written by a path that skips the bust serves the old payload for up to 600 s (was 120 s); the guard test exists so that cannot be added silently.
+
+## Ruling RESOLVE-SWR-1b - the KV propagation residual is accepted (2026-11-17)
+
+A KV delete reaches other data centres within about 60 s (the same residual as Ruling NZ-D1 for the directory). So after a store is suspended, or its plan is lowered, a storefront READ in another data centre can still render the old payload for up to 60 s after the bust, whether or not the stale window is on; the stale window itself never serves an entry the bust deleted. Accepted by the main controller on 2026-11-17: reads only.
+
+What stays exact: carts, checkout, orders, payments, account and every admin route never read this cache. They read D1 (`lookupStore`) or the StoreDO and refuse a suspended store, so no sale can complete on a stale payload.
+
+Cost if wrong: a suspended or downgraded store's pages stay browsable (and list the old features) for up to about 60 s after the write; no money moves, no order is accepted.
+
+Rebase note: #891 (B1) also edits `store-directory-reconcile.ts` (`repairDoMirror` clears the entitlement caches for a re-pushed DO copy). The two changes merge without conflict (verified with a trial merge) and are additive: #891 covers the DO mirror repair, this one covers every store the reconciler CORRECTED in D1. Rebase on #891 once it merges.
