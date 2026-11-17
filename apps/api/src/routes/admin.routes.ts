@@ -1,5 +1,6 @@
 import { revokeForAccount } from '../lib/wa/consent';
 import { requirePlatformDb } from '../lib/platform-db';
+import { AppError } from '../middleware/error-handler';
 import { d1StoreBriefs, platformDb as platformDirectoryDb } from '../lib/platform-directory';
 import { aiUsageFeatureStats } from '../services/usage-aggregates.service';
 import { platformFamilyOnD1 } from '../services/platform/cutover';
@@ -273,6 +274,8 @@ const updateStoreAdminSchema = z.object({
     // A platform host (`accounts`, `wa`, `api`...) must never become a merchant store, even by a super admin's slip.
     .refine(s => !isReservedSlug(s), 'This slug is reserved for a platform host')
     .optional(),
+  // Ruling B1-PLAN-SOT-1: the plan tier is DERIVED from the subscription; it is never set here (a direct tier write was
+  // reverted by the daily drift repair with a P1). Kept in the schema only to refuse it with a clear error.
   plan: z.enum(['free', 'starter', 'professional', 'enterprise']).optional(),
   status: z.enum(['active', 'suspended']).optional(),
 });
@@ -424,7 +427,19 @@ router.get(
           ? await (async () => {
               const rec = await (await storeDb(hit.id)).store.findUnique({ where: { id: hit.id } });
               const owner = rec ? (await hubOwners([rec.ownerId])).get(rec.ownerId) : undefined;
-              return rec ? { ...rec, owner: owner ?? null } : null;
+              // Ruling B1-PLAN-SOT-1: D1 `stores.plan` is the authority (NZ-D20; derived from the subscription); a DO store's
+              // own row holds a COPY that can lag. Show the authority, never the copy.
+              const d1 = rec
+                ? ((await (
+                    await requirePlatformDb()
+                  ).store.findUnique({
+                    where: { id: hit.id },
+                    select: { plan: true },
+                  })) as { plan: string } | null)
+                : null;
+              return rec
+                ? { ...rec, ...(d1 ? { plan: d1.plan } : {}), owner: owner ?? null }
+                : null;
             })()
           : await withStore(hit.id, tx =>
               tx.store.findUnique({
@@ -960,6 +975,13 @@ router.put(
     try {
       const { id } = req.params;
       const { name, slug, plan, status } = updateStoreAdminSchema.parse(req.body);
+      if (plan !== undefined) {
+        throw new AppError(
+          400,
+          'PLAN_VIA_SUBSCRIPTION',
+          'Set the plan through PUT /admin/stores/:id/subscription (planCode); the tier follows it'
+        );
+      }
       await closeClaimsOnSlugGrant(req.user!.userId, slug);
 
       // Pre-read so a slug change can bust the OLD slug's cache key too.
@@ -978,7 +1000,6 @@ router.put(
         data: {
           ...(name !== undefined && { name }),
           ...(slug !== undefined && { slug }),
-          ...(plan !== undefined && { plan }),
           ...(status !== undefined && { status }),
         },
         ...(onHub
@@ -1024,7 +1045,6 @@ router.put(
         details: {
           ...(name !== undefined && { name }),
           ...(slug !== undefined && { slug }),
-          ...(plan !== undefined && { plan }),
           ...(status !== undefined && { status }),
         },
         ip: req.ip,
