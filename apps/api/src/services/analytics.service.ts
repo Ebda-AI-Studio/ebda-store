@@ -140,6 +140,9 @@ interface DashboardStats {
   revenueChange: number;
   ordersChange: number;
   customersChange: number;
+  /** Previous-period revenue/orders, so a client can tell "up 100%" from "first sales" (previous = 0). */
+  previousRevenue: number;
+  previousOrders: number;
   /**
    * Sum of (price - costPrice) * quantity over the period's order lines that
    * carry a cost snapshot (orders not cancelled/refunded). `null` when lines
@@ -346,6 +349,8 @@ export class AnalyticsService {
       revenueChange: Math.round(revenueChange * 10) / 10,
       ordersChange: Math.round(ordersChange * 10) / 10,
       customersChange: Math.round(customersChange * 10) / 10,
+      previousRevenue: prevStats.revenue,
+      previousOrders: prevStats.orders,
       totalProfit: currentStats.profit,
       profitItemsMissingCost: currentStats.itemsMissingCost,
       profitRevenueMissingCost: currentStats.revenueMissingCost,

@@ -13,6 +13,7 @@ import { buildStorefrontCsp } from './src/lib/csp';
 // global alias would be ambiguous across apps/{web,admin,api,orders}).
 // Zero behavior change — Next.js resolves both forms identically.
 import { devSuffixesAllowed } from './src/lib/platform-host';
+import { loginAliasRedirect } from './src/lib/login-alias';
 import { studioHostResponse } from './studio-host';
 import { DEMO_LOOK_HEADER, parseDemoLook } from './src/lib/demo-look-param';
 import {
@@ -391,6 +392,28 @@ function handleStoreHost(
     const url = request.nextUrl.clone();
     url.pathname = '/api/store-favicon';
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+  }
+
+  // `/login`, `/account/login`, `/ar/login`, `/ar/account/login` are guessed URLs: the real sign-in is `/auth/login`.
+  // A permanent redirect, `returnTo` kept; a language prefix on the guess becomes the language cookie (as QA-C6).
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const alias = loginAliasRedirect(request.nextUrl.pathname, request.nextUrl.search);
+    if (alias) {
+      const target = request.nextUrl.clone();
+      target.pathname = '/auth/login';
+      target.search = request.nextUrl.search;
+      const redirectResponse = NextResponse.redirect(target, 308);
+      if (alias.locale) {
+        redirectResponse.cookies.set('force-language', alias.locale, {
+          path: '/',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 365,
+          secure: request.nextUrl.protocol === 'https:',
+        });
+        redirectResponse.headers.set('Cache-Control', 'private, no-store');
+      }
+      return redirectResponse;
+    }
   }
 
   // Language in the URL (Ruling LOCALE-PATHS-1): only for a store that opted in, never inside the admin preview

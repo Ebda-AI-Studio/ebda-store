@@ -27,6 +27,7 @@ import { apiGet } from '../../lib/api';
 import { useT } from '@/i18n/useT';
 import { formatSpend } from '@/lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
+import { useAuth } from '../../lib/auth';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -55,11 +56,13 @@ function SpendFigure({
   unpriced,
   t,
   size,
+  showFloor,
 }: {
   micros: number | null | undefined;
   unpriced: number;
   t: ReturnType<typeof useT>;
   size: 'sm' | 'lg';
+  showFloor: boolean;
 }) {
   return (
     <>
@@ -68,7 +71,8 @@ function SpendFigure({
       >
         {micros == null ? '—' : formatSpend(micros)}
       </p>
-      {unpriced > 0 && (
+      {/* Cost-accounting internals: only the platform team reads this, never a merchant. */}
+      {showFloor && unpriced > 0 && (
         <p className="text-xs text-warning-ink">
           {t('spendUnpriced', { count: unpriced.toLocaleString(undefined, withNumerals()) })}
         </p>
@@ -175,6 +179,8 @@ export function AiUsageSummaryCard({
   onLoaded,
 }: AiUsageSummaryCardProps) {
   const t = useT('components.aiUsageSummaryCard');
+  const { user } = useAuth();
+  const showFloor = user?.role === 'super_admin';
   const [summary, setSummary] = useState<AiUsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -314,6 +320,7 @@ export function AiUsageSummaryCard({
                   unpriced={summary.monthUnpricedCount ?? 0}
                   t={t}
                   size="sm"
+                  showFloor={showFloor}
                 />
               </div>
             </div>
@@ -402,6 +409,7 @@ export function AiUsageSummaryCard({
             unpriced={summary.todayUnpricedCount ?? 0}
             t={t}
             size="lg"
+            showFloor={showFloor}
           />
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
@@ -411,6 +419,7 @@ export function AiUsageSummaryCard({
             unpriced={summary.monthUnpricedCount ?? 0}
             t={t}
             size="lg"
+            showFloor={showFloor}
           />
         </div>
       </div>
