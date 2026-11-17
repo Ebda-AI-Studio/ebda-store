@@ -325,6 +325,13 @@ class NotificationDispatcherService {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: event_disabled');
     } else if (!this.hasValidCredentials(pushConfig, 'push', storeId)) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: not_configured');
+    } else if (isPromotionalSmsEvent && !data.customerId) {
+      // A promotional push is addressed to ONE shopper and carries their name and cart; with no recipient it would be a
+      // store-wide broadcast to every subscribed device (other shoppers, the orders app). Unknown recipient: no send.
+      logger.debug(
+        { storeId, event },
+        '[NotificationDispatcher] Push skipped: promotional_no_recipient'
+      );
     } else if (!(await this.checkRateLimit(storeId, 'push'))) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] Push skipped: rate_limited');
     } else {
@@ -334,10 +341,14 @@ class NotificationDispatcherService {
         const title = pushTemplate.title[locale];
         const body = renderPushBody(pushTemplate.body[locale], data, locale);
 
-        await pushService.sendToStore(storeId, title, body, {
-          event,
-          orderNumber: data.orderNumber,
-        });
+        await pushService.sendToStore(
+          storeId,
+          title,
+          body,
+          { event, orderNumber: data.orderNumber },
+          // promotional events reach only the addressed shopper's own devices (their subscription is their opt-in)
+          isPromotionalSmsEvent ? { customerId: data.customerId! } : undefined
+        );
 
         logger.info({ storeId, event }, '[NotificationDispatcher] Push dispatched');
       } catch (err) {

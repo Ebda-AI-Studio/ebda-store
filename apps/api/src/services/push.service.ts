@@ -58,7 +58,9 @@ class PushService {
     storeId: string,
     title: string,
     body: string,
-    data?: Record<string, unknown>
+    data?: Record<string, unknown>,
+    /** One shopper's own storefront devices only (a message addressed to a person, never a store-wide broadcast). */
+    recipient?: { customerId: string }
   ): Promise<void> {
     // 1. VAPID must be configured platform-wide
     if (!vapidConfigured) {
@@ -91,7 +93,9 @@ class PushService {
     // proxy threw PostgresRemovedError there on the Worker, so every dispatched push failed (Ruling NZ-D23).
     const subscriptions = await withStoreRw(storeId, tx =>
       tx.pushSubscription.findMany({
-        where: { storeId },
+        where: recipient
+          ? { storeId, customerId: recipient.customerId, audience: 'storefront' }
+          : { storeId },
         select: { id: true, endpoint: true, p256dh: true, auth: true },
       })
     );

@@ -4351,7 +4351,7 @@
     },
     "emailNudge": {
       "title": "Get abandoned carts back by email",
-      "body": "One email per cart, sent as your store and only to shoppers who opted in to your newsletter. The reminder steps below (up to 3 reminders by message and notification) are separate. The email is off until you turn it on.",
+      "body": "One email per cart, sent as your store and only to shoppers who opted in to your newsletter. The reminder steps below (up to 3 reminders by message and notification) are separate, and reach only shoppers who agreed to them. The email is off until you turn it on.",
       "review": "Review settings",
       "dismiss": "Not now"
     }

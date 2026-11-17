@@ -1201,6 +1201,7 @@ export class InventoryService {
         notificationDispatcher.dispatch(storeId, 'back_in_stock', {
           customerName,
           customerPhone: user.phone ?? undefined,
+          customerId: user.id,
           orderNumber: '', // not applicable
           // One SMS per shopper per product per restock day. Without it every
           // back-in-stock SMS of the store shared ONE idempotency key.

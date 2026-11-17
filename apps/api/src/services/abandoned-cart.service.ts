@@ -530,6 +530,7 @@ class AbandonedCartService {
     const notificationData: NotificationData = {
       customerName,
       customerPhone: abandonedCart.customerPhone ?? undefined,
+      customerId: abandonedCart.customerId ?? undefined,
       orderNumber: abandonedCart.id, // no order number at abandonment stage; use record ID
       storeId,
       storeName: abandonedCart.store?.name ?? '',

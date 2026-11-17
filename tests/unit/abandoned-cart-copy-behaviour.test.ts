@@ -34,6 +34,9 @@ describe('abandoned carts: copy matches what the sender does', () => {
     expect(nudge(en)).toMatch(/up to 3 reminders/);
     expect(nudge(ar)).toContain('بريد واحد');
     expect(nudge(ar)).toContain('3 تذكيرات');
+    // consent per channel is pinned in abandoned-cart-step-consent.test.ts
+    expect(nudge(en)).toMatch(/only shoppers who agreed/);
+    expect(nudge(ar)).toContain('للعملاء اللي وافقوا');
   });
 });
 
