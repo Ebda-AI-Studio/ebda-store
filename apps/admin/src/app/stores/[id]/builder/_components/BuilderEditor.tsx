@@ -16,6 +16,7 @@
 import { Button } from '@/components/ui/Button';
 import { navItemClasses } from '@/components/ui/tokens';
 import { ResizablePane } from './ResizablePane';
+import { applyAiPatchToDraft } from './apply-ai-patch';
 import { PANE_BOUNDS } from '../_lib/pane-width';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -122,7 +123,7 @@ export function BuilderEditor({
 }) {
   const t = useT('builder');
   const locale = useLocale();
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError, addToast } = useToast();
   const b = useBuilderDocument(storeId, pageKey);
   const isHome = pageKey === 'home';
   const [store, setStore] = useState<StoreInfo | null>(null);
@@ -550,9 +551,16 @@ export function BuilderEditor({
       // One undo step, then the normal draft save: a hand edit and an AI edit are the same thing to the page.
       const candidate = patchPreview.candidate;
       setPatchPreview(null);
-      b.replaceDocument(candidate);
-      if (await b.saveDraftNow()) toastSuccess(t('aiPatch.applied'));
-      else setPatchError(t('aiPatch.failed'));
+      const saved = await applyAiPatchToDraft({
+        candidate,
+        replaceDocument: b.replaceDocument,
+        saveDraftNow: b.saveDraftNow,
+        undo: b.undo,
+        addToast,
+        appliedLabel: t('aiPatch.applied'),
+        undoLabel: t('aiPatch.undo'),
+      });
+      if (!saved) setPatchError(t('aiPatch.failed'));
     } finally {
       setPatchBusy(null);
     }
