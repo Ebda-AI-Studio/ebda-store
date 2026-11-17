@@ -97,6 +97,7 @@ import {
   type ImportVariantRow,
 } from './catalog-import';
 import { ensureBarcode, generateMissingBarcodes } from './barcode';
+import { runDoMetric } from './do-metrics';
 import {
   analyticsCashflowOp,
   analyticsCustomersOp,
@@ -306,6 +307,7 @@ export type MoneyOpName =
   | 'analyticsCustomers'
   | 'analyticsRepeatBuyers'
   | 'analyticsLowStock'
+  | 'doMetric'
   | 'analyticsStock'
   | 'analyticsCashflow'
   | 'taxReportLines'
@@ -448,6 +450,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'analyticsCustomers',
   'analyticsRepeatBuyers',
   'analyticsLowStock',
+  'doMetric',
   'analyticsStock',
   'analyticsCashflow',
   'taxReportLines',
@@ -974,6 +977,8 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   analyticsCustomers: (db, storeId, a) => analyticsCustomersOp(db, storeId, a),
   analyticsRepeatBuyers: (db, storeId, a) => analyticsRepeatBuyersOp(db, storeId, a),
   analyticsLowStock: (db, storeId, a) => analyticsLowStockOp(db, storeId, a),
+  /** Operator metric (do-metrics.ts, Ruling DO-METRICS-1): read-only, count-only, allow-listed by NAME. */
+  doMetric: (db, _storeId, a) => runDoMetric(db, a),
   analyticsStock: (db, storeId) => analyticsStockOp(db, storeId),
   analyticsCashflow: (db, storeId, a) => analyticsCashflowOp(db, storeId, a),
   taxReportLines: (db, storeId, a) => taxReportLinesOp(db, storeId, a),

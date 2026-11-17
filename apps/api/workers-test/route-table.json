@@ -80,6 +80,7 @@
   "GET /admin/ci/insights",
   "GET /admin/customers",
   "GET /admin/dashboard",
+  "GET /admin/do-metrics",
   "GET /admin/email-queue/failed",
   "GET /admin/export/orders",
   "GET /admin/export/orders.xlsx",

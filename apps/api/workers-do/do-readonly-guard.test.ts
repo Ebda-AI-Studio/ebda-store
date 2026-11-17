@@ -68,6 +68,18 @@ describe('StoreDO read-only enforcement at runtime (DO-METRICS-1 spike)', () => 
     });
   });
 
+  it('total_changes() works on workerd and moves on a write (the doMetric rollback guard reads it)', async () => {
+    await inDo('ro-total-changes', (sql, s) => {
+      const tc = () => Number(sql.exec('SELECT total_changes() AS c').one().c);
+      const before = tc();
+      expect(tc()).toBe(before);
+      s.storage.transactionSync(() =>
+        sql.exec("INSERT INTO metric_spike (v) VALUES ('t')").toArray()
+      );
+      expect(tc()).toBeGreaterThan(before);
+    });
+  });
+
   it('ROLLBACK GUARD: running the statement inside transactionSync and throwing when rowsWritten > 0 undoes an INSERT and a multi-statement DELETE', async () => {
     await inDo('ro-guard', (sql, s) => {
       const run = (query: string) => () =>
