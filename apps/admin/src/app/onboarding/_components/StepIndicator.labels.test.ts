@@ -4,6 +4,9 @@ import en from '../../../i18n/messages/en.json';
 import ar from '../../../i18n/messages/ar.json';
 import { STEP_ORDER } from './types';
 
+const stepsOf = (messages: unknown) =>
+  (messages as { onboarding: { flow: { steps: Record<string, string> } } }).onboarding.flow.steps;
+
 describe('onboarding stepper labels', () => {
   for (const [name, messages] of [
     ['ar', ar],
@@ -20,8 +23,8 @@ describe('onboarding stepper labels', () => {
   }
 
   it('the two payment steps say which payment they mean', () => {
-    const a = (ar as any).onboarding.flow.steps;
-    const e = (en as any).onboarding.flow.steps;
+    const a = stepsOf(ar);
+    const e = stepsOf(en);
     expect([a.billing, a.payment]).toEqual(['دفع الباقة', 'طرق دفع عملائك']);
     expect([e.billing, e.payment]).toEqual(['Plan payment', 'Customer payments']);
   });
