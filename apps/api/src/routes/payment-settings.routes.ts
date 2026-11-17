@@ -523,6 +523,7 @@ router.put(
           provider,
           mode: (data.testMode ?? existing.testMode) === false ? 'live' : 'sandbox',
           revert: async () => {
+            const w = await storeWriter(storeId);
             await w.paymentConfig.update({
               where: { id: existing.id, storeId },
               data: { isEnabled: false },
