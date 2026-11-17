@@ -359,6 +359,17 @@ describe('trust details (audit UI-2, UI-9)', () => {
   });
 });
 
+describe('storefront probes measure the page, not a redirect hop', () => {
+  // Unprefixed storefront URLs 308 to /ar|/en (a second Worker round trip, 41 % of probe latency, measured 2026-11-15).
+  for (const id of ['storefront', 'storefront-product']) {
+    it(`${id} probes the locale-prefixed URL directly`, () => {
+      const c = COMPONENTS.find(x => x.id === id);
+      expect(c).toBeDefined();
+      expect(new URL(c!.url).pathname).toMatch(/^\/(ar|en)(\/|$)/);
+    });
+  }
+});
+
 describe('manual incidents (authenticated POST)', () => {
   const post = (path: string, payload: unknown, secret?: string) =>
     worker.fetch(

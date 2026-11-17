@@ -8,6 +8,7 @@ import {
   relativeProblems,
 } from '../../scripts/ci/worker-startup-budget.mjs';
 import budget from '../../scripts/ci/worker-startup-budget.json';
+import webBudget from '../../scripts/ci/worker-startup-budget-web.json';
 
 const ok = { startupCpuMs: 90, bundleBytes: 7_518_999, bundleGzipBytes: 2_171_018 };
 
@@ -103,5 +104,20 @@ describe('banned bundle inputs (Ruling BUNDLE-BUDGET-9)', () => {
   });
   it('a metafile without worker.js never passes', () => {
     expect(bannedInputProblems({ outputs: {} })).toHaveLength(1);
+  });
+});
+
+describe('storefront (web) Worker budget, Ruling WEB-COLD-3', () => {
+  const after = { startupCpuMs: 38.6, bundleBytes: 16_070_960, bundleGzipBytes: 3_221_014 };
+  it('the slimmed bundle passes', () => {
+    expect(budgetProblems(after, webBudget)).toEqual([]);
+  });
+  it('the old bundle (22.8 MB raw, 4.7 MB gzip, @sentry/nextjs in the server graph) fails both size gates', () => {
+    expect(
+      budgetProblems(
+        { startupCpuMs: 38, bundleBytes: 22_813_353, bundleGzipBytes: 4_715_303 },
+        webBudget
+      )
+    ).toHaveLength(2);
   });
 });

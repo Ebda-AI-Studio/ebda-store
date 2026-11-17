@@ -1,3 +1,4 @@
+import { assertStoreOperational } from '../lib/store-operational';
 import { deliverableOnly } from '../lib/undeliverable-email';
 import { withStore } from '@ebda/database';
 import { resolveSender, type StoreSenderShape } from './email-sender';
@@ -59,8 +60,12 @@ export class StoreMailer {
    *   (at-least-once; the recipient-status check closes most of that gap).
    */
   static async sendMarketingEmail(
-    store: StoreSenderShape,
+    store: StoreSenderShape & { id: string },
     opts: {
+      /** A test send to the merchant's OWN address: transactional to the merchant, so it is not refused for a suspended store. */
+      toMerchant?: boolean;
+      /** The caller already checked `storeOperational` for this whole batch (campaign-send): skip the per-message lookup. */
+      operationalChecked?: boolean;
       to: string;
       subject: string;
       html: string;
@@ -68,6 +73,9 @@ export class StoreMailer {
       idempotencyKey?: string;
     }
   ): Promise<{ id: string }> {
+    // Ruling SUSPEND-OUT-1: no marketing mail for a store that is not `active` (the one chokepoint of every campaign,
+    // cart-recovery and test-to-subscriber send). The caller treats a thrown error as a failed send.
+    if (!opts.toMerchant && !opts.operationalChecked) await assertStoreOperational(store.id);
     const sender = resolveSender(store);
     return sendMail({
       from: sender.from,
@@ -101,6 +109,8 @@ export class StoreMailer {
   ): Promise<{ ids: string[]; error?: string }> {
     if (opts.messages.length === 0) return { ids: [] };
     if (opts.messages.length > 100) throw new Error('A branded batch accepts at most 100 emails');
+    // Ruling SUSPEND-OUT-1: the newsletter broadcast is marketing to subscribers.
+    await assertStoreOperational(storeId);
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },

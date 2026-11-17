@@ -15,6 +15,10 @@ export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
   'billing.pay-card': { secret: 'card details' },
   'payment.card-providers': { secret: 'provider API keys' },
   'payment.instapay-merchant': { secret: 'provider credentials' },
+  'onboarding.slug-claim': {
+    secret:
+      'proof-of-ownership evidence (document link) for a protected address; filed before a store exists, so it has no store for the assistant to act in',
+  },
 };
 
 /** Capabilities another plan owns on this same engine, with who owns them. Not a hole: the owning plan registers the tools. */

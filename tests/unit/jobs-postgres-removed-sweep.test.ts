@@ -116,6 +116,8 @@ describe('ci-outcomes onboarding step on a Worker with no Postgres', () => {
       ownerSignupAt: new Date('2026-10-01T00:00:00.000Z'),
       template: 'souq',
       ciSharing: true,
+      ownerId: OWNER,
+      isDemo: false,
     });
     const sharing = await runWithRequestDb(
       () => createPostgresRemovedClient(),
