@@ -26,6 +26,8 @@ vi.mock('@ebda/database', () => ({
   withUser: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({
       store: { count: m.count },
+      // the owner's store-limit grant (owner-store-limit.ts): none here, so the default cap of 3 applies
+      trustRequest: { findMany: async () => [] },
       user: {
         findUnique: async () => ({
           email: 'o@x.com',

@@ -651,6 +651,7 @@ export const stores = sqliteTable('stores', {
   storageBackend: text('storage_backend', { enum: ['pg', 'do'] })
     .notNull()
     .default('pg'),
+  templateOriginal: text('template_original'),
 });
 
 export const systemSettings = sqliteTable('system_settings', {
@@ -662,6 +663,32 @@ export const systemSettings = sqliteTable('system_settings', {
   value: text('value', { mode: 'json' }).$type<unknown>().notNull(),
   category: text('category').notNull().default('general'),
   isPublic: integer('is_public', { mode: 'boolean' }).notNull().default(false),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),
+});
+
+export const trustRequests = sqliteTable('trust_requests', {
+  id: text('id')
+    .primaryKey()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+  kind: text('kind').notNull(),
+  storeId: text('store_id'),
+  userId: text('user_id'),
+  topic: text('topic'),
+  message: text('message'),
+  pageUrl: text('page_url'),
+  slug: text('slug'),
+  evidenceUrl: text('evidence_url'),
+  status: text('status').notNull().default('open'),
+  rejectedAt: integer('rejected_at', { mode: 'timestamp_ms' }),
+  capDay: text('cap_day'),
+  capSlot: integer('cap_slot'),
+  grantedLimit: integer('granted_limit'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`),

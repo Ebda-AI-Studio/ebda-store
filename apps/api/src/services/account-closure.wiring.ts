@@ -6,6 +6,7 @@ import {
   mediaSurface,
   paymentsSurface,
   storeDoSurface,
+  vectorizeSurface,
   type ErasureEnv,
   type ErasureSurface,
   type IdentityPort,
@@ -14,10 +15,23 @@ import {
   type Subject,
 } from '../cf/erasure';
 import { ownedStoreIds } from '../lib/definer';
+import { purgeStoreVectors } from '../lib/search/purge-store-vectors';
 import { paymentsErasurePort } from './billing/payments-erasure';
 import { auditLog } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
+import { sendAlert } from './alerts.service';
+import { erasureEnabled } from '../cf/erasure';
 import type { ClosureDeps } from './account-closure.service';
+
+/** S3: the live state of the PDPL erasure flag, for the deep health check (it was invisible: unset everywhere). */
+export function erasureFlagState(): 'enabled' | 'disabled' {
+  const b = cfBindings() as ErasureEnv | undefined;
+  return erasureEnabled({
+    PDPL_CF_ERASURE_ENABLED: b?.PDPL_CF_ERASURE_ENABLED ?? process.env.PDPL_CF_ERASURE_ENABLED,
+  })
+    ? 'enabled'
+    : 'disabled';
+}
 
 /**
  * The production wiring of the closure trigger: the surfaces the erasure job runs, from the Worker bindings. A surface
@@ -50,9 +64,12 @@ export function closureDeps(req: Request): ClosureDeps {
       paymentsSurface(paymentsErasurePort, storesOf),
       mediaSurface(need(env.MEDIA_BUCKET as R2BucketLike | undefined, 'MEDIA_BUCKET')),
       ciSurface(need(env.CI_BUCKET as R2BucketLike | undefined, 'CI_BUCKET')),
+      vectorizeSurface(purgeStoreVectors),
       identity(),
     ],
     staffSurfaces: () => [identity()],
+    alert: (title, body) =>
+      sendAlert({ level: 'p1', scope: 'platform', source: 'account.closure', title, body }),
     recordRequest: async (userId, requestId, stores) => {
       await auditLog({
         action: 'account.closure.requested',

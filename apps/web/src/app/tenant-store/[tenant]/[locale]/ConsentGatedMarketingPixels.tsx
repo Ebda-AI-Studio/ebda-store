@@ -7,7 +7,7 @@ import { readMarketingConsentFromCookie } from '@/lib/consent-cookie';
 
 /**
  * Track-A (tenant-cacheable) consent gate — Phase 1 of
- * docs/plans/2026-07-12-tenant-cacheable-routing.md, dormant while
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md, dormant while
  * `STOREFRONT_TENANT_ROUTING` is off (this whole route tree is unreachable
  * until the flag flips — see `middleware.ts`).
  *

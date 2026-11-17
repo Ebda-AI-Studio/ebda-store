@@ -1,0 +1,31 @@
+{
+  "id": "account.verify-email",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تفعيل الايميل",
+  "titleEn": "Verify email address",
+  "screens": ["/verify-email"],
+  "api": ["POST /auth/verify-email", "POST /auth/resend-verification"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["public"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "create-your-store",
+  "questions": {
+    "ar": ["لينك التفعيل منتهي"],
+    "en": ["My verification link expired"]
+  },
+  "steps": ["Resend from the page."],
+  "edgeCases": [
+    "Expired token",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

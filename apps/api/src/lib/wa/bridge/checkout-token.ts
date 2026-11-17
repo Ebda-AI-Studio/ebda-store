@@ -12,7 +12,18 @@ export const CHECKOUT_TTL_MS = 30 * 60 * 1000;
 export interface CheckoutPayload {
   storeId: string;
   items: Array<{ variantId: string; quantity: number }>;
-  buyerKey: string;
+  /** Per-store buyer id (WA-3): HMAC(storeId, suite buyerKey), NOT the suite key, so a link cannot be linked across stores. */
+  bk: string;
+}
+// Tokens minted before WA-3 carried the raw suite key as `buyerKey` (30 min TTL): they still verify (the MAC covers the whole
+// body, no field is required) and redeem never reads the buyer field, so in-flight links keep working.
+
+/** The per-store id of a buyer. One-way and domain separated: the suite key cannot be recovered from it. */
+export function storeBuyerId(storeId: string, suiteBuyerKey: string): string {
+  return createHmac('sha256', derivedSecret('ebda:wa-checkout-bk:v1'))
+    .update(`wa-checkout-bk:v1:${storeId}:${suiteBuyerKey}`)
+    .digest('hex')
+    .slice(0, 32);
 }
 
 const mac = (body: string) =>

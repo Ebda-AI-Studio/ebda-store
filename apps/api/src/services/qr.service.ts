@@ -10,7 +10,8 @@
 import { SlugEntityType, prisma, withStore } from '@ebda/database';
 import { storeDb } from '../lib/repo-factory';
 import { analyticsMoney, analyticsOnDo } from '../lib/analytics-backend';
-import { waMeLink, regionDayStart } from '@ebda/shared';
+import { waMeLink, regionDayKey } from '@ebda/shared';
+import { SentryService } from './sentry.service';
 import {
   DEFAULT_QR_SETTINGS,
   qrSettingsSchema,
@@ -95,17 +96,19 @@ export async function recordQrScan(
   ref: string,
   now: Date = new Date()
 ): Promise<boolean> {
-  const day = regionDayStart(now);
+  // Ruling ANALYTICS-DAY-1: UTC-midnight day key shared with the DO op contract and the readers.
+  const dayKeyMs = regionDayKey(now);
+  const day = new Date(dayKeyMs);
   try {
     // Ruling NZ-AN-1: a Durable Object store counts in its own DO once the analytics copy flipped
     const money = await analyticsMoney(storeId, 'write');
     if (money) {
       const prune = Math.floor(Math.random() * PRUNE_ONE_IN) === 0;
       await money.qrScanRecord({
-        dayMs: day.getTime(),
+        dayMs: dayKeyMs,
         kind,
         ref,
-        ...(prune ? { pruneBeforeMs: day.getTime() - QR_SCAN_RETENTION_DAYS * 86_400_000 } : {}),
+        ...(prune ? { pruneBeforeMs: dayKeyMs - QR_SCAN_RETENTION_DAYS * 86_400_000 } : {}),
       });
       return true;
     }
@@ -127,6 +130,14 @@ export async function recordQrScan(
       { storeId, err: err instanceof Error ? err.message : 'unknown' },
       '[QR] scan not counted'
     );
+    try {
+      SentryService.captureException(err instanceof Error ? err : new Error(String(err)), {
+        tags: { area: 'analytics', op: 'qr-scan-record' },
+        extra: { storeId, kind },
+      });
+    } catch {
+      /* reporting must never break the shopper redirect */
+    }
     return false;
   }
 }
@@ -141,7 +152,7 @@ export type QrStatRow = {
 
 /** Scans per code over the last `days` days, with product/category names for the admin list. */
 export async function qrStats(storeId: string, days: number): Promise<QrStatRow[]> {
-  const since = new Date(regionDayStart().getTime() - (days - 1) * 86_400_000);
+  const since = new Date(regionDayKey() - (days - 1) * 86_400_000);
   // Ruling NZ-AN-1: the DO when this store's analytics moved, else Postgres (both answer the same groupBy)
   const reader = (await analyticsOnDo(storeId, 'read')) ? await storeDb(storeId) : prisma;
   const rows = await reader.qrScanDaily.groupBy({

@@ -7,7 +7,7 @@ const CONSENT_COOKIE_NAME = 'force-cookie-consent';
  * so it can be used by components that mount before `ConsentProvider` has
  * synced, e.g. the tenant-cacheable routing tree's
  * `ConsentGatedMarketingPixels` (see
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6).
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6).
  */
 export function readMarketingConsentFromCookie(): boolean {
   if (typeof document === 'undefined') return false;

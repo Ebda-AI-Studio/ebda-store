@@ -22,7 +22,7 @@ export { resolveBannerLink };
 
 /**
  * Stretched-link wrapper implementing the "banner link" feature
- * (docs/plans/2026-07-04-hero-banner-link.md): when a hero slide has an
+ * (docs/plans/done/2026-07-04-hero-banner-link.md): when a hero slide has an
  * optional `link` set, the whole slide becomes a clickable marketing
  * banner. The slide's own CTA button keeps its own destination and wins
  * the click because it renders with `relative z-10` (see the CTA `<Link>`

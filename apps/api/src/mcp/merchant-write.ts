@@ -4,10 +4,8 @@ import { withStore } from '@ebda/database';
 import { runInStoreTenantContext } from '../lib/store-scoped-read';
 import type { FeatureKey } from '@ebda/shared';
 import { featureService } from '../services/feature.service';
-import { auditLog } from '../middleware/security';
-import { hasPermission, type Permission, type Role } from '../middleware/rbac';
+import type { Permission, Role } from '../middleware/rbac';
 import { AppError } from '../middleware/error-handler';
-import { insertAuditLog } from '../lib/definer';
 import logger from '../lib/logger';
 import {
   MERCHANT_SCOPES,
@@ -23,6 +21,7 @@ import {
   CONFIRM_TOKEN_TTL_MS,
 } from './merchant-confirm-token';
 import type { McpStore } from './resolve-store';
+import { assertMerchantMay, writeMerchantAudit } from './run-as-merchant';
 import { ok } from './tools/tool-result';
 
 /**
@@ -162,40 +161,25 @@ async function auditPhase(
   extra?: Record<string, unknown>,
   strict = false
 ): Promise<void> {
-  const resourceId = spec.audit.resourceId?.(args, result);
-  const details = {
-    ...(spec.audit.details?.(args, result) ?? {}),
-    ...extra,
-    phase,
-    tool: spec.name,
-    actor: 'mcp',
-    keyId: ctx.auth.keyId,
-  };
-  if (strict) {
-    // Throws on failure — the caller turns that into a refused write.
-    await insertAuditLog({
-      action: spec.audit.action,
-      userId: ctx.auth.userId,
+  await writeMerchantAudit(
+    {
       storeId: ctx.store.id,
-      resourceType: spec.audit.resourceType,
-      resourceId,
+      userId: ctx.auth.userId,
+      tool: spec.name,
+      actor: 'mcp',
+      audit: {
+        action: spec.audit.action,
+        resourceType: spec.audit.resourceType,
+        resourceId: spec.audit.resourceId?.(args, result),
+      },
+      details: spec.audit.details?.(args, result),
       ip: ctx.auth.ip,
       userAgent: ctx.auth.userAgent,
-      details,
-    });
-    return;
-  }
-  await auditLog({
-    action: spec.audit.action,
-    userId: ctx.auth.userId,
-    storeId: ctx.store.id,
-    resourceType: spec.audit.resourceType,
-    resourceId,
-    ip: ctx.auth.ip,
-    userAgent: ctx.auth.userAgent,
-    details,
-  }).catch(err =>
-    logger.error({ err, action: spec.audit.action, phase }, '[mcp write] post-write audit failed')
+      stamp: { keyId: ctx.auth.keyId },
+    },
+    phase,
+    extra,
+    strict
   );
 }
 
@@ -241,29 +225,18 @@ export function registerMerchantWriteTool<S extends ZodRawShape>(
       }
       await assertMerchantWriteEnabled(store.id, spec.name);
 
-      // 2. RBAC of the owning user + the route's feature gate. A platform super_admin never
-      //    runs a store's own workflow (ORDER-MONEY-SUPERADMIN), so its keys are refused.
-      if (auth.role === 'super_admin') {
-        throw new Error(
-          `FORBIDDEN: ${spec.name}: MCP write tools are not available to platform super-admin keys.`
-        );
-      }
-      if (spec.permission && !hasPermission(auth.role as Role, spec.permission)) {
-        throw new Error(
-          `FORBIDDEN: ${spec.name} needs the "${spec.permission}" permission; the key's owner (${auth.role}) lacks it.`
-        );
-      }
-      if (spec.roles && !spec.roles.includes(auth.role as Role)) {
-        throw new Error(
-          `FORBIDDEN: ${spec.name} is limited to ${spec.roles.join(' / ')}; the key's owner is ${auth.role}.`
-        );
-      }
+      // 2. RBAC of the owning user + the route's feature gate (shared with the assistant: run-as-merchant.ts). A platform
+      //    super_admin never runs a store's own workflow (ORDER-MONEY-SUPERADMIN), so its keys are refused there.
+      await assertMerchantMay({
+        storeId: store.id,
+        userId: auth.userId,
+        role: auth.role,
+        tool: spec.name,
+        permission: spec.permission,
+        roles: spec.roles,
+        feature: spec.feature,
+      });
       spec.extraAuthorize?.(args, auth);
-      if (spec.feature && !(await featureService.isFeatureEnabled(store.id, spec.feature))) {
-        throw new Error(
-          `FORBIDDEN: ${spec.name} needs the "${spec.feature}" feature, which is not enabled for this store.`
-        );
-      }
 
       const ctx: WriteToolContext = {
         store,

@@ -19,8 +19,7 @@ export const STORE_EXTRA_RESERVED_SLUGS = [
   'studio',
   'checkin',
   'manage',
-  // coming-soon software with a coming-soon page at <label>.ebda.app (Ruling SUBDOMAIN-SOON-2): Ebda Invite, Ebda Ads,
-  // Ebda Quote Studio (`quote` and its BRAND id `quote-studio`)
+  // labels held back from store slugs; they answer the neutral reserved page, never a "coming soon" page
   'invite',
   'ads',
   'quote',
