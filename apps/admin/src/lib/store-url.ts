@@ -26,3 +26,14 @@ export function getPlatformStoreUrl(slug: string): string {
 export function getStoreHref(store: StoreUrlInput): string {
   return storefrontOrigin(store);
 }
+
+/**
+ * The origin the editor's preview frame loads: ALWAYS `https://<slug>.ebda.app`, never the custom domain. Every
+ * store has that origin, the admin's frame-src allows `https://*.ebda.app` on every route, and it keeps the
+ * postMessage origin check pinned to one known host whatever the merchant's domain does (Controller design note
+ * 2026-11-15; the web middleware does not redirect a slug host to a custom domain: `routeByHost` serves
+ * `subdomain` hosts directly).
+ */
+export function getBuilderPreviewOrigin(store: { slug: string }): string {
+  return storefrontOrigin({ slug: store.slug });
+}

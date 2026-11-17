@@ -5,7 +5,7 @@ import { EtaReceiptService, type ReturnEvent } from '../../../services/eta-recei
 import { withStoreRw } from '../../jobs/store-db';
 
 /**
- * Egypt ETA e-receipts (Ruling ETA-1, plan docs/plans/2026-10-07-egypt-vat-and-eta.md addendum).
+ * Egypt ETA e-receipts (Ruling ETA-1, plan docs/plans/done/2026-10-07-egypt-vat-and-eta.md addendum).
  *
  *  etaReceiptEnqueue  order/created, order/refunded -> writes the eta_receipts row (flag + connection
  *                     gated, so a store without the feature costs one cached flag read) and sends

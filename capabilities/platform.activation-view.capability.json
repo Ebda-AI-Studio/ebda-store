@@ -1,0 +1,36 @@
+{
+  "id": "platform.activation-view",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-15",
+  "titleAr": "متابعة تفعيل التجار (للفريق)",
+  "titleEn": "Merchant activation view (staff)",
+  "screens": ["/activation"],
+  "api": ["GET /admin/ci/activation", "GET /admin/ci/activation/funnel"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "read only"
+  },
+  "operatorReason": {
+    "code": "platform-config",
+    "text": "platform-wide read of how long stores take from signup to first order; ids and times only, no merchant or shopper data a merchant could act on",
+    "validUnderRule": true
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [
+      "إزاي أعرف التاجر وقف فين؟",
+      "كام يوم بياخد المتجر لحد أول طلب؟",
+      "مين التجار اللي محتاجين مساعدة؟"
+    ],
+    "en": ["Where did a merchant get stuck on the way to the first order?"]
+  },
+  "steps": ["Super admin: open Merchant activation to see the funnel and where a store stopped"],
+  "edgeCases": ["Ids and times only"],
+  "gaps": []
+}

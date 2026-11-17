@@ -2,6 +2,7 @@
  * Ruling NZ-BACKUP-1: the off-Cloudflare backup + restore drill. wrangler, age and R2 are replaced by fakes; the pipeline, tiers,
  * skip-if-unchanged, size guard, checksums and the drill's negative controls run for real.
  */
+import { randomBytes } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../apps/api/src/lib/logger', () => ({
@@ -74,6 +75,69 @@ describe('tiers + keychain + size guard (pure)', () => {
     expect(B.sizeProblems({ uploaded: 50 * MB, history: [MB], total: 1, cap: 1e9 })).toHaveLength(
       0
     ); // too little history
+  });
+});
+
+describe('size guard compares like with like on a weekly day', () => {
+  const rnd = (n: number) => randomBytes(n).toString('hex'); // incompressible-ish, so bytes are real
+  const sat = at('2026-11-14');
+  const sun = at('2026-11-15');
+  async function sundayWith(payload: string, dailyMedian: number) {
+    const b = bucket();
+    b.m.set(
+      'cf/ledger.json',
+      Buffer.from(
+        JSON.stringify({
+          objects: {},
+          last: {},
+          runs: [1, 2, 3, 4].map(i => ({
+            day: `2026-11-1${i - 1}`,
+            uploaded: dailyMedian,
+            daily: dailyMedian,
+          })),
+        })
+      )
+    );
+    return B.runBackup({ io: mkIo(b, { d1: payload, store: payload }), now: sun });
+  }
+  it('Sunday with daily bytes equal to the median passes although weekly doubles the upload', async () => {
+    const payload = rnd(400_000);
+    const sample = await B.runBackup({
+      io: mkIo(bucket(), { d1: payload, store: payload }),
+      now: sat,
+    });
+    const D = sample.dailyUploadedBytes;
+    expect(D).toBeGreaterThan(B.GROWTH_FLOOR_BYTES);
+    const r = await sundayWith(payload, D);
+    expect(r.tiers).toEqual(['daily', 'weekly']);
+    expect(r.uploadedBytes).toBeGreaterThan(B.GROWTH_FACTOR * D); // the old guard compared this and false-alarmed
+    expect(r.dailyUploadedBytes).toBe(D);
+    expect(r.problems).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+  it('a real 2x+ jump in the daily bytes still fails on a Sunday', async () => {
+    const small = rnd(400_000);
+    const D = (await B.runBackup({ io: mkIo(bucket(), { d1: small, store: small }), now: sat }))
+      .dailyUploadedBytes;
+    const r = await sundayWith(rnd(1_400_000), D);
+    expect(r.ok).toBe(false);
+    expect(r.problems[0]).toMatch(/more than 2x the median/);
+  });
+  it('a ledger written before the daily field falls back to uploaded', async () => {
+    const b = bucket();
+    b.m.set(
+      'cf/ledger.json',
+      Buffer.from(
+        JSON.stringify({
+          objects: {},
+          last: {},
+          runs: [1, 2, 3].map(i => ({ day: `2026-11-0${i}`, uploaded: 2e6 })),
+        })
+      )
+    );
+    const p = rnd(3_000_000);
+    const r = await B.runBackup({ io: mkIo(b, { d1: p, store: p }), now: at('2026-11-04') });
+    expect(r.ok).toBe(false);
   });
 });
 

@@ -51,11 +51,11 @@ const FIXED_DATE = '2026-07-20';
 
 function mockClient(
   impl: (siteUrl: string, startDate: string, endDate: string) => Promise<GscResult>,
-  forms: string[] = ['sc-domain:example.com', 'https://example.com/']
+  target: { siteUrl: string; pageHost?: string } | null = { siteUrl: 'sc-domain:example.com' }
 ): GscClientLike & { queryMock: ReturnType<typeof vi.fn> } {
   const queryMock = vi.fn(impl);
   return {
-    gscSiteUrlsForDomain: () => forms,
+    resolveGscTarget: async () => target,
     querySearchAnalytics: queryMock,
     queryMock,
   };
@@ -195,25 +195,47 @@ describe('runGscIngest', () => {
     expect(rows[0].topQueries).toEqual([{ query: 'updated query', impressions: 10, clicks: 1 }]);
   });
 
-  it('a store with NO domain is skipped — zero rows, the GSC client is never called', async () => {
-    const client = mockClient(async () => CANNED_RESULT);
+  it('a store with NO custom domain is queried by its <slug>.ebda.app host (parent-property page filter)', async () => {
+    const hosts: string[] = [];
+    const client: GscClientLike & { queryMock: ReturnType<typeof vi.fn> } = {
+      resolveGscTarget: async host => {
+        hosts.push(host);
+        return { siteUrl: 'sc-domain:ebda.app', pageHost: host };
+      },
+      querySearchAnalytics: vi.fn(async () => CANNED_RESULT),
+      queryMock: vi.fn(),
+    };
 
     const result = await runGscIngest(noDomainStoreId, { client, date: FIXED_DATE });
-    expect(result).toEqual({ skipped: 'no_domain', date: FIXED_DATE });
-    expect(client.queryMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ date: FIXED_DATE });
+    expect(hosts).toHaveLength(1);
+    expect(hosts[0]).toMatch(/^gsc-ingest-no-domain-\d+\.ebda\.app$/);
+    expect(client.querySearchAnalytics).toHaveBeenCalledWith(
+      'sc-domain:ebda.app',
+      FIXED_DATE,
+      FIXED_DATE,
+      { pageHost: hosts[0] }
+    );
+  });
 
-    const rows = await prisma.gscDailyMetric.findMany({ where: { storeId: noDomainStoreId } });
+  it('a host no accessible property covers is skipped (no_access) — zero rows, never thrown', async () => {
+    const client = mockClient(async () => CANNED_RESULT, null);
+    const result = await runGscIngest(noDomainStoreId, { client, date: '2026-07-16' });
+    expect(result).toEqual({ skipped: 'no_access', date: '2026-07-16' });
+    expect(client.queryMock).not.toHaveBeenCalled();
+    const rows = await prisma.gscDailyMetric.findMany({
+      where: { storeId: noDomainStoreId, date: new Date('2026-07-16') },
+    });
     expect(rows.length).toBe(0);
   });
 
-  it('a client reporting GscNoAccessError on every property form is skipped — zero rows, no throw', async () => {
+  it('a property that 403s at query time is skipped — zero rows, no throw', async () => {
     const noAccessDate = '2026-07-19';
     await prisma.gscDailyMetric.deleteMany({ where: { storeId, date: new Date(noAccessDate) } });
 
-    const forms = ['sc-domain:no-access.example.com', 'https://no-access.example.com/'];
     const client = mockClient(async siteUrl => {
       throw new GscNoAccessError(siteUrl);
-    }, forms);
+    });
 
     let result: Awaited<ReturnType<typeof runGscIngest>> | undefined;
     await expect(
@@ -223,8 +245,7 @@ describe('runGscIngest', () => {
     ).resolves.not.toThrow();
 
     expect(result).toEqual({ skipped: 'no_access', date: noAccessDate });
-    // Tried BOTH forms before giving up.
-    expect(client.queryMock).toHaveBeenCalledTimes(forms.length);
+    expect(client.queryMock).toHaveBeenCalledTimes(1);
 
     const rows = await prisma.gscDailyMetric.findMany({
       where: { storeId, date: new Date(noAccessDate) },

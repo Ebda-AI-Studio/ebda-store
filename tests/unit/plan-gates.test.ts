@@ -1,5 +1,5 @@
 /**
- * Locked-pricing entitlement gates (docs/plans/2026-10-05-pricing-decisions.md).
+ * Locked-pricing entitlement gates (docs/plans/done/2026-10-05-pricing-decisions.md).
  * One block per lever, each proven at the SERVER write/resolve path:
  *   stores 1/1/3          assertOwnerMayCreateStore (StoreService.create, OnboardingService.createStore)
  *   branding removal      FeatureService layer -> `remove_branding` (storefront payload + customer email)

@@ -7,6 +7,7 @@ import { writeLimiter } from '../middleware/security';
 import { tenantContext } from '../middleware/tenant-context';
 import { catalogueMissRoute } from '../middleware/catalogue-miss';
 import { storeDb } from '../lib/repo-factory';
+import { purgeStorefrontBlog } from '../lib/public-cache';
 
 /**
  * Blog routes (Bucket E1, 2026-05-17).
@@ -22,7 +23,7 @@ import { storeDb } from '../lib/repo-factory';
  * Express does NOT populate req.params.storeId at the mount level.
  * router.param (below) sets RLS tenant context after Express resolves
  * :storeId for the matched route. See F2,
- * docs/plans/2026-07-02-rls-cutover.md.
+ * docs/plans/done/2026-07-02-rls-cutover.md.
  */
 const router = Router({ mergeParams: true });
 
@@ -166,6 +167,7 @@ router.post(
       const { storeId } = req.params;
       const payload = blogPostSchema.parse(req.body);
       const post = await BlogService.create(storeId, payload);
+      purgeStorefrontBlog(storeId);
       res.status(201).json({ success: true, data: { post } });
     } catch (error) {
       next(error);
@@ -187,6 +189,7 @@ router.put(
       const { storeId, postId } = req.params;
       const payload = blogPostPatchSchema.parse(req.body);
       const post = await BlogService.update(storeId, postId, payload);
+      purgeStorefrontBlog(storeId);
       res.json({ success: true, data: { post } });
     } catch (error) {
       next(error);
@@ -207,6 +210,7 @@ router.delete(
     try {
       const { storeId, postId } = req.params;
       await BlogService.remove(storeId, postId);
+      purgeStorefrontBlog(storeId);
       res.json({ success: true, data: { ok: true } });
     } catch (error) {
       next(error);

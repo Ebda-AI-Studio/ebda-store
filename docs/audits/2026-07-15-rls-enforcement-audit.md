@@ -95,7 +95,7 @@ when `20260609000000` re-`FORCE`'d them under the correct names (its own
 header comment documents this). This is exactly the migration-drift failure
 mode this audit was commissioned to watch for, and it already happened once —
 worth a standing CI check (the Phase-0 discovery query already written in
-`docs/plans/2026-07-02-rls-cutover.md` — `SELECT relname ... HAVING
+`docs/plans/done/2026-07-02-rls-cutover.md` — `SELECT relname ... HAVING
 COUNT(policyname)=0`) run against every migration, not just at cutover time,
 so a hardcoded array typo fails CI instead of silently landing.
 
@@ -304,7 +304,7 @@ the `to_regclass` guard rather than failing loud. This is the exact failure
 mode a hardcoded-array approach to RLS enforcement produces, and the fix
 (`20260609000000`) was a manual audit catch, not an automated one. Recommend
 converting the Phase-0 discovery query (already written in
-`docs/plans/2026-07-02-rls-cutover.md`) into a standing CI assertion so any
+`docs/plans/done/2026-07-02-rls-cutover.md`) into a standing CI assertion so any
 future migration that silently drifts fails the build instead of waiting for
 the next manual audit.
 
@@ -318,7 +318,7 @@ instance is already remediated.
 **Severity: High** · **Verdict: CONFIRMED, novel** (not in
 `docs/audits/2026-06-09-rls-async-writer-audit.md`,
 `docs/audits/2026-07-02-tenancy-rls-auth.md`,
-`docs/plans/2026-07-02-rls-cutover.md`, or
+`docs/plans/done/2026-07-02-rls-cutover.md`, or
 `tests/unit/rls-router-context-invariant.test.ts`)
 
 `apps/api/src/routes/index.ts:75`: `router.use('/payment-settings',
@@ -425,4 +425,4 @@ is a race that can lose, not a guaranteed failure). Items 1-5 (High) should
 be closed as a set: 2-5 are cheap, surgical, mechanical fixes (route wrap,
 `await`, policy string fix, `tx` threading + unique constraint); 1 is the
 tracked the earlier app role cutover already gated behind items 2-9 per
-`docs/plans/2026-07-02-rls-cutover.md`.
+`docs/plans/done/2026-07-02-rls-cutover.md`.

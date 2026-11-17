@@ -207,7 +207,7 @@ describe('trackSearch — the term reaches an ad network only when it is not per
     '01012345678',
     '٠١٠١٢٣٤٥٦٧٨',
     "O'Brien 010 1234 5678",
-    'ahmed@mail.com',
+    'buyer@example.com',
     'ORD-LX3K9A2-7F',
     'https://x.com/a',
   ];

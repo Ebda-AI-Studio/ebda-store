@@ -100,3 +100,24 @@ describe('adminApiOrigin', () => {
     expect(() => adminApiOrigin('http://evil.example')).toThrow(/HTTPS/);
   });
 });
+
+import { builderNeedsDocumentReload } from '../../apps/admin/src/lib/csp';
+
+describe('builder reached by client-side navigation keeps the wrong frame-src (custom-domain preview blocked)', () => {
+  const base = 'https://store.ebda.app/stores/abc/builder';
+  it('document first loaded on another admin page -> must hard reload', () => {
+    expect(builderNeedsDocumentReload('https://store.ebda.app/stores/abc', base)).toBe(true);
+    expect(builderNeedsDocumentReload('https://store.ebda.app/dashboard', base)).toBe(true);
+  });
+  it('document that IS the builder (even with query) -> no reload, no loop', () => {
+    expect(builderNeedsDocumentReload('https://store.ebda.app/stores/abc/builder', base)).toBe(
+      false
+    );
+    expect(
+      builderNeedsDocumentReload('https://store.ebda.app/stores/abc/builder?page=cart', base)
+    ).toBe(false);
+  });
+  it('no navigation entry -> no reload', () => {
+    expect(builderNeedsDocumentReload(undefined, base)).toBe(false);
+  });
+});

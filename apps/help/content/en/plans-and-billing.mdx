@@ -5,6 +5,12 @@ section: Settings
 order: 9
 appPath: /stores
 keywords: plans pricing basic growth business billing subscription
+capabilities:
+  - billing.change-plan@1
+  - billing.pay-card@1
+  - billing.plans-compare@1
+  - billing.platform-fee-vat@1
+  - billing.view@1
 ---
 
 Try Growth for 14 days. There is no public free plan. Ebda Store takes no commission on your orders; payment gateway fees are separate, and cash on delivery never carries a fee.
@@ -32,3 +38,8 @@ Every paid plan includes all supported payment methods and a custom domain. Cash
 After you pass your monthly order cap you get seven days to upgrade; after that new orders are blocked. Existing orders stay available. When a trial ends without a paid plan, new orders are blocked too.
 
 The listed prices are final amounts. Ebda AI Studio is not registered for VAT and charges none; if that changes, VAT is introduced only with at least 30 days of written notice and never applies retroactively. Taxes on your own store are configured separately.
+
+## Ask the assistant to change your plan
+
+- **Downgrade:** the assistant shows a card with what changes (limits you lose) and starts the new plan at the end of the period you paid for. Nothing is charged.
+- **Upgrade:** the assistant shows the price before VAT, the VAT and the total, then gives you a link to the payment screen. You confirm the charge there. The assistant never charges your saved card itself.
