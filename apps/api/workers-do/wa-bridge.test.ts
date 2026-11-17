@@ -472,6 +472,36 @@ describe('WA-RPC-8: replay completes the order (#616) and refusals are typed (#6
     });
   });
 
+  it('BRIDGE-ACTIVE-1: only an active product reaches the bridge (getProducts and listCatalog); a draft or archived one is gone for the cart check and the event sync, and the order engine refuses it too', async () => {
+    const T = Date.now();
+    await sql(
+      C,
+      "INSERT INTO products (id, store_id, name, slug, price, inventory, status, has_variants, created_at, updated_at) VALUES ('shop-c-draft', ?1, 'Draft', 'draft', 7000, 5, 'draft', 0, ?2, ?2), ('shop-c-dv', ?1, 'Draft with variant', 'draft-v', 8000, 0, 'draft', 1, ?2, ?2), ('shop-c-arv', ?1, 'Archived with variant', 'arch-v', 8000, 0, 'archived', 1, ?2, ?2)",
+      C,
+      T
+    );
+    await sql(
+      C,
+      "INSERT INTO product_variants (id, product_id, title, price, inventory, is_active, created_at, updated_at) VALUES ('shop-c-dv-1', 'shop-c-dv', 'M', 8000, 5, 1, ?1, ?1), ('shop-c-arv-1', 'shop-c-arv', 'M', 8000, 5, 1, ?1, ?1)",
+      T
+    );
+    const ids = [
+      'shop-c-p1',
+      'shop-c-gone',
+      'shop-c-draft',
+      'shop-c-dv-1',
+      'shop-c-arv-1',
+      'shop-c-dv',
+    ];
+    const got = await bridge().getProducts(C, ids);
+    expect(got.ok && got.value.items.map(i => i.retailerId)).toEqual(['shop-c-p1']);
+    const listed = await bridge().listCatalog(C, null, 100);
+    expect(listed.ok && listed.value.items.map(i => i.retailerId)).toEqual(['shop-c-p1']);
+    // the money path: the order engine itself refuses a draft (typed, nothing written)
+    const r = await bridge().createOrderFromChat(C, cod('example-idem-active1', 'shop-c-draft'));
+    expect(r).toMatchObject({ ok: false, reason: 'out_of_stock', code: 'PRODUCT_UNAVAILABLE' });
+  });
+
   it('#617: the same key with different lines is a typed invalid (IDEMPOTENCY_CONFLICT), not retried forever', async () => {
     const b = bridge();
     await b.createOrderFromChat(C, cod('example-idem-r617b', 'shop-c-p1', 1, '+201212345678'));

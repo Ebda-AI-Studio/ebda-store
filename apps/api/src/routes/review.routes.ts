@@ -6,9 +6,7 @@ import { requireStore } from '../middleware/store';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { ReviewService } from '../services/review.service';
-import { LoyaltyService } from '../services/loyalty.service';
-import logger from '../lib/logger';
-import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { moderateReview, refreshRatingCaches } from '../services/review-moderation.service';
 import { storeWriter } from '../lib/repo-factory';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
@@ -21,21 +19,6 @@ import { assertScalarQuery } from '../lib/query-params';
 // `requireStore` returns 400 VALIDATION_ERROR — which is what the merchant
 // saw when the storefront fetched /reviews/product/:productId.
 const router = Router({ mergeParams: true });
-
-/**
- * The PDP rating line (Phase B3, Ruling B3-6) reads `ratingStats` off the cached public product
- * payload (`public:product:<store>:<slug>`, 120 s, plus the 60 s edge copy). CACHE CLASS:
- * BOUNDED-stale. Moderation (approve / reject / delete) changes the published set, so it busts the
- * product caches now instead of waiting the TTL out; a failed purge never fails the moderation
- * (the TTL is the residual window, about 8 minutes with the edge copy).
- */
-async function refreshRatingCaches(storeId: string): Promise<void> {
-  try {
-    await invalidateStoreProductCaches(storeId);
-  } catch (err) {
-    logger.warn({ err, storeId }, '[ReviewRoutes] rating cache purge failed after moderation');
-  }
-}
 
 // Validation schemas
 const createReviewSchema = z.object({
@@ -282,8 +265,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const review = await ReviewService.approve(req.storeId!, id);
-      await refreshRatingCaches(req.storeId!);
+      const review = await moderateReview(req.storeId!, id, 'published');
 
       await auditLog({
         action: 'review.approved',
@@ -295,21 +277,6 @@ router.post(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-
-      // Award review bonus points if the review has a customer
-      if (review.customerId) {
-        try {
-          await LoyaltyService.awardReviewBonus(
-            req.storeId!,
-            review.customerId,
-            review.productId,
-            id
-          );
-        } catch (err) {
-          // Non-fatal: log and continue
-          logger.warn({ err, reviewId: id }, '[ReviewRoutes] Failed to award review bonus points');
-        }
-      }
 
       res.json({
         success: true,
@@ -334,8 +301,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const review = await ReviewService.reject(req.storeId!, id);
-      await refreshRatingCaches(req.storeId!);
+      const review = await moderateReview(req.storeId!, id, 'rejected');
 
       await auditLog({
         action: 'review.rejected',

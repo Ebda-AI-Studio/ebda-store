@@ -19,7 +19,7 @@ import { postWalletMovementJournal } from './accounting/posting/wallet-posting';
 
 /**
  * Customer wallet (store credit) — the ONLY writer of `customer_wallets` and
- * `wallet_transactions`. Design + invariants: docs/plans/2026-09-25-customer-wallet.md.
+ * `wallet_transactions`. Design + invariants: docs/plans/done/2026-09-25-customer-wallet.md.
  *
  * Every money movement is one call to `applyEntry`, which:
  *   1. makes sure a wallet row exists (credits only — a debit against a

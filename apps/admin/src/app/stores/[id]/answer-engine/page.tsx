@@ -89,7 +89,7 @@ export default function AnswerEnginePage() {
                 <GscTopQueriesList topQueries={gsc.topQueries} />
               </div>
             ) : (
-              <GscNotConnected />
+              <GscNotConnected setup={gsc.setup} />
             )}
           </div>
         </div>

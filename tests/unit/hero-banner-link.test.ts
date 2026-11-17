@@ -1,6 +1,6 @@
 /**
  * Unit tests for `resolveBannerLink` — the decision logic behind
- * `HeroBannerLink` (docs/plans/2026-07-04-hero-banner-link.md).
+ * `HeroBannerLink` (docs/plans/done/2026-07-04-hero-banner-link.md).
  *
  * `HeroBannerLink` itself is a `.tsx` React component; this repo has no
  * jsdom/testing-library installed (vitest env = 'node', see

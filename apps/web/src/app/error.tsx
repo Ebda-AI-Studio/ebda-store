@@ -11,7 +11,7 @@ import { RouteErrorFallback } from '../components';
  * catches BEFORE this one, so copy that lives only here never reaches the
  * three routes a shopper is most likely to land on — which is exactly how the
  * "we're a little busy" retry body went missing on the highest-traffic pages
- * in the first draft of docs/plans/2026-09-16-store-resolve-transient-not-404.md.
+ * in the first draft of docs/plans/done/2026-09-16-store-resolve-transient-not-404.md.
  *
  * `error` is forwarded, never discarded: RouteErrorFallback picks the retry
  * body off `error.digest`.

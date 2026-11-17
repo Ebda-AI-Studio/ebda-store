@@ -476,14 +476,14 @@ Railway's stdout buffer is ephemeral (~72h on the Pro plan, less on Hobby). With
 Sentry / Axiom / PostHog each have their own native notification channels (email, Slack, webhook), but none route to Telegram natively without paid plans. To keep the operator on **one notification channel** for everything, the API exposes a small translator that accepts each service's webhook payload and forwards via the existing `sendAlert()` Telegram pipeline.
 
 - **Endpoints** (`apps/api/src/routes/alert-webhooks.routes.ts`):
-  - `POST /api/v1/alerts/webhooks/sentry?token=<TOKEN>` — Sentry issue alert action → P1 platform
-  - `POST /api/v1/alerts/webhooks/axiom?token=<TOKEN>` — Axiom monitor → P1 platform
-  - `POST /api/v1/alerts/webhooks/posthog?token=<TOKEN>` — PostHog insight alert → P1 platform
-  - `POST /api/v1/alerts/webhooks/generic?token=<TOKEN>` — `{title, body, level, source}` for any other service
-- **Auth**: shared-secret token via querystring `?token=...` or header `x-alerts-token: ...`, checked against `ALERTS_WEBHOOK_TOKEN` (a `wrangler secret` on the `ebda-api` Worker; the value lives in macOS Keychain `ebda-alerts-webhook-token`). **Fail closed in production**: with the secret unset every call gets 503 `alerts_not_configured` (it used to accept any payload — security audit F-06, 2026-10-14).
+  - `POST /api/v1/alerts/webhooks/sentry` (header `x-alerts-token: <TOKEN>`) — Sentry issue alert action → P1 platform
+  - `POST /api/v1/alerts/webhooks/axiom` (header `x-alerts-token: <TOKEN>`) — Axiom monitor → P1 platform
+  - `POST /api/v1/alerts/webhooks/posthog` (header `x-alerts-token: <TOKEN>`) — PostHog insight alert → P1 platform
+  - `POST /api/v1/alerts/webhooks/generic` (header `x-alerts-token: <TOKEN>`) — `{title, body, level, source}` for any other service
+- **Auth**: shared-secret token in the **`x-alerts-token` header only** (S7, 2026-11-12: `?token=` is refused with 401 `token_in_query_refused` because query strings land in logs), read from the env on every request and checked against `ALERTS_WEBHOOK_TOKEN` (a `wrangler secret` on the `ebda-api` Worker; the value lives in macOS Keychain `ebda-alerts-webhook-token`). **Fail closed in production**: with the secret unset every call gets 503 `alerts_not_configured` (it used to accept any payload — security audit F-06, 2026-10-14).
 - **Delivery**: one company bot, **@EbdaAIStudiobot** (Ebda AI Studio), serves every product. `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ALERT_CHAT_ID` are `ebda-api` Worker secrets (Keychain `ebda-telegram-bot` / `ebda-telegram-alert-chat-id`). Every alert's first line is `<emoji> Ebda Store: <problem>` (product name from `BRAND.product.nameEn`), then the `[LEVEL SCOPE]` tag.
 - **Configured senders**:
-  - **Sentry** (org `whisky11`, projects `ebda-api`/`ebda-web`/`ebda-admin`/`ebda-orders`): internal integration **"Ebda AI Studio Alerts"** subscribed to `issue` webhooks → `https://api.ebda.app/api/v1/alerts/webhooks/sentry?token=<ALERTS_WEBHOOK_TOKEN>`. The route alerts only on `created` (new issue) and `triggered` (alert-rule action); resolved/assigned/archived are acknowledged and dropped.
+  - **Sentry** (org `whisky11`, projects `ebda-api`/`ebda-web`/`ebda-admin`/`ebda-orders`): internal integration **"Ebda AI Studio Alerts"** subscribed to `issue` webhooks → `https://api.ebda.app/api/v1/alerts/webhooks/sentry`. **Operator action after S7:** Sentry webhooks cannot set a custom header, so the integration's old `?token=` URL now gets 401 — front it with a header-adding hop (or switch the sender) before this ships, otherwise Sentry alerts stop reaching Telegram. The route alerts only on `created` (new issue) and `triggered` (alert-rule action); resolved/assigned/archived are acknowledged and dropped.
   - **PostHog** (EU, project 296820): not wired yet — needs a chosen metric (e.g. zero sign-ups/day) before an insight alert means anything.
   - **Axiom**: not used by Ebda Store.
 - **What this does NOT do**: it doesn't replace each service's dashboard — Sentry issues still live in Sentry, etc. It only adds Telegram as a parallel notification channel for high-signal events.
@@ -558,7 +558,7 @@ The wrangler OAuth login and the stored `CF_API_TOKEN` cannot create notificatio
    - **D1**: rows read exceed **20 billion**, rows written **40 million** (25 B / 50 M included)
    - **R2**: Class A operations exceed **800,000** (1 M free), Class B **8,000,000** (10 M free), storage **8 GB** (10 GB free)
    - **Email (Email Service)**: outbound messages exceed **2,400** per month (3,000 included)
-4. Notification method: **Email**, `as.montaseer@gmail.com`; add the Telegram webhook (`/api/v1/alerts/webhooks/generic?token=...`) as a second method if Webhooks is enabled on the account.
+4. Notification method: **Email**, `as.montaseer@gmail.com`; add the Telegram webhook (`/api/v1/alerts/webhooks/generic` with the `x-alerts-token` header) as a second method if Webhooks is enabled on the account.
 5. Save, then **Notifications > History** is where a fired one shows. Re-check quarterly with the rest of this table.
 
 Included allowances are from developers.cloudflare.com pricing pages as read on 2026-10-24 and must be re-read before trusting the thresholds. If a product is missing from the Usage Based Billing product list, record it in the register and watch it in the billing page instead (Billing > Billable Usage).

@@ -17,7 +17,7 @@ describe('merchant webhooks docs match reality', () => {
     for (const f of [
       'packages/shared/src/schemas/webhook.ts',
       'apps/api/src/services/webhook-payload.ts',
-      'docs/plans/2026-10-21-merchant-webhooks.md',
+      'docs/plans/done/2026-10-21-merchant-webhooks.md',
     ]) {
       expect(read(f), f).not.toContain('docs/developers/webhooks.md');
       expect(read(f), f).toContain('apps/docs/content/merchant-webhooks.mdx');

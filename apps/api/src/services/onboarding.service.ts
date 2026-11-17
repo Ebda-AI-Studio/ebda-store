@@ -38,6 +38,7 @@ import { readInStoreContext } from '../lib/store-scoped-read';
 import { storeIdBySlug } from '../lib/definer';
 import { assertOwnerMayCreateStore, ownerStoreAllowance } from './plan-limit.service';
 import { countOwnerStores, storeCreateOnDo } from '../lib/store-create-do';
+import { MAX_SELF_SERVE_STORES_PER_OWNER, ownerStoreLimit } from './owner-store-limit';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 import { assertStoreMayGoLive } from './billing/go-live-gate';
 import {
@@ -47,8 +48,7 @@ import {
 import { DEFAULT_TRIAL_CHOICE, type TrialChoice } from './billing/trial';
 import { emitEbdaConversion } from './ebda-ads-emit';
 
-/** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
-export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
+export { MAX_SELF_SERVE_STORES_PER_OWNER };
 
 /**
  * Bare-skin choice, kept for callers that predate looks (new clients send `lookId`). Only skins
@@ -246,7 +246,9 @@ export class OnboardingService {
             tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
           )
     );
-    if (owned >= MAX_SELF_SERVE_STORES_PER_OWNER) {
+    // A store-limit request staff resolved raises this owner's limit (owner-store-limit.ts); no request = the constant.
+    const storeLimit = await ownerStoreLimit(owner.userId);
+    if (owned >= storeLimit) {
       throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');
     }
 
@@ -309,13 +311,14 @@ export class OnboardingService {
           // (only reachable on a plan that allows it) is covered by the owner's
           // Business plan and starts on it, with no second trial.
           plan: ownedNow > 0 ? 'enterprise' : 'professional',
+          // The effective cap is min(paid plan allowance or unlimited, the owner's abuse cap): a staff grant only raises the
+          // abuse cap and never the plan allowance (owner-store-limit.ts), so a 1-store plan still stops at 1.
           maxOwnedStores:
             owner.isSuperAdmin || !storeCreateOnDo()
               ? null
               : Math.min(
-                  MAX_SELF_SERVE_STORES_PER_OWNER,
-                  (await ownerStoreAllowance(owner.userId)).allowance ??
-                    MAX_SELF_SERVE_STORES_PER_OWNER
+                  storeLimit,
+                  (await ownerStoreAllowance(owner.userId)).allowance ?? storeLimit
                 ),
           growthTrial: ownedNow === 0,
           trialChoice,

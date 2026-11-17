@@ -10,8 +10,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { scanPrismaProductReads } from '../helpers/prisma-product-read-scan';
+import { ORIGINAL_ROOT } from '../helpers/original-repo-root';
 
-const API_SRC = resolve(__dirname, '../../apps/api/src');
+const API_SRC = resolve(ORIGINAL_ROOT, 'apps/api/src');
 
 /** Every file that serves (or feeds) an anonymous or buyer-facing product surface. */
 const STOREFRONT_FILES = [

@@ -1,0 +1,20 @@
+---
+title: 'Abandoned payments and a payment''s history'
+description: 'See who started paying and left, and what happened to the payment of one order.'
+section: Selling
+order: 40
+appPath: /stores
+keywords: payment abandoned paid unpaid events دفع سابوا الدفع
+capabilities:
+  - payment.abandonments@1
+  - payment.events@1
+---
+
+## Who started paying and left
+Open **Payment abandonments** (Business plan). It lists orders where the customer reached the payment gateway but did not finish, newest first, with the amount and when they left. Phone numbers and emails are masked in the list; open the order for the full details.
+
+## A customer says they paid
+Open the order and look at **Payments**. Each payment shows its status and an event log: created, paid, failed, refunded. If the provider says paid but the order is unpaid, the log shows where it stopped. You can retry a failed payment from there.
+
+## Ask the assistant
+The assistant can prepare this for you. It always shows a preview first, and you press the button yourself. The assistant reads this for you at no risk: ask 'who left without paying this week' or 'what happened to the payment of order 1042'. It never shows raw provider data.

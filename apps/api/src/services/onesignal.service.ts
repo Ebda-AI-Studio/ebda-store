@@ -13,6 +13,7 @@
  * at consent time so `broadcastToStore` can target only that tenant.
  */
 
+import { assertStoreOperational } from '../lib/store-operational';
 import { withStore, withUser } from '@ebda/database';
 import { adminPushPlayerIds } from '../lib/definer';
 import { prisma } from '@ebda/database';
@@ -1093,6 +1094,8 @@ export class OneSignalService {
    * the route handler can surface a real error to the admin UI.
    */
   static async broadcastToStore(input: BroadcastInput): Promise<BroadcastResult> {
+    // Ruling SUSPEND-OUT-1: a marketing push to a store's storefront subscribers is refused (423) for a store that is not `active`.
+    await assertStoreOperational(input.storeId);
     if (!isConfigured()) {
       throw new OneSignalNotConfiguredError();
     }

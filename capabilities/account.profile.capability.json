@@ -1,0 +1,34 @@
+{
+  "id": "account.profile",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "عدل بياناتي الشخصية",
+  "titleEn": "Edit my profile / name / phone",
+  "screens": ["/account/security"],
+  "api": ["GET /auth/me", "PUT /auth/me"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "account-security",
+  "questions": {
+    "ar": ["ازاي اغير اسمي او رقمي؟", "عايز اغير الايميل بتاعي"],
+    "en": ["How do I change my name or phone?"]
+  },
+  "steps": ["Account menu > profile."],
+  "edgeCases": [
+    "Email change requires re-verification (inferred)",
+    "Phone change via accounts:/phone",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Email change flow not verified"]
+}

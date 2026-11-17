@@ -7,3 +7,4 @@ export * from './phone-search';
 export * from './admin-search';
 export * from './search-request';
 export * from './customer-patterns';
+export * from './arabic-stem';
