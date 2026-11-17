@@ -6,7 +6,7 @@
 
 export type LedgerCostsStatus = 'known' | 'partial' | 'unknown';
 
-export interface LedgerCostsInput {
+interface LedgerCostsInput {
   revenue: number;
   cogs: number;
   /** From the API: known = every sold line has a cost, partial = some do not, unknown = none does. */
@@ -26,7 +26,7 @@ export function ledgerCostsStatus(gl: LedgerCostsInput): LedgerCostsStatus {
   return gl.revenue > 0 && gl.cogs === 0 ? 'unknown' : 'known';
 }
 
-export type StockValueState =
+type StockValueState =
   | { kind: 'full'; value: number }
   /** Some stocked products have no cost: `value` covers only `costed` of `stocked`. */
   | { kind: 'partial'; value: number; costed: number; stocked: number }
