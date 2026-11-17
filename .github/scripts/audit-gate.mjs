@@ -47,9 +47,11 @@ import { loadAllow } from './audit-allow.mjs';
  *              it still exits 1 for an advisory that is not allow-listed so the step shows red without stopping the merge.
  */
 const ALL = process.argv.includes('--all');
-const { allow: ALLOW, expired, invalid } = loadAllow(
-  new URL('../audit-allow.json', import.meta.url).pathname
-);
+const {
+  allow: ALLOW,
+  expired,
+  invalid,
+} = loadAllow(new URL('../audit-allow.json', import.meta.url).pathname);
 if (invalid.length || expired.length) {
   console.error('audit-gate: the allow-list needs attention:');
   for (const m of [...invalid, ...expired]) console.error('  ' + m);
@@ -94,7 +96,13 @@ function runAudit() {
   try {
     return execFileSync(
       'npm',
-      ['audit', ...(ALL ? [] : ['--omit=dev']), '--json', '--fetch-timeout=45000', '--fetch-retries=1'],
+      [
+        'audit',
+        ...(ALL ? [] : ['--omit=dev']),
+        '--json',
+        '--fetch-timeout=45000',
+        '--fetch-retries=1',
+      ],
       { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: ATTEMPT_TIMEOUT_MS }
     );
   } catch (e) {
@@ -172,10 +180,18 @@ if (waived.length) {
   console.log('::endgroup::');
 }
 if (verdict === AUDIT.BLOCKING) {
-  console.error(`audit-gate: ${ALL ? 'NOT ALLOW-LISTED advisories (all dependencies, non-blocking report)' : 'BLOCKING production advisories'}:`);
+  console.error(
+    `audit-gate: ${ALL ? 'NOT ALLOW-LISTED advisories (all dependencies, non-blocking report)' : 'BLOCKING production advisories'}:`
+  );
   for (const b of new Set(blocking)) console.error('  ' + b);
   process.exit(auditExitCode(verdict));
 }
 const usedIds = new Set(waived.map(w => w.split(' ')[2]));
-for (const id of ALLOW.keys()) if (!usedIds.has(id)) console.log(`audit-gate: allow-list entry ${id} matched nothing: remove it (the advisory is gone).`);
+// only the all-dependencies scope can say an entry is dead: the production scope never sees a development-only advisory
+if (ALL)
+  for (const id of ALLOW.keys())
+    if (!usedIds.has(id))
+      console.log(
+        `audit-gate: allow-list entry ${id} matched nothing: remove it (the advisory is gone).`
+      );
 console.log(`audit-gate: clean (${new Set(waived).size} documented waiver(s))`);
