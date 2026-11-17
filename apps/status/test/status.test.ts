@@ -3,7 +3,12 @@ import { runInDurableObject } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import worker, { alertOnOutcome, runProbes, thresholdsFrom } from '../src/index';
 import { SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
-import { COMPONENTS, DEFAULT_TIMEOUT_MS, SLOW_THRESHOLD_MS } from '../src/config';
+import {
+  COMPONENTS,
+  DEFAULT_TIMEOUT_MS,
+  SLOW_THRESHOLD_MS,
+  DEGRADED_LABEL_MS,
+} from '../src/config';
 import { probe, probeErrorAr, type Fetcher } from '../src/probe';
 import type { ProbeResult, Snapshot } from '../src/types';
 
@@ -162,10 +167,52 @@ describe('slow is degraded, not down (quiet-hour cold renders, 8 s < t <= 15 s)'
     const en = await (await get('/en')).text();
     const ar = await (await get('/')).text();
     expect(has(en, 'Response time:')).toBe(true);
-    expect(has(en, '(slow: over 8 s)')).toBe(true);
+    expect(has(en, '(slow: over 8 s, counted against uptime)')).toBe(true);
     expect(has(en, 'Degraded')).toBe(true);
     expect(has(ar, 'زمن الاستجابة:')).toBe(true);
     expect(has(ar, 'بطيء: أكتر من 8 ثواني')).toBe(true);
+  });
+});
+
+describe('STATUS-PROBE-1: the status reflects what a shopper feels', () => {
+  it('a slow answer (over 8 s) is not an available check in the daily uptime; a fast one is', async () => {
+    const s = stub();
+    const now = Date.now();
+    await s.record([{ ...res('docs', true), latencyMs: 9000, slow: true }], now, T);
+    await s.record([{ ...res('docs', true), latencyMs: 200, slow: false }], now + 1000, T);
+    const docs = (await s.snapshot(now + 2000)).components.find(c => c.id === 'docs')!;
+    expect(docs.days.at(-1)).toMatchObject({ checks: 2, ok: 1 });
+    expect(docs.uptime).toBe(50);
+  });
+
+  it('a slow answer still opens no incident on its own (degraded, not down)', async () => {
+    const s = stub();
+    const out = await s.record(
+      [{ ...res('docs', true), latencyMs: 9000, slow: true }],
+      Date.now(),
+      T
+    );
+    expect(out).toEqual({ opened: [], resolved: [] });
+  });
+
+  it('the page labels a 3-8 s answer "slower than usual" in both languages and still counts it available', async () => {
+    const s = stub();
+    const now = Date.now();
+    await s.record(
+      [{ ...res('docs', true), latencyMs: DEGRADED_LABEL_MS + 1500, slow: false }],
+      now,
+      T
+    );
+    const docs = (await s.snapshot(now + 1)).components.find(c => c.id === 'docs')!;
+    expect(docs.days.at(-1)).toMatchObject({ checks: 1, ok: 1 });
+    const en = await (await get('/en')).text();
+    const ar = await (await get('/')).text();
+    expect(has(en, 'slower than usual: over 3 s')).toBe(true);
+    expect(has(ar, 'أبطأ من المعتاد: أكتر من 3 ثواني')).toBe(true);
+  });
+
+  it('constants: hard abort 15 s, slow line 8 s, label line 3 s', () => {
+    expect([DEFAULT_TIMEOUT_MS, SLOW_THRESHOLD_MS, DEGRADED_LABEL_MS]).toEqual([15000, 8000, 3000]);
   });
 });
 

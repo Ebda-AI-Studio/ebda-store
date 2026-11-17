@@ -13,7 +13,7 @@ import {
   siteNavHtml,
   siteWordmarkHtml,
 } from '../../../packages/shared/src/brand/index';
-import { COMPONENTS, HISTORY_DAYS, PRODUCTS } from './config';
+import { COMPONENTS, DEGRADED_LABEL_MS, HISTORY_DAYS, PRODUCTS } from './config';
 import type { ComponentSnapshot, ComponentStatus, Incident, Snapshot } from './types';
 
 export type Lang = 'ar' | 'en';
@@ -50,7 +50,13 @@ const T = {
     },
     checked: 'آخر فحص',
     respTime: (ms: number, slow: boolean) =>
-      `زمن الاستجابة: ${(ms / 1000).toFixed(1)} ث${slow ? ' (بطيء: أكتر من 8 ثواني)' : ''}`,
+      `زمن الاستجابة: ${(ms / 1000).toFixed(1)} ث${
+        slow
+          ? ' (بطيء: أكتر من 8 ثواني، وبيتحسب ضد نسبة التشغيل)'
+          : ms > DEGRADED_LABEL_MS
+            ? ' (أبطأ من المعتاد: أكتر من 3 ثواني)'
+            : ''
+      }`,
     generated: 'آخر تحديث للصفحة',
     explain:
       'بنفحص كل خدمة كل 5 دقايق من برّه منصتنا. لو كذا فحص ورا بعض فشلوا بنفتح مشكلة لوحدها، وبنقفلها أول ما الخدمة ترجع.',
@@ -90,7 +96,13 @@ const T = {
     },
     checked: 'Last checked',
     respTime: (ms: number, slow: boolean) =>
-      `Response time: ${(ms / 1000).toFixed(1)} s${slow ? ' (slow: over 8 s)' : ''}`,
+      `Response time: ${(ms / 1000).toFixed(1)} s${
+        slow
+          ? ' (slow: over 8 s, counted against uptime)'
+          : ms > DEGRADED_LABEL_MS
+            ? ' (slower than usual: over 3 s)'
+            : ''
+      }`,
     generated: 'Page generated',
     explain:
       'Every service is probed every 5 minutes from outside our platform. An incident opens automatically after several consecutive failed probes and resolves after the service recovers.',
