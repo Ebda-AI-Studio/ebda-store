@@ -12,9 +12,9 @@
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "super_admin"],
-  "policy": "free",
+  "policy": "confirm",
   "undo": {
-    "class": "unclassified",
+    "class": "compensating",
     "note": "revert: not-received puts plan back to unpaid with 48 h grace"
   },
   "helpArticle": null,

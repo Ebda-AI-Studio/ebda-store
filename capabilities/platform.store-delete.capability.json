@@ -17,7 +17,7 @@
     "note": "n/a"
   },
   "operatorReason": {
-    "code": null,
+    "code": "critical",
     "text": "irreversible data deletion; today because no safe self-flow",
     "validUnderRule": false
   },

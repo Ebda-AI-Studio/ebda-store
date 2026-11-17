@@ -7,7 +7,7 @@
   "titleAr": "مساعدة ابدأ شات",
   "titleEn": "Ebda Chat help set: shared number, Meta verify, Meta fees, campaigns and opt-out, COD confirmations, InstaPay orders, service menu, team seats, wallet top-ups, customer data, delete workspace",
   "screens": ["(Ebda Chat)"],
-  "api": ["(Ebda Chat API)"],
+  "api": [],
   "mcpTool": null,
   "planGate": "whatsapp",
   "roles": ["owner", "super_admin"],

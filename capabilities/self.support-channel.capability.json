@@ -8,7 +8,7 @@
   "titleAr": "المساعدة والدعم جوه المنتج",
   "titleEn": "In-product help and support channel with context handoff",
   "screens": ["/stores/[id]"],
-  "api": ["(planned)"],
+  "api": [],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff"],

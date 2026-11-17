@@ -8,7 +8,7 @@
   "titleAr": "ملفات المنتجات لجوجل وميتا وتيك توك",
   "titleEn": "Product catalogue feeds for Google Merchant, Meta Catalog, TikTok",
   "screens": ["/stores/[id]/marketing-pixels"],
-  "api": ["(planned) /feeds/google.xml", "/feeds/meta.xml", "/feeds/tiktok.csv"],
+  "api": ["GET /feeds/google.xml", "GET /feeds/meta.xml", "GET /feeds/tiktok.csv"],
   "mcpTool": null,
   "planGate": "agent_feed (existing AI feed) ",
   "roles": ["owner", "super_admin"],

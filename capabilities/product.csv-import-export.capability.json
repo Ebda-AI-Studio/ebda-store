@@ -21,7 +21,7 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
+    "class": "irreversible",
     "note": "import: no auto-undo"
   },
   "helpArticle": "products-and-csv-import",

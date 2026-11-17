@@ -17,7 +17,7 @@
   "mcpTool": null,
   "planGate": null,
   "roles": ["public"],
-  "policy": "free",
+  "policy": "forbidden",
   "undo": {
     "class": "none",
     "note": "n/a"

@@ -20,8 +20,8 @@
     "note": "n/a"
   },
   "operatorReason": {
-    "code": null,
-    "text": "ops convenience",
+    "code": "platform-config",
+    "text": "ops convenience: run a scan or rollup now",
     "validUnderRule": false
   },
   "helpArticle": null,

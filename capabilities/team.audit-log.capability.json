@@ -28,5 +28,10 @@
     "Team members need to know who edited",
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
   ],
-  "gaps": ["NO merchant UI/API for store audit log (platform /audit-logs is super-admin)"]
+  "gaps": ["NO merchant UI/API for store audit log (platform /audit-logs is super-admin)"],
+  "operatorReason": {
+    "code": "legal",
+    "text": "security/compliance: the platform audit log is read by super-admin only; no merchant surface exists",
+    "validUnderRule": true
+  }
 }

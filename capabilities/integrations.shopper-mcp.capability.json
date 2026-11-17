@@ -11,10 +11,10 @@
   "mcpTool": "get_store_info; search_products; get_product; view_cart; add_to_cart; place_order; get_order_status",
   "planGate": "agent_checkout",
   "roles": ["owner", "super_admin"],
-  "policy": "free",
+  "policy": "confirm",
   "undo": {
-    "class": "none",
-    "note": "n/a"
+    "class": "compensating",
+    "note": "place_order creates an order; the merchant cancels it (order.cancel)"
   },
   "helpArticle": null,
   "questions": {

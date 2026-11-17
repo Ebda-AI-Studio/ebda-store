@@ -8,7 +8,7 @@
   "titleAr": "باقي ميزات الذكاء",
   "titleEn": "AI features remainder (search words, bulk sweeps, stemming)",
   "screens": ["/stores/[id]/ai-tools"],
-  "api": ["(plans)"],
+  "api": [],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff", "super_admin"],

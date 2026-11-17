@@ -27,5 +27,10 @@
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
   ],
-  "gaps": ["Merchant cannot delete own non-legal pages (audit gap 13)"]
+  "gaps": ["Merchant cannot delete own non-legal pages (audit gap 13)"],
+  "operatorReason": {
+    "code": "legal",
+    "text": "the guard blocks all page deletions to protect legal pages; a merchant cannot delete a non-legal page yet (audit gap 13)",
+    "validUnderRule": false
+  }
 }

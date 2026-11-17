@@ -29,5 +29,6 @@
     "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
     "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
   ],
-  "gaps": ["plans only, PR #753"]
+  "gaps": ["plans only, PR #753"],
+  "plan": "ebda-store#753 (open): docs/plans/2026-11-14-ai-bank-reconciliation.md, 2026-11-14-ai-transaction-categorising.md, 2026-11-14-gateway-payout-postings.md, 2026-11-14-sales-forecasting.md"
 }

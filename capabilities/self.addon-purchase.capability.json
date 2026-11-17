@@ -14,7 +14,7 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
+    "class": "compensating",
     "note": "cancel add-on"
   },
   "helpArticle": null,
