@@ -9,7 +9,7 @@
  * when anything in that render failed first the visitor got a 500 instead of the redirect (lamma/dahab, same day).
  * Here it is an empty-body 308/307 decided from the same rules (`decideLocalePath` + `pendingRedirect`, locale-paths.ts)
  * and the store's default language from the API resolver (`storeVerdict`, the call the edge cache already makes,
- * remembered 60 s per isolate).
+ * remembered 60 s per isolate; the decided 308 is also kept in the Cache API, WEB-COLD-4/6).
  *
  * Falls through to Next (the old path, unchanged) whenever it cannot decide: not GET/HEAD, locale paths off for the
  * store, the admin preview iframe (`?_preview=`), a path that is not pending, or a store the resolver does not vouch for
@@ -36,8 +36,14 @@ export interface RedirectCache {
   put(key: string, res: Response): Promise<void>;
 }
 
-/** Ruling WEB-COLD-4: how long a cached cookie-less 308 may be served. Same window as the per-isolate verdict memo. */
+/**
+ * Ruling WEB-COLD-4: a cached cookie-less 308 younger than this is served as is (the per-isolate verdict memo window).
+ * Ruling WEB-COLD-6: an older one (up to {@link REDIRECT_CACHE_STALE_S}) is STILL served at once and re-decided in `waitUntil`,
+ * because a 60 s hard expiry meant every visitor after an idle minute (all of a quiet store's visitors) paid the resolver
+ * round trip: a cold API + AuthState Durable Object chain, measured 1.4-2.3 s on the hop alone.
+ */
 const REDIRECT_CACHE_TTL_S = 60;
+export const REDIRECT_CACHE_STALE_S = 21_600;
 
 export type DefaultLanguageOf = (host: string) => Promise<'ar' | 'en' | null>;
 
@@ -75,7 +81,20 @@ export async function edgeLocaleRedirect(
     try {
       const hit = await cache.store.match(cacheKey);
       const loc = hit?.headers.get('x-redirect-location');
-      if (loc && loc.startsWith('/') && !loc.startsWith('//')) {
+      const at = Number(hit?.headers.get('x-redirect-at'));
+      const age = (Date.now() - at) / 1000;
+      if (
+        loc &&
+        loc.startsWith('/') &&
+        !loc.startsWith('//') &&
+        age >= 0 &&
+        age < REDIRECT_CACHE_STALE_S
+      ) {
+        // Stale-while-revalidate: the visitor never waits for the resolver; the next one sees a language change.
+        if (age >= REDIRECT_CACHE_TTL_S)
+          cache.waitUntil(
+            refreshRedirect(url, decision.rest, cacheKey, defaultLanguageOf, cache).catch(() => {})
+          );
         return new Response(null, { status: 308, headers: permanentHeaders(loc) });
       }
     } catch {
@@ -101,20 +120,7 @@ export async function edgeLocaleRedirect(
   // Same-origin path only (the rules already produce one; refuse anything else rather than redirect off-site).
   if (!target.location.startsWith('/') || target.location.startsWith('//')) return null;
   if (cache && !hasCookie && target.permanent) {
-    cache.waitUntil(
-      cache.store
-        .put(
-          cacheKey,
-          new Response(null, {
-            status: 200,
-            headers: {
-              'x-redirect-location': target.location,
-              'cache-control': `public, max-age=${REDIRECT_CACHE_TTL_S}`,
-            },
-          })
-        )
-        .catch(() => {})
-    );
+    cache.waitUntil(storeRedirect(cache.store, cacheKey, target.location).catch(() => {}));
   }
   return new Response(null, {
     status: target.permanent ? 308 : 307,
@@ -126,4 +132,39 @@ export async function edgeLocaleRedirect(
 
 function permanentHeaders(location: string): Record<string, string> {
   return { location, 'cache-control': 'private, max-age=300', vary: 'Cookie' };
+}
+
+function storeRedirect(store: RedirectCache, cacheKey: string, location: string): Promise<void> {
+  return store.put(
+    cacheKey,
+    new Response(null, {
+      status: 200,
+      headers: {
+        'x-redirect-location': location,
+        'x-redirect-at': String(Date.now()),
+        'cache-control': `public, max-age=${REDIRECT_CACHE_STALE_S}`,
+      },
+    })
+  );
+}
+
+/** Re-decide a stale cookie-less 308 from the resolver and rewrite the entry (only a permanent answer is stored). */
+async function refreshRedirect(
+  url: URL,
+  rest: string,
+  cacheKey: string,
+  defaultLanguageOf: DefaultLanguageOf,
+  cache: { store: RedirectCache }
+): Promise<void> {
+  const defaultLocale = await defaultLanguageOf(url.hostname);
+  if (!defaultLocale) return;
+  const target = pendingRedirect({
+    rest,
+    search: url.search,
+    defaultLocale,
+    cookieLocale: undefined,
+  });
+  if (!target.permanent || !target.location.startsWith('/') || target.location.startsWith('//'))
+    return;
+  await storeRedirect(cache.store, cacheKey, target.location);
 }
