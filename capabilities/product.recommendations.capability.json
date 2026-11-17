@@ -22,7 +22,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": "product-recommendations",
+  "helpArticle": "coupons-bundles-and-recommendations",
   "questions": {
     "ar": ["ازاي اظهر منتجات مقترحة؟", "اللي اشتروا ده اشتروا ده"],
     "en": ["Show related products"]
@@ -37,5 +37,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Automatic recommendations not merged (#742)", "No help article"]
+  "gaps": ["Automatic recommendations not merged (#742)"]
 }

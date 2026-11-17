@@ -129,6 +129,39 @@ interface ListShippingZonesOptions {
 }
 
 export class ShippingService {
+  /**
+   * Area rates of THIS store by id (the screen's own rows). Fees are integer piasters. A foreign id is simply absent from the result
+   * (store-scoped read), so a caller that needs every id to exist compares lengths. Used by the assistant `shipping_rate_set` tool.
+   */
+  static async getAreaRatesByIds(storeId: string, ids: string[]) {
+    const db = await storeDb(storeId);
+    return db.shippingAreaRate.findMany({
+      where: { storeId, id: { in: ids } },
+      orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
+    });
+  }
+
+  /**
+   * Partial update of ONE area rate (fees in piasters), scoped to the store. Returns the updated row, or null when the id is not this
+   * store's. The single writer of `PATCH /:storeId/shipping/area-rates/:id` and of the assistant `shipping_rate_set` tool.
+   */
+  static async updateAreaRate(
+    storeId: string,
+    id: string,
+    data: {
+      deliveryFee?: number;
+      freeShippingThreshold?: number | null;
+      isActive?: boolean;
+      [k: string]: unknown;
+    }
+  ) {
+    const db = await storeDb(storeId);
+    const w = await storeWriter(storeId);
+    const rate = await w.shippingAreaRate.updateMany({ where: { id, storeId }, data });
+    if (rate.count === 0) return null;
+    return db.shippingAreaRate.findFirst({ where: { id, storeId } });
+  }
+
   static async list(storeId: string, options: ListShippingZonesOptions = {}) {
     const db = await storeDb(storeId);
     const { page = 1, limit = 50, isActive } = options;

@@ -16,7 +16,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": "contact-form-messages",
+  "helpArticle": null,
   "questions": {
     "ar": ["فين رسايل التواصل بتاعة العملاء؟"],
     "en": ["Where do customer contact messages go?"]

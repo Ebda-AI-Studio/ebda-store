@@ -21,12 +21,17 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "payout no"
+    "class": "irreversible",
+    "note": "payout is money out and reject/suspend have no reopen"
   },
-  "helpArticle": "affiliates",
+  "helpArticle": "affiliate-program",
   "questions": {
-    "ar": ["ازاي اعمل نظام عمولة للمسوقين؟", "ادفع عمولة لمسوق"],
+    "ar": [
+      "ازاي اعمل نظام عمولة للمسوقين؟",
+      "ادفع عمولة لمسوق",
+      "وافق على المسوق ده",
+      "المسوقين عليهم كام عمولة"
+    ],
     "en": ["Pay an affiliate"]
   },
   "steps": ["Affiliates page."],
@@ -39,5 +44,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

@@ -20,10 +20,15 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": "customer-phone-app",
+  "helpArticle": "phone-app-pwa",
   "questions": {
-    "ar": ["ازاي العميل يحط متجري على الموبايل؟", "غير ايقونة التطبيق"],
-    "en": ["Make my store installable on phones"]
+    "ar": [
+      "ازاي العميل يحط متجري على الموبايل؟",
+      "غير ايقونة التطبيق",
+      "خلي متجري يتثبت زي تطبيق",
+      "غير اسم تطبيق المتجر على الموبايل"
+    ],
+    "en": ["Make my store installable on phones", "Change my phone app name"]
   },
   "steps": ["PWA page: name, short name (12 chars), icons."],
   "edgeCases": [
@@ -35,5 +40,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

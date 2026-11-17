@@ -6,54 +6,58 @@ import { sendAlert } from '../services/alerts.service';
 
 const router = Router();
 
-const ALERTS_TOKEN = process.env.ALERTS_WEBHOOK_TOKEN;
+// S7 (2026-11-12 audit): the secret is read PER REQUEST (a rotated `wrangler secret` takes effect without a
+// redeploy, and a Worker isolate that booted before the secret existed does not stay stuck open/closed), and it is
+// accepted from the `x-alerts-token` HEADER ONLY. A `?token=` query string lands in access logs, Sentry breadcrumbs
+// and proxies, so a request that carries it and no header is refused (and logged WITHOUT the value).
+const alertsToken = (): string | undefined => process.env.ALERTS_WEBHOOK_TOKEN || undefined;
 
-// CLAUDE.md rule 12: a missing token in production means the bridge accepts
-// spoofed alerts from any IP — a single curl floods Telegram. Warn loudly at
-// boot so the misconfiguration is visible in the Railway logs instead of
-// silently allowed. Dev / preview without the env var still works (no token
-// required), same convenience the original `!ALERTS_TOKEN -> allow` gave.
-if (!ALERTS_TOKEN && process.env.NODE_ENV === 'production') {
+/** Boot/health check: warn loudly when the token is unset in production (CLAUDE.md rule 12). Fail-closed at request time. */
+function alertsBridgeConfigured(): boolean {
+  return alertsToken() !== undefined;
+}
+if (!alertsBridgeConfigured() && process.env.NODE_ENV === 'production') {
   logger.error(
     { rule: 'CLAUDE.md#12', endpoint: '/api/v1/alerts/webhooks/*' },
     'ALERTS_WEBHOOK_TOKEN is unset in production — webhook bridge rejects every call (fail closed). Set it with `wrangler secret put ALERTS_WEBHOOK_TOKEN --name ebda-api`; until then the bridge refuses every call.'
   );
 }
 
+function reject(res: Response, status: number, code: string, message: string): false {
+  res.status(status).json({ ok: false, success: false, error: { code, message } });
+  return false;
+}
+
 function requireToken(req: Request, res: Response): boolean {
-  if (!ALERTS_TOKEN) {
-    // Fail CLOSED in production: an unset token used to mean "accept any
-    // payload", so anyone could post fake alerts to the operator's Telegram.
-    // Dev / preview keep the convenience of no token.
+  const expected = alertsToken();
+  if (!expected) {
+    // Fail CLOSED in production: an unset token used to mean "accept any payload", so anyone could post fake
+    // alerts to the operator's Telegram. Dev / preview keep the convenience of no token.
     if (process.env.NODE_ENV === 'production') {
-      res.status(503).json({
-        ok: false,
-        success: false,
-        error: {
-          code: 'alerts_not_configured',
-          message: 'Alerts webhook token is not configured.',
-        },
-      });
-      return false;
+      return reject(res, 503, 'alerts_not_configured', 'Alerts webhook token is not configured.');
     }
     return true;
   }
-  const token = (req.query.token as string) || req.header('x-alerts-token') || '';
-  if (!token || token.length !== ALERTS_TOKEN.length) {
-    res.status(401).json({
-      ok: false,
-      success: false,
-      error: { code: 'invalid_token', message: 'Missing or invalid alerts webhook token.' },
-    });
-    return false;
+  const token = req.header('x-alerts-token') || '';
+  if (!token) {
+    if (req.query.token !== undefined) {
+      logger.warn(
+        { endpoint: req.path },
+        'alerts bridge: ?token= query auth refused (S7); send the secret in the x-alerts-token header'
+      );
+      return reject(
+        res,
+        401,
+        'token_in_query_refused',
+        'Send the alerts webhook token in the x-alerts-token header, not the query string.'
+      );
+    }
+    return reject(res, 401, 'invalid_token', 'Missing or invalid alerts webhook token.');
   }
-  if (!crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ALERTS_TOKEN))) {
-    res.status(401).json({
-      ok: false,
-      success: false,
-      error: { code: 'invalid_token', message: 'Missing or invalid alerts webhook token.' },
-    });
-    return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return reject(res, 401, 'invalid_token', 'Missing or invalid alerts webhook token.');
   }
   return true;
 }
@@ -307,6 +311,6 @@ router.get('/healthcheck', (_req, res) => {
 export default router;
 
 logger.info(
-  { tokenRequired: !!ALERTS_TOKEN },
+  { tokenRequired: alertsBridgeConfigured() },
   'alert-webhooks routes mounted at /api/v1/webhooks/alerts'
 );

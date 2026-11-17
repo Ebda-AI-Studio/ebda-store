@@ -1,59 +1,23 @@
 ---
-title: Email campaigns
-description: Write a marketing email in Arabic and English, test it on yourself, then send or schedule it to your newsletter subscribers.
-section: Selling
-order: 35
-appPath: /stores
-keywords: campaign email marketing draft ai draft test send schedule cancel subscribers
+title: 'Email campaigns'
+description: 'Write an email campaign, send yourself a test, then send it to every subscriber who opted in.'
+section: Marketing
+order: 40
+appPath: /stores/[id]/campaigns
+keywords: email campaigns
 capabilities:
   - marketing.campaigns@1
+  - marketing.overview@1
 ---
 
-A campaign is a marketing email you send once to your newsletter subscribers, like an Eid offer or a new product. You write it in Arabic and English and test it on yourself before sending. The feature is available from the **Growth** plan upward, and the store owner sends it.
+Write an email campaign, send yourself a test, then send it to every subscriber who opted in.
 
-## Who receives it
+## Steps
+1. Open **Email campaigns** from the Marketing group.
+2. Create a campaign: name, subject and body (add Arabic too if you want).
+3. Send a test to your own email first.
+4. Press **Send** (now or scheduled). The audience size is shown before you confirm; an unsubscribe link is added automatically.
+5. Sent email cannot be recalled. A scheduled campaign can be cancelled before it starts.
 
-A campaign goes **only to newsletter subscribers who opted in**. There is no other audience source. Every email has an unsubscribe link, and anyone who unsubscribes gets nothing after that. Before sending, the page tells you **N people will receive this campaign**. If nobody has opted in, nothing is sent. See [Newsletter](/en/newsletter/).
-
-## Create and send a campaign
-
-1. From **Marketing and offers** open the **Campaigns** tab.
-2. Select **New campaign**. A draft is created and the editor opens.
-3. Enter a **Campaign name** (for your own use).
-4. Write the message in **English** and **Arabic**: the **Subject** and the **Body (HTML)**. You must write a subject and body in at least one language. Select **Preview email** to see it.
-5. If you want help, select **AI draft**, describe the email in **Describe the email you want** (for example "Announce our Ramadan offer with 20% off"), and select **Generate**. Review and edit the result, because it is only a draft.
-6. Choose the **Language sent to each subscriber**: **Each subscriber's own language** (it falls back to the other language if theirs is empty), **Always English**, or **Always Arabic**.
-7. Select **Send test to me** to get a copy at your account email and check the look. A test send does not count toward the sending limit.
-8. Under **Send** choose:
-   - **Send now**: a confirmation window shows the number of people.
-   - **Schedule**: pick a time in the future, within 30 days.
-9. Confirm with **Send**. After you confirm there is no undo, but you can cancel before it finishes (see below).
-
-## The daily sending limit
-
-To protect sender reputation there is a limit on messages in the last 24 hours: **1000** on the Growth plan and **5000** on the Business plan. The page shows **N of N more can be sent in the next 24 hours**. If a campaign would go over the limit you see a message, and you should schedule it for another day or reduce the audience.
-
-## After sending
-
-Open the campaign from the list. The list shows the **Status** (**Draft**, **Scheduled**, **Sending**, **Sent**, **Cancelled**, **Failed**) and the **Recipients**, **Sent** and **Failed** counts. On the campaign page:
-
-- **Recipients** with each one's status: **Queued**, **Sent**, **Failed**, **Bounced**, **Unsubscribed**, and you can filter by status.
-- **Cancel campaign** stops it before it starts, or before the next batch if it is being sent. It cannot be resumed after cancelling, you have to send it again.
-
-## Editing and deleting
-
-- Only a **draft** can be edited. A campaign that was sent can no longer be edited.
-- **Delete draft** works on a draft. A cancelled or failed campaign can be deleted too. One that already sent mail is kept as send history and cannot be deleted.
-
-## If something is not working
-
-- If your plan does not include campaigns: the page is locked behind an upgrade card with **This feature isn't enabled for your store**. See [Plans and billing](/en/plans-and-billing/).
-- **Nobody to send to:** **No subscribers have opted in yet**. Only people who sign up from the store footer count.
-- **Could not queue the campaign:** nothing was sent. Try again.
-- **Send is disabled:** add a subject and body in at least one language.
-
-## Common questions
-
-**I want to send an Eid offer to all my subscribers.** Make a campaign, write the message, test it on yourself, then **Send now** or **Schedule**.
-
-**How is it different from "Send Newsletter"?** The [Newsletter](/en/newsletter/) page has a quick send for up to 400 subscribers. Campaigns are for larger lists and have scheduling and recipient tracking.
+## Ask the assistant
+The assistant can write the text for you and send it to your subscribers. The card shows the audience size and the exact text, and sending needs your approval; it cannot be undone. The assistant previews the change and offers Undo for 24 hours where the change can be undone.

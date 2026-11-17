@@ -19,8 +19,8 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "status yes; delete no"
+    "class": "compensating",
+    "note": "assistant undo restores the before prices, status and flags of the changed products (a confirm-class card of its own); bulk delete is not an assistant tool"
   },
   "helpArticle": "products-and-csv-import",
   "questions": {

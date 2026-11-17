@@ -17,14 +17,19 @@
   "mcpTool": null,
   "planGate": "inventory.barcode",
   "roles": ["owner", "staff", "super_admin"],
-  "policy": "preview",
+  "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "count reconcile writes adjustments (inverse possible)"
+    "class": "compensating",
+    "note": "a count posts a cycle-count adjustment to the accounts; undoing it recounts the old numbers and posts a second adjustment"
   },
   "helpArticle": "barcode-scan-pick-and-count",
   "questions": {
-    "ar": ["ازاي اجرد المخزن بالباركود؟", "اسكان الاوردر قبل الشحن"],
+    "ar": [
+      "ازاي اجرد المخزن بالباركود؟",
+      "اسكان الاوردر قبل الشحن",
+      "الجرد طلع ٣ بدل ٥",
+      "اجرد المنتج ده"
+    ],
     "en": ["How do I run a stock count with a scanner?"]
   },
   "steps": ["Scan page on phone camera or scanner."],

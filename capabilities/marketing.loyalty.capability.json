@@ -17,8 +17,8 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "award: reversal via adjust (clawback #691 open)"
+    "class": "irreversible",
+    "note": "settings reversible; an award is treated as irreversible by the assistant"
   },
   "helpArticle": "loyalty-points",
   "questions": {
@@ -35,5 +35,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

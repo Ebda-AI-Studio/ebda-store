@@ -176,6 +176,17 @@ function isBlockedIp(ip: string): boolean {
  * if it isn't a public http(s) URL. Returns the parsed URL on success.
  */
 export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
+  return (await resolvePublicHttpUrl(rawUrl)).url;
+}
+
+/**
+ * Same checks as `assertPublicHttpUrl`, and ALSO returns the exact addresses that passed them (empty for an IP
+ * literal), so a caller that can pin the connection to those addresses closes the check-then-connect DNS-rebinding
+ * window (S4, 2026-11-12 audit).
+ */
+export async function resolvePublicHttpUrl(
+  rawUrl: string
+): Promise<{ url: URL; addresses: string[] }> {
   let u: URL;
   try {
     u = new URL(rawUrl);
@@ -189,7 +200,7 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
 
   if (isIP(host)) {
     if (isBlockedIp(host)) throw new Error('SSRF_BLOCKED: private/loopback IP literal');
-    return u;
+    return { url: u, addresses: [] };
   }
 
   let addrs: Array<{ address: string }>;
@@ -209,7 +220,7 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
   for (const { address } of addrs) {
     if (isBlockedIp(address)) throw new Error('SSRF_BLOCKED: host resolves to a private address');
   }
-  return u;
+  return { url: u, addresses: addrs.map(a => a.address) };
 }
 
 // Headers that must not travel to a host the ORIGINAL target chose for us.

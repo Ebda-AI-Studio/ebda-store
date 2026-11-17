@@ -43,6 +43,20 @@ const RUNTIME_TABLES = {
   vector_usage: 'store_id, day, texts: a per-day embedding counter',
 };
 /**
+ * Runtime tables of the assistant's journal (Smart Layer, Ruling SL-STORE-1; packages/repo do/smart-layer.ts). The text in them is masked by the
+ * engine before it is stored (secrets, phones, e-mails, cards), they hold the merchant's own conversation and preview rows, no customer subject
+ * key: they are store-owned, retained 90 days and removed with the store (and per merchant user by `scrubUserFromStoreDo` (packages/repo/src/platform-erasure.ts, StoreDO.scrubActor), and a shopper's name by eraseShopper).
+ */
+const RUNTIME_STORE_OWNED = {
+  sl_turns: 'the merchant\'s own masked assistant messages',
+  sl_audit: 'one masked audit row per assistant turn',
+  sl_previews: 'previews of a change (before/after labels of the merchant\'s own data)',
+  sl_applied: 'what an applied assistant change did and its inverse',
+  sl_approvals: 'server-issued single-use approvals (token hash only)',
+  sl_decisions: 'who pressed confirm or reject',
+  sl_counters: 'sliding-window rate-limit hits, no content',
+};
+/**
  * Runtime tables (as above) that DO hold a buyer's personal data: classified here with the same shape a schema table gets.
  * `instapay_order_receipts` (Ruling INSTAPAY-DO-1): the payer's typed / AI-read fields on a receipt, reached through the order.
  */
@@ -147,6 +161,10 @@ export async function generate() {
   for (const t of Object.keys(RUNTIME_TABLES)) {
     if (out[t]) throw new Error(`${t} is now in the schema: drop it from RUNTIME_TABLES`);
     out[t] = { kind: 'no-pii' };
+  }
+  for (const t of Object.keys(RUNTIME_STORE_OWNED)) {
+    if (out[t]) throw new Error(`${t} is now in the schema: drop it from RUNTIME_STORE_OWNED`);
+    out[t] = { kind: 'store-owned' };
   }
   for (const [t, e] of Object.entries(RUNTIME_PII_TABLES)) {
     if (out[t]) throw new Error(`${t} is now in the schema: drop it from RUNTIME_PII_TABLES`);

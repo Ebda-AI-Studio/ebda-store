@@ -20,8 +20,8 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "cancel before send only; no after"
+    "class": "irreversible",
+    "note": "a send cannot be recalled; cancel only before it starts"
   },
   "helpArticle": "email-campaigns",
   "questions": {
@@ -41,6 +41,6 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"],
+  "gaps": [],
   "assistantNote": "messaging: confirm with audience count + test send first"
 }

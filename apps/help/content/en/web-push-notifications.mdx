@@ -1,51 +1,20 @@
 ---
-title: Browser notifications for customers
-description: Turn on browser notifications for your store, send a notification to all your subscribed customers, and set which events tell the customer.
-section: Selling
-order: 39
-appPath: /stores
-keywords: push notifications browser web broadcast send to all customers flash sale subscribers link
+title: 'Web push to customers'
+description: 'Send a push notification to every shopper who allowed notifications on your storefront.'
+section: Marketing
+order: 40
+appPath: /stores/[id]/notifications
+keywords: web push to customers
 capabilities:
   - marketing.push-web@1
 ---
 
-Browser notifications reach your customer on their phone or device even when your store is not open, after they agree to them. You can send one notification to all subscribers at once, like "Flash sale today". The feature is available from the **Growth** plan upward, and the store owner uses it.
+Send a push notification to every shopper who allowed notifications on your storefront.
 
-## Turn on browser notifications
+## Steps
+1. Open **Notifications** from the Marketing group.
+2. Write the title and body in English and Arabic, and an optional https link.
+3. Send it. Only shoppers who allowed notifications receive it; it cannot be recalled.
 
-1. From **Marketing and offers** open the **Notifications** tab.
-2. If push notifications are available for your store you see the **Browser notifications for customers** card. It is off at first. Switch it on and you see **Browser notifications are on**.
-3. After that, customers can subscribe from your store and get notifications. **Nobody gets a notification unless they subscribed.**
-
-The push setup uses the platform's own configuration, so you do not enter any connection details.
-
-If the page says **No notification channels enabled**, push notifications are not available for your store. Check your plan.
-
-## Send a notification to all your customers
-
-1. On the same page open **Send a notification to all your customers now**.
-2. Enter the **Title (English)**, **Title (Arabic)**, **Message (English)** and **Message (Arabic)**. All four are required. The title can be up to 200 characters and the message up to 2000.
-3. Optional: **Link**. It must start with `https://`. If you leave it empty the notification opens the store.
-4. Select **Send broadcast**.
-
-You see **Broadcast sent** and "Targeted N subscriber(s)". Below it, **Recent broadcasts** shows the **delivered** and **clicked** counts for each one.
-
-Two-step verification must be on for your account to send. See [Account security](/en/account-security/).
-
-For a one-off offer by email instead of a notification, use [Email campaigns](/en/email-campaigns/). The page itself points you to **Campaigns** for messages sent once.
-
-## Order notifications to the customer
-
-On the same page, **Event Configuration** sets what the customer is told on each channel: **Order Confirmed**, **Payment Success**, **Payment Failed**, **Order Shipped**, **Order Delivered**, **Order Cancelled**, **Order Refunded**. Select **Save Event Config**. Below it, **Recent Notifications** is the delivery log, and you can filter by channel and status.
-
-## If something is not working
-
-- **Failed to send broadcast:** the notification provider may not be set up or may be unavailable right then. Try again shortly, and if it stays that way contact support.
-- **No subscribers:** the subscriber count shows on the push card. The customer has to agree from your store first.
-- **The feature is locked:** if your plan is below **Growth** the page shows an upgrade message. See [Plans and billing](/en/plans-and-billing/).
-
-## Common questions
-
-**Send a push to all my customers?** Open **Send a notification to all your customers now**, fill the four fields, and select **Send broadcast**.
-
-**I want a flash sale.** Write the offer's title and message, and put the offer page in **Link**.
+## Ask the assistant
+Ask it to send a flash-sale push. The card shows all four texts and needs your approval. The assistant previews the change and offers Undo for 24 hours where the change can be undone.

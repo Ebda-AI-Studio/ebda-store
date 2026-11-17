@@ -17,12 +17,17 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "posted adjustments need a reversing adjustment"
+    "class": "irreversible",
+    "note": "a posted adjustment is only reversed by another adjustment"
   },
-  "helpArticle": null,
+  "helpArticle": "stock-adjustments",
   "questions": {
-    "ar": ["عايز اعمل تسوية جرد بملف"],
+    "ar": [
+      "عايز اعمل تسوية جرد بملف",
+      "سجّل تالف في المخزون",
+      "عدّل المخزون بعد الجرد",
+      "سجّل بضاعة اتسرقت"
+    ],
     "en": ["Adjust stock from a CSV"]
   },
   "steps": ["Adjustments > new > review > post."],
@@ -35,5 +40,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

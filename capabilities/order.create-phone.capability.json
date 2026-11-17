@@ -13,10 +13,10 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "cancel = confirm"
+    "class": "compensating",
+    "note": "cancel the created order (its own confirm card)"
   },
-  "helpArticle": null,
+  "helpArticle": "phone-orders",
   "questions": {
     "ar": ["زبون كلمني تليفون ازاي اعمله اوردر؟", "ابعتله لينك دفع"],
     "en": ["Create a phone order"]
@@ -31,5 +31,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["#713 open", "No help article"]
+  "gaps": ["#713 open"]
 }

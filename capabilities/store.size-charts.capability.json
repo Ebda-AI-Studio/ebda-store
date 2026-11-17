@@ -16,10 +16,10 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "delete = confirm"
+    "class": "reversible",
+    "note": "edit: yes (before values restored); create = irreversible (no hide switch; delete is wave 2)"
   },
-  "helpArticle": "size-charts",
+  "helpArticle": "store-content-faqs-pages-blog",
   "questions": {
     "ar": ["ازاي اعمل جدول مقاسات؟"],
     "en": ["Add a size chart"]
@@ -33,5 +33,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

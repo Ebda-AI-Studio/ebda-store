@@ -21,7 +21,7 @@
     "class": "reversible",
     "note": "yes (remove then re-invite)"
   },
-  "helpArticle": "staff-members",
+  "helpArticle": "staff-accounts",
   "questions": {
     "ar": [
       "ازاي اضيف موظف؟",
@@ -43,6 +43,6 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No custom roles/permissions editor (one fixed staff role)", "No help article"],
+  "gaps": ["No custom roles/permissions editor (one fixed staff role)"],
   "assistantNote": "grants access: confirm"
 }

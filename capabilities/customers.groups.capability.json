@@ -21,7 +21,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "customer-groups",
   "questions": {
     "ar": ["اعمل مجموعة VIP", "خصم لمجموعة معينة"],
     "en": ["Create a VIP group"]
@@ -34,5 +34,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

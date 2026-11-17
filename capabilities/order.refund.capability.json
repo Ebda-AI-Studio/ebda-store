@@ -23,7 +23,12 @@
   },
   "helpArticle": "invoices-and-credit-notes",
   "questions": {
-    "ar": ["ازاي ارجع فلوس العميل؟", "الريفند فشل", "رجّع كاش مش على الكارت"],
+    "ar": [
+      "ازاي ارجع فلوس العميل؟",
+      "الريفند فشل",
+      "رجّع كاش مش على الكارت",
+      "رجّع فلوس الاوردر ده للعميل"
+    ],
     "en": ["How do I refund a customer?", "The refund failed"]
   },
   "steps": ["Order > Refund."],

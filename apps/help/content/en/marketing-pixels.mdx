@@ -1,65 +1,20 @@
 ---
-title: Marketing pixels (Meta, Google, TikTok)
-description: Connect your Facebook and Instagram, TikTok and Google pixels to your store to measure your ads, and turn on server-side purchase tracking.
-section: Selling
-order: 38
-appPath: /stores
-keywords: pixel facebook meta tiktok snapchat google analytics tag manager capi conversions api access token ads tracking consent
+title: 'Marketing pixels'
+description: 'Add your Meta, TikTok and Google pixels by their public ids.'
+section: Marketing
+order: 40
+appPath: /stores/[id]/marketing-pixels
+keywords: marketing pixels
 capabilities:
   - marketing.pixels@1
 ---
 
-A pixel is a small piece of code that tracks what visitors do in your store and sends it to the ad platform (like Meta or TikTok) so you can measure your ads and improve their results. You enter only the **ID** and the store does the rest. The feature is available on every paid Ebda Store plan, and the store owner sets it up.
+Add your Meta, TikTok and Google pixels by their public ids.
 
-## Add a pixel
+## Steps
+1. Open **Marketing pixels** from the Marketing group.
+2. Turn a platform on and paste its public id.
+3. Access tokens for server-side tracking are pasted on this screen only, never in the assistant.
 
-1. From **Marketing and offers** open the **Pixels** tab. The page is called **Marketing Pixels**.
-2. Open the card of the platform you want and switch its toggle on.
-3. Enter the ID in the field:
-   - **Meta Pixel**: **Pixel ID** (digits).
-   - **TikTok Pixel**: **Pixel ID**.
-   - **Snapchat Pixel**: **Pixel ID**.
-   - **Google Analytics 4**: **Measurement ID** (starts with `G-`).
-   - **Google Tag Manager**: **Container ID** (starts with `GTM-`).
-   - **Google Ads**: **Conversion ID** (starts with `AW-`) and **Conversion Label** (optional).
-   - **Twitter/X Pixel**: **Pixel ID**.
-   - **Pinterest Tag**: **Tag ID**.
-4. Select **Save Changes**. You will see **Marketing pixels saved successfully.**
-
-A card shows **Active** when it is on and **Inactive** when it is off. If you turn a platform off, the store stops using its ID until you turn it on again.
-
-If saving fails you see **Failed to save marketing pixels. Please try again.** Also make sure two-step verification is on for your account, because it is required to save these settings. See [Account security](/en/account-security/).
-
-## What is tracked
-
-When pixels are on, the store sends these events automatically: **Page View**, **View Content** (product page), **Add to Cart**, **Initiate Checkout**, **Purchase**, **Search**, **Add to Wishlist** and **Lead** (contact form submissions).
-
-## Visitor consent
-
-Pixels in the store load after the visitor accepts marketing cookies in the consent banner. A visitor who did not accept is not tracked. This is why ad numbers can look lower than your real order numbers.
-
-## Server-side purchase tracking (Conversions API)
-
-Some browsers and ad blockers stop the normal pixel. That is why Meta and TikTok have an **Access Token (Optional - for Conversions API)** field:
-
-1. Get the access token from your Meta (or TikTok) account.
-2. Paste it into the **Access Token** field on the platform's card and save.
-
-Then the store also sends the **Purchase** event from the server, without needing the customer's browser. Email and phone are hashed before they are sent, and the purchase event is sent with the same order number from the browser and the server, so the platform counts it as one conversion. Server sending is for **Purchase only**, and for Meta and TikTok only.
-
-The token shows masked after saving. If you save without changing it, the old token stays as it is.
-
-## If a pixel is not recording
-
-- Make sure the platform's card is **Active** and you selected **Save Changes**.
-- Make sure the ID is typed correctly and belongs to that platform (for example a GA4 ID in the Google Analytics field).
-- Test from a browser where you accepted cookies, with no ad blocker.
-- If only Purchase is missing, set up the access token for server-side tracking.
-
-## Common questions
-
-**How do I add my Facebook pixel?** On the **Meta Pixel** card: switch it on, enter the **Pixel ID**, and save.
-
-**What does CAPI mean?** Server-side purchase tracking, and it needs the **Access Token**.
-
-**TikTok?** The **TikTok Pixel** card, same idea, with an access token field for server-side tracking.
+## Ask the assistant
+The assistant can turn a pixel on or off and set its public id, with a preview and Undo for 24 hours. It never accepts an access token. The assistant previews the change and offers Undo for 24 hours where the change can be undone.

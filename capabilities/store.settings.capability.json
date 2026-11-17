@@ -22,7 +22,7 @@
     "class": "reversible",
     "note": "yes (edit back)"
   },
-  "helpArticle": "store-details-contact-social",
+  "helpArticle": "store-settings",
   "questions": {
     "ar": ["ازاي اغير رقم التليفون في المتجر؟", "اضيف لينك الانستجرام", "غير اسم المتجر"],
     "en": ["How do I change my store contact details?", "Add my Instagram link"]
@@ -37,5 +37,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article for settings"]
+  "gaps": []
 }

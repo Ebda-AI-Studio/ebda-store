@@ -24,8 +24,13 @@
   },
   "helpArticle": "customer-account-area",
   "questions": {
-    "ar": ["العميل مش لاقي طلباته"],
-    "en": ["Customer cannot see their orders"]
+    "ar": [
+      "العميل مش لاقي طلباته",
+      "العميل مش شايف نقاط الولاء",
+      "المحفظة شغالة عند العملاء؟",
+      "العميل مش لاقي المرتجعات"
+    ],
+    "en": ["Customer cannot see their orders", "Is the customer wallet on?"]
   },
   "steps": ["Storefront /account."],
   "edgeCases": [
@@ -33,5 +38,5 @@
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

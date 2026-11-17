@@ -20,12 +20,12 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "cancel no"
+    "class": "irreversible",
+    "note": "a cancelled or received purchase order cannot be taken back"
   },
-  "helpArticle": null,
+  "helpArticle": "purchase-orders-and-backorders",
   "questions": {
-    "ar": ["ازاي اعمل امر شراء؟", "استلمت نص الشحنة"],
+    "ar": ["ازاي اعمل امر شراء؟", "استلمت نص الشحنة", "ضيف مورد جديد", "اعمل امر شراء من المورد"],
     "en": ["Create a purchase order", "Receive a partial delivery"]
   },
   "steps": ["PO page."],
@@ -39,5 +39,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Accounting/PO fixes open #755", "No help article"]
+  "gaps": ["Accounting/PO fixes open #755"]
 }

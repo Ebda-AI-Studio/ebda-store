@@ -13,10 +13,10 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "delete = confirm no"
+    "class": "compensating",
+    "note": "assistant creates drafts only (never publishes); undo discards the draft through blog_post_discard_draft (confirm-class)"
   },
-  "helpArticle": "blog-posts",
+  "helpArticle": "store-content-faqs-pages-blog",
   "questions": {
     "ar": ["ازاي انزل مقال؟", "شيل المدونة"],
     "en": ["How do I publish a blog post?"]
@@ -32,5 +32,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

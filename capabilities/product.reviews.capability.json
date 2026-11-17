@@ -22,10 +22,10 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "preview",
   "undo": {
-    "class": "unclassified",
-    "note": "reject/approve yes; delete = confirm"
+    "class": "reversible",
+    "note": "approve, hide and send-back are one tool that restores the previous status; deleting a review is not an assistant tool (Reviews page, confirm)"
   },
-  "helpArticle": null,
+  "helpArticle": "product-reviews",
   "questions": {
     "ar": ["ازاي اوافق على تقييم؟", "ارد على تقييم سلبي", "التقييم الوهمي ازاي اشيله؟"],
     "en": ["How do I reply to a bad review?"]
@@ -42,5 +42,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

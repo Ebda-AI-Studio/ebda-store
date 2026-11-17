@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes (tick/untick, dismiss)"
   },
-  "helpArticle": "setup-guide",
+  "helpArticle": null,
   "questions": {
     "ar": ["لسه باقي إيه عشان المتجر يجهز؟", "ايه الخطوات اللي ناقصاني؟", "اخفي قايمة التجهيز"],
     "en": ["What's left before my store is ready?", "Hide the setup checklist"]

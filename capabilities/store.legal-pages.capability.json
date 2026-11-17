@@ -20,7 +20,7 @@
     "class": "reversible",
     "note": "yes (page revisions)"
   },
-  "helpArticle": "store-pages-and-policies",
+  "helpArticle": "store-content-faqs-pages-blog",
   "questions": {
     "ar": ["ازاي اكتب سياسة الاسترجاع؟", "عدل صفحة الشروط"],
     "en": ["Edit my privacy policy"]
@@ -34,5 +34,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article for editing store pages"]
+  "gaps": []
 }

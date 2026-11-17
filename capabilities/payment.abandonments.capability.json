@@ -16,9 +16,9 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "payment-abandonments-and-events",
   "questions": {
-    "ar": ["مين بدأ الدفع وماكملش؟"],
+    "ar": ["مين بدأ الدفع وماكملش؟", "كام واحد سابوا الدفع النهارده؟", "مين وصل للدفع وماكملش"],
     "en": ["Who started paying and left?"]
   },
   "steps": ["Business plan page."],
@@ -28,5 +28,5 @@
     "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }
