@@ -1,0 +1,44 @@
+{
+  "id": "product.create",
+  "status": "live",
+  "area": "products",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اضيف منتج",
+  "titleEn": "Create a product (title, price, images, stock)",
+  "screens": ["/stores/[id]/products/new"],
+  "api": ["POST /stores/:storeId/products", "POST /uploads/image"],
+  "mcpTool": "admin_create_product",
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "compensating",
+    "note": "assistant undo archives the created product (set status archived); deleting is a confirm-class action"
+  },
+  "helpArticle": "products-and-csv-import",
+  "questions": {
+    "ar": [
+      "ازاي اضيف منتج؟",
+      "عايز اضيف منتج بسعر 250 جنيه",
+      "اضيف صور للمنتج",
+      "المنتج مش ظاهر في المتجر ليه؟"
+    ],
+    "en": ["How do I add a product?", "Why is my product not visible?"]
+  },
+  "steps": ["Products > New: names AR/EN, price, images, category, stock, publish."],
+  "edgeCases": [
+    "Basic/Free: Free plan maxProducts 50",
+    "Image too large / many images: upload limiter",
+    "Duplicate SKU/slug",
+    "Price in piastres vs EGP (integer minor units)",
+    "Draft vs active",
+    "Arabic-only product on bilingual store",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

@@ -19,10 +19,23 @@
   "undo": {
     "class": "compensating"
   },
+  "operatorReason": {
+    "code": "abuse",
+    "text": "provider verification and abuse (fraud): platform staff turn a provider off for one store",
+    "validUnderRule": true
+  },
   "helpArticle": "payment-providers",
   "questions": {
-    "ar": ["ليه البوابة اتقفلت على متجري؟"],
-    "en": ["Why was my provider turned off for my store?"]
+    "ar": [
+      "ليه البوابة اتقفلت على متجري؟",
+      "مين قفل شركة الشحن عندي؟",
+      "ازاي ارجّع البوابة بعد ما اتقفلت؟"
+    ],
+    "en": [
+      "Why was my provider turned off for my store?",
+      "Who switched off my carrier?",
+      "How do I get my gateway back after it was turned off?"
+    ]
   },
   "steps": [
     "Super admin opens Activation requests, picks the row and deactivates with a note the merchant sees"

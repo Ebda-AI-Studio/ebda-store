@@ -1,0 +1,7 @@
+{
+  "ids": [
+    "model-call-outside-smart-layer|apps/api/src/lib/ai/gemini-keys.ts|provider-sdk-import|e7b5e6352e|0",
+    "model-call-outside-smart-layer|apps/api/src/services/answer-engine/gemini.provider.ts|gemini-rest|2f351b3ad4|0",
+    "model-call-outside-smart-layer|apps/api/src/services/answer-engine/openai.provider.ts|openai-rest|eadf0a120c|0"
+  ]
+}
