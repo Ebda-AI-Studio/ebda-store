@@ -69,6 +69,7 @@ import {
   GRANTED_PLAN_CODES,
   MAX_DUNNING_ATTEMPTS,
   INSTAPAY_GRACE_DAYS,
+  REMINDER_OFFSETS,
   TRIAL_DAYS,
   isGrantedPlan,
   addDays,
@@ -2282,6 +2283,39 @@ export function nextChargeOf(
   return { at, planCode, amountMinor: charge.totalMinor, vat: ledgerVat(charge).vat };
 }
 
+export type TermBasis = 'paid' | 'assigned' | 'comped' | 'trial';
+
+/**
+ * What the current term rests on (B2). `comped`/`trial` come from the status. Otherwise the term is `paid` when a
+ * succeeded payment for a plan (checkout, renewal, upgrade, manual payment; an add-on purchase never counts) was made
+ * since the current period started (one day of slack), else `assigned`: a super admin set the plan with no payment.
+ */
+export async function termBasisOf(
+  storeId: string,
+  sub: { status: string; planCode: string; currentPeriodStart: Date | null }
+): Promise<TermBasis | null> {
+  if (sub.status === 'comped' || isGrantedPlan(sub.planCode)) return 'comped';
+  if (sub.status === 'trialing') return 'trial';
+  if (sub.status === 'canceled' || sub.planCode === FREE_PLAN_CODE) return null;
+  const since = sub.currentPeriodStart
+    ? new Date(sub.currentPeriodStart.getTime() - 86_400_000)
+    : new Date(0);
+  const rows = await withStore(storeId, tx =>
+    tx.billingEvent.findMany({
+      where: {
+        storeId,
+        status: 'succeeded',
+        amountMinor: { gt: 0 },
+        type: { in: ['checkout', 'renewal', 'upgrade', 'manual_payment'] },
+        createdAt: { gte: since },
+      },
+      select: { planCode: true },
+      take: 20,
+    })
+  );
+  return rows.some(r => !r.planCode?.startsWith('addon')) ? 'paid' : 'assigned';
+}
+
 /** Billing-cycle facts the merchant Billing page needs beyond the entitlements. */
 export async function getSubscriptionBillingState(storeId: string) {
   const sub = await loadSub(storeId);
@@ -2315,6 +2349,7 @@ export async function getSubscriptionBillingState(storeId: string) {
   const next = nextChargeOf(sub, plans, vat);
   const now = Date.now();
   const daysLeft = next ? Math.ceil((next.at.getTime() - now) / 86_400_000) : null;
+  const termBasis = sub ? await termBasisOf(storeId, sub) : null;
   const handle = instapayHandle();
   const support = supportContact();
   return {
@@ -2338,6 +2373,13 @@ export async function getSubscriptionBillingState(storeId: string) {
       qrUrl: handle ? instapayQrUrl() : null,
       pendingClaims,
     },
+    /**
+     * B2: true while the next payment is inside the reminder window (REMINDER_OFFSETS, 7 days) or past due. Outside it
+     * the screen says "renews on", never "payment due" or "returns to free" (a year-long term showed both a year early).
+     */
+    inRenewalWindow: daysLeft !== null && daysLeft <= Math.max(...REMINDER_OFFSETS),
+    /** What the CURRENT term rests on: paid, assigned by Ebda Store (no payment), comped, trial; null = none. */
+    termBasis,
     /** Banner input: the next due date when it is within 7 days (or already past). */
     dueSoon:
       next && daysLeft !== null && daysLeft <= 7

@@ -34,6 +34,8 @@ import {
   applyWebhookEvent,
   cancelSubscription,
   changePlan,
+  getSubscriptionBillingState,
+  termBasisOf,
   findDueSubscriptionIds,
   listLedger,
   listStoreCharges,
@@ -883,6 +885,70 @@ describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
       (await changePlan({ storeId: paid.storeId, planCode: NOPRICE, provider: stub }).catch(e => e))
         .code
     ).toBe('PLAN_PRICE_NOT_SET');
+  });
+});
+
+describe.skipIf(!hasDb)('B2: term basis and the renewal window', () => {
+  it('a plan set with no payment is "assigned"; a succeeded plan payment this period makes it "paid"; comped is comped', async () => {
+    const now = new Date();
+    const { storeId, subId } = await subscribedStore({
+      planCode: PRO,
+      periodEnd: addDays(now, 360),
+    });
+    // the period started 5 days ago (the fixture's start is not meaningful here)
+    await withRlsBypass(tx =>
+      tx.storeSubscription.update({
+        where: { storeId },
+        data: { currentPeriodStart: addDays(now, -5) },
+      })
+    );
+    const sub = await getSub(storeId);
+    expect(await termBasisOf(storeId, sub)).toBe('assigned');
+    // an add-on purchase never counts as paying for the plan term
+    await withRlsBypass(tx =>
+      tx.billingEvent.create({
+        data: {
+          storeId,
+          subscriptionId: subId,
+          type: 'upgrade',
+          planCode: 'addon:feature:loyalty',
+          amountMinor: 9900,
+          currency: 'EGP',
+          provider: 'stub',
+          idempotencyKey: `b2-addon-${crypto.randomUUID()}`,
+          status: 'succeeded',
+        },
+      })
+    );
+    expect(await termBasisOf(storeId, sub)).toBe('assigned');
+    await withRlsBypass(tx =>
+      tx.billingEvent.create({
+        data: {
+          storeId,
+          subscriptionId: subId,
+          type: 'manual_payment',
+          planCode: PRO,
+          amountMinor: 49900,
+          currency: 'EGP',
+          provider: 'manual',
+          idempotencyKey: `b2-paid-${crypto.randomUUID()}`,
+          status: 'succeeded',
+        },
+      })
+    );
+    expect(await termBasisOf(storeId, sub)).toBe('paid');
+    const comped = await subscribedStore({ planCode: 'comped', status: 'comped', token: null });
+    expect(await termBasisOf(comped.storeId, await getSub(comped.storeId))).toBe('comped');
+  });
+
+  it('inRenewalWindow is false a year before the due date and true within 7 days', async () => {
+    const now = new Date();
+    const far = await subscribedStore({ planCode: PRO, periodEnd: addDays(now, 360) });
+    expect((await getSubscriptionBillingState(far.storeId)).inRenewalWindow).toBe(false);
+    const near = await subscribedStore({ planCode: PRO, periodEnd: addDays(now, 3) });
+    const st = await getSubscriptionBillingState(near.storeId);
+    expect(st.inRenewalWindow).toBe(true);
+    expect(st.termBasis).toBe('assigned');
   });
 });
 

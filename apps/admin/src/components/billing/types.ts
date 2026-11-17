@@ -63,6 +63,10 @@ export interface BillingInfo {
     pendingClaims: number;
   };
   dueSoon: { dueAt: string; daysLeft: number } | null;
+  /** B2: the next payment is within the 7-day reminder window (or past). Absent = treat as inside (older API). */
+  inRenewalWindow?: boolean;
+  /** B2: what the current term rests on; null/absent = none. */
+  termBasis?: 'paid' | 'assigned' | 'comped' | 'trial' | null;
   overdue: boolean;
   /** InstaPay: the store pauses at this time if unpaid. */
   suspendAt: string | null;

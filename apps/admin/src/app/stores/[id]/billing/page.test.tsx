@@ -363,6 +363,54 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     expect(screen.queryByText(/^trial\.nextChargeLine/)).toBeNull();
   });
 
+  it('B2: a term renewing a year from now says "renews on", never "payment due" or "returns to free"', async () => {
+    mockApi(
+      billing({
+        subscription: {
+          status: 'active',
+          currentPeriodEnd: '2027-11-12T00:00:00.000Z',
+          trialEndsAt: null,
+          cancelAtPeriodEnd: false,
+        },
+        availablePlans: plans,
+        billing: {
+          ...billingFixture(),
+          billingMethod: 'instapay',
+          cardBilling: false,
+          inRenewalWindow: false,
+          termBasis: 'assigned',
+          nextCharge: { at: '2027-11-12T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('trial.renewsOn')).toBeTruthy();
+    expect(screen.getByText(/^trial\.renewsOnLine:/)).toBeTruthy();
+    expect(screen.queryByText('trial.instapayDue')).toBeNull();
+    expect(screen.queryByText('trial.returnsToFree')).toBeNull();
+    expect(screen.getByTestId('term-basis').textContent).toContain('trial.basis.assigned');
+  });
+
+  it('B2: inside the 7-day window the same store says payment due and warns about free', async () => {
+    mockApi(
+      billing({
+        availablePlans: plans,
+        billing: {
+          ...billingFixture(),
+          billingMethod: 'instapay',
+          cardBilling: false,
+          inRenewalWindow: true,
+          termBasis: 'paid',
+          nextCharge: { at: '2026-11-20T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('trial.instapayDue')).toBeTruthy();
+    expect(screen.getByText('trial.returnsToFree')).toBeTruthy();
+    expect(screen.getByTestId('term-basis').textContent).toContain('trial.basis.paid');
+  });
+
   it('a card store still says next charge, now with the interval beside the amount', async () => {
     mockApi(
       billing({

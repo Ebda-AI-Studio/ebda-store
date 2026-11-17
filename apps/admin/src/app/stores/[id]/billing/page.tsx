@@ -505,6 +505,8 @@ export default function StoreBillingPage() {
   // InstaPay-only deployment (BILLING_PROVIDER=none) or a store that pays by transfer: a payment is DUE, nothing is
   // charged automatically (Ruling BILLING-NONE-COPY-1).
   const instapayDue = info?.cardBilling === false || instapayChosen;
+  // B2: "payment due" + "returns to free" only inside the reminder window; a long term says "renews on" until then.
+  const dueNow = instapayDue && info?.inRenewalWindow !== false;
   // What the merchant is shown to transfer: the plan just picked, else the stored quote.
   const payDetails = instapay && quote ? { ...instapay, ...quote } : instapay;
   const showCardControls =
@@ -806,24 +808,41 @@ export default function StoreBillingPage() {
                 {info.nextCharge && (
                   <div className="flex justify-between gap-2 sm:col-span-2">
                     <dt className="text-muted-foreground">
-                      {t(instapayDue ? 'trial.instapayDue' : 'trial.nextCharge')}
+                      {t(
+                        dueNow
+                          ? 'trial.instapayDue'
+                          : instapayDue
+                            ? 'trial.renewsOn'
+                            : 'trial.nextCharge'
+                      )}
                     </dt>
                     <dd className="text-end tabular-nums">
                       {info.nextCharge.amountMinor !== null
-                        ? t(instapayDue ? 'trial.instapayDueLine' : 'trial.nextChargeLine', {
-                            amount: formatMoney(info.nextCharge.amountMinor, locale, {
-                              fixedDecimals: true,
-                            }),
-                            interval: t(
-                              info.billingInterval === 'yearly'
-                                ? 'intervalYearly'
-                                : 'intervalMonthly'
-                            ),
-                            plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
-                            date: fmtBillingDate(info.nextCharge.at, locale),
-                          })
+                        ? t(
+                            dueNow
+                              ? 'trial.instapayDueLine'
+                              : instapayDue
+                                ? 'trial.renewsOnLine'
+                                : 'trial.nextChargeLine',
+                            {
+                              amount: formatMoney(info.nextCharge.amountMinor, locale, {
+                                fixedDecimals: true,
+                              }),
+                              interval: t(
+                                info.billingInterval === 'yearly'
+                                  ? 'intervalYearly'
+                                  : 'intervalMonthly'
+                              ),
+                              plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
+                              date: fmtBillingDate(info.nextCharge.at, locale),
+                            }
+                          )
                         : t(
-                            instapayDue ? 'trial.instapayDueNoAmount' : 'trial.nextChargeNoAmount',
+                            dueNow
+                              ? 'trial.instapayDueNoAmount'
+                              : instapayDue
+                                ? 'trial.renewsOnNoAmount'
+                                : 'trial.nextChargeNoAmount',
                             {
                               plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
                               date: fmtBillingDate(info.nextCharge.at, locale),
@@ -832,10 +851,19 @@ export default function StoreBillingPage() {
                     </dd>
                   </div>
                 )}
-                {info.nextCharge && instapayDue && (
+                {info.nextCharge && dueNow && (
                   <p className="text-xs text-muted-foreground sm:col-span-2">
                     {t('trial.returnsToFree')}
                   </p>
+                )}
+                {info.termBasis && (
+                  <div
+                    className="flex justify-between gap-2 sm:col-span-2"
+                    data-testid="term-basis"
+                  >
+                    <dt className="text-muted-foreground">{t('trial.termBasis')}</dt>
+                    <dd>{t(`trial.basis.${info.termBasis}`)}</dd>
+                  </div>
                 )}
               </dl>
             </section>

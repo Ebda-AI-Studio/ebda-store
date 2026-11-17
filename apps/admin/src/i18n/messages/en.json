@@ -9368,7 +9368,17 @@
       "instapayDue": "Payment due",
       "instapayDueLine": "InstaPay payment due by {date}: {amount} ({interval}) for {plan}",
       "instapayDueNoAmount": "InstaPay payment due by {date} for {plan}",
-      "returnsToFree": "Your plan returns to Free if it is not paid by then."
+      "returnsToFree": "Your plan returns to Free if it is not paid by then.",
+      "renewsOn": "Renews on",
+      "renewsOnLine": "{plan} renews on {date}: {amount} ({interval}) by InstaPay",
+      "renewsOnNoAmount": "{plan} renews on {date}",
+      "termBasis": "Current term",
+      "basis": {
+        "paid": "Paid",
+        "assigned": "Assigned by the Ebda Store team (no payment)",
+        "comped": "Free from the Ebda Store team",
+        "trial": "Free trial"
+      }
     },
     "pay": {
       "title": "Payment method",

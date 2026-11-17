@@ -9368,7 +9368,17 @@
       "instapayDue": "مستحق الدفع",
       "instapayDueLine": "دفع إنستاباي مستحق بحلول {date}: {amount} ({interval}) لباقة {plan}",
       "instapayDueNoAmount": "دفع إنستاباي مستحق بحلول {date} لباقة {plan}",
-      "returnsToFree": "باقتك هترجع للمجانية لو ما اتدفعتش لحد ساعتها."
+      "returnsToFree": "باقتك هترجع للمجانية لو ما اتدفعتش لحد ساعتها.",
+      "renewsOn": "ميعاد التجديد",
+      "renewsOnLine": "باقة {plan} بتتجدد يوم {date}: {amount} ({interval}) بإنستاباي",
+      "renewsOnNoAmount": "باقة {plan} بتتجدد يوم {date}",
+      "termBasis": "الفترة الحالية",
+      "basis": {
+        "paid": "مدفوعة",
+        "assigned": "فريق ابدأ ستور فعّلها من غير دفع",
+        "comped": "هدية من فريق ابدأ ستور",
+        "trial": "تجربة مجانية"
+      }
     },
     "pay": {
       "title": "طريقة الدفع",
