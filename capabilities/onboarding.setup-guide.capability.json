@@ -1,0 +1,39 @@
+{
+  "id": "onboarding.setup-guide",
+  "status": "live",
+  "area": "onboarding",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "قايمة تجهيز المتجر",
+  "titleEn": "Setup guide checklist (add product, brand, shipping, payment, domain, test order, share)",
+  "screens": ["/stores/[id]"],
+  "api": [
+    "GET /stores/:storeId/setup-guide",
+    "PUT /stores/:storeId/setup-guide/items/:key",
+    "PUT /stores/:storeId/setup-guide/dismissed"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (tick/untick, dismiss)"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["لسه باقي إيه عشان المتجر يجهز؟", "ايه الخطوات اللي ناقصاني؟", "اخفي قايمة التجهيز"],
+    "en": ["What's left before my store is ready?", "Hide the setup checklist"]
+  },
+  "steps": [
+    "Dashboard shows 7 items; auto items complete from real data, manual items can be ticked."
+  ],
+  "edgeCases": [
+    "Auto items cannot be hand-ticked",
+    "Dismissed guide can be restored",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article for the setup guide"]
+}

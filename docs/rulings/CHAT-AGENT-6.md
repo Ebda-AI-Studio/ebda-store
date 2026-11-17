@@ -1,0 +1,11 @@
+Ruling CHAT-AGENT-6 (2026-11-14, independent review of ebda-store pr 757 I1) - Chat's `searchProducts` reaches the meaning leg and says when it did not.
+
+- The bridge calls `rankedSearchWithMode(storeId, query, { searcher })`. Before, no searcher was passed, so the embed gate (default deny, `embed-budget.ts`) refused with `no-searcher` and every query the keyword leg could not answer returned an empty list that Chat then read as a real "we don't have it".
+- Searcher id = `wa-chat:<storeId>` or `wa-chat:<storeId>:<opaque>` (`lib/wa/bridge/searcher.ts`). The optional `searcher` arg is an opaque per-shopper id Chat already holds (`^[A-Za-z0-9_-]{1,64}$`, never a phone); a malformed one is `invalid`. The `wa-chat:` prefix cannot collide with a storefront `ip:` bucket. The per-minute searcher cap, the per-store DAILY cap and the platform DAILY cap all still apply, so Chat cannot spend more of a store's embed budget than the same number of storefront searches, and one shopper cannot drain Chat's share.
+- Result is `{ items, degraded }`. `degraded: true` = the meaning leg was wanted but skipped (budget, searcher limit, outage). Chat must treat an EMPTY + degraded answer as uncertain ("let me check"), never as a negative. Non-empty results are returned as they are.
+- Contract: `bridge-chat-context-v2.json` replaces the unmerged v1 (adds `degraded`, a degraded case, the searcher cases, and a synthetic profile phone instead of a plausible real number). ebda-whatsapp vendors v2.
+  Cost if wrong: Chat shows a smaller (keyword-only) answer when the budget is spent and says "let me check" instead of "we don't have it"; the worst case is a few extra handoffs on a store that exhausted its daily embed cap.
+
+## Amendment 2026-11-14 (re-review): budget spent = degraded for Chat
+
+Once the store daily query-embed budget is spent the storefront skips the meaning leg and reports `degraded: false` (a budget, not a failure). For Chat an empty answer then rests on keyword search alone, so `searchProducts` reports `degraded: true` when nothing ranks and `queryBudgetSpent(storeId)`; the agent says it will check. Test: wa-bridge-do-port-chat-context "an empty answer once the store search budget is spent is DEGRADED". Cost if wrong: on a budget-spent day Chat says "let me check" for genuinely absent products instead of "we do not have it".

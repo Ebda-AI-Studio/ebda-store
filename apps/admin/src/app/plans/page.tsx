@@ -6,12 +6,15 @@
  * `plans` is DATA: this page lists every plan (including the non-public
  * `comped` grant) and edits its names, order, visibility, prices and limits.
  * Prices are piastres in the DB and NULL until Ahmad sets them ("Not set" is
- * shown, never 0). A null numeric limit means unlimited.
+ * shown, never 0). A null price means "no price for that period yet": the
+ * marketing page shows "price soon", onboarding shows "price TBD" and
+ * subscribing raises PLAN_PRICE_NOT_SET. A null numeric limit means unlimited.
+ * Fees are edited as percentages and sent as bps (API contract unchanged).
  *
  * Route guard: super_admin only (RequireSuperAdmin + the API's requireRole).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Input, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
@@ -22,6 +25,7 @@ import { Toggle } from '../../components/Toggle';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
+import { bpsToPercentInput, percentInputToBps } from './plan-form';
 
 interface PlanRow {
   code: string;
@@ -56,6 +60,133 @@ const TIER_KEYS = [
   { key: 'supportTier', options: ['email', 'chat', 'priority'] },
 ] as const;
 const BPS_KEYS = ['platformFeeBps', 'codPlatformFeeBps'] as const;
+type FeeKey = (typeof BPS_KEYS)[number];
+
+interface FormState {
+  nameEn: string;
+  nameAr: string;
+  sort: string;
+  isPublic: boolean;
+  priceMonthly: string;
+  priceYearly: string;
+}
+
+/** Form state -> API payload; null while any field is invalid. */
+function buildPayload(form: FormState, fees: Record<FeeKey, string>, limits: PlanLimits) {
+  const monthly = inputToMinor(form.priceMonthly);
+  const yearly = inputToMinor(form.priceYearly);
+  const sort = Number.parseInt(form.sort, 10);
+  const platformFeeBps = percentInputToBps(fees.platformFeeBps);
+  const codPlatformFeeBps = percentInputToBps(fees.codPlatformFeeBps);
+  if ([monthly, yearly, sort, platformFeeBps, codPlatformFeeBps].some(n => Number.isNaN(n))) {
+    return null;
+  }
+  if (!form.nameEn.trim() || !form.nameAr.trim() || sort < 0) return null;
+  return {
+    nameEn: form.nameEn,
+    nameAr: form.nameAr,
+    sort,
+    isPublic: form.isPublic,
+    priceMonthlyMinor: monthly,
+    priceYearlyMinor: yearly,
+    limits: { ...limits, platformFeeBps, codPlatformFeeBps },
+  };
+}
+
+/** Input with a fixed unit (EGP / %) inside the field, logical-end aligned for RTL. */
+function UnitField({
+  label,
+  unit,
+  help,
+  error,
+  ...props
+}: {
+  label: string;
+  unit: string;
+  help?: string;
+  error?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  const id = useId();
+  const noteId = `${id}-note`;
+  return (
+    <div className="w-full">
+      <label htmlFor={id} className="mb-2 block text-sm font-medium text-foreground">
+        {label}
+      </label>
+      <div className="relative">
+        <Input
+          id={id}
+          className="pe-14 tabular-nums"
+          data-error={error ? 'true' : undefined}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={help || error ? noteId : undefined}
+          {...props}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-sm text-muted-foreground"
+        >
+          {unit}
+        </span>
+      </div>
+      {(error || help) && (
+        <p
+          id={noteId}
+          className={`mt-1.5 text-xs ${error ? 'text-destructive-ink' : 'text-muted-foreground'}`}
+        >
+          {error || help}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id} className="space-y-3">
+      <h3 id={id} className="border-b pb-1.5 text-sm font-semibold text-foreground">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+/** Label + help on the start side, switch on the end side. */
+function SwitchRow({
+  label,
+  help,
+  checked,
+  onChange,
+}: {
+  label: string;
+  help?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5">
+      <span className="min-w-0">
+        <span id={`${id}-l`} className="block text-sm text-foreground">
+          {label}
+        </span>
+        {help && (
+          <span id={`${id}-h`} className="block text-xs text-muted-foreground">
+            {help}
+          </span>
+        )}
+      </span>
+      <Toggle
+        checked={checked}
+        onChange={onChange}
+        aria-labelledby={`${id}-l`}
+        aria-describedby={help ? `${id}-h` : undefined}
+      />
+    </div>
+  );
+}
 
 /** Piastres -> the EGP string in an input ('' = not set). */
 function minorToInput(minor: number | null): string {
@@ -83,7 +214,7 @@ function PlansInner() {
   const [formError, setFormError] = useState<string | null>(null);
 
   // Edit-form state (strings for inputs; converted on save).
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     nameEn: '',
     nameAr: '',
     sort: '0',
@@ -92,6 +223,17 @@ function PlansInner() {
     priceYearly: '',
   });
   const [limits, setLimits] = useState<PlanLimits | null>(null);
+  const [fees, setFees] = useState<Record<FeeKey, string>>({
+    platformFeeBps: '0',
+    codPlatformFeeBps: '0',
+  });
+  const [baseline, setBaseline] = useState('');
+
+  const payload = useMemo(
+    () => (limits ? buildPayload(form, fees, limits) : null),
+    [form, fees, limits]
+  );
+  const dirty = payload !== null && JSON.stringify(payload) !== baseline;
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -119,29 +261,35 @@ function PlansInner() {
       priceYearly: minorToInput(plan.priceYearlyMinor),
     });
     setLimits({ ...plan.limits });
+    const nextFees = {
+      platformFeeBps: bpsToPercentInput(plan.limits.platformFeeBps),
+      codPlatformFeeBps: bpsToPercentInput(plan.limits.codPlatformFeeBps),
+    };
+    setFees(nextFees);
+    const first = buildPayload(
+      {
+        nameEn: plan.nameEn,
+        nameAr: plan.nameAr,
+        sort: String(plan.sort),
+        isPublic: plan.isPublic,
+        priceMonthly: minorToInput(plan.priceMonthlyMinor),
+        priceYearly: minorToInput(plan.priceYearlyMinor),
+      },
+      nextFees,
+      plan.limits
+    );
+    setBaseline(JSON.stringify(first));
   }
 
   async function save() {
-    if (!editing || !limits) return;
-    const monthly = inputToMinor(form.priceMonthly);
-    const yearly = inputToMinor(form.priceYearly);
-    const sort = Number.parseInt(form.sort, 10);
-    if (Number.isNaN(monthly) || Number.isNaN(yearly) || Number.isNaN(sort)) {
+    if (!editing || !payload) {
       setFormError(t('errors.invalidNumber'));
       return;
     }
     setSaving(true);
     setFormError(null);
     try {
-      const { error } = await apiPut(`/api/v1/admin/plans/${editing.code}`, {
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
-        sort,
-        isPublic: form.isPublic,
-        priceMonthlyMinor: monthly,
-        priceYearlyMinor: yearly,
-        limits,
-      });
+      const { error } = await apiPut(`/api/v1/admin/plans/${editing.code}`, payload);
       if (error) {
         setFormError(error.message || t('errors.saveFailed'));
         return;
@@ -270,64 +418,86 @@ function PlansInner() {
         isOpen={editing !== null}
         onClose={() => setEditing(null)}
         title={editing ? t('editTitle', { code: editing.code }) : ''}
+        closeLabel={t('form.close')}
         size="lg"
       >
-        <ModalBody>
+        <ModalBody className="space-y-6 px-0 py-0">
           {limits && (
-            <div className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input
-                  label={t('form.nameEn')}
-                  value={form.nameEn}
-                  onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
-                />
-                <Input
-                  label={t('form.nameAr')}
-                  dir="rtl"
-                  value={form.nameAr}
-                  onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
-                />
-                <Input
-                  label={t('form.sort')}
-                  type="number"
-                  min={0}
-                  value={form.sort}
-                  onChange={e => setForm(f => ({ ...f, sort: e.target.value }))}
-                />
-                <div className="flex items-end gap-3 pb-2">
-                  <Toggle
-                    checked={form.isPublic}
-                    onChange={v => setForm(f => ({ ...f, isPublic: v }))}
+            <>
+              <Section title={t('form.sectionVisibility')}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input
+                    label={t('form.nameEn')}
+                    value={form.nameEn}
+                    onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
                   />
-                  <span className="text-sm">{t('form.isPublic')}</span>
+                  <Input
+                    label={t('form.nameAr')}
+                    dir="rtl"
+                    value={form.nameAr}
+                    onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
+                  />
+                  <Input
+                    label={t('form.sort')}
+                    type="number"
+                    min={0}
+                    value={form.sort}
+                    onChange={e => setForm(f => ({ ...f, sort: e.target.value }))}
+                  />
+                  <div className="self-end">
+                    <SwitchRow
+                      label={t('form.isPublic')}
+                      help={t('form.isPublicHelp')}
+                      checked={form.isPublic}
+                      onChange={v => setForm(f => ({ ...f, isPublic: v }))}
+                    />
+                  </div>
                 </div>
-                <Input
-                  label={t('form.priceMonthly')}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  placeholder={t('priceNotSet')}
-                  value={form.priceMonthly}
-                  onChange={e => setForm(f => ({ ...f, priceMonthly: e.target.value }))}
-                />
-                <Input
-                  label={t('form.priceYearly')}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  placeholder={t('priceNotSet')}
-                  value={form.priceYearly}
-                  onChange={e => setForm(f => ({ ...f, priceYearly: e.target.value }))}
-                />
-              </div>
+              </Section>
 
-              <div>
-                <h3 className="mb-2 text-sm font-semibold">{t('form.limitsTitle')}</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
+              <Section title={t('form.sectionPrices')}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <UnitField
+                    label={t('form.priceMonthly')}
+                    unit={t('form.currency')}
+                    help={t('form.priceMonthlyHelp')}
+                    error={
+                      Number.isNaN(inputToMinor(form.priceMonthly))
+                        ? t('errors.invalidNumber')
+                        : undefined
+                    }
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder={t('priceNotSet')}
+                    value={form.priceMonthly}
+                    onChange={e => setForm(f => ({ ...f, priceMonthly: e.target.value }))}
+                  />
+                  <UnitField
+                    label={t('form.priceYearly')}
+                    unit={t('form.currency')}
+                    help={t('form.priceYearlyHelp')}
+                    error={
+                      Number.isNaN(inputToMinor(form.priceYearly))
+                        ? t('errors.invalidNumber')
+                        : undefined
+                    }
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder={t('priceNotSet')}
+                    value={form.priceYearly}
+                    onChange={e => setForm(f => ({ ...f, priceYearly: e.target.value }))}
+                  />
+                </div>
+              </Section>
+
+              <Section title={t('form.sectionLimits')}>
+                <div className="grid gap-4 sm:grid-cols-2">
                   {NUMERIC_KEYS.map(k => (
-                    <div key={k} className="space-y-1">
+                    <div key={k} className="space-y-1.5">
                       <Input
                         label={t(`limits.${k}`)}
                         type="number"
@@ -340,9 +510,11 @@ function PlansInner() {
                           setLimits(l => (l ? { ...l, [k]: Number.isNaN(n) ? 0 : n } : l));
                         }}
                       />
-                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <label className="flex min-h-6 items-center gap-2 text-xs text-muted-foreground">
                         <input
                           type="checkbox"
+                          className="h-4 w-4 accent-primary"
+                          aria-label={`${t(`limits.${k}`)}: ${t('unlimited')}`}
                           checked={limits[k] === null}
                           onChange={e =>
                             setLimits(l => (l ? { ...l, [k]: e.target.checked ? null : 0 } : l))
@@ -352,38 +524,50 @@ function PlansInner() {
                       </label>
                     </div>
                   ))}
+                </div>
+              </Section>
+
+              <Section title={t('form.sectionFees')}>
+                <div className="grid gap-4 sm:grid-cols-2">
                   {BPS_KEYS.map(k => (
-                    <Input
+                    <UnitField
                       key={k}
                       label={t(`limits.${k}`)}
-                      type="number"
-                      min={0}
-                      max={10000}
-                      value={String(limits[k])}
-                      onChange={e => {
-                        const n = Number.parseInt(e.target.value, 10);
-                        setLimits(l => (l ? { ...l, [k]: Number.isNaN(n) ? 0 : n } : l));
-                      }}
+                      unit="%"
+                      error={
+                        Number.isNaN(percentInputToBps(fees[k])) ? t('form.invalidFee') : undefined
+                      }
+                      type="text"
+                      inputMode="decimal"
+                      dir="ltr"
+                      value={fees[k]}
+                      onChange={e => setFees(f => ({ ...f, [k]: e.target.value }))}
                     />
                   ))}
                 </div>
-                <div className="mt-3 space-y-2">
+                <p className="text-xs text-muted-foreground">{t('form.feesHelp')}</p>
+              </Section>
+
+              <Section title={t('form.sectionFeatures')}>
+                <div className="grid gap-2 sm:grid-cols-2">
                   {BOOLEAN_KEYS.map(k => (
-                    <div key={k} className="flex items-center gap-3">
-                      <Toggle
-                        checked={limits[k]}
-                        onChange={v => setLimits(l => (l ? { ...l, [k]: v } : l))}
-                      />
-                      <span className="text-sm">{t(`limits.${k}`)}</span>
-                    </div>
+                    <SwitchRow
+                      key={k}
+                      label={t(`limits.${k}`)}
+                      checked={limits[k]}
+                      onChange={v => setLimits(l => (l ? { ...l, [k]: v } : l))}
+                    />
                   ))}
                 </div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              </Section>
+
+              <Section title={t('form.sectionTiers')}>
+                <div className="grid gap-4 sm:grid-cols-2">
                   {TIER_KEYS.map(({ key, options }) => (
-                    <label key={key} className="space-y-1 text-sm">
+                    <label key={key} className="block space-y-2 text-sm font-medium">
                       <span>{t(`limits.${key}`)}</span>
                       <select
-                        className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        className="block h-11 w-full rounded-md border border-input bg-background px-3 text-base font-normal sm:h-10 sm:text-sm"
                         value={limits[key]}
                         onChange={e => setLimits(l => (l ? { ...l, [key]: e.target.value } : l))}
                       >
@@ -396,18 +580,21 @@ function PlansInner() {
                     </label>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">{t('form.bpsHint')}</p>
-              </div>
+              </Section>
 
-              {formError && <p className="text-sm text-destructive-ink">{formError}</p>}
-            </div>
+              {formError && (
+                <p role="alert" className="text-sm text-destructive-ink">
+                  {formError}
+                </p>
+              )}
+            </>
           )}
         </ModalBody>
         <ModalFooter>
           <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
             {tCommon('cancel')}
           </Button>
-          <Button onClick={save} disabled={saving}>
+          <Button onClick={save} disabled={saving || !dirty}>
             {saving ? t('saving') : t('save')}
           </Button>
         </ModalFooter>

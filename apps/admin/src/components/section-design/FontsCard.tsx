@@ -7,6 +7,7 @@
  * (the editor keeps it in the draft document, Ruling VE-4).
  */
 import { Button } from '@/components/ui/Button';
+import { fieldControlClasses } from '../ui/Field';
 import { useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiFetch, localizedApiMessage } from '../../lib/api';
@@ -121,24 +122,20 @@ export function FontsCard({
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+    <section className="rounded-lg border border-border bg-card p-4" data-testid="fonts-card">
       <div className="mb-3">
         <h3 className="text-base font-semibold text-foreground">{t('fonts.title')}</h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">{t('fonts.description')}</p>
+        <p className="mt-0.5 text-xs leading-5 text-muted-ink">{t('fonts.description')}</p>
       </div>
       {fonts.length > 0 && (
         <ul className="mb-3 space-y-1.5">
           {fonts.map((f, i) => (
             <li
               key={`${f.family}-${i}`}
-              className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border bg-background px-3 py-2"
             >
               <span
-                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
-                  f.type === 'google'
-                    ? 'bg-sky-100 text-sky-800'
-                    : 'bg-emerald-100 text-emerald-800'
-                }`}
+                className={`inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-ink`}
               >
                 {f.type === 'google' ? t('fonts.google') : t('fonts.custom')}
               </span>
@@ -164,7 +161,7 @@ export function FontsCard({
       {showAdd ? (
         <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/20 p-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="text-sm font-medium text-foreground">
               {t('fonts.familyNameLabel')}
             </span>
             <input
@@ -172,22 +169,20 @@ export function FontsCard({
               value={family}
               onChange={e => setFamily(e.target.value)}
               placeholder={t('fontFamilyExample')}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              className={fieldControlClasses()}
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              {t('fonts.googleUrlLabel')}
-            </span>
+            <span className="text-sm font-medium text-foreground">{t('fonts.googleUrlLabel')}</span>
             <input
               type="text"
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="https://fonts.googleapis.com/css2?family=..."
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              className={fieldControlClasses()}
             />
           </label>
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
             <Button
               variant="outline"
               size="sm"
@@ -215,7 +210,7 @@ export function FontsCard({
       ) : showUpload ? (
         <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/20 p-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="text-sm font-medium text-foreground">
               {t('fonts.familyNameDisplayLabel')}
             </span>
             <input
@@ -223,18 +218,16 @@ export function FontsCard({
               value={uploadFamily}
               onChange={e => setUploadFamily(e.target.value)}
               placeholder={t('fontNameExample')}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+              className={fieldControlClasses()}
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              {t('fonts.fileLabel')}
-            </span>
+            <span className="text-sm font-medium text-foreground">{t('fonts.fileLabel')}</span>
             <input
               type="file"
               accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
               onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className={fieldControlClasses('h-auto py-2')}
             />
             {uploadFile && (
               <span className="text-xs text-muted-foreground">
@@ -250,7 +243,7 @@ export function FontsCard({
               {uploadError}
             </p>
           )}
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
             <Button
               variant="outline"
               size="sm"
@@ -278,12 +271,12 @@ export function FontsCard({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="flex flex-col gap-2" data-testid="fonts-actions">
           <Button
             variant="outline"
             type="button"
             onClick={() => setShowAdd(true)}
-            className="font-semibold text-muted-foreground"
+            className="w-full font-semibold"
           >
             {t('fonts.addGoogleFont')}
           </Button>
@@ -291,7 +284,7 @@ export function FontsCard({
             variant="outline"
             type="button"
             onClick={() => setShowUpload(true)}
-            className="font-semibold text-muted-foreground"
+            className="w-full font-semibold"
           >
             {t('fonts.uploadCustomFont')}
           </Button>

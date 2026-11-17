@@ -1,0 +1,31 @@
+{
+  "id": "planned.ai-features-rest",
+  "status": "planned",
+  "plan": "docs/plans/ai-features.md; 2026-07-03-ai-bulk-sweeps.md; 2026-11-12-arabic-stemming.md",
+  "area": "ai",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "باقي ميزات الذكاء",
+  "titleEn": "AI features remainder (search words, bulk sweeps, stemming)",
+  "screens": ["/stores/[id]/ai-tools"],
+  "api": ["(plans)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["البحث بالعربي مش بيلاقي"],
+    "en": ["Arabic search misses products"]
+  },
+  "steps": ["Partial."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
+  ],
+  "gaps": ["PARTIAL"]
+}

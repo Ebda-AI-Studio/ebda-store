@@ -17,6 +17,7 @@ import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { accessToken, authState } from './helpers';
+import { TEST_PASSWORD_HASH } from './fixtures/test-password-hash';
 
 type Kind = 'd1' | 'store-do' | 'auth-state' | 'do-other' | 'accounts' | 'kv' | 'io-waves';
 type Tally = Record<Kind, number>;
@@ -55,8 +56,7 @@ const MARKER_KEYS = [
 ];
 const EMAIL = 'budget-shopper@exit-test.invalid';
 const PW = 'Passw0rd!xyz';
-// bcrypt cost 4 of PW (test fixture only; production hashes are cost 12, see the PR's bcrypt note)
-const HASH = '$2b$04$jYDlZaJj/X/kmBmzPXDwsOP4.aIZ2IBm.rDUDGyiC8iKKUZPb/Rzm';
+const HASH = TEST_PASSWORD_HASH;
 
 let ip = 0;
 const freshIp = () => `10.91.${(ip >> 8) & 255}.${ip++ & 255}`;

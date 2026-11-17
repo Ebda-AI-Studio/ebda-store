@@ -1,0 +1,32 @@
+{
+  "id": "self.support-channel",
+  "status": "planned",
+  "plan": "audit gap 12",
+  "area": "support",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "المساعدة والدعم جوه المنتج",
+  "titleEn": "In-product help and support channel with context handoff",
+  "screens": ["/stores/[id]"],
+  "api": ["(planned)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["عايز اكلم حد من ابدأ", "فين الدعم؟"],
+    "en": ["How do I contact support?"]
+  },
+  "steps": [
+    "Today: no in-product channel; eight+ UI strings say contact support. Assistant gives the support email/WhatsApp once defined."
+  ],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)"
+  ],
+  "gaps": ["gap 12; assistant (spec) is the planned fix"]
+}

@@ -4,6 +4,7 @@ import { withStore, type Prisma } from '@ebda/database';
 import { AppError } from './error-handler';
 import { auditLog } from './security';
 import { gateRead, onAccessD1 } from '../services/platform/access-d1';
+import { sendOnboardingHelpToCi } from '../lib/ci/emit';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -186,6 +187,10 @@ export async function requireStoreAccess(
           ip: req.ip,
           userAgent: req.headers['user-agent'],
         });
+        // Activation (Ruling ACT-1): a super admin writing to a store that is not live yet is a "help needed" signal.
+        // Advisory and never throws (sendEventAfterCommit swallows its own failures); the planner names the open step.
+        if (String(store.status) !== 'active')
+          void sendOnboardingHelpToCi(storeId, 'super_admin_action');
       }
 
       // Attach store to request for downstream use

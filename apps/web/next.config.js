@@ -105,6 +105,21 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
 
+  // Ruling WEB-COLD-3 (sentry-worker-stub.ts): Cloudflare build only, the Worker's server graph gets a no-op stand-in
+  // for @sentry/nextjs (3.7 MB of script every cold isolate compiles); the browser bundle keeps the real SDK.
+  ...(IS_CLOUDFLARE
+    ? {
+        turbopack: {
+          resolveAlias: {
+            '@sentry/nextjs': {
+              browser: '@sentry/nextjs',
+              default: './src/lib/sentry-worker-stub.ts',
+            },
+          },
+        },
+      }
+    : {}),
+
   experimental: {
     optimizePackageImports: ['@ebda/shared', '@ebda/ui'],
   },

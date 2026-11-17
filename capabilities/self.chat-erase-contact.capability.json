@@ -1,0 +1,30 @@
+{
+  "id": "self.chat-erase-contact",
+  "status": "planned",
+  "plan": "audit gaps 4,10",
+  "area": "chat",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "مسح جهة اتصال وشحن رصيد",
+  "titleEn": "Chat: erase a contact (merchant is controller); InstaPay top-up self-confirm",
+  "screens": ["(Chat)"],
+  "api": ["(Chat) operator.ts routes"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["العميل عايز يمسح بياناته من الشات"],
+    "en": ["Delete a chat contact"]
+  },
+  "steps": ["Today operator only."],
+  "edgeCases": [
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
+  ],
+  "gaps": ["Chat gaps 4,10; NOT BUILT"]
+}

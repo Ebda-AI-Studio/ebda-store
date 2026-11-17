@@ -115,6 +115,7 @@ jobs:
       has_build_apps: ${{ steps.affected.outputs.has_build_apps }}
       integration: ${{ steps.affected.outputs.integration }}
       integration_paths: ${{ steps.affected.outputs.integration_paths }}
+      all: ${{ steps.affected.outputs.all }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -225,7 +226,8 @@ jobs:
     name: Lint
     needs: [changes]
     if: needs.changes.outputs.lint != ''
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    # PR-CI-CHEAP-1: no workerd/macOS need, so the light runner (GitHub Linux), not a heavy Mac slot
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -268,7 +270,8 @@ jobs:
     name: Type Check
     needs: [changes]
     if: needs.changes.outputs.typecheck != ''
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    # PR-CI-CHEAP-1: no workerd/macOS need, so the light runner (GitHub Linux), not a heavy Mac slot
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -319,17 +322,19 @@ jobs:
   # <= 3 min. `vitest --shard=i/N` splits by file; fail-fast is off so every shard reports. The roll-up job
   # `Unit Tests (affected)` below keeps the check name stable.
   unit:
-    name: ${{ format('Unit shard {0}/3', matrix.shard) }}
+    name: ${{ format('Unit shard {0}/{1} (affected)', matrix.shard, needs.changes.outputs.all == 'true' && 3 || 1) }}
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3] # CI-SLIM-1: 3 shards; the workerd extras run as the tail of shard 3 (one setup, not two)
+        # PR-CI-CHEAP-1: ONE job when the affected set is narrow (setup paid once, not 3x); the whole suite (root config /
+        # packages/shared|database change => `all`) keeps 3 shards so wall time stays bounded.
+        shard: ${{ fromJSON(needs.changes.outputs.all == 'true' && '[1,2,3]' || '[1]') }}
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 35, not 20: on a congested Umbra runner the SETUP (npm ci, builds, chromium) took 16.5 of the 20 minutes and
     # the job was CANCELLED while its 3.7 minutes of tests were still running (#253, #256: cancelled, not failed).
-    timeout-minutes: 35
+    timeout-minutes: 95 # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -368,29 +373,30 @@ jobs:
       - name: Run unit tests (affected paths)
         env:
           UNIT_PATHS: ${{ needs.changes.outputs.unit }}
+          UNIT_SHARDS: ${{ needs.changes.outputs.all == 'true' && 3 || 1 }}
           NODE_OPTIONS: --max-old-space-size=4096
-        run: npx vitest run $UNIT_PATHS --shard=${{ matrix.shard }}/3 --reporter=verbose --retry=0
+        run: npx vitest run $UNIT_PATHS --shard=${{ matrix.shard }}/$UNIT_SHARDS --reporter=verbose --retry=0
 
       # The editor control matrix and the classic-builder parity ratchet (plan 2026-10-22-visual-editor,
       # Task 5): the committed docs/ebda/templates/editor-matrix.* must be current and every not-wired row
       # accepted in scripts/editor-audit/baseline.json. Cheap (a few seconds), so it always runs.
       - name: Editor matrix check
-        if: ${{ !cancelled() && matrix.shard == 3 }}
+        if: ${{ !cancelled() && matrix.shard == 1 }}
         run: npm run editor:matrix:check
 
       # apps/status runs on workerd via @cloudflare/vitest-pool-workers, outside
       # the root vitest config.
       - name: Run status worker tests
-        if: ${{ !cancelled() && matrix.shard == 3 && needs.changes.outputs.status_tests == 'true' }}
+        if: ${{ !cancelled() && matrix.shard == 1 && needs.changes.outputs.status_tests == 'true' }}
         run: npm run test:status
 
       # apps/accounts (the shared identity service) runs on workerd with a local D1.
       - name: Run accounts worker tests
-        if: ${{ !cancelled() && matrix.shard == 3 && needs.changes.outputs.accounts_tests == 'true' }}
+        if: ${{ !cancelled() && matrix.shard == 1 && needs.changes.outputs.accounts_tests == 'true' }}
         run: npm run test:accounts
       # prisma-lite on a real Durable Object (workerd): the transaction runner contract. ~5 s.
       - name: Run prisma-lite Durable Object tests
-        if: ${{ !cancelled() && matrix.shard == 3 }}
+        if: ${{ !cancelled() && matrix.shard == 1 }}
         run: npm run test:repo-workers
       - name: Release the heavy-job host lock
         if: always()
@@ -425,7 +431,7 @@ jobs:
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 35, not 25: the green run 42827770627 took 20m03s for 192 tests on one worker (hosted 2 vCPU), 80% of the old
     # cap; a slow runner would cancel a passing suite.
-    timeout-minutes: 35
+    timeout-minutes: 95 # 35 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -477,7 +483,7 @@ jobs:
     # because no main run measured it (Ruling MKT-LEGAL-HTML-BUDGET-2); the other Workers build in their deploy workflows.
     if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true')
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 30
+    timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     strategy:
       fail-fast: false
       matrix:
@@ -587,6 +593,24 @@ jobs:
           else
             node scripts/ci/worker-startup-budget.mjs --runs 5 --record "$RUNNER_TEMP/worker-startup-budget.json"
           fi
+      # Storefront Worker (Ruling WEB-COLD-3): same gate on the OpenNext bundle (apps/web); the PR baseline is main built
+      # with the deploy's own generator + OpenNext build, so the web job pays one extra build on PRs.
+      - name: Web Worker startup budget (startup CPU and bundle size)
+        if: matrix.app == 'web'
+        timeout-minutes: 20
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/ci/worker-startup-budget.mjs --app web --runs 5 --baseline-ref origin/main --record "$RUNNER_TEMP/worker-startup-budget-web.json"
+          else
+            node scripts/ci/worker-startup-budget.mjs --app web --runs 5 --record "$RUNNER_TEMP/worker-startup-budget-web.json"
+          fi
+      - name: Upload the web startup measurement
+        if: matrix.app == 'web' && always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: worker-startup-budget-web
+          path: ${{ runner.temp }}/worker-startup-budget-web.json
+          if-no-files-found: ignore
       - name: Upload the startup measurement
         if: matrix.app == 'api' && always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -678,9 +702,11 @@ jobs:
     # No `if`: a required PR check (scripts/ci/merge-gate-required.mjs) AND part of the full lane, where it runs the
     # WHOLE workers-test suite (route-sweep included) instead of the PR slice below.
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 25
+    timeout-minutes: 85 # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2 # PR checkout is a merge commit: depth 2 holds both parents, enough to diff base..HEAD (no deep history)
       - name: Private TMPDIR per runner
         # Two runners on one VM share /tmp, and concurrent vitest runs collided on Vite's temp cache (ENOENT
         # /tmp/<random>/client/..., hundreds of files failing at startup with 0 assertion failures, #150 / #202).
@@ -690,18 +716,48 @@ jobs:
           mkdir -p "$RUNNER_TEMP/tmp"
           echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
           echo "runner=$RUNNER_NAME TMPDIR=$RUNNER_TEMP/tmp"
-      - name: Heavy-job host lock (Mac runner only; one heavy test job at a time, Ruling CI-MAC-RUNNER-1)
-        run: bash scripts/ci/heavy-lock.sh acquire
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: ${{ (!contains(github.event.pull_request.labels.*.name, 'ci-umbra') && vars.EBDA_RUNS_ON == '') && 'npm' || '' }}
+      # PR-CI-CHEAP-1: a REQUIRED check (merge-gate derives it from this job having no `if`), so the job always runs and
+      # reports SUCCESS, but on a pull request the boot + tests are SKIPPED only when EVERY changed file is on the
+      # allowlist in scripts/ci/api-smoke-scope.mjs (docs, markdown, other apps, tests). Anything else, an empty diff or
+      # an unreadable one RUNS it. Push to main, the nightly and manual dispatch always run it in full.
+      - name: Decide whether the API Worker is in scope
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "full lane: running the whole workerd smoke"; exit 0
+          fi
+          base=""
+          if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then base="$BASE_SHA"
+          elif git rev-parse -q --verify HEAD^1 >/dev/null; then base="HEAD^1"; fi
+          if [ -n "$base" ]; then
+            node scripts/ci/api-smoke-scope.mjs --base "$base" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "no base commit in the checkout: running to be safe"
+          fi
+          grep -q '^run=false' "$GITHUB_OUTPUT" \
+            && echo "::notice::API Worker boots on workerd: SKIPPED (every changed file is docs/other-app/test); the full workerd suite runs on main and nightly." || true
+      - name: Heavy-job host lock (Mac runner only; one heavy test job at a time, Ruling CI-MAC-RUNNER-1)
+        if: steps.scope.outputs.run == 'true'
+        run: bash scripts/ci/heavy-lock.sh acquire
       - uses: ./.github/actions/npm-ci
+        if: steps.scope.outputs.run == 'true'
       - run: npm run db:generate
+        if: steps.scope.outputs.run == 'true'
       - run: npm run build -w packages/shared
+        if: steps.scope.outputs.run == 'true'
       - run: npm run build -w packages/database
+        if: steps.scope.outputs.run == 'true'
       - name: Boot the Worker on workerd (no Postgres, N-17)
+        if: steps.scope.outputs.run == 'true'
         run: bash scripts/ci/workerd-smoke.sh
       # Search Task 11 review M8: embed() inside workerd with SEARCH_SEMANTIC_ENABLED=true and a fake
       # `AI` binding (AbortSignal.any, the binding call shape, error mapping). The smoke above strips
@@ -716,6 +772,7 @@ jobs:
       # + MERCHANT-JOURNEY (Rulings NZ-JOURNEY-1/2, UPLOAD-DO-1): a new DO-store merchant signs in, onboards, creates a product
       # and uploads its photo + 3D model with no step reaching the removed Postgres.
       - name: Embedding provider + tenant isolation + money path + latency budgets on workerd (fake AI binding, no Postgres)
+        if: steps.scope.outputs.run == 'true'
         timeout-minutes: 20
         env:
           EVENT: ${{ github.event_name }}
@@ -729,7 +786,7 @@ jobs:
             npm run cf:test -w apps/api
           fi
       - name: Release the heavy-job host lock
-        if: always()
+        if: always() && steps.scope.outputs.run == 'true'
         run: bash scripts/ci/heavy-lock.sh release
 
   # G11 (Ruling INFRA-CF-1): the DB-less integration lane. The real StoreDO (SQLite), D1 and R2 bindings run on
@@ -743,7 +800,7 @@ jobs:
     if: always() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.has_workers == 'true')
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 30, not 15: the job timeout also covers the Umbra throttle-slot wait (775s on #322, tests then took 6s).
-    timeout-minutes: 30
+    timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -843,12 +900,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3] # CI-SLIM-1: 3 shards; the workerd extras run as the tail of shard 3 (one setup, not two)
+        shard: [1, 2, 3]
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 50, not 20: on hosted ubuntu-24.04 (2 vCPU) the coverage step alone took 16m47s in run 42820243819 and the
     # job was cancelled at 20:00 inside the accounts worker tests, with every assertion so far green; green runs then
     # took 20m05s (42827770627) and 28m39s (42829048643) for the same suite, so the cap keeps ~20 min of headroom.
-    timeout-minutes: 30
+    timeout-minutes: 90 # 30 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -1128,7 +1185,7 @@ jobs:
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     # 40, not 25: the full suite (305 files + serial lane) reached its last lane and was cancelled at 25:01 on a
     # hosted runner (run 42046806700, PR 437); a wide PR runs every integration file.
-    timeout-minutes: 40
+    timeout-minutes: 100 # 40 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     needs: [build, changes]
     services:
       postgres:
@@ -1367,7 +1424,7 @@ jobs:
   test-e2e:
     name: E2E Tests
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 25
+    timeout-minutes: 85 # 25 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     needs: [build]
     services:
       postgres:
@@ -1564,7 +1621,7 @@ jobs:
     # Sunday cron or a manual dispatch with `mutation` ticked; never on a push (Ruling CI-FULL-MAIN-1).
     if: (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0') || (github.event_name == 'workflow_dispatch' && inputs.mutation)
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 45
+    timeout-minutes: 105 # 45 run + 60 heavy-lock wait (Ruling HOST-RUNNERS-4)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -1615,7 +1672,8 @@ jobs:
 
   notify-failure:
     name: Notify on failure (main and nightly)
-    runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    # Seconds-long reporting job: runs on the light runner so it never queues behind heavy PR jobs and holds main (2026-11-15).
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 3
     needs:
       [

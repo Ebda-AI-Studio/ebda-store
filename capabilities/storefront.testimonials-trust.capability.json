@@ -1,0 +1,34 @@
+{
+  "id": "storefront.testimonials-trust",
+  "status": "live",
+  "area": "storefront",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اقسام الصفحة الرئيسية",
+  "titleEn": "Testimonials, trust badges, maker profile and other home sections",
+  "screens": ["/stores/[id]/builder"],
+  "api": ["GET /public/:storeId/layout", "testimonials"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["اضيف اراء العملاء في الصفحة"],
+    "en": ["Add testimonials"]
+  },
+  "steps": ["Editor > Add a section."],
+  "edgeCases": [
+    "Section keys: hero, categories, newArrivals, bestSellers, brandStory, blogCarousel, trustStrip, testimonials, imageText, newsletter, menu, steps, etc.",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article"]
+}
