@@ -425,14 +425,14 @@ export function placeAdminOrder(db: SyncSql, input: AdminOrderInput): AdminOrder
       if (!p || !p.track_inventory) continue; // an untracked line has no stock to take or give back
       const move = (n: number) =>
         variantId ? decrementVariant(db, variantId, n) : decrementProduct(db, productId, n);
-      // Ruling WAREHOUSE-ROUTE-2: a reasoned stock override skips routing (it must never be refused NO_SINGLE_WAREHOUSE);
+      // Ruling WAREHOUSE-ROUTE-2: a reasoned stock override skips routing (routing never refuses, but an override reconciles instead);
       // no allocation is written, so a cancel gives back like a pre-routing order (aggregate + reconcile to the default)
       const route =
         input.overrideStock === true ? null : planRoute(db, storeId, productId, variantId, qty);
       const full = move(qty);
       if (full.ok && route)
         allocations.push(
-          applyRoute(db, storeId, route, productId, variantId, qty, {
+          ...applyRoute(db, storeId, route, productId, variantId, qty, {
             orderItemId: row.id as string,
           })
         );

@@ -2,16 +2,18 @@ import { MoneyError, type SyncSql } from './sync-sql';
 import { reconcileToAggregate, upsertWarehouseStock } from './stock-ops';
 
 /**
- * Ruling WAREHOUSE-ROUTE-1: order creation routes each stock line to ONE warehouse, in the same StoreDO section as the order.
+ * Ruling WAREHOUSE-ROUTE-1 + 3: order creation routes each stock line to a warehouse (or, when no single one holds the whole
+ * line, splits it across several), in the same StoreDO section as the order.
  *
  * `Product.inventory` / `ProductVariant.inventory` stays the authoritative, oversell-guarded number (checkout is unchanged);
  * the warehouse rows are the per-location shadow whose SUM equals it. Routing keeps that invariant: the SKU's shadow is first
  * reconciled to the aggregate (a no-op when already equal), the line goes to the best warehouse that can fulfil the WHOLE line
- * (priority desc, code asc: the rule of `WarehouseService.routeOrder`), the aggregate is decremented as before and the chosen
- * warehouse row is decremented by the same quantity. No single warehouse can fulfil it -> 409 NO_SINGLE_WAREHOUSE and the
- * section rolls back (never an oversell, never a partial). The allocation is stored as an order event `warehouse_allocated`;
- * a cancel / refund / partial return reads it and puts the units back into the SAME warehouse (`warehouse_released` events
- * keep what was already given back, so a second return never returns more than was taken).
+ * (priority desc, code asc: the rule of `WarehouseService.routeOrder`); when none can, it is split greedily by that same
+ * order (Ruling WAREHOUSE-ROUTE-3: an order the aggregate covers is never refused). The aggregate is decremented as before
+ * (the oversell guard), then each chosen warehouse row is decremented by its chunk. One allocation per (line, warehouse) is
+ * stored in the order event `warehouse_allocated`; a cancel / refund / partial return reads it and puts the units back into
+ * the SAME warehouses, lowest priority first (`warehouse_released` events keep what was already given back per
+ * (line, warehouse), so a second return never returns more than was taken).
  *
  * A store with fewer than 2 active warehouses is NOT routed at all: `planRoute` returns null and every statement is exactly
  * what it was before this file existed (single / no-warehouse stores keep byte-identical stock math).
@@ -58,8 +60,8 @@ const rowQty = (
   )[0]?.quantity as number | undefined) ?? 0;
 
 export interface RoutePlan {
-  /** the warehouse that can fulfil the whole line, or null when none can (the caller refuses once the aggregate is taken) */
-  chosen: WarehouseRow | null;
+  /** where the line's units come from, in priority order: one entry when a warehouse holds the whole line, else a greedy split */
+  chunks: Array<{ warehouse: WarehouseRow; quantity: number }>;
 }
 
 /**
@@ -76,8 +78,19 @@ export function planRoute(
   const whs = activeWarehouses(db, storeId);
   if (whs.length < 2) return null;
   reconcileToAggregate(db, storeId, productId, variantId);
-  const chosen = whs.find(w => rowQty(db, storeId, w.id, productId, variantId) >= qty) ?? null;
-  return { chosen };
+  const held = whs.map(w => ({ w, q: rowQty(db, storeId, w.id, productId, variantId) }));
+  // Ruling WAREHOUSE-ROUTE-3: the whole line from one warehouse when any can; otherwise split greedily by priority
+  const whole = held.find(h => h.q >= qty);
+  if (whole) return { chunks: [{ warehouse: whole.w, quantity: qty }] };
+  const chunks: RoutePlan['chunks'] = [];
+  let remaining = qty;
+  for (const h of held) {
+    if (remaining <= 0) break;
+    const n = Math.min(Math.max(0, h.q), remaining);
+    if (n > 0) chunks.push({ warehouse: h.w, quantity: n });
+    remaining -= n;
+  }
+  return { chunks };
 }
 
 /** Override lines skip routing, so bring their shadow to the aggregate right after the take (routed stores only). */
@@ -91,7 +104,11 @@ export function reconcileOverrideSku(
     reconcileToAggregate(db, storeId, productId, variantId);
 }
 
-/** AFTER the aggregate decrement succeeded for the whole `qty`: move the same units out of the chosen warehouse. */
+/**
+ * AFTER the aggregate decrement succeeded for the whole `qty`: move the same units out of the chosen warehouse(s), one
+ * allocation per chunk. If the rows held less than the aggregate (drift the reconcile could not fix) the uncovered units are
+ * left to a reconcile, which lands the difference on the default warehouse (Ruling WAREHOUSE-ROUTE-2); it never throws.
+ */
 export function applyRoute(
   db: SyncSql,
   storeId: string,
@@ -100,30 +117,30 @@ export function applyRoute(
   variantId: string | null,
   qty: number,
   ref: { lineIndex?: number; orderItemId?: string }
-): Allocation {
-  if (!plan.chosen)
-    throw new MoneyError(
-      'NO_SINGLE_WAREHOUSE',
-      'no single warehouse holds enough stock for this line',
-      409,
-      { productId, variantId, requested: qty }
-    );
-  upsertWarehouseStock(db, {
-    storeId,
-    warehouseId: plan.chosen.id,
-    productId,
-    variantId,
-    mode: 'shift',
-    value: -qty,
-  });
-  return {
-    ...ref,
-    productId,
-    variantId,
-    warehouseId: plan.chosen.id,
-    warehouseCode: plan.chosen.code,
-    quantity: qty,
-  };
+): Allocation[] {
+  let covered = 0;
+  const out: Allocation[] = [];
+  for (const c of plan.chunks) {
+    upsertWarehouseStock(db, {
+      storeId,
+      warehouseId: c.warehouse.id,
+      productId,
+      variantId,
+      mode: 'shift',
+      value: -c.quantity,
+    });
+    covered += c.quantity;
+    out.push({
+      ...ref,
+      productId,
+      variantId,
+      warehouseId: c.warehouse.id,
+      warehouseCode: c.warehouse.code,
+      quantity: c.quantity,
+    });
+  }
+  if (covered < qty) reconcileToAggregate(db, storeId, productId, variantId);
+  return out;
 }
 
 function writeEvent(
@@ -173,7 +190,7 @@ function eventsOf(db: SyncSql, storeId: string, orderId: string, type: string): 
   return out;
 }
 
-/** What the order took from each warehouse for ONE ORDER LINE, minus what was already given back. */
+/** What the order took from each warehouse for ONE ORDER LINE, minus what was already given back, lowest priority first. */
 function outstanding(
   db: SyncSql,
   storeId: string,
@@ -190,9 +207,11 @@ function outstanding(
   };
   sign(eventsOf(db, storeId, orderId, ALLOCATED_EVENT), 1);
   sign(eventsOf(db, storeId, orderId, RELEASED_EVENT), -1);
+  // allocation order is priority order; a give-back walks it backwards (the last chunk taken is the first returned)
   return [...left]
     .filter(([, q]) => q > 0)
-    .map(([warehouseId, quantity]) => ({ warehouseId, quantity }));
+    .map(([warehouseId, quantity]) => ({ warehouseId, quantity }))
+    .reverse();
 }
 
 /**

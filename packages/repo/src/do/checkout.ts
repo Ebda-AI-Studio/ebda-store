@@ -469,7 +469,7 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
         const r = decrementVariant(db, variantId, qty);
         if (r.ok && route)
           allocations.push(
-            applyRoute(db, input.storeId, route, productId, variantId, qty, { lineIndex })
+            ...applyRoute(db, input.storeId, route, productId, variantId, qty, { lineIndex })
           );
         if (r.ok)
           return void recordMovement(db, {
@@ -513,7 +513,9 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
       const route = planRoute(db, input.storeId, productId, null, qty);
       let r = decrementProduct(db, productId, qty);
       if (r.ok && route)
-        allocations.push(applyRoute(db, input.storeId, route, productId, null, qty, { lineIndex }));
+        allocations.push(
+          ...applyRoute(db, input.storeId, route, productId, null, qty, { lineIndex })
+        );
       if (!r.ok) {
         // backorder on a product WITHOUT variants: both the store feature and the product flag; the stock goes negative
         // (a real backorder debt, unlike a variant row which floors at 0) and the whole quantity counts as taken

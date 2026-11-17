@@ -74,8 +74,10 @@ describe('multi-warehouse routing on order creation', () => {
     placeOrder(f.db, f.base({}, 2));
     expect(f.wh()).toEqual({ A: 4, B: 4 });
     expect(f.agg()).toBe(8);
-    // B (4 left) cannot hold 5, A (4) neither: refused
-    expect(code(() => placeOrder(f.db, f.base({}, 5)))).toBe('NO_SINGLE_WAREHOUSE');
+    // B (4 left) cannot hold 5, A (4) neither: ROUTE-3 splits it (B x4, A x1) instead of refusing
+    placeOrder(f.db, f.base({}, 5));
+    expect(f.wh()).toEqual({ A: 3, B: 0 });
+    expect(f.agg()).toBe(3);
   });
 
   it('skips a higher-priority warehouse that cannot fulfil the whole line', () => {
@@ -87,15 +89,15 @@ describe('multi-warehouse routing on order creation', () => {
     expect(f.wh()).toEqual({ A: 3, B: 2 });
   });
 
-  it('refuses (409 NO_SINGLE_WAREHOUSE) when stock exists but no single warehouse holds the line; nothing changes', () => {
+  it('ROUTE-3: a line no single warehouse holds is split across warehouses instead of refused', () => {
     const f = fixture([
       ['A', 1, 3],
       ['B', 5, 3],
     ]);
-    expect(code(() => placeOrder(f.db, f.base({}, 5)))).toBe('NO_SINGLE_WAREHOUSE');
-    expect(f.wh()).toEqual({ A: 3, B: 3 });
-    expect(f.agg()).toBe(6);
-    expect(f.all(`SELECT 1 FROM orders`).length).toBe(0);
+    placeOrder(f.db, f.base({}, 5));
+    expect(f.wh()).toEqual({ A: 1, B: 0 });
+    expect(f.agg()).toBe(1);
+    expect(f.all(`SELECT 1 FROM orders`).length).toBe(1);
   });
 
   it('never oversells: more than the total is OUT_OF_STOCK', () => {
@@ -154,7 +156,7 @@ describe('multi-warehouse routing on order creation', () => {
 });
 
 describe('WAREHOUSE-ROUTE-2', () => {
-  it('a reasoned phone-order stock override is never refused NO_SINGLE_WAREHOUSE, writes no allocation, and its cancel restores the totals', () => {
+  it('a reasoned phone-order stock override writes no allocation, and its cancel restores the totals', () => {
     const f = fixture([
       ['A', 1, 4],
       ['B', 5, 6],
@@ -165,7 +167,6 @@ describe('WAREHOUSE-ROUTE-2', () => {
       shippingAddress: { name: 'A' },
       actorId: 'u1',
     };
-    expect(code(() => placeAdminOrder(f.db, input))).toBe('NO_SINGLE_WAREHOUSE');
     const o = placeAdminOrder(f.db, {
       ...input,
       overrideStock: true,
@@ -259,6 +260,130 @@ describe('WAREHOUSE-ROUTE-2', () => {
     // the 2-unit line still has its own 2 outstanding
     releaseToWarehouses(f.db, 's1', o.orderId, items[0].id, 'p1', null, 2, Date.now());
     expect(f.wh().B).toBe(6);
+  });
+});
+
+const sum = (w: Record<string, number>) => Object.values(w).reduce((n, q) => n + q, 0);
+const allocs = (f: ReturnType<typeof fixture>, type = 'warehouse_allocated') =>
+  f
+    .all<{ metadata: string }>(
+      `SELECT metadata FROM order_events WHERE to_status = ? ORDER BY rowid`,
+      type
+    )
+    .flatMap(
+      e =>
+        (
+          JSON.parse(e.metadata) as {
+            allocations: Array<{ warehouseCode: string; quantity: number }>;
+          }
+        ).allocations
+    )
+    .map(a => `${a.warehouseCode}x${a.quantity}`);
+const split = () =>
+  fixture([
+    ['A', 5, 2],
+    ['B', 1, 1],
+  ]);
+
+describe('WAREHOUSE-ROUTE-3: split lines, never refuse what the aggregate covers', () => {
+  it('2+1 units, order of 3: accepted, A=0 B=0, aggregate 0, one allocation per warehouse, shadow == aggregate', () => {
+    const f = split();
+    placeOrder(f.db, f.base({}, 3));
+    expect(f.wh()).toEqual({ A: 0, B: 0 });
+    expect(f.agg()).toBe(0);
+    expect(allocs(f)).toEqual(['Ax2', 'Bx1']);
+    expect(sum(f.wh())).toBe(f.agg());
+  });
+
+  it('cancel restores A=2 B=1 and aggregate 3, exactly once', () => {
+    const f = split();
+    const o = placeOrder(f.db, f.base({}, 3));
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    expect(f.wh()).toEqual({ A: 2, B: 1 });
+    expect(f.agg()).toBe(3);
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    expect(f.wh()).toEqual({ A: 2, B: 1 });
+    expect(f.agg()).toBe(3);
+    expect(allocs(f, 'warehouse_released')).toEqual(['Bx1', 'Ax2']);
+  });
+
+  it('partial returns give back lowest priority first and never beyond what was allocated', () => {
+    const f = split();
+    const o = placeOrder(f.db, f.base({}, 3));
+    const item = f.all<{ id: string }>(`SELECT id FROM order_items`)[0].id;
+    const give = (n: number) =>
+      releaseToWarehouses(f.db, 's1', o.orderId, item, 'p1', null, n, Date.now());
+    const restock = (n: number) =>
+      f.raw.prepare(`UPDATE products SET inventory = inventory + ? WHERE id='p1'`).run(n);
+    restock(1);
+    give(1);
+    expect(f.wh()).toEqual({ A: 0, B: 1 });
+    restock(1);
+    give(1);
+    expect(f.wh()).toEqual({ A: 1, B: 1 });
+    restock(1);
+    give(1);
+    expect(f.wh()).toEqual({ A: 2, B: 1 });
+    // everything was given back: a further (clamped) request adds nothing to any warehouse via allocations
+    const before = f.events('warehouse_released');
+    give(5);
+    expect(f.events('warehouse_released')).toBe(before);
+  });
+
+  it('a return larger than what was taken is clamped to the allocation', () => {
+    const f = split();
+    const o = placeOrder(f.db, f.base({}, 3));
+    const item = f.all<{ id: string }>(`SELECT id FROM order_items`)[0].id;
+    f.raw.prepare(`UPDATE products SET inventory = 10 WHERE id='p1'`).run();
+    releaseToWarehouses(f.db, 's1', o.orderId, item, 'p1', null, 10, Date.now());
+    expect(f.wh().B).toBe(1); // never above its allocation
+    expect(f.wh().A).toBe(9); // 2 allocated + the 7 never-allocated units reconciled onto the default (A)
+    expect(sum(f.wh())).toBe(10);
+  });
+
+  it('keeps the whole line on ONE warehouse when any holds it (split only when none does)', () => {
+    const f = fixture([
+      ['A', 5, 2],
+      ['B', 1, 6],
+    ]);
+    placeOrder(f.db, f.base({}, 3));
+    expect(f.wh()).toEqual({ A: 2, B: 3 });
+    expect(allocs(f)).toEqual(['Bx3']);
+  });
+
+  it('an order above the aggregate is still OUT_OF_STOCK and changes nothing', () => {
+    const f = split();
+    expect(code(() => placeOrder(f.db, f.base({}, 4)))).toBe('OUT_OF_STOCK');
+    expect(f.wh()).toEqual({ A: 2, B: 1 });
+    expect(f.agg()).toBe(3);
+    expect(f.all(`SELECT 1 FROM orders`).length).toBe(0);
+  });
+
+  it('a phone order splits the same way and its cancel restores per allocation; override stays unrouted', () => {
+    const f = split();
+    const input = {
+      storeId: 's1',
+      lines: [{ productId: 'p1', quantity: 3 }],
+      shippingAddress: { name: 'A' },
+      actorId: 'u1',
+    };
+    const o = placeAdminOrder(f.db, input);
+    expect(f.wh()).toEqual({ A: 0, B: 0 });
+    expect(allocs(f)).toEqual(['Ax2', 'Bx1']);
+    cancelOrder(f.db, { storeId: 's1', orderId: o.orderId });
+    expect(f.wh()).toEqual({ A: 2, B: 1 });
+    const g = split();
+    placeAdminOrder(g.db, { ...input, overrideStock: true, stockOverrideReason: 'phone deal' });
+    expect(g.events('warehouse_allocated')).toBe(0);
+    expect(sum(g.wh())).toBe(g.agg());
+  });
+
+  it('rows holding less than the aggregate are repaired by the reconcile first, so the split still covers the line', () => {
+    const f = split();
+    f.raw.prepare(`UPDATE products SET inventory = 5 WHERE id='p1'`).run();
+    placeOrder(f.db, f.base({}, 5));
+    expect(f.agg()).toBe(0);
+    expect(f.wh()).toEqual({ A: 0, B: 0 });
   });
 });
 
