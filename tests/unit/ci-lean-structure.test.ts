@@ -96,9 +96,9 @@ describe('ci.yml triggers', () => {
 
   it('cancels superseded PR runs and superseded main pushes, never a cron or manual run', () => {
     expect(ci.concurrency.group).toMatch(/^ci-/);
-    // PR runs group per ref, every main push has a group per merge sha, anything else is alone (run_id)
+    // PR runs group per ref, every main push AND every merge-queue group (MERGE-QUEUE-1) has a group per sha, anything else is alone (run_id)
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
+      "ci-${{ github.event_name == 'merge_group' && format('mq-{0}', github.sha) || github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
     );
     // Ruling CI-MAIN-SHA-1: only PR runs are cancelled; a main push (own group per sha) always completes.
     // CI-SLIM-1: a pre-merge full-tier dispatch on a PR branch (group per branch) is superseded by the next one too.
