@@ -52,6 +52,14 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "../../packages/cf-schema/migrations/platform",
     },
+    // Shared InstaPay duplicate index with Ebda Chat (docs/rulings/INSTAPAY-AUTO-1.md in ebda-whatsapp, ruling 1.10). The ...0001 id is a
+    // DISTINCT placeholder: the real id is the repo variable EBDA_INSTAPAY_DEDUPE_D1_ID, substituted by scripts/ebda-cf-api-config.mjs.
+    // DRAFT: do not merge before the D1 ebda-instapay-dedupe exists and that variable is set (the deploy refuses to build without it).
+    {
+      "binding": "INSTAPAY_DEDUPE_DB",
+      "database_name": "ebda-instapay-dedupe",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+    },
   ],
 
   // Public caches (store / product payloads). Placeholder ids: `wrangler kv namespace create`.

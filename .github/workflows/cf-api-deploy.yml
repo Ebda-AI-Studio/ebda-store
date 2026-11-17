@@ -66,6 +66,8 @@ jobs:
       EBDA_KV_CACHE_ID: ${{ vars.EBDA_KV_CACHE_ID }}
       # D1 ebda-platform (task 2.4): the per-store backend switch; the deploy config refuses to build without it.
       EBDA_PLATFORM_D1_ID: ${{ vars.EBDA_PLATFORM_D1_ID }}
+      # D1 ebda-instapay-dedupe: the duplicate index shared with Ebda Chat (INSTAPAY-AUTO-1.10); the deploy config refuses to build without it.
+      EBDA_INSTAPAY_DEDUPE_D1_ID: ${{ vars.EBDA_INSTAPAY_DEDUPE_D1_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
