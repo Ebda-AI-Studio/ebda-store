@@ -16,6 +16,7 @@ import { STUB_WEBHOOK_SECRET, StubBillingProvider, getBillingProvider } from '..
 import {
   cancelSubscription,
   changePlan,
+  previewChangePlan,
   getSubscriptionBillingState,
   handleBillingWebhook,
   listStoreCharges,
@@ -417,15 +418,58 @@ router.post(
   }
 );
 
+/**
+ * GET /change-plan/quote?planCode= - what changing to this plan does and costs right now (Ruling G35-PRORATE-1): an
+ * upgrade charges the prorated difference for the days left in the paid period (VAT included) and keeps the period;
+ * a downgrade starts at the period end with nothing charged. Read only; the confirm dialog shows it before the charge.
+ */
+router.get(
+  '/change-plan/quote',
+  ...guard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { planCode } = z.object({ planCode: z.string().min(1).max(64) }).parse(req.query);
+      const { quote, interval } = await previewChangePlan({
+        storeId: req.params.storeId,
+        planCode,
+      });
+      res.json({
+        success: true,
+        data: {
+          planCode,
+          interval,
+          kind: quote.kind,
+          amountMinor: quote.charge.totalMinor,
+          netMinor: quote.charge.netMinor,
+          vatMinor: quote.charge.vatMinor,
+          remainingDays: quote.remainingDays,
+          periodDays: quote.periodDays,
+          currentTotalMinor: quote.currentTotalMinor,
+          newTotalMinor: quote.newTotalMinor,
+          effectiveAt: quote.effectiveAt.toISOString(),
+          periodEnd: quote.periodEnd.toISOString(),
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 router.post(
   '/change-plan',
   ...writeGuard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { planCode } = z.object({ planCode: z.string().min(1).max(64) }).parse(req.body);
+      const { planCode, expectedAmountMinor } = z
+        .object({
+          planCode: z.string().min(1).max(64),
+          expectedAmountMinor: z.number().int().min(0).optional(),
+        })
+        .parse(req.body);
       res.json({
         success: true,
-        data: await changePlan({ storeId: req.params.storeId, planCode }),
+        data: await changePlan({ storeId: req.params.storeId, planCode, expectedAmountMinor }),
       });
     } catch (err) {
       next(err);

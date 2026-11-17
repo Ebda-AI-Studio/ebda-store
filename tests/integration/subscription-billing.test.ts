@@ -34,6 +34,7 @@ import {
   applyWebhookEvent,
   cancelSubscription,
   changePlan,
+  previewChangePlan,
   findDueSubscriptionIds,
   listLedger,
   listStoreCharges,
@@ -49,6 +50,7 @@ import {
   kashierSignaturePayload,
 } from '../../apps/api/src/services/billing/kashier.provider';
 import { addDays, addInterval } from '../../apps/api/src/services/billing/period';
+import { periodStartFor } from '../../apps/api/src/services/billing/proration';
 import { encryption } from '../../apps/api/src/services/encryption.service';
 import { EmailService } from '../../apps/api/src/services/email.service';
 import { socketService } from '../../apps/api/src/services/socket.service';
@@ -123,7 +125,7 @@ async function subscribedStore(opts: {
         planCode: opts.planCode ?? PRO,
         status: opts.status ?? 'active',
         billingInterval: opts.interval ?? 'monthly',
-        currentPeriodStart: addInterval(opts.periodEnd ?? T0, 'monthly'),
+        currentPeriodStart: periodStartFor(opts.periodEnd ?? T0, 'monthly'),
         currentPeriodEnd: opts.periodEnd ?? T0,
         trialEndsAt: opts.trialEndsAt ?? null,
         provider: opts.provider === undefined ? 'stub' : opts.provider,
@@ -828,18 +830,48 @@ describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
     });
   });
 
-  it('upgrade charges the full new price immediately and starts a fresh period (no proration)', async () => {
-    const { storeId } = await subscribedStore({ planCode: LITE, periodEnd: addDays(T0, 20) });
+  it('upgrade starts now and charges only the prorated difference; the period keeps its end (G35-PRORATE-1)', async () => {
+    // 20 of the 31 days (Oct 23 -> Nov 23) left: (49900 - 19999) x 20 / 31 = 19290.97 -> 19291 (rounded up), VAT off
+    const end = addDays(T0, 20);
+    const { storeId } = await subscribedStore({ planCode: LITE, periodEnd: end });
+    const before = await getSub(storeId);
+    const preview = await previewChangePlan({ storeId, planCode: PRO, now: T0 });
+    expect(preview.quote).toMatchObject({ kind: 'upgrade', remainingDays: 20, periodDays: 31 });
+    expect(preview.quote.charge.totalMinor).toBe(19291);
     const out = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
-    expect(out).toMatchObject({ mode: 'upgraded', status: 'succeeded' });
+    expect(out).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 19291 });
     expect(stub.chargeCalls).toHaveLength(1);
-    expect(stub.chargeCalls[0].amountMinor).toBe(49900); // full price, not the difference
+    expect(stub.chargeCalls[0].amountMinor).toBe(19291); // the difference, not the full 49900
     const sub = await getSub(storeId);
     expect(sub.planCode).toBe(PRO);
-    expect(sub.currentPeriodStart!.toISOString()).toBe(T0.toISOString());
-    expect(sub.currentPeriodEnd!.toISOString()).toBe(addInterval(T0, 'monthly').toISOString());
+    expect(sub.currentPeriodStart!.toISOString()).toBe(before.currentPeriodStart!.toISOString());
+    expect(sub.currentPeriodEnd!.toISOString()).toBe(end.toISOString());
     expect((await storeTier(storeId)).plan).toBe('professional');
-    expect((await ledger(storeId))[0].type).toBe('upgrade');
+    const rows = await ledger(storeId);
+    expect(rows[0]).toMatchObject({ type: 'upgrade', amountMinor: 19291, status: 'succeeded' });
+  });
+
+  it('refuses an upgrade whose shown amount no longer matches (QUOTE_CHANGED) and charges nothing', async () => {
+    const { storeId } = await subscribedStore({ planCode: LITE, periodEnd: addDays(T0, 20) });
+    const err = await changePlan({
+      storeId,
+      planCode: PRO,
+      expectedAmountMinor: 49900,
+      now: T0,
+      provider: stub,
+    }).catch(e => e);
+    expect(err.code).toBe('QUOTE_CHANGED');
+    expect(stub.chargeCalls).toHaveLength(0);
+    expect((await getSub(storeId)).planCode).toBe(LITE);
+  });
+
+  it('an upgrade with a scheduled downgrade drops the downgrade', async () => {
+    const { storeId } = await subscribedStore({ planCode: LITE, periodEnd: addDays(T0, 10) });
+    await withRlsBypass(tx =>
+      tx.storeSubscription.update({ where: { storeId }, data: { pendingPlanCode: LITE } })
+    );
+    await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(await getSub(storeId)).toMatchObject({ planCode: PRO, pendingPlanCode: null });
   });
 
   it('a declined upgrade leaves the plan untouched and can be retried', async () => {

@@ -40,6 +40,7 @@ import {
   changePlan,
   getSubscriptionBillingState,
   listStoreCharges,
+  previewChangePlan,
   resumeSubscription,
 } from '../../services/billing/subscription-billing.service';
 import { listStaffWithUsers, removeStaffFromStore } from '../../services/staff-members.service';
@@ -203,7 +204,21 @@ async function billingState(storeId: string, planCode?: string) {
   ]);
   // the store's CURRENT plan, from the plan record itself (a hidden or legacy plan is not in the public list)
   const cur = await planService.getPlan(e.planCode).catch(() => undefined);
+  // Ruling G35-PRORATE-1: what an upgrade charges NOW is the prorated difference, from the one proration seam. Part of
+  // the fingerprint (it moves with the days left), so a card from yesterday refreshes. Null = not a priceable change.
+  const changeQuote = planCode
+    ? await previewChangePlan({ storeId, planCode })
+        .then(({ quote: q }) => ({
+          kind: q.kind,
+          totalMinor: q.charge.totalMinor,
+          netMinor: q.charge.netMinor,
+          vatMinor: q.charge.vatMinor,
+          remainingDays: q.remainingDays,
+        }))
+        .catch(() => null)
+    : null;
   return {
+    change: changeQuote,
     planCode: e.planCode,
     planName: { ar: e.planNameAr, en: e.planNameEn },
     status: e.status,
@@ -252,8 +267,11 @@ const amountOf = (price: number | null, st: BState) =>
   price === null ? null : subscriptionChargeAmount(price, st.vat as PlatformVat);
 const isUpgrade = (st: BState, price: number | null) =>
   price !== null && (st.currentPriceMinor ?? 0) < price;
+/** The amounts charged now for an upgrade: the prorated difference (G35-PRORATE-1); the full price only if no quote. */
+const upgradeCharge = (price: number | null, st: BState) =>
+  st.change?.kind === 'upgrade' ? st.change : amountOf(price, st);
 const amountRows = (price: number | null, st: BState) => {
-  const c = amountOf(price, st);
+  const c = upgradeCharge(price, st);
   return c
     ? [
         row('السعر قبل الضريبة بالجنيه', 'Price before VAT in EGP', null, egp(c.netMinor)),
@@ -277,7 +295,7 @@ const MONEY_WORDS = 'Say: ';
 const planChange = change<{ planCode: string }>({
   name: 'plan_change',
   capabilityId: 'billing.change-plan',
-  description: `Upgrade or downgrade my Ebda Store plan to another plan by its code (get the codes and prices from quote_plan). The price is read from the plan catalogue, never typed. An upgrade charges the card on file immediately; a downgrade starts at the end of the paid period. ${MONEY_WORDS}"upgrade me to Growth", "اترقى لباقة Growth", "انزل الباقة".`,
+  description: `Upgrade or downgrade my Ebda Store plan to another plan by its code (get the codes and prices from quote_plan). The price is read from the plan catalogue, never typed. An upgrade starts now and charges the card on file the price difference for the days left in the paid period; a downgrade starts at the end of the paid period. ${MONEY_WORDS}"upgrade me to Growth", "اترقى لباقة Growth", "انزل الباقة".`,
   schema: shape<{ planCode: string }>(
     { planCode: f.id('The plan code, exactly as quote_plan returns it.') },
     ['planCode']
@@ -293,14 +311,14 @@ const planChange = change<{ planCode: string }>({
     const t = targetOf(st, a.planCode);
     const price = targetPrice(t, st.interval);
     const upgrade = isUpgrade(st, price);
-    const total = amountOf(price, st)?.totalMinor ?? null;
+    const total = upgradeCharge(price, st)?.totalMinor ?? null;
     return {
       summary: pair(
         upgrade
-          ? `الترقية من ${st.planName.ar} إلى ${t.name.ar} بتتأكد من شاشة الدفع: افتح شاشة الدفع عشان تأكد خصم ${egp(total)} جنيه شامل الضريبة (${st.interval === 'yearly' ? 'سنوي' : 'شهري'}). المساعد مش بيخصم من الكارت بنفسه.`
+          ? `الترقية من ${st.planName.ar} إلى ${t.name.ar} بتتأكد من شاشة الدفع: افتح شاشة الدفع عشان تأكد خصم ${egp(total)} جنيه شامل الضريبة، وده فرق السعر للأيام الباقية من الفترة اللي دفعتها (${st.interval === 'yearly' ? 'سنوي' : 'شهري'}). المساعد مش بيخصم من الكارت بنفسه.`
           : `تغيير باقتك من ${st.planName.ar} إلى ${t.name.ar}. الباقة الجديدة هتبدأ في آخر الفترة المدفوعة ومفيش خصم دلوقتي. التغيير ده مش بيترجع بضغطة.`,
         upgrade
-          ? `Upgrading from ${st.planName.en} to ${t.name.en} is confirmed on the payment screen: open it to confirm the charge of ${egp(total)} EGP including VAT (${st.interval}). The assistant never charges your card itself.`
+          ? `Upgrading from ${st.planName.en} to ${t.name.en} is confirmed on the payment screen: open it to confirm the charge of ${egp(total)} EGP including VAT, the price difference for the days left in the period you paid (${st.interval}). The assistant never charges your card itself.`
           : `Change your plan from ${st.planName.en} to ${t.name.en}. The new plan starts at the end of the paid period and nothing is charged now. This cannot be undone with one press.`
       ),
       rows: [

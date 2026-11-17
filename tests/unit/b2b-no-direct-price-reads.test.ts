@@ -394,7 +394,7 @@ const ALLOW: Record<string, AllowEntry> = {
   'services/billing/subscription-billing.service.ts': {
     category: 'unrelated',
     reason: 'subscription plan price',
-    reads: { changePlan: 1, loadPayablePlan: 1, selectTrialPlan: 1, startCheckout: 1 },
+    reads: { previewChangePlan: 1, loadPayablePlan: 1, selectTrialPlan: 1, startCheckout: 1 },
   },
   'services/carriers/bosta.carrier.ts': {
     category: 'unrelated',
