@@ -98,10 +98,8 @@ const auth = async (page: Page, fallback: string): Promise<Record<string, string
 async function removeSection(page: Page, sid: string) {
   const row = page.getByTestId(`tree-row-${sid}`);
   if (!(await row.count())) return;
-  await row
-    .getByRole('button', { name: /^(حذف|Remove)/ })
-    .first()
-    .click();
+  await row.getByRole('button', { name: /^(خيارات|Options)/ }).click();
+  await page.getByRole('menuitem', { name: L('حذف', 'Delete'), exact: true }).click();
   await expect(row).toHaveCount(0);
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'saved', {
     timeout: 30_000,
@@ -273,9 +271,9 @@ for (const lang of ['ar', 'en'] as const) {
 
       await page
         .getByTestId(`tree-row-${victim}`)
-        .getByRole('button', { name: L(/^حذف/, /^Remove/) })
-        .first()
+        .getByRole('button', { name: L(/^خيارات/, /^Options/) })
         .click();
+      await page.getByRole('menuitem', { name: L('حذف', 'Delete'), exact: true }).click();
       await expect(live(page)).toHaveText(
         L(/اتحذف القسم .+ فاضل \d+ قسم/, /^Removed .+ sections left/)
       );

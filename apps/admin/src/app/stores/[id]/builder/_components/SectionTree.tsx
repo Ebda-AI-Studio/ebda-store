@@ -4,23 +4,42 @@
  * Left pane: the page structure — Header group, Template, Footer group — each
  * a sortable list of sections with their blocks (Shopify theme editor shape).
  *
- * Three ways to reorder, all the same reducer action: drag (dnd-kit, already
- * a dependency), keyboard (Alt+ArrowUp/Down on a focused row; dnd-kit's own
- * keyboard sensor too), and the move buttons. Per row: visibility, duplicate,
- * delete; cardinality is enforced by the reducer, which refuses and says why.
+ * Three ways to reorder, all the same reducer action: drag (dnd-kit, with a lifted
+ * overlay and a drop line), keyboard (Alt+ArrowUp/Down on a focused row; dnd-kit's
+ * own keyboard sensor too), and Move up / Move down in the row menu. A row shows
+ * the handle, the name, an eye toggle and an overflow menu (Duplicate, Move, Delete);
+ * the actions stay visible on focus-within and on the selected row, never hover-only.
+ * Cardinality is enforced by the reducer, which refuses and says why.
  * Logical CSS only (`ps-`, `ms-`, `text-start`), so the tree mirrors in Arabic.
  */
 import { Button } from '@/components/ui/Button';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronUp,
+  Copy,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Lock,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { RowMenu, type RowMenuItem } from './RowMenu';
 import { useLocale } from 'next-intl';
 import {
   DndContext,
   closestCenter,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -52,7 +71,8 @@ interface Props {
   /** Enter on a row: select it and hand keyboard focus to its first target on the canvas. */
   onFocusCanvas?: (s: Selection) => void;
   dispatch: (a: DocumentAction) => void;
-  onAddSection: (list: SectionList) => void;
+  /** `index` = insert at that position (the insert line between rows); omitted = at the end. */
+  onAddSection: (list: SectionList, index?: number) => void;
 }
 
 function label(node: SectionNode, locale: string): string {
@@ -60,6 +80,18 @@ function label(node: SectionNode, locale: string): string {
   if (!d) return node.type;
   return locale === 'ar' ? d.labelAr : d.labelEn;
 }
+
+function reducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+/** Every icon in the tree: one stroke weight, from the icon set the admin already uses. */
+const ICON = 'h-4 w-4';
+const STROKE = 1.75;
 
 function Row({
   node,
@@ -69,6 +101,7 @@ function Row({
   onSelect,
   onFocusCanvas,
   dispatch,
+  dropLine,
 }: {
   node: SectionNode;
   index: number;
@@ -77,6 +110,7 @@ function Row({
   onSelect: (s: Selection) => void;
   onFocusCanvas?: (s: Selection) => void;
   dispatch: (a: DocumentAction) => void;
+  dropLine?: 'before' | 'after' | null;
 }) {
   const t = useT('builder.tree');
   const locale = useLocale();
@@ -91,18 +125,64 @@ function Row({
   const blockDef = d?.blocks[0];
   // The core of a product / collection / cart page: it moves, it is never hidden or removed.
   const pinned = d?.pinned === true;
+  const menuItems: RowMenuItem[] = [
+    ...(d?.cardinality === 'many'
+      ? [
+          {
+            label: t('duplicateItem'),
+            icon: <Copy className={ICON} strokeWidth={STROKE} />,
+            onSelect: () => dispatch({ type: 'duplicateSection', id: node.id }),
+          },
+        ]
+      : []),
+    {
+      label: t('moveUpItem'),
+      icon: <ArrowUp className={ICON} strokeWidth={STROKE} />,
+      disabled: index === 0,
+      onSelect: () => dispatch({ type: 'moveSection', id: node.id, toIndex: index - 1 }),
+    },
+    {
+      label: t('moveDownItem'),
+      icon: <ArrowDown className={ICON} strokeWidth={STROKE} />,
+      disabled: index === count - 1,
+      onSelect: () => dispatch({ type: 'moveSection', id: node.id, toIndex: index + 1 }),
+    },
+    ...(pinned
+      ? []
+      : [
+          {
+            label: t('removeItem'),
+            icon: <Trash2 className={ICON} strokeWidth={STROKE} />,
+            destructive: true,
+            onSelect: () => dispatch({ type: 'removeSection', id: node.id }),
+          },
+        ]),
+  ];
 
   return (
     <li
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={isDragging ? 'opacity-60' : undefined}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition: reducedMotion() ? undefined : transition,
+      }}
+      className={`relative ${isDragging ? 'opacity-40' : ''}`}
       data-testid={`tree-row-${node.id}`}
     >
+      {dropLine && (
+        <span
+          aria-hidden="true"
+          data-testid="tree-drop-line"
+          className={`pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded-full bg-primary ${
+            dropLine === 'before' ? '-top-0.5' : '-bottom-0.5'
+          }`}
+        />
+      )}
       <div
-        className={`group flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm ${
+        data-selected={selected ? 'true' : undefined}
+        className={`group relative flex min-h-9 items-center gap-1 rounded-lg ps-1 pe-1 text-sm ${
           selected
-            ? 'bg-primary/15 text-foreground ring-1 ring-primary'
+            ? 'bg-primary/10 text-foreground before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:rounded-full before:bg-primary'
             : hovered
               ? 'bg-muted'
               : 'hover:bg-muted'
@@ -111,16 +191,16 @@ function Row({
         <button
           data-ui="handle"
           type="button"
-          className="min-h-6 min-w-6 cursor-grab touch-none rounded px-1 text-muted-foreground hover:text-foreground"
+          className="flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
           aria-label={t('drag', { name })}
           {...attributes}
           {...listeners}
         >
-          ⋮⋮
+          <GripVertical className={ICON} strokeWidth={STROKE} aria-hidden="true" />
         </button>
         <button
           type="button"
-          className={`min-w-0 flex-1 truncate text-start ${node.hidden ? 'text-muted-foreground line-through' : ''}`}
+          className={`min-w-0 flex-1 truncate text-start ${node.hidden ? 'text-muted-foreground opacity-70' : ''}`}
           onClick={() => onSelect({ sectionId: node.id })}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.altKey && onFocusCanvas) {
@@ -144,21 +224,32 @@ function Row({
         >
           {name}
         </button>
-        <span className="flex items-center opacity-70 group-hover:opacity-100">
-          <IconButton
-            label={t('moveUp', { name })}
-            disabled={index === 0}
-            onClick={() => dispatch({ type: 'moveSection', id: node.id, toIndex: index - 1 })}
+        {node.hidden && (
+          <span
+            data-testid={`tree-hidden-${node.id}`}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
           >
-            ↑
-          </IconButton>
-          <IconButton
-            label={t('moveDown', { name })}
-            disabled={index === count - 1}
-            onClick={() => dispatch({ type: 'moveSection', id: node.id, toIndex: index + 1 })}
+            <EyeOff className="h-3 w-3" strokeWidth={STROKE} aria-hidden="true" />
+            {t('hiddenTag')}
+          </span>
+        )}
+        {pinned && (
+          <span
+            role="img"
+            aria-label={t('pinned', { name })}
+            title={t('pinned', { name })}
+            className="flex h-8 w-6 shrink-0 items-center justify-center text-muted-foreground"
+            data-testid={`tree-pinned-${node.id}`}
           >
-            ↓
-          </IconButton>
+            <Lock className="h-3.5 w-3.5" strokeWidth={STROKE} aria-hidden="true" />
+          </span>
+        )}
+        <span
+          data-testid={`tree-actions-${node.id}`}
+          className={`flex shrink-0 items-center transition-opacity duration-150 motion-reduce:transition-none group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 ${
+            selected || node.hidden ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
           {!pinned && (
             <IconButton
               label={node.hidden ? t('show', { name }) : t('hide', { name })}
@@ -166,46 +257,14 @@ function Row({
                 dispatch({ type: 'setSectionHidden', id: node.id, hidden: !node.hidden })
               }
             >
-              {node.hidden ? '◌' : '◉'}
+              {node.hidden ? (
+                <EyeOff className={ICON} strokeWidth={STROKE} />
+              ) : (
+                <Eye className={ICON} strokeWidth={STROKE} />
+              )}
             </IconButton>
           )}
-          {d?.cardinality === 'many' && (
-            <IconButton
-              label={t('duplicate', { name })}
-              onClick={() => dispatch({ type: 'duplicateSection', id: node.id })}
-            >
-              ⧉
-            </IconButton>
-          )}
-          {pinned ? (
-            <span
-              role="img"
-              aria-label={t('pinned', { name })}
-              title={t('pinned', { name })}
-              className="px-1.5 py-0.5 text-xs text-muted-foreground"
-              data-testid={`tree-pinned-${node.id}`}
-            >
-              <svg
-                viewBox="0 0 16 16"
-                width="12"
-                height="12"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                aria-hidden="true"
-              >
-                <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
-                <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-              </svg>
-            </span>
-          ) : (
-            <IconButton
-              label={t('remove', { name })}
-              onClick={() => dispatch({ type: 'removeSection', id: node.id })}
-            >
-              ✕
-            </IconButton>
-          )}
+          <RowMenu label={t('options', { name })} items={menuItems} />
         </span>
       </div>
       {(node.blocks?.length || blockDef) && (
@@ -216,7 +275,7 @@ function Row({
             return (
               <li
                 key={b.id}
-                className="flex items-center gap-1"
+                className="group/block flex items-center gap-1"
                 data-testid={`tree-block-${node.id}-${b.id}`}
               >
                 <button
@@ -229,47 +288,65 @@ function Row({
                     onSelect({ sectionId: node.id, blockId: b.id });
                     onFocusCanvas({ sectionId: node.id, blockId: b.id });
                   }}
-                  className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-start text-xs ${
-                    bSelected ? 'bg-primary/15 ring-1 ring-primary' : 'hover:bg-muted'
-                  } ${b.hidden ? 'text-muted-foreground line-through' : ''}`}
+                  className={`relative flex min-h-8 min-w-0 flex-1 items-center gap-1.5 truncate rounded-md px-2 py-1 text-start text-xs ${
+                    bSelected
+                      ? 'bg-primary/10 before:absolute before:inset-y-1 before:start-0 before:w-0.5 before:rounded-full before:bg-primary'
+                      : 'hover:bg-muted'
+                  } ${b.hidden ? 'text-muted-foreground opacity-70' : ''}`}
                 >
-                  {bName}
+                  <span className="truncate">{bName}</span>
+                  {b.hidden && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 text-xs text-muted-foreground">
+                      <EyeOff className="h-3 w-3" strokeWidth={STROKE} aria-hidden="true" />
+                      {t('hiddenTag')}
+                    </span>
+                  )}
                 </button>
-                <IconButton
-                  label={t('moveUp', { name: bName })}
-                  disabled={bi === 0}
-                  onClick={() =>
-                    dispatch({
-                      type: 'moveBlock',
-                      sectionId: node.id,
-                      blockId: b.id,
-                      toIndex: bi - 1,
-                    })
-                  }
+                <span
+                  className={`flex shrink-0 items-center group-focus-within/block:opacity-100 group-hover/block:opacity-100 [@media(hover:none)]:opacity-100 ${
+                    bSelected || b.hidden ? 'opacity-100' : 'opacity-0'
+                  }`}
                 >
-                  ↑
-                </IconButton>
-                <IconButton
-                  label={b.hidden ? t('show', { name: bName }) : t('hide', { name: bName })}
-                  onClick={() =>
-                    dispatch({
-                      type: 'setBlockHidden',
-                      sectionId: node.id,
-                      blockId: b.id,
-                      hidden: !b.hidden,
-                    })
-                  }
-                >
-                  {b.hidden ? '◌' : '◉'}
-                </IconButton>
-                <IconButton
-                  label={t('remove', { name: bName })}
-                  onClick={() =>
-                    dispatch({ type: 'removeBlock', sectionId: node.id, blockId: b.id })
-                  }
-                >
-                  ✕
-                </IconButton>
+                  <IconButton
+                    label={t('moveUp', { name: bName })}
+                    disabled={bi === 0}
+                    onClick={() =>
+                      dispatch({
+                        type: 'moveBlock',
+                        sectionId: node.id,
+                        blockId: b.id,
+                        toIndex: bi - 1,
+                      })
+                    }
+                  >
+                    <ChevronUp className={ICON} strokeWidth={STROKE} />
+                  </IconButton>
+                  <IconButton
+                    label={b.hidden ? t('show', { name: bName }) : t('hide', { name: bName })}
+                    onClick={() =>
+                      dispatch({
+                        type: 'setBlockHidden',
+                        sectionId: node.id,
+                        blockId: b.id,
+                        hidden: !b.hidden,
+                      })
+                    }
+                  >
+                    {b.hidden ? (
+                      <EyeOff className={ICON} strokeWidth={STROKE} />
+                    ) : (
+                      <Eye className={ICON} strokeWidth={STROKE} />
+                    )}
+                  </IconButton>
+                  <IconButton
+                    label={t('remove', { name: bName })}
+                    onClick={() =>
+                      dispatch({ type: 'removeBlock', sectionId: node.id, blockId: b.id })
+                    }
+                  >
+                    <X className={ICON} strokeWidth={STROKE} />
+                  </IconButton>
+                </span>
               </li>
             );
           })}
@@ -315,8 +392,30 @@ function IconButton({
       onClick={onClick}
       className="text-muted-foreground"
     >
-      {children}
+      <span aria-hidden="true">{children}</span>
     </Button>
+  );
+}
+
+/** A thin insert affordance between two rows: appears on hover or keyboard focus. */
+function InsertLine({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <li role="presentation" className="relative h-0.5" data-testid="tree-insert-line">
+      <button
+        type="button"
+        data-ui="row"
+        aria-label={label}
+        title={label}
+        onClick={onClick}
+        className="group/insert absolute inset-x-1 -top-1.5 z-10 flex h-3.5 items-center opacity-0 transition-opacity duration-150 hover:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none [@media(hover:none)]:hidden"
+      >
+        <span className="h-px flex-1 bg-primary" />
+        <span className="mx-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <Plus className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+        </span>
+        <span className="h-px flex-1 bg-primary" />
+      </button>
+    </li>
   );
 }
 
@@ -327,40 +426,113 @@ function Group({
   ...rest
 }: Omit<Props, 'doc'> & { list: SectionList; title: string; nodes: SectionNode[] }) {
   const t = useT('builder.tree');
+  const locale = useLocale();
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  const end = () => {
+    setActiveId(null);
+    setOverId(null);
+  };
+  const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
+  const onDragOver = (e: DragOverEvent) => setOverId(e.over ? String(e.over.id) : null);
   const onDragEnd = (e: DragEndEvent) => {
+    end();
     if (!e.over || e.active.id === e.over.id) return;
     const to = nodes.findIndex(n => n.id === e.over!.id);
     if (to >= 0) rest.dispatch({ type: 'moveSection', id: String(e.active.id), toIndex: to });
   };
+  const activeIndex = nodes.findIndex(n => n.id === activeId);
+  const overIndex = nodes.findIndex(n => n.id === overId);
+  const lineFor = (id: string): 'before' | 'after' | null =>
+    activeId && overId && activeId !== overId && id === overId && activeIndex >= 0
+      ? activeIndex < overIndex
+        ? 'after'
+        : 'before'
+      : null;
+  const active = nodes.find(n => n.id === activeId);
+  const addButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      type="button"
+      onClick={() => rest.onAddSection(list)}
+      className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+      data-testid={`add-section-${list}`}
+      data-setting-id="builder.add-section"
+    >
+      <Plus className={ICON} strokeWidth={STROKE} aria-hidden="true" />
+      {t('addSection')}
+    </Button>
+  );
   return (
     <section aria-label={title} className="mb-4" data-testid={`tree-group-${list}`}>
-      <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h2>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>
-          <ul className="space-y-0.5">
-            {nodes.map((n, i) => (
-              <Row key={n.id} node={n} index={i} count={nodes.length} {...rest} />
-            ))}
-          </ul>
-        </SortableContext>
-      </DndContext>
-      <Button
-        variant="outline"
-        size="sm"
-        type="button"
-        onClick={() => rest.onAddSection(list)}
-        className="mt-1 w-full justify-start"
-        data-testid={`add-section-${list}`}
-        data-setting-id="builder.add-section"
-      >
-        + {t('addSection')}
-      </Button>
+      <h2 className="mb-1 px-2 text-sm font-semibold text-muted-foreground">{title}</h2>
+      {nodes.length === 0 ? (
+        <div
+          className="rounded-lg border border-dashed border-border px-3 py-4 text-center"
+          data-testid={`tree-empty-${list}`}
+        >
+          <p className="mb-2 text-sm text-muted-foreground">{t(`empty.${list}`)}</p>
+          {addButton}
+        </div>
+      ) : (
+        <>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDragEnd={onDragEnd}
+            onDragCancel={end}
+          >
+            <SortableContext items={nodes.map(n => n.id)} strategy={verticalListSortingStrategy}>
+              <ul className="space-y-0.5">
+                {nodes.flatMap((n, i) => [
+                  ...(i > 0
+                    ? [
+                        <InsertLine
+                          key={`ins-${n.id}`}
+                          label={t('insertHere')}
+                          onClick={() => rest.onAddSection(list, i)}
+                        />,
+                      ]
+                    : []),
+                  <Row
+                    key={n.id}
+                    node={n}
+                    index={i}
+                    count={nodes.length}
+                    dropLine={lineFor(n.id)}
+                    {...rest}
+                  />,
+                ])}
+              </ul>
+            </SortableContext>
+            <DragOverlay
+              dropAnimation={
+                reducedMotion() ? null : { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' }
+              }
+            >
+              {active ? (
+                <div
+                  data-testid="tree-drag-overlay"
+                  className="flex min-h-9 items-center gap-1 rounded-lg border border-border bg-card ps-1 pe-3 text-sm shadow-lg"
+                >
+                  <span className="flex h-8 w-6 items-center justify-center text-muted-foreground">
+                    <GripVertical className={ICON} strokeWidth={STROKE} aria-hidden="true" />
+                  </span>
+                  <span className="truncate">{label(active, locale)}</span>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+          <div className="mt-1 border-t border-border/60 pt-1">{addButton}</div>
+        </>
+      )}
     </section>
   );
 }
