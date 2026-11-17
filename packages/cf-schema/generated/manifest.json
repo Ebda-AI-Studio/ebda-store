@@ -675,12 +675,6 @@
     },
     {
       "kind": "check",
-      "name": "manual_payment_claims_status_check",
-      "table": "manual_payment_claims",
-      "disposition": "d1:manual_payment_claims"
-    },
-    {
-      "kind": "check",
       "name": "manual_payment_claims_method_check",
       "table": "manual_payment_claims",
       "disposition": "d1:manual_payment_claims"
@@ -1368,6 +1362,12 @@
       "name": "trust_requests_granted_limit_check",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "manual_payment_claims_status_check",
+      "table": "manual_payment_claims",
+      "disposition": "d1:manual_payment_claims"
     },
     {
       "kind": "index",
