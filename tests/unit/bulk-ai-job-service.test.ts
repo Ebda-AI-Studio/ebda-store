@@ -27,12 +27,20 @@ describe('enqueueBulkAiJob', () => {
     });
     expect(m.send).toHaveBeenCalledWith({
       name: 'bulk-ai/translate-requested',
-      data: { jobId: 'j1', storeId: 's1', direction: 'to_ar', force: false },
+      data: { jobId: 'j1', storeId: 's1', direction: 'to_ar' },
     });
-    // a replace run keeps `force` on the event AND on the job row (the stuck-job watcher resumes from the row)
-    await enqueueBulkAiJob('s1', 'u1', { kind: 'translate', direction: 'to_en', force: true });
-    expect(m.create.mock.calls[1]![0].data).toMatchObject({ force: true });
-    expect(m.send.mock.calls[1]![0].data).toMatchObject({ direction: 'to_en', force: true });
+    // translate is fill-only for every caller (NEVER-OVERWRITE-1): `force` never reaches the row or the event
+    await enqueueBulkAiJob('s1', 'u1', {
+      kind: 'translate',
+      direction: 'to_en',
+      force: true,
+    } as never);
+    expect(m.create.mock.calls[1]![0].data).not.toHaveProperty('force');
+    expect(m.send.mock.calls[1]![0].data).toEqual({
+      jobId: 'j1',
+      storeId: 's1',
+      direction: 'to_en',
+    });
     await enqueueBulkAiJob('s1', 'u1', { kind: 'llms_txt', force: true });
     expect(m.send.mock.calls[2]![0]).toEqual({
       name: 'bulk-ai/llms-txt-requested',

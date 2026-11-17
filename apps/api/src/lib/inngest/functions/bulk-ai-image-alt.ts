@@ -84,11 +84,7 @@ const bulkAiImageAltFn = inngest.createFunction(
     triggers: [{ event: 'bulk-ai/image-alt-requested' }],
   },
   async ({ event, step }) => {
-    const {
-      jobId,
-      storeId,
-      force: forceFlag,
-    } = event.data as {
+    const { jobId, storeId } = event.data as {
       jobId: string;
       storeId: string;
       force?: boolean;
@@ -98,8 +94,9 @@ const bulkAiImageAltFn = inngest.createFunction(
       logger.warn('bulk-ai/image-alt-requested fired without ids');
       return;
     }
-    // "Replace existing" (AITOOLS-4): off = fill-only, an image that has alt is never touched. On = regenerate it, backup first.
-    const force = forceFlag === true;
+    // NEVER-OVERWRITE-1 (Ruling RF-833-2): this sweep never replaces merchant-written content, whatever a caller sends. The
+    // `force` flag on the event or the job row is ignored; only empty fields are filled.
+    const force = false as boolean;
 
     return runInStoreScope(storeId, async () => {
       // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object

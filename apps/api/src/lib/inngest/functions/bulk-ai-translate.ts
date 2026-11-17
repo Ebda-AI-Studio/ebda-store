@@ -83,8 +83,9 @@ const bulkAiTranslateFn = inngest.createFunction(
   },
   async ({ event, step }) => {
     const { jobId, storeId, direction } = event.data;
-    // "Replace existing" (AITOOLS-4): off = fill-only. Also on a resumed run: the stuck-job watcher re-sends `force` from the job row.
-    const force = (event.data as { force?: boolean }).force === true;
+    // NEVER-OVERWRITE-1 (Ruling RF-833-2): this sweep never replaces merchant-written content, whatever a caller sends. The
+    // `force` flag on the event or the job row is ignored; only empty fields are filled.
+    const force = false as boolean;
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/translate-requested fired without ids');
       return;

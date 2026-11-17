@@ -1,7 +1,6 @@
 /**
- * bulk-ai-translate and "Replace existing" (AITOOLS-4): the server honours the switch.
- *  - force off: a pair with both sides filled is never touched (fill-only, NEVER-OVERWRITE-1)
- *  - force on: the target side is regenerated from the source side, through the backup service, never a bare update
+ * bulk-ai-translate is fill-only for every caller (NEVER-OVERWRITE-1, Ruling RF-833-2):
+ *  - a pair with both sides filled is never touched, with or without `force` on the event
  *  - an empty target is still a plain fill; the store's own name is never replaced
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -100,29 +99,20 @@ describe('translate: replace existing', () => {
     expect(m.product.update).not.toHaveBeenCalled();
   });
 
-  it('force on: regenerates the Arabic name through the backup service with the old value', async () => {
+  it('force on is ignored: both sides filled -> nothing translated, nothing written (NEVER-OVERWRITE-1)', async () => {
     m.product.findUnique.mockResolvedValue(BOTH);
     await run({ direction: 'to_ar', force: true });
-    expect(mockReplace).toHaveBeenCalledWith(
-      expect.objectContaining({ jobId: 'job-1', userId: 'u1', tool: 'translate_ar' }),
-      {
-        entityKind: 'product',
-        entityId: 'p1',
-        field: 'nameAr',
-        previous: 'تيشرت',
-        next: 'ترجمة جديدة',
-      }
-    );
-    expect(m.product.update).not.toHaveBeenCalled(); // no bare overwrite
+    expect(mockTranslate).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(m.product.update).not.toHaveBeenCalled();
   });
 
-  it('force on, to_en: the English field is the target', async () => {
+  it('force on, to_en: the English text is untouched too', async () => {
     m.product.findUnique.mockResolvedValue(BOTH);
     await run({ direction: 'to_en', force: true });
-    expect(mockReplace).toHaveBeenCalledWith(
-      expect.objectContaining({ tool: 'translate_en' }),
-      expect.objectContaining({ field: 'name', previous: 'Tee' })
-    );
+    expect(mockTranslate).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(m.product.update).not.toHaveBeenCalled();
   });
 
   it('an empty target is a plain fill even with force (no backup needed)', async () => {

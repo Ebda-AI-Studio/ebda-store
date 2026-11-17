@@ -170,22 +170,19 @@ describe('bulk-ai-categorize sweep', () => {
       expect(mockReplaceCategories).not.toHaveBeenCalled();
     });
 
-    it('with force replaces a categorized product through the backup service, never a bare write', async () => {
+    it('force=true is ignored: a categorized product is never replaced, never even sent to the AI', async () => {
       mockFindManyCategory.mockResolvedValue([{ id: 'cat-1', name: 'Clothing', nameAr: null }]);
       mockFindManyProduct.mockResolvedValue(categorized);
       mockSuggestProductCategory.mockResolvedValue([{ id: 'cat-1', confidence: 'high' }]);
-      mockReplaceCategories.mockResolvedValue('replaced');
       mockFindUniqueJob.mockResolvedValue({ status: 'running', userId: 'u1' });
 
       await runSweep({ jobId: 'job-1', storeId: 'store-1', force: true });
 
-      expect(mockReplaceCategories).toHaveBeenCalledWith(
-        expect.objectContaining({ jobId: 'job-1', userId: 'u1', tool: 'categorize' }),
-        { productId: 'p1', previousIds: ['old-1'], nextIds: ['cat-1'] }
-      );
+      for (const [args] of mockFindManyProduct.mock.calls)
+        expect(args.where.categories).toEqual({ none: {} });
+      expect(mockSuggestProductCategory).not.toHaveBeenCalled();
+      expect(mockReplaceCategories).not.toHaveBeenCalled();
       expect(mockCreateProductCategory).not.toHaveBeenCalled();
-      const finalCall = mockUpdateJob.mock.calls[mockUpdateJob.mock.calls.length - 1][0];
-      expect(finalCall.data.filled).toBe(1);
     });
   });
 });

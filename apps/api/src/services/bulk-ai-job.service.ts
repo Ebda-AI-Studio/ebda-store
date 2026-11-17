@@ -9,7 +9,7 @@ import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { storeWriter } from '../lib/repo-factory';
 
 export type BulkAiJobSpec =
-  | { kind: 'translate'; direction: 'to_ar' | 'to_en'; force?: boolean }
+  | { kind: 'translate'; direction: 'to_ar' | 'to_en' }
   | { kind: 'seo'; force?: boolean }
   | { kind: 'llms_txt'; force?: boolean };
 
@@ -27,7 +27,7 @@ export async function enqueueBulkAiJob(
   userId: string,
   spec: BulkAiJobSpec
 ): Promise<BulkAiJobRow> {
-  const force = spec.force === true;
+  const force = spec.kind !== 'translate' && spec.force === true;
   const job = await (
     await storeWriter(storeId)
   ).bulkAiJob.create({
@@ -36,7 +36,7 @@ export async function enqueueBulkAiJob(
       userId,
       kind: spec.kind,
       ...(spec.kind === 'translate' ? { direction: spec.direction } : {}),
-      ...(force && spec.kind !== 'translate' ? { errors: { force: true } as object } : {}),
+      ...(force ? { errors: { force: true } as object } : {}),
       // the durable copy the stuck-job watcher resumes from (a replace run must stay a replace run)
       ...(force ? { force: true } : {}),
     },
@@ -47,7 +47,7 @@ export async function enqueueBulkAiJob(
       spec.kind === 'translate'
         ? {
             name: 'bulk-ai/translate-requested',
-            data: { jobId: job.id, storeId, direction: spec.direction, force },
+            data: { jobId: job.id, storeId, direction: spec.direction },
           }
         : {
             name: spec.kind === 'seo' ? 'bulk-ai/seo-requested' : 'bulk-ai/llms-txt-requested',

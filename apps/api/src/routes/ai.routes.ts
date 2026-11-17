@@ -571,13 +571,12 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { direction, force } = bulkTranslateSchema.parse(req.body);
+      const { direction } = bulkTranslateSchema.parse(req.body);
       let job;
       try {
         job = await enqueueBulkAiJob(storeId, req.user!.userId, {
           kind: 'translate',
           direction,
-          force: force === true,
         });
       } catch (err) {
         if (!(err instanceof BulkAiEnqueueError)) throw err;
@@ -908,8 +907,8 @@ router.post(
 // See docs/plans/2026-07-03-ai-bulk-sweeps.md.
 // =====================================================================
 
-// Category assignment. `force` = replace existing (AITOOLS-4): the AI's pick replaces a categorized product's set and the
-// previous set is backed up first (undo). Without it only uncategorized products are touched (bulk-ai-categorize.ts).
+// Category assignment. Only uncategorized products are touched (bulk-ai-categorize.ts). A `force` in the body is ignored:
+// NEVER-OVERWRITE-1, the API never replaces a merchant's choice for any caller (Ruling RF-833-2).
 router.post(
   '/bulk/categorize',
   requireFeature('bulk_operations'),
@@ -917,19 +916,17 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const force = req.body?.force === true;
-
       const job = await (
         await storeWriter(currentStoreId())
       ).bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'category_assign', force },
+        data: { storeId, userId: req.user!.userId, kind: 'category_assign' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/categorize-requested',
-          data: { jobId: job.id, storeId, force },
+          data: { jobId: job.id, storeId },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);
@@ -950,8 +947,8 @@ router.post(
   }
 );
 
-// Gemini-Vision image alt-text sweep. `force` = replace existing (AITOOLS-4): an image that has alt is regenerated with its
-// previous alt backed up (undo). Without it an image that already has `alt` is never overwritten (bulk-ai-image-alt.ts).
+// Gemini-Vision image alt-text sweep. An image that already has `alt` is never overwritten (bulk-ai-image-alt.ts). A `force`
+// in the body is ignored: NEVER-OVERWRITE-1 (Ruling RF-833-2).
 router.post(
   '/bulk/image-alt',
   requireFeature('bulk_operations'),
@@ -959,19 +956,17 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const force = req.body?.force === true;
-
       const job = await (
         await storeWriter(currentStoreId())
       ).bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'image_alt', force },
+        data: { storeId, userId: req.user!.userId, kind: 'image_alt' },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/image-alt-requested',
-          data: { jobId: job.id, storeId, force },
+          data: { jobId: job.id, storeId },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);

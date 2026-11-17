@@ -178,28 +178,16 @@ describe('bulk-ai-image-alt sweep', () => {
       expect(mockUpdateProductImage).not.toHaveBeenCalled();
     });
 
-    it('with force regenerates it through the backup service, never a bare image update', async () => {
+    it('force=true is ignored: an image that already has alt is never regenerated or overwritten', async () => {
       mockFindManyProduct.mockResolvedValue(withAlt);
       mockGenerateProductAltText.mockResolvedValue('Fresh alt');
-      mockReplaceText.mockResolvedValue('replaced');
       mockFindUniqueJob.mockResolvedValue({ status: 'running', userId: 'u1' });
 
       await runSweep({ jobId: 'job-1', storeId: 'store-1', force: true });
 
-      expect(mockReplaceText).toHaveBeenCalledWith(
-        expect.objectContaining({ jobId: 'job-1', userId: 'u1', tool: 'image_alt' }),
-        {
-          entityKind: 'product_image',
-          entityId: 'img-1',
-          productId: 'p1',
-          field: 'alt',
-          previous: 'Old alt',
-          next: 'Fresh alt',
-        }
-      );
+      expect(mockGenerateProductAltText).not.toHaveBeenCalled();
+      expect(mockReplaceText).not.toHaveBeenCalled();
       expect(mockUpdateProductImage).not.toHaveBeenCalled();
-      const finalCall = mockUpdateJob.mock.calls[mockUpdateJob.mock.calls.length - 1][0];
-      expect(finalCall.data.filled).toBe(1);
     });
   });
 });

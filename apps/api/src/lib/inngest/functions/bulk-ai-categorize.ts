@@ -81,11 +81,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
     triggers: [{ event: 'bulk-ai/categorize-requested' }],
   },
   async ({ event, step }) => {
-    const {
-      jobId,
-      storeId,
-      force: forceFlag,
-    } = event.data as {
+    const { jobId, storeId } = event.data as {
       jobId: string;
       storeId: string;
       force?: boolean;
@@ -95,9 +91,9 @@ const bulkAiCategorizeFn = inngest.createFunction(
       logger.warn('bulk-ai/categorize-requested fired without ids');
       return;
     }
-    // "Replace existing" (AITOOLS-4): off = only uncategorized products (a manual choice is never touched). On = the AI's pick
-    // replaces a product's category set, the previous set backed up first (undo restores it).
-    const force = forceFlag === true;
+    // NEVER-OVERWRITE-1 (Ruling RF-833-2): this sweep never replaces merchant-written content, whatever a caller sends. The
+    // `force` flag on the event or the job row is ignored; only empty fields are filled.
+    const force = false as boolean;
 
     return runInStoreScope(storeId, async () => {
       // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
@@ -219,6 +215,12 @@ const bulkAiCategorizeFn = inngest.createFunction(
               const product = byId.get(id);
               if (!product) {
                 // Deleted, or already categorized since load-items.
+                bSkipped++;
+                bProcessed++;
+                continue;
+              }
+              // NEVER-OVERWRITE-1: a categorized product is left alone, even if a read returned it.
+              if (!force && product.categories.length > 0) {
                 bSkipped++;
                 bProcessed++;
                 continue;

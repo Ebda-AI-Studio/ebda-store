@@ -25,7 +25,7 @@
   "policy": "preview",
   "undo": {
     "class": "reversible",
-    "note": "yes: replace runs of translate, categorize and image alt are backed up and undone from the AI tools page (per run) or the product page (per product), refused for a field edited since (AITOOLS-4); reset-field / revert-balance as before"
+    "note": "yes: translate, categorize and image alt only fill empty fields for every caller (NEVER-OVERWRITE-1, a `force` flag is ignored); backups and undo cover the product page history and any run recorded before (AITOOLS-4, RF-833-2); reset-field / revert-balance as before"
   },
   "helpArticle": "ai-switch-and-category-suggestions",
   "questions": {
@@ -49,7 +49,7 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success",
-    "Replace existing (translate, categorize, image alt): the old value is saved first; Undo restores it unless the merchant edited that field after the run, in which case it is left alone and the merchant is told"
+    "Translate, categorize and image alt never replace a filled field, even when a direct API call sends force=true; the assistant must not offer or claim a replace for them"
   ],
   "gaps": []
 }

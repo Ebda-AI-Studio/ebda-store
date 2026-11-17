@@ -146,15 +146,20 @@ describe.each([
     );
   });
 
-  it('passes force=true through to the Inngest event when requested', async () => {
-    const handler = getHandler('post', path);
-    const { req, res, next } = mockReqRes({ force: true });
+  // categorize and image-alt never replace merchant content (NEVER-OVERWRITE-1): see the dedicated block below
+  const honoursForce = path === '/bulk/excerpt' || path === '/bulk/tags';
+  it.runIf(honoursForce)(
+    'passes force=true through to the Inngest event when requested',
+    async () => {
+      const handler = getHandler('post', path);
+      const { req, res, next } = mockReqRes({ force: true });
 
-    await handler(req, res, next);
+      await handler(req, res, next);
 
-    const sendArgs = mockInngestSend.mock.calls[0][0];
-    expect(sendArgs.data.force).toBe(true);
-  });
+      const sendArgs = mockInngestSend.mock.calls[0][0];
+      expect(sendArgs.data.force).toBe(true);
+    }
+  );
 
   it('marks the job failed and returns 503 when the Inngest enqueue throws', async () => {
     mockInngestSend.mockRejectedValueOnce(new Error('enqueue boom'));
@@ -177,5 +182,26 @@ describe.each([
         error: expect.objectContaining({ code: 'AI_QUEUE_UNREACHABLE' }),
       })
     );
+  });
+});
+
+describe.each([
+  { path: '/bulk/categorize', kind: 'category_assign' },
+  { path: '/bulk/image-alt', kind: 'image_alt' },
+])('POST $path ignores force (NEVER-OVERWRITE-1, Ruling RF-833-2)', ({ path, kind }) => {
+  it('a direct API call with force=true does not reach the job row or the event', async () => {
+    mockBulkAiJobCreate.mockResolvedValue({
+      id: 'job-1',
+      status: 'queued',
+      kind,
+      createdAt: new Date(),
+    });
+    const handler = getHandler('post', path);
+    const { req, res, next } = mockReqRes({ force: true });
+
+    await handler(req, res, next);
+
+    expect(mockBulkAiJobCreate.mock.calls[0][0].data).not.toHaveProperty('force');
+    expect(mockInngestSend.mock.calls[0][0].data).not.toHaveProperty('force');
   });
 });

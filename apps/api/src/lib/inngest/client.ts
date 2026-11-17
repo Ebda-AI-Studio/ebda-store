@@ -60,7 +60,7 @@ type BulkAiTranslateEvent = EventPayload & {
     jobId: string;
     storeId: string;
     direction: 'to_ar' | 'to_en';
-    /** Replace existing (AITOOLS-4): off = fill-only. */
+    /** Ignored: translate is fill-only for every caller (NEVER-OVERWRITE-1, Ruling RF-833-2). */
     force?: boolean;
   };
 };
