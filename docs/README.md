@@ -38,6 +38,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 ## admin - Admin app standards
 
 - [admin/ACTION-PLACEMENT-STANDARD.md](admin/ACTION-PLACEMENT-STANDARD.md) - Admin action-placement standard
+- [admin/activation-view.md](admin/activation-view.md) - Super-admin merchant activation view (Ruling ACT-1)
 
 ## adr - Architecture decision records
 
@@ -134,6 +135,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## ebda - Ebda program: plans, research, brand, templates
 
+- [ebda-assistant-rollout.md](ebda-assistant-rollout.md) - Ebda Store assistant: rollout stages and safety gate
 - [ebda/ads-tracking.md](ebda/ads-tracking.md) - Ebda Store acquisition tracking (own Meta ads + PostHog funnel)
 - [ebda/brand/ebda-brief-v2.html](ebda/brand/ebda-brief-v2.html) - ebda brief v2
 - [ebda/brand/operator.md](ebda/brand/operator.md) - Operator of Ebda
@@ -296,6 +298,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [plans/done/2026-10-21-phase-b2-souq.md](plans/done/2026-10-21-phase-b2-souq.md) - Phase B2 — Souq (general retail & electronics) Implementation Plan
 - [plans/done/2026-10-21-phase-b3-jasmine.md](plans/done/2026-10-21-phase-b3-jasmine.md) - Phase B3 — Jasmine (beauty & skincare) Implementation Plan
 - [plans/done/2026-10-21-phase-b4-lamma.md](plans/done/2026-10-21-phase-b4-lamma.md) - Phase B4 — Lamma (home food & home kitchens) Implementation Plan
+- [plans/2026-11-15-gsc-custom-domain-verification.md](plans/2026-11-15-gsc-custom-domain-verification.md) - GSC data for custom merchant domains: automatic META verification via the Site Verification API, then sites.add (2026-11-15)
 - [plans/2026-11-05-nz-17-postgres-removal.md](plans/2026-11-05-nz-17-postgres-removal.md) - N-17: inventory of Postgres residue, what replaces the Postgres integration suite, CI footprint (2026-11-05)
 - [plans/done/2026-11-03-sharia-gold-bnpl-aup.md](plans/done/2026-11-03-sharia-gold-bnpl-aup.md) - Sharia decisions: gold prepaid, BNPL off by default, acceptable use (2026-11-03)
 - [plans/done/2026-10-21-phase-b5-dahab-looks.md](plans/done/2026-10-21-phase-b5-dahab-looks.md) - Phase B5 — Dahab redesign: Worn / Workshop / Gift box Implementation Plan
@@ -368,6 +371,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## security - Security
 
+- [security/2026-11-12-backfill-hardening-s-ten.md](security/2026-11-12-backfill-hardening-s-ten.md) - Backfill audit 2026-11-12: S2-S7, TEN-5, TEN-7 fixes
 - [security/audit-2026-10-14.md](security/audit-2026-10-14.md) - Security audit — 2026-10-14 (static, `apps/api` + `packages/database`)
 - [security/burp-manual-pentest-checklist.md](security/burp-manual-pentest-checklist.md) - Manual Burp Suite Pentest Checklist (quarterly)
 - [security/csp-hardening-plan.md](security/csp-hardening-plan.md) - CSP hardening: removing `script-src 'unsafe-inline'`
@@ -388,6 +392,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 - [superpowers/plans/2026-04-23-final-push-plan.md](superpowers/plans/2026-04-23-final-push-plan.md) - Final Push — Plan
 - [superpowers/plans/2026-04-23-remaining-refactors-master-plan.md](superpowers/plans/2026-04-23-remaining-refactors-master-plan.md) - Remaining Refactors — Master Plan
 - [superpowers/plans/2026-04-29-tenant-control-batch-2.md](superpowers/plans/2026-04-29-tenant-control-batch-2.md) - Tenant Control Batch 2 — 2026-04-29
+- [superpowers/plans/2026-11-14-instapay-auto-confirm.md](superpowers/plans/2026-11-14-instapay-auto-confirm.md) - InstaPay Auto-Confirm Implementation Plan
 - [superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md](superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md) - Storefront per-store PWA — extend to full size set
 - [superpowers/plans/2026-05-16-mobile-ui-ship.md](superpowers/plans/2026-05-16-mobile-ui-ship.md) - Mobile UI ship — match Storefront + Bank-Alkahraman sizing
 - [superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md](superpowers/plans/2026-05-17-ui-ux-refresh-from-references.md) - Ebda Store Storefront UI/UX Refresh — Plan

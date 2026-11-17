@@ -1,0 +1,36 @@
+{
+  "id": "platform.store-suspend",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "وقف او رجع متجر",
+  "titleEn": "Suspend / reactivate a store",
+  "screens": ["/stores"],
+  "api": ["PATCH /stores/:id/status", "PATCH /admin/stores/:id/status"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "operatorReason": {
+    "code": "abuse",
+    "text": "abuse / legal (AUP) ; billing suspensions auto-reactivate on payment",
+    "validUnderRule": true
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["متجري اتوقف ليه؟", "ازاي ارجع متجري", "عايز اعترض على الايقاف"],
+    "en": ["Why was my store suspended?", "How do I appeal?"]
+  },
+  "steps": ["Super-admin console only."],
+  "edgeCases": [
+    "Assistant must refuse and offer a handoff request with context",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
+  ],
+  "gaps": ["No appeal route or reason shown to merchant (gap 11)"]
+}

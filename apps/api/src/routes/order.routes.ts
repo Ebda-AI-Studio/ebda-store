@@ -51,6 +51,7 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { prisma } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
+import { invoiceRecipient, queueInvoiceEmail } from '../services/order-invoice-email.service';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import {
@@ -70,8 +71,11 @@ import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.se
 import { config } from '../config';
 import type { Currency, PaymentProvider } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
-import { idempotencyKeyOf, opKey, withIdempotencyKey } from '../lib/money-idempotency';
-import { refundMayHaveExecuted } from '../services/payment-providers/refund-outcome';
+import { idempotencyKeyOf } from '../lib/money-idempotency';
+import {
+  lookupRefundTarget,
+  refundThroughProvider,
+} from '../services/order-provider-refund.service';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
   resolveRefundSettlement,
@@ -860,9 +864,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      const order = await OrderService.getById(storeId, orderId);
-      const customerEmail =
-        order.customer?.email ?? (order.shippingAddress as Record<string, string> | null)?.email;
+      const { to: customerEmail } = await invoiceRecipient(storeId, orderId);
       if (!customerEmail) {
         res.status(400).json({
           success: false,
@@ -871,10 +873,7 @@ router.post(
         return;
       }
 
-      await inngest.send({
-        name: 'order/invoice.email-requested',
-        data: { orderId, storeId, to: customerEmail },
-      });
+      await queueInvoiceEmail(storeId, orderId, customerEmail);
 
       await auditLog({
         action: 'order.invoice.email-queued',
@@ -936,132 +935,25 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      const db = await storeDb(storeId);
       const user = getAuthUser(req);
-
-      const order = await db.order.findFirst({
-        where: { id: orderId, storeId },
-        include: { payments: true },
-      });
-
-      if (!order) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Order not found' },
-        });
-        return;
-      }
-
-      // Verify this is a COD order
-      const codPayment = order.payments.find(p => p.provider === 'cod');
-      if (!codPayment) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'NOT_COD', message: 'This order is not a Cash on Delivery order' },
-        });
-        return;
-      }
-
-      if (order.paymentStatus === 'paid') {
-        res.status(400).json({
-          success: false,
-          error: { code: 'ALREADY_PAID', message: 'Order is already marked as paid' },
-        });
-        return;
-      }
-      // A cancelled / refunded order (incl. a returned-to-origin COD parcel)
-      // collected nothing: marking it paid would book a sale that never
-      // happened (sense audit O8).
-      if (order.status === 'cancelled' || order.status === 'refunded') {
-        res.status(409).json({
-          success: false,
-          error: {
-            code: 'ORDER_NOT_PAYABLE',
-            message: 'A cancelled or refunded order cannot be marked paid',
-          },
-        });
-        return;
-      }
-
-      // Update payment and order status atomically. Only advance a still-pending
-      // order to `confirmed`; leave a further-along order (processing/shipped/
-      // delivered) untouched. COD cash is collected AT delivery, so marking paid
-      // typically happens after fulfilment — forcing `confirmed` there regressed
-      // the order's status and lost fulfilment progress.
-      const money = await storeMoney(storeId);
-      // the payment row that was actually flipped (on a Durable Object store: the one the section updated)
-      let flipped = { paymentId: codPayment.id, fromStatus: codPayment.status as string };
-      if (money) {
-        // Durable Object store (Ruling NZ-A-2): the same writes in ONE section there.
-        const done = await money.codMarkPaid({ orderIds: [orderId] });
-        if (done.updated.length === 0) {
-          res.status(409).json({
-            success: false,
-            error: { code: 'ORDER_NOT_PAYABLE', message: 'The order can no longer be marked paid' },
-          });
-          return;
-        }
-        flipped = { paymentId: done.updated[0].paymentId, fromStatus: done.updated[0].fromStatus };
-      } else {
-        await prisma.$transaction([
-          prisma.payment.update({
-            where: { id: codPayment.id },
-            data: { status: 'completed', paidAt: new Date() },
-          }),
-          prisma.order.update({
-            where: { id: orderId, storeId },
-            data: {
-              paymentStatus: 'paid',
-              ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
-            },
-          }),
-        ]);
-      }
-
-      // Append-only audit row for the COD completion.
-      await (money ? recordPaymentEventForStore : recordPaymentEvent)({
-        paymentId: flipped.paymentId,
-        storeId: order.storeId,
-        orderId,
-        eventType: 'status_change',
-        fromStatus: flipped.fromStatus as typeof codPayment.status,
-        toStatus: 'completed',
-        provider: 'cod',
-        triggeredByUserId: user.userId,
-        details: { reason: 'cod_marked_paid', orderNumber: order.orderNumber },
-      });
-
-      // Fire the same post-payment fanout the webhook handler does —
-      // accounting journal relies on this event.
-      inngest
-        .send({
-          name: 'order/created',
-          data: {
-            orderId,
-            storeId: order.storeId,
-            paymentMethod: codPayment.provider,
-            locale: undefined,
-          },
-        })
-        .catch((err: unknown) =>
-          logger.error({ err, orderId }, '[COD] Failed to enqueue order/created')
-        );
+      // The logic lives in OrderService.markCodPaid so the merchant assistant calls the same path.
+      const { orderNumber, amount } = await OrderService.markCodPaid(storeId, orderId, user.userId);
 
       await auditLog({
         action: 'order.cod_marked_paid',
         userId: user.userId,
         resourceType: 'order',
         resourceId: orderId,
-        details: { orderNumber: order.orderNumber, amount: codPayment.amount },
+        details: { orderNumber, amount },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      logger.info({ orderId, orderNumber: order.orderNumber }, '[COD] Order marked as paid');
+      logger.info({ orderId, orderNumber }, '[COD] Order marked as paid');
 
       res.json({
         success: true,
-        data: { message: 'Order marked as paid', orderNumber: order.orderNumber },
+        data: { message: 'Order marked as paid', orderNumber },
       });
     } catch (error) {
       next(error);
@@ -2001,9 +1893,12 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      const db = await storeDb(storeId);
       const user = getAuthUser(req);
       const data = refundViaProviderSchema.parse(req.body ?? {});
+      // The lookup, the money-moving chain and their refusals live in services/order-provider-refund.service.ts (shared with the assistant's
+      // `order_refund` tool). PaymentService.refund covers the provider call, the Payment/Order status flip and applyRefundEffects; a failure
+      // ANYWHERE in that chain surfaces as a non-2xx (money-integrity audit F2).
+      const target = await lookupRefundTarget(storeId, orderId);
       const idem = idempotencyKeyOf(req.header('idempotency-key'));
       if (!idem)
         throw new AppError(
@@ -2011,32 +1906,14 @@ router.post(
           'IDEMPOTENCY_KEY_REQUIRED',
           'This refund needs an Idempotency-Key header (one per refund attempt). Nothing was done.'
         );
-
-      const order = await db.order.findFirst({
-        where: { id: orderId, storeId, deletedAt: null },
-        include: {
-          payments: {
-            // A partially refunded payment still has a refundable balance
-            // (#1360) — PaymentService.refund budgets against
-            // `amount - refundedAmount` and accepts it as a starting state, as
-            // ReturnService does. Filtering to 'completed' alone left this
-            // button dead after the first partial return.
-            where: { status: { in: ['completed', 'partially_refunded'] } },
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-          },
-        },
-      });
-      if (!order) {
+      if (target.kind === 'not_found') {
         res.status(404).json({
           success: false,
           error: { code: 'NOT_FOUND', message: 'Order not found' },
         });
         return;
       }
-
-      const payment = order.payments[0];
-      if (!payment || !payment.transactionId) {
+      if (target.kind === 'no_payment') {
         res.status(400).json({
           success: false,
           error: {
@@ -2047,8 +1924,7 @@ router.post(
         });
         return;
       }
-
-      if (order.paymentStatus === 'refunded') {
+      if (target.kind === 'already_refunded') {
         res.status(400).json({
           success: false,
           error: {
@@ -2058,66 +1934,16 @@ router.post(
         });
         return;
       }
-
-      // `PaymentService.refund` covers the whole money-moving chain: the
-      // provider refund call, the Payment/Order status flip, and firing
-      // `applyRefundEffects` (which enqueues `order/refunded` — the sole
-      // trigger for inventory/coupon/affiliate/loyalty reversal + the
-      // customer refund email/admin push). A failure ANYWHERE in that
-      // chain must surface as a non-2xx — this used to catch only the
-      // provider-call error and swallow everything else into an HTTP 200
-      // (money-integrity audit F2: operator gets no signal a refund
-      // broke). We forward to `next(err)` instead of writing the response ourselves, so every
-      // failure mode in the chain — not just the provider call — reaches
-      // the client as a real error.
-      let result;
-      try {
-        const scope = `refund-via-provider:${storeId}:${orderId}`;
-        result = (
-          await withIdempotencyKey(
-            scope,
-            idem,
-            () =>
-              runInStoreCtx(storeId, async () =>
-                // the store id selects the store's backend (a Durable Object store refunds through its own section)
-                PaymentService.refund(
-                  {
-                    transactionId: payment.transactionId!,
-                    amount: data.amount,
-                    reason: data.reason,
-                    attemptKey: opKey(scope, idem),
-                  },
-                  undefined,
-                  storeId
-                )
-              ),
-            refundMayHaveExecuted,
-            { required: true }
-          )
-        ).value;
-      } catch (refundError) {
-        // a replay refusal / a may-have-executed failure keeps its own code (409 / 502): the admin must check, not retry
-        if (
-          refundError instanceof AppError &&
-          (refundError.statusCode < 500 || refundMayHaveExecuted(refundError))
-        )
-          throw refundError;
-        const refundMessage =
-          refundError instanceof Error ? refundError.message : 'Unknown refund error';
-        logger.error(
-          {
-            err: refundError,
-            orderId,
-            orderNumber: order.orderNumber,
-            transactionId: payment.transactionId,
-            provider: payment.provider,
-            amount: data.amount,
-          },
-          '[Refund] admin-initiated provider refund failed'
-        );
-        next(new AppError(502, 'REFUND_FAILED', refundMessage));
-        return;
-      }
+      const { order, payment } = target;
+      const result = await refundThroughProvider({
+        storeId,
+        orderId,
+        orderNumber: order.orderNumber,
+        payment,
+        amount: data.amount,
+        reason: data.reason,
+        idempotencyKey: idem,
+      });
 
       await auditLog({
         action: 'order.refund_via_provider',

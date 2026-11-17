@@ -9,7 +9,7 @@
  * when anything in that render failed first the visitor got a 500 instead of the redirect (lamma/dahab, same day).
  * Here it is an empty-body 308/307 decided from the same rules (`decideLocalePath` + `pendingRedirect`, locale-paths.ts)
  * and the store's default language from the API resolver (`storeVerdict`, the call the edge cache already makes,
- * remembered 60 s per isolate).
+ * remembered 60 s per isolate; the decided 308 is also kept in the Cache API, WEB-COLD-4/6).
  *
  * Falls through to Next (the old path, unchanged) whenever it cannot decide: not GET/HEAD, locale paths off for the
  * store, the admin preview iframe (`?_preview=`), a path that is not pending, or a store the resolver does not vouch for
@@ -30,12 +30,29 @@ import {
   storeKeyForHost,
 } from './src/lib/locale-paths';
 
+/** The subset of the Workers Cache API used here (structurally the same as store-edge-cache's CacheLike). */
+export interface RedirectCache {
+  match(key: string): Promise<Response | undefined>;
+  put(key: string, res: Response): Promise<void>;
+}
+
+/**
+ * Ruling WEB-COLD-4: a cached cookie-less 308 younger than this is served as is (the per-isolate verdict memo window).
+ * Ruling WEB-COLD-6: an older one (up to {@link REDIRECT_CACHE_STALE_S}) is STILL served at once and re-decided in `waitUntil`,
+ * because a 60 s hard expiry meant every visitor after an idle minute (all of a quiet store's visitors) paid the resolver
+ * round trip: a cold API + AuthState Durable Object chain, measured 1.4-2.3 s on the hop alone.
+ */
+const REDIRECT_CACHE_TTL_S = 60;
+// pq-allow(unused-export): test seam, imported by apps/web/locale-redirect-edge.test.ts
+export const REDIRECT_CACHE_STALE_S = 21_600;
+
 export type DefaultLanguageOf = (host: string) => Promise<'ar' | 'en' | null>;
 
 export async function edgeLocaleRedirect(
   request: Request,
   env: Record<string, unknown>,
-  defaultLanguageOf: DefaultLanguageOf
+  defaultLanguageOf: DefaultLanguageOf,
+  cache?: { store: RedirectCache; waitUntil(p: Promise<unknown>): void }
 ): Promise<Response | null> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const url = new URL(request.url);
@@ -55,6 +72,36 @@ export async function edgeLocaleRedirect(
     method: request.method,
   });
   if (decision.kind !== 'pending') return null;
+  const hasCookie = /(?:^|;\s*)force-language=(ar|en)(?:;|$)/.test(
+    request.headers.get('cookie') ?? ''
+  );
+  // Ruling WEB-COLD-4: the cookie-less 308 depends only on host + path, so it is remembered across isolates and data centres'
+  // Cache API colo (a cold isolate then skips the resolver subrequest). Cookie visitors never touch it (their target differs).
+  const cacheKey = `https://${url.hostname}/__edge-locale-redirect${url.pathname}${url.search}`;
+  if (cache && !hasCookie) {
+    try {
+      const hit = await cache.store.match(cacheKey);
+      const loc = hit?.headers.get('x-redirect-location');
+      const at = Number(hit?.headers.get('x-redirect-at'));
+      const age = (Date.now() - at) / 1000;
+      if (
+        loc &&
+        loc.startsWith('/') &&
+        !loc.startsWith('//') &&
+        age >= 0 &&
+        age < REDIRECT_CACHE_STALE_S
+      ) {
+        // Stale-while-revalidate: the visitor never waits for the resolver; the next one sees a language change.
+        if (age >= REDIRECT_CACHE_TTL_S)
+          cache.waitUntil(
+            refreshRedirect(url, decision.rest, cacheKey, defaultLanguageOf, cache).catch(() => {})
+          );
+        return new Response(null, { status: 308, headers: permanentHeaders(loc) });
+      }
+    } catch {
+      // cache unavailable: decide live
+    }
+  }
   let defaultLocale: 'ar' | 'en' | null = null;
   try {
     defaultLocale = await defaultLanguageOf(url.hostname);
@@ -73,10 +120,52 @@ export async function edgeLocaleRedirect(
   });
   // Same-origin path only (the rules already produce one; refuse anything else rather than redirect off-site).
   if (!target.location.startsWith('/') || target.location.startsWith('//')) return null;
+  if (cache && !hasCookie && target.permanent) {
+    cache.waitUntil(storeRedirect(cache.store, cacheKey, target.location).catch(() => {}));
+  }
   return new Response(null, {
     status: target.permanent ? 308 : 307,
     headers: target.permanent
-      ? { location: target.location, 'cache-control': 'private, max-age=300', vary: 'Cookie' }
+      ? permanentHeaders(target.location)
       : { location: target.location, 'cache-control': 'private, no-store' },
   });
+}
+
+function permanentHeaders(location: string): Record<string, string> {
+  return { location, 'cache-control': 'private, max-age=300', vary: 'Cookie' };
+}
+
+function storeRedirect(store: RedirectCache, cacheKey: string, location: string): Promise<void> {
+  return store.put(
+    cacheKey,
+    new Response(null, {
+      status: 200,
+      headers: {
+        'x-redirect-location': location,
+        'x-redirect-at': String(Date.now()),
+        'cache-control': `public, max-age=${REDIRECT_CACHE_STALE_S}`,
+      },
+    })
+  );
+}
+
+/** Re-decide a stale cookie-less 308 from the resolver and rewrite the entry (only a permanent answer is stored). */
+async function refreshRedirect(
+  url: URL,
+  rest: string,
+  cacheKey: string,
+  defaultLanguageOf: DefaultLanguageOf,
+  cache: { store: RedirectCache }
+): Promise<void> {
+  const defaultLocale = await defaultLanguageOf(url.hostname);
+  if (!defaultLocale) return;
+  const target = pendingRedirect({
+    rest,
+    search: url.search,
+    defaultLocale,
+    cookieLocale: undefined,
+  });
+  if (!target.permanent || !target.location.startsWith('/') || target.location.startsWith('//'))
+    return;
+  await storeRedirect(cache.store, cacheKey, target.location);
 }

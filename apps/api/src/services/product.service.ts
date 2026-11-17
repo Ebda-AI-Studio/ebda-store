@@ -818,6 +818,26 @@ export class ProductService {
     }
   }
 
+  /**
+   * The named categories of THIS store (id, name, nameAr), in the order asked. 404 CATEGORY_NOT_FOUND when any id is not in
+   * the store: the Store assistant resolves a model-named category here before it shows a card, so a foreign id never reaches a write.
+   */
+  static async getCategoriesByIds(storeId: string, categoryIds: string[]) {
+    const ids = [...new Set(categoryIds)];
+    if (ids.length === 0) return [];
+    const rows = await (
+      await storeDb(storeId)
+    ).category.findMany({
+      where: { id: { in: ids }, storeId },
+      select: { id: true, name: true, nameAr: true },
+    });
+    if (rows.length !== ids.length) {
+      throw new AppError(404, 'CATEGORY_NOT_FOUND', 'Category not found in this store');
+    }
+    const byId = new Map(rows.map(r => [r.id, r]));
+    return ids.map(id => byId.get(id)!);
+  }
+
   static async create(storeId: string, data: CreateProductData) {
     await assertB2bProductFields(storeId, data);
     // Plan ceiling (SP5): one more product must fit the store's maxProducts.

@@ -1,0 +1,49 @@
+{
+  "id": "inventory.overview-adjust",
+  "status": "live",
+  "area": "inventory",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "المخزون وتعديل الكميات",
+  "titleEn": "Stock levels, quick adjust and set exact stock",
+  "screens": ["/stores/[id]/stock/inventory", "/stock/dashboard"],
+  "api": [
+    "GET /stores/:storeId/inventory/stats",
+    "GET .../inventory/products",
+    "POST .../inventory/adjust",
+    "PUT .../inventory/products/:productId/set",
+    "GET .../inventory/history"
+  ],
+  "mcpTool": "admin_adjust_inventory; admin_set_inventory",
+  "planGate": "inventory.basic",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "compensating",
+    "note": "yes (inverse adjustment; history kept)"
+  },
+  "helpArticle": "barcode-scan-pick-and-count",
+  "questions": {
+    "ar": [
+      "ازاي اغير كمية المخزون؟",
+      "خلص المنتج وانا معايا 5",
+      "مخزوني بيسالب",
+      "شوف تاريخ حركة المخزون"
+    ],
+    "en": ["How do I update stock?", "Why is my stock negative?"]
+  },
+  "steps": ["Stock > Inventory."],
+  "edgeCases": [
+    "Stale stock writes fixed in #754 (open)",
+    "Failed-payment holds not released (#754)",
+    "Overselling with backorder off",
+    "Multi-warehouse routing (#733 open)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Inventory audit fixes OPEN-PR #754"]
+}

@@ -25,16 +25,14 @@ export const CATALOGUE_MISS_ROUTES = [
 export type CatalogueMissRoute = (typeof CATALOGUE_MISS_ROUTES)[number];
 
 const LISTED: ReadonlySet<string> = new Set(CATALOGUE_MISS_ROUTES);
-const CATALOGUE_MISS = Symbol('ebda.catalogueMiss');
 type Mark = { route: string; pathStoreId?: string };
+/** Keyed by the response object itself: no property is ever written onto it, so no request-controlled key can reach one. */
+const MARKS = new WeakMap<Response, Mark>();
 
 /** Route middleware for the routes on `CATALOGUE_MISS_ROUTES`, in front of the handler. It reads the path id at the route. */
 export function catalogueMissRoute(route: CatalogueMissRoute): RequestHandler {
   return (req, res, next) => {
-    (res as unknown as Record<symbol, Mark>)[CATALOGUE_MISS] = {
-      route,
-      pathStoreId: req.params.storeId,
-    };
+    MARKS.set(res, { route, pathStoreId: req.params.storeId });
     next();
   };
 }
@@ -42,7 +40,7 @@ export function catalogueMissRoute(route: CatalogueMissRoute): RequestHandler {
 /** True only for a 404 the store-miss limiter may leave uncounted. The caller has already checked the status. */
 export function isVerifiedCatalogueMiss(req: Request, res: Response): boolean {
   const verified = resolvedStoreId(req);
-  const mark = (res as unknown as Record<symbol, Mark | undefined>)[CATALOGUE_MISS];
+  const mark = MARKS.get(res);
   const flagged = Boolean(verified);
   const listed = mark !== undefined && LISTED.has(mark.route);
   const sameStore = (mark?.pathStoreId ?? verified) === verified;

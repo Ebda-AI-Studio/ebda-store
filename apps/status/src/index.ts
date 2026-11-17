@@ -58,9 +58,9 @@ const store = (env: Cloudflare.Env) => env.STATUS_STORE.get(env.STATUS_STORE.idF
 /** One probe round: probe every component, then record. Exported so tests drive it directly. */
 export async function runProbes(
   env: Cloudflare.Env,
-  opts: { fetcher?: Fetcher; now?: number; timeoutMs?: number } = {}
+  opts: { fetcher?: Fetcher; now?: number; timeoutMs?: number; slowMs?: number } = {}
 ) {
-  const results = await probeAll(COMPONENTS, opts.fetcher, opts.timeoutMs);
+  const results = await probeAll(COMPONENTS, opts.fetcher, opts.timeoutMs, opts.slowMs);
   return store(env).record(results, opts.now ?? Date.now(), thresholdsFrom(env));
 }
 

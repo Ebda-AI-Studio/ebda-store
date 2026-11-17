@@ -1,0 +1,30 @@
+{
+  "id": "ai.shopper-support-agent",
+  "status": "in-pr",
+  "pr": "ebda-store#757; ebda-whatsapp#79",
+  "area": "ai",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "وكيل شات للعملاء",
+  "titleEn": "Chat AI agent for shoppers (Ebda Chat)",
+  "screens": ["(Ebda Chat)"],
+  "api": ["wa#79", "Store #757 rpc"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "whatsapp/ai-agent",
+  "questions": {
+    "ar": ["الAI بيرد على العملاء ازاي؟", "وقف الAI"],
+    "en": ["How does the WhatsApp AI agent reply?"]
+  },
+  "steps": ["Chat product; Store side RPC in #757."],
+  "edgeCases": [
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
+  ],
+  "gaps": ["Open PRs #757 wa#79"]
+}
