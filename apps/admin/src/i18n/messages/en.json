@@ -9850,7 +9850,9 @@
     "stuck": "Outcome unknown — reconcile",
     "retry": "retry {n}",
     "refund": "Refund",
-    "confirmRefund": "Refund {amount} to the merchant's card?",
+    "confirmRefund": "Refund {amount} to the merchant's card? If this charge paid for their current plan, the plan ends now and the store moves to the free plan. Nothing is charged again.",
+    "refundKeepAccess": "Refund, keep access",
+    "confirmRefundKeepAccess": "Refund {amount} to the merchant's card and let them keep the period they paid for?",
     "refundFailed": "Refund failed: {message}",
     "refundDone": "Refund recorded.",
     "columns": {
