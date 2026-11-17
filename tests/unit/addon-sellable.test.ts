@@ -57,6 +57,17 @@ describe('computed sellable set', () => {
 });
 
 describe('approved prices and messaging', () => {
+  it('customer_intelligence is never sold: the owner switches it on any plan (Ruling CI-10)', async () => {
+    // holds even once Business carries it (#847): the exclusion is explicit, not a side effect of the baseline
+    const { NEVER_SOLD_FEATURES } = await import('@ebda/shared');
+    expect(NEVER_SOLD_FEATURES.has('customer_intelligence')).toBe(true);
+    expect(sold).not.toContain('customer_intelligence');
+    expect(addonSkuForFeature('customer_intelligence')).toBeNull();
+    for (const plan of ['starter', 'professional'])
+      expect(canBuyFeatureOnPlan(plan, 'customer_intelligence')).toBe(false);
+    expect(ADDON_CATALOG['feature:customer_intelligence']).toBeUndefined();
+  });
+
   it('sms and whatsapp are never sold, and sms is hidden from every plan, gate and marketing surface', () => {
     expect(sold).not.toContain('sms');
     expect(sold).not.toContain('whatsapp');
@@ -82,7 +93,6 @@ describe('approved prices and messaging', () => {
     for (const [k, minor] of [
       ['bundles', 14900],
       ['remove_branding', 24900],
-      ['customer_intelligence', 14900],
       ['merchant_mcp', 19900],
       ['merchant_mcp_write', 9900],
       ['b2b.wholesale', 39900],

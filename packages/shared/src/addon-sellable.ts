@@ -18,15 +18,23 @@ const BUYER_PLANS: readonly StorePlan[] = ['starter', 'professional'];
 
 /**
  * Never sold as a monthly feature: `whatsapp` and `sms` are messaging, which lives in the Ebda Chat product (its own plans,
- * own repo; Ahmad 2026-11-15); the agent-checkout open-writes switch is a security escape hatch only a super admin may flip.
+ * own repo; Ahmad 2026-11-15); the agent-checkout open-writes switch is a security escape hatch only a super admin may flip;
+ * `customer_intelligence` is switched on and off by the OWNER on any plan (Ruling CI-10, `PUT /ci/hints`), so selling it
+ * would charge for something the merchant can turn on free (money review of #859). Ahmad's approved price (EGP 149) is
+ * parked until he decides whether the owner toggle becomes plan/purchase-gated.
  */
-const NEVER_SOLD: ReadonlySet<string> = new Set(['whatsapp', 'sms', 'agent_checkout_open_writes']);
+export const NEVER_SOLD_FEATURES: ReadonlySet<string> = new Set([
+  'whatsapp',
+  'sms',
+  'agent_checkout_open_writes',
+  'customer_intelligence',
+]);
 
 /** Every feature Business holds that is a real, visible, sellable product (the catalogue of possible add-ons). */
 export function addonFeatureKeys(): FeatureKey[] {
   const top = new Set<string>(PLAN_BASELINE[TOP_PLAN]);
   return (Object.keys(FEATURE_REGISTRY) as FeatureKey[]).filter(
-    k => top.has(k) && !NEVER_SOLD.has(k) && !FEATURE_REGISTRY[k].hidden
+    k => top.has(k) && !NEVER_SOLD_FEATURES.has(k) && !FEATURE_REGISTRY[k].hidden
   );
 }
 

@@ -39,7 +39,7 @@ export const ADDON_FEATURE_PRICE_MINOR: Partial<Record<FeatureKey, number>> = {
   // it ships, so it is sold only then (the sellable set excludes hidden features).
   bundles: egp(149),
   remove_branding: egp(249),
-  customer_intelligence: egp(149),
+  // customer_intelligence: egp(149) approved 2026-11-15 but NOT sold (owner self-toggle, Ruling CI-10; addon-sellable NEVER_SOLD)
   merchant_mcp: egp(199),
   merchant_mcp_write: egp(99),
   'b2b.wholesale': egp(399),
