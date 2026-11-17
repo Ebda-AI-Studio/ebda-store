@@ -8,6 +8,7 @@
   "titleEn": "Buy an add-on outside my plan",
   "screens": ["/stores/[id]/billing/addons"],
   "api": [
+    "GET /stores/:storeId/my-features",
     "GET /stores/:storeId/billing/addons",
     "POST /stores/:storeId/billing/addons/preview",
     "POST /stores/:storeId/billing/addons/checkout",
@@ -16,7 +17,7 @@
   ],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
     "class": "irreversible",

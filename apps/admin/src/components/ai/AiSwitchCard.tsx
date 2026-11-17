@@ -11,7 +11,14 @@ import Link from 'next/link';
 import { apiGet, apiPut } from '../../lib/api';
 import { useT } from '@/i18n/useT';
 
-export function AiSwitchCard({ storeId }: { storeId: string }) {
+export function AiSwitchCard({
+  storeId,
+  onChange,
+}: {
+  storeId: string;
+  /** Reports the switch state so a page can disable its AI buttons while it is off. */
+  onChange?: (enabled: boolean) => void;
+}) {
   const t = useT('aiSwitch');
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,7 +32,8 @@ export function AiSwitchCard({ storeId }: { storeId: string }) {
     if (r.error || !r.data) return setFailed(true);
     setFailed(false);
     setEnabled(r.data.enabled);
-  }, [base]);
+    onChange?.(r.data.enabled);
+  }, [base, onChange]);
   useEffect(() => {
     void load();
     // Today's allowance (base + paid packs) from the billing add-ons read; a miss just hides the line.
@@ -42,6 +50,7 @@ export function AiSwitchCard({ storeId }: { storeId: string }) {
     setBusy(false);
     if (r.error || !r.data) return setFailed(true);
     setEnabled(r.data.enabled);
+    onChange?.(r.data.enabled);
   };
 
   return (
