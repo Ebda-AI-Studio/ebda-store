@@ -161,6 +161,7 @@
   "GET /public/feed/products.json",
   "GET /public/health",
   "GET /public/lifecycle-emails/unsubscribe",
+  "GET /public/order-status/:token",
   "GET /public/orders",
   "GET /public/orders/:id",
   "GET /public/orders/:id/invoice",

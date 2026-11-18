@@ -181,7 +181,9 @@ describe('light jobs route to the light runners, heavy jobs never do (Ruling HOS
         'ci.yml:changes',
         'ci.yml:guards',
         'ci.yml:lint',
+        'ci.yml:merge-queue-gate',
         'ci.yml:notify-failure',
+        'ci.yml:tested-tree',
         'ci.yml:typecheck',
         'ci.yml:unit-gate',
         'deploy-change-label.yml:deploy-label',
@@ -189,6 +191,7 @@ describe('light jobs route to the light runners, heavy jobs never do (Ruling HOS
         'gitleaks.yml:scan',
         'pr-quality.yml:pr-body',
         'pr-quality.yml:slop-baselines',
+        'pr-quality.yml:capability-ratchet',
       ].sort()
     );
   });
