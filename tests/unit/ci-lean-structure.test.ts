@@ -122,7 +122,13 @@ describe('ci.yml triggers', () => {
 describe('ci.yml lanes', () => {
   it('every job is declared in exactly one lane (a new job must pick one)', () => {
     // `merge-queue-gate` (MERGE-QUEUE-1) is its own lane: it reports on pull_request and merge_group only; tests/unit/merge-queue-gate.test.ts pins it
-    const declared = new Set([...PR_LANE, ...MAIN_LANE, 'notify-failure', 'merge-queue-gate']);
+    const declared = new Set([
+      ...PR_LANE,
+      ...MAIN_LANE,
+      'notify-failure',
+      'merge-queue-gate',
+      'tested-tree',
+    ]);
     expect(Object.keys(ci.jobs).sort()).toEqual([...declared].sort());
   });
 
@@ -176,6 +182,8 @@ describe('ci.yml lanes', () => {
         const expr = j.if
           .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
           .replace(/needs\.([\w-]+)\.result == 'success'/g, (_, n) => String(run(n)))
+          // MERGE-QUEUE-1 part B: `tested-tree` answers skip=false unless a merge group proved the tree, so the evaluator's world (no such evidence) is `true`
+          .replace(/needs\.tested-tree\.outputs\.skip != 'true'/g, 'true')
           .replace(/needs\.[\w-]+\.outputs\.\w+ (==|!=) '[^']*'/g, (_, op) =>
             String(op === '!=' ? false : false)
           )
@@ -262,7 +270,10 @@ describe('ci.yml lanes', () => {
 
   it('the PR lane runs lint, typecheck and unit tests for changed paths only', () => {
     for (const name of ['lint', 'typecheck', 'unit', 'worker-dry-run']) {
-      expect(ci.jobs[name].needs, name).toEqual(['changes']);
+      // worker-dry-run also waits on `tested-tree` (MERGE-QUEUE-1 part B: skipped on a push whose tree a merge group proved)
+      expect(ci.jobs[name].needs, name).toEqual(
+        name === 'worker-dry-run' ? ['changes', 'tested-tree'] : ['changes']
+      );
       expect(ci.jobs[name].if, name).toMatch(/needs\.changes\.outputs\./);
     }
     expect(ci.jobs.changes.if).toBe("github.event_name == 'pull_request'");

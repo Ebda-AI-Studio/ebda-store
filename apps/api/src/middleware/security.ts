@@ -26,6 +26,7 @@ import {
   recordSharedCounting,
 } from '../lib/rate-limit-telemetry';
 import { withSavepoint } from '../lib/savepoint';
+import { storeResolveIsNative } from './store-resolve-native';
 import { insertAuditLog } from '../lib/definer';
 import { currentImpersonator } from '../lib/impersonation-context';
 
@@ -1039,6 +1040,8 @@ export function createStoreMissLimiter(opts?: {
   };
   return async (req, res, next) => {
     if (skip(req)) return next();
+    // Store resolve on the native limiters (Ruling PERF-AUTHSTATE-1): the miss is counted lazily, on the 404 path, by the handler.
+    if (storeResolveIsNative(req)) return next();
     const key = ipKeyGenerator(req.ip ?? '');
     let misses = 0;
     let resetAt = 0;

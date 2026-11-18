@@ -188,6 +188,7 @@ describe('light jobs route to the light runners, heavy jobs never do (Ruling HOS
         'ci.yml:lint',
         'ci.yml:merge-queue-gate',
         'ci.yml:notify-failure',
+        'ci.yml:tested-tree',
         'ci.yml:typecheck',
         'ci.yml:unit-gate',
         'deploy-change-label.yml:deploy-label',
