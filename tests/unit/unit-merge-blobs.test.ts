@@ -91,6 +91,19 @@ describe('the mixed-root merge (the production failure)', () => {
       /blob-3-3\.json: no workspace root ending in \/ebda-store\/ebda-store found to rewrite: refusing/
     );
   });
+  it('is tolerant when the blobs already sit under the merge root (the merge runner ran the shards): nothing to rewrite is not a failure, the content is unchanged', () => {
+    writeFileSync(join(dir, 'blob-1-3.json'), blob(B, 3));
+    const before = readFileSync(join(dir, 'blob-1-3.json'), 'utf8');
+    expect(() => reroot(dir, B)).not.toThrow();
+    expect(readFileSync(join(dir, 'blob-1-3.json'), 'utf8')).toBe(before);
+  });
+  it('rewrites a GitHub-style /home/runner/work root fixture blob and keeps the file count', () => {
+    writeFileSync(join(dir, 'blob-1-3.json'), blob(HOSTED, 4));
+    reroot(dir, B);
+    const s = readFileSync(join(dir, 'blob-1-3.json'), 'utf8');
+    expect(s).not.toContain('/home/runner/work');
+    expect(blobFileCount(JSON.parse(s))).toBe(4);
+  });
   it('the CLI exits 1 with a ::error:: line on a missing directory argument', () => {
     const r = spawnSync('node', [SCRIPT, 'reroot'], { encoding: 'utf8' });
     expect(r.status).toBe(1);
