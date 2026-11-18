@@ -12,6 +12,7 @@ import {
   STUDIO_PAGE_HEADERS,
 } from '../../../packages/shared/src/studio-pages/index';
 import { COMPONENTS, DEFAULT_FAIL_THRESHOLD, DEFAULT_RECOVER_THRESHOLD } from './config';
+import { getSnapshot, warmSnapshot } from './snapshot-cache';
 import { probeAll, type Fetcher } from './probe';
 import { renderStatusPage, statusSearchDocs } from './render';
 import { TYPEAHEAD_JS } from './typeahead-bundle';
@@ -55,13 +56,20 @@ export const thresholdsFrom = (env: Cloudflare.Env): Thresholds => ({
 
 const store = (env: Cloudflare.Env) => env.STATUS_STORE.get(env.STATUS_STORE.idFromName('global'));
 
+/** Public reads: served from the edge snapshot cache, BOUNDED-stale (see snapshot-cache.ts). */
+const publicSnapshot = (env: Cloudflare.Env, ctx?: ExecutionContext) =>
+  getSnapshot(() => store(env).snapshot(Date.now()), ctx);
+
 /** One probe round: probe every component, then record. Exported so tests drive it directly. */
 export async function runProbes(
   env: Cloudflare.Env,
   opts: { fetcher?: Fetcher; now?: number; timeoutMs?: number; slowMs?: number } = {}
 ) {
   const results = await probeAll(COMPONENTS, opts.fetcher, opts.timeoutMs, opts.slowMs);
-  return store(env).record(results, opts.now ?? Date.now(), thresholdsFrom(env));
+  const outcome = await store(env).record(results, opts.now ?? Date.now(), thresholdsFrom(env));
+  // the new round is on the public page at once in this colo (snapshot-cache.ts: BOUNDED-stale elsewhere)
+  await warmSnapshot(() => store(env).snapshot(opts.now ?? Date.now()));
+  return outcome;
 }
 
 /** Telegram on an incident opening or resolving (no-op without TELEGRAM_* secrets). Exported for tests. */
@@ -176,7 +184,7 @@ async function handleIncidentPost(
 }
 
 export default {
-  async fetch(req: Request, env: Cloudflare.Env): Promise<Response> {
+  async fetch(req: Request, env: Cloudflare.Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname.replace(/(.)\/+$/, '$1');
 
@@ -184,7 +192,9 @@ export default {
       req.method === 'POST' &&
       (path === '/api/incidents' || /^\/api\/incidents\/\d+\/updates$/.test(path))
     ) {
-      return handleIncidentPost(req, env, path);
+      const r = await handleIncidentPost(req, env, path);
+      if (r.ok) await warmSnapshot(() => store(env).snapshot(Date.now()));
+      return r;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return json({ success: false, error: { code: 'METHOD_NOT_ALLOWED' } }, 405, {
@@ -233,19 +243,19 @@ export default {
       });
     if (path === '/search.json') {
       const lang = url.searchParams.get('lang') === 'en' ? 'en' : 'ar';
-      const snap = await store(env).snapshot(Date.now());
+      const snap = await publicSnapshot(env, ctx);
       return json(statusSearchDocs(snap, lang), 200, { 'cache-control': 'public, max-age=30' });
     }
 
     if (path === '/api/status.json') {
-      const snap = await store(env).snapshot(Date.now());
+      const snap = await publicSnapshot(env, ctx);
       return json(snap, 200, {
         'cache-control': 'public, max-age=30',
         'access-control-allow-origin': '*',
       });
     }
     if (path === '/' || path === '/en') {
-      const snap = await store(env).snapshot(Date.now());
+      const snap = await publicSnapshot(env, ctx);
       return new Response(
         renderStatusPage(
           snap,

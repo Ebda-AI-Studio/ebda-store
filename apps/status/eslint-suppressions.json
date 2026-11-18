@@ -3,5 +3,10 @@
     "no-console": {
       "count": 1
     }
+  },
+  "src/snapshot-cache.ts": {
+    "no-console": {
+      "count": 2
+    }
   }
 }
