@@ -9,21 +9,19 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
+import { cleanGitEnv, initSandboxRepo, sandboxGit, type SandboxGit } from '../helpers/git-env';
 
 const SCRIPT = join(__dirname, '../../scripts/ci/ensure-full-clone.sh');
-const ENV = {
-  ...process.env,
-  GIT_CONFIG_GLOBAL: '/dev/null',
-  GIT_CONFIG_SYSTEM: '/dev/null',
+// the hook-exported GIT_* variables are stripped (tests/helpers/git-env.ts)
+const ENV = cleanGitEnv({
   GIT_AUTHOR_NAME: 't',
   GIT_AUTHOR_EMAIL: 't@t',
   GIT_COMMITTER_NAME: 't',
   GIT_COMMITTER_EMAIL: 't@t',
-};
-const git = (cwd: string, ...a: string[]) =>
-  execFileSync('git', a, { cwd, env: ENV, encoding: 'utf8' });
+});
 let root: string;
 let src: string;
+let git: SandboxGit;
 
 /** A workspace cloned depth 1 with a blob filter and NO checkout: blobs are missing, exactly the runner state. */
 function brokenWorkspace(name: string): string {
@@ -43,17 +41,21 @@ const localClone = (ws: string, name: string) =>
 
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), 'efc-'));
-  src = join(root, 'src');
-  execFileSync('git', ['init', '-q', src], { env: ENV });
-  git(src, 'config', 'uploadpack.allowFilter', 'true');
-  git(src, 'config', 'uploadpack.allowAnySHA1InWant', 'true');
+  const sb = initSandboxRepo('efc-src-');
+  src = sb.dir;
+  git = sb.git;
+  git('config', 'uploadpack.allowFilter', 'true');
+  git('config', 'uploadpack.allowAnySHA1InWant', 'true');
   for (const i of [1, 2, 3]) {
     writeFileSync(join(src, `f${i}.txt`), `v${i} ${Math.random()}\n`);
-    git(src, 'add', '.');
-    git(src, 'commit', '-qm', `c${i}`);
+    git('add', '.');
+    git('commit', '-qm', `c${i}`);
   }
 });
-afterAll(() => rmSync(root, { recursive: true, force: true }));
+afterAll(() => {
+  rmSync(root, { recursive: true, force: true });
+  rmSync(src, { recursive: true, force: true });
+});
 
 describe('ensure-full-clone.sh', () => {
   it('control: a partial-clone workspace with missing blobs cannot be cloned locally', () => {
@@ -66,12 +68,12 @@ describe('ensure-full-clone.sh', () => {
 
   it('after the script the same workspace clones locally and the blobs are readable', () => {
     const ws = brokenWorkspace('ws-fixed');
-    const sha = git(src, 'rev-parse', 'HEAD').trim();
+    const sha = git('rev-parse', 'HEAD').trim();
     const out = execFileSync('bash', [SCRIPT, sha], { cwd: ws, env: ENV, encoding: 'utf8' });
     expect(out).toContain('partial clone');
     const r = localClone(ws, 'scan-fixed');
     expect(r.status, r.stderr).toBe(0);
-    expect(git(join(root, 'scan-fixed'), 'cat-file', '-p', 'HEAD:f1.txt')).toMatch(/^v1 /);
+    expect(sandboxGit(join(root, 'scan-fixed'))('cat-file', '-p', 'HEAD:f1.txt')).toMatch(/^v1 /);
     expect(
       spawnSync('git', ['config', '--get', 'remote.origin.promisor'], { cwd: ws, env: ENV }).status
     ).not.toBe(0);
@@ -80,7 +82,7 @@ describe('ensure-full-clone.sh', () => {
   it('is a no-op on a full clone', () => {
     const ws = join(root, 'ws-full');
     execFileSync('git', ['clone', '-q', `file://${src}`, ws], { env: ENV });
-    const sha = git(src, 'rev-parse', 'HEAD').trim();
+    const sha = git('rev-parse', 'HEAD').trim();
     expect(execFileSync('bash', [SCRIPT, sha], { cwd: ws, env: ENV, encoding: 'utf8' })).toContain(
       'full clone'
     );
