@@ -7,7 +7,8 @@
  * It must only ever shrink — remove an entry the moment its advisory is
  * resolvable.
  *
- * EMPTY as of 2026-08-08 — the gate currently waives nothing.
+ * The waivers moved to `.github/audit-allow.json` (Ruling AUDIT-SPLIT-1, 2026-11-17) with an expiry per entry. First entry: picomatch
+ * GHSA-fc5q-39xc-vjpf (no patched version; build-time tooling only), expires 2026-12-17.
  *
  * Shrunk 2026-08-08: both protobufjs waivers (GHSA-j3f2-48v5-ccww DoS,
  * GHSA-jfj6-75fj-8934 Text Format map mutation) REMOVED. Their stated premise —
@@ -36,8 +37,26 @@
  * same bar the (now removed) protobufjs pair was held to on 2026-07-21.
  */
 import { classifyAuditReport, auditExitCode, AUDIT } from './audit-report-verdict.mjs';
+import { loadAllow } from './audit-allow.mjs';
 
-const ALLOW = new Map([]);
+/**
+ * Ruling AUDIT-SPLIT-1: the waivers live in `.github/audit-allow.json` (id, package, reason, EXPIRY), not in this file. An expired or
+ * malformed entry fails the gate by itself. Two scopes:
+ *   (default)  production dependencies (`npm audit --omit=dev`): BLOCKING.
+ *   --all      every dependency incl. development tooling: run as a NON-blocking report step (continue-on-error in the workflow),
+ *              it still exits 1 for an advisory that is not allow-listed so the step shows red without stopping the merge.
+ */
+const ALL = process.argv.includes('--all');
+const {
+  allow: ALLOW,
+  expired,
+  invalid,
+} = loadAllow(new URL('../audit-allow.json', import.meta.url).pathname);
+if (invalid.length || expired.length) {
+  console.error('audit-gate: the allow-list needs attention:');
+  for (const m of [...invalid, ...expired]) console.error('  ' + m);
+  process.exit(1);
+}
 
 const { execFileSync } = await import('node:child_process');
 
@@ -77,7 +96,13 @@ function runAudit() {
   try {
     return execFileSync(
       'npm',
-      ['audit', '--omit=dev', '--json', '--fetch-timeout=45000', '--fetch-retries=1'],
+      [
+        'audit',
+        ...(ALL ? [] : ['--omit=dev']),
+        '--json',
+        '--fetch-timeout=45000',
+        '--fetch-retries=1',
+      ],
       { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: ATTEMPT_TIMEOUT_MS }
     );
   } catch (e) {
@@ -155,8 +180,18 @@ if (waived.length) {
   console.log('::endgroup::');
 }
 if (verdict === AUDIT.BLOCKING) {
-  console.error('audit-gate: BLOCKING production advisories:');
+  console.error(
+    `audit-gate: ${ALL ? 'NOT ALLOW-LISTED advisories (all dependencies, non-blocking report)' : 'BLOCKING production advisories'}:`
+  );
   for (const b of new Set(blocking)) console.error('  ' + b);
   process.exit(auditExitCode(verdict));
 }
+const usedIds = new Set(waived.map(w => w.split(' ')[2]));
+// only the all-dependencies scope can say an entry is dead: the production scope never sees a development-only advisory
+if (ALL)
+  for (const id of ALLOW.keys())
+    if (!usedIds.has(id))
+      console.log(
+        `audit-gate: allow-list entry ${id} matched nothing: remove it (the advisory is gone).`
+      );
 console.log(`audit-gate: clean (${new Set(waived).size} documented waiver(s))`);

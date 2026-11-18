@@ -134,12 +134,13 @@ describe('the retry budget fits inside the job budget', () => {
     const jobTimeoutMin = num(/timeout-minutes: (\d+)/, jobBlock, 'Security Audit timeout-minutes');
 
     const auditWorstS = attempts * (perAttemptMs / 1000) + (attempts - 1) * maxBackoffS;
-    const needS = auditWorstS + COLD_INSTALL_S + OTHER_STEPS_S;
+    // two bounded audit runs: the blocking production gate and the non-blocking all-dependencies report (Ruling AUDIT-SPLIT-1)
+    const needS = 2 * auditWorstS + COLD_INSTALL_S + OTHER_STEPS_S;
     const budgetS = jobTimeoutMin * 60;
 
     expect(
       needS,
-      `audit ${auditWorstS}s + cold install ${COLD_INSTALL_S}s + other steps ${OTHER_STEPS_S}s = ` +
+      `2 x audit ${auditWorstS}s + cold install ${COLD_INSTALL_S}s + other steps ${OTHER_STEPS_S}s = ` +
         `${needS}s must fit the ${budgetS}s job budget`
     ).toBeLessThan(budgetS);
   });
