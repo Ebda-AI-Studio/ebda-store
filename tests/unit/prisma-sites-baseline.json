@@ -21,6 +21,7 @@
   "lib/inngest/functions/store-usage-snapshot.ts": 1,
   "lib/inngest/functions/wa-store-events.ts": 1,
   "lib/order-search-ids.ts": 1,
+  "lib/store-deletion-marker.ts": 1,
   "lib/tax-change-purge.ts": 1,
   "lib/wa/consent.ts": 14,
   "lib/wa/store-events-consumer.ts": 2,

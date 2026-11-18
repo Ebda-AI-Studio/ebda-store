@@ -166,9 +166,20 @@ describe('StoreService.delete ordering and no wipe (static)', () => {
     expect(m, 'StoreService.delete not found').toBeTruthy();
     return m;
   };
+  // The post-commit steps live in StoreService.postCommitDelete (idempotent, re-runnable by finishDeletedStore); delete() must
+  // call it AFTER the transaction and outside any catch.
+  const post = () => {
+    const sf = parseFile('apps/api/src/services/store.service.ts');
+    const cls = all(sf, ts.isClassDeclaration).find(c => c.name?.text === 'StoreService')!;
+    const m = cls.members.find(
+      x => ts.isMethodDeclaration(x) && x.name.getText() === 'postCommitDelete'
+    ) as ts.MethodDeclaration;
+    expect(m, 'StoreService.postCommitDelete not found').toBeTruthy();
+    return m;
+  };
   it('closes the DO FIRST (after the billing-parent refusal), before the Postgres transaction; reopens in the catch; finishes after', () => {
     const d = del();
-    const only = (name: string) => {
+    const only = (name: string | RegExp) => {
       const c = callsIn(d, name);
       expect(c, name).toHaveLength(1);
       return c[0]!;
@@ -178,7 +189,9 @@ describe('StoreService.delete ordering and no wipe (static)', () => {
     const close = only('closeDoIfNoMoney');
     const tx = only('withMoneyTx');
     const reopen = only('reopenDoAfterFailedDelete');
-    const finish = only('finishStoreDeletion');
+    const finish = only(/postCommitDelete$/);
+    const finishCalls = callsIn(post(), 'finishStoreDeletion');
+    expect(finishCalls, 'finishStoreDeletion runs inside postCommitDelete').toHaveLength(1);
     expect(close.getStart()).toBeGreaterThan(refusal!.getStart());
     expect(close.getStart()).toBeLessThan(tx.getStart());
     expect(reopen.getStart()).toBeGreaterThan(tx.getStart());
@@ -203,8 +216,9 @@ describe('StoreService.delete ordering and no wipe (static)', () => {
     expect(callsIn(d, /deleteAll|tearDown/).map(calleeText)).toEqual([]);
     // The only eraseSubject is the PDPL anonymisation (Ruling FOLD-ERASURE-2): an eraseDo port handed to
     // anonymiseDeletedStore, which runs AFTER the delete is committed (the DO stays, closed). Never a wipe in the flow itself.
-    const finish = callsIn(d, 'finishStoreDeletion')[0]!;
-    for (const c of callsIn(d, /eraseSubject$/)) {
+    const p = post();
+    const finish = callsIn(p, 'finishStoreDeletion')[0]!;
+    for (const c of callsIn(p, /eraseSubject$/)) {
       expect(
         hasAncestor(c, a => ts.isCallExpression(a) && calleeText(a) === 'anonymiseDeletedStore'),
         'eraseSubject only inside anonymiseDeletedStore'

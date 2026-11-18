@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../middleware/error-handler';
+import type { DeletionMarker } from '../lib/store-deletion-marker';
 import {
   consumeConfirmToken,
   hashConfirmArgs,
@@ -37,6 +38,8 @@ export interface DeletionRequest {
   /** Set when the system (not a person) cancelled it, e.g. the store changed owner during the window. */
   voidedReason?: 'owner_changed';
   executedAt?: string;
+  /** How many times a failed execution was put back to `pending` and re-queued (capped, then a manual-action alert). */
+  recoveries?: number;
   /** Why the last execution attempt was refused or failed (the request stays pending and is re-checked). */
   lastBlock?: { code: string; at: string; reason?: string };
 }
@@ -84,6 +87,21 @@ export interface DeletionDeps {
    * delete) and `PDPL_CF_ERASURE_ENABLED` is not "true". Ruling DEL-FLAG-1: such a deletion is refused, never run without erasure.
    */
   erasureBlocked(storeId: string): Promise<boolean>;
+  /** True when the store is served by its Durable Object (known before the delete, which removes what could tell). */
+  isOnDo(storeId: string): Promise<boolean>;
+  /** Durable claim marker (see lib/store-deletion-marker.ts): survives the store row, so a retry after a committed delete can finish. */
+  marker: {
+    write(storeId: string, m: DeletionMarker): Promise<void>;
+    read(storeId: string): Promise<DeletionMarker | null>;
+    clear(storeId: string): Promise<void>;
+  };
+  /** Re-runs the idempotent post-commit steps of a delete that already committed. */
+  finishDeletedStore(snap: {
+    id: string;
+    slug: string;
+    ownerId: string;
+    onDo: boolean;
+  }): Promise<void>;
   /** The owner's current address (identity service), or null. The request never stores an address. */
   ownerEmail(userId: string): Promise<string | null>;
   audit(entry: {
@@ -351,7 +369,21 @@ export async function executeStoreDeletion(
   deps: DeletionDeps
 ): Promise<ExecuteOutcome> {
   const store = await deps.loadStore(input.storeId);
-  if (!store) return { outcome: 'gone' };
+  if (!store) {
+    // The store is gone. Normally that is the end ('gone'). But if THIS request had claimed the delete and the delete committed
+    // while a post-commit step threw, the retry lands here with nothing left to read: the durable marker says so. Finish the job
+    // (idempotent post-commit steps, the audit row, the owner email), then clear the marker.
+    const m = await deps.marker.read(input.storeId);
+    if (!m || m.requestId !== input.requestId) return { outcome: 'gone' };
+    await deps.finishDeletedStore({
+      id: input.storeId,
+      slug: m.slug,
+      ownerId: m.ownerId,
+      onDo: m.onDo,
+    });
+    await finishExecuted(deps, input.storeId, m);
+    return { outcome: 'executed' };
+  }
   const req = store.deletionRequest;
   if (!req || req.id !== input.requestId) return { outcome: 'stale' };
   if (req.state === 'cancelled') return { outcome: 'cancelled' };
@@ -421,12 +453,22 @@ export async function executeStoreDeletion(
     }
   }
   // The requester's address, read before the delete (the identity service stays reachable afterwards, but one read is enough).
-  const ownerAddress = await deps.ownerEmail(req.requestedBy).catch(() => null);
+  // The claim marker outlives the store row: written BEFORE the delete, cleared only after the audit + email (finishExecuted).
+  const marker: DeletionMarker = {
+    requestId: req.id,
+    requestedBy: req.requestedBy,
+    slug: store.slug,
+    storeName: store.name,
+    ownerId: store.ownerId ?? req.requestedBy,
+    onDo: await deps.isOnDo(store.id),
+  };
+  await deps.marker.write(store.id, marker);
   try {
     await deps.deleteStore(store.id, req.requestedBy, req.id);
   } catch (err) {
     // A Durable Object store checks its money inside the delete (it cannot be read before): that 409 is a BLOCK, not a failure.
     if (err instanceof AppError && BLOCKING_DELETE_CODES.get(err.code) === err.statusCode) {
+      await deps.marker.clear(store.id); // nothing was deleted: no claim to finish
       return block(
         [
           {
@@ -440,22 +482,23 @@ export async function executeStoreDeletion(
     }
     throw err; // the job retries; the request stays `executing` and resumes
   }
+  await finishExecuted(deps, store.id, marker);
+  return { outcome: 'executed' };
+}
+
+/** The deletion committed: the audit row, the owner email (best effort: the store is gone, a mail failure must not retry), the marker. */
+async function finishExecuted(deps: DeletionDeps, storeId: string, m: DeletionMarker) {
   await deps.audit({
     action: 'STORE_DELETED_BY_OWNER',
-    userId: req.requestedBy,
-    storeId: store.id,
-    details: { requestId: req.id, slug: store.slug, storeName: store.name },
+    userId: m.requestedBy,
+    storeId,
+    details: { requestId: m.requestId, slug: m.slug, storeName: m.storeName },
   });
-  // The store row (and its settings) is gone after a successful delete; nothing is left to mark. The notice is best effort:
-  // the store is already deleted, so a mail failure must not fail (and retry) the job.
+  const to = await deps.ownerEmail(m.requestedBy).catch(() => null);
   await deps
-    .notifyOwner('executed', {
-      to: ownerAddress,
-      storeName: store.name,
-      slug: store.slug,
-    })
+    .notifyOwner('executed', { to, storeName: m.storeName, slug: m.slug })
     .catch(() => undefined);
-  return { outcome: 'executed' };
+  await deps.marker.clear(storeId);
 }
 
 /**
@@ -463,34 +506,76 @@ export async function executeStoreDeletion(
  * cancel is refused 409, so the owner would be stuck. Put it back to `pending` (compare-and-set, so a request that moved on is left
  * alone) with the failure on `lastBlock`, and say so (the caller raises the P1 alert). Returns whether it was recovered.
  */
+export const MAX_EXECUTION_RECOVERIES = 5;
+const RETRY_DELAY_MS = 86_400_000;
+export interface RecoveryResult {
+  /** The request (or its committed-delete marker) was found in the stuck state and handled. */
+  recovered: boolean;
+  /** A fresh execute event was queued for now + 1 day: "we retry automatically" is true. */
+  retryScheduled: boolean;
+  /** Retries are spent: a person has to act (the caller raises the P1 "needs manual action"). */
+  exhausted: boolean;
+  attempt?: number;
+}
+
 export async function recoverFailedExecution(
   input: { storeId: string; requestId: string; reason: string },
   deps: DeletionDeps
-): Promise<boolean> {
+): Promise<RecoveryResult> {
+  const none: RecoveryResult = { recovered: false, retryScheduled: false, exhausted: false };
   const store = await deps.loadStore(input.storeId);
   const req = store?.deletionRequest;
-  if (!store || !req || req.id !== input.requestId || req.state !== 'executing') return false;
+  const nowIso = new Date(deps.now()).toISOString();
+  const retryAt = new Date(deps.now() + RETRY_DELAY_MS).toISOString();
+  const queue = async () => {
+    try {
+      await deps.emit('store/deletion.scheduled', {
+        storeId: input.storeId,
+        requestId: input.requestId,
+        executeAfter: retryAt,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!store) {
+    // The delete committed and a post-commit step failed for good: the retry (marker path) finishes it, so queue one.
+    const m = await deps.marker.read(input.storeId);
+    if (!m || m.requestId !== input.requestId) return none;
+    const attempt = (m.recoveries ?? 0) + 1;
+    if (attempt > MAX_EXECUTION_RECOVERIES)
+      return { ...none, recovered: true, exhausted: true, attempt };
+    await deps.marker.write(input.storeId, { ...m, recoveries: attempt });
+    return { recovered: true, retryScheduled: await queue(), exhausted: false, attempt };
+  }
+  if (!req || req.id !== input.requestId || req.state !== 'executing') return none;
+  const attempt = (req.recoveries ?? 0) + 1;
   const ok = await deps.transition(
     store.id,
     { id: req.id, state: 'executing' },
     {
       ...req,
       state: 'pending',
+      recoveries: attempt,
       lastBlock: {
         code: 'EXECUTION_FAILED',
-        at: new Date(deps.now()).toISOString(),
+        at: nowIso,
         reason: input.reason.slice(0, 300),
       },
     }
   );
-  if (ok)
-    await deps.audit({
-      action: 'STORE_DELETION_EXECUTION_FAILED',
-      userId: req.requestedBy,
-      storeId: store.id,
-      details: { requestId: req.id, reason: input.reason.slice(0, 300) },
-    });
-  return ok;
+  if (!ok) return none;
+  await deps.audit({
+    action: 'STORE_DELETION_EXECUTION_FAILED',
+    userId: req.requestedBy,
+    storeId: store.id,
+    details: { requestId: req.id, reason: input.reason.slice(0, 300), attempt },
+  });
+  // Back to `pending` with no job alive: queue the next attempt for tomorrow, up to the cap.
+  if (attempt > MAX_EXECUTION_RECOVERIES)
+    return { recovered: true, retryScheduled: false, exhausted: true, attempt };
+  return { recovered: true, retryScheduled: await queue(), exhausted: false, attempt };
 }
 
 /** Step-up for the whole-store export (M2): a single-use token bound to (store, owner), issued to the owner only. */

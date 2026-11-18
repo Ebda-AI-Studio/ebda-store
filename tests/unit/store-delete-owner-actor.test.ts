@@ -129,4 +129,13 @@ describe('StoreService.delete as the store OWNER (self-service)', () => {
     await StoreService.delete('s1', 'admin-1');
     expect(h.order).toEqual(['identity-inactive', 'pg-delete-owner', 'identity-erase']);
   });
+
+  it('finishDeletedStore re-runs the idempotent post-commit steps with no store row left (follow-up m2)', async () => {
+    h.clients = [];
+    await StoreService.finishDeletedStore({ id: 's1', slug: 's', ownerId: 'owner-1', onDo: false });
+    expect(h.clients).toEqual(['s1']);
+    // idempotent: a second run converges, never throws
+    await StoreService.finishDeletedStore({ id: 's1', slug: 's', ownerId: 'owner-1', onDo: false });
+    expect(h.clients).toEqual(['s1', 's1']);
+  });
 });

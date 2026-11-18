@@ -1243,6 +1243,21 @@ export class StoreService {
       }
       throw err;
     }
+    await this.postCommitDelete(store, wasOnDo, erasedOwnerId);
+
+    return { id: storeId, name: store.name, slug: store.slug };
+  }
+
+  /**
+   * Everything AFTER the delete committed. Every step is idempotent (client removal, directory retire, anonymisation, cache and
+   * R2 purges), so `finishDeletedStore` can run it again when a first run threw part-way (STORE-LIFECYCLE-1 follow-up).
+   */
+  private static async postCommitDelete(
+    store: { id: string; slug: string; domain?: string | null; ownerId?: string | null },
+    wasOnDo: boolean,
+    erasedOwnerId: string | null
+  ) {
+    const storeId = store.id;
     // Integrator clients (identity v1.3) are bound to the store and die with it. Post-commit (a rolled-back deletion never gets
     // here, so no client is lost with a store that still exists) and idempotent, so it is retried; a final failure is logged loudly:
     // the store is gone, so its clients' tokens reach nothing, but the rows stay until the next attempt.
@@ -1370,8 +1385,16 @@ export class StoreService {
         '[STORE_DELETE] private R2 prefix purge failed or not configured (DB delete stands)'
       );
     }
+  }
 
-    return { id: storeId, name: store.name, slug: store.slug };
+  /** Re-run the post-commit steps of an owner deletion whose delete already committed (the store row is gone). */
+  static async finishDeletedStore(snap: {
+    id: string;
+    slug: string;
+    ownerId: string;
+    onDo: boolean;
+  }) {
+    await this.postCommitDelete({ ...snap, domain: null }, snap.onDo, null);
   }
 
   static async getStoreStats(storeId: string) {

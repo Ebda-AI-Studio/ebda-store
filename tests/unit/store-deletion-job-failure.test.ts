@@ -6,13 +6,19 @@ import { describe, it, expect, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   alert: vi.fn(async () => undefined),
-  recover: vi.fn(async () => true),
+  recover: vi.fn(async () => ({
+    recovered: true,
+    retryScheduled: true,
+    exhausted: false,
+    attempt: 1,
+  })),
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.alert }));
 vi.mock('@api/services/store-deletion.wiring', () => ({ productionDeletionDeps: () => ({}) }));
 vi.mock('@api/services/store-deletion.service', () => ({
   executeStoreDeletion: vi.fn(),
   recoverFailedExecution: h.recover,
+  MAX_EXECUTION_RECOVERIES: 5,
 }));
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: { createFunction: (opts: unknown, fn: unknown) => ({ opts, fn }) },
@@ -42,7 +48,12 @@ describe('store-deletion-execute onFailure', () => {
     const { handleStoreDeletionFailure } =
       await import('@api/lib/inngest/functions/store-deletion-execute');
     h.alert.mockClear();
-    h.recover.mockResolvedValueOnce(true);
+    h.recover.mockResolvedValueOnce({
+      recovered: true,
+      retryScheduled: true,
+      exhausted: false,
+      attempt: 2,
+    });
     expect(
       (await handleStoreDeletionFailure({ storeId: 's1', requestId: 'r1' }, 'boom')).recovered
     ).toBe(true);
@@ -57,9 +68,31 @@ describe('store-deletion-execute onFailure', () => {
     });
   });
 
+  it('names the retry in the alert, and says NEEDS MANUAL ACTION once the retries are spent', async () => {
+    const { handleStoreDeletionFailure } =
+      await import('@api/lib/inngest/functions/store-deletion-execute');
+    h.alert.mockClear();
+    h.recover.mockResolvedValueOnce({
+      recovered: true,
+      retryScheduled: true,
+      exhausted: false,
+      attempt: 2,
+    });
+    await handleStoreDeletionFailure({ storeId: 's1', requestId: 'r1' }, 'boom');
+    expect(h.alert.mock.calls[0][0].body).toContain('retry queued for tomorrow (attempt 2/5)');
+    h.recover.mockResolvedValueOnce({
+      recovered: true,
+      retryScheduled: false,
+      exhausted: true,
+      attempt: 6,
+    });
+    await handleStoreDeletionFailure({ storeId: 's1', requestId: 'r1' }, 'boom');
+    expect(h.alert.mock.calls[1][0].body).toContain('NEEDS MANUAL ACTION');
+  });
+
   it('ignores an event without ids', async () => {
     const { handleStoreDeletionFailure } =
       await import('@api/lib/inngest/functions/store-deletion-execute');
-    expect(await handleStoreDeletionFailure({}, 'x')).toEqual({ recovered: false });
+    expect(await handleStoreDeletionFailure({}, 'x')).toMatchObject({ recovered: false });
   });
 });

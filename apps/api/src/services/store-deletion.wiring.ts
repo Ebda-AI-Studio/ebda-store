@@ -8,6 +8,11 @@ import { StoreService } from './store.service';
 import { BILLED_SUBSCRIPTION_STATUSES } from './account-closure-guard';
 import { EmailService } from './email.service';
 import { sortOwnerStores } from './billing/billing-parent';
+import {
+  clearDeletionMarker,
+  readDeletionMarker,
+  writeDeletionMarker,
+} from '../lib/store-deletion-marker';
 import { moneyInFlight } from './store-closure.service';
 import { cfBindings } from '../cf/bindings';
 import { getAccountState } from '../lib/identity-client';
@@ -70,6 +75,13 @@ export function productionDeletionDeps(): DeletionDeps {
       // The OWNER is the actor, not a super_admin (STORE-LIFECYCLE-1): the owner-request path skips the platform-operator step.
       await StoreService.delete(storeId, actorUserId, { ownerRequest: { requestId } });
     },
+    isOnDo: storeId => storeWritesToDo(storeId),
+    marker: {
+      write: writeDeletionMarker,
+      read: readDeletionMarker,
+      clear: clearDeletionMarker,
+    },
+    finishDeletedStore: snap => StoreService.finishDeletedStore(snap),
     async erasureBlocked(storeId) {
       // Ruling DEL-FLAG-1: only a Durable Object store needs the erasure step after its delete (a Postgres store's people are
       // removed by the delete's own cascade), and that step is gated by PDPL_CF_ERASURE_ENABLED like the account closure.

@@ -45,6 +45,7 @@ function makeDeps(over: Partial<DeletionDeps> = {}, store?: Partial<DeletionStor
   };
   let now = NOW;
   let deleted = false;
+  const markers = new Map<string, unknown>();
   const deps = {
     now: () => now,
     loadStore: vi.fn(async (id: string) =>
@@ -67,6 +68,13 @@ function makeDeps(over: Partial<DeletionDeps> = {}, store?: Partial<DeletionStor
     deleteStore: vi.fn(async () => {
       deleted = true;
     }),
+    isOnDo: vi.fn(async () => false),
+    marker: {
+      write: vi.fn(async (id: string, m: unknown) => void markers.set(id, m)),
+      read: vi.fn(async (id: string) => (markers.get(id) ?? null) as never),
+      clear: vi.fn(async (id: string) => void markers.delete(id)),
+    },
+    finishDeletedStore: vi.fn(async () => undefined),
     erasureBlocked: vi.fn(async () => false),
     ownerEmail: vi.fn(async () => 'owner@example.com' as string | null),
     audit: vi.fn(async () => undefined),
@@ -77,6 +85,10 @@ function makeDeps(over: Partial<DeletionDeps> = {}, store?: Partial<DeletionStor
   return {
     deps,
     state,
+    markers,
+    markDeleted: () => {
+      deleted = true;
+    },
     advance: (ms: number) => {
       now += ms;
     },
@@ -609,7 +621,7 @@ describe('blocker fixes (re-review of #772)', () => {
         { storeId: 'store-a', requestId: h.r.id, reason: 'boom' },
         h.deps
       )
-    ).toBe(true);
+    ).toMatchObject({ recovered: true });
     expect(h.state.store.deletionRequest).toMatchObject({
       state: 'pending',
       lastBlock: { code: 'EXECUTION_FAILED', reason: 'boom' },
@@ -620,7 +632,7 @@ describe('blocker fixes (re-review of #772)', () => {
     // pending again: nothing to recover, and the owner can cancel
     expect(
       await recoverFailedExecution({ storeId: 'store-a', requestId: h.r.id, reason: 'x' }, h.deps)
-    ).toBe(false);
+    ).toMatchObject({ recovered: false });
     expect((await cancelStoreDeletion({ storeId: 'store-a', userId: OWNER }, h.deps)).state).toBe(
       'cancelled'
     );
@@ -664,5 +676,173 @@ describe('blocker fixes (re-review of #772)', () => {
     expect(
       (await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps)).outcome
     ).toBe('executed');
+  });
+});
+
+describe('follow-up of #772: automatic retry after a failed run, and a committed delete whose post-commit step threw', () => {
+  async function scheduledStore(over: Partial<DeletionDeps> = {}) {
+    const h = makeDeps(over);
+    const r = await scheduleStoreDeletion(
+      {
+        storeId: 'store-a',
+        userId: OWNER,
+        confirmToken: await mintToken(h.deps),
+        typedSlug: 'shop-a',
+      },
+      h.deps
+    );
+    h.advance(COOLING_OFF_MS + 1);
+    return { ...h, r };
+  }
+  const failExecuting = async (h: Awaited<ReturnType<typeof scheduledStore>>) => {
+    await expect(
+      executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps)
+    ).rejects.toThrow();
+  };
+
+  it('m1: a recovery re-sends the execute event for now + 1 day, so the retry really happens', async () => {
+    const h = await scheduledStore({
+      deleteStore: vi.fn(async () => {
+        throw new Error('boom');
+      }),
+    });
+    await failExecuting(h);
+    (h.deps.emit as ReturnType<typeof vi.fn>).mockClear();
+    const { recoverFailedExecution } = await import('@api/services/store-deletion.service');
+    const r = await recoverFailedExecution(
+      { storeId: 'store-a', requestId: h.r.id, reason: 'boom' },
+      h.deps
+    );
+    expect(r).toMatchObject({
+      recovered: true,
+      retryScheduled: true,
+      exhausted: false,
+      attempt: 1,
+    });
+    expect(h.deps.emit).toHaveBeenCalledWith('store/deletion.scheduled', {
+      storeId: 'store-a',
+      requestId: h.r.id,
+      executeAfter: new Date(h.deps.now() + 86_400_000).toISOString(),
+    });
+    expect(h.state.store.deletionRequest?.recoveries).toBe(1);
+  });
+
+  it('m1: after 5 recoveries the next failure queues nothing and reports exhausted (manual action)', async () => {
+    const h = await scheduledStore({
+      deleteStore: vi.fn(async () => {
+        throw new Error('boom');
+      }),
+    });
+    const { recoverFailedExecution } = await import('@api/services/store-deletion.service');
+    const results = [];
+    for (let i = 0; i < 6; i++) {
+      await failExecuting(h);
+      results.push(
+        await recoverFailedExecution(
+          { storeId: 'store-a', requestId: h.r.id, reason: 'boom' },
+          h.deps
+        )
+      );
+    }
+    expect(results.slice(0, 5).every(x => x.retryScheduled)).toBe(true);
+    expect(results[5]).toMatchObject({ recovered: true, retryScheduled: false, exhausted: true });
+    // 1 (schedule) + 5 retries, never a 6th
+    expect(h.deps.emit).toHaveBeenCalledTimes(6);
+  });
+
+  it('m1: a failed re-queue is reported (retryScheduled false), not hidden', async () => {
+    const emit = vi.fn(async () => undefined);
+    const h = await scheduledStore({
+      emit,
+      deleteStore: vi.fn(async () => {
+        throw new Error('boom');
+      }),
+    });
+    await failExecuting(h);
+    emit.mockRejectedValue(new Error('inngest down'));
+    const { recoverFailedExecution } = await import('@api/services/store-deletion.service');
+    expect(
+      await recoverFailedExecution({ storeId: 'store-a', requestId: h.r.id, reason: 'x' }, h.deps)
+    ).toMatchObject({ recovered: true, retryScheduled: false, exhausted: false });
+  });
+
+  it('m2: the delete committed and a post-commit step threw: the retry (store gone) still audits, emails, finishes the steps and clears the marker', async () => {
+    let hh: Awaited<ReturnType<typeof scheduledStore>>;
+    const del = vi.fn(async () => {
+      hh.markDeleted(); // the Postgres delete committed...
+      throw new Error('post-commit step failed'); // ...then a step threw
+    });
+    hh = await scheduledStore({ deleteStore: del });
+    await failExecuting(hh);
+    expect(hh.deps.audit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETED_BY_OWNER' })
+    );
+    expect(hh.markers.size).toBe(1);
+    const o = await executeStoreDeletion({ storeId: 'store-a', requestId: hh.r.id }, hh.deps);
+    expect(o.outcome).toBe('executed');
+    expect(hh.deps.finishDeletedStore).toHaveBeenCalledWith({
+      id: 'store-a',
+      slug: 'shop-a',
+      ownerId: OWNER,
+      onDo: false,
+    });
+    expect(hh.deps.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETED_BY_OWNER' })
+    );
+    expect(hh.deps.notifyOwner).toHaveBeenCalledWith(
+      'executed',
+      expect.objectContaining({ to: 'owner@example.com' })
+    );
+    expect(hh.markers.size).toBe(0);
+    // and a third run is the plain 'gone'
+    expect(
+      (await executeStoreDeletion({ storeId: 'store-a', requestId: hh.r.id }, hh.deps)).outcome
+    ).toBe('gone');
+  });
+
+  it('m2: a store that is gone WITHOUT a claim marker for this request stays a plain gone (no audit, no email)', async () => {
+    const h = await scheduledStore();
+    h.markDeleted(); // e.g. a super admin deleted it during the window
+    const o = await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+    expect(o.outcome).toBe('gone');
+    expect(h.deps.audit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETED_BY_OWNER' })
+    );
+    expect(h.deps.finishDeletedStore).not.toHaveBeenCalled();
+  });
+
+  it('m2: a marker that belongs to a DIFFERENT request never completes this one', async () => {
+    const h = await scheduledStore();
+    h.markers.set('store-a', {
+      requestId: 'some-other-request',
+      requestedBy: OWNER,
+      slug: 'shop-a',
+      storeName: 'Shop A',
+      ownerId: OWNER,
+      onDo: false,
+    });
+    h.markDeleted();
+    const o = await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+    expect(o.outcome).toBe('gone');
+    expect(h.deps.audit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETED_BY_OWNER' })
+    );
+  });
+
+  it('m2: a recovery for a committed delete (store gone) still queues the retry that finishes it', async () => {
+    let hh: Awaited<ReturnType<typeof scheduledStore>>;
+    hh = await scheduledStore({
+      deleteStore: vi.fn(async () => {
+        hh.markDeleted();
+        throw new Error('post-commit step failed');
+      }),
+    });
+    await failExecuting(hh);
+    (hh.deps.emit as ReturnType<typeof vi.fn>).mockClear();
+    const { recoverFailedExecution } = await import('@api/services/store-deletion.service');
+    expect(
+      await recoverFailedExecution({ storeId: 'store-a', requestId: hh.r.id, reason: 'x' }, hh.deps)
+    ).toMatchObject({ recovered: true, retryScheduled: true });
+    expect(hh.deps.emit).toHaveBeenCalledTimes(1);
   });
 });

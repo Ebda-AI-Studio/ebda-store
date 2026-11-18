@@ -4,7 +4,9 @@ import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import {
   executeStoreDeletion,
+  MAX_EXECUTION_RECOVERIES,
   recoverFailedExecution,
+  type RecoveryResult,
 } from '../../../services/store-deletion.service';
 import { productionDeletionDeps } from '../../../services/store-deletion.wiring';
 
@@ -27,26 +29,31 @@ const MAX_BLOCKED_DAYS = 30;
 export async function handleStoreDeletionFailure(
   data: { storeId?: string; requestId?: string },
   reason: string
-): Promise<{ recovered: boolean }> {
+): Promise<RecoveryResult> {
   const { storeId, requestId } = data;
-  if (!storeId || !requestId) return { recovered: false };
-  let recovered = false;
+  const none: RecoveryResult = { recovered: false, retryScheduled: false, exhausted: false };
+  if (!storeId || !requestId) return none;
+  let r = none;
   try {
-    recovered = await recoverFailedExecution(
-      { storeId, requestId, reason },
-      productionDeletionDeps()
-    );
+    r = await recoverFailedExecution({ storeId, requestId, reason }, productionDeletionDeps());
   } catch (e) {
     reason = `${reason}; recovery failed: ${e instanceof Error ? e.message : String(e)}`;
   }
+  const outcome = r.exhausted
+    ? `NEEDS MANUAL ACTION: ${MAX_EXECUTION_RECOVERIES} automatic retries are spent.`
+    : r.retryScheduled
+      ? `Request back to pending, retry queued for tomorrow (attempt ${r.attempt}/${MAX_EXECUTION_RECOVERIES}).`
+      : r.recovered
+        ? 'Request back to pending but the retry could NOT be queued: NEEDS MANUAL ACTION.'
+        : 'Request NOT recovered: check settings.deletionRequest by hand.';
   await sendAlert({
     level: 'p1',
     scope: 'store',
     source: 'job.store-deletion-execute',
     title: 'Owner store deletion FAILED',
-    body: `Store ${storeId}, request ${requestId}: ${reason}. ${recovered ? 'Request put back to pending (lastBlock EXECUTION_FAILED).' : 'Request NOT recovered: check settings.deletionRequest by hand.'}`,
+    body: `Store ${storeId}, request ${requestId}: ${reason}. ${outcome}`,
   } as Parameters<typeof sendAlert>[0]).catch(() => undefined);
-  return { recovered };
+  return r;
 }
 
 export const storeDeletionExecute: JobDef = inngest.createFunction(
