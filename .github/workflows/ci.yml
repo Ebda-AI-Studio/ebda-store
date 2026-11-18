@@ -1081,10 +1081,20 @@ jobs:
           pattern: unit-blob-*
           path: .vitest-reports
           merge-multiple: true
+      # Ruling UNIT-MERGE-ROOTS-1: vitest keeps only the blob entries whose absolute paths sit under THIS checkout. The shards and this job run on
+      # different runners (different workspace roots): no match = "No test files found", exit 1 (#951 group run 44343978493); a partial match =
+      # one shard silently dropped from the merged report and its coverage (#955 group run 44326426543: 1389 of 2083 files). Re-root first, merge, then
+      # fail the job unless every shard's files are in the merged total.
+      - name: Re-root the shard blobs onto this checkout
+        run: node scripts/ci/unit-merge-blobs.mjs reroot .vitest-reports "$GITHUB_WORKSPACE"
       - name: Merge reports and enforce the coverage threshold
-        run: npx vitest run --merge-reports --coverage --reporter=default
+        run: |
+          set -o pipefail
+          npx vitest run --merge-reports --coverage --reporter=default 2>&1 | tee "$RUNNER_TEMP/unit-merge.log"
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+      - name: Every shard's test files are in the merged report (hard check)
+        run: node scripts/ci/unit-merge-blobs.mjs check .vitest-reports "$RUNNER_TEMP/unit-merge.log"
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
