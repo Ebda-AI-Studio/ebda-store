@@ -677,11 +677,14 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     expect(mac?.if).toBe("runner.os == 'macOS'");
     expect(mac?.run).toMatch(/shasum -a 256 -c -/);
     expect(mac?.run).toMatch(/--only-verified/);
-    // depth-1 checkout: a push must deepen to `before` and scan only before..after (never a silent whole-tree scan); the
-    // Mac skips exactly the listed fixture files (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list).
+    // a push scans only before..after in a PRIVATE fresh shallow clone (scripts/ci/scan-clone.sh, Ruling CI-TRUFFLE-FRESH-1), and fails
+    // rather than fall back to a silent whole-tree scan; the Mac skips exactly the listed fixture files
+    // (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list). tests/unit/ci-scan-clone.test.ts pins the clone itself.
+    expect(mac?.run).toMatch(/scripts\/ci\/scan-clone\.sh "\$AFTER" "\$SCAN" \d+/);
     expect(mac?.run).toMatch(
-      /git fetch --no-tags --deepen=\d+ origin "\$AFTER" && git merge-base --is-ancestor "\$BEFORE" "\$AFTER"/
+      /git -C "\$SCAN" merge-base --is-ancestor "\$RANGE_BASE" "\$AFTER" \|\| \{/
     );
+    expect(mac?.run).toContain('RANGE_BASE="$MG_BASE"'); // a merge-queue run has no `before`: its base is merge_group.base_sha
     expect(mac?.run).toContain('--exclude-paths .github/trufflehog-mac-exclude-paths.txt');
   });
   it('ai-review links the native claude binary (--ignore-scripts leaves only a stub)', () => {

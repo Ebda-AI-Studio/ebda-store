@@ -1641,6 +1641,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
+          MG_BASE: ${{ github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
           V=3.99.8
@@ -1658,15 +1659,22 @@ jobs:
           # tests/unit/skins-preflight.test.ts (lines 62-63) report as VERIFIED (main run 43112327669; earlier hosted main runs passed the same
           # whole-tree scan), so .github/trufflehog-mac-exclude-paths.txt skips exactly that file here (pinned by a test). Postgres URLs
           # trufflehog cannot verify are caught by gitleaks' ebda-postgres-url-password rule (.gitleaks.toml).
-          # Ruling CI-TRUFFLE-PARTIAL-1: trufflehog clones this workspace locally; a partial clone left by an earlier job on this
-          # persistent runner makes that clone abort ("could not fetch ... from promisor remote", main run 44223670604). Make it full first.
-          bash scripts/ci/ensure-full-clone.sh "$AFTER"
+          # Ruling CI-TRUFFLE-FRESH-1: trufflehog reads a PRIVATE fresh shallow clone, never this workspace. The persistent runner workspace carries
+          # state from earlier jobs (`filter: blob:none` plan jobs: promisor config AND .git/objects/pack/*.promisor markers) that made
+          # a local clone of the workspace fail "could not fetch ... from promisor remote" (main runs 44223670604, 44268095513), even after the config keys were removed.
+          SCAN="$RUNNER_TEMP/scan"
+          bash scripts/ci/scan-clone.sh "$AFTER" "$SCAN" 21
+          # The range base: a push scans before..after; a merge-queue run has no `before`, its base is the queue's base_sha, so it scans exactly
+          # the queued commits (not the 20 older ones the shallow clone also carries). Anything else (schedule, dispatch, PR) scans the clone.
+          RANGE_BASE=""
+          if [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then RANGE_BASE="$BEFORE"
+          elif [ "$EVENT" = merge_group ] && [ -n "$MG_BASE" ]; then RANGE_BASE="$MG_BASE"; fi
           since=()
-          if [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
-            git fetch --no-tags --deepen=20 origin "$AFTER" && git merge-base --is-ancestor "$BEFORE" "$AFTER" || { echo "::error::before ($BEFORE) is not an ancestor within 20 commits; refusing a whole-tree scan"; exit 1; }
-            since=(--since-commit "$BEFORE")
+          if [ -n "$RANGE_BASE" ]; then
+            git -C "$SCAN" merge-base --is-ancestor "$RANGE_BASE" "$AFTER" || { echo "::error::range base ($RANGE_BASE) is not an ancestor within 20 commits; refusing a whole-tree scan"; exit 1; }
+            since=(--since-commit "$RANGE_BASE")
           fi
-          "$RUNNER_TEMP/th/trufflehog" git "file://$PWD" "${since[@]}" --exclude-paths .github/trufflehog-mac-exclude-paths.txt --branch "$AFTER" --fail --no-update --github-actions --only-verified
+          "$RUNNER_TEMP/th/trufflehog" git "file://$SCAN" "${since[@]}" --exclude-paths .github/trufflehog-mac-exclude-paths.txt --branch "$AFTER" --fail --no-update --github-actions --only-verified
 
   # Mutation tests: weekly (Sunday) or manual only (far too slow for a push or
   # a nightly).
