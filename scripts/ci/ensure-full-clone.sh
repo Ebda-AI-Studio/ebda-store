@@ -9,10 +9,9 @@
 set -euo pipefail
 SHA="${1:?usage: ensure-full-clone.sh <sha>}"
 # CI only: the refetch below is a SHALLOW fetch (the CI checkout is depth 1 already). tests/unit/migration-order-gate.test.ts bans a bare shallow
-# `git fetch` in scripts so a developer or agent repo can never be made shallow; this script refuses to run outside GitHub Actions, and the depth is
-# held in a variable so that guard's literal match does not fire on a script that is CI-only by construction.
+# `git fetch` in scripts so a developer or agent repo can never be made shallow; THIS script has an explicit, reasoned entry in that guard's allow-list
+# (ALLOWED_SHALLOW_FETCH) because it refuses to run outside GitHub Actions (pinned by tests/unit/ci-ensure-full-clone.test.ts).
 [ "${GITHUB_ACTIONS:-}" = true ] || { echo "ensure-full-clone: refusing to run outside GitHub Actions (it would make this repo shallow)" >&2; exit 2; }
-CI_DEPTH="--depth=1"
 if [ "$(git config --get remote.origin.promisor || true)" = true ] \
   || git config --get remote.origin.partialclonefilter >/dev/null 2>&1 \
   || git config --get extensions.partialclone >/dev/null 2>&1; then
@@ -20,7 +19,7 @@ if [ "$(git config --get remote.origin.promisor || true)" = true ] \
   git config --unset-all remote.origin.partialclonefilter || true
   git config --unset-all remote.origin.promisor || true
   git config --unset-all extensions.partialclone || true
-  git fetch --no-tags --refetch "$CI_DEPTH" origin "$SHA"
+  git fetch --no-tags --refetch --depth=1 origin "$SHA"
 else
   echo "ensure-full-clone: the workspace is a full clone"
 fi
