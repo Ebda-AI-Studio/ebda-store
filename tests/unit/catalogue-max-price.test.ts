@@ -58,3 +58,28 @@ describe('priceRangeWhere: match what the shopper can actually buy (PL1)', () =>
     expect(only(priceRangeWhere(100, undefined))).toEqual({ gte: 100 });
   });
 });
+
+describe('meta.priceMax is opt-in (Ruling SEARCH-T12-2: the default listing payload is unchanged)', () => {
+  it('the list endpoint accepts withPriceMax and forwards it only when it is "1"', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { PUBLIC_PRODUCT_LIST_QUERY_KEYS } = await import('@api/lib/query-params');
+    expect(PUBLIC_PRODUCT_LIST_QUERY_KEYS).toContain('withPriceMax');
+    const route = readFileSync('apps/api/src/routes/public.routes.ts', 'utf8');
+    expect(route).toMatch(/withPriceMax: req\.query\.withPriceMax === '1' \? true : undefined/);
+  });
+
+  it('the service computes and emits priceMax only on request (never in the default meta)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const svc = readFileSync('apps/api/src/services/product.service.ts', 'utf8');
+    // both listing paths: gated on the option, and the key is spread in only when defined
+    expect(svc.match(/options\.withPriceMax/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(svc.match(/\.\.\.\(priceMax !== undefined \? \{ priceMax \} : \{\}\)/g)).toHaveLength(2);
+    expect(svc).not.toMatch(/^\s+priceMax,\s*$/m);
+  });
+
+  it('the storefront PLP asks for it on its server fetch', async () => {
+    const { readFileSync } = await import('node:fs');
+    const body = readFileSync('apps/web/src/app/products/ProductsPageBody.tsx', 'utf8');
+    expect(body).toMatch(/withPriceMax: '1'/);
+  });
+});

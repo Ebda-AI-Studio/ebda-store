@@ -1730,6 +1730,11 @@ export class ProductService {
        * a ranked search never embeds (default deny, Ruling SEARCH-T12-6).
        */
       searcher?: string;
+      /**
+       * Add `meta.priceMax` (the store's highest price, PL1). Opt-in so the default listing payload stays exactly what
+       * it was (Ruling SEARCH-T12-2, pinned by listing-flag-off-golden); only the storefront price filter asks.
+       */
+      withPriceMax?: boolean;
     } = {}
   ) {
     const {
@@ -2096,7 +2101,7 @@ export class ProductService {
         (await storeDb(storeId)).product.findMany(positionFindArgs),
         (await storeDb(storeId)).product.count({ where }),
         computeFacets(storeId, whereForFacets),
-        catalogueMaxPrice(storeId),
+        options.withPriceMax ? catalogueMaxPrice(storeId) : Promise.resolve(undefined),
       ]);
 
       const allMatchingRaw = withStoreRef(allMatchingFetched, positionStoreRef);
@@ -2142,7 +2147,7 @@ export class ProductService {
           totalPages: cursor ? undefined : Math.ceil(total / limit),
           nextCursor,
           skipCapped: skipCapped || undefined,
-          priceMax,
+          ...(priceMax !== undefined ? { priceMax } : {}),
         },
       };
 
@@ -2193,8 +2198,10 @@ export class ProductService {
       sort === 'on_sale'
         ? Promise.resolve([] as ProductFacet[])
         : computeFacets(storeId, whereForFacets),
-      // The deals strip has no price filter either.
-      sort === 'on_sale' ? Promise.resolve(0) : catalogueMaxPrice(storeId),
+      // The deals strip has no price filter either; every other list only on request.
+      sort === 'on_sale' || !options.withPriceMax
+        ? Promise.resolve(undefined)
+        : catalogueMaxPrice(storeId),
     ]);
     const productsRaw = withStoreRef(productsFetched, listStoreRef);
 
@@ -2222,7 +2229,7 @@ export class ProductService {
         totalPages: cursor ? undefined : Math.ceil(total / limit),
         nextCursor,
         skipCapped: skipCapped || undefined,
-        priceMax,
+        ...(priceMax !== undefined ? { priceMax } : {}),
       },
     };
 
