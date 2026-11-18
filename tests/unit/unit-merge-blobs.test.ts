@@ -21,6 +21,8 @@ import {
 const SCRIPT = join(__dirname, '../../scripts/ci/unit-merge-blobs.mjs');
 const A = '/Users/ahmadsharaf/actions-runner-ebda/_work/ebda-store/ebda-store';
 const B = '/Users/ahmadsharaf/actions-runner-ebda-2/_work/ebda-store/ebda-store';
+const HOSTED = '/home/runner/work/ebda-store/ebda-store'; // a GitHub-style layout: no `_work`, still `<prefix>/<repo>/<repo>`
+const ROOT = '/work/co/ebda-store/ebda-store';
 
 /** A vitest-shaped blob: [refs, version, files, errors, {path: ref}, ...] with `n` test files rooted at `root`. */
 function blob(root: string, n: number): string {
@@ -47,12 +49,26 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 describe('rerootText', () => {
   it('rewrites a runner workspace root, in path keys, values and error text, and leaves other paths and messages alone', () => {
     const t = `{"${A}/tests/x.ts":1,"s":"at f (${A}/src/y.ts:2:3)","other":"/usr/lib/node/z.js","msg":"Error at /foo/bar (${B}/a.ts)"}`;
-    const { text, n } = rerootText(t, '/work/co');
+    const { text, n } = rerootText(t, ROOT);
     expect(n).toBe(3);
-    expect(text).toContain('"/work/co/tests/x.ts"');
-    expect(text).toContain('at f (/work/co/src/y.ts:2:3)');
+    expect(text).toContain(`"${ROOT}/tests/x.ts"`);
+    expect(text).toContain(`at f (${ROOT}/src/y.ts:2:3)`);
     expect(text).toContain('"/usr/lib/node/z.js"'); // not a runner root
-    expect(text).toContain('Error at /foo/bar (/work/co/a.ts)'); // the earlier path in the same string is untouched
+    expect(text).toContain(`Error at /foo/bar (${ROOT}/a.ts)`); // the earlier path in the same string is untouched
+  });
+  it('rewrites ANY layout ending in /<repo>/<repo> (a runner `_work` tree, /home/runner/work, a custom prefix) and nothing else', () => {
+    const t = JSON.stringify({
+      [`${A}/a.ts`]: 1,
+      [`${HOSTED}/b.ts`]: 2,
+      '/opt/custom/ci/ebda-store/ebda-store/c.ts': 3,
+      '/x/lib/lib/d.ts': 4,
+      '/x/ebda-store/e.ts': 5,
+    });
+    const { text, n } = rerootText(t, ROOT);
+    expect(n).toBe(3);
+    for (const f of ['a', 'b', 'c']) expect(text).toContain(`${ROOT}/${f}.ts`);
+    expect(text).toContain('/x/lib/lib/d.ts'); // an arbitrary doubled directory is not a workspace root
+    expect(text).toContain('/x/ebda-store/e.ts'); // the repo name once is not either
   });
   it('is idempotent on an already re-rooted blob', () => {
     const once = rerootText(blob(A, 2), B).text;
@@ -71,7 +87,9 @@ describe('the mixed-root merge (the production failure)', () => {
       expect(s).toContain(`${B}/tests/unit/f0.test.ts`);
     }
     writeFileSync(join(dir, 'blob-3-3.json'), JSON.stringify([[], 'v', [], [], {}]));
-    expect(() => reroot(dir, B)).toThrow(/blob-3-3\.json: no runner workspace root/);
+    expect(() => reroot(dir, B)).toThrow(
+      /blob-3-3\.json: no workspace root ending in \/ebda-store\/ebda-store found to rewrite: refusing/
+    );
   });
   it('the CLI exits 1 with a ::error:: line on a missing directory argument', () => {
     const r = spawnSync('node', [SCRIPT, 'reroot'], { encoding: 'utf8' });
@@ -87,6 +105,15 @@ describe('check: merged test files must equal the sum of the shards', () => {
     expect(blobFileCount(JSON.parse(blob(A, 4)))).toBe(4);
     expect(mergedFileTotal(log(2083))).toBe(2083);
     expect(mergedFileTotal('no summary here')).toBeNull();
+    // the real colour escapes vitest/tinyrainbow emit on Actions (CI + GITHUB_ACTIONS set) even when the output is piped to tee
+    const E = String.fromCharCode(27);
+    const coloured = `${E}[2m Test Files ${E}[22m ${E}[1m${E}[32m2080 passed${E}[39m${E}[22m${E}[2m | ${E}[22m${E}[33m3 skipped${E}[39m${E}[90m (2083)${E}[39m\n`;
+    expect(mergedFileTotal(coloured)).toBe(2083);
+    expect(
+      mergedFileTotal(
+        `${E}[1m${E}[31m 1 failed${E}[39m${E}[22m\n Test Files  1 failed | 2 passed (3)\n`
+      )
+    ).toBe(3);
   });
   it('passes when they are equal and FAILS when a shard was dropped (1386+... vs 2083), or when there is no summary', () => {
     writeFileSync(join(dir, 'blob-1-3.json'), blob(A, 695));
@@ -115,7 +142,10 @@ describe('ci.yml wiring', () => {
   const doc = yaml.load(
     readFileSync(join(__dirname, '../../.github/workflows/ci.yml'), 'utf8')
   ) as {
-    jobs: Record<string, { steps?: Array<{ name?: string; run?: string }> }>;
+    jobs: Record<
+      string,
+      { steps?: Array<{ name?: string; run?: string; env?: Record<string, string> }> }
+    >;
   };
   const steps = Object.values(doc.jobs).flatMap(j => j.steps ?? []);
   const idx = (re: RegExp) => steps.findIndex(s => re.test(s.run ?? ''));
@@ -127,6 +157,7 @@ describe('ci.yml wiring', () => {
     expect(mg).toBeGreaterThan(rr);
     expect(ck).toBeGreaterThan(mg);
     expect(steps[mg]?.run).toMatch(/pipefail/);
+    expect((steps[mg] as { env?: Record<string, string> }).env?.NO_COLOR).toBe('1'); // plain text for the parse (the parse also strips escapes)
     expect(steps[mg]?.run).toMatch(/tee "\$RUNNER_TEMP\/unit-merge\.log"/);
     expect(steps[ck]?.run).toContain('"$RUNNER_TEMP/unit-merge.log"');
   });

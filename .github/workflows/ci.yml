@@ -1093,6 +1093,7 @@ jobs:
           npx vitest run --merge-reports --coverage --reporter=default 2>&1 | tee "$RUNNER_TEMP/unit-merge.log"
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          NO_COLOR: '1' # plain summary for the file-count check (it also strips colour escapes: vitest colours piped output on Actions)
       - name: Every shard's test files are in the merged report (hard check)
         run: node scripts/ci/unit-merge-blobs.mjs check .vitest-reports "$RUNNER_TEMP/unit-merge.log"
       - name: Upload coverage artifact

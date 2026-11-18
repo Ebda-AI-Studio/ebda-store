@@ -14,16 +14,26 @@
  * A blob is a flatted array: [ref-array, version, files (one entry per test file), errors, ...]; the file count of a shard is `blob[2].length`.
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** `<anything without a quote, backslash, space or paren>/_work/<name>/<name>`: the runner's workspace root inside a path string. */
-const ROOT_RE = /\/[^"\\\s()]*?\/_work\/([^/"\\\s()]+)\/\1(?=\/|["\\\s)]|$)/g;
+/** Escapes a string for use inside a RegExp. */
+const escapeRe = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Rewrites every runner workspace root in a blob's text to `root`. Returns the new text and how many were rewritten. */
+/**
+ * The checkout root's directory name is the repo (`.../_work/ebda-store/ebda-store`, `/home/runner/work/ebda-store/ebda-store`: both end in
+ * `/<repo>/<repo>`). Any absolute prefix, whatever the runner layout, followed by `/<repo>/<repo>` is a workspace root. Only the REPO's own doubled
+ * name counts: an arbitrary `/x/lib/lib` directory must not be rewritten.
+ */
+export function rootRegex(root) {
+  const repo = escapeRe(basename(root));
+  return new RegExp(String.raw`/[^"\\\s()]*?/${repo}/${repo}(?=/|["\\\s)]|$)`, 'g');
+}
+
+/** Rewrites every runner workspace root (any layout) in a blob's text to `root`. Returns the new text and how many were rewritten. */
 export function rerootText(text, root) {
   let n = 0;
-  const out = text.replace(ROOT_RE, () => {
+  const out = text.replace(rootRegex(root), () => {
     n += 1;
     return root;
   });
@@ -38,7 +48,10 @@ export function blobFileCount(blob) {
 
 /** The merged total from vitest's default reporter: ` Test Files  2080 passed | 3 skipped (2083)` -> 2083. */
 export function mergedFileTotal(log) {
-  const m = /^\s*Test Files\s.*\((\d+)\)\s*$/m.exec(log);
+  // On Actions vitest/tinyrainbow colours the summary even when piped (CI + GITHUB_ACTIONS are set): strip the SGR escapes before parsing
+  // eslint-disable-next-line no-control-regex
+  const plain = log.replace(/\u001b\[[0-9;]*m/g, '');
+  const m = /^\s*Test Files\s.*\((\d+)\)\s*$/m.exec(plain);
   return m ? Number(m[1]) : null;
 }
 
@@ -49,7 +62,7 @@ export function reroot(dir, root) {
   for (const f of files) {
     const p = join(dir, f);
     const { text, n } = rerootText(readFileSync(p, 'utf8'), root);
-    if (n === 0) throw new Error(`${f}: no runner workspace root found to rewrite (is this a vitest blob from this repo?)`);
+    if (n === 0) throw new Error(`${f}: no workspace root ending in /${basename(root)}/${basename(root)} found to rewrite: refusing to merge blobs that cannot be mapped onto this checkout (is this a vitest blob from this repo?)`);
     writeFileSync(p, text);
     total += n;
     console.log(`reroot: ${f}: ${n} path(s) now under ${root}`);
