@@ -892,7 +892,11 @@ export function siteFooter(lang: NavLang): {
         id: a.id,
         label: a.label,
         href: a.url,
-        ariaLabel: L(lang, `ابدأ ستوديو على ${a.label}`, `Ebda AI Studio on ${a.label}`),
+        ariaLabel: L(
+          lang,
+          `ابدأ ستوديو للذكاء الاصطناعي على ${a.label}`,
+          `Ebda AI Studio on ${a.label}`
+        ),
       })),
     },
     columns: [
