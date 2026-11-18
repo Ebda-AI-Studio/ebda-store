@@ -87,7 +87,16 @@ export function applyStoreSettings(
 
 /** The JSON columns `patchStoreSettings` merges key by key (Prisma `Store` field names). */
 export const PATCHABLE_JSON_FIELDS = ['settings', 'theme', 'socialLinks'] as const;
-export type JsonKeyPatch = { set?: Record<string, unknown>; remove?: string[] };
+export type JsonKeyPatch = {
+  set?: Record<string, unknown>;
+  remove?: string[];
+  /**
+   * PRECONDITION, checked inside the same synchronous DO transaction as the write: for each top-level key, every listed sub-field
+   * must equal the stored value (`{ deletionRequest: { id, state } }`). A mismatch throws `PATCH_PRECONDITION_FAILED` and writes
+   * nothing: a real compare-and-set (the DO is single threaded, so no other write can land between the check and the patch).
+   */
+  expect?: Record<string, Record<string, unknown>>;
+};
 
 /**
  * BE:F-2 / BE:F-3: the DO's atomic settings PATCH. The service used to read `settings` (or `theme`,
@@ -120,6 +129,14 @@ export function patchStoreSettings(
       for (const n of jsonNames) {
         const patch = (input.json as Record<string, JsonKeyPatch>)[n];
         const cur = rec.record[n];
+        for (const [key, want] of Object.entries(patch.expect ?? {})) {
+          const have = (cur as Record<string, Record<string, unknown> | undefined> | null)?.[key];
+          for (const [field, value] of Object.entries(want))
+            if (have?.[field] !== value)
+              throw Object.assign(new Error(`Store.${n}.${key}.${field} changed`), {
+                code: 'PATCH_PRECONDITION_FAILED',
+              });
+        }
         const next: Record<string, unknown> = {
           ...(cur && typeof cur === 'object' && !Array.isArray(cur)
             ? (cur as Record<string, unknown>)

@@ -8,7 +8,8 @@
   "titleEn": "Download all my data, or close my account",
   "screens": ["/stores/[id]/settings", "/account/settings"],
   "api": [
-    "GET /stores/:storeId/export",
+    "POST /stores/:storeId/export/preview",
+    "POST /stores/:storeId/export",
     "GET /auth/me/export",
     "POST /auth/me/erase",
     "POST /auth/me/close-account",

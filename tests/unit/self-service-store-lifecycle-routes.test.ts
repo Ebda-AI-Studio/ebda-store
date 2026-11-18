@@ -20,6 +20,7 @@ const m = vi.hoisted(() => ({
   cancel: vi.fn(),
   status: vi.fn(),
   exportBundle: vi.fn(),
+  exportPreview: vi.fn(),
 }));
 vi.mock('@api/services/store-deletion.service', async () => {
   const real = await vi.importActual<typeof import('@api/services/store-deletion.service')>(
@@ -34,7 +35,10 @@ vi.mock('@api/services/store-deletion.service', async () => {
   };
 });
 vi.mock('@api/services/store-deletion.wiring', () => ({ productionDeletionDeps: () => ({}) }));
-vi.mock('@api/services/store-export.wiring', () => ({ exportStoreBundle: m.exportBundle }));
+vi.mock('@api/services/store-export.wiring', () => ({
+  exportStoreBundle: m.exportBundle,
+  exportPreview: m.exportPreview,
+}));
 vi.mock('@api/middleware/auth', async () => {
   const real = await vi.importActual<typeof import('@api/middleware/auth')>('@api/middleware/auth');
   return {
@@ -89,6 +93,7 @@ beforeEach(() => {
   });
   m.cancel.mockResolvedValue({ id: 'r1', state: 'cancelled' });
   m.status.mockResolvedValue({ request: null });
+  m.exportPreview.mockResolvedValue({ confirmToken: 'aaaaaaaaaaaa.bbbb' });
   m.exportBundle.mockResolvedValue({ ok: true, zip: Buffer.from('zip'), filename: 'x.zip' });
 });
 
@@ -101,7 +106,8 @@ it('customer role is 403 on every owner route', async () => {
     ['post', '/stores/store-a/deletion'],
     ['delete', '/stores/store-a/deletion'],
     ['get', '/stores/store-a/deletion'],
-    ['get', '/stores/store-a/export'],
+    ['post', '/stores/store-a/export/preview'],
+    ['post', '/stores/store-a/export'],
   ] as const) {
     const res = await (request(app) as any)[method](url).set('x-role', 'customer').send({});
     expect(res.status, `${method} ${url}`).toBe(403);
@@ -166,15 +172,41 @@ it('super_admin: status and cancel carry the role (platform override); preview d
   expect(m.preview.mock.calls[0][0].role).toBeUndefined();
 });
 
-it('export: returns the zip to the owner, 413 when over the row cap, 403 for a non-owner', async () => {
-  const ok = await request(app).get('/stores/store-a/export').set('x-role', 'store_admin');
+it('export (M2): needs the step-up token; GET is gone; the zip goes to the owner, 413 over the cap', async () => {
+  // the old one-call GET no longer exists
+  expect(
+    (await request(app).get('/stores/store-a/export').set('x-role', 'store_admin')).status
+  ).toBe(404);
+  // no token: Zod refuses before any data is read
+  const none = await request(app)
+    .post('/stores/store-a/export')
+    .set('x-role', 'store_admin')
+    .send({});
+  expect(none.status).toBe(400);
+  expect(m.exportBundle).not.toHaveBeenCalled();
+  const pv = await request(app)
+    .post('/stores/store-a/export/preview')
+    .set('x-role', 'store_admin')
+    .send({});
+  expect(pv.body.data.confirmToken).toBe('aaaaaaaaaaaa.bbbb');
+  const ok = await request(app)
+    .post('/stores/store-a/export')
+    .set('x-role', 'store_admin')
+    .send({ confirmToken: 'aaaaaaaaaaaa.bbbb' });
   expect(ok.status).toBe(200);
   expect(ok.headers['content-type']).toMatch(/zip/);
   expect(m.exportBundle).toHaveBeenCalledWith(
-    expect.objectContaining({ storeId: 'store-a', userId: OWNER })
+    expect.objectContaining({
+      storeId: 'store-a',
+      userId: OWNER,
+      confirmToken: 'aaaaaaaaaaaa.bbbb',
+    })
   );
   m.exportBundle.mockResolvedValue({ ok: false, rows: 60000, cap: 50000 });
-  const big = await request(app).get('/stores/store-a/export').set('x-role', 'store_admin');
+  const big = await request(app)
+    .post('/stores/store-a/export')
+    .set('x-role', 'store_admin')
+    .send({ confirmToken: 'aaaaaaaaaaaa.bbbb' });
   expect(big.status).toBe(413);
   expect(big.body.error.code).toBe('EXPORT_TOO_LARGE');
 });

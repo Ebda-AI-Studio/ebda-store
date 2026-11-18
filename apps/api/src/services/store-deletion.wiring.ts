@@ -9,6 +9,10 @@ import { BILLED_SUBSCRIPTION_STATUSES } from './account-closure-guard';
 import { EmailService } from './email.service';
 import { sortOwnerStores } from './billing/billing-parent';
 import { moneyInFlight } from './store-closure.service';
+import { cfBindings } from '../cf/bindings';
+import { getAccountState } from '../lib/identity-client';
+import { erasureEnabled } from '../cf/erasure';
+import type { ErasureEnv } from '../cf/erasure';
 import type { DeletionDeps, DeletionRequest } from './store-deletion.service';
 
 /** Production wiring of the owner store-deletion policy (store-deletion.service.ts): kept apart so the policy is unit-tested without a database. */
@@ -62,8 +66,21 @@ export function productionDeletionDeps(): DeletionDeps {
       );
       return family.length > 1 && family[0].id === store.id;
     },
-    async deleteStore(storeId, actorUserId) {
-      await StoreService.delete(storeId, actorUserId);
+    async deleteStore(storeId, actorUserId, requestId) {
+      // The OWNER is the actor, not a super_admin (STORE-LIFECYCLE-1): the owner-request path skips the platform-operator step.
+      await StoreService.delete(storeId, actorUserId, { ownerRequest: { requestId } });
+    },
+    async erasureBlocked(storeId) {
+      // Ruling DEL-FLAG-1: only a Durable Object store needs the erasure step after its delete (a Postgres store's people are
+      // removed by the delete's own cascade), and that step is gated by PDPL_CF_ERASURE_ENABLED like the account closure.
+      if (!(await storeWritesToDo(storeId))) return false;
+      const b = cfBindings() as ErasureEnv | undefined;
+      return !erasureEnabled({
+        PDPL_CF_ERASURE_ENABLED: b?.PDPL_CF_ERASURE_ENABLED ?? process.env.PDPL_CF_ERASURE_ENABLED,
+      });
+    },
+    async ownerEmail(userId) {
+      return (await getAccountState(userId))?.email || null;
     },
     async audit(entry) {
       await auditLog({
@@ -92,6 +109,16 @@ export function productionDeletionDeps(): DeletionDeps {
           subject: `Ebda Store: deletion of ${info.storeName} cancelled`,
           en: `The scheduled deletion of ${info.storeName} (${info.slug}) was cancelled. Nothing was deleted.`,
           ar: `اتلغى طلب حذف متجر ${info.storeName} (${info.slug}). مفيش حاجة اتمسحت.`,
+        },
+        voided: {
+          subject: `Ebda Store: deletion of ${info.storeName} cancelled`,
+          en: `The scheduled deletion of ${info.storeName} (${info.slug}) was cancelled because the store changed owner. Nothing was deleted.`,
+          ar: `اتلغى طلب حذف متجر ${info.storeName} (${info.slug}) لأن ملكية المتجر اتغيّرت. مفيش حاجة اتمسحت.`,
+        },
+        exported: {
+          subject: `Ebda Store: data export of ${info.storeName}`,
+          en: `A full data export of ${info.storeName} (${info.slug}), including customer details, was just downloaded from your account. If this was not you, change your password and contact support now.`,
+          ar: `اتنزّل دلوقتي تصدير كامل لبيانات متجر ${info.storeName} (${info.slug}) من حسابك، وفيه بيانات العملاء. لو مش انت، غيّر كلمة السر وكلّم الدعم فورًا.`,
         },
         executed: {
           subject: `Ebda Store: ${info.storeName} was deleted`,

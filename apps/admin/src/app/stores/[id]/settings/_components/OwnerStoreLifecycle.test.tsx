@@ -35,11 +35,12 @@ vi.mock('@/components/ui/Button', () => ({
 const apiGet = vi.fn();
 const apiPost = vi.fn();
 const apiDelete = vi.fn();
+const apiFetch = vi.fn();
 vi.mock('@/lib/api', () => ({
   apiGet: (...a: unknown[]) => apiGet(...a),
   apiPost: (...a: unknown[]) => apiPost(...a),
   apiDelete: (...a: unknown[]) => apiDelete(...a),
-  apiFetch: vi.fn(),
+  apiFetch: (...a: unknown[]) => apiFetch(...a),
 }));
 
 import { OwnerStoreLifecycle } from './OwnerStoreLifecycle';
@@ -49,6 +50,7 @@ beforeEach(() => {
   apiGet.mockReset().mockResolvedValue({ data: { request: null, isOwner: true }, error: null });
   apiPost.mockReset();
   apiDelete.mockReset();
+  apiFetch.mockReset();
 });
 
 describe('OwnerStoreLifecycle', () => {
@@ -151,5 +153,29 @@ describe('OwnerStoreLifecycle', () => {
     render(<OwnerStoreLifecycle storeId="s1" />);
     expect(await screen.findByText(/can no longer be cancelled/)).toBeTruthy();
     expect(screen.queryByText('Cancel the deletion')).toBeNull();
+  });
+
+  it('export (M2): takes a step-up token first, then POSTs it; no token means no download call', async () => {
+    apiPost.mockResolvedValueOnce({ data: { confirmToken: 'exp.tok.tok' }, error: null });
+    apiFetch.mockResolvedValueOnce({ ok: false, status: 500, headers: new Headers() });
+    render(<OwnerStoreLifecycle storeId="s1" />);
+    fireEvent.click(await screen.findByText('Download my data', { selector: 'button' }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(1));
+    expect(apiPost.mock.calls[0][0]).toMatch(/\/export\/preview$/);
+    const [url, init] = apiFetch.mock.calls[0];
+    expect(url).toMatch(/\/export$/);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ confirmToken: 'exp.tok.tok' });
+  });
+
+  it('export: a refused step-up (no token) never reaches the download call', async () => {
+    apiPost.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'OWNER_ONLY', status: 403, message: 'x' },
+    });
+    render(<OwnerStoreLifecycle storeId="s1" />);
+    fireEvent.click(await screen.findByText('Download my data', { selector: 'button' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 });

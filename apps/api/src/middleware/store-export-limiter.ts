@@ -22,6 +22,8 @@ export function createStoreExportLimiter(opts?: { skip?: (req: Request) => boole
     standardHeaders: true,
     legacyHeaders: false,
     passOnStoreError: true,
+    // a refused attempt (bad token, 403, 413) must not spend the owner's one export of the hour
+    skipFailedRequests: true,
     skip: opts?.skip ?? (() => process.env.NODE_ENV === 'test' || process.env.VITEST === 'true'),
     keyGenerator: (req: Request) => String(req.params.storeId ?? 'nostore'),
   });

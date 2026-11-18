@@ -139,7 +139,14 @@ export function OwnerStoreLifecycle({ storeId }: { storeId: string }) {
     setExportMsg(null);
     setBusy(true);
     try {
-      const res = await apiFetch(`${base}/export`);
+      // step-up: a single-use token first (the export carries customer details), then the download itself
+      const pv = await apiPost<{ confirmToken: string }>(`${base}/export/preview`);
+      if (pv.error || !pv.data) return setExportMsg(t('errExportFailed'));
+      const res = await apiFetch(`${base}/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmToken: pv.data.confirmToken }),
+      });
       if (res.status === 413) return setExportMsg(t('errExportTooLarge'));
       if (res.status === 429) return setExportMsg(t('errExportRateLimited'));
       if (!res.ok) return setExportMsg(t('errExportFailed'));

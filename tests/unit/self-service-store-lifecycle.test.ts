@@ -67,6 +67,8 @@ function makeDeps(over: Partial<DeletionDeps> = {}, store?: Partial<DeletionStor
     deleteStore: vi.fn(async () => {
       deleted = true;
     }),
+    erasureBlocked: vi.fn(async () => false),
+    ownerEmail: vi.fn(async () => 'owner@example.com' as string | null),
     audit: vi.fn(async () => undefined),
     emit: vi.fn(async () => undefined),
     notifyOwner: vi.fn(async () => undefined),
@@ -315,7 +317,12 @@ describe('execute (after the cooling-off)', () => {
       (await executeStoreDeletion({ storeId: 'store-a', requestId: r.id }, deps)).outcome
     ).toBe('executed');
     expect(deps.deleteStore).toHaveBeenCalledTimes(1);
-    expect(deps.deleteStore).toHaveBeenCalledWith('store-a', OWNER);
+    expect(deps.deleteStore).toHaveBeenCalledWith('store-a', OWNER, r.id);
+    // m1: the owner is told the store was deleted, on the address the identity service holds
+    expect(deps.notifyOwner).toHaveBeenCalledWith(
+      'executed',
+      expect.objectContaining({ to: 'owner@example.com', slug: 'shop-a' })
+    );
     expect(deps.audit).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'STORE_DELETED_BY_OWNER' })
     );
@@ -466,7 +473,11 @@ describe('review findings (Opus review of #772)', () => {
     expect(h.deps.audit).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'STORE_DELETION_VOIDED_OWNER_CHANGED' })
     );
-    expect(h.deps.notifyOwner).toHaveBeenCalledWith('cancelled', expect.anything());
+    // m1: the requester is emailed that the request was voided (not silently dropped)
+    expect(h.deps.notifyOwner).toHaveBeenCalledWith(
+      'voided',
+      expect.objectContaining({ to: 'owner@example.com' })
+    );
   });
 
   it('F3: a cancel that wins the compare-and-set before the claim stops the delete; a cancel during executing is refused', async () => {
@@ -553,5 +564,105 @@ describe('review findings (Opus review of #772)', () => {
         h.deps
       )
     ).rejects.toMatchObject({ statusCode: 403 });
+  });
+});
+
+describe('blocker fixes (re-review of #772)', () => {
+  async function scheduledStore(over: Partial<DeletionDeps> = {}) {
+    const h = makeDeps(over);
+    const r = await scheduleStoreDeletion(
+      {
+        storeId: 'store-a',
+        userId: OWNER,
+        confirmToken: await mintToken(h.deps),
+        typedSlug: 'shop-a',
+      },
+      h.deps
+    );
+    h.advance(COOLING_OFF_MS + 1);
+    return { ...h, r };
+  }
+
+  it('C2: FISCAL_ARCHIVE_FAILED (503) from the delete is a BLOCK, not a job failure', async () => {
+    const del = vi.fn(async () => {
+      throw new AppError(503, 'FISCAL_ARCHIVE_FAILED', 'archive failed');
+    });
+    const h = await scheduledStore({ deleteStore: del });
+    const o = await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+    expect(o.outcome).toBe('blocked');
+    expect(h.state.store.deletionRequest?.state).toBe('pending');
+    expect(h.state.store.deletionRequest?.lastBlock?.code).toBe('FISCAL_ARCHIVE_FAILED');
+  });
+
+  it('C2: recoverFailedExecution puts a stuck `executing` request back to pending with the reason; a moved-on request is left alone', async () => {
+    const del = vi.fn(async () => {
+      throw new Error('boom');
+    });
+    const h = await scheduledStore({ deleteStore: del });
+    await expect(
+      executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps)
+    ).rejects.toThrow('boom');
+    expect(h.state.store.deletionRequest?.state).toBe('executing');
+    const { recoverFailedExecution } = await import('@api/services/store-deletion.service');
+    expect(
+      await recoverFailedExecution(
+        { storeId: 'store-a', requestId: h.r.id, reason: 'boom' },
+        h.deps
+      )
+    ).toBe(true);
+    expect(h.state.store.deletionRequest).toMatchObject({
+      state: 'pending',
+      lastBlock: { code: 'EXECUTION_FAILED', reason: 'boom' },
+    });
+    expect(h.deps.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'STORE_DELETION_EXECUTION_FAILED' })
+    );
+    // pending again: nothing to recover, and the owner can cancel
+    expect(
+      await recoverFailedExecution({ storeId: 'store-a', requestId: h.r.id, reason: 'x' }, h.deps)
+    ).toBe(false);
+    expect((await cancelStoreDeletion({ storeId: 'store-a', userId: OWNER }, h.deps)).state).toBe(
+      'cancelled'
+    );
+  });
+
+  it('M4: the event is sent BEFORE the request is saved, so a failed send leaves nothing pending and the retry is not a 409', async () => {
+    const emit = vi.fn(async () => {
+      throw new Error('inngest down');
+    });
+    const h = makeDeps({ emit });
+    const input = async () => ({
+      storeId: 'store-a',
+      userId: OWNER,
+      confirmToken: await mintToken(h.deps),
+      typedSlug: 'shop-a',
+    });
+    await expect(scheduleStoreDeletion(await input(), h.deps)).rejects.toThrow('inngest down');
+    expect(h.state.store.deletionRequest).toBeNull();
+    expect(h.deps.saveRequest).not.toHaveBeenCalled();
+    emit.mockImplementation(async () => undefined);
+    expect((await scheduleStoreDeletion(await input(), h.deps)).state).toBe('pending');
+  });
+
+  it('M5 (Ruling DEL-FLAG-1): with the erasure flag off a Durable Object store is refused at preview, schedule and execution, never deleted', async () => {
+    const blocked = vi.fn(async () => true);
+    const p = await previewStoreDeletion(
+      { storeId: 'store-a', userId: OWNER },
+      makeDeps({ erasureBlocked: blocked }).deps
+    );
+    expect(p.ok).toBe(false);
+    if (!p.ok) expect(p.reasons[0].code).toBe('ERASURE_NOT_ENABLED');
+    // flag on at schedule time, off again at execution (an operator turned it off): the delete does not run
+    const flag = vi.fn(async () => false);
+    const h = await scheduledStore({ erasureBlocked: flag });
+    flag.mockResolvedValue(true);
+    const o = await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps);
+    expect(o.outcome).toBe('blocked');
+    expect(h.deps.deleteStore).not.toHaveBeenCalled();
+    expect(h.state.store.deletionRequest?.lastBlock?.code).toBe('ERASURE_NOT_ENABLED');
+    flag.mockResolvedValue(false);
+    expect(
+      (await executeStoreDeletion({ storeId: 'store-a', requestId: h.r.id }, h.deps)).outcome
+    ).toBe('executed');
   });
 });

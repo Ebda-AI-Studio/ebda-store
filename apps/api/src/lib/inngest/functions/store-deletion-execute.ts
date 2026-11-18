@@ -2,7 +2,10 @@ import type { JobDef } from '../../jobs/types';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
-import { executeStoreDeletion } from '../../../services/store-deletion.service';
+import {
+  executeStoreDeletion,
+  recoverFailedExecution,
+} from '../../../services/store-deletion.service';
 import { productionDeletionDeps } from '../../../services/store-deletion.wiring';
 
 /**
@@ -16,12 +19,46 @@ import { productionDeletionDeps } from '../../../services/store-deletion.wiring'
  */
 const MAX_BLOCKED_DAYS = 30;
 
+/**
+ * The job died for good (retries spent). The request may be left `executing`, which nothing else reads and a cancel refuses: put it
+ * back to `pending` with the failure on `lastBlock` (compare-and-set, so a request that moved on is untouched) and raise a P1 alert
+ * either way, because an owner-requested deletion is stuck. Exported so a test drives the real recovery.
+ */
+export async function handleStoreDeletionFailure(
+  data: { storeId?: string; requestId?: string },
+  reason: string
+): Promise<{ recovered: boolean }> {
+  const { storeId, requestId } = data;
+  if (!storeId || !requestId) return { recovered: false };
+  let recovered = false;
+  try {
+    recovered = await recoverFailedExecution(
+      { storeId, requestId, reason },
+      productionDeletionDeps()
+    );
+  } catch (e) {
+    reason = `${reason}; recovery failed: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  await sendAlert({
+    level: 'p1',
+    scope: 'store',
+    source: 'job.store-deletion-execute',
+    title: 'Owner store deletion FAILED',
+    body: `Store ${storeId}, request ${requestId}: ${reason}. ${recovered ? 'Request put back to pending (lastBlock EXECUTION_FAILED).' : 'Request NOT recovered: check settings.deletionRequest by hand.'}`,
+  } as Parameters<typeof sendAlert>[0]).catch(() => undefined);
+  return { recovered };
+}
+
 export const storeDeletionExecute: JobDef = inngest.createFunction(
   {
     id: 'store-deletion-execute',
     name: 'Owner store deletion after the cooling-off',
     retries: 3,
     triggers: [{ event: 'store/deletion.scheduled' }],
+    onFailure: async ({ event, error }) => {
+      const data = (event?.data?.event?.data ?? {}) as { storeId?: string; requestId?: string };
+      await handleStoreDeletionFailure(data, error?.message ?? 'job failed');
+    },
   },
   async ({ event, step }) => {
     const { storeId, requestId, executeAfter } = event.data as {

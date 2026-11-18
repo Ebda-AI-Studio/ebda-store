@@ -995,7 +995,16 @@ export class StoreService {
    * Caller is responsible for super_admin authorization (route enforces it)
    * and for writing the STORE_DELETED audit log AFTER this returns successfully.
    */
-  static async delete(storeId: string, actorUserId?: string) {
+  static async delete(
+    storeId: string,
+    actorUserId?: string,
+    /**
+     * Owner self-service deletion (STORE-LIFECYCLE-1): the actor is the store OWNER, not a super_admin. The platform-operator
+     * block below (owner profile cleanup) needs a super_admin and would throw for the owner, so it is skipped: the owner keeps
+     * their account (closing the account is the separate account-closure flow). The request id is audited by the caller.
+     */
+    opts?: { ownerRequest?: { requestId: string } }
+  ) {
     // Decided BEFORE the Postgres delete (Ruling NZ-D14): the post-commit teardown must know whether the store lived on its DO.
     const wasOnDo = await storeWritesToDo(storeId);
     // N-18 (Ruling NZ-D14): a store created on D1 + its DO has NO Postgres row, so the Postgres phase (getById, the raw SQL deletes)
@@ -1183,7 +1192,7 @@ export class StoreService {
               // The owner's row is outside this store's scope (users.store_id NULL): only the
               // platform operator may read and delete it ('platform-operator' hatch, checked by
               // `ebda_is_super_admin()` in this same transaction).
-              if (!actorUserId) return;
+              if (!actorUserId || opts?.ownerRequest) return;
               await asPlatformOperator(actorUserId, async () => {
                 const owner = await tx.user.findUnique({
                   where: { id: store.ownerId },
@@ -1804,8 +1813,7 @@ export class StoreService {
   /**
    * STORE-LIFECYCLE-1: compare-and-set of the deletion request. Writes `to` only while the stored request still has `from.id` and
    * `from.state` (a cancel and the executor's claim cannot both win). Postgres: ONE conditional UPDATE. Durable Object store: the
-   * settings patch has no condition, so it is read, checked, patched and read back (the DO is single threaded per call, the window
-   * is two calls; the executor's claim + the cancel's refusal of `executing` narrow it further, Ruling STORE-LIFECYCLE-1).
+   * precondition (`expect`) is checked inside the StoreDO's own transaction, atomic with the write (Ruling STORE-LIFECYCLE-1).
    */
   static async compareAndSetDeletionRequest(
     storeId: string,
@@ -1814,18 +1822,23 @@ export class StoreService {
   ): Promise<boolean> {
     const store = await this.getById(storeId);
     if (await storeWritesToDo(storeId)) {
-      const live = ((await this.getById(storeId)).settings ?? {}) as {
-        deletionRequest?: { id?: string; state?: string };
-      };
-      const cur = live.deletionRequest;
-      if (!cur || cur.id !== from.id || cur.state !== from.state) return false;
-      await storePatchOnDo(storeId, { json: { settings: { set: { deletionRequest: to } } } });
-      const after = ((await this.getById(storeId)).settings ?? {}) as {
-        deletionRequest?: { id?: string; state?: string };
-      };
-      const ok = after.deletionRequest?.state === (to as { state?: string }).state;
-      if (ok) await this.afterDeletionRequestWrite(store, storeId);
-      return ok;
+      // The precondition runs INSIDE the StoreDO's synchronous transaction (single threaded), so a cancel and the executor's
+      // claim cannot both win: the loser's patch finds the other's state and writes nothing.
+      try {
+        await storePatchOnDo(storeId, {
+          json: {
+            settings: {
+              set: { deletionRequest: to },
+              expect: { deletionRequest: { id: from.id, state: from.state } },
+            },
+          },
+        });
+      } catch (e) {
+        if (e instanceof AppError && e.code === 'PATCH_PRECONDITION_FAILED') return false;
+        throw e;
+      }
+      await this.afterDeletionRequestWrite(store, storeId);
+      return true;
     }
     const rows = await withStore(
       storeId,

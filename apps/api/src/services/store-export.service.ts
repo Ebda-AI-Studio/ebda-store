@@ -7,6 +7,8 @@ import { strToU8, zipSync } from 'fflate';
  * tokens) are in tables that are deliberately not listed here.
  */
 export const EXPORT_ROW_CAP = 20_000;
+/** Order lines per order in the bundle: the row cap counts orders, so the lines are bounded per order to bound Worker memory. */
+export const EXPORT_ITEMS_PER_ORDER = 200;
 export const EXPORT_TABLES = [
   'product',
   'category',

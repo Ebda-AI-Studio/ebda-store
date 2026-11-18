@@ -13,7 +13,7 @@ import {
   readDeletionStatus,
 } from '../services/store-deletion.service';
 import { productionDeletionDeps } from '../services/store-deletion.wiring';
-import { exportStoreBundle } from '../services/store-export.wiring';
+import { exportPreview, exportStoreBundle } from '../services/store-export.wiring';
 
 /**
  * Owner self-service store lifecycle (SELF-SERVICE gap A11, Ruling STORE-LIFECYCLE-1): delete the store behind a confirm token +
@@ -125,13 +125,27 @@ router.delete(
 );
 
 const exportLimiter = createStoreExportLimiter();
-router.get(
+// Step-up (M2): the export carries customer PII, so it needs the same single-use token as the delete. Step 1 issues it (owner only).
+router.post(
+  '/stores/:storeId/export/preview',
+  ...guard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ success: true, data: await exportPreview(actor(req)) });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+const exportBody = z.object({ confirmToken: z.string().min(10).max(2000) });
+router.post(
   '/stores/:storeId/export',
   ...guard,
   exportLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const r = await exportStoreBundle(actor(req));
+      const body = exportBody.parse(req.body ?? {});
+      const r = await exportStoreBundle({ ...actor(req), ...body });
       if (!r.ok) {
         res.status(413).json({
           success: false,
