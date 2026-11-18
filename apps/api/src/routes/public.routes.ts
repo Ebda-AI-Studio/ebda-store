@@ -400,6 +400,8 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       cursor: validCursor,
       ids: idsParam?.sort(),
       optionFilters: hasOptionFilters ? optionFilters : undefined,
+      // Opt-in (Ruling SEARCH-T12-2: the default listing payload is unchanged): the PLP asks for `meta.priceMax`.
+      withPriceMax: req.query.withPriceMax === '1' ? true : undefined,
     };
     // `on_sale` is a short merchandising row: it ignores page and cursor and caps the limit, so
     // none of them is in its key (a crafted ?page=N, or a negative limit, cannot mint a fresh SQL
