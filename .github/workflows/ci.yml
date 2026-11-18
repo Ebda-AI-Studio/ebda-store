@@ -640,6 +640,24 @@ jobs:
           else
             node scripts/ci/worker-startup-budget.mjs --app web --runs 5 --record "$RUNNER_TEMP/worker-startup-budget-web.json"
           fi
+      # Merchant admin Worker (Ruling ADMIN-STARTUP-BUDGET-1): the same gate on the admin OpenNext bundle (health-worker-entry.js); first measured
+      # 2026-11-18: 20.7 ms startup CPU, 19.70 MB raw / 3.55 MB gzip. PRs compare with main built in this same job.
+      - name: Admin Worker startup budget (startup CPU and bundle size)
+        if: matrix.app == 'admin'
+        timeout-minutes: 25
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/ci/worker-startup-budget.mjs --app admin --runs 5 --baseline-ref origin/main --record "$RUNNER_TEMP/worker-startup-budget-admin.json"
+          else
+            node scripts/ci/worker-startup-budget.mjs --app admin --runs 5 --record "$RUNNER_TEMP/worker-startup-budget-admin.json"
+          fi
+      - name: Upload the admin startup measurement
+        if: matrix.app == 'admin' && always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: worker-startup-budget-admin
+          path: ${{ runner.temp }}/worker-startup-budget-admin.json
+          if-no-files-found: ignore
       - name: Upload the web startup measurement
         if: matrix.app == 'web' && always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
