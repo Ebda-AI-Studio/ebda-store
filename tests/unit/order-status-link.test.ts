@@ -4,10 +4,17 @@ import express from 'express';
 import request from 'supertest';
 
 const h = vi.hoisted(() => ({ order: vi.fn(), store: vi.fn(), logs: [] as unknown[][] }));
-vi.mock('@api/middleware/security', () => ({
-  makeRateLimitStore: () => undefined,
-  rateLimitRedisClient: () => null,
-}));
+vi.mock('@api/middleware/security', async () => {
+  const rateLimit = (
+    await vi.importActual<typeof import('express-rate-limit')>('express-rate-limit')
+  ).default;
+  return {
+    makeRateLimitStore: () => undefined,
+    rateLimitRedisClient: () => null,
+    // the order-status limiter is a PLANNED limiter (PERF-BATCH-1): here the real express-rate-limit with its in-memory store and the SAME options
+    plannedRateLimit: (_name: string, opts: Record<string, unknown>) => rateLimit(opts as never),
+  };
+});
 vi.mock('@api/lib/repo-factory', () => ({
   storeRepo: async () => ({ db: { order: { findFirst: h.order } } }),
 }));
