@@ -6,8 +6,8 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, rmSync, writeFileSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
 import { cleanGitEnv, initSandboxRepo, sandboxGit, type SandboxGit } from '../helpers/git-env';
@@ -97,6 +97,47 @@ describe('scan-clone.sh', () => {
     expect(promisorPacks(ws).join(',')).toBe(before); // the workspace was only read
   });
 
+  it('the clone has an INDEX and a worktree: the scanner (trufflehog git source) reads .git/index, a bare fetch + update-ref leaves none', () => {
+    // main run (merge_group of #955): "failed to read index file: open .../scan/.git/index: no such file or directory"
+    const ws = poisonedWorkspace('ws-index');
+    const sha = git('rev-parse', 'HEAD');
+    const dest = join(root, 'scan-index');
+    execFileSync('bash', [SCRIPT, sha, dest, '3'], { cwd: ws, env: ENV, encoding: 'utf8' });
+    expect(existsSync(join(dest, '.git/index'))).toBe(true);
+    expect(sandboxGit(dest)('ls-files').split('\n').sort()).toEqual(['f1.txt', 'f2.txt', 'f3.txt']);
+    expect(sandboxGit(dest)('status', '--porcelain')).toBe('');
+  });
+
+  // The REAL scanner path: the pinned trufflehog release the Mac step downloads (checksum-pinned in ci.yml) reads the result. Runs when the binary is
+  // available (TRUFFLEHOG_BIN, or the runners' tool cache tarball); skipped, never faked, where it is not.
+  const thBin = (() => {
+    if (process.env.TRUFFLEHOG_BIN && existsSync(process.env.TRUFFLEHOG_BIN))
+      return process.env.TRUFFLEHOG_BIN;
+    const tgz = join(homedir(), '.ebda-ci/tools/trufflehog_3.99.8_darwin_arm64.tar.gz');
+    if (!existsSync(tgz) || process.platform !== 'darwin') return undefined;
+    const dir = mkdtempSync(join(tmpdir(), 'th-'));
+    execFileSync('tar', ['-xz', '-C', dir, '-f', tgz, 'trufflehog']);
+    return join(dir, 'trufflehog');
+  })();
+  it.skipIf(!thBin)(
+    'trufflehog git scans the scan-clone result end to end (chunks > 0, no error)',
+    () => {
+      const ws = poisonedWorkspace('ws-th');
+      const sha = git('rev-parse', 'HEAD');
+      const dest = join(root, 'scan-th');
+      execFileSync('bash', [SCRIPT, sha, dest, '3'], { cwd: ws, env: ENV, encoding: 'utf8' });
+      const r = spawnSync(
+        thBin as string,
+        ['git', `file://${dest}`, '--branch', sha, '--fail', '--no-update', '--only-verified'],
+        { env: ENV, encoding: 'utf8' }
+      );
+      const out = `${r.stdout}\n${r.stderr}`;
+      expect(out, out).not.toMatch(/error preparing repo|failed to read index|promisor/);
+      expect(r.status, out).toBe(0);
+      expect(out).toMatch(/"chunks": [1-9]/); // it read content: not a vacuous pass
+    }
+  );
+
   it('replaces a leftover destination and honours the depth', () => {
     const ws = poisonedWorkspace('ws-depth');
     const sha = git('rev-parse', 'HEAD');
@@ -132,7 +173,10 @@ describe('ci.yml wiring', () => {
   const doc = yaml.load(
     readFileSync(join(__dirname, '../../.github/workflows/ci.yml'), 'utf8')
   ) as {
-    jobs: Record<string, { steps?: Array<{ name?: string; run?: string }> }>;
+    jobs: Record<
+      string,
+      { steps?: Array<{ name?: string; run?: string; env?: Record<string, string> }> }
+    >;
   };
   const steps = Object.values(doc.jobs).flatMap(j => j.steps ?? []);
   const mac = steps.find(s => (s.name ?? '').startsWith('Check for secrets (Mac runner'));
@@ -147,7 +191,10 @@ describe('ci.yml wiring', () => {
     expect(run).not.toContain('file://$PWD');
   });
   it('the since-commit range is checked in the private clone, and the old in-workspace deepen is gone', () => {
-    expect(run).toContain('git -C "$SCAN" merge-base --is-ancestor "$BEFORE" "$AFTER"');
+    expect(run).toContain('git -C "$SCAN" merge-base --is-ancestor "$RANGE_BASE" "$AFTER"');
+    // a merge-queue run has no `before`: the range base is merge_group.base_sha (else it scanned every commit the shallow clone carries)
+    expect(mac?.env?.MG_BASE).toBe('${{ github.event.merge_group.base_sha }}');
+    expect(run).toContain('RANGE_BASE="$MG_BASE"');
     expect(run).not.toMatch(/git fetch[^\n]*--deepen/);
   });
 });

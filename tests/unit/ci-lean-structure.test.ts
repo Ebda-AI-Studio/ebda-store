@@ -682,8 +682,9 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     // (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list). tests/unit/ci-scan-clone.test.ts pins the clone itself.
     expect(mac?.run).toMatch(/scripts\/ci\/scan-clone\.sh "\$AFTER" "\$SCAN" \d+/);
     expect(mac?.run).toMatch(
-      /git -C "\$SCAN" merge-base --is-ancestor "\$BEFORE" "\$AFTER" \|\| \{/
+      /git -C "\$SCAN" merge-base --is-ancestor "\$RANGE_BASE" "\$AFTER" \|\| \{/
     );
+    expect(mac?.run).toContain('RANGE_BASE="$MG_BASE"'); // a merge-queue run has no `before`: its base is merge_group.base_sha
     expect(mac?.run).toContain('--exclude-paths .github/trufflehog-mac-exclude-paths.txt');
   });
   it('ai-review links the native claude binary (--ignore-scripts leaves only a stub)', () => {

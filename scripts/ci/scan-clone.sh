@@ -21,4 +21,6 @@ if [ -n "$HDR" ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://g
 git -C "$DEST" fetch -q --no-tags --depth="$DEPTH" origin "$SHA"
 git -C "$DEST" update-ref refs/heads/scan FETCH_HEAD
 git -C "$DEST" symbolic-ref HEAD refs/heads/scan
+# trufflehog's git source reads .git/index: a fetch + update-ref leaves NO index and no worktree (first run on main: "failed to read index file"), so check the commit out.
+git -C "$DEST" checkout -q --force scan
 echo "scan-clone: $(git -C "$DEST" rev-parse --short HEAD) in a fresh clone ($(git -C "$DEST" rev-list --count refs/heads/scan) commits)"
