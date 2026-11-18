@@ -288,6 +288,20 @@ describe('the gate never makes a developer/agent repo shallow (2026-09-30, twice
     expect(fetchArgs({ CI: 'true', GITHUB_ACTIONS: 'true' })).toContain('--depth=1');
   });
 
+  // The ONLY scripts allowed a shallow `git fetch`, each with the reason. Adding one needs a reason a reviewer can check: it must be CI-only by
+  // construction (the script refuses outside GitHub Actions) so it can never make a developer or agent repo shallow.
+  const ALLOWED_SHALLOW_FETCH: Record<string, string> = {
+    'scripts/ci/ensure-full-clone.sh':
+      'CI-only: refuses to run unless GITHUB_ACTIONS=true (tests/unit/ci-ensure-full-clone.test.ts pins the refusal); refetches the depth-1 CI workspace without a leftover partial-clone filter (Ruling CI-TRUFFLE-PARTIAL-1)',
+  };
+
+  it('the shallow-fetch allow-list is exactly the CI-only full-clone script, and that script refuses outside GitHub Actions', () => {
+    expect(Object.keys(ALLOWED_SHALLOW_FETCH)).toEqual(['scripts/ci/ensure-full-clone.sh']);
+    const src = readFileSync(path.join(ROOT, 'scripts/ci/ensure-full-clone.sh'), 'utf8');
+    expect(src).toMatch(/\[ "\$\{GITHUB_ACTIONS:-\}" = true \] \|\| \{[^\n]*exit 2/);
+    expect(src).toContain('git fetch --no-tags --refetch --depth=1 origin');
+  });
+
   it('no workflow run step, script or hook runs a bare shallow `git fetch`', () => {
     const roots = ['.github/workflows', 'scripts', '.husky'];
     const offenders: string[] = [];
@@ -298,6 +312,7 @@ describe('the gate never makes a developer/agent repo shallow (2026-09-30, twice
           if (n.name !== 'node_modules') walk(p);
           continue;
         }
+        if (path.relative(ROOT, p) in ALLOWED_SHALLOW_FETCH) continue;
         readFileSync(p, 'utf8')
           .split('\n')
           .forEach((l, i) => {

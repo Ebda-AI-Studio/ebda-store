@@ -1616,6 +1616,9 @@ jobs:
           # tests/unit/skins-preflight.test.ts (lines 62-63) report as VERIFIED (main run 43112327669; earlier hosted main runs passed the same
           # whole-tree scan), so .github/trufflehog-mac-exclude-paths.txt skips exactly that file here (pinned by a test). Postgres URLs
           # trufflehog cannot verify are caught by gitleaks' ebda-postgres-url-password rule (.gitleaks.toml).
+          # Ruling CI-TRUFFLE-PARTIAL-1: trufflehog clones this workspace locally; a partial clone left by an earlier job on this
+          # persistent runner makes that clone abort ("could not fetch ... from promisor remote", main run 44223670604). Make it full first.
+          bash scripts/ci/ensure-full-clone.sh "$AFTER"
           since=()
           if [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
             git fetch --no-tags --deepen=20 origin "$AFTER" && git merge-base --is-ancestor "$BEFORE" "$AFTER" || { echo "::error::before ($BEFORE) is not an ancestor within 20 commits; refusing a whole-tree scan"; exit 1; }
