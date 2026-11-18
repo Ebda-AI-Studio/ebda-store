@@ -35,6 +35,7 @@
     },
     "./brand": {
       "types": "./src/brand/index.ts",
+      "require": "./dist/brand/index.js",
       "default": "./src/brand/index.ts"
     },
     "./contact-enquiry": {
