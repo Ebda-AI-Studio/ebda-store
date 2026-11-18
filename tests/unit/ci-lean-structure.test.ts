@@ -107,19 +107,15 @@ describe('ci.yml triggers', () => {
     );
   });
 
-  it('uses Node 22 (wrangler >= 4.110) and caches npm (hosted runners only) in every setup-node that installs', () => {
+  it('uses Node 22 (wrangler >= 4.110) and no setup-node has a `cache:` input (the Mac pool keeps ~/.npm locally; the remote Actions cache is never used)', () => {
     expect(ci.env.NODE_VERSION).toBe('22');
     const steps = raw.split('uses: actions/setup-node@').slice(1);
     expect(steps.length).toBeGreaterThan(8);
-    // Exactly one setup-node skips the cache: the `changes` job, which only
-    // runs the dependency-free scripts/ci-affected.mjs and installs nothing.
-    const uncached = steps.filter(
-      b =>
-        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ \(!contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci-umbra'\) && vars\.EBDA_RUNS_ON == ''\) && 'npm' \|\| '' \}\}/.test(
-          b.split('\n\n')[0] + '\n'
-        )
+    // Ahmad 2026-11-16 (no hosted runners): every job runs on a Mac runner, where the remote cache cost 1.5-2.5 min per restore and pulled 14 GB once.
+    const cached = steps.filter(b =>
+      /^[^\n]*\n\s+with:[\s\S]*?\n\s+cache:/.test(b.split('\n\n')[0] + '\n')
     );
-    expect(uncached).toHaveLength(1);
+    expect(cached).toHaveLength(0);
   });
 });
 
@@ -544,10 +540,8 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
 describe('app-build is one-at-a-time and heavy-lane (guest memory)', () => {
   const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   const job = ci.slice(ci.indexOf('\n  app-build:\n'), ci.indexOf('\n  app-builds:\n'));
-  it('runs one production build at a time on a shared Umbra guest, in parallel on hosted runners', () => {
-    expect(job).toMatch(
-      /max-parallel: \$\{\{ \(vars\.EBDA_RUNS_ON == '' && [^}]*\) && 6 \|\| 1 \}\}/
-    );
+  it('runs one production build at a time on the shared Mac pool (no hosted VMs to parallelise onto)', () => {
+    expect(job).toMatch(/max-parallel: 1\n/);
   });
   it('is not a light-lane job id (umbra DefaultLightJobs globs)', () => {
     const light = [
