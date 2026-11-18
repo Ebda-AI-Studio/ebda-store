@@ -14,6 +14,7 @@ import { resolvedStoreId } from '../utils/resolved-store';
 import { publicIpKey, publicTenantKey, skipPublicLimiters } from './public-limiter-keys';
 import { isAnonymousPublicRead } from './public-read-limit';
 import { hasSearchTerm } from './security';
+import { storeResolveIsNative } from './store-resolve-native';
 
 /**
  * PERF-RL-DO: send every public-router rate-limit hit of this request in ONE round trip, before the limiters run.
@@ -41,6 +42,8 @@ export function plannedPublicHits(
   const keys: string[] = [];
   const peeks: string[] = [];
   const b = cfBindings();
+  // Store resolve (Ruling PERF-AUTHSTATE-1): all three of its limiters are native, so there is nothing to send to the Durable Object.
+  if (storeResolveIsNative(req)) return { hits: [], peeks: [] };
   // publicReadLimit's native fast path (anonymous cached catalogue read of a resolved store): no exact DO limiters.
   const native =
     isAnonymousPublicRead(req) &&

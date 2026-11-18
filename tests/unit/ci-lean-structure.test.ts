@@ -96,9 +96,9 @@ describe('ci.yml triggers', () => {
 
   it('cancels superseded PR runs and superseded main pushes, never a cron or manual run', () => {
     expect(ci.concurrency.group).toMatch(/^ci-/);
-    // PR runs group per ref, every main push has a group per merge sha, anything else is alone (run_id)
+    // PR runs group per ref, every main push AND every merge-queue group (MERGE-QUEUE-1) has a group per sha, anything else is alone (run_id)
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
+      "ci-${{ github.event_name == 'merge_group' && format('mq-{0}', github.sha) || github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
     );
     // Ruling CI-MAIN-SHA-1: only PR runs are cancelled; a main push (own group per sha) always completes.
     // CI-SLIM-1: a pre-merge full-tier dispatch on a PR branch (group per branch) is superseded by the next one too.
@@ -125,7 +125,14 @@ describe('ci.yml triggers', () => {
 
 describe('ci.yml lanes', () => {
   it('every job is declared in exactly one lane (a new job must pick one)', () => {
-    const declared = new Set([...PR_LANE, ...MAIN_LANE, 'notify-failure']);
+    // `merge-queue-gate` (MERGE-QUEUE-1) is its own lane: it reports on pull_request and merge_group only; tests/unit/merge-queue-gate.test.ts pins it
+    const declared = new Set([
+      ...PR_LANE,
+      ...MAIN_LANE,
+      'notify-failure',
+      'merge-queue-gate',
+      'tested-tree',
+    ]);
     expect(Object.keys(ci.jobs).sort()).toEqual([...declared].sort());
   });
 
@@ -179,6 +186,8 @@ describe('ci.yml lanes', () => {
         const expr = j.if
           .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
           .replace(/needs\.([\w-]+)\.result == 'success'/g, (_, n) => String(run(n)))
+          // MERGE-QUEUE-1 part B: `tested-tree` answers skip=false unless a merge group proved the tree, so the evaluator's world (no such evidence) is `true`
+          .replace(/needs\.tested-tree\.outputs\.skip != 'true'/g, 'true')
           .replace(/needs\.[\w-]+\.outputs\.\w+ (==|!=) '[^']*'/g, (_, op) =>
             String(op === '!=' ? false : false)
           )
@@ -199,7 +208,8 @@ describe('ci.yml lanes', () => {
   };
   const PR_ONLY = ['changes', 'lint', 'typecheck', 'unit', 'unit-gate', 'app-build', 'app-builds'];
   const FULL_LANE = Object.keys(ci.jobs)
-    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation')
+    // merge-queue-gate (MERGE-QUEUE-1) runs on pull_request and merge_group only, never on push / schedule / dispatch
+    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation' && j !== 'merge-queue-gate')
     .sort();
 
   it('a push to main runs the FULL lane except mutation (build, unit, integration, workerd, e2e, audit)', () => {
@@ -264,7 +274,10 @@ describe('ci.yml lanes', () => {
 
   it('the PR lane runs lint, typecheck and unit tests for changed paths only', () => {
     for (const name of ['lint', 'typecheck', 'unit', 'worker-dry-run']) {
-      expect(ci.jobs[name].needs, name).toEqual(['changes']);
+      // worker-dry-run also waits on `tested-tree` (MERGE-QUEUE-1 part B: skipped on a push whose tree a merge group proved)
+      expect(ci.jobs[name].needs, name).toEqual(
+        name === 'worker-dry-run' ? ['changes', 'tested-tree'] : ['changes']
+      );
       expect(ci.jobs[name].if, name).toMatch(/needs\.changes\.outputs\./);
     }
     expect(ci.jobs.changes.if).toBe("github.event_name == 'pull_request'");
@@ -664,11 +677,14 @@ describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
     expect(mac?.if).toBe("runner.os == 'macOS'");
     expect(mac?.run).toMatch(/shasum -a 256 -c -/);
     expect(mac?.run).toMatch(/--only-verified/);
-    // depth-1 checkout: a push must deepen to `before` and scan only before..after (never a silent whole-tree scan); the
-    // Mac skips exactly the listed fixture files (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list).
+    // a push scans only before..after in a PRIVATE fresh shallow clone (scripts/ci/scan-clone.sh, Ruling CI-TRUFFLE-FRESH-1), and fails
+    // rather than fall back to a silent whole-tree scan; the Mac skips exactly the listed fixture files
+    // (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list). tests/unit/ci-scan-clone.test.ts pins the clone itself.
+    expect(mac?.run).toMatch(/scripts\/ci\/scan-clone\.sh "\$AFTER" "\$SCAN" \d+/);
     expect(mac?.run).toMatch(
-      /git fetch --no-tags --deepen=\d+ origin "\$AFTER" && git merge-base --is-ancestor "\$BEFORE" "\$AFTER"/
+      /git -C "\$SCAN" merge-base --is-ancestor "\$RANGE_BASE" "\$AFTER" \|\| \{/
     );
+    expect(mac?.run).toContain('RANGE_BASE="$MG_BASE"'); // a merge-queue run has no `before`: its base is merge_group.base_sha
     expect(mac?.run).toContain('--exclude-paths .github/trufflehog-mac-exclude-paths.txt');
   });
   it('ai-review links the native claude binary (--ignore-scripts leaves only a stub)', () => {

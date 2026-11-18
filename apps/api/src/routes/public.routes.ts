@@ -114,6 +114,7 @@ import type { PaymentProvider } from '../services/payment-providers/types';
 import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 import { inParallel } from '../lib/run-in-parallel';
 import { publicReadLimit } from '../middleware/public-read-limit';
+import { countStoreMiss, storeResolveLimit } from '../middleware/store-resolve-native';
 import { prefetchPublicLimits } from '../middleware/public-limit-prefetch';
 /**
  * The guest view token for a just-created order, or undefined when it cannot be signed. The order
@@ -399,6 +400,8 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       cursor: validCursor,
       ids: idsParam?.sort(),
       optionFilters: hasOptionFilters ? optionFilters : undefined,
+      // Opt-in (Ruling SEARCH-T12-2: the default listing payload is unchanged): the PLP asks for `meta.priceMax`.
+      withPriceMax: req.query.withPriceMax === '1' ? true : undefined,
     };
     // `on_sale` is a short merchandising row: it ignores page and cursor and caps the limit, so
     // none of them is in its key (a crafted ?page=N, or a negative limit, cannot mint a fresh SQL
@@ -2230,7 +2233,7 @@ async function fetchStoreExtras(storeId: string) {
 }
 
 /**
- * PERF-BATCH-1 (Ruling PERF-BATCH-1): every per-store read a public store payload needs (`/stores/:slugOrId` and
+ * RESOLVE-PARALLEL-1 + PERF-BATCH-1 (Rulings RESOLVE-PARALLEL-1, PERF-BATCH-1): every per-store read a public store payload needs (`/stores/:slugOrId` and
  * `/store/resolve`), started at once. They are independent of each other (each reads its own table or flag), so a cold
  * resolve waits on ONE wave of StoreDO / D1 calls instead of one per read (9 serial StoreDO round trips on a cold
  * `/stores/:slugOrId`, measured 2026-11-11). FAQs, how-tos and the unpublished page slugs come from ONE `fetchStoreExtras`
@@ -2521,7 +2524,7 @@ async function resolveBuilderPreviewStoreId(
 // GET /store/resolve - Resolve store by domain header (for multi-tenant)
 router.get(
   '/store/resolve',
-  storeResolveLimiter,
+  storeResolveLimit(storeResolveLimiter),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rawDomain = req.headers['x-store-domain'] as string;
@@ -2540,6 +2543,7 @@ router.get(
       // database — they are a 404, and there is NO default-store fallback.
       const lookup = storeLookupForHost(rawDomain);
       if (!lookup) {
+        if (await countStoreMiss(req, res)) return;
         res.status(404).json({
           success: false,
           error: { code: 'STORE_NOT_FOUND', message: 'No store found for the specified domain' },
@@ -2712,6 +2716,7 @@ router.get(
       );
 
       if (!result) {
+        if (await countStoreMiss(req, res)) return;
         res.status(404).json({
           success: false,
           error: { code: 'STORE_NOT_FOUND', message: 'No store found for the specified domain' },
@@ -2729,6 +2734,9 @@ router.get(
         data: result,
       });
     } catch (error) {
+      // An unknown store surfaces as an AppError 404 out of the fill: count it (native limiters only) before it is answered.
+      if (error instanceof AppError && error.statusCode === 404 && (await countStoreMiss(req, res)))
+        return;
       next(error);
     }
   }
