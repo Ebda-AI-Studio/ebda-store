@@ -96,9 +96,9 @@ describe('ci.yml triggers', () => {
 
   it('cancels superseded PR runs and superseded main pushes, never a cron or manual run', () => {
     expect(ci.concurrency.group).toMatch(/^ci-/);
-    // PR runs group per ref, every main push has a group per merge sha, anything else is alone (run_id)
+    // PR runs group per ref, every main push AND every merge-queue group (MERGE-QUEUE-1) has a group per sha, anything else is alone (run_id)
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
+      "ci-${{ github.event_name == 'merge_group' && format('mq-{0}', github.sha) || github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
     );
     // Ruling CI-MAIN-SHA-1: only PR runs are cancelled; a main push (own group per sha) always completes.
     // CI-SLIM-1: a pre-merge full-tier dispatch on a PR branch (group per branch) is superseded by the next one too.
@@ -125,7 +125,8 @@ describe('ci.yml triggers', () => {
 
 describe('ci.yml lanes', () => {
   it('every job is declared in exactly one lane (a new job must pick one)', () => {
-    const declared = new Set([...PR_LANE, ...MAIN_LANE, 'notify-failure']);
+    // `merge-queue-gate` (MERGE-QUEUE-1) is its own lane: it reports on pull_request and merge_group only; tests/unit/merge-queue-gate.test.ts pins it
+    const declared = new Set([...PR_LANE, ...MAIN_LANE, 'notify-failure', 'merge-queue-gate']);
     expect(Object.keys(ci.jobs).sort()).toEqual([...declared].sort());
   });
 
@@ -199,7 +200,8 @@ describe('ci.yml lanes', () => {
   };
   const PR_ONLY = ['changes', 'lint', 'typecheck', 'unit', 'unit-gate', 'app-build', 'app-builds'];
   const FULL_LANE = Object.keys(ci.jobs)
-    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation')
+    // merge-queue-gate (MERGE-QUEUE-1) runs on pull_request and merge_group only, never on push / schedule / dispatch
+    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation' && j !== 'merge-queue-gate')
     .sort();
 
   it('a push to main runs the FULL lane except mutation (build, unit, integration, workerd, e2e, audit)', () => {

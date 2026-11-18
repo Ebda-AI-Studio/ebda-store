@@ -2390,6 +2390,36 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
 
         if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
+        // RESOLVE-PARALLEL-1: the reads below depend only on `store`; run together, not eight round trips in a row
+        // (see the same fill in /store/resolve).
+        const [
+          taxRate,
+          faqsAndHowtos,
+          smsMarketingOptIn,
+          cartEmailOptIn,
+          whatsappMarketingOptIn,
+          enabledFeatures,
+          disabledPages,
+          locations,
+        ] = await Promise.all([
+          resolveActiveTaxRate(store.id),
+          fetchStoreFaqsAndHowtos(store.id),
+          notificationDispatcher.isSmsMarketingAvailable(store.id),
+          cartEmailOptInAvailable(store.id),
+          whatsappOptInAvailable(store.id),
+          featureService.getEnabledFeatureKeys(store.id),
+          // Mirror the /store/resolve endpoint: surface explicitly-disabled
+          // CMS pages so the storefront footer can hide their links rather
+          // than rendering a "Page unavailable" landing on click.
+          readInStoreContext(store.id, async () =>
+            (await storeDb(store.id)).storePage.findMany({
+              where: { storeId: store.id, isPublished: false },
+              select: { slug: true },
+            })
+          ),
+          fetchFooterLocations(store),
+        ]);
+
         // Strip server-only marketing-pixel secrets (Meta CAPI / TikTok Events
         // access tokens) before this store object reaches the public storefront
         // (and the edge cache). The browser pixel snippets only use the public
@@ -2401,38 +2431,23 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
           template: normalizeLegacyTemplate(store.template),
           marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
           settings: publicStoreSettings(store.settings),
-          // The checkout/cart tax line needs the rate, not just the
-          // enabled/included booleans already on the Store row. The SAME
-          // resolver order creation charges against (ruling M3-9), so it carries
-          // the VAT gate (ruling TAX-2): an unverified store is never shown a
-          // VAT line NOR charged one, even with `taxEnabled` set and old TaxRate
-          // rows still `isActive: true`. `taxEnabled` is overwritten with the
-          // EFFECTIVE value so no storefront code can key on the merchant's wish.
-          ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
-          ...(await fetchStoreFaqsAndHowtos(store.id)),
-          // Issue 206: the storefront renders the SMS-offers opt-in ONLY when
-          // this is true (sms feature on + provider configured + a promotional
-          // event enabled), so a store without SMS marketing shows no new UI.
-          // BOUNDED-stale: rides this 120s cache + the edge s-maxage 120 /
-          // SWR 600; a provider switched on/off shows up within that window.
-          // It is display-only — the send gate re-checks everything live.
-          smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
-          cartEmailOptIn: await cartEmailOptInAvailable(store.id),
-          whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
+          // The checkout/cart tax line needs the rate, not just the enabled/included booleans already on the Store row.
+          // The SAME resolver order creation charges against (ruling M3-9), so it carries the VAT gate (ruling TAX-2):
+          // an unverified store is never shown a VAT line NOR charged one, even with `taxEnabled` set and old TaxRate
+          // rows still `isActive: true`. `taxEnabled` is overwritten with the EFFECTIVE value so no storefront code can
+          // key on the merchant's wish.
+          ...effectiveTaxFields(taxRate),
+          ...faqsAndHowtos,
+          // Issue 206: the storefront renders the SMS-offers opt-in ONLY when this is true (sms feature on + provider
+          // configured + a promotional event enabled), so a store without SMS marketing shows no new UI.
+          // BOUNDED-stale: rides this 120s cache + the edge s-maxage 120 / SWR 600; a provider switched on/off shows up
+          // within that window. It is display-only: the send gate re-checks everything live.
+          smsMarketingOptIn,
+          cartEmailOptIn,
+          whatsappMarketingOptIn,
         };
 
-        const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
-        // Mirror the /store/resolve endpoint: surface explicitly-disabled
-        // CMS pages so the storefront footer can hide their links rather
-        // than rendering a "Page unavailable" landing on click.
-        const disabledPages = await readInStoreContext(store.id, async () =>
-          (await storeDb(store.id)).storePage.findMany({
-            where: { storeId: store.id, isPublished: false },
-            select: { slug: true },
-          })
-        );
         const disabledCmsSlugs = disabledPages.map(p => p.slug);
-        const locations = await fetchFooterLocations(store);
         return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
       });
     });
@@ -2620,17 +2635,32 @@ router.get(
 
         // Durable Object store: the rest of the fill runs in a bare store scope (no Postgres transaction), see /stores/:slugOrId.
         return inDoStoreScope(store.id, async () => {
-          const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
-
-          // Surface CMS pages that the merchant has explicitly turned off
-          // ("Show on storefront" toggle in /content). The storefront uses
-          // this to hide footer links pointing at those slugs — without it,
-          // a customer would click "Privacy" in the footer and land on a
-          // "Page unavailable" message, which is a worse UX than the link
-          // simply not being there. Only rows that exist AND are unpublished
-          // need to be reported; if the row is missing the storefront falls
-          // back to its built-in copy and the link should still work.
-          const extras = await fetchStoreExtras(store.id);
+          // RESOLVE-PARALLEL-1: every read below depends only on `store`, so they run together. They used to be eight
+          // awaits in a row, each a Durable Object / D1 round trip: on a cache miss (the first visit after the 120 s
+          // entry expired, and every external probe at a 5 min cadence) the fill was the SUM of them, 4-8 s measured on
+          // 2026-11-15 (p90 5.1 s, max 8.2 s for `/store/resolve`), which the storefront page waits on before it can
+          // start its own layout/products calls. Now it is the slowest single read.
+          const [
+            enabledFeatures,
+            extras,
+            taxRate,
+            smsMarketingOptIn,
+            cartEmailOptIn,
+            whatsappMarketingOptIn,
+            locations,
+          ] = await Promise.all([
+            featureService.getEnabledFeatureKeys(store.id),
+            // Surface CMS pages that the merchant has explicitly turned off ("Show on storefront" toggle in /content).
+            // The storefront uses this to hide footer links pointing at those slugs: a customer must not click
+            // "Privacy" and land on "Page unavailable". Only rows that exist AND are unpublished are reported; a
+            // missing row falls back to the built-in copy and the link still works.
+            fetchStoreExtras(store.id),
+            resolveActiveTaxRate(store.id),
+            notificationDispatcher.isSmsMarketingAvailable(store.id),
+            cartEmailOptInAvailable(store.id),
+            whatsappOptInAvailable(store.id),
+            fetchFooterLocations(store),
+          ]);
           const disabledCmsSlugs = extras.disabledCmsSlugs;
 
           // Strip server-only marketing-pixel secrets before the store reaches the
@@ -2641,16 +2671,15 @@ router.get(
             marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
             settings: publicStoreSettings(store.settings),
             // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
-            ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
+            ...effectiveTaxFields(taxRate),
             faqs: extras.faqs,
             howtos: extras.howtos,
             // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
-            smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
-            cartEmailOptIn: await cartEmailOptInAvailable(store.id),
-            whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
+            smsMarketingOptIn,
+            cartEmailOptIn,
+            whatsappMarketingOptIn,
           };
 
-          const locations = await fetchFooterLocations(store);
           return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
         });
       };

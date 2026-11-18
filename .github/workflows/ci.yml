@@ -49,6 +49,11 @@ on:
     # so required checks never reported and branch protection blocked the PR.
     # The `changes` job gates the expensive jobs instead.
     branches: [main]
+  # MERGE-QUEUE-1 (draft, inert until a merge queue ruleset is enabled): GitHub runs the FULL lane once per queued group on a
+  # temp branch gh-readonly-queue/main/... (main + the PRs ahead). Without this trigger a required check never reports and
+  # every queued PR would be removed. The full-lane jobs select on `event_name != 'pull_request'`, so no job needs a rewrite.
+  merge_group:
+    types: [checks_requested]
   schedule:
     # 01:17 UTC, off the :00 mark where scheduled runs queue (Ruling CI-FULL-MAIN-1). Mon-Sat = the nightly full
     # lane; Sunday = the full lane + mutation. Keep the Sunday string in sync with the mutation `if:` below.
@@ -67,7 +72,7 @@ on:
 # main full lane in turn (measured 2026-11-11: 4 consecutive main runs `cancelled`, none completed), so main was never
 # proven green. A nightly or manual run gets a group of its own. Deploys live in other workflows (cf-*-deploy.yml).
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}
+  group: ci-${{ github.event_name == 'merge_group' && format('mq-{0}', github.sha) || github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}
 
 env:
@@ -1530,10 +1535,11 @@ jobs:
     # scheduled no-op: schedules run on hosted runners when EBDA_RUNS_ON is unset).
     if: github.event_name != 'pull_request'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    # 18: the budget is the SUM of the worst cases, not the audit alone — 3
-    # bounded audit attempts (~5.8 min, #1520) + a COLD `npm ci` + checkout and
+    # 20: the budget is the SUM of the worst cases, not the audit alone — TWO
+    # audit runs of 3 bounded attempts (~5.8 min each, #1520; the blocking production gate and the
+    # non-blocking all-dependencies report, Ruling AUDIT-SPLIT-1) + a COLD `npm ci` + checkout and
     # trufflehog. tests/unit/audit-report-verdict.test.ts asserts this sum.
-    timeout-minutes: 18
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -1569,6 +1575,13 @@ jobs:
           # its justification live in .github/scripts/audit-gate.mjs — it fails
           # on anything not explicitly waived, and the list must only shrink.
           node .github/scripts/audit-gate.mjs
+
+      - name: Report development advisories (non-blocking)
+        # Ruling AUDIT-SPLIT-1: the step above is the BLOCKING gate on production dependencies. This one audits EVERY dependency, development
+        # tooling included, with the same allow-list (.github/audit-allow.json, expiry per entry). It shows red for an advisory that is not
+        # allow-listed but never stops a merge (continue-on-error). It is a second bounded audit run: the job budget above counts both.
+        continue-on-error: true
+        run: node .github/scripts/audit-gate.mjs --all
 
       - name: Check for secrets
         # The action runs trufflehog in a docker container; the Mac runner has no docker, so it runs on Linux only.
@@ -1670,6 +1683,52 @@ jobs:
         if: always()
         run: bash scripts/ci/heavy-lock.sh release
 
+  # MERGE-QUEUE-1: the ONE check a queue ruleset requires besides `Repo guards` and `API Worker boots on workerd` (the other full-lane and
+  # pull-request-lane jobs cannot be required: GitHub matches required checks by name on the pull request AND the merge group, and
+  # each lane only reports on its own event). On a pull request it is an instant success; on a merge group it is green only when every
+  # full-lane job it needs succeeded (scripts/ci/merge-queue-gate.mjs; a skipped or cancelled job fails it). Every full-lane job
+  # (one that runs on a merge group) must be listed in `needs`: tests/unit/merge-queue-gate.test.ts fails when one is missing.
+  merge-queue-gate:
+    name: Merge queue gate
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    needs:
+      [
+        guards,
+        api-workerd-smoke,
+        worker-dry-run,
+        workerd-integration,
+        build,
+        test-unit,
+        orphan-tests,
+        test-integration,
+        test-e2e,
+        builder-e2e,
+        security,
+      ]
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'merge_group'
+      - name: Private TMPDIR per runner
+        # same rule as every Node job here (tests/unit/ci-private-tmpdir.test.ts): two runners on one VM share /tmp
+        if: github.event_name == 'merge_group'
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmp"
+          echo "TMPDIR=$RUNNER_TEMP/tmp" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: ${{ (!contains(github.event.pull_request.labels.*.name, 'ci-umbra') && vars.EBDA_RUNS_ON == '') && 'npm' || '' }}
+        if: github.event_name == 'merge_group'
+      - name: Verdict
+        env:
+          EVENT: ${{ github.event_name }}
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then echo "merge-queue-gate: pull request: the full lane runs on the merge group"; exit 0; fi
+          node scripts/ci/merge-queue-gate.mjs
+
   notify-failure:
     name: Notify on failure (main and nightly)
     # Seconds-long reporting job: runs on the light runner so it never queues behind heavy PR jobs and holds main (2026-11-15).
@@ -1696,7 +1755,7 @@ jobs:
     # labelled `ci-main-red`; a green full run on main closes that issue.
     # A pre-merge full-tier run on a PR branch (workflow_dispatch from ci-full-pr.yml, CI-SLIM-1) reports on the PR; it must
     # not page Telegram or open ci-main-red (that is for main and the nightly): the Telegram step below is guarded.
-    if: always() && !cancelled() && github.event_name != 'pull_request'
+    if: always() && !cancelled() && github.event_name != 'pull_request' && github.event_name != 'merge_group'
     permissions:
       contents: read
       issues: write

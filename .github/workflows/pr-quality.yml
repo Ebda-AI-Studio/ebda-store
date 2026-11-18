@@ -81,7 +81,7 @@ jobs:
 
   capability-ratchet:
     name: Capability baselines
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 10
     # fork-guard-exempt: forks must be checked too (a skipped check is a pass); the PR is only read as data, symlinks are refused
     steps:
