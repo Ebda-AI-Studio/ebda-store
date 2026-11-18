@@ -1577,10 +1577,11 @@ jobs:
     needs: [tested-tree]
     if: github.event_name != 'pull_request' && needs.tested-tree.outputs.skip != 'true'
     runs-on: ${{ fromJSON(contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]' || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
-    # 18: the budget is the SUM of the worst cases, not the audit alone — 3
-    # bounded audit attempts (~5.8 min, #1520) + a COLD `npm ci` + checkout and
+    # 20: the budget is the SUM of the worst cases, not the audit alone — TWO
+    # audit runs of 3 bounded attempts (~5.8 min each, #1520; the blocking production gate and the
+    # non-blocking all-dependencies report, Ruling AUDIT-SPLIT-1) + a COLD `npm ci` + checkout and
     # trufflehog. tests/unit/audit-report-verdict.test.ts asserts this sum.
-    timeout-minutes: 18
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Private TMPDIR per runner
@@ -1616,6 +1617,13 @@ jobs:
           # its justification live in .github/scripts/audit-gate.mjs — it fails
           # on anything not explicitly waived, and the list must only shrink.
           node .github/scripts/audit-gate.mjs
+
+      - name: Report development advisories (non-blocking)
+        # Ruling AUDIT-SPLIT-1: the step above is the BLOCKING gate on production dependencies. This one audits EVERY dependency, development
+        # tooling included, with the same allow-list (.github/audit-allow.json, expiry per entry). It shows red for an advisory that is not
+        # allow-listed but never stops a merge (continue-on-error). It is a second bounded audit run: the job budget above counts both.
+        continue-on-error: true
+        run: node .github/scripts/audit-gate.mjs --all
 
       - name: Check for secrets
         # The action runs trufflehog in a docker container; the Mac runner has no docker, so it runs on Linux only.
