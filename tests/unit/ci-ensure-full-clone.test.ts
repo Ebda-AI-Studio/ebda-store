@@ -14,6 +14,7 @@ import { cleanGitEnv, initSandboxRepo, sandboxGit, type SandboxGit } from '../he
 const SCRIPT = join(__dirname, '../../scripts/ci/ensure-full-clone.sh');
 // the hook-exported GIT_* variables are stripped (tests/helpers/git-env.ts)
 const ENV = cleanGitEnv({
+  GITHUB_ACTIONS: 'true',
   GIT_AUTHOR_NAME: 't',
   GIT_AUTHOR_EMAIL: 't@t',
   GIT_COMMITTER_NAME: 't',
@@ -86,6 +87,15 @@ describe('ensure-full-clone.sh', () => {
     expect(execFileSync('bash', [SCRIPT, sha], { cwd: ws, env: ENV, encoding: 'utf8' })).toContain(
       'full clone'
     );
+  });
+
+  it('refuses to run outside GitHub Actions (it would make a developer repo shallow)', () => {
+    const ws = brokenWorkspace('ws-dev');
+    const env = { ...ENV };
+    delete env.GITHUB_ACTIONS;
+    const r = spawnSync('bash', [SCRIPT, 'HEAD'], { cwd: ws, env, encoding: 'utf8' });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('refusing');
   });
 
   it('refuses to run without a sha', () => {
