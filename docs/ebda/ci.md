@@ -132,12 +132,12 @@ Delete the variable to go back to hosted `ubuntu-24.04`. Never the Umbra VM.
   review's `CLAUDE_OUTPUT` and its CLI install live there, never `npm install --global`); gitleaks installs the darwin binary into
   `$RUNNER_TEMP/bin` without sudo. Pinned by `tests/unit/ci-lean-structure.test.ts` ("the Mac runner shape").
 
-## Per-PR runner routing (Ruling CI-ROUTE-1)
+## Runner routing (Rulings NO-HOSTED-RUNNERS-1, HOST-RUNNERS-2)
 
-A pull request labelled `ci-umbra` runs every job of every PR workflow on the Umbra runners; unlabelled PRs and all
-push/schedule events use `vars.EBDA_RUNS_ON` (unset = GitHub-hosted `ubuntu-24.04`). One PR never splits across runners, and
-the setup-node remote cache is used only when the job really runs hosted. Add the label before the push, or re-run the
-workflow after labelling (`labeled` is not a trigger, so label changes cost no minutes). If Umbra is down, remove the label.
+Every job runs on the Mac pool: light jobs on `vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]'`, heavy and deploy jobs on
+`vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]'`. There is no GitHub-hosted fallback (Ahmad 2026-11-16) and no per-PR label route: the old
+`ci-umbra` label (Ruling CI-ROUTE-1) went with Umbra on 2026-11-14. No setup-node step uses the remote Actions cache; `~/.npm` is local on the runners.
+`tests/unit/workflow-hosted-runners-only.test.ts` pins all of this.
 
 ## Lanes
 

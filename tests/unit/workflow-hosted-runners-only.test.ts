@@ -48,12 +48,9 @@ describe('no workflow job can run on a GitHub-hosted runner', () => {
     expect(runsOnValues().length).toBeGreaterThan(10);
   });
 
-  // The three allowed forms. Each falls back to a Mac label, never a hosted image.
-  // Ruling CI-ROUTE-1: a pull_request labelled `ci-umbra` routes its WHOLE run to Umbra (retired 2026-11-14; removed in the follow-up PR).
-  const ROUTE = `contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]'`;
+  // The two allowed forms. Each falls back to a Mac label, never a hosted image.
   const HEAVY_FALLBACK = `'["self-hosted","ebda-mac"]'`;
   const LIGHT_FALLBACK = `'["ebda-mac-light"]'`;
-  const ROUTED = `\${{ fromJSON(${ROUTE} || vars.EBDA_RUNS_ON || ${HEAVY_FALLBACK}) }}`;
   // Push-to-main deploy workflows (cf-*-deploy.yml) keep the plain selector: no PR label can reach them.
   const PLAIN = `\${{ fromJSON(vars.EBDA_RUNS_ON || ${HEAVY_FALLBACK}) }}`;
   // Ruling HOST-RUNNERS-2: light jobs prefer EBDA_LIGHT_RUNS_ON, then EBDA_RUNS_ON, then the light Mac label.
@@ -67,13 +64,13 @@ describe('no workflow job can run on a GitHub-hosted runner', () => {
     expect(HOSTED.test(PLAIN)).toBe(false);
     expect(HOSTED.test(LIGHT)).toBe(false);
   });
-  it('every runs-on is one of the three Mac-fallback forms, and none names a hosted image', () => {
+  it('every runs-on is one of the two Mac-fallback forms, and none names a hosted image', () => {
     const values = runsOnValues();
     expect(
       values.filter(r => HOSTED.test(r.value)).map(r => `${r.file}:${r.line} -> ${r.value}`),
       'a hosted runner name in runs-on'
     ).toEqual([]);
-    const bad = values.filter(r => r.value !== ROUTED && r.value !== PLAIN && r.value !== LIGHT);
+    const bad = values.filter(r => r.value !== PLAIN && r.value !== LIGHT);
     expect(
       bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
       'runs-on must be exactly a repo-variable switch with a Mac-label fallback'
@@ -81,7 +78,14 @@ describe('no workflow job can run on a GitHub-hosted runner', () => {
   });
 });
 
-const CI_ROUTE = `contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]'`;
+describe('the retired Umbra route is gone (Umbra retired by Ahmad 2026-11-14)', () => {
+  it('no workflow mentions the ci-umbra label or the umbra-ebda runner label', () => {
+    for (const f of workflowFiles) {
+      const raw = fs.readFileSync(path.join(WORKFLOWS, f), 'utf8');
+      expect(raw, f).not.toMatch(/ci-umbra|umbra-ebda/);
+    }
+  });
+});
 
 describe('nothing under .github mentions a self-hosted runner or its switches', () => {
   // Comments are prose and may explain WHY a switch is gone; only code counts.
@@ -116,8 +120,6 @@ describe('nothing under .github mentions a self-hosted runner or its switches', 
       .join('\n');
     const exempt = EXEMPT[_rel.split(path.sep).join('/')];
     if (exempt) code = code.replace(exempt, '');
-    // Ruling CI-ROUTE-1: the one whole-PR label route (exact string) is the only allowed self-hosted/umbra mention in code.
-    code = code.split(CI_ROUTE).join('').split("'ci-umbra'").join('');
     // Ruling NO-HOSTED-RUNNERS-1: the heavy Mac fallback label set is the other allowed self-hosted mention in code (exact string).
     code = code.split(`'["self-hosted","ebda-mac"]'`).join('');
     for (const re of FORBIDDEN) {
