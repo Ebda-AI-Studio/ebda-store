@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   backup:
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 45
     environment: production
     env:
@@ -36,7 +36,6 @@ jobs:
         with:
           node-version: '24'
           # remote Actions cache on hosted runners only (a self-hosted runner already has ~/.npm; the remote cache pulled GBs there)
-          cache: ${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}
       - uses: ./.github/actions/npm-ci
       - name: Require the inputs
         run: |
@@ -60,7 +59,7 @@ jobs:
     name: Notify on backup failure
     needs: [backup]
     if: always() && needs.backup.result == 'failure'
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 2
     # Environment secrets are only visible to a job that names the environment: without this line the alert saw no
     # TELEGRAM_* values even when they were set in `production` (first real run: "no telegram secrets - skip").

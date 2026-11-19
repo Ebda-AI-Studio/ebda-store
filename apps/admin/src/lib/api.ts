@@ -841,7 +841,19 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
       if (accessToken) authHeaders.Authorization = `Bearer ${accessToken}`;
     }
 
+    // STORE-QA-56: a multipart body is not `application/json`, so the API's
+    // CSRF gate (apps/api/src/middleware/security.ts, "custom request header"
+    // branch) only lets a cookie-only session through when this header is set.
+    // The admin never sends X-Session-ID, so without it every FormData write
+    // (InstaPay receipt, imports, uploads) 403s CSRF_MISSING_SESSION whenever
+    // there is no Bearer token in localStorage.
+    const writeHeaders: Record<string, string> = {};
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      writeHeaders['X-Requested-With'] = 'XMLHttpRequest';
+    }
+
     return {
+      ...writeHeaders,
       ...authHeaders,
       ...csrfHeaders,
       ...(options.headers as Record<string, string>),
