@@ -4,6 +4,7 @@ import { authStateAvailable } from '../cf/auth-state-client';
 import { prefetchHits, releaseUnconsumed, runWithPrefetchedHits } from '../cf/rate-limit-store';
 import { isWorkers } from '../lib/runtime';
 import { limitPlanOf, plannedSteps, type PlannedStep } from './limit-plan';
+import { REAL_REQUEST } from './public-limiter-keys';
 
 /**
  * PERF-BATCH-1 (Ruling PERF-BATCH-1): every rate-limit hit of a request in ONE AuthState round trip per shard.
@@ -50,6 +51,8 @@ interface RequestLimitPrefetchOptions {
 function predictionCopy(req: Request, own: Record<PropertyKey, unknown>): Request {
   return new Proxy(req, {
     get(target, prop) {
+      if (prop === REAL_REQUEST)
+        return (target as unknown as Record<symbol, unknown>)[REAL_REQUEST] ?? target; // copies nest
       if (Object.prototype.hasOwnProperty.call(own, prop)) return own[prop];
       const v: unknown = Reflect.get(target, prop, target);
       return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;

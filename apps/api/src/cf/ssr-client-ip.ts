@@ -22,7 +22,7 @@ export const SSR_AUTH_HEADER = 'x-ebda-ssr-auth';
 export const NO_SHOPPER_ADDRESS = 'none';
 /** v2: ts.hex(HMAC(HKDF(REVALIDATE_SECRET, info), method|path+query|store host|address|ts)); the only thing that grants {@link TRUSTED_SSR_HEADER}. */
 export const SSR_V2_HEADER = 'x-ebda-ssr-v2';
-export const SSR_V2_MAX_SKEW_MS = 60_000;
+const SSR_V2_MAX_SKEW_MS = 60_000;
 const SSR_V2_INFO = 'ebda-ssr-forward.v2';
 /**
  * Set by this module (never by a caller: an inbound copy is always removed) when a request has NO client address.
@@ -127,7 +127,7 @@ export async function verifyClientIpSignature(
  * the client address and a timestamp inside +-60 s, under a key derived from the secret (HKDF-SHA256), so it cannot be moved to
  * another request, replayed later, or produced from a leaked revalidate token alone.
  */
-export async function verifySsrV2(
+async function verifySsrV2(
   secret: string,
   header: string,
   parts: { method: string; pathAndQuery: string; host: string; ip: string },

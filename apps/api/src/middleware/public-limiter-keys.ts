@@ -49,8 +49,17 @@ export function skipPublicLimiters(req: Request): boolean {
  * Residual: the signing key is derived from the revalidate secret (one root secret).
  */
 export function isTrustedSsr(req: Request): boolean {
-  return trustedSsrRequests.has(req);
+  return trustedSsrRequests.has(realRequest(req));
 }
+
+/**
+ * The limiter prefetch (request-limit-prefetch.ts) predicts keys on a Proxy copy of the request. A Proxy is not the WeakSet member,
+ * so the copy answers `REAL_REQUEST` with the request it wraps: trust and the once-per-request budget decision are then read
+ * from the real request, and the plan agrees with what the limiters later decide.
+ */
+export const REAL_REQUEST = Symbol('ebda.realRequest');
+const realRequest = (req: Request): Request =>
+  ((req as unknown as Record<symbol, Request | undefined>)[REAL_REQUEST] ?? req) as Request;
 
 /**
  * A trusted render is still limited per VERIFIED shopper address and per store, but isolate-first: an in-memory fixed-window
@@ -59,12 +68,11 @@ export function isTrustedSsr(req: Request): boolean {
  * protection under abuse, no DO call in the normal case. Per-isolate counts are the residual: N isolates can each pass
  * LOCAL_HOT free hits.
  */
-export const LOCAL_WINDOW_MS = 60_000;
-export const LOCAL_HOT = { ip: 60, tenant: 1200 } as const;
-export const LOCAL_MAX_KEYS = 20_000;
+const LOCAL_WINDOW_MS = 60_000;
+const LOCAL_HOT = { ip: 60, tenant: 1200 } as const;
+const LOCAL_MAX_KEYS = 20_000;
 const local = new Map<string, { n: number; resetAt: number }>();
 const decided = new WeakMap<object, boolean>();
-let clock = (): number => Date.now();
 
 /**
  * Fixed window per key. At the cap, make room WITHOUT forgetting live counters (a full clear would hand a large botnet fresh
@@ -72,7 +80,7 @@ let clock = (): number => Date.now();
  * to the end of the Map's insertion order), one at a time, until there is room.
  */
 function bump(key: string, hot: number): boolean {
-  const now = clock();
+  const now = Date.now();
   let e = local.get(key);
   if (e)
     local.delete(key); // re-inserted below: most recently used goes last
@@ -95,17 +103,12 @@ function bump(key: string, hot: number): boolean {
  */
 export function ssrWithinLocalBudget(req: Request): boolean {
   if (!isTrustedSsr(req)) return false;
-  const known = decided.get(req);
+  const real = realRequest(req);
+  const known = decided.get(real);
   if (known !== undefined) return known;
   const ipHot = req.ip ? bump(`ip:${publicIpKey(req)}`, LOCAL_HOT.ip) : false;
   const tenantHot = bump(`t:${publicTenantKey(req)}`, LOCAL_HOT.tenant);
   const cold = !ipHot && !tenantHot;
-  decided.set(req, cold);
+  decided.set(real, cold);
   return cold;
-}
-
-/** Tests only. */
-export function __resetSsrLocalLimitForTests(now?: () => number): void {
-  local.clear();
-  clock = now ?? (() => Date.now());
 }

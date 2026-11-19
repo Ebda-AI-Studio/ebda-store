@@ -230,7 +230,7 @@ describe.skipIf(e.E2E_DB === '1')('public request Durable Object round trips (PE
    * `toBeLessThanOrEqual` lines fail.
    *   resolve, storefront render (verified HMAC): <= 1 AuthState call (the store-miss peek), 0 rate-limit HITS
    *   products,  storefront render (verified HMAC): <= 1 AuthState call (the store-miss peek), 0 rate-limit HITS
-   *   resolve from the internet: still 3 limiter calls (per-IP+miss batch, tenant, store-resolve); the trusted render 1
+   *   resolve from the internet: 4 limiter calls (per-IP+miss batch, tenant by host, tenant by store id, store-resolve); the trusted render 1
    */
   it('a storefront render (verified HMAC) spends no rate-limit hit: resolve and products make at most ONE rate-limit call (the store-miss peek)', async () => {
     for (const path of ['/public/store/resolve', '/public/products?limit=24']) {
@@ -267,7 +267,8 @@ describe.skipIf(e.E2E_DB === '1')('public request Durable Object round trips (PE
       const s = await observe(await call('/public/store/resolve', headers, ip));
       expect(s.status).toBe(200);
       expect(rlCalls(s).length, JSON.stringify(s.calls)).toBeGreaterThanOrEqual(1);
-      expect(rlCalls(s).length, JSON.stringify(s.calls)).toBeLessThanOrEqual(3);
+      // 4 since #868: the tenant bucket is predicted by host before the store resolves, then taken by store id after it
+      expect(rlCalls(s).length, JSON.stringify(s.calls)).toBeLessThanOrEqual(4);
     }
   });
 

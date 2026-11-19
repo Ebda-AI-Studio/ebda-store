@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import express, { type RequestHandler } from 'express';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   CLIENT_IP_HEADER,
   NO_CLIENT_ADDRESS_HEADER,
@@ -19,29 +19,23 @@ import {
   SSR_V2_HEADER,
   TRUSTED_SSR_HEADER,
   trustedSsrRequests,
-  verifySsrV2,
   __resetSsrClientIpForTests,
   isForwardableRead,
   resolveClientAddress,
   shouldWarnNoSecret,
 } from '@api/cf/ssr-client-ip';
 import { publicLimiter, storeResolveLimiter } from '@api/middleware/security';
-import {
-  LOCAL_MAX_KEYS,
-  __resetSsrLocalLimitForTests,
-  isTrustedSsr,
-  ssrWithinLocalBudget,
-} from '@api/middleware/public-limiter-keys';
+import { isTrustedSsr, ssrWithinLocalBudget } from '@api/middleware/public-limiter-keys';
 import {
   __resetForTests as resetStorefront,
   installApiFetchForwarding,
   signClientIp,
-  signSsrV2,
-  ssrV2Message,
   withClientAddress,
 } from '../../apps/web/ssr-client-address';
 
 const SECRET = 'test-revalidate-secret';
+// public-limiter-keys.ts LOCAL_MAX_KEYS, restated: the test must fill the map past it
+const LOCAL_KEY_CAP = 20_000;
 const realFetchForTest = globalThis.fetch;
 const API = 'https://api.ebda.app';
 const WORKER_EGRESS = '2a06:98c0:3600::103';
@@ -245,6 +239,28 @@ describe('storefront: API-origin fetches carry the signed shopper address (apps/
     expect(cdn.headers.has(CLIENT_IP_HEADER)).toBe(false);
     expect(cdn.headers.has(SSR_AUTH_HEADER)).toBe(false);
     expect(outside.headers.has(CLIENT_IP_HEADER)).toBe(false);
+  });
+
+  it('the signature the real web fetch wrapper sends is trusted by the API, and only under that secret and request', async () => {
+    const shopper = new Request('https://storedemo.ebda.app/', {
+      headers: { 'cf-connecting-ip': '203.0.113.7' },
+    });
+    await withClientAddress(shopper, SECRET, () =>
+      fetch(`${API}/api/v1/public/products?page=2`, {
+        headers: { 'x-store-domain': 'shop.ebda.app' },
+      })
+    );
+    const sent = Object.fromEntries(seen[0].headers);
+    const arrive = async (path: string, secret: string) =>
+      (
+        await resolveClientAddress(
+          apiRequest(path, { ...sent, 'cf-connecting-ip': WORKER_EGRESS }),
+          secret
+        )
+      ).request.headers.get(TRUSTED_SSR_HEADER) === '1';
+    expect(await arrive('/api/v1/public/products?page=2', SECRET)).toBe(true);
+    expect(await arrive('/api/v1/public/products?page=2', 'other')).toBe(false);
+    expect(await arrive('/api/v1/public/products?page=3', SECRET)).toBe(false);
   });
 
   it('adds neither header with no secret; with no shopper address it forwards nothing', async () => {
@@ -470,10 +486,49 @@ describe('Ruling DO-BUDGET-2 (v2): only a fresh, request-bound, derived-key sign
     [CLIENT_IP_HEADER]: addr,
     [SSR_AUTH_HEADER]: await signClientIp(SECRET, addr),
   });
-  const v2 = (
+  // An independent oracle for the v2 wire format (HKDF-SHA256 key, MAC over the bound request), so a bug in the web signer cannot hide.
+  const hex = (b: ArrayBuffer) =>
+    Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
+  const v2Message = (p: {
+    method: string;
+    pathAndQuery: string;
+    host: string;
+    ip: string;
+    ts: number;
+  }) => `ebda-ssr-forward.v2\n${p.method}\n${p.pathAndQuery}\n${p.host}\n${p.ip}\n${p.ts}`;
+  const v2 = async (
     over: Partial<{ method: string; pathAndQuery: string; host: string; ip: string }> = {},
     now = Date.now()
-  ) => signSsrV2(SECRET, { method: 'GET', pathAndQuery: path, host: HOST, ip: addr, ...over }, now);
+  ) => {
+    const base = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(SECRET),
+      'HKDF',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'HKDF',
+        hash: 'SHA-256',
+        salt: new Uint8Array(0),
+        info: new TextEncoder().encode('ebda-ssr-forward.v2'),
+      },
+      base,
+      { name: 'HMAC', hash: 'SHA-256', length: 256 },
+      false,
+      ['sign']
+    );
+    const msg = v2Message({
+      method: 'GET',
+      pathAndQuery: path,
+      host: HOST,
+      ip: addr,
+      ...over,
+      ts: now,
+    });
+    return `${now}.${hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)))}`;
+  };
   const resolve = async (
     sig: string | null,
     o: { path?: string; method?: string; v1?: boolean; host?: string } = {}
@@ -525,7 +580,7 @@ describe('Ruling DO-BUDGET-2 (v2): only a fresh, request-bound, derived-key sign
       false,
       ['sign']
     );
-    const msg = ssrV2Message({ method: 'GET', pathAndQuery: path, host: HOST, ip: addr, ts });
+    const msg = v2Message({ method: 'GET', pathAndQuery: path, host: HOST, ip: addr, ts });
     const mac = Array.from(
       new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg))),
       b => b.toString(16).padStart(2, '0')
@@ -553,23 +608,18 @@ describe('Ruling DO-BUDGET-2 (v2): only a fresh, request-bound, derived-key sign
     expect(trusted(noSecret)).toBe(false);
   });
 
-  it('the web signer and the API verifier agree (same bytes, same derived key)', async () => {
-    expect(
-      await verifySsrV2(SECRET, await v2(), {
-        method: 'GET',
-        pathAndQuery: path,
-        host: HOST,
-        ip: addr,
-      })
-    ).toBe(true);
-    expect(
-      await verifySsrV2('other', await v2(), {
-        method: 'GET',
-        pathAndQuery: path,
-        host: HOST,
-        ip: addr,
-      })
-    ).toBe(false);
+  it('a v2 signature made under another secret is not trusted', async () => {
+    const sig = await v2();
+    const r = await resolveClientAddress(
+      apiRequest(path, {
+        'cf-connecting-ip': WORKER_EGRESS,
+        'x-store-domain': HOST,
+        ...(await v1()),
+        [SSR_V2_HEADER]: sig,
+      }),
+      'other-secret'
+    );
+    expect(trusted(r)).toBe(false);
   });
 
   it('isTrustedSsr is WeakSet membership: a header on the Express request means nothing', () => {
@@ -580,7 +630,6 @@ describe('Ruling DO-BUDGET-2 (v2): only a fresh, request-bound, derived-key sign
   });
 
   it('isolate-first: a verified shopper is limited like any client. 400/min through SSR hits the cap; the first 60 cost no exact-limiter hit', async () => {
-    __resetSsrLocalLimitForTests();
     const app = express();
     app.set('trust proxy', 1);
     app.use((req, _res, next) => {
@@ -619,8 +668,10 @@ describe('Ruling DO-BUDGET-2 (v2): only a fresh, request-bound, derived-key sign
   });
 
   it('at the key cap an existing hot key keeps its count (no full clear); expired windows are swept first', () => {
-    let now = 1_000_000;
-    __resetSsrLocalLimitForTests(() => now);
+    // a base far past every window the earlier tests opened, so those entries are expired and the clock is ours
+    vi.useFakeTimers({ toFake: ['Date'] });
+    let now = Date.now() + 3_600_000;
+    vi.setSystemTime(now);
     const fake = (ip: string) => {
       const r = { ip, headers: { 'x-store-id': 'cap-store' }, params: {} } as never;
       trustedSsrRequests.add(r);
@@ -630,13 +681,15 @@ describe('Ruling DO-BUDGET-2 (v2): only a fresh, request-bound, derived-key sign
     for (let i = 0; i < 61; i++) ssrWithinLocalBudget(fake('198.51.100.1'));
     expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(false);
     // a botnet fills the map well past the cap (one new key per request, plus the shared store key)
-    for (let i = 0; i < LOCAL_MAX_KEYS + 500; i++) {
+    for (let i = 0; i < LOCAL_KEY_CAP + 500; i++) {
       ssrWithinLocalBudget(fake(`10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}`));
       if (i % 1000 === 0) ssrWithinLocalBudget(fake('198.51.100.1')); // the scraper keeps going
     }
     expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(false); // still hot, count intact
     // once the window ends everything is cold again (swept, not leaked)
     now += 61_000;
+    vi.setSystemTime(now);
     expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(true);
+    vi.useRealTimers();
   });
 });

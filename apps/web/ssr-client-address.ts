@@ -35,10 +35,10 @@ interface Forward {
  */
 export const SSR_V2_HEADER = 'x-ebda-ssr-v2';
 export const SSR_V2_INFO = 'ebda-ssr-forward.v2';
-export const SSR_V2_PREFIX = 'ebda-ssr-forward.v2\n';
+const SSR_V2_PREFIX = 'ebda-ssr-forward.v2\n';
 
 const derived = new Map<string, Promise<CryptoKey>>();
-export function deriveSsrKey(secret: string, usage: 'sign' | 'verify'): Promise<CryptoKey> {
+function deriveSsrKey(secret: string, usage: 'sign' | 'verify'): Promise<CryptoKey> {
   const k = `${usage}:${secret}`;
   let p = derived.get(k);
   if (!p) {
@@ -64,7 +64,7 @@ export function deriveSsrKey(secret: string, usage: 'sign' | 'verify'): Promise<
 }
 
 /** The exact bytes signed: the API rebuilds them from the request it received. */
-export function ssrV2Message(parts: {
+function ssrV2Message(parts: {
   method: string;
   pathAndQuery: string;
   host: string;
@@ -74,7 +74,7 @@ export function ssrV2Message(parts: {
   return `${SSR_V2_PREFIX}${parts.method.toUpperCase()}\n${parts.pathAndQuery}\n${parts.host.toLowerCase()}\n${parts.ip}\n${parts.ts}`;
 }
 
-export async function signSsrV2(
+async function signSsrV2(
   secret: string,
   parts: { method: string; pathAndQuery: string; host: string; ip: string },
   now = Date.now()
