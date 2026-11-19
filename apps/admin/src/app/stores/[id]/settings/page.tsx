@@ -9,8 +9,8 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPatch, apiPut } from '../../../../lib/api';
-import { PLAN_LABELS, STORE_PLANS, type StorePlan } from '@ebda/shared';
+import { apiGet, apiPatch } from '../../../../lib/api';
+import { SubscriptionPlanRow } from '../../../../components/billing/SubscriptionPlanRow';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 import { SETTINGS_GROUPS } from '../../../../lib/settings-groups';
 
@@ -106,14 +106,13 @@ interface SettingsCard {
 interface StoreBasicInfo {
   id: string;
   name: string;
-  plan: StorePlan;
   status: string;
 }
 
 export default function StoreSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
-  const { isEnabled, isLoading, refresh: refreshFeatures } = useFeatures();
+  const { isEnabled, isLoading } = useFeatures();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
   const t = useT('settings');
@@ -127,11 +126,6 @@ export default function StoreSettingsPage() {
   // Suspend modal
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
   const [statusChanging, setStatusChanging] = useState(false);
-
-  // Plan change
-  const [planModalOpen, setPlanModalOpen] = useState(false);
-  const [pendingPlan, setPendingPlan] = useState<StorePlan | null>(null);
-  const [planChanging, setPlanChanging] = useState(false);
 
   const fetchStore = useCallback(async () => {
     if (!isSuperAdmin || !storeId) return;
@@ -164,28 +158,6 @@ export default function StoreSettingsPage() {
     setStatusChanging(false);
     setSuspendModalOpen(false);
   }, [storeInfo, storeId, fetchStore, toastSuccess, toastError, t]);
-
-  const handlePlanChange = useCallback(async () => {
-    if (!pendingPlan) return;
-    setPlanChanging(true);
-    const { error: apiErr } = await apiPut(`/api/v1/admin/stores/${storeId}/plan`, {
-      plan: pendingPlan,
-    });
-    if (apiErr) {
-      toastError(t('superadmin.planChangeFailed'), apiErr.message);
-    } else {
-      toastSuccess(
-        t('superadmin.planUpdated'),
-        t('superadmin.planUpdatedBody', { plan: PLAN_LABELS[pendingPlan].en })
-      );
-      // A plan change moves the feature baseline — refresh the store-wide
-      // flags so the Settings cards and sidebar reflect it without a reload.
-      await Promise.all([fetchStore(), refreshFeatures()]);
-    }
-    setPlanChanging(false);
-    setPlanModalOpen(false);
-    setPendingPlan(null);
-  }, [pendingPlan, storeId, fetchStore, refreshFeatures, toastSuccess, toastError, t]);
 
   const cards: SettingsCard[] = [
     {
@@ -612,42 +584,8 @@ export default function StoreSettingsPage() {
       {/* ── Super-admin: Plan info + Danger Zone ─────────────────────────── */}
       {isSuperAdmin && (
         <div className="mt-8 space-y-6">
-          {/* Plan row */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-card p-5">
-            <div>
-              <p className="text-sm font-medium text-foreground">{t('superAdmin.planLabel')}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {storeInfo
-                  ? `${PLAN_LABELS[storeInfo.plan]?.en ?? storeInfo.plan} — ${PLAN_LABELS[storeInfo.plan]?.ar ?? ''}`
-                  : t('superAdmin.loadingPlan')}
-              </p>
-            </div>
-            {storeInfo && (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-full bg-primary/10 text-primary-ink px-3 py-1 text-sm font-medium">
-                  {PLAN_LABELS[storeInfo.plan]?.en ?? storeInfo.plan}
-                </span>
-                <select
-                  className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  value=""
-                  onChange={e => {
-                    const val = e.target.value as StorePlan;
-                    if (val && val !== storeInfo.plan) {
-                      setPendingPlan(val);
-                      setPlanModalOpen(true);
-                    }
-                  }}
-                >
-                  <option value="">{t('superAdmin.changePlanPlaceholder')}</option>
-                  {STORE_PLANS.filter(p => p !== storeInfo.plan).map(p => (
-                    <option key={p} value={p}>
-                      {PLAN_LABELS[p].en} — {PLAN_LABELS[p].ar}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+          {/* Plan row: the subscription's priced plan + the one place to assign it (Ruling B1-PLAN-SOT-1) */}
+          <SubscriptionPlanRow storeId={storeId} />
 
           {/* Danger Zone */}
           <div>
@@ -686,43 +624,6 @@ export default function StoreSettingsPage() {
       )}
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
-
-      {/* Plan change confirm */}
-      <Modal
-        isOpen={planModalOpen}
-        onClose={() => {
-          setPlanModalOpen(false);
-          setPendingPlan(null);
-        }}
-        title={t('superAdmin.changePlanModalTitle')}
-        size="sm"
-      >
-        <p className="text-sm text-muted-foreground">
-          {t('superAdmin.changePlanModalBody', {
-            plan: pendingPlan ? PLAN_LABELS[pendingPlan].en : '',
-          })}
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setPlanModalOpen(false);
-              setPendingPlan(null);
-            }}
-            disabled={planChanging}
-          >
-            {tCommon('cancel')}
-          </Button>
-          <Button
-            variant="default"
-            onClick={handlePlanChange}
-            disabled={planChanging}
-            isLoading={planChanging}
-          >
-            {tCommon('confirm')}
-          </Button>
-        </div>
-      </Modal>
 
       {/* Suspend / reactivate confirm */}
       <Modal
