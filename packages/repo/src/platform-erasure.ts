@@ -8,6 +8,7 @@
  * Postgres twin: `AuthService.eraseAccount` (scrubProviderVerifier and the audit actor scrubs).
  */
 import classification from '../../cf-schema/erasure-classification.json';
+import { ensureSmartLayerSchema, runSmartLayerOp } from './do/smart-layer';
 import type { SyncSql } from './do/sync-sql';
 
 type Entry = { db: 'store-do' | 'd1'; actorScrub?: Record<string, string | null> };
@@ -39,4 +40,10 @@ function run(sql: SyncSql, db: 'store-do' | 'd1', userId: string): { rows: numbe
 /** The D1 platform database. */
 export const scrubUserFromPlatform = (sql: SyncSql, userId: string) => run(sql, 'd1', userId);
 /** One store's Durable Object (call it on each store the user acted in). */
-export const scrubUserFromStoreDo = (sql: SyncSql, userId: string) => run(sql, 'store-do', userId);
+export function scrubUserFromStoreDo(sql: SyncSql, userId: string): { rows: number } {
+  const scrubbed = run(sql, 'store-do', userId);
+  // The assistant's journal (sl_* tables, masked text the user typed or was shown) is the user's too: it goes with them, not at the 90-day purge.
+  ensureSmartLayerSchema(sql);
+  const journal = runSmartLayerOp(sql, 'eraseUserEverywhere', [userId]) as number;
+  return { rows: scrubbed.rows + journal };
+}

@@ -29,6 +29,7 @@ import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
 import { withSavepoint } from '../../lib/savepoint';
 
 import {
+  regionDayKey,
   regionDayStart,
   regionDayStartOffset,
   regionMonthStart,
@@ -557,24 +558,25 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     const ordersCompleted = ordersCompletedAgg._count.id;
     const revenueFils = ordersCompletedAgg._sum.total ?? 0;
 
-    // ordersAbandoned: AbandonedCart created before (dayStart - 7d) with recoveredAt IS NULL
-    // These are carts that had 7+ days to convert and did not.
-    const abandonedThreshold = new Date(dayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+    // ordersAbandoned (Ruling ANALYTICS-DAY-1, D2): carts that BECAME abandoned on this day, i.e. created exactly 7 Cairo days
+    // earlier ([dayStart-7d, dayStart-6d)) and still unrecovered. The tile sums the daily figure over its 7/30/90-day window, so a
+    // per-day FLOW is required; the old unbounded `lt` summed the whole backlog once per day (~30x on a 30-day window).
+    const abandonedFrom = regionDayStartOffset(dayStart, -7);
+    const abandonedTo = regionDayStartOffset(dayStart, -6);
     const ordersAbandoned = await db.abandonedCart.count({
       where: {
         storeId,
         recoveredAt: null,
-        createdAt: { lt: abandonedThreshold },
+        createdAt: { gte: abandonedFrom, lt: abandonedTo },
       },
     });
 
     // productViews: sum of ProductDailyView.count for this store on this calendar day.
-    // `date` in product_daily_views is a DATE stored at UTC midnight (regionDayStart output),
-    // so an exact equality match on dayStart gives the right rows.
+    // `date` in product_daily_views is the day key (UTC midnight; see regionDayKey), written by view-ingest with the same helper.
     const viewsArgs = {
       where: {
         storeId,
-        date: dayStart, // exact match — DATE column stored as Cairo-day-start instant
+        date: new Date(regionDayKey(dayStart)), // exact match on the counter day key (Ruling ANALYTICS-DAY-1)
       },
       _sum: { count: true as const },
     };

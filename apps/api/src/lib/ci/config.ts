@@ -1,5 +1,5 @@
 /**
- * Customer Intelligence capture wiring (docs/plans/2026-10-25-ci1-capture-impl.md). Names only; the
+ * Customer Intelligence capture wiring (docs/plans/done/2026-10-25-ci1-capture-impl.md). Names only; the
  * bindings themselves are in apps/api/wrangler.jsonc.
  */
 import type { CfBindings } from '../../cf/bindings';

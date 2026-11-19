@@ -8,16 +8,15 @@ import type { Locale } from './site';
  * are unchanged and still the only ones in the nav and the footer (BRAND-ARCH-1). Honest wording: no dates, no prices, no waitlist
  * form; the "notify me" CTA opens the studio contact form with the `products` topic preselected.
  * DRAFT until Ahmad approves: the Arabic product names, every blurb and fact.
- * SOFTWARE only: the Products area is for software; the studio's on-the-ground services (Ebda Events, Ebda Marketing, Ebda Design) live under Services. The card names differ from the service names on purpose (names confirmed by Ahmad 2026-11-09; the Arabic follows the BRAND pattern of transliterating the English name, as in ابدأ ستور / ابدأ شات: ابدأ إنفايت, ابدأ آدز): Ebda Invite vs the Events service, Ebda Ads vs the Marketing service, Ebda Quote Studio vs the Design service.
- * Three cards: Ebda Quote Studio, Ebda Events, Ebda Marketing (approved by Ahmad 2026-11-09, same release flag, no separate one).
- * Plus Ebda CRM and Ebda ERP (Ahmad 2026-11-10, Ruling COMING-SOON-CRM-ERP-1): built like the others. A card whose product has its
- * own live coming-soon page at <label>.ebda.app (Ruling SUBDOMAIN-SOON-2, served by the storefront Worker)
- * ALSO links to it (`href`); since SUBDOMAIN-SOON-2 that is all five (crm, erp, invite, ads, quote). DRAFT until Ahmad approves: the CRM and ERP blurbs and facts (plain
+ * SOFTWARE only: the Products area is for software; the studio's on-the-ground services live under Services.
+ * Only Ebda CRM and Ebda ERP are "coming soon" (Ahmad 2026-11-10, Ruling COMING-SOON-CRM-ERP-1; 2026-11-11 public-copy rule: nothing else is
+ * ever announced as coming). A card only offers "notify me": the <label>.ebda.app coming-soon pages stay live (Ruling SUBDOMAIN-SOON-2)
+ * but are never linked as "visit" (Ruling COMING-SOON-NO-VISIT-1: a visit link reads as if the product exists). DRAFT until Ahmad approves: the CRM and ERP blurbs and facts (plain
  * descriptions only; no dates, prices or feature promises).
  */
 export const comingSoonVisible = () => serviceLinesPublished();
 
-export type ComingSoonId = 'quote-studio' | 'invite' | 'ads' | 'crm' | 'erp';
+export type ComingSoonId = 'crm' | 'erp';
 export type ComingSoon = {
   id: ComingSoonId;
   name: string;
@@ -25,58 +24,13 @@ export type ComingSoon = {
   short: string;
   blurb: string;
   facts: string[];
-  /** the product's own live coming-soon page, when it has one; the card links to it next to the "notify me" CTA */
-  href?: string;
-};
-
-/** The live coming-soon subdomain pages (SUBDOMAIN-SOON-2). */
-const HREF: Partial<Record<ComingSoonId, string>> = {
-  'quote-studio': 'https://quote.ebda.app/',
-  invite: 'https://invite.ebda.app/',
-  ads: 'https://ads.ebda.app/',
-  crm: 'https://crm.ebda.app/',
-  erp: 'https://erp.ebda.app/',
 };
 
 const COPY = {
   ar: {
     label: 'قريبًا',
     notify: 'عرّفني أول ما يجهز',
-    visit: 'زور',
     items: {
-      'quote-studio': {
-        blurb:
-          'للمهندسين الداخليين ومكاتب التصميم: بتعرض تصميمك على عميلك في رابط، وهو بيغيّر الخامات والألوان ويشوف السعر مباشرة.',
-        facts: [
-          'ارفع تصميماتك وابعت رابط للعميل',
-          'العميل يغيّر الخامات والألوان ويشوف السعر لحظيًا',
-          'العميل يوافق من نفس الرابط',
-          'عرض واقع معزز وافتراضي للتصميم',
-        ],
-      },
-      invite: {
-        blurb:
-          'برنامج لتنظيم الفعاليات: صفحة للفعالية وتذاكر، ودعوات على واتساب وتأكيد حضور، وتسجيل دخول بالـ QR، ومتابعة بعد الفعالية.',
-        facts: [
-          'صفحة الفعالية والتذاكر',
-          'دعوات على واتساب وتأكيد الحضور',
-          'تسجيل دخول بالـ QR',
-          'متابعة بعد الفعالية',
-        ],
-      },
-      ads: {
-        blurb:
-          'برنامج تسويق من ابدأ ستوديو للذكاء الاصطناعي: إعلاناتك ومبيعاتك ومحادثات عملائك في مكان واحد، بالجنيه المصري.',
-        facts: [
-          'لوحة إعلانات واحدة بالجنيه المصري لكل المنصات اللي بتعلن عليها: ميتا وإنستجرام وتيك توك وجوجل',
-          'ربط المبيعات بالإعلان اللي جابها، من طلبات ابدأ ستور',
-          'إعلانات بالعربي بالذكاء الاصطناعي من صور منتجاتك',
-          'كل عميل جاي من إعلان بيتردّ عليه على واتساب من خلال ابدأ شات',
-          'تقويم محتوى وموافقات بضغطة واحدة',
-          'خطة تسويق وتحليل SWOT وشخصيات عملاء وتقرير شهري بالذكاء الاصطناعي',
-          'وضع الوكالة لإدارة أكتر من عميل',
-        ],
-      },
       crm: {
         blurb:
           'برنامج لإدارة عملائك: العملاء والعملاء المحتملين والمتابعات في مكان واحد، للتجار والفرق في مصر، ومربوط بابدأ ستور وابدأ شات.',
@@ -102,41 +56,7 @@ const COPY = {
   en: {
     label: 'Coming soon',
     notify: 'Tell me when it is ready',
-    visit: 'Visit',
     items: {
-      'quote-studio': {
-        blurb:
-          'For interior engineers and design offices: share your design with a client in one link, and they change materials and colours and see the live price.',
-        facts: [
-          'Upload your designs and share a link with the client',
-          'The client changes materials and colours and sees the live price',
-          'The client approves from the same link',
-          'AR and VR views of the design',
-        ],
-      },
-      invite: {
-        blurb:
-          'A product for running events: an event page and tickets, WhatsApp invitations and RSVP, QR check-in and post-event follow-up.',
-        facts: [
-          'An event page and tickets',
-          'WhatsApp invitations and RSVP',
-          'QR check-in',
-          'Post-event follow-up',
-        ],
-      },
-      ads: {
-        blurb:
-          'A marketing platform from Ebda AI Studio: your ads, sales and customer conversations in one place, in Egyptian pounds.',
-        facts: [
-          'One ads dashboard in EGP across where your ads run: Meta, Instagram, TikTok and Google',
-          'Sales linked to the ad that brought them, from Ebda Store orders',
-          'AI ad creative in Arabic, made from your product photos',
-          'Every lead from an ad answered on WhatsApp through Ebda Chat',
-          'A content calendar with one-tap approvals',
-          'An AI marketing plan, SWOT, customer personas and monthly report',
-          'Agency mode for managing many clients',
-        ],
-      },
       crm: {
         blurb:
           'A product for managing your customers: customers, leads and follow-ups in one place, for Egyptian merchants and teams, connected to Ebda Store and Ebda Chat.',
@@ -164,13 +84,12 @@ const COPY = {
 export const comingSoonLabels = (locale: Locale) => ({
   label: COPY[locale].label,
   notify: COPY[locale].notify,
-  visit: COPY[locale].visit,
 });
 
 /** The cards to show for a locale (empty unless published). */
 export function comingSoonItems(locale: Locale): ComingSoon[] {
   if (!comingSoonVisible()) return [];
-  const ids: ComingSoonId[] = ['quote-studio', 'invite', 'ads', 'crm', 'erp'];
+  const ids: ComingSoonId[] = ['crm', 'erp'];
   return ids.map(id => {
     const b = BRAND.comingProducts.find(p => p.id === id)!;
     return {
@@ -179,7 +98,6 @@ export function comingSoonItems(locale: Locale): ComingSoon[] {
       short: locale === 'ar' ? b.shortAr : b.shortEn,
       ...COPY[locale].items[id],
       facts: [...COPY[locale].items[id].facts],
-      ...(HREF[id] ? { href: HREF[id] } : {}),
     };
   });
 }

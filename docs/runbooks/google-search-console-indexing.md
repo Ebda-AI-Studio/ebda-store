@@ -21,6 +21,13 @@ This is **force-managed, not a per-merchant credential** — a single Google Clo
 3. Set `GSC_SERVICE_ACCOUNT_JSON` (the full downloaded key JSON, one line) in the API's production env — see `docs/ENVIRONMENT.md` for the exact var and dormancy behavior.
 4. Live-smoke ONE real property first (check `GscDailyMetric` rows land with non-zero impressions on a known-indexed domain) before relying on the data platform-wide — GSC data typically lags 2-3 days, so a freshly-added property may read thin for the first few days.
 
+### Which property does a store use? (2026-11-15)
+
+- `<slug>.ebda.app`: the platform property `sc-domain:ebda.app` (service account `ebda-gsc@ebda-search.iam.gserviceaccount.com`, siteFullUser). Search Analytics is queried with an anchored `page includingRegex ^https?://<slug>\.ebda\.app/` filter so a store only sees its own rows.
+- Custom domain: the daily cron verifies it automatically (service account gets a META token from the Site Verification API, it is stored in `Store.googleSiteVerification` and rendered by the storefront, then `sites.add` registers `https://<domain>/`). Prerequisite: Site Verification API enabled in project `ebda-search`. Log lines: `gsc-ingest: custom-domain property check` with `status` = `verified | verify_failed | token_failed | sites_add_failed | merchant_token`.
+- `merchant_token`: the merchant already pasted their OWN token (verified in their own Search Console). We never overwrite it; the merchant adds `ebda-gsc@ebda-search.iam.gserviceaccount.com` as a user (Settings, Users and permissions, Restricted) instead, and the next run finds the property.
+- The merchant sees "Verifying your domain with Google" in the answer-engine GSC section until the property is visible.
+
 No changes to the sitemap/robots.txt/structured-data guidance above are needed for this — it is a read-only Search Analytics pull, not an indexing action.
 
 ---

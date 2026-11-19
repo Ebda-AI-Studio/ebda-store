@@ -1,7 +1,7 @@
 import { z } from 'zod/v3';
 
 /**
- * Egypt VAT gate (ruling TAX-2, docs/plans/2026-10-07-egypt-vat-and-eta.md).
+ * Egypt VAT gate (ruling TAX-2, docs/plans/done/2026-10-07-egypt-vat-and-eta.md).
  *
  * A merchant may charge VAT only once its VAT registration is VERIFIED by a
  * super-admin. These are the shapes shared by the API (validation) and the

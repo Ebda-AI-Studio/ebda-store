@@ -1,0 +1,34 @@
+{
+  "id": "store.typography",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الخطوط",
+  "titleEn": "Fonts and custom font upload",
+  "screens": ["/stores/[id]/builder"],
+  "api": ["GET /stores/:storeId/typography", "POST /uploads/font"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "store-fonts",
+  "questions": {
+    "ar": ["ازاي اغير الخط؟", "ارفع خط خاص"],
+    "en": ["Change my store font"]
+  },
+  "steps": ["Editor > Fonts / text styles by area."],
+  "edgeCases": [
+    "Arabic font coverage",
+    "Font licence",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

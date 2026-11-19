@@ -82,6 +82,8 @@ export interface AccountsRpc {
     actorId?: string
   ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'FORBIDDEN_TARGET' }>;
   getAccountState?(userId: string): Promise<AccountState | null>;
+  /** Platform-admin invariant (Ruling ID-20): active super_admins, and those that can act (verified + second factor). */
+  superAdminSummary?(): Promise<{ active: number; ready: number }>;
   /** Display facts for up to 100 accounts in one call (apps/accounts `getAccountsBrief`). */
   getAccountsBrief?(userIds: string[]): Promise<AccountBrief[]>;
   resendVerification?(email: string): Promise<void>;
@@ -202,6 +204,10 @@ export interface CfBindings {
   PUBLIC_IP_LIMITER?: RateLimitBindingLike;
   /** Anonymous public READS only: per-tenant, 6000 / 60 s per location. */
   PUBLIC_TENANT_LIMITER?: RateLimitBindingLike;
+  /** `GET /public/store/resolve` only (middleware/store-resolve-native.ts): per shopper IP, 30 / 60 s per location. */
+  STORE_RESOLVE_LIMITER?: RateLimitBindingLike;
+  /** `GET /public/store/resolve` only: unknown-store answers per shopper IP, 20 / 60 s per location, counted on the 404 path. */
+  STORE_MISS_LIMITER?: RateLimitBindingLike;
   CF_VERSION_METADATA?: { id?: string; tag?: string };
   /** Service Binding to the storefront Worker (ebda-web): cache purge without a public host. */
   STOREFRONT?: ServiceBindingLike;

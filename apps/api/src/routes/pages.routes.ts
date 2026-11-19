@@ -14,7 +14,7 @@ const router = Router();
 // Express does NOT populate req.params.storeId at that bare mount level.
 // Every route below declares ':storeId' explicitly, so router.param sets
 // RLS tenant context correctly here regardless of which surface is hit.
-// See F2, docs/plans/2026-07-02-rls-cutover.md.
+// See F2, docs/plans/done/2026-07-02-rls-cutover.md.
 router.param('storeId', tenantContext);
 
 // Empty strings from controlled admin inputs are coerced to null so an

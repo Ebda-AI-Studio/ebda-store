@@ -44,6 +44,23 @@ function extraApiOrigins(): string {
 }
 
 /**
+ * S5 (2026-11-12 audit): connect-src no longer wildcards `*.r2.dev` (any R2 public bucket, i.e. an exfil channel for
+ * injected script). Production media is `media.ebda.app`; an environment that serves media from one specific
+ * `pub-<id>.r2.dev` bucket names that exact host through NEXT_PUBLIC_MEDIA_ORIGIN (already the documented media override).
+ */
+function extraMediaOrigin(): string {
+  try {
+    const raw = process.env.NEXT_PUBLIC_MEDIA_ORIGIN;
+    if (!raw) return '';
+    const u = new URL(raw);
+    if (u.protocol !== 'https:' || u.origin === 'https://media.ebda.app') return '';
+    return ` ${u.origin}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Who may frame the storefront (the visual builder's live preview). `STOREFRONT_FRAME_ANCESTORS` wins; the
  * production default carries no dev origin (S1-1, 2026-09-22 audit).
  */
@@ -75,8 +92,9 @@ export function buildStorefrontCsp(nonce: string): string {
     "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
     // media.ebda.app: the PDP 3D viewer fetch()es the product's .glb from it. ebda.app: the maintenance page and
     // bare-root redirect can trigger a preconnect. The Google hosts are the Ads conversion beacons.
-    "connect-src 'self' https://api.ebda.app https://*.r2.dev https://media.ebda.app https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com" +
-      extraApiOrigins(),
+    "connect-src 'self' https://api.ebda.app https://media.ebda.app https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.facebook.com https://connect.facebook.net https://analytics.tiktok.com wss://api.ebda.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com" +
+      extraApiOrigins() +
+      extraMediaOrigin(),
     // /OneSignalSDKWorker.js registers as a service worker: Push API mandates same-origin worker scripts.
     "worker-src 'self' blob:",
     // Meta Pixel's invisible iframe; the Locations page embeds a key-free Google Maps preview per branch.

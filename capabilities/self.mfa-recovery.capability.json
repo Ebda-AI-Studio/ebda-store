@@ -1,0 +1,31 @@
+{
+  "id": "self.mfa-recovery",
+  "status": "planned",
+  "plan": "audit gap 22",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اكواد استرجاع MFA",
+  "titleEn": "Self-serve MFA recovery codes",
+  "screens": ["/account/security"],
+  "api": ["(planned)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "confirm",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ضاع الموبايل ومش عارف ادخل"],
+    "en": ["I lost my phone and cannot log in"]
+  },
+  "steps": ["Today: staff script; assistant hands off."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
+  ],
+  "gaps": ["gap 22"]
+}
