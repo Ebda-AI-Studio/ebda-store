@@ -768,7 +768,7 @@ export const STORE_MIGRATIONS: ReadonlyArray<{ id: string; sql: string }> = [
   { id: 'cf-0004_template_current', sql: ${JSON.stringify(templateCurrentSql)} },
   { id: 'cf-0005_reorder_rules_one_per_item', sql: ${JSON.stringify(reorderRulesUniqueSql)} },
   { id: 'cf-0006_template_expand_only', sql: ${JSON.stringify(templateExpandOnlySql)} },
-  { id: 'cf-0008_ai_replace_backups', sql: ${JSON.stringify(aiReplaceBackupsSql)} },
+  { id: 'cf-0009_ai_replace_backups', sql: ${JSON.stringify(aiReplaceBackupsSql)} },
 ];
 `;
 }
@@ -782,7 +782,7 @@ const ANALYTICS_STORE_TABLES = [
   'notification_logs',
   'gsc_daily_metrics',
 ];
-// Ruling AITOOLS-4: the AI replace undo history, added after 0001 went live (0007 is the parked template contract).
+// Ruling AITOOLS-4: the AI replace undo history, added after 0001 went live (0007 is the parked template contract, 0008 is #611's returns_customer_nullable).
 const AI_REPLACE_STORE_TABLES = ['ai_replace_backups'];
 const ANALYTICS_PLATFORM_TABLES = ['ai_usage'];
 // Ruling NZ-C-11: admin push devices (family ops), added after 0001 went live.
@@ -831,7 +831,7 @@ function main() {
       aiReplaceStoreSql
     ),
     'migrations/store/0003_analytics.sql': analyticsStoreSql,
-    'migrations/store/0008_ai_replace_backups.sql': aiReplaceStoreSql,
+    'migrations/store/0009_ai_replace_backups.sql': aiReplaceStoreSql,
     'migrations/platform/0005_ai_usage.sql': emitSql(
       onlyTables(out.d1, ANALYTICS_PLATFORM_TABLES),
       'D1 ai_usage (Ruling NZ-AN-1), for a D1 that already ran 0001'
