@@ -24,7 +24,7 @@ import { canBuyNow, inStockNow } from '../../lib/can-buy-now';
  * routing, Phase 1) so the SAME rendering logic serves both
  * `app/products/page.tsx` (legacy, header-based) and
  * `app/tenant-store/[tenant]/[locale]/products/page.tsx` (new, params-based,
- * dark-launched). See docs/plans/2026-07-12-tenant-cacheable-routing.md
+ * dark-launched). See docs/plans/done/2026-07-12-tenant-cacheable-routing.md
  * §3.6/§9.
  */
 
@@ -91,6 +91,8 @@ async function fetchInitialData(
   const productsQuery = new URLSearchParams({
     page: '1',
     limit: '96',
+    // The price filter sizes its slider from `meta.priceMax`, which the API only sends on request.
+    withPriceMax: '1',
   });
   if (filters.category) productsQuery.set('category', filters.category);
   if (filters.tag) productsQuery.set('tag', filters.tag);

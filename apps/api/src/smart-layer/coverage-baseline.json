@@ -1,0 +1,23 @@
+{
+  "ids": [
+    "uncovered|account.devices",
+    "uncovered|account.export-erase-close",
+    "uncovered|account.legal-notices",
+    "uncovered|account.sms-consent",
+    "uncovered|chat.connect-number",
+    "uncovered|chat.ref-help",
+    "uncovered|integrations.shopper-mcp",
+    "uncovered|integrations.webhooks",
+    "uncovered|onboarding.create-store",
+    "uncovered|order.export",
+    "uncovered|orders.app-alerts",
+    "uncovered|product.3d",
+    "uncovered|product.csv-import-export",
+    "uncovered|product.import-from-photos",
+    "uncovered|shipping.cod-reconciliation",
+    "uncovered|store.typography",
+    "uncovered|storefront.contact-enquiry",
+    "uncovered|storefront.testimonials-trust",
+    "uncovered|wallet.help-dup"
+  ]
+}

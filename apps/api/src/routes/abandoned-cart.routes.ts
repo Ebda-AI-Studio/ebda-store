@@ -22,7 +22,7 @@ const router = Router();
 // every route below declares its own '/:storeId/...' path. router.param
 // runs AFTER Express resolves :storeId for the matched route, so RLS
 // tenant context is set correctly here regardless of which mount reached
-// it. See F2, docs/plans/2026-07-02-rls-cutover.md.
+// it. See F2, docs/plans/done/2026-07-02-rls-cutover.md.
 router.param('storeId', tenantContext);
 
 // ==========================================

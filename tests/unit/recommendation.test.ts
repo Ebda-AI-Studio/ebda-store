@@ -55,6 +55,11 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
   },
 }));
 
+// The merchant's automatic-recommendations switch is read from the store row (absent = on)
+vi.mock('../../apps/api/src/services/store.service', () => ({
+  StoreService: { getById: vi.fn(async () => ({ settings: {} })) },
+}));
+
 // Mock logger
 vi.mock('../../apps/api/src/lib/logger', () => ({
   default: {

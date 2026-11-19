@@ -417,16 +417,23 @@ export async function idempotencyKeyStoreD1(key: string): Promise<string | null>
   return rows[0]?.store_id ?? null;
 }
 
-/** Stores whose directory tier (`stores.plan`) differs from the tier of the plan their subscription names. */
+/**
+ * Stores whose directory tier (`stores.plan`) differs from the tier the subscription ENTITLES: the named plan's tier,
+ * or `free` when the subscription is canceled (getEntitlements falls back to the free plan then). Ignoring the status
+ * let a canceled Growth row on `professional` read as "no drift" (#835).
+ */
 export async function planTierDriftD1(
   limit: number
 ): Promise<Array<{ storeId: string; current: string; tier: string }>> {
   return d1All<{ storeId: string; current: string; tier: string }>(
-    `SELECT s.id AS storeId, s.plan AS current, p.feature_tier AS tier
-       FROM store_subscriptions ss
-       JOIN stores s ON s.id = ss.store_id
-       JOIN plans p ON p.code = ss.plan_code
-      WHERE s.deleted_at IS NULL AND s.plan <> p.feature_tier
+    `SELECT storeId, current, tier FROM (
+       SELECT s.id AS storeId, s.plan AS current,
+              CASE WHEN ss.status = 'canceled' THEN 'free' ELSE p.feature_tier END AS tier
+         FROM store_subscriptions ss
+         JOIN stores s ON s.id = ss.store_id
+         JOIN plans p ON p.code = ss.plan_code
+        WHERE s.deleted_at IS NULL
+     ) WHERE current <> tier
       LIMIT ?1`,
     limit
   );

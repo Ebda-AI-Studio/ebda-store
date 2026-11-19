@@ -10,6 +10,7 @@ import { apiPost } from '../../lib/api';
 import { AccountsError, accountsFetch } from '../../lib/accounts';
 import { useAuth } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
+import { forgetEmailedLink, takeEmailedLink } from '../../lib/emailed-link';
 
 type Phase =
   | { kind: 'form' }
@@ -38,15 +39,14 @@ export default function VerifyEmailPage() {
     started.current = true;
     // The emailed link is `/verify-email?email=…#code=…`: the code lives in the fragment, which no server, Referer header or
     // analytics pageview ever sees. Take both out of the address bar before anything records the URL.
-    const mail = new URLSearchParams(window.location.search).get('email') ?? '';
-    const raw = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('code') ?? '';
-    window.history.replaceState(null, '', window.location.pathname);
-    if (!/^\d{6}$/.test(raw) || !mail) {
+    // Read once and kept for this visit (lib/emailed-link.ts): the page is re-created after the address bar is cleaned.
+    const link = takeEmailedLink();
+    if (!link) {
       setPhase({ kind: 'error', reason: 'missing' });
       return;
     }
-    setEmail(mail);
-    setCode(raw);
+    setEmail(link.email);
+    setCode(link.code);
     // Verifying also needs the password chosen at signup (a code mailed because someone else typed this address cannot
     // activate their password on the owner's behalf), so the visitor types it now.
     setPhase({ kind: 'form' });
@@ -59,16 +59,17 @@ export default function VerifyEmailPage() {
     setPhase({ kind: 'verifying' });
     try {
       await accountsFetch('/otp/verify', { json: { email, code, password } });
+      forgetEmailedLink();
       setPhase({ kind: 'success' });
     } catch (err) {
       if (err instanceof AccountsError && err.code === 'INVALID_CODE') {
         setWrongPassword(true);
         setPhase({ kind: 'form' });
-      } else
-        setPhase({
-          kind: 'error',
-          reason: err instanceof AccountsError && err.status === 429 ? 'rateLimited' : 'invalid',
-        });
+      } else {
+        const rateLimited = err instanceof AccountsError && err.status === 429;
+        if (!rateLimited) forgetEmailedLink(); // a used or expired code: never reused this visit
+        setPhase({ kind: 'error', reason: rateLimited ? 'rateLimited' : 'invalid' });
+      }
     }
   }
 

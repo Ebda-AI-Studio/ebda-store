@@ -13,7 +13,7 @@ import { z } from 'zod/v3';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
-import { isStoreAiEnabled, requireAiEnabled } from '../lib/store-ai-switch';
+import { isStoreAiEnabled, requireAiEnabled, setStoreAiEnabled } from '../lib/store-ai-switch';
 import { requireFeature } from '../middleware/feature-gate';
 import { AIService } from '../services/ai.service';
 import {
@@ -34,12 +34,28 @@ import {
   revertProductBalance,
 } from '../services/ai-autofill.service';
 import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
+import { BulkAiEnqueueError, enqueueBulkAiJob } from '../services/bulk-ai-job.service';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
-import { storeUpdate } from '../lib/repo-factory';
+import { sendOnboardingHelpToCi } from '../lib/ci/emit';
 
 const router = Router({ mergeParams: true });
 
 router.use(authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess);
+
+/**
+ * Activation (Ruling ACT-1): a merchant (not a super admin) whose assistant call SUCCEEDED is a "help needed" signal while
+ * a setup step is open. After the response, advisory: the planner names the open step and drops it for an established
+ * store, and its per-(store, step, kind) seed keeps it to one row.
+ */
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === 'POST' && req.user?.role === 'store_admin') {
+    const storeId = req.params.storeId;
+    res.on('finish', () => {
+      if (storeId && res.statusCode < 400) void sendOnboardingHelpToCi(storeId, 'assistant_used');
+    });
+  }
+  next();
+});
 
 /**
  * The merchant's AI switch (`stores.ai_features_enabled`). These two routes are the ONLY ones registered before
@@ -61,7 +77,7 @@ router.put('/settings', writeLimiter, async (req: Request, res: Response, next: 
   try {
     const { storeId } = req.params;
     const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(req.body);
-    await storeUpdate(prisma, { where: { id: storeId }, data: { aiFeaturesEnabled: enabled } });
+    await setStoreAiEnabled(storeId, enabled);
     await auditLog({
       action: enabled ? 'store.ai.enabled' : 'store.ai.disabled',
       userId: req.user!.userId,
@@ -549,21 +565,11 @@ router.post(
     try {
       const { storeId } = req.params;
       const { direction } = bulkTranslateSchema.parse(req.body);
-
-      const job = await (
-        await storeWriter(currentStoreId())
-      ).bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'translate', direction },
-        select: { id: true, status: true, kind: true, createdAt: true },
-      });
-
+      let job;
       try {
-        await inngest.send({
-          name: 'bulk-ai/translate-requested',
-          data: { jobId: job.id, storeId, direction },
-        });
+        job = await enqueueBulkAiJob(storeId, req.user!.userId, { kind: 'translate', direction });
       } catch (err) {
-        await markJobFailedIfEnqueueFailed(job.id, err);
+        if (!(err instanceof BulkAiEnqueueError)) throw err;
         res.status(503).json({
           success: false,
           error: {
@@ -589,26 +595,11 @@ router.post(
     try {
       const { storeId } = req.params;
       const force = req.body?.force === true;
-
-      const job = await (
-        await storeWriter(currentStoreId())
-      ).bulkAiJob.create({
-        data: {
-          storeId,
-          userId: req.user!.userId,
-          kind: 'seo',
-          ...(force ? { errors: { force: true } as object } : {}),
-        },
-        select: { id: true, status: true, kind: true, createdAt: true },
-      });
-
+      let job;
       try {
-        await inngest.send({
-          name: 'bulk-ai/seo-requested',
-          data: { jobId: job.id, storeId, force },
-        });
+        job = await enqueueBulkAiJob(storeId, req.user!.userId, { kind: 'seo', force });
       } catch (err) {
-        await markJobFailedIfEnqueueFailed(job.id, err);
+        if (!(err instanceof BulkAiEnqueueError)) throw err;
         res.status(503).json({
           success: false,
           error: {
@@ -1440,26 +1431,11 @@ router.post(
     try {
       const { storeId } = req.params;
       const force = req.body?.force === true;
-
-      const job = await (
-        await storeWriter(currentStoreId())
-      ).bulkAiJob.create({
-        data: {
-          storeId,
-          userId: req.user!.userId,
-          kind: 'llms_txt',
-          ...(force ? { errors: { force: true } as object } : {}),
-        },
-        select: { id: true, status: true, kind: true, createdAt: true },
-      });
-
+      let job;
       try {
-        await inngest.send({
-          name: 'bulk-ai/llms-txt-requested',
-          data: { jobId: job.id, storeId, force },
-        });
+        job = await enqueueBulkAiJob(storeId, req.user!.userId, { kind: 'llms_txt', force });
       } catch (err) {
-        await markJobFailedIfEnqueueFailed(job.id, err);
+        if (!(err instanceof BulkAiEnqueueError)) throw err;
         res.status(503).json({
           success: false,
           error: {

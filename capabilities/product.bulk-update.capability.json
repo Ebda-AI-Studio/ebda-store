@@ -1,0 +1,50 @@
+{
+  "id": "product.bulk-update",
+  "status": "live",
+  "area": "products",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تعديل جماعي للمنتجات",
+  "titleEn": "Bulk edit products (status, price, category, backorder, thresholds)",
+  "screens": ["/stores/[id]/bulk", "/stores/[id]/products"],
+  "api": [
+    "POST /stores/:storeId/products/bulk-update",
+    "POST .../bulk/status",
+    "POST .../bulk/delete",
+    "POST .../products/bulk-set-backorder",
+    "POST .../products/bulk-set-low-stock-threshold"
+  ],
+  "mcpTool": null,
+  "planGate": "bulk_operations",
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "compensating",
+    "note": "assistant undo restores the before prices, status and flags of the changed products (a confirm-class card of its own); bulk delete is not an assistant tool"
+  },
+  "helpArticle": "products-and-csv-import",
+  "questions": {
+    "ar": [
+      "عايز اغير سعر 5000 منتج مرة واحدة",
+      "اخفي كل منتجات الفئة دي",
+      "زود الاسعار 10%",
+      "مسح جماعي"
+    ],
+    "en": ["Raise all prices by 10%", "Hide every product in a category"]
+  },
+  "steps": ["Bulk page: select/filter then action."],
+  "edgeCases": [
+    "5,000 products: job + progress, partial failures, cap per request",
+    "Plan gate bulk_operations (Basic+)",
+    "Rate limits (writeLimiter)",
+    "Undo of price change needs snapshot (none): preview must show count and sample",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No undo for bulk price change (inferred); assistant must export a CSV backup before"],
+  "assistantNote": "always confirm with count + sample + offer export first"
+}

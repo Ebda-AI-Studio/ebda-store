@@ -4,7 +4,7 @@ import { sanitizeThemeColor, sanitizeCssValue, buildThemeStyleTag } from '@web/l
 /**
  * Unit tests for the theme CSS sanitizers extracted from `app/layout.tsx`
  * during the tenant-cacheable routing Phase 1 work (see
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6). These are
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6). These are
  * security-sensitive (they sanitize merchant-supplied theme values before
  * they're injected into a raw `<style>` tag), so both trees (legacy
  * header-based layout + the new params-based `tenant-store` layout) must share

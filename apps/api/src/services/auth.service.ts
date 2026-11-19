@@ -382,6 +382,7 @@ export class AuthService {
    * every cold start, which workerd forbids (R-EBDA-001, experiment B2c).
    */
   private static readonly DUMMY_PASSWORD_HASH: string =
+    // nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash -- dummy hash for timing equalisation (random plaintext discarded), not a credential
     '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 
   static async register(data: {

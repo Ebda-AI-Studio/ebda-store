@@ -1,4 +1,4 @@
-/** R2 `ebda-ci` key layout (docs/plans/2026-10-28-customer-intelligence.md 1.6). Dependency-free. */
+/** R2 `ebda-ci` key layout (docs/plans/done/2026-10-28-customer-intelligence.md 1.6). Dependency-free. */
 export const ciBuyerIndexKey = (buyerKey: string) =>
   `index/buyer/${buyerKey.slice(0, 2)}/${buyerKey}.json`;
 export const ciPartitionPrefix = (storeId: string, day: string) =>
@@ -34,6 +34,10 @@ export const CI_AGG_WINDOW_DAYS = 90;
 export const ciStoreAggPrefix = (storeId: string) => `aggregates/v1/store=${storeId}/`;
 export const ciStoreDayAggKey = (storeId: string, day: string) =>
   `${ciStoreAggPrefix(storeId)}dt=${day}.json`;
+/** Activation timeline of one store (Ruling ACT-1): milestone times, help signals, trail of its first orders. Ids and times only.
+ *  Under the store's aggregate prefix, so a merchant erasure that deletes the prefix removes it. */
+export const ciStoreActivationKey = (storeId: string) =>
+  `${ciStoreAggPrefix(storeId)}activation.json`;
 export const ciStoreWindowKey = (storeId: string) => `${ciStoreAggPrefix(storeId)}window.json`;
 export const ciMetricAggKey = (metric: string, day: string) =>
   `aggregates/v1/${metric}/dt=${day}.json`;
