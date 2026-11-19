@@ -345,7 +345,8 @@
         "reviews": "Reviews waiting for approval",
         "allClear": "Nothing is waiting for you right now.",
         "loadFailed": "We could not load what needs your attention right now.",
-        "retry": "Try again"
+        "retry": "Try again",
+        "seoMissing": "Store title and description for search engines are still empty"
       },
       "pulse": {
         "title": "Store pulse",
@@ -6592,6 +6593,7 @@
     },
     "guestCheckout": {
       "notTracked": "Not tracked for guest checkout",
+      "abandonedExplainer": "Abandoned carts are not recorded for guest checkout, so these figures are unavailable. Only registered customers' carts appear here.",
       "registeredOnly": "Registered customers only",
       "checkoutsTableNote": "Checkouts started are not tracked for guest checkout — those days show “—” instead of 0."
     },
@@ -7983,7 +7985,9 @@
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
-    "alsoIncluded": "Also included in this plan"
+    "alsoIncluded": "Also included in this plan",
+    "noSoldPlan": "This feature is not part of a plan you can buy. The Ebda team switches it on for a single store, so get in touch if you need it.",
+    "contactOnlyCta": "Talk to the Ebda team"
   },
   "aiTools": {
     "title": "AI tools",
@@ -8499,7 +8503,7 @@
       "not_trialing": "Not on a trial",
       "no_order": "No order yet",
       "opted_out": "You unsubscribed",
-      "store_not_active": "Store not active",
+      "store_not_active": "The store was not live when this was due (not activated yet or suspended), so it was skipped",
       "no_recipient": "No owner email",
       "ENQUEUE_FAILED": "The email could not be queued",
       "unsubscribed_by_link": "Unsubscribed from an email link"

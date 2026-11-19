@@ -300,9 +300,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     name: 'SMS Notifications',
     nameAr: 'إشعارات الرسائل القصيرة',
     description:
-      'Send transactional SMS messages to customers (order confirmed, shipped, delivered, cancelled, refunded) via Unifonic. Customers who tick the opt-in checkbox at checkout also receive promotional SMS (cart reminders, back-in-stock alerts).',
+      'Send transactional SMS messages to customers (order confirmed, shipped, delivered, cancelled, refunded) through our SMS gateway. Customers who tick the opt-in checkbox at checkout also receive promotional SMS (cart reminders, back-in-stock alerts).',
     descriptionAr:
-      'إرسال رسائل قصيرة للمعاملات (تأكيد الطلب، الشحن، التسليم، الإلغاء، الاسترداد) عبر Unifonic. العملاء الذين يوافقون على استقبال الرسائل عند الدفع يتلقون أيضاً رسائل ترويجية (تذكير بالسلة، إشعار توفر المنتج).',
+      'إرسال رسائل قصيرة للمعاملات (تأكيد الطلب، الشحن، التسليم، الإلغاء، الاسترداد) عبر بوابة الرسائل. العملاء الذين يوافقون على استقبال الرسائل عند الدفع يتلقون أيضاً رسائل ترويجية (تذكير بالسلة، إشعار توفر المنتج).',
     category: 'marketing',
     tier: 'addon',
   },
@@ -488,7 +488,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     nameAr: 'المخزون — مستودعات متعددة',
     description:
       'Track stock counts per warehouse location and route orders to the closest or highest-priority warehouse that has sufficient stock. ' +
-      'Includes per-warehouse stock views, delta adjustments with audit trail, and a cross-warehouse order-routing API (priority rule or proximity/Haversine rule). ' +
+      'Includes per-warehouse stock views, delta adjustments with audit trail, and a cross-warehouse order-routing API (priority rule or nearest-warehouse rule). ' +
       'Existing Product.inventory aggregates are kept in sync automatically — single-warehouse stores are unaffected when the flag is off.',
     descriptionAr:
       'تتبع مستويات المخزون لكل مستودع وتوجيه الطلبات تلقائياً إلى أقرب مستودع أو الأعلى أولوية الذي يحتوي على مخزون كافٍ. ' +
@@ -592,9 +592,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     name: 'Accounting — Profit Anomaly Watch',
     nameAr: 'المحاسبة — مراقبة شذوذ الأرباح',
     description:
-      'Runs a daily AI scan of margins (06:30 KWT); flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline.',
+      'Runs a daily AI scan of margins; flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline.',
     descriptionAr:
-      'فحص يومي بالذكاء الاصطناعي للهوامش (06:30 بتوقيت القاهرة)؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
+      'فحص يومي بالذكاء الاصطناعي للهوامش؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
     category: 'operations',
     tier: 'addon',
   },
@@ -629,12 +629,12 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     nameAr: 'الشراء عبر وكلاء الذكاء الاصطناعي — بدون بيانات اعتماد',
     description:
       'Escape hatch. By default the MCP write tools (add_to_cart, place_order) require ' +
-      "the store's agent credential sent as the X-Agent-Key header; read tools never do. " +
+      "the store's agent credential; read tools never do. " +
       'Turning this on lets any unauthenticated agent write to this store again — enable it ' +
       'only to unblock a live integration while a credential is issued.',
     descriptionAr:
       'مخرج طوارئ. افتراضياً تتطلب أدوات الكتابة في MCP (إضافة إلى السلة، إنشاء الطلب) ' +
-      'بيانات اعتماد المتجر عبر ترويسة X-Agent-Key، أما أدوات القراءة فلا تتطلب ذلك. ' +
+      'بيانات اعتماد وكيل المتجر، أما أدوات القراءة فلا تتطلب ذلك. ' +
       'تفعيل هذا الخيار يسمح لأي وكيل غير موثّق بالكتابة في هذا المتجر مجدداً — فعّله فقط ' +
       'لإصلاح تكامل قائم ريثما تُصدر بيانات الاعتماد.',
     category: 'marketing',
@@ -679,11 +679,11 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     nameAr: 'أسعار الجملة',
     description:
       'Quantity price breaks, customer-group prices, minimum order quantities, wholesale-only ' +
-      'products and a wholesale account application you approve. Included in Business; granted ' +
-      'per store by a super-admin override otherwise.',
+      'products and a wholesale account application you approve. Included in Business; the Ebda team can ' +
+      'enable it for a single store otherwise.',
     descriptionAr:
       'خصومات الكميات وأسعار مجموعات العملاء والحد الأدنى للطلب ومنتجات الجملة فقط ' +
-      'وطلبات حسابات الجملة التي توافق عليها. مضمّن في باقة الأعمال، ويُمنح لمتجر بعينه عبر تجاوز من المشرف العام.',
+      'وطلبات حسابات الجملة التي توافق عليها. مضمّن في باقة الأعمال، ويقدر فريق ابدأ يفعّله لمتجر بعينه.',
     category: 'commerce',
     tier: 'addon',
     // Hidden from the merchant feature list until the merchant + storefront UI ships (Tasks 6-7); a super-admin can
@@ -697,10 +697,10 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     nameAr: 'إزالة «مدعوم من ابدأ ستور»',
     description:
       'Hides the "Powered by Ebda Store" attribution in the storefront footer. Included in Growth ' +
-      'and Business; granted per store by a super-admin override otherwise.',
+      'and Business; the Ebda team can enable it for a single store otherwise.',
     descriptionAr:
       'يخفي عبارة «مدعوم من ابدأ ستور» من تذييل المتجر. مضمّن في باقتي النمو والأعمال، ' +
-      'ويُمنح لمتجر بعينه عبر تجاوز من المشرف العام.',
+      'ويقدر فريق ابدأ يفعّله لمتجر بعينه.',
     category: 'storefront',
     tier: 'addon',
   },
@@ -721,7 +721,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
   bundles: {
     key: 'bundles',
     name: 'Product Bundles',
-    nameAr: 'باقات المنتجات',
+    nameAr: 'مجموعات المنتجات',
     description:
       'Sell a fixed kit of products as one item at one price. Stock is drawn from the ' +
       'component products, so nothing is double-counted.',
