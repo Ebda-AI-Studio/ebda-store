@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { DocumentTitle } from '../DocumentTitle';
 import { usePinnedLightTheme } from '@/lib/use-pinned-light-theme';
+import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
 import { maskEmail } from '@/lib/mask-email';
 
@@ -29,13 +30,9 @@ export function SignedInStrip() {
           {t('signedInAs')} <bdi dir="ltr">{maskEmail(user.email)}</bdi>
         </span>
       )}
-      <button
-        type="button"
-        onClick={() => void logout()}
-        className="min-h-11 rounded-lg border border-border px-3 font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      >
+      <Button type="button" variant="outline" size="sm" onClick={() => void logout()}>
         {t('signOut')}
-      </button>
+      </Button>
     </div>
   );
 }
