@@ -16,6 +16,9 @@ const h = vi.hoisted(() => ({
   owner: vi.fn(),
   consentRow: vi.fn(),
   store: vi.fn(),
+  linkRowDb: vi.fn(),
+  redisExists: vi.fn(),
+  redisSet: vi.fn(),
 }));
 const dbMock = vi.hoisted(() => ({
   order: { findUnique: h.order },
@@ -24,6 +27,10 @@ const dbMock = vi.hoisted(() => ({
   storeWhatsAppConsent: { findUnique: h.consentRow },
   product: { findMany: h.products },
   store: { findUnique: h.store },
+  storeWhatsAppLink: { findUnique: h.linkRowDb },
+}));
+vi.mock('@api/services/redis.service', () => ({
+  redis: { exists: h.redisExists, set: h.redisSet },
 }));
 vi.mock('@ebda/database', () => ({
   prisma: dbMock,
@@ -57,6 +64,7 @@ import { storeEventSchema } from '@api/contracts/wa-v1';
 import {
   contractPaymentMethod,
   emitStoreEventsFor,
+  announceLinkOrigin,
 } from '@api/lib/inngest/functions/wa-store-events';
 import { assertWhatsAppLinkConfig, suiteBuyerKeySecret } from '@api/lib/wa/config';
 import { deterministicEventId } from '@api/lib/wa/events';
@@ -79,6 +87,7 @@ const ORDER = {
 
 beforeEach(() => {
   process.env.SUITE_BUYER_KEY_SECRET = SECRET;
+  process.env.ORDER_STATUS_LINK_SECRET = 'producer-test-order-status-link-secret-0123456789';
   h.order.mockReset().mockResolvedValue(ORDER);
   h.linked.mockReset().mockResolvedValue(true);
   h.consent.mockReset().mockResolvedValue(true);
@@ -153,6 +162,70 @@ describe('order/created', () => {
     // 24 h after the order was placed
     expect(cod!.data.deadlineAt).toBe('2026-10-26T10:00:00.000Z');
     expect(cod!.data.buyerKey).toBe(created!.data.buyerKey);
+  });
+
+  it('the COD request carries the v1.6 fields (store name, one-line address, item count, order link), valid against the contract', async () => {
+    h.order.mockResolvedValue({
+      ...ORDER,
+      shippingAddress: {
+        phone: '01001234567',
+        street: '9 شارع النصر\nالدور 3',
+        city: 'المعادي',
+        country: 'EG',
+      },
+      items: [{ quantity: 2 }, { quantity: 1 }],
+    });
+    h.store.mockResolvedValue({
+      name: 'Souq',
+      nameAr: 'سوق',
+      slug: 'souq',
+      domain: null,
+      settings: {},
+    });
+    await emitStoreEventsFor(ev('cod'));
+    const cod = sent().find(e => e.type === 'order.cod_confirmation_requested')!;
+    expect(storeEventSchema.safeParse(cod).success).toBe(true);
+    expect(cod.data).toMatchObject({
+      storeName: 'سوق',
+      itemCount: 3,
+      orderUrlSuffix: expect.stringMatching(/^o\/[0-9a-f-]+\.o1\./),
+      storefrontOrigin: 'https://souq.ebda.app',
+    });
+    expect(String(cod.data.shippingAddressLine)).toContain('النصر');
+    expect(String(cod.data.shippingAddressLine)).not.toMatch(/[\n\t]/);
+  });
+
+  it('PII: the address is never written to a log line', async () => {
+    const logger = (await import('@api/lib/logger')).default as unknown as Record<
+      string,
+      { mock: { calls: unknown[][] } }
+    >;
+    h.order.mockResolvedValue({
+      ...ORDER,
+      shippingAddress: { phone: '01001234567', street: 'SECRET-STREET-77', city: 'Cairo' },
+      items: [{ quantity: 1 }],
+    });
+    h.store.mockResolvedValue({
+      name: 'Souq',
+      nameAr: null,
+      slug: 'souq',
+      domain: null,
+      settings: {},
+    });
+    await emitStoreEventsFor(ev('cod'));
+    const logged = JSON.stringify(
+      ['info', 'warn', 'error', 'debug'].flatMap(l => logger[l]!.mock.calls)
+    );
+    expect(logged).not.toContain('SECRET-STREET-77');
+  });
+
+  it('a store read that fails still sends the plain COD request (the extras are optional)', async () => {
+    h.store.mockRejectedValue(new Error('boom'));
+    await emitStoreEventsFor(ev('cod'));
+    const cod = sent().find(e => e.type === 'order.cod_confirmation_requested')!;
+    expect(storeEventSchema.safeParse(cod).success).toBe(true);
+    expect(cod.data).not.toHaveProperty('storeName');
+    expect(cod.data).not.toHaveProperty('storefrontOrigin');
   });
 
   it('a prepaid order emits only order.created, with the gateway mapped to the contract enum', async () => {
@@ -583,7 +656,7 @@ describe('customer.consent_changed v1.5 wording (WA-OPTIN-WORDING-1)', () => {
     }
   });
 
-  it('the vendored contract is v1.6 (v1.5 wording kept)', async () => {
+  it('the vendored contract is v1.6', async () => {
     const { CONTRACT_VERSION } = await import('@api/contracts/wa-v1');
     expect(CONTRACT_VERSION).toBe('1.6');
   });
@@ -685,5 +758,44 @@ describe('order.created paymentMethod: instapay (WA-C5)', () => {
       expect(['cod', 'link', 'card', 'wallet', 'instapay']).toContain(contractPaymentMethod(raw));
     expect(contractPaymentMethod('instapay')).not.toBe('card');
     expect(contractPaymentMethod('InstaPay')).toBe('instapay');
+  });
+});
+
+describe('link origin announcement (COD v2 backfill, contract v1.6)', () => {
+  beforeEach(() => {
+    h.linkRowDb.mockReset().mockResolvedValue({ linked: true, ownerUserId: 'owner-1' });
+    h.store.mockReset().mockResolvedValue({ slug: 'souq', domain: null });
+    h.redisExists.mockReset().mockResolvedValue(0);
+    h.redisSet.mockReset().mockResolvedValue('OK');
+    h.send.mockClear();
+  });
+
+  it('sends a valid store.linked carrying the storefront origin, and flags it so the next run sends nothing', async () => {
+    expect(await announceLinkOrigin(STORE)).toBe(1);
+    const [e] = sent();
+    expect(storeEventSchema.safeParse(e).success).toBe(true);
+    expect(e).toMatchObject({
+      type: 'store.linked',
+      data: { ownerUserId: 'owner-1', storefrontOrigin: 'https://souq.ebda.app' },
+    });
+    expect(h.redisSet).toHaveBeenCalledWith(
+      expect.stringContaining(`${STORE}:https://souq.ebda.app`),
+      '1',
+      expect.any(Number)
+    );
+    h.redisExists.mockResolvedValue(1);
+    h.send.mockClear();
+    expect(await announceLinkOrigin(STORE)).toBe(0);
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it('is deterministic per (store, origin) and sends nothing for an unlinked store', async () => {
+    await announceLinkOrigin(STORE);
+    await announceLinkOrigin(STORE);
+    expect(sent()[0]!.id).toBe(sent()[1]!.id);
+    h.send.mockClear();
+    h.linkRowDb.mockResolvedValue({ linked: false, ownerUserId: 'owner-1' });
+    expect(await announceLinkOrigin(STORE)).toBe(0);
+    expect(h.send).not.toHaveBeenCalled();
   });
 });

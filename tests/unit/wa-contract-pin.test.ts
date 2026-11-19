@@ -1,6 +1,6 @@
 /**
  * The Store <-> WhatsApp envelope is ONE file in two repos. This pins the vendored copy to the
- * Ebda Chat repo's bytes (commit 16abd6a + v1.4 pastDueSince (WA-GRACE-1) + v1.5 wording (WA-OPTIN-WORDING-1) + v1.6 store standing (STORE-STANDING-1), src/core/api/store-events.ts; the Store's copy is contracts/wa-v1.ts): a change here
+ * Ebda Chat repo's bytes (commit 16abd6a + v1.4 pastDueSince (WA-GRACE-1) + v1.5 wording (WA-OPTIN-WORDING-1) + v1.6 COD-request fields + store.suspended/reactivated/deleted (STORE-STANDING-1), src/core/api/store-events.ts; the Store's copy is contracts/wa-v1.ts): a change here
  * must be a deliberate, mirrored one.
  */
 import { describe, it, expect } from 'vitest';
