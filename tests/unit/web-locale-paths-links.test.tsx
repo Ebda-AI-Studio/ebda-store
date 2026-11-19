@@ -13,8 +13,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
   LOCALE_PATH_ROOTS,
+  decideLocalePath,
   isLocalePathRoute,
-  isLocaleServedRoute,
   splitLocalePrefix,
 } from '../../apps/web/src/lib/locale-paths';
 import { LocalePathProvider } from '../../apps/web/src/contexts/LocalePathContext';
@@ -104,10 +104,14 @@ const internalHrefs = (html: string) =>
     .map(m => m[1].replace(/&amp;/g, '&'))
     .filter(h => h.startsWith('/') && !h.startsWith('//'));
 
+/** Served under a language prefix (the middleware rewrites `/en<path>` instead of redirecting it away). */
+const servedUnderPrefix = (p: string) =>
+  decideLocalePath({ pathname: `/en${p}`, search: '', method: 'GET' }).kind === 'rewrite';
+
 /** An indexable-route link without the language prefix: the thing this guard forbids. */
 const unprefixedIndexable = (hrefs: string[]) =>
   hrefs.filter(
-    h => !splitLocalePrefix(h.split(/[?#]/)[0]) && isLocaleServedRoute(h.split(/[?#]/)[0])
+    h => !splitLocalePrefix(h.split(/[?#]/)[0]) && servedUnderPrefix(h.split(/[?#]/)[0])
   );
 
 describe('rendered chrome carries zero unprefixed internal links on a locale-path page', () => {
