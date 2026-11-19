@@ -597,8 +597,7 @@ describe('marketing SEO and trust surface', () => {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain(`${word} ${cur.version}`);
         // the WhatsApp button's wa.me href is the only long number on the page, and it is not a registration number
-        // ... and the studio's LinkedIn company id in the footer profile link (a profile URL, not a registration number)
-        const withoutPhone = html.replace(/201514191411/g, '').replace(/company\/146968293/g, '');
+        const withoutPhone = html.replace(/201514191411/g, '');
         expect(withoutPhone).not.toMatch(/\b\d{5,}\b/);
       }
     }

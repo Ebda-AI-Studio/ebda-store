@@ -47,11 +47,11 @@ export function Footer({ locale }: { locale: Locale; page?: PageSlug }) {
                 </div>
               ))}
             </dl>
-            <ul className="sf-social" aria-label={f.brand.socialLabel}>
-              {f.brand.social.map(s => (
-                <li key={s.id}>
-                  <SiteLink href={s.href} locale={locale} aria-label={s.aria}>
-                    {s.label}
+            <ul className="sf-social">
+              {f.brand.social.map(a => (
+                <li key={a.id}>
+                  <SiteLink href={a.href} locale={locale} aria-label={a.ariaLabel}>
+                    {a.label}
                   </SiteLink>
                 </li>
               ))}

@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ContactPage } from '../../apps/marketing/src/components/ContactPage';
+import { SOCIAL_SAME_AS } from '../../packages/shared/src/brand';
 import sitemap from '../../apps/marketing/src/app/sitemap';
 import { COMPARE_SLUGS, SITE_PAGES } from '../../apps/marketing/src/lib/site';
 
@@ -18,9 +19,7 @@ describe('/contact (6c)', () => {
       expect(html).toContain('/.well-known/security.txt');
       expect(html).toContain('https://help.ebda.app');
       expect(html).toContain('https://status.ebda.app');
-      expect(html).toContain('https://www.instagram.com/ebdaaistudio');
-      expect(html).toContain('https://www.facebook.com/ebdaaistudio');
-      expect(html).toContain('https://www.linkedin.com/company/146968293');
+      for (const url of SOCIAL_SAME_AS) expect(html).toContain(url);
       expect(html.match(/<h1/g)).toHaveLength(1);
     });
   }

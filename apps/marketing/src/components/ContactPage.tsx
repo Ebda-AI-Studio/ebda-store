@@ -1,5 +1,5 @@
 import { PageLink } from './PageLink';
-import { BRAND, socialLinks, whatsappDisplay, whatsappUrl } from '@ebda/shared/brand';
+import { BRAND, siteFooter, whatsappDisplay, whatsappUrl } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { pageJsonLd } from '../lib/seo';
 import { HOME, SECURITY_EMAIL, type Locale } from '../lib/site';
@@ -58,10 +58,10 @@ export function ContactPage({ locale }: { locale: Locale }) {
               <section aria-labelledby="contact-social-h">
                 <h2 id="contact-social-h">{p.socialH}</h2>
                 <p>
-                  {socialLinks(locale).map((s, i) => (
+                  {siteFooter(locale).brand.social.map((s, i) => (
                     <span key={s.id}>
                       {i > 0 ? ' · ' : null}
-                      <SiteLink href={s.href} locale={locale} aria-label={s.aria}>
+                      <SiteLink href={s.href} locale={locale} aria-label={s.ariaLabel}>
                         {s.label}
                       </SiteLink>
                     </span>

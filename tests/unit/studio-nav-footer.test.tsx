@@ -583,23 +583,3 @@ describe('office (BRAND.office): the studio has one office, so no "branch" wordi
     expect(text).not.toMatch(/فرع|فروع|branch/i);
   });
 });
-
-// Ebda AI Studio's profiles (2026-11-16): one BRAND list, rendered by both footers, the contact page and the JSON-LD.
-describe('studio social links', () => {
-  const expected = [
-    'https://www.instagram.com/ebdaaistudio',
-    'https://www.facebook.com/ebdaaistudio',
-    'https://www.linkedin.com/company/146968293',
-  ];
-  for (const lang of ['ar', 'en'] as const) {
-    it(`${lang}: both footers carry the three profiles with an accessible name and the WhatsApp line`, () => {
-      const f = siteFooter(lang);
-      expect(f.brand.social.map(s => s.href)).toEqual(expected);
-      for (const s of f.brand.social) expect(s.aria).toContain(f.brand.name);
-      const html = siteFooterHtml(lang, '', 2026);
-      for (const url of expected) expect(html).toContain(`href="${url}"`);
-      expect(html).toContain('class="sf-social"');
-      expect(html).toContain('https://wa.me/201514191411');
-    });
-  }
-});

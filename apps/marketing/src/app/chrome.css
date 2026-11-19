@@ -284,16 +284,20 @@
 }
 .sf-social {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 16px 0 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0 20px;
+  gap: 4px 16px;
 }
 .sf-social a {
   display: inline-block;
-  padding: 11px 0;
+  padding: 10px 0;
   min-height: 44px;
+  color: #f3f5f4;
+}
+.sf-social a:hover {
+  color: #cba873;
 }
 .sf-col h2 {
   font-size: 0.8125rem;

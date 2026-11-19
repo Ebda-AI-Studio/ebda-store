@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as seo from '../../apps/marketing/src/lib/seo';
+import { SOCIAL_SAME_AS } from '../../packages/shared/src/brand';
 
 const PERSON = 'https://mypovonai.com/#person';
 const ORG = 'https://ebda.app/#organization';
@@ -31,12 +32,8 @@ describe('Ebda AI Studio founder entity', () => {
 });
 
 describe('Ebda AI Studio public profiles', () => {
-  const profiles = [
-    'https://www.instagram.com/ebdaaistudio',
-    'https://www.facebook.com/ebdaaistudio',
-    'https://www.linkedin.com/company/146968293',
-  ];
-  it('the studio Organization carries the three profiles as sameAs, from BRAND.social', () => {
+  const profiles = SOCIAL_SAME_AS;
+  it('the studio Organization carries the foundation profiles as sameAs, from EBDA.social', () => {
     for (const locale of ['ar', 'en'] as const) {
       const orgs = studioOrgs(
         seo.studioJsonLd(locale) as unknown as { '@graph': Node[] }
