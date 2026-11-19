@@ -5454,7 +5454,8 @@
         "overridesCleared": "تم مسح التجاوزات",
         "overridesClearedDescription": "أصبح المتجر يستخدم إعدادات الخطة الافتراضية.",
         "resetFailed": "معرفناش نعيد التعيين"
-      }
+      },
+      "baselineTierNote": "الميزات اللي تحت محسوبة على مجموعة ميزات {plan}، ودي ماشية مع باقة اشتراك المتجر."
     }
   },
   "template": {
@@ -6686,6 +6687,12 @@
         "appealOpen": "اعتراضك بيتراجع. هنرد عليك على الإيميل.",
         "appeal": "اعترض على القرار"
       }
+    },
+    "subscriptionPlanRow": {
+      "label": "باقة المتجر",
+      "loading": "بنحمّل الباقة…",
+      "loadError": "معرفناش نحمّل الباقة. افتح صفحة الفوترة عشان تشوفها.",
+      "assignLink": "عيّن الباقة من الفوترة"
     }
   },
   "finance": {
@@ -9468,7 +9475,8 @@
     "viewReceipt": "شوف الإيصال",
     "receiptProcessing": "الدفع تم. الإيصال هيطلع هنا حالاً.",
     "cancelObject": "إلغاء اشتراكك في الباقة",
-    "cancelAction": "الغي الاشتراك"
+    "cancelAction": "الغي الاشتراك",
+    "adminPlanHidden": "مخفية"
   },
   "planLimit": {
     "maxProducts": "باقتك تسمح بحد أقصى {limit} منتج. رقّي باقتك لإضافة المزيد.",
@@ -12035,7 +12043,11 @@
       "first_order": "أول أوردر",
       "first_fulfilled_order": "أول أوردر اتسلّم"
     },
-    "col": { "step": "الخطوة", "store": "المتجر", "stopped": "الأوردر وقف فين" },
+    "col": {
+      "step": "الخطوة",
+      "store": "المتجر",
+      "stopped": "الأوردر وقف فين"
+    },
     "funnel": {
       "title": "القمع حسب تاريخ التسجيل",
       "body": "المتاجر اللي سجّلت في الفترة دي: كام واحد وصل لكل خطوة، ومتوسط الوقت من التسجيل. بيتحدّث مرة في اليوم.",
@@ -12047,8 +12059,14 @@
       "median": "متوسط الوقت من التسجيل",
       "help": "متاجر احتاجت مساعدة"
     },
-    "stores": { "title": "المتاجر" },
-    "channel": { "storefront": "المتجر", "whatsapp": "واتساب", "admin": "لوحة التاجر" },
+    "stores": {
+      "title": "المتاجر"
+    },
+    "channel": {
+      "storefront": "المتجر",
+      "whatsapp": "واتساب",
+      "admin": "لوحة التاجر"
+    },
     "helpKind": {
       "assistant_used": "استخدم مساعد Ebda AI Studio",
       "super_admin_action": "الدعم عدّل في المتجر",
@@ -12068,7 +12086,11 @@
       "delivered": "اتسلّم",
       "returned": "رجع"
     },
-    "duration": { "minutes": "{n} دقيقة", "hours": "{n} ساعة", "days": "{n} يوم" }
+    "duration": {
+      "minutes": "{n} دقيقة",
+      "hours": "{n} ساعة",
+      "days": "{n} يوم"
+    }
   },
   "assistant": {
     "title": "المساعد",
