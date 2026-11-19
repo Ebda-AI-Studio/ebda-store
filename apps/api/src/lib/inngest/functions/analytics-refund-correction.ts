@@ -21,6 +21,7 @@ import logger from '../../logger';
 
 const DAY_MS = 86_400_000;
 /** Whole Cairo days between the order's day and today (>= 1: the rollup never writes today). */
+// pq-allow(unused-export): imported by tests/unit/revenue-definition.test.ts
 export function cairoDaysAgo(orderCreatedAt: Date, now: Date = new Date()): number {
   const days = Math.round(
     (regionDayStart(now).getTime() - regionDayStart(orderCreatedAt).getTime()) / DAY_MS

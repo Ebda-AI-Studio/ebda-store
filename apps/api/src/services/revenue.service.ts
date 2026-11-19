@@ -9,7 +9,7 @@ import { Prisma, withStore } from '@ebda/database';
 import { storeMoney } from '../lib/repo-factory';
 import { orderNetRevenueSql, revenueOrderPredicateSql } from '../lib/revenue-sql';
 
-export interface NetRevenueOpts {
+interface NetRevenueOpts {
   from?: Date;
   to?: Date;
   /** Paid-only population (rollups, funnel, usage snapshot, reconciliation): adds payment_status = 'paid'. */

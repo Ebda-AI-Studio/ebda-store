@@ -11,7 +11,19 @@ const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url),
 
 describe('the two copies of the definition', () => {
   it('are byte-equal (the API must not import packages/repo statically)', () => {
-    expect(read('apps/api/src/lib/revenue-sql.ts')).toBe(read('packages/repo/src/revenue.ts'));
+    // identical except the SLOP-TWIN-1 annotations, which necessarily name the OTHER file
+    const strip = (t: string) =>
+      t.replace(/^\/\/ pq-allow\(duplicate-helper\): twin of .*\n/gm, '');
+    expect(strip(read('apps/api/src/lib/revenue-sql.ts'))).toBe(
+      strip(read('packages/repo/src/revenue.ts'))
+    );
+    // and each annotation points at the other file (the guard checks this too)
+    expect(read('apps/api/src/lib/revenue-sql.ts')).toContain(
+      'twin of packages/repo/src/revenue.ts'
+    );
+    expect(read('packages/repo/src/revenue.ts')).toContain(
+      'twin of apps/api/src/lib/revenue-sql.ts'
+    );
   });
   it('exclude exactly the statuses @ebda/shared declares as non-revenue', () => {
     expect([...api.NON_REVENUE_ORDER_STATUSES]).toEqual([...NON_REVENUE_ORDER_STATUSES]);

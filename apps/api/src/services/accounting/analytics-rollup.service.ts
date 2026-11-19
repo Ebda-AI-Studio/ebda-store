@@ -896,7 +896,7 @@ export async function runDailyRollup(storeId: string): Promise<RollupResult> {
 // Funnel revenue drift (REVENUE-DEF-1 backfill)
 // ---------------------------------------------------------------------------
 
-export interface FunnelDriftDay {
+interface FunnelDriftDay {
   daysAgo: number;
   periodDate: string;
   storedOrders: number;

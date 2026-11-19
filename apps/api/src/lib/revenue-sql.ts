@@ -41,6 +41,7 @@ export function revenueOrderPredicateSql(alias = 'o', opts: { paidOnly?: boolean
 }
 
 /** Scalar SQL: the piastres of order `<alias>` already refunded (partial or full), capped at its total. */
+// pq-allow(duplicate-helper): twin of packages/repo/src/revenue.ts; API cannot import packages/repo; equality enforced by tests/unit/revenue-definition.test.ts
 export function orderRefundedMinorSql(alias: string, dialect: RevenueSqlDialect): string {
   const t = (n: string) => (dialect === 'pg' ? `public.${n}` : n);
   const [least, greatest] = dialect === 'pg' ? ['LEAST', 'GREATEST'] : ['MIN', 'MAX'];
@@ -75,6 +76,7 @@ export function netOrderRevenueMinor(o: {
  * exposes l.id, l.order_id, l.product_id, l.quantity, l.price_source, l.price_group_applied and net_total.
  * The WHERE must select WHOLE orders (it filters on the order, never on a line) so the window sums see every line.
  */
+// pq-allow(duplicate-helper): twin of packages/repo/src/revenue.ts; API cannot import packages/repo; equality enforced by tests/unit/revenue-definition.test.ts
 export function netLinesInnerSql(dialect: RevenueSqlDialect): string {
   return `SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price_source, oi.price_group_applied, oi.total,
        ${orderRefundedMinorSql('o', dialect)} AS ref_minor,
@@ -99,6 +101,7 @@ export function netLinesWrapSql(dialect: RevenueSqlDialect): { head: string; tai
 }
 
 /** Pure twin of the line allocation, for tests and for code that already holds an order's lines. */
+// pq-allow(duplicate-helper): twin of packages/repo/src/revenue.ts; API cannot import packages/repo; equality enforced by tests/unit/revenue-definition.test.ts
 export function allocateRefundToLines(lineTotals: number[], refundedMinor: number): number[] {
   const sum = lineTotals.reduce((a, b) => a + b, 0);
   if (refundedMinor <= 0 || sum <= 0) return lineTotals.slice();

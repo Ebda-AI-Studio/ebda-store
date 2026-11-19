@@ -19,9 +19,10 @@ import {
 } from '../../../services/accounting/analytics-rollup.service';
 import logger from '../../logger';
 
-export const FUNNEL_BACKFILL_DEFAULT_DAYS = 90;
-export const FUNNEL_BACKFILL_MAX_DAYS = 400;
+const FUNNEL_BACKFILL_DEFAULT_DAYS = 90;
+const FUNNEL_BACKFILL_MAX_DAYS = 400;
 
+// pq-allow(unused-export): imported by tests/unit/revenue-definition.test.ts
 export function clampBackfillDays(n: unknown): number {
   const v =
     typeof n === 'number' && Number.isFinite(n) ? Math.floor(n) : FUNNEL_BACKFILL_DEFAULT_DAYS;
