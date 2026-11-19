@@ -70,7 +70,7 @@ describe('first screen', () => {
     expect(screen.getAllByTestId(/^preset-/)).toHaveLength(THEME_PRESETS.length);
     const quick = screen.getByTestId('theme-quick');
     // three colours, each the shared ColorField (repo rule: no raw native colour input in the panel)
-    expect(within(quick).getAllByRole('combobox')).toHaveLength(3);
+    expect(quick.querySelectorAll('button[aria-expanded][aria-controls]')).toHaveLength(3);
     for (const id of ['density', 'borderRadius', 'fontFamily'])
       expect(quick.querySelector(`[data-feel="${id}"]`), id).not.toBeNull();
   });
@@ -111,14 +111,13 @@ describe('first screen', () => {
 describe('tiers', () => {
   it('only one accordion group is open at a time', () => {
     mount();
-    const header = screen.getByTestId('tier2-header') as HTMLDetailsElement;
-    const cards = screen.getByTestId('tier2-cards') as HTMLDetailsElement;
-    header.open = true;
-    fireEvent(header, new Event('toggle'));
-    cards.open = true;
-    fireEvent(cards, new Event('toggle'));
-    expect((screen.getByTestId('tier2-header') as HTMLDetailsElement).open).toBe(false);
-    expect((screen.getByTestId('tier2-cards') as HTMLDetailsElement).open).toBe(true);
+    const trigger = (id: string) =>
+      within(screen.getByTestId(id)).getAllByRole('button')[0] as HTMLButtonElement;
+    fireEvent.click(trigger('tier2-header'));
+    expect(trigger('tier2-header').getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(trigger('tier2-cards'));
+    expect(trigger('tier2-header').getAttribute('aria-expanded')).toBe('false');
+    expect(trigger('tier2-cards').getAttribute('aria-expanded')).toBe('true');
   });
 
   it('fonts, text zones and the rarely used toggles sit behind Advanced, closed', () => {
@@ -127,8 +126,8 @@ describe('tiers', () => {
       typography: { fonts: [], zones: {} },
       onTypography: vi.fn(),
     });
-    const adv = screen.getByTestId('theme-advanced') as HTMLDetailsElement;
-    expect(adv.open).toBe(false);
+    const adv = screen.getByTestId('theme-advanced');
+    expect(adv.getAttribute('data-state')).toBe('closed');
     expect(adv.querySelector('[data-testid="fonts-field"]')).not.toBeNull();
     expect(adv.querySelector('[data-testid="typography-zones-field"]')).not.toBeNull();
   });
