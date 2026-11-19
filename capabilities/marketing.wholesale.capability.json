@@ -1,0 +1,39 @@
+{
+  "id": "marketing.wholesale",
+  "status": "live",
+  "area": "b2b",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "اسعار الجملة",
+  "titleEn": "Wholesale pricing: tiers, MOQ, applications (approve/reject/revoke)",
+  "screens": ["/stores/[id]/wholesale-applications", "price tiers"],
+  "api": [
+    "GET/POST/PUT/DELETE /stores/:storeId/price-tiers",
+    "GET .../wholesale/summary",
+    "POST .../wholesale/:id/approve|reject|revoke"
+  ],
+  "mcpTool": null,
+  "planGate": "b2b.wholesale",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "an approve/reject emails the applicant; a revoked buyer must apply again after the cooldown"
+  },
+  "helpArticle": "wholesale-buyers",
+  "questions": {
+    "ar": ["ازاي ابيع جملة؟", "اقبل طلب تاجر جملة", "اقبل تاجر الجملة ده", "الغي تاجر جملة"],
+    "en": ["How do I sell wholesale?"]
+  },
+  "steps": ["Wholesale page (Business plan)."],
+  "edgeCases": [
+    "Business plan only",
+    "Wholesale-only products hidden from retail",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

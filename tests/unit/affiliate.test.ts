@@ -7,6 +7,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+vi.mock('@api/lib/store-operational', () => ({
+  STORE_NOT_OPERATIONAL: 'STORE_NOT_OPERATIONAL',
+  isStoreOperational: (s: unknown) => s === 'active',
+  storeOperational: async () => true,
+  storeMayMessageCustomers: async () => true,
+  assertStoreOperational: async () => undefined,
+  activeStoreIds: async () => ({ has: () => true }) as unknown as Set<string>,
+  requireOperationalStore: (_q: unknown, _r: unknown, next: () => void) => next(),
+}));
 import { affiliateService } from '@api/services/affiliate.service';
 import { prisma, withMoneyTx } from '@ebda/database';
 import { AppError } from '@api/middleware/error-handler';

@@ -883,3 +883,62 @@ export function evalQueries(): EvalQuery[] {
   for (const h of EVAL_HARD) out.push({ cls: `hard-${h.form}`, core: false, key: h.key, q: h.q });
   return out;
 }
+
+// ---- Arabic stemming eval (Ruling SEARCH-STEM-1) --------------------------------------------------------------------
+// A small commerce set on top of the base catalogue (distractors): the keyword arm must find an item by ANY inflection of
+// its word. Not part of the SEARCH-10 bar and not in `catalogueRows()` (those stay byte-identical for the PG harness).
+
+export const EVAL_STEM_ROWS: readonly EvalRow[] = [
+  { id: 'stem-bag-1', type: 'stem-bag', nameAr: 'شنطة جلد حريمي', name: '' },
+  { id: 'stem-bag-2', type: 'stem-bag', nameAr: 'شنط سفر كبيرة', name: '' },
+  { id: 'stem-bag-3', type: 'stem-bag', nameAr: 'الشنطة المدرسية', name: '' },
+  { id: 'stem-watch-1', type: 'stem-watch', nameAr: 'ساعة يد رجالي', name: '' },
+  { id: 'stem-watch-2', type: 'stem-watch', nameAr: 'ساعات حائط ديكور', name: '' },
+  { id: 'stem-book-1', type: 'stem-book', nameAr: 'كتب أطفال ملونة', name: '' },
+  { id: 'stem-book-2', type: 'stem-book', nameAr: 'الكتاب المدرسي', name: '' },
+  { id: 'stem-book-3', type: 'stem-book', nameAr: 'مكتبة خشب للكتب', name: '' },
+  { id: 'stem-shoe-1', type: 'stem-shoe', nameAr: 'جزمة جلد رجالي', name: '' },
+  { id: 'stem-shoe-2', type: 'stem-shoe', nameAr: 'جزم شتوي', name: '' },
+  { id: 'stem-shoe-3', type: 'stem-shoe', nameAr: 'الجزمة السوداء', name: '' },
+  { id: 'stem-cup-1', type: 'stem-cup', nameAr: 'كوبايات زجاج', name: '' },
+  { id: 'stem-cup-2', type: 'stem-cup', nameAr: 'كوباية قهوة', name: '' },
+];
+
+export interface EvalStemCase {
+  q: string;
+  /** Every one of these ids must be in the results. */
+  relevant: readonly string[];
+  /** None of these may be (precision guard: a stem must not merge unrelated words). */
+  absent?: readonly string[];
+}
+const BAGS = ['stem-bag-1', 'stem-bag-2', 'stem-bag-3'];
+const WATCHES = ['stem-watch-1', 'stem-watch-2'];
+const BOOKS = ['stem-book-1', 'stem-book-2', 'stem-book-3'];
+const SHOES = ['stem-shoe-1', 'stem-shoe-2', 'stem-shoe-3'];
+const CUPS = ['stem-cup-1', 'stem-cup-2'];
+const only = (keep: readonly string[]) =>
+  EVAL_STEM_ROWS.map(r => r.id).filter(id => !keep.includes(id));
+
+export const EVAL_STEM: readonly EvalStemCase[] = [
+  ...['كتب', 'الكتب', 'كتابين', 'مكتبة', 'الكتاب'].map(q => ({
+    q,
+    relevant: BOOKS,
+    absent: only(BOOKS),
+  })),
+  ...['شنط', 'شنطة', 'الشنط', 'شنطتين', 'بالشنطة'].map(q => ({
+    q,
+    relevant: BAGS,
+    absent: only(BAGS),
+  })),
+  ...['ساعة', 'ساعات', 'الساعات', 'ساعتين', 'للساعه'].map(q => ({
+    q,
+    relevant: WATCHES,
+    absent: only(WATCHES),
+  })),
+  ...['جزمة', 'جزم', 'الجزم', 'جزمتين'].map(q => ({
+    q,
+    relevant: SHOES,
+    absent: only(SHOES),
+  })),
+  ...['كوباية', 'كوبايات', 'الكوبايات'].map(q => ({ q, relevant: CUPS, absent: only(CUPS) })),
+];

@@ -1,0 +1,41 @@
+{
+  "id": "finance.journal-accounts",
+  "status": "live",
+  "area": "finance",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "دليل الحسابات والقيود اليدوية",
+  "titleEn": "Chart of accounts and manual journal entries",
+  "screens": ["/stores/[id]/finance/accounts", "/finance/journal"],
+  "api": [
+    "GET/POST .../finance/accounts",
+    "POST .../accounts/seed",
+    "PATCH .../accounts/:accountId/active",
+    "GET/POST .../finance/journal",
+    "GET .../journal/:entryId"
+  ],
+  "mcpTool": null,
+  "planGate": "accounting.basic",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "a posted entry is corrected with a reversing entry on the Journal page; the assistant has no undo for it"
+  },
+  "helpArticle": "finance-books-and-reports",
+  "questions": {
+    "ar": ["اعمل قيد يومية", "ضيف حساب جديد", "رحّل قيد تسوية", "اعمل حساب تحت المصروفات"],
+    "en": ["Add a manual journal entry"]
+  },
+  "steps": ["Journal page."],
+  "edgeCases": [
+    "POST journal is super-admin only in code (finance.routes) but UI offers new entry: inconsistency",
+    "Manual journals in #755",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Role mismatch between UI and API (inferred; verify)"]
+}

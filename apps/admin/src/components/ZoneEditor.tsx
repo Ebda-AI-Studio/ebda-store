@@ -1,11 +1,13 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { ZoneOverride, StoreTheme, ColorToken } from '@ebda/shared';
 import { ColorField } from './ColorField';
+import { Disclosure } from './ui/Disclosure';
+import { Field, Segmented, TextInput, type SegmentOption } from './ui/Field';
+import { FontPicker, type PickerFont } from './section-design/FontPicker';
 import { useT } from '@/i18n/useT';
-import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 export interface ZoneEditorProps {
   /** Unique key identifying the zone (e.g. 'sectionHeading', 'kicker'). Used as label prefix. */
@@ -64,6 +66,11 @@ export interface ZoneEditorProps {
    * Omit when the zone's text doesn't inherit from a predictable brand token.
    */
   inheritFromToken?: ColorToken;
+  /**
+   * The store's font library. When given (and no `fontFamilyOptions`), the font field is the FontPicker:
+   * each family listed in its own face. Without it the field stays a plain text input (legacy callers).
+   */
+  fonts?: PickerFont[];
 }
 
 // Auto-append `px` to bare numbers in size / spacing fields so merchants
@@ -108,75 +115,115 @@ export function ZoneEditor({
   hideLabel,
   className,
   inheritFromToken,
+  fonts,
 }: ZoneEditorProps) {
   const t = useT('zoneEditor');
   const hasValues = hasAnyValue(values);
   // UX:C-3 - inline feedback instead of a native alert().
   const [sizeRejected, setSizeRejected] = useState(false);
 
-  // Build placeholder text for each field from the inherited zone values.
-  const ph = (field: keyof ZoneOverride): string => {
-    const v = placeholder?.[field];
-    return typeof v === 'string' && v ? t('inheritWithValue', { value: v }) : t('inherit');
-  };
-
   const handleSize = (field: 'fontSize' | 'letterSpacing' | 'lineHeight', raw: string) => {
     if (field === 'fontSize') setSizeRejected(false);
     onChange({ [field]: normaliseSizeValue(raw) });
   };
 
-  // Default styling: standalone zone card with border and padding.
-  // When embedded inside an existing bordered block, the parent can pass
-  // className="" to suppress the outer border (avoids nested double-borders).
+  /** Named options + the merchant's current value when it is none of them (never lose a stored value). */
+  const withCurrent = (opts: SegmentOption[], cur: string | undefined): SegmentOption[] =>
+    cur && !opts.some(o => o.value === cur) ? [...opts, { value: cur, label: cur }] : opts;
+  const same: SegmentOption = { value: '', label: t('same') };
+
+  const sizeOptions = withCurrent(
+    [
+      same,
+      { value: '14px', label: t('sizeNames.small') },
+      { value: '16px', label: t('sizeNames.normal') },
+      { value: '18px', label: t('sizeNames.large') },
+      { value: '22px', label: t('sizeNames.title') },
+    ],
+    values.fontSize
+  );
+  const weightOptions = withCurrent(
+    [
+      same,
+      { value: '400', label: t('weightNames.regular') },
+      { value: '500', label: t('weightNames.medium') },
+      { value: '600', label: t('weightNames.semibold') },
+      { value: '700', label: t('weightNames.bold') },
+    ],
+    values.fontWeight
+  );
+  const caseOptions: SegmentOption[] = [
+    same,
+    { value: 'uppercase', label: t('caseNames.upper') },
+    { value: 'lowercase', label: t('caseNames.lower') },
+    { value: 'capitalize', label: t('caseNames.capitalize') },
+    { value: 'none', label: t('caseNames.none') },
+  ];
+  const decoOptions: SegmentOption[] = [
+    same,
+    { value: 'none', label: t('decoNames.none') },
+    { value: 'underline', label: t('decoNames.underline') },
+    { value: 'overline', label: t('decoNames.overline') },
+    { value: 'line-through', label: t('decoNames.strikethrough') },
+  ];
+  const alignOptions: SegmentOption[] = (['', 'start', 'center', 'end'] as const).map(v => {
+    const key = v === '' ? 'auto' : v;
+    return { value: v, label: t(`alignNames.${key}`), icon: <AlignIcon kind={key} /> };
+  });
+
+  // Live specimen: the zone as it will read (font, size, weight, case, decoration, a hex colour).
+  const specimenStyle: CSSProperties = {
+    fontFamily: values.fontFamily
+      ? `"${values.fontFamily.replace(/^["']|["']$/g, '')}", system-ui`
+      : undefined,
+    fontSize: values.fontSize || undefined,
+    fontWeight: values.fontWeight || undefined,
+    textTransform: values.textTransform,
+    textDecoration: values.textDecoration,
+    letterSpacing: values.letterSpacing || undefined,
+    lineHeight: values.lineHeight || undefined,
+    color: values.color?.startsWith('#') ? values.color : undefined,
+  };
+
+  // Standalone zone card; the parent may pass className="" when it already provides a border.
   const containerClass =
-    className !== undefined ? className : 'rounded-xl border border-border/60 bg-background p-4';
+    className !== undefined ? className : 'rounded-lg border border-border bg-card p-4';
+  const resetButton =
+    hasValues && onReset ? (
+      <Button variant="link" size="sm" type="button" onClick={onReset} className="shrink-0">
+        {t('resetToDefault')}
+      </Button>
+    ) : null;
 
   return (
-    // data-zone-key is used by e2e tests and browser devtools to identify
-    // which zone this editor controls.
+    // data-zone-key is used by e2e tests and browser devtools to identify which zone this editor controls.
     <div className={containerClass} data-zone-key={zoneKey}>
-      {!hideLabel && (
+      {!hideLabel ? (
         <div className="flex items-center justify-between gap-2">
-          <h4 className="text-sm font-semibold text-foreground capitalize">{zoneLabel}</h4>
-          {hasValues && onReset && (
-            <Button
-              variant="link"
-              size="sm"
-              type="button"
-              onClick={onReset}
-              className="text-destructive-ink shrink-0"
-            >
-              {t('resetToDefault')}
-            </Button>
-          )}
+          <h4 className="min-w-0 text-sm font-semibold text-foreground">{zoneLabel}</h4>
+          {resetButton}
         </div>
-      )}
-      {/* When label is hidden but reset is available, show reset link inline */}
-      {hideLabel && hasValues && onReset && (
-        <div className="flex justify-end">
-          <Button
-            variant="link"
-            size="sm"
-            type="button"
-            onClick={onReset}
-            className="text-destructive-ink shrink-0"
-          >
-            {t('resetToDefault')}
-          </Button>
-        </div>
+      ) : (
+        resetButton && <div className="flex justify-end">{resetButton}</div>
       )}
 
-      <div className={`${hideLabel ? '' : 'mt-3'} grid gap-3 sm:grid-cols-2 lg:grid-cols-3`}>
-        {/* Font family — select when fontFamilyOptions are provided (typography page
-            has a curated font library); free-form text input otherwise (the editor
-            context where no font library is loaded). */}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">{t('fontFamilyLabel')}</span>
+      <div className={`${hideLabel ? '' : 'mt-3'} flex flex-col gap-4`}>
+        <p
+          className="min-h-12 break-words rounded-md bg-muted px-3 py-2 text-foreground"
+          style={specimenStyle}
+          aria-hidden="true"
+          data-testid="zone-specimen"
+        >
+          {t('specimen')}
+        </p>
+
+        <Field label={t('fontFamilyLabel')}>
           {fontFamilyOptions ? (
             <select
+              aria-label={t('fontFamilyLabel')}
               value={values.fontFamily ?? ''}
               onChange={e => onChange({ fontFamily: e.target.value })}
-              className={FIELD_CLASSES}
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-base sm:h-10 sm:text-sm"
             >
               {fontFamilyOptions.map(o => (
                 <option key={o.value} value={o.value}>
@@ -184,198 +231,54 @@ export function ZoneEditor({
                 </option>
               ))}
             </select>
+          ) : fonts ? (
+            <FontPicker
+              label={t('fontFamilyLabel')}
+              value={values.fontFamily ?? ''}
+              fonts={fonts}
+              onChange={family => onChange({ fontFamily: family })}
+            />
           ) : (
-            <input
+            <TextInput
               type="text"
+              aria-label={t('fontFamilyLabel')}
               value={values.fontFamily ?? ''}
               onChange={e => onChange({ fontFamily: e.target.value })}
-              placeholder={ph('fontFamily')}
-              className={FIELD_CLASSES}
+              placeholder={placeholder?.fontFamily || t('same')}
             />
           )}
-        </label>
+        </Field>
 
-        {/* Font size */}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">{t('fontSizeLabel')}</span>
-          <input
-            type="text"
+        <Field label={t('fontSizeLabel')}>
+          <Segmented
+            label={t('fontSizeLabel')}
             value={values.fontSize ?? ''}
-            onChange={e => handleSize('fontSize', e.target.value)}
-            onBlur={e => {
-              // PC-4: reject Tailwind arbitrary bracket syntax (text-[20px] etc.)
-              // on blur so the merchant sees inline feedback immediately.
-              // Allowed: px / rem / em / % values, or Tailwind named tokens
-              // (text-xs / text-sm / text-base / text-lg / text-xl / text-2xl).
-              // The canonical 4-step scale is: 12px / 14px / 16px / 18px / 22px.
-              // Bracket syntax bypasses the scale + wins specificity over the
-              // per-store CSS emitter, silently no-oping merchant overrides.
-              const v = normaliseSizeValue(e.target.value);
-              if (v && /text-\[/.test(v)) {
-                onChange({ fontSize: '' });
-                setSizeRejected(true);
-              }
-            }}
-            placeholder={ph('fontSize') === t('inherit') ? t('fontSizeExample') : ph('fontSize')}
-            className={FIELD_CLASSES}
+            options={sizeOptions}
+            onChange={v => onChange({ fontSize: v })}
           />
-          {sizeRejected ? (
-            <span role="alert" className="whitespace-pre-line text-xs text-destructive-ink">
-              {t('arbitrarySizeNotAllowed')}
-            </span>
-          ) : null}
-          <span className="text-xs text-muted-foreground/80">{t('fontSizeHint')}</span>
-        </label>
+        </Field>
 
-        {/* Font weight */}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">{t('fontWeightLabel')}</span>
-          <input
-            type="text"
+        <Field label={t('fontWeightLabel')}>
+          <Segmented
+            label={t('fontWeightLabel')}
             value={values.fontWeight ?? ''}
-            onChange={e => onChange({ fontWeight: e.target.value })}
-            placeholder={
-              ph('fontWeight') === t('inherit') ? t('fontWeightExample') : ph('fontWeight')
-            }
-            className={FIELD_CLASSES}
+            options={weightOptions}
+            onChange={v => onChange({ fontWeight: v })}
           />
-          <span className="text-xs text-muted-foreground/80">{t('fontWeightHint')}</span>
-        </label>
+        </Field>
 
-        {/* Letter spacing */}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            {t('letterSpacingLabel')}
-          </span>
-          <input
-            type="text"
-            value={values.letterSpacing ?? ''}
-            onChange={e => handleSize('letterSpacing', e.target.value)}
-            placeholder={
-              ph('letterSpacing') === t('inherit') ? t('letterSpacingExample') : ph('letterSpacing')
+        <Field label={t('textAlignmentLabel')}>
+          <Segmented
+            iconOnly
+            label={t('textAlignmentLabel')}
+            value={values.textAlign ?? ''}
+            options={alignOptions}
+            onChange={v =>
+              onChange({ textAlign: v === '' ? undefined : (v as ZoneOverride['textAlign']) })
             }
-            className={FIELD_CLASSES}
           />
-        </label>
+        </Field>
 
-        {/* Line height */}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">{t('lineHeightLabel')}</span>
-          <input
-            type="text"
-            value={values.lineHeight ?? ''}
-            onChange={e => handleSize('lineHeight', e.target.value)}
-            placeholder={
-              ph('lineHeight') === t('inherit') ? t('lineHeightExample') : ph('lineHeight')
-            }
-            className={FIELD_CLASSES}
-          />
-        </label>
-
-        {/* Text transform */}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            {t('textTransformLabel')}
-          </span>
-          <select
-            value={values.textTransform ?? ''}
-            onChange={e =>
-              onChange({
-                textTransform:
-                  e.target.value === ''
-                    ? undefined
-                    : (e.target.value as ZoneOverride['textTransform']),
-              })
-            }
-            className={FIELD_CLASSES}
-          >
-            <option value="">{t('textTransformOptions.inherit')}</option>
-            <option value="uppercase">{t('textTransformOptions.uppercase')}</option>
-            <option value="lowercase">{t('textTransformOptions.lowercase')}</option>
-            <option value="capitalize">{t('textTransformOptions.capitalize')}</option>
-            <option value="none">{t('textTransformOptions.explicitNone')}</option>
-          </select>
-        </label>
-
-        {/* Text decoration (underline / strikethrough / overline) — 2026-05-20.
-            Sits beside text-transform; applies via inline style.textDecoration
-            on the zone's text element. */}
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            {t('textDecorationLabel')}
-          </span>
-          <select
-            value={values.textDecoration ?? ''}
-            onChange={e =>
-              onChange({
-                textDecoration:
-                  e.target.value === ''
-                    ? undefined
-                    : (e.target.value as ZoneOverride['textDecoration']),
-              })
-            }
-            className={FIELD_CLASSES}
-          >
-            <option value="">{t('textDecorationOptions.inherit')}</option>
-            <option value="none">{t('textDecorationOptions.none')}</option>
-            <option value="underline">{t('textDecorationOptions.underline')}</option>
-            <option value="overline">{t('textDecorationOptions.overline')}</option>
-            <option value="line-through">{t('textDecorationOptions.strikethrough')}</option>
-          </select>
-        </label>
-      </div>
-
-      {/* Text alignment — pulled OUT of the grid above and rendered full-width
-          for breathing room (same reasoning as Color below). When nested in
-          the 3-col grid the 4 buttons + labels were getting clipped by
-          overflow-hidden, especially inside Smart Palette modal where the
-          editor column is ~150px wide.
-
-          Logical values (start/center/end) so RTL Arabic flips correctly.
-          4-button segmented control with rounded outer corners + dividers
-          between options. Each label has an aria-label spelling out the
-          LTR/RTL effect for screen readers. */}
-      <div className="mt-3 flex flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">{t('textAlignmentLabel')}</span>
-        <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-border">
-          {(
-            [
-              { value: '', key: 'auto' },
-              { value: 'start', key: 'start' },
-              { value: 'center', key: 'center' },
-              { value: 'end', key: 'end' },
-            ] as const
-          ).map(opt => {
-            const active = (values.textAlign ?? '') === opt.value;
-            const label = t(`textAlign.${opt.key}.label`);
-            const title = t(`textAlign.${opt.key}.title`);
-            return (
-              <Button
-                variant={active ? 'soft' : 'ghost'}
-                size="sm"
-                key={opt.value || 'auto'}
-                type="button"
-                title={title}
-                aria-label={t('textAlignAriaLabel', { label, title })}
-                onClick={() =>
-                  onChange({
-                    textAlign:
-                      opt.value === '' ? undefined : (opt.value as ZoneOverride['textAlign']),
-                  })
-                }
-              >
-                {label}
-              </Button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Color — full-width below the grid for breathing room.
-          When renderColorField is provided by the parent (e.g. the legacy
-          typography page uses a different brand-preset format), the default
-          ColorField is skipped entirely and the parent's UI is rendered. */}
-      <div className="mt-3">
         {renderColorField ? (
           renderColorField()
         ) : (
@@ -392,7 +295,115 @@ export function ZoneEditor({
             inheritFromToken={inheritFromToken}
           />
         )}
+
+        <Disclosure title={t('moreOptions')} testId={`zone-more-${zoneKey}`}>
+          <div className="flex flex-col gap-4">
+            <Field label={t('textTransformLabel')}>
+              <Segmented
+                label={t('textTransformLabel')}
+                value={values.textTransform ?? ''}
+                options={caseOptions}
+                onChange={v =>
+                  onChange({
+                    textTransform: v === '' ? undefined : (v as ZoneOverride['textTransform']),
+                  })
+                }
+              />
+            </Field>
+            <Field label={t('textDecorationLabel')}>
+              <Segmented
+                label={t('textDecorationLabel')}
+                value={values.textDecoration ?? ''}
+                options={decoOptions}
+                onChange={v =>
+                  onChange({
+                    textDecoration: v === '' ? undefined : (v as ZoneOverride['textDecoration']),
+                  })
+                }
+              />
+            </Field>
+            <Field
+              label={t('exactSizeLabel')}
+              hint={t('exactSizeHint')}
+              error={sizeRejected ? t('arbitrarySizeNotAllowed') : undefined}
+            >
+              <TextInput
+                type="text"
+                aria-label={t('exactSizeLabel')}
+                value={values.fontSize ?? ''}
+                onChange={e => handleSize('fontSize', e.target.value)}
+                onBlur={e => {
+                  // PC-4: reject Tailwind arbitrary bracket syntax (text-[20px] etc.): it bypasses the scale and
+                  // wins specificity over the per-store CSS emitter, silently no-oping merchant overrides.
+                  const v = normaliseSizeValue(e.target.value);
+                  if (v && /text-\[/.test(v)) {
+                    onChange({ fontSize: '' });
+                    setSizeRejected(true);
+                  }
+                }}
+                placeholder={placeholder?.fontSize || t('fontSizeExample')}
+              />
+            </Field>
+            <Field label={t('letterSpacingLabel')}>
+              <TextInput
+                type="text"
+                aria-label={t('letterSpacingLabel')}
+                value={values.letterSpacing ?? ''}
+                onChange={e => handleSize('letterSpacing', e.target.value)}
+                placeholder={placeholder?.letterSpacing || t('letterSpacingExample')}
+              />
+            </Field>
+            <Field label={t('lineHeightLabel')}>
+              <TextInput
+                type="text"
+                aria-label={t('lineHeightLabel')}
+                value={values.lineHeight ?? ''}
+                onChange={e => handleSize('lineHeight', e.target.value)}
+                placeholder={placeholder?.lineHeight || t('lineHeightExample')}
+              />
+            </Field>
+          </div>
+        </Disclosure>
       </div>
     </div>
+  );
+}
+
+/** Logical alignment glyphs: start/end lines are drawn from the reading edge, so they mirror in Arabic. */
+function AlignIcon({ kind }: { kind: 'auto' | 'start' | 'center' | 'end' }) {
+  const lines =
+    kind === 'center'
+      ? [
+          [3, 13],
+          [5, 11],
+          [3, 13],
+        ]
+      : kind === 'end'
+        ? [
+            [3, 13],
+            [7, 13],
+            [3, 13],
+          ]
+        : [
+            [3, 13],
+            [3, 9],
+            [3, 13],
+          ];
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      className={kind === 'auto' ? 'opacity-60' : 'rtl:-scale-x-100'}
+    >
+      {lines.map(([a, b], i) => (
+        <path key={i} d={`M${a} ${4 + i * 4}H${b}`} />
+      ))}
+    </svg>
   );
 }

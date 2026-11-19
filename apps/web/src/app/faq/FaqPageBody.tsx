@@ -13,7 +13,7 @@ import FAQClient from './FAQClient';
  * so the SAME rendering logic serves both `app/faq/page.tsx` (legacy,
  * header-based) and `app/tenant-store/[tenant]/[locale]/faq/page.tsx` (new,
  * params-based, dark-launched). See
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
  */
 export async function FaqPageBody({ store }: { store: ResolvedStore }) {
   // Build FAQ JSON-LD from store-authored FAQs (both locales included via

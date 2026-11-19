@@ -26,7 +26,7 @@ function getStoreIdFromHeader(req: Request): string | null {
   return (req.headers['x-store-id'] as string) || null;
 }
 
-// RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — this router
+// RLS cutover Phase 1c (docs/plans/done/2026-07-02-rls-cutover.md) — this router
 // is mounted BARE at `/wishlist` (routes/index.ts) with no `:storeId` in its
 // mount path — wishlist's store comes from the `x-store-id` HEADER, not the
 // URL — so `tenantContext` could never reach it. `wishlists` /

@@ -1,6 +1,6 @@
 /**
  * Unit coverage for `userContext` (RLS cutover Phase 1c,
- * docs/plans/2026-07-02-rls-cutover.md), the middleware factory that wires
+ * docs/plans/done/2026-07-02-rls-cutover.md), the middleware factory that wires
  * `app.current_user_id` (and, optionally, `app.current_store_id`) into the
  * two bare-mounted, user-scoped routers `router.param`/`tenantContext` can't
  * reach: `address.routes.ts` and `wishlist.routes.ts`.

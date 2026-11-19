@@ -53,6 +53,10 @@ npm run dev:web      # or dev:api / dev:admin / dev:orders
 
 Commits use lowercase conventional-commit subjects (commitlint). Money is integer minor units; tenant isolation rules are in [CLAUDE.md](./CLAUDE.md) and `docs/RULINGS.md`.
 
+## Capability registry
+
+Every feature is registered in `capabilities/` and checked by four guards plus a help guard (`tests/unit/capability-*.test.ts`); see CONTRIBUTING.md, "How a new feature joins the capability registry".
+
 ## Plans and status
 
 - Program plan: [docs/ebda/plans/2026-10-03-ebda-program-plan.md](./docs/ebda/plans/2026-10-03-ebda-program-plan.md)

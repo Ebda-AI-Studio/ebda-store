@@ -1,5 +1,6 @@
 import { applyWalletEntry } from './refund';
 import { scrubReceiptsForOrders } from './instapay-receipts';
+import { ensureSmartLayerSchema, runSmartLayerOp } from './smart-layer';
 import { MoneyError, type SyncSql } from './sync-sql';
 
 /**
@@ -323,6 +324,23 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
         if (rows.length === 1) ids.add(rows[0].id as string);
         else if (rows.length > 1) out.crmAmbiguous = true;
       }
+      // The assistant's masked journal may name this person (a customer list it read for the merchant): those rows go with them, BEFORE the names are overwritten.
+      ensureSmartLayerSchema(db);
+      // Identifying terms only: the id, e-mail, phone and the FULL name (both parts present). A first name alone also belongs to other shoppers.
+      const fullName = (c: Record<string, unknown>): string[] => {
+        const f = String(c.first_name ?? '').trim();
+        const l = String(c.last_name ?? '').trim();
+        return f && l ? [`${f} ${l}`, `${l} ${f}`] : [];
+      };
+      const terms: string[] = [a.email ?? '', a.phone ?? ''];
+      for (const id of ids) {
+        const c = db.all(
+          'SELECT first_name, last_name, email, phone FROM customers WHERE id = ? AND store_id = ?',
+          [id, storeId]
+        )[0];
+        if (c) terms.push(id, String(c.email ?? ''), String(c.phone ?? ''), ...fullName(c));
+      }
+      runSmartLayerOp(db, 'eraseMentions', [terms]);
       for (const id of ids) {
         db.run('DELETE FROM customer_addresses WHERE customer_id = ?', [id]);
         db.run(

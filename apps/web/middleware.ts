@@ -48,7 +48,7 @@ import {
 /**
  * Route roots eligible for the tenant-cacheable Track-A rewrite. Dark-
  * launched behind `STOREFRONT_TENANT_ROUTING` — see
- * `docs/plans/2026-07-12-tenant-cacheable-routing.md` §3.3/§4/§9 Phase 1.
+ * `docs/plans/done/2026-07-12-tenant-cacheable-routing.md` §3.3/§4/§9 Phase 1.
  * Anonymous, non-personalized surfaces only (home is handled separately as
  * the empty-path case in `isCacheableTrackARoute`); every other route
  * (cart, checkout, account, auth, wishlist, search, compare, review, and
@@ -334,7 +334,7 @@ function propagateDraftHeader(
  * STOREFRONT_TENANT_ROUTING_ROUTES canary list names (missing/empty/unparseable
  * list = no route), and only for a store that STOREFRONT_TENANT_ROUTING_STORES
  * names (missing/empty/unparseable list = no store, Ruling TRC-6).
- * See docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
+ * See docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
  */
 function isTenantTreeEligible(
   pathname: string,

@@ -9,7 +9,7 @@
  *   G4  the bare `rounded` class (4px): control = rounded-md, surface = rounded-lg, pill = rounded-full.
  *   G5  letter-spacing (`tracking-*` other than tracking-normal): it breaks Arabic letter joining.
  *   G7  a raw <input>/<select>/<textarea> (not checkbox/radio/hidden/file/range/color) that does not use FIELD_CLASSES /
- *       TEXTAREA_CLASSES (or an explicit h-10/h-11): fields sit on the 44/40 control scale.
+ *       TEXTAREA_CLASSES / fieldControlClasses (or an explicit h-10/h-11): fields sit on the 44/40 control scale.
  *   G6  a `data-ui="nav"` item that does not take its classes from navItemClasses() / bottomNavClasses().
  *
  * G1-G5 are a RATCHET: tests/unit/admin-design-tokens.baseline.json holds the per-file count of pages not yet
@@ -55,7 +55,7 @@ export function countFields(src: string): number {
     const tag = openingTag(code, m.index);
     if (
       FIELD_SKIP.test(tag) ||
-      /\b(?:FIELD_CLASSES|TEXTAREA_CLASSES)\b/.test(tag) ||
+      /\b(?:FIELD_CLASSES|TEXTAREA_CLASSES|fieldControlClasses)\b/.test(tag) ||
       /(?<![\w-])h-1[01](?![\w-])/.test(tag)
     )
       continue;

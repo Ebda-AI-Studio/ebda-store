@@ -18,7 +18,7 @@ import {
 const DROPPED = [
   // email
   'ahmed@example.com',
-  'Ahmed.Hassan@Gmail.COM',
+  'Jane.Doe@Example.COM',
   'ahmed@gmail', // half-typed: any @ is dropped
   // phone, every way an Egyptian shopper writes one
   '01012345678',

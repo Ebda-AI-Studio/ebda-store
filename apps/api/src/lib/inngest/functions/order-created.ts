@@ -1,3 +1,4 @@
+import { storeOperational } from '../../store-operational';
 import type { JobDef } from '../../jobs/types';
 import { withStoreDb } from '../../jobs/store-db';
 import { customerRow, isLiveCustomer } from '../../customer-directory';
@@ -208,8 +209,11 @@ export const orderCreated: JobDef = inngest.createFunction(
     );
 
     const results = await Promise.allSettled([
-      step.run('send-customer-confirmation', () =>
-        EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
+      // Ruling SUSPEND-OUT-1: no customer mail for a store that is not `active`.
+      step.run('send-customer-confirmation', async () =>
+        (await storeOperational(storeId))
+          ? EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
+          : undefined
       ),
       // No "new order" alert to Ebda's own address any more (Ruling FU46-1a): it carried
       // every store's shopper name, email and items. The store's own notice is the invoice
@@ -225,7 +229,7 @@ export const orderCreated: JobDef = inngest.createFunction(
         if (!to) return;
         await inngest.send({
           name: 'order/invoice.email-requested',
-          data: { orderId: order.id, storeId, to },
+          data: { orderId: order.id, storeId, to, toMerchant: true },
         });
       }),
       step.run('dispatch-notification-channels', async () => {

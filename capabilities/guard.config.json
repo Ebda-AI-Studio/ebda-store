@@ -1,0 +1,22 @@
+{
+  "product": "store",
+  "mustConfirm": [
+    { "pattern": "/payments?(/|$)" },
+    { "pattern": "/refunds?(/|$)" },
+    { "pattern": "/payouts?(/|$)" },
+    { "pattern": "/billing/(charge|pay|change-plan|plan)" },
+    { "pattern": "/wallet(/|$)", "method": "POST" },
+    { "pattern": "/store-credit", "method": "POST" },
+    { "pattern": "/campaigns/[^/]+/send" },
+    { "pattern": "/(send-email|email/send|broadcast)" }
+  ],
+  "routeKinds": [
+    { "match": "^/(public|stores/public)(/|$)", "kind": "public" },
+    { "match": "^/realtime(/|$)", "kind": "public" },
+    { "match": "^/mcp(/|$)", "kind": "public" },
+    { "match": "/webhooks?(/|$)", "kind": "public" },
+    { "match": "^/internal(/|$)", "kind": "internal" }
+  ],
+  "helpExemptAreas": ["platform"],
+  "smartLayerPaths": ["packages/shared/src/foundation/smart-layer/", "apps/api/src/smart-layer/"]
+}

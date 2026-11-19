@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Search-as-you-type behaviour spec (docs/plans/2026-10-26-search-as-you-type.md): the header input
+ * Search-as-you-type behaviour spec (docs/plans/done/2026-10-26-search-as-you-type.md): the header input
  * becomes an ARIA combobox, arrows work FROM the input, results show from one character, and a slow
  * older response never replaces a newer one.
  */

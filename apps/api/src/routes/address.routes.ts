@@ -63,7 +63,7 @@ async function addressDb(req: Request) {
   return (await storeWriter(storeId)) as unknown as typeof prisma;
 }
 
-// RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — this router
+// RLS cutover Phase 1c (docs/plans/done/2026-07-02-rls-cutover.md) — this router
 // is mounted BARE at `/addresses` (routes/index.ts), with no `:storeId`/`:id`
 // in its mount path, so `tenantContext` can never reach it (Express only
 // populates req.params for params declared in the MOUNT path). Addresses are

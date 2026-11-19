@@ -15,7 +15,7 @@ import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 /**
  * Merchant outgoing webhooks: endpoints, the once-only signing secret, the delivery log with
- * resend, and "send test event". Plan: docs/plans/2026-10-21-merchant-webhooks.md.
+ * resend, and "send test event". Plan: docs/plans/done/2026-10-21-merchant-webhooks.md.
  *
  * The secret exists in this browser only in `secret` state while the reveal modal is open: never
  * in storage or the URL, and the list API never returns it. A lost secret is replaced, not read.

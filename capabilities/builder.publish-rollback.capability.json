@@ -1,0 +1,40 @@
+{
+  "id": "builder.publish-rollback",
+  "status": "live",
+  "area": "builder",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "انشر وارجع لنسخة قديمة",
+  "titleEn": "Publish draft, view revisions, restore a version",
+  "screens": ["/stores/[id]/builder"],
+  "api": [
+    "POST /admin/stores/:storeId/builder/pages/:pageKey/publish",
+    "GET .../revisions",
+    "POST .../rollback"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (rollback to a revision)"
+  },
+  "helpArticle": "page-versions-and-restore",
+  "questions": {
+    "ar": ["ازاي انشر التعديلات؟", "رجعني لنسخة امبارح", "نشرت بالغلط"],
+    "en": ["How do I publish my changes?", "Undo my last publish"]
+  },
+  "steps": ["Editor > Publish; History > Restore."],
+  "edgeCases": [
+    "Publish is customer-visible: confirm",
+    "Rollback creates a new revision",
+    "Cache purge delay up to minutes",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}
