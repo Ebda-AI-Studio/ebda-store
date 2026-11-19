@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPONENTS, HISTORY_DAYS } from '../src/config';
 import { renderStatusPage, statusSearchDocs } from '../src/render';
+import { HEADLINE_DAYS, uptimeOver } from '../src/uptime';
 import { TYPEAHEAD_JS } from '../src/typeahead-bundle';
 import type { ComponentSnapshot, Incident, Snapshot } from '../src/types';
 
@@ -32,6 +33,7 @@ const components: ComponentSnapshot[] = COMPONENTS.map((c, idx) => {
     slow: c.id === 'docs',
     lastError: c.id === 'api' ? 'status 503, expected 200' : null,
     uptime: Math.round((ok / checks) * 10000) / 100,
+    uptime30d: uptimeOver(days, HEADLINE_DAYS),
     days,
   };
 });
