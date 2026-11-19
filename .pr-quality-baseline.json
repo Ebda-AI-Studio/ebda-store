@@ -2361,6 +2361,7 @@
     "unused-export|packages/repo/src/do/customer-auth.ts|CustomerPublic",
     "unused-export|packages/repo/src/do/customer-auth.ts|PasskeyRow",
     "unused-export|packages/repo/src/do/customer-auth.ts|REVOKED_RETENTION_MS",
+    "unused-export|packages/repo/src/do/customer-auth.ts|Refusal",
     "unused-export|packages/repo/src/do/customer-auth.ts|RegisterIn",
     "unused-export|packages/repo/src/do/customer-auth.ts|RevokeReason",
     "unused-export|packages/repo/src/do/customer-auth.ts|RotateIn",
