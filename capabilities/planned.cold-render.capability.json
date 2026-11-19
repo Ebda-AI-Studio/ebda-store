@@ -1,0 +1,28 @@
+{
+  "id": "planned.cold-render",
+  "status": "planned",
+  "plan": "docs/plans/2026-11-10-storefront-cold-render.md",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "سرعة تحميل المتجر",
+  "titleEn": "Storefront cold-render speed target 2.5 s",
+  "screens": ["storefront"],
+  "api": ["(plan)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["متجري بطيء"],
+    "en": ["My storefront is slow"]
+  },
+  "steps": ["Measured 3.25 s cold TTFB; target not met."],
+  "edgeCases": [],
+  "gaps": ["PARTIAL"]
+}

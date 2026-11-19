@@ -171,7 +171,12 @@ export const planService = {
           ordersOverLimitNotifiedAt: null,
         },
       });
-      await storeUpdate(tx, { where: { id: storeId }, data: { plan: plan.featureTier } });
+      // A canceled subscription is entitled to the free plan (getEntitlements), so the directory tier follows that,
+      // not the named plan: assigning `growth` + `canceled` used to leave `stores.plan` on `professional` (#835).
+      await storeUpdate(tx, {
+        where: { id: storeId },
+        data: { plan: status === 'canceled' ? 'free' : plan.featureTier },
+      });
       return s;
     });
 
