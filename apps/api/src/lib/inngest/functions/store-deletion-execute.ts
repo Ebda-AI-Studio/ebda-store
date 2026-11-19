@@ -26,6 +26,7 @@ const MAX_BLOCKED_DAYS = 30;
  * back to `pending` with the failure on `lastBlock` (compare-and-set, so a request that moved on is untouched) and raise a P1 alert
  * either way, because an owner-requested deletion is stuck. Exported so a test drives the real recovery.
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/store-deletion-job-failure.test.ts
 export async function handleStoreDeletionFailure(
   data: { storeId?: string; requestId?: string },
   reason: string
