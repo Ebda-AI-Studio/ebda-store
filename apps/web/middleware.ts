@@ -25,6 +25,7 @@ import {
   localePathsOn,
   type PathLocale,
 } from './src/lib/locale-paths';
+import { applyOrderLinkHeaders } from './src/lib/order-link-headers';
 
 /**
  * HOST ROUTING (program plan §1, design cloudflare-backend §4).
@@ -578,6 +579,7 @@ export function middleware(request: NextRequest) {
   headers.set('x-nonce', nonce);
   headers.set('Content-Security-Policy', csp);
   const response = routeStorefront(new NextRequest(request, { headers }));
+  applyOrderLinkHeaders(request.nextUrl.pathname, response.headers);
   // The studio pages (ebda.app help/status hosts) already carry their own, stricter CSP: keep it.
   if (!response.headers.has('Content-Security-Policy')) {
     response.headers.set('Content-Security-Policy', csp);
