@@ -1,6 +1,6 @@
 import { signedParts, splitNumber, type SignedOptions } from '@ebda/shared';
 
-export interface SignedNumberProps extends SignedOptions {
+interface SignedNumberProps extends SignedOptions {
   value: number;
   className?: string;
 }
