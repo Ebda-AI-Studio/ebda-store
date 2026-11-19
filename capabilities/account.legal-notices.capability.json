@@ -7,7 +7,12 @@
   "titleAr": "الاشعارات القانونية والموافقة على السياسات",
   "titleEn": "Read and accept platform legal notices / policy updates",
   "screens": [],
-  "api": ["GET /me/legal-notices", "GET /me/legal-acceptances", "POST /me/legal-acceptances"],
+  "api": [
+    "GET /me/legal-notices",
+    "GET /me/legal-acceptances",
+    "POST /me/legal-acceptances",
+    "POST /me/legal-notices/accept"
+  ],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff"],
