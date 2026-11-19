@@ -1665,7 +1665,7 @@ export interface WebhookResult {
  * facts in `detail` (JSON), a P1 alert goes out after the commit, and the super-admin billing page lists it until a person
  * resolves it (`resolveHeldBillingWebhook`). The provider still gets 200: the fact is recorded, a retry adds nothing.
  */
-export const WEBHOOK_HELD = 'held';
+const WEBHOOK_HELD = 'held';
 const WEBHOOK_HELD_RESOLVED = 'held_resolved';
 interface HeldBillingWebhook {
   reason:
