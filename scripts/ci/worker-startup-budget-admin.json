@@ -1,0 +1,19 @@
+{
+  "_doc": "Budget for the merchant admin Worker (ebda-admin, OpenNext), enforced by `scripts/ci/worker-startup-budget.mjs --app admin` (CI: Worker dry-run (admin)). Same method and caveats as worker-startup-budget.json (API): local-workerd CPU, NOT Cloudflare's, regression gates with headroom, raise only with a Ruling. Bundle = health-worker-entry.js (the generated entry the deploy uses; it wraps the OpenNext worker). The absolute CPU ceiling runs on main/nightly; PRs compare against main built in the same job (relative).",
+  "startupCpuMs": 60,
+  "bundleBytes": 21700000,
+  "bundleGzipBytes": 3900000,
+  "baseline": {
+    "recorded": "2026-11-18",
+    "after": {
+      "startupCpuMs": 20.7,
+      "bundleBytes": 19704284,
+      "bundleGzipBytes": 3551285
+    }
+  },
+  "relative": {
+    "ratio": 0.25,
+    "slackMs": 15
+  },
+  "_ruling": "Ruling ADMIN-STARTUP-BUDGET-1 (QA-PERF-LOGIN-1 (b), 2026-11-18): the admin Worker had no startup/bundle budget. First measurement (7 runs, local workerd, min of samples, first sample 34.6 ms): 20.7 ms startup CPU, 19.70 MB raw / 3.55 MB gzip. Ceilings: ~3x CPU, ~10% size headroom."
+}

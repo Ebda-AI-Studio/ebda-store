@@ -41,14 +41,16 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-// `--app api|web` (default api). web = the OpenNext storefront Worker: its bundle is cache-worker-entry.js, its budget lives in
+// `--app api|web|admin` (default api). admin = the OpenNext merchant-admin Worker (bundle health-worker-entry.js, budget worker-startup-budget-admin.json); web = the OpenNext storefront Worker: its bundle is cache-worker-entry.js, its budget lives in
 // worker-startup-budget-web.json, and the baseline is built with the deploy's own setup + build scripts.
 const APP_NAME = (() => {
   const i = process.argv.indexOf('--app');
   return i > 0 ? process.argv[i + 1] : 'api';
 })();
 const API = path.join(ROOT, 'apps', APP_NAME);
-const BUNDLE_NAME = APP_NAME === 'web' ? 'cache-worker-entry.js' : 'worker.js';
+// the generated entries the deploys use: web = cache-worker-entry.js, admin = health-worker-entry.js (apps/admin/health-worker-entry.ts wraps the OpenNext worker)
+const BUNDLE_NAME =
+  { web: 'cache-worker-entry.js', admin: 'health-worker-entry.js' }[APP_NAME] ?? 'worker.js';
 const BUDGET_FILE =
   APP_NAME === 'api' ? 'worker-startup-budget.json' : `worker-startup-budget-${APP_NAME}.json`;
 
@@ -251,11 +253,11 @@ function buildBaseline(ref, config) {
     }
   }
   const outdir = mkdtempSync(path.join(tmpdir(), 'ebda-startup-base-out-'));
-  if (APP_NAME === 'web') {
-    // The storefront Worker only exists after the deploy's own generator + OpenNext build (same env as ci.yml's dry-run job).
+  if (APP_NAME === 'web' || APP_NAME === 'admin') {
+    // The OpenNext Workers (storefront, merchant admin) only exist after the deploy's own generator + OpenNext build (same env as ci.yml's dry-run job).
     const env = { ...process.env, OPENNEXT_CACHE: 'true', CF_SETUP_SKIP_DEPS: '1' };
     for (const script of ['scripts/cf-setup-local.sh', 'scripts/cf-build.sh'])
-      sh('bash', [script, 'web'], dir, env);
+      sh('bash', [script, APP_NAME], dir, env);
   }
   sh(
     'npx',

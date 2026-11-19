@@ -65,6 +65,9 @@ vi.mock('@ebda/database', async () => {
       update: () => ({}),
     }),
     user: model('User', { findMany: () => [] }),
+    storeSubscription: model('StoreSubscription', {
+      findUnique: () => ({ planCode: 'growth' }),
+    }),
     $transaction: (fn: (tx: unknown) => unknown) => fn(prisma),
   };
   const withStore = (storeId: string, fn: (tx: unknown) => unknown) =>
@@ -99,6 +102,13 @@ vi.mock('@api/services/redis.service', () => ({
 vi.mock('@api/services/store.service', () => ({ bustStoreCaches: vi.fn() }));
 vi.mock('@api/lib/public-cache', () => ({ invalidateStoreProductCaches: vi.fn() }));
 vi.mock('@api/services/plan-sync', () => ({ syncSubscriptionFromLegacyPlan: vi.fn() }));
+const assignPlan = vi.hoisted(() =>
+  vi.fn(async (_id: string, i: { planCode: string }) => ({
+    planCode: i.planCode,
+    status: 'active',
+  }))
+);
+vi.mock('@api/services/plan.service', () => ({ planService: { assignPlan } }));
 vi.mock('@api/services/plan-entitlements', () => ({ getAutomationFlags: vi.fn(async () => null) }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -166,8 +176,19 @@ describe('/admin/stores/:id/* feature routes bind the target store after authori
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(h.calls).toContain('StoreFeature.deleteMany');
   });
-  it('PUT plan answers 200 (previous-plan read is store scoped)', async () => {
-    const res = await request(app).put(`${base}/plan`).send({ plan: 'professional' });
+  it('PUT plan by plan code answers 200 through assignPlan (previous-plan read is store scoped)', async () => {
+    const res = await request(app).put(`${base}/plan`).send({ planCode: 'business' });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(assignPlan).toHaveBeenCalledWith(STORE, { planCode: 'business' });
+    expect(h.calls).toContain('StoreSubscription.findUnique');
+    expect(res.body.data).toMatchObject({ planCode: 'business', status: 'active' });
+  });
+  it('B1-PLAN-SOT-1: PUT plan with a legacy TIER is refused 400 and changes nothing', async () => {
+    assignPlan.mockClear();
+    const res = await request(app).put(`${base}/plan`).send({ plan: 'professional' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('PLAN_CODE_REQUIRED');
+    expect(assignPlan).not.toHaveBeenCalled();
+    expect(h.calls).not.toContain('Store.update');
   });
 });
