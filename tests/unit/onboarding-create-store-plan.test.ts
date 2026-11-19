@@ -14,7 +14,8 @@ const m = vi.hoisted(() => ({
   gate: vi.fn(),
   budget: vi.fn(),
   used: vi.fn(),
-  mark: vi.fn(),
+  claim: vi.fn(),
+  release: vi.fn(),
   order: [] as string[],
 }));
 
@@ -57,7 +58,8 @@ vi.mock('@api/services/billing/subscription-billing.service', () => ({
 // R-TRIAL-ONCE-1: the durable "this owner already had a signup trial" marker (survives a hard store delete).
 vi.mock('@api/services/billing/trial-eligibility', () => ({
   ownerHasUsedTrial: m.used,
-  markOwnerTrialUsed: m.mark,
+  claimOwnerTrial: m.claim,
+  releaseOwnerTrial: m.release,
 }));
 vi.mock('@api/services/billing/go-live-gate', () => ({ assertStoreMayGoLive: vi.fn() }));
 vi.mock('@api/services/store-creation-limit', () => ({
@@ -73,9 +75,19 @@ import { OnboardingService } from '@api/services/onboarding.service';
 const input = { name: 'Shop', slug: 'my-shop' };
 
 beforeEach(() => {
-  for (const f of [m.count, m.findUnique, m.provision, m.gate, m.budget, m.used, m.mark])
+  for (const f of [
+    m.count,
+    m.findUnique,
+    m.provision,
+    m.gate,
+    m.budget,
+    m.used,
+    m.claim,
+    m.release,
+  ])
     f.mockReset();
   m.used.mockResolvedValue(false);
+  m.claim.mockResolvedValue({ grant: true, owned: true });
   m.order.length = 0;
   m.findUnique.mockResolvedValue(null);
   m.provision.mockResolvedValue({ store: { id: 'new' } });
@@ -96,11 +108,15 @@ describe('OnboardingService.createStore — locked pricing', () => {
     );
   });
 
-  it('first store records the owner trial as used', async () => {
+  it('first store CLAIMS the owner trial before provisioning', async () => {
     m.count.mockResolvedValue(0);
     await OnboardingService.createStore({ userId: 'u1' }, input);
     expect(m.used).toHaveBeenCalledWith('o@x.com');
-    expect(m.mark).toHaveBeenCalledWith('o@x.com', 'new');
+    expect(m.claim).toHaveBeenCalledWith('o@x.com');
+    expect(m.claim.mock.invocationCallOrder[0]).toBeLessThan(
+      m.provision.mock.invocationCallOrder[0]
+    );
+    expect(m.release).not.toHaveBeenCalled();
   });
 
   it('delete + recreate: an owner with 0 live stores who already had a trial gets NO second trial', async () => {
@@ -110,7 +126,7 @@ describe('OnboardingService.createStore — locked pricing', () => {
     expect(m.provision).toHaveBeenCalledWith(
       expect.objectContaining({ plan: 'starter', growthTrial: false, status: 'inactive' })
     );
-    expect(m.mark).not.toHaveBeenCalled();
+    expect(m.claim).not.toHaveBeenCalled();
   });
 
   it('second store (owner already allowed by the gate): Business tier, NO second trial', async () => {
@@ -134,5 +150,23 @@ describe('OnboardingService.createStore — locked pricing', () => {
     await OnboardingService.createStore({ userId: 'u1', isSuperAdmin: true }, input);
     expect(m.gate).not.toHaveBeenCalled();
     expect(m.order).not.toContain('lock');
+  });
+});
+
+describe('OnboardingService.createStore — trial claim race (R-TRIAL-ONCE-1)', () => {
+  it('lost the claim to a concurrent request: no trial and a starter tier', async () => {
+    m.count.mockResolvedValue(0);
+    m.claim.mockResolvedValue({ grant: false, owned: false });
+    await OnboardingService.createStore({ userId: 'u1' }, input);
+    expect(m.provision).toHaveBeenCalledWith(
+      expect.objectContaining({ plan: 'starter', growthTrial: false })
+    );
+  });
+
+  it('a provision that fails gives back the marker this request claimed', async () => {
+    m.count.mockResolvedValue(0);
+    m.provision.mockRejectedValue(new Error('boom'));
+    await expect(OnboardingService.createStore({ userId: 'u1' }, input)).rejects.toThrow('boom');
+    expect(m.release).toHaveBeenCalledWith('o@x.com');
   });
 });

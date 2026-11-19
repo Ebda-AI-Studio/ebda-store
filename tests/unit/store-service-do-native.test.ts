@@ -114,9 +114,22 @@ vi.mock('../../apps/api/src/lib/identity-client', () => ({
 // R-TRIAL-ONCE-1: the durable used-trial marker (system_settings in prod) as an in-memory set keyed by owner email
 vi.mock('../../apps/api/src/services/billing/trial-eligibility', () => ({
   ownerEmailOf: async (id: string) =>
-    h.emailUnreadable ? { unknown: true } : { email: `${id}@x.co`, unknown: false },
-  ownerHasUsedTrial: async (email: string) => h.trialUsed.has(email),
-  markOwnerTrialUsed: async (email: string) => void h.trialUsed.add(email),
+    h.emailUnreadable
+      ? { unknown: true }
+      : { email: id.startsWith('race-') ? 'shared@x.co' : `${id}@x.co`, unknown: false },
+  // a tick between the read and the claim, so two concurrent creates both pass the read (the race this PR closes)
+  ownerHasUsedTrial: async (email: string) => {
+    const used = h.trialUsed.has(email);
+    await new Promise(r => setTimeout(r, 5));
+    return used;
+  },
+  // ONE synchronous insert-or-skip, like the unique `system_settings.key` insert: only the creator is `owned` / `grant`
+  claimOwnerTrial: async (email: string) => {
+    const first = !h.trialUsed.has(email);
+    h.trialUsed.add(email);
+    return { grant: first, owned: first };
+  },
+  releaseOwnerTrial: async (email: string) => void h.trialUsed.delete(email),
 }));
 vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: { delete: vi.fn(), get: vi.fn(), set: vi.fn(), acquireLock: vi.fn() },
@@ -237,6 +250,40 @@ describe('R-TRIAL-ONCE-1: one signup trial per owner on the DO create path', () 
     const s = sub(second.id);
     expect(s.status).not.toBe('trialing');
     expect(['growth', 'business']).not.toContain(s.plan_code);
+  });
+});
+
+describe('R-TRIAL-ONCE-1: the claim is atomic (race) and given back when the create fails', () => {
+  const planOf = (id: string) =>
+    (
+      sqlite
+        .prepare('SELECT plan_code, status FROM store_subscriptions WHERE store_id=?')
+        .get(id) as {
+        plan_code: string;
+        status: string;
+      }
+    ).status;
+
+  it('two concurrent first-store creates by the same person (two accounts, one address): exactly ONE trial', async () => {
+    const [a, b] = (await Promise.all([
+      StoreService.create('race-1', { name: 'Race A' } as never),
+      StoreService.create('race-2', { name: 'Race B' } as never),
+    ])) as Array<Record<string, any>>;
+    const trials = [a, b].filter(st => planOf(st.id) === 'trialing');
+    expect(trials).toHaveLength(1);
+    expect([a.plan, b.plan].sort()).toEqual(['professional', 'starter']);
+  });
+
+  it('a create that fails after the claim gives the marker back, so a retry still gets the trial', async () => {
+    await expect(
+      StoreService.create('owner-retry', { name: 'Bad Slug', slug: 'a' } as never)
+    ).rejects.toBeTruthy();
+    expect(h.trialUsed.size).toBe(0);
+    const ok = (await StoreService.create('owner-retry', { name: 'Good Shop' } as never)) as Record<
+      string,
+      any
+    >;
+    expect(planOf(ok.id)).toBe('trialing');
   });
 });
 

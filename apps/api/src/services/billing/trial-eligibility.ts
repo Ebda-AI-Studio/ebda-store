@@ -34,25 +34,52 @@ export async function ownerHasUsedTrial(email: string): Promise<boolean> {
 }
 
 /**
- * Record that this owner's signup trial started. Called AFTER the store (and its trial) committed: a failure here must not
- * fail a store that already exists, so it is logged loudly and the next create would re-grant a trial (residual window).
+ * CLAIM the owner's one signup trial BEFORE the store is created: ONE atomic insert-or-skip of the marker row (a unique
+ * `system_settings.key`; `createMany ... skipDuplicates` is one D1 statement, `count === 1` only for the request that created it).
+ * Only that request grants the trial, so two concurrent first-store creates (or a create racing an onboarding) can never both
+ * get one: the read-then-write it replaces let both pass the read.
+ *  - `owned`: THIS request created the marker, so a failed store create must give it back (`releaseOwnerTrial`).
+ *  - `grant`: the trial may be granted. False when another request / an earlier store already used it.
+ * A marker store that cannot be read or written (`platformDb()` absent, D1 error) is logged and does NOT block the merchant:
+ * `grant: true, owned: false` (fails in the merchant's favour; Ruling R-TRIAL-ONCE-1, the residual window is one extra trial
+ * while D1 is down, never a lost store). Nothing here is retried.
  */
-export async function markOwnerTrialUsed(email: string, storeId: string): Promise<void> {
+export async function claimOwnerTrial(email: string): Promise<{ grant: boolean; owned: boolean }> {
+  try {
+    const db = await platformDb();
+    if (!db) return { grant: true, owned: false };
+    const { count } = await db.systemSetting.createMany({
+      data: [
+        {
+          key: trialUsedKey(email),
+          value: { at: new Date().toISOString() },
+          category: 'billing',
+          isPublic: false,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return count === 1 ? { grant: true, owned: true } : { grant: false, owned: false };
+  } catch (err) {
+    logger.error(
+      { err },
+      '[trial] could not claim the signup trial marker; granting (fails in the merchant favour)'
+    );
+    return { grant: true, owned: false };
+  }
+}
+
+/** Give back a marker THIS request created, when the store it was claimed for was never created. Never throws. */
+export async function releaseOwnerTrial(email: string): Promise<void> {
   try {
     const db = await platformDb();
     if (!db) return;
-    await db.systemSetting.upsert({
-      where: { key: trialUsedKey(email) },
-      create: {
-        key: trialUsedKey(email),
-        value: { storeId, at: new Date().toISOString() },
-        category: 'billing',
-        isPublic: false,
-      },
-      update: {},
-    });
+    await db.systemSetting.deleteMany({ where: { key: trialUsedKey(email) } });
   } catch (err) {
-    logger.error({ err, storeId }, '[trial] could not record the used signup trial');
+    logger.error(
+      { err },
+      '[trial] could not release the signup trial marker after a failed store create'
+    );
   }
 }
 

@@ -97,7 +97,12 @@ import {
 import { sortOwnerStores } from './billing/billing-parent';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial } from './billing/trial';
-import { markOwnerTrialUsed, ownerEmailOf, ownerHasUsedTrial } from './billing/trial-eligibility';
+import {
+  claimOwnerTrial,
+  ownerEmailOf,
+  ownerHasUsedTrial,
+  releaseOwnerTrial,
+} from './billing/trial-eligibility';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -657,7 +662,6 @@ export class StoreService {
     // rides the owner's Business plan — the same shapes as self-serve onboarding.
     // The platform operator keeps the old behaviour (active, default plan).
     // N-18 (Ruling NZ-D11): a store created on D1 + its Durable Object has no Postgres row.
-    const onDo = storeCreateOnDo();
     // R-TRIAL-ONCE-1: the FIRST store of an owner who never had a signup trial (deleted stores included).
     const ownerLookup = !opts.platformOperator ? await ownerEmailOf(ownerId) : undefined;
     const ownerEmail = ownerLookup?.email;
@@ -676,11 +680,29 @@ export class StoreService {
           return { isFirst, trialEligible };
         })()
       : null;
-    // The ONE writer of the used-trial marker: every create branch below calls it after its store committed.
-    const recordTrial = async (storeId: string) => {
-      if (merchantCreate?.trialEligible && ownerEmail)
-        await markOwnerTrialUsed(ownerEmail, storeId);
-    };
+    // R-TRIAL-ONCE-1 (race): the marker is claimed by ONE atomic insert-or-skip BEFORE the store is created, and only the request
+    // that created it grants the trial. A store create that fails afterwards gives the marker back.
+    let claimedMarker = false;
+    if (merchantCreate?.trialEligible && ownerEmail) {
+      const claim = await claimOwnerTrial(ownerEmail);
+      merchantCreate.trialEligible = claim.grant;
+      claimedMarker = claim.owned;
+    }
+    try {
+      return await StoreService.createStore(ownerId, data, opts, merchantCreate);
+    } catch (err) {
+      if (claimedMarker && ownerEmail) await releaseOwnerTrial(ownerEmail);
+      throw err;
+    }
+  }
+
+  private static async createStore(
+    ownerId: string,
+    data: CreateStoreData,
+    opts: { allowProtectedSlug?: boolean; platformOperator?: boolean },
+    merchantCreate: { isFirst: boolean; trialEligible: boolean } | null
+  ) {
+    const onDo = storeCreateOnDo();
     // Legacy tier of a merchant-created store: trial -> Growth; first store without a trial -> `starter` (unpaid, go-live
     // needs payment); an additional store -> Business (only reachable when the owner's plan allows it, covered by the parent).
     const merchantPlan = merchantCreate
@@ -766,7 +788,6 @@ export class StoreService {
         slug,
         domain: data.domain ?? null,
       });
-      await recordTrial(id);
       // The owner row is identity (Postgres until the identity track moves it): not read on this path.
       return { ...created, owner: { id: ownerId } } as typeof created & { owner: { id: string } };
     }
@@ -830,8 +851,6 @@ export class StoreService {
         },
       });
     });
-
-    await recordTrial(store.id);
 
     // Seed Chart of Accounts (Egypt retail template, 27 system accounts).
     // Idempotent — safe if accountingEnabled is later toggled.
