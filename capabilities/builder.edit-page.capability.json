@@ -1,0 +1,40 @@
+{
+  "id": "builder.edit-page",
+  "status": "live",
+  "area": "builder",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "محرر الصفحات",
+  "titleEn": "Visual editor: edit home/product/collection/cart pages (sections, blocks, theme)",
+  "screens": ["/stores/[id]/builder", "/stores/[id]/page-builder"],
+  "api": [
+    "GET /admin/stores/:storeId/builder/pages/:pageKey",
+    "PUT /admin/stores/:storeId/builder/pages/:pageKey/draft",
+    "POST .../preview-token"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (history/undo, draft never live until publish)"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي اغير الصفحة الرئيسية؟", "اضيف قسم جديد", "اخفي قسم", "الموبايل شكله مش حلو"],
+    "en": ["How do I edit my home page?", "Add a section"]
+  },
+  "steps": ["Editor: pick page, add/move/hide sections, change settings, preview per device."],
+  "edgeCases": [
+    "Concurrent edits from two staff: draft rebase (rebase-draft)",
+    "Mobile vs desktop spacing per device",
+    "Editor live preview needs preview token",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Editor itself is PARTIAL (visual editor plan 2026-10-22)", "No help article"]
+}

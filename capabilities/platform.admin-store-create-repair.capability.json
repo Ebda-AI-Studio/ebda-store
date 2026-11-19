@@ -1,0 +1,41 @@
+{
+  "id": "platform.admin-store-create-repair",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ادوات الصيانة",
+  "titleEn": "Create stores for others, repair product names, backfills, platform export",
+  "screens": ["/stores/new"],
+  "api": [
+    "POST /admin/stores",
+    "POST /admin/stores/:id/repair-product-names",
+    "POST /admin/images/backfill-variants",
+    "GET /admin/export/orders"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "operatorReason": {
+    "code": "platform-config",
+    "text": "platform ops",
+    "validUnderRule": true
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [],
+    "en": []
+  },
+  "steps": ["Super-admin console only."],
+  "edgeCases": [
+    "Assistant must refuse and offer a handoff request with context",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
+  ],
+  "gaps": []
+}
