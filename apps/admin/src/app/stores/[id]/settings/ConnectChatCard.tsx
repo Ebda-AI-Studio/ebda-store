@@ -14,7 +14,7 @@ import { apiGet, apiPost } from '../../../../lib/api';
  * check here only decides whether the card is shown. Connecting creates the Chat workspace only: no
  * charge, no plan change, no message.
  */
-export const CHAT_URL = 'https://wa.ebda.app';
+const CHAT_URL = 'https://wa.ebda.app';
 
 interface LinkState {
   linked: boolean;
@@ -25,7 +25,7 @@ interface LinkState {
 type Refusal = 'notIncluded' | 'errRole' | 'errMfa' | 'errSession' | 'errNetwork' | 'errGeneric';
 
 /** One refusal key per failure; the server's own text is never shown. */
-export function refusalKey(error: { code?: string; status?: number }): Refusal {
+function refusalKey(error: { code?: string; status?: number }): Refusal {
   if (error.code === 'WHATSAPP_NOT_INCLUDED') return 'notIncluded';
   if (error.code === 'MFA_SETUP_REQUIRED') return 'errMfa';
   if (error.status === 401) return 'errSession';

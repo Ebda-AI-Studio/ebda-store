@@ -28,7 +28,9 @@ vi.mock('@/i18n/useT', () => ({ useT: () => (k: string) => k }));
 vi.mock('../../../../lib/auth', () => ({ useAuth: () => ({ user: { role: auth.role } }) }));
 vi.mock('../../../../lib/api', () => ({ apiGet, apiPost }));
 
-import { ConnectChatCard, CHAT_URL, refusalKey } from './ConnectChatCard';
+import { ConnectChatCard } from './ConnectChatCard';
+
+const CHAT_URL = 'https://wa.ebda.app';
 
 const URL_ = '/api/v1/stores/s1/whatsapp-link';
 const notLinked = { data: { linked: false, entitled: true, active: false }, error: null };
@@ -122,7 +124,7 @@ describe('ConnectChatCard', () => {
   });
 });
 
-describe('refusalKey', () => {
+describe('every refusal is its own sentence, by code (never the server text)', () => {
   it.each([
     [{ code: 'WHATSAPP_NOT_INCLUDED', status: 403 }, 'notIncluded'],
     [{ code: 'MFA_SETUP_REQUIRED', status: 403 }, 'errMfa'],
@@ -130,5 +132,12 @@ describe('refusalKey', () => {
     [{ code: 'TOKEN_INVALID', status: 401 }, 'errSession'],
     [{ code: 'NETWORK', status: 0 }, 'errNetwork'],
     [{ code: 'X', status: 500 }, 'errGeneric'],
-  ])('%j -> %s', (e, key) => expect(refusalKey(e)).toBe(key));
+  ])('%j -> %s', async (error, key) => {
+    apiPost.mockResolvedValue({ data: null, error: { ...error, message: 'raw server text' } });
+    render(<ConnectChatCard storeId="s1" />);
+    fireEvent.click(await screen.findByText('connect'));
+    const msg = await screen.findByTestId('chat-refusal');
+    expect(msg.textContent).toContain(key);
+    expect(msg.textContent).not.toContain('raw server text');
+  });
 });
