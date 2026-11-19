@@ -88,6 +88,15 @@ export function urlCarriesSensitiveQuery(
  *      not a UUID) is masked. Slugs without digits and UUID ids stay readable.
  */
 const BOSTA_TOKEN_RE = /(\/shipping\/bosta\/[^/?#\s"']+\/)[^/?#\s"']+/gi;
+/**
+ * The guest order-status link (Ruling WA-COD-V2-2) is a bearer secret in the path: `/public/order-status/<token>` (API) and `/o/<token>`
+ * (storefront page). Masked whatever the path looks like, and by SHAPE too (<uuid>.<uuid>.<exp>.<43-char mac>), so a router-relative
+ * `/<token>` in a log line is hidden as well.
+ */
+const ORDER_STATUS_PATH_RE =
+  /(\/public\/order-status\/|(?:https?:\/\/[^/\s"']+|^|[\s"'(])\/o\/)[^/?#\s"']+/gi;
+const ORDER_STATUS_SHAPE_RE =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.\d{1,12}\.[A-Za-z0-9_-]{43}/gi;
 const LONG_SEGMENT_RE = /(\/)([A-Za-z0-9_-]{24,})(?=[/?#\s"']|$)/g;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -96,7 +105,10 @@ export function redactPathSecrets(
   opts: { anyLongSegment?: boolean } = { anyLongSegment: true }
 ): string {
   if (typeof text !== 'string' || !text.includes('/')) return text;
-  const bosta = text.replace(BOSTA_TOKEN_RE, `$1${REDACTED_QUERY_VALUE}`);
+  const bosta = text
+    .replace(BOSTA_TOKEN_RE, `$1${REDACTED_QUERY_VALUE}`)
+    .replace(ORDER_STATUS_PATH_RE, `$1${REDACTED_QUERY_VALUE}`)
+    .replace(ORDER_STATUS_SHAPE_RE, REDACTED_QUERY_VALUE);
   if (!opts.anyLongSegment) return bosta;
   return bosta.replace(LONG_SEGMENT_RE, (whole, slash: string, seg: string) =>
     UUID_RE.test(seg) || !/\d/.test(seg) ? whole : `${slash}${REDACTED_QUERY_VALUE}`
