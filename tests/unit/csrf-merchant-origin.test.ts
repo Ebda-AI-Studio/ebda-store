@@ -116,6 +116,21 @@ describe('csrfProtection — merchant origins are no longer exempt', () => {
     }
   });
 
+  it('S2: /public/ writes carrying an auth cookie are NOT exempt (cookie-auth POST /public/orders)', () => {
+    for (const cookies of [{ token: 'victim.jwt' }, { refresh_token: 'victim.refresh' }]) {
+      const res = makeRes();
+      const next = vi.fn();
+      csrfProtection(
+        makeReq('/api/v1/public/orders', { origin: MERCHANT_ORIGIN, cookies }),
+        res,
+        next as unknown as NextFunction
+      );
+      expect(next).not.toHaveBeenCalled();
+      expect(res.statusCode).toBe(403);
+      expect(res.body.error?.code).toBe('CSRF_MISSING_SESSION');
+    }
+  });
+
   it('still exempts the credential-less /auth/ entry points and Bearer-authenticated requests', () => {
     const res1 = makeRes();
     const n1 = vi.fn();

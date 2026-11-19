@@ -14,6 +14,7 @@ import {
   clearStoredSignupSlug,
   readStoredSignupSlug,
 } from '../../../components/onboarding/signup-slug';
+import { RequestForm } from '@/components/support/RequestForm';
 import type { OnboardingStore, SlugCheck } from './types';
 
 type SlugUi =
@@ -53,6 +54,8 @@ export function StoreStep({
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
   const [slugUi, setSlugUi] = useState<SlugUi>({ kind: 'idle' });
+  // A16: ask Ebda Store staff to release a protected address, or to raise the store limit.
+  const [ask, setAsk] = useState<'slug' | 'cap' | null>(null);
   // A name carried from a store host's 404 ("Start your store as <slug>"): prefill, still checked live below.
   useEffect(() => {
     const carried = readStoredSignupSlug();
@@ -132,8 +135,11 @@ export function StoreStep({
       else if (error?.code === 'SLUG_RESERVED') setSlugUi({ kind: 'problem', key: 'reserved' });
       else if (error?.code === 'SLUG_PROTECTED') setSlugUi({ kind: 'problem', key: 'protected' });
       else if (error?.code === 'STORE_DAILY_LIMIT') setFormError(t('dailyLimit'));
-      else if (error?.code === 'STORE_LIMIT_REACHED') setFormError(t('limit'));
-      else setFormError(t('createFailed'));
+      else if (error?.code === 'STORE_LIMIT_REACHED') {
+        // the per-account limit (3): staff can grant a higher one, so show the request form
+        setFormError(t('limit'));
+        setAsk('cap');
+      } else setFormError(t('createFailed'));
       return;
     }
     // StoreCreated: same event_id as the server's Conversions API event (dedup).
@@ -188,7 +194,22 @@ export function StoreStep({
           )}
         </p>
         <p className="text-xs text-muted-foreground">{t('slugHelp')}</p>
+        {slugUi.kind === 'problem' && slugUi.key === 'protected' && ask !== 'slug' && (
+          <Button type="button" variant="outline" className="mt-2" onClick={() => setAsk('slug')}>
+            {t('claimAddress')}
+          </Button>
+        )}
       </div>
+      {ask && (
+        <div className="rounded-lg border border-border p-4">
+          <RequestForm
+            mode={ask}
+            slug={slug}
+            onDone={() => undefined}
+            onCancel={() => setAsk(null)}
+          />
+        </div>
+      )}
       <div className="flex gap-3">
         {onBack && (
           <Button type="button" variant="outline" onClick={onBack}>
