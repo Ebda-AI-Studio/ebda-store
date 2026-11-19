@@ -564,7 +564,7 @@ export default function NewStockAdjustmentPage() {
               value={item.variantId ?? ''}
               onChange={e => updateItem(i, { variantId: e.target.value })}
               aria-label={tNew('selectVariant')}
-              className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+              className="w-full border border-border rounded-md px-2 py-1 text-base sm:text-sm"
             >
               <option value="">— {tNew('selectVariant')} —</option>
               {variantsByProduct[item.productId]!.map(v => (
