@@ -76,7 +76,7 @@ export interface ProviderWebhookDef {
 }
 
 /** The record of a full provider run (GW-VERIFIED-1). Both parts are required. */
-export interface ProviderEvidence {
+interface ProviderEvidence {
   /** ISO date (YYYY-MM-DD) of the run that proved create + pay + webhook + refund end to end. */
   runAt: string;
   /** Where the run is recorded: a run id (`sandbox-check:<id>`) or a link to the run record. */
