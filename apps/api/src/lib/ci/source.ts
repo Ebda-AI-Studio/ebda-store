@@ -8,6 +8,12 @@ import { getAccountsBrief } from '../identity-client';
 import { storeMoney, storeRepo, type StoreRepo, type StoreReads } from '../repo-factory';
 import { toE164 } from '@ebda/shared';
 import { areaKeyFor, type AreaKeyResult } from './area-key';
+import {
+  ACTIVATION_PEER_LIMIT,
+  activationOf,
+  qualifiedAt,
+  type CiActivationOrder,
+} from './activation';
 
 export interface CiOrderFacts {
   id: string;
@@ -33,7 +39,9 @@ export interface CiOrderFacts {
     failureReason: string | null;
   }>;
   transitions: Array<{ from: string | null; to: string; at: Date; actorId: string | null }>;
-  shipment: { pickedUpAt: Date | null; returnedAt: Date | null } | null;
+  shipment: { pickedUpAt: Date | null; returnedAt: Date | null; deliveredAt?: Date | null } | null;
+  /** The order's activation facts (`activation.ts`): provenance, who placed it from the admin, when it became real. */
+  activation?: CiActivationOrder;
   ciSharing: boolean;
 }
 
@@ -68,6 +76,20 @@ export interface CiStoreSetupFacts {
   ownerSignupAt: Date | null;
   template: string | null;
   ciSharing: boolean;
+  /** Activation rules: a demo store's orders never count, and the owner's own admin orders do. */
+  ownerId?: string | null;
+  isDemo?: boolean;
+}
+
+/** Where a store stands in setup right now (for the help signal). Reads only; `live` hides the order reads. */
+interface CiOnboardingProgress {
+  ownerId: string | null;
+  isDemo: boolean;
+  createdAt: Date | null;
+  live: boolean;
+  paymentConfirmed: boolean;
+  hasFirstOrder: boolean;
+  hasFirstFulfilled: boolean;
 }
 
 export interface CiSource {
@@ -90,6 +112,17 @@ export interface CiSource {
   ): Promise<void>;
   abandonedCart(storeId: string, abandonedCartId: string): Promise<CiAbandonedCartFacts | null>;
   storeSetup(storeId: string): Promise<CiStoreSetupFacts | null>;
+  /**
+   * Up to ACTIVATION_PEER_LIMIT other orders of the store, oldest first, that could be its first real order
+   * (`qualified`: paid, or moved on by a COD confirmation) or its first fulfilled one (`fulfilled`: status delivered).
+   * Explicit select, served by (store_id, created_at).
+   */
+  activationPeers(
+    storeId: string,
+    excludeOrderId: string,
+    mode: 'qualified' | 'fulfilled'
+  ): Promise<CiActivationOrder[]>;
+  onboardingProgress(storeId: string): Promise<CiOnboardingProgress | null>;
   /** The shipment's own flag for ciSharing lookups of a shipment's store. */
   storeCiSharing(storeId: string): Promise<boolean>;
 }
@@ -154,7 +187,7 @@ export const prismaCiSource: CiSource = {
               take: 50,
               select: { fromStatus: true, toStatus: true, createdAt: true, actorId: true },
             },
-            shipment: { select: { pickedUpAt: true, returnedAt: true } },
+            shipment: { select: { pickedUpAt: true, returnedAt: true, deliveredAt: true } },
           },
         }),
         readCiSharing(storeId),
@@ -188,6 +221,25 @@ export const prismaCiSource: CiSource = {
           actorId: e.actorId,
         })),
         shipment: o.shipment,
+        activation: activationOf({
+          id: o.id,
+          source: o.source,
+          status: String(o.status),
+          paymentStatus: String(o.paymentStatus),
+          createdAt: o.createdAt,
+          payments: o.payments.map(p => ({
+            provider: p.provider,
+            status: String(p.status),
+            paidAt: p.paidAt,
+          })),
+          transitions: o.events.map(e => ({
+            from: e.fromStatus,
+            to: e.toStatus,
+            at: e.createdAt,
+            actorId: e.actorId,
+          })),
+          shipmentDeliveredAt: o.shipment?.deliveredAt ?? null,
+        }),
         ciSharing: store?.ciSharing ?? false,
       };
     });
@@ -316,7 +368,7 @@ export const prismaCiSource: CiSource = {
     const s = await inStore(storeId, db =>
       db.store.findFirst({
         where: { id: storeId },
-        select: { template: true, ciSharing: true, ownerId: true },
+        select: { template: true, ciSharing: true, ownerId: true, isDemo: true },
       })
     );
     if (!s) return null;
@@ -326,6 +378,104 @@ export const prismaCiSource: CiSource = {
       ownerSignupAt: owner?.createdAt ? new Date(owner.createdAt) : null,
       template: s.template ? String(s.template) : null,
       ciSharing: s.ciSharing ?? false,
+      ownerId: s.ownerId ?? null,
+      isDemo: s.isDemo === true,
+    };
+  },
+
+  async activationPeers(storeId, excludeOrderId, mode) {
+    return inStore(storeId, async db => {
+      const rows = await db.order.findMany({
+        where: {
+          storeId,
+          deletedAt: null,
+          id: { not: excludeOrderId },
+          ...(mode === 'fulfilled'
+            ? { status: 'delivered' }
+            : {
+                OR: [
+                  { paymentStatus: 'paid' },
+                  { status: { in: ['confirmed', 'processing', 'shipped', 'delivered'] } },
+                ],
+              }),
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        take: ACTIVATION_PEER_LIMIT,
+        select: {
+          id: true,
+          source: true,
+          status: true,
+          paymentStatus: true,
+          createdAt: true,
+          payments: { select: { provider: true, status: true, paidAt: true } },
+          events: {
+            orderBy: { createdAt: 'asc' },
+            take: 50,
+            select: { fromStatus: true, toStatus: true, createdAt: true, actorId: true },
+          },
+          shipment: { select: { deliveredAt: true } },
+        },
+      });
+      return rows.map(o =>
+        activationOf({
+          id: o.id,
+          source: o.source,
+          status: String(o.status),
+          paymentStatus: String(o.paymentStatus),
+          createdAt: o.createdAt,
+          payments: o.payments.map(p => ({
+            provider: p.provider,
+            status: String(p.status),
+            paidAt: p.paidAt,
+          })),
+          transitions: o.events.map(e => ({
+            from: e.fromStatus,
+            to: e.toStatus,
+            at: e.createdAt,
+            actorId: e.actorId,
+          })),
+          shipmentDeliveredAt: o.shipment?.deliveredAt ?? null,
+        })
+      );
+    });
+  },
+
+  async onboardingProgress(storeId) {
+    const s = await inStore(storeId, async db => {
+      const [store, otherMethods] = await Promise.all([
+        db.store.findFirst({
+          where: { id: storeId },
+          select: { status: true, createdAt: true, settings: true, ownerId: true, isDemo: true },
+        }),
+        db.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
+      ]);
+      return store ? { store, otherMethods } : null;
+    });
+    if (!s) return null;
+    const live = String(s.store.status) === 'active';
+    const ownerId = s.store.ownerId ?? null;
+    const manual = (
+      s.store.settings as { setupGuide?: { manual?: Record<string, boolean> } } | null
+    )?.setupGuide?.manual;
+    let hasFirstOrder = false;
+    let hasFirstFulfilled = false;
+    if (live) {
+      const none = '00000000-0000-0000-0000-000000000000';
+      const q = await prismaCiSource.activationPeers(storeId, none, 'qualified');
+      hasFirstOrder = q.some(o => qualifiedAt(o, ownerId) != null);
+      if (hasFirstOrder) {
+        const f = await prismaCiSource.activationPeers(storeId, none, 'fulfilled');
+        hasFirstFulfilled = f.some(o => qualifiedAt(o, ownerId) != null && o.fulfilledAt != null);
+      }
+    }
+    return {
+      ownerId,
+      isDemo: s.store.isDemo === true,
+      createdAt: s.store.createdAt ?? null,
+      live,
+      paymentConfirmed: s.otherMethods > 0 || manual?.payment === true,
+      hasFirstOrder,
+      hasFirstFulfilled,
     };
   },
 
