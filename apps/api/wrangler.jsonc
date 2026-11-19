@@ -205,6 +205,19 @@
       "namespace_id": "1003",
       "simple": { "limit": 6000, "period": 60 },
     },
+    // GET /public/store/resolve only (middleware/store-resolve-native.ts, Ruling PERF-AUTHSTATE-1): the numbers of the Durable Object
+    // limiters they replace on that route (storeResolveLimiter 30/min per IP, storeMissLimiter 20 unknown-store answers/min per IP),
+    // counted per location. Missing binding = the exact DO limiters.
+    {
+      "name": "STORE_RESOLVE_LIMITER",
+      "namespace_id": "1004",
+      "simple": { "limit": 30, "period": 60 },
+    },
+    {
+      "name": "STORE_MISS_LIMITER",
+      "namespace_id": "1005",
+      "simple": { "limit": 20, "period": 60 },
+    },
   ],
 
   // Scheduled work that used to be setInterval loops (index.ts, Node only): see src/cf/cron.ts.

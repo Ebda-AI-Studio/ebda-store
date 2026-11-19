@@ -22,6 +22,7 @@ import { LOCKED_PUBLIC_PLANS, STORE_PLAN_TO_PLAN_CODE } from './schemas/plan-lim
 // alongside PLAN_BASELINE in one line.
 export type { StorePlan };
 
+// pq-allow(unused-export): test seam, imported by plan-baselines, b2b-plan-gate, ai-plan-eligibility, product-3d and plan-limits tests
 export const STORE_PLANS: readonly StorePlan[] = [
   'free',
   'starter',
