@@ -11,11 +11,9 @@ import { PublicShell } from '../../components/onboarding/PublicShell';
 import { AccountsError, accountsFetch } from '../../lib/accounts';
 import { isStrongPassword } from '../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
+import { forgetEmailedLink, takeEmailedLink } from '../../lib/emailed-link';
 
 type Phase = 'loading' | 'form' | 'invalid' | 'success';
-
-/** The emailed link carries the address in the query and a 6 digit code in the fragment (`#code=`): never sent to any server. */
-const CODE_SHAPE = /^\d{6}$/;
 
 /**
  * Ebda Store "choose a new password", opened from the reset email
@@ -46,12 +44,10 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const mail = new URLSearchParams(window.location.search).get('email') ?? '';
-    const raw = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('code') ?? '';
-    window.history.replaceState(null, '', window.location.pathname);
-    if (CODE_SHAPE.test(raw) && mail) {
-      setEmail(mail);
-      setCode(raw);
+    const link = takeEmailedLink();
+    if (link) {
+      setEmail(link.email);
+      setCode(link.code);
       setPhase('form');
     } else {
       setPhase('invalid');
@@ -72,11 +68,14 @@ export default function ResetPasswordPage() {
       await accountsFetch('/password/reset', { json: { email, code, newPassword: password } });
       setSubmitting(false);
       setCode('');
+      forgetEmailedLink();
       setPhase('success');
     } catch (e) {
       setSubmitting(false);
-      if (e instanceof AccountsError && e.code === 'INVALID_CODE') setPhase('invalid');
-      else if (e instanceof AccountsError && e.code === 'VALIDATION_ERROR')
+      if (e instanceof AccountsError && e.code === 'INVALID_CODE') {
+        forgetEmailedLink();
+        setPhase('invalid');
+      } else if (e instanceof AccountsError && e.code === 'VALIDATION_ERROR')
         setErrors({ password: t('passwordWeak') });
       else
         setFormError(

@@ -19,9 +19,31 @@ export function validateRegistration(
   if (formData.password !== formData.confirmPassword) {
     return t('Passwords do not match', 'كلمة المرور وتأكيدها مش زي بعض');
   }
-  // Every rule of the shared policy (the API enforces the same five), named in the shopper's language.
-  const en = passwordUnmetSentence(formData.password, 'en');
-  const ar = passwordUnmetSentence(formData.password, 'ar');
+  return passwordPolicyError(formData.password, t);
+}
+
+/**
+ * Every rule of the shared password policy (the API enforces the same five), named in the shopper's language, checked
+ * before the request. The register and reset pages use this one function, so the form and the server cannot drift.
+ */
+export function passwordPolicyError(
+  password: string,
+  t: (en: string, ar: string) => string
+): string | null {
+  const en = passwordUnmetSentence(password, 'en');
+  const ar = passwordUnmetSentence(password, 'ar');
   if (en && ar) return t(en, ar);
   return null;
+}
+
+/** The register API's 400 shown in the shopper's language (the server message is English and generic). */
+export function registrationRefusalText(
+  error: { code?: unknown } | null | undefined,
+  t: (en: string, ar: string) => string
+): string | null {
+  if (error?.code !== 'VALIDATION_ERROR') return null;
+  return t(
+    'Please check what you entered: a valid email, and a password of at least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol.',
+    'راجع البيانات اللي كتبتها: الإيميل لازم يكون صحيح، وكلمة المرور 8 حروف على الأقل وفيها حرف إنجليزي كبير وحرف صغير ورقم ورمز.'
+  );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
-import { validateRegistration } from './validate-registration';
+import { registrationRefusalText, validateRegistration } from './validate-registration';
 import { useRouter } from 'next/navigation';
 import Link from '../../../components/StoreLink';
 import { Button, Input } from '@ebda/ui';
@@ -77,6 +77,7 @@ export default function RegisterClient() {
         if (!result.success) {
           throw new Error(
             authRefusalText(result.error, t) ||
+              registrationRefusalText(result.error, t) ||
               result.error?.message ||
               t('Failed to register', 'فشل إنشاء الحساب')
           );

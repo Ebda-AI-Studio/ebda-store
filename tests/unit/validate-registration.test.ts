@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { validateRegistration } from '../../apps/web/src/app/auth/register/validate-registration';
+import {
+  passwordPolicyError,
+  registrationRefusalText,
+  validateRegistration,
+} from '../../apps/web/src/app/auth/register/validate-registration';
 
 const t = (en: string) => en;
 
@@ -26,6 +30,24 @@ describe('validateRegistration', () => {
     ['Abcd1234', 'Your password still needs: A symbol such as ! @ # $.'],
   ])('rejects %s and names the missing rule', (pw, message) => {
     expect(validateRegistration({ password: pw, confirmPassword: pw }, t)).toBe(message);
+  });
+
+  it('treats exactly 8 characters as valid when the policy is met (boundary)', () => {
+    expect(
+      validateRegistration({ password: 'Aa1!aaaa', confirmPassword: 'Aa1!aaaa' }, t)
+    ).toBeNull();
+  });
+
+  it('the same policy is what the storefront reset page uses', () => {
+    expect(passwordPolicyError('abcd1234', t)).not.toBeNull();
+    expect(passwordPolicyError('Abcd123!', t)).toBeNull();
+  });
+
+  it("the register API's 400 is shown in the shopper's language, other refusals are left alone", () => {
+    const ar = (_en: string, arText: string) => arText;
+    expect(registrationRefusalText({ code: 'VALIDATION_ERROR' }, ar)).toContain('راجع البيانات');
+    expect(registrationRefusalText({ code: 'RATE_LIMITED' }, ar)).toBeNull();
+    expect(registrationRefusalText(null, ar)).toBeNull();
   });
 
   it('lists every missing rule at once', () => {

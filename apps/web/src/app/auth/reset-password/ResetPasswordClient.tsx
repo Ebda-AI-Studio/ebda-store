@@ -7,6 +7,7 @@ import Link from '../../../components/StoreLink';
 import { Button, Input } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
+import { passwordPolicyError } from '../register/validate-registration';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { authRefusalText } from '../../../lib/auth-refusal';
@@ -45,10 +46,10 @@ function ResetPasswordForm() {
       return;
     }
 
-    const unmetEn = passwordUnmetSentence(formData.newPassword, 'en');
-    const unmetAr = passwordUnmetSentence(formData.newPassword, 'ar');
-    if (unmetEn && unmetAr) {
-      setError(t(unmetEn, unmetAr));
+    // The shared policy, not just the length (a weak password got the server's English 400).
+    const weak = passwordPolicyError(formData.newPassword, t);
+    if (weak) {
+      setError(weak);
       return;
     }
 
