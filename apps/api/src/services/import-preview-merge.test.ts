@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildImportPreview, mergeImportCheckErrors } from './import-preview';
-import { parentKeyFor } from './bulk.service';
+import { parentKeyFor } from './bulk-parent-key';
 
 const csv = ['name,sku,price,parentSku', 'A,A-1,1000,', 'B,B-1,2000,', ',,500,A-1'].join('\n');
 

@@ -1,4 +1,5 @@
 import { isFreeActiveProduct, PRICE_REQUIRED_MESSAGE } from '../lib/sellable-price';
+import { PARENT_SLUG_PREFIX, parentKeyFor } from './bulk-parent-key';
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@ebda/database';
 import { storeDb, storeMoney, storeWriter } from '../lib/repo-factory';
 import logger from '../lib/logger';
@@ -132,14 +133,6 @@ export interface CollectedOption {
   name: string;
   values: string[]; // distinct, first-seen order
 }
-
-/**
- * STORE-QA-64: the key a base row's variant rows use as their `parentSku`. A product WITHOUT a sku cannot be linked by sku, so the
- * export writes `slug:<slug>` for its variant rows and the importer resolves that against the base row / the store's slug.
- */
-export const PARENT_SLUG_PREFIX = 'slug:';
-export const parentKeyFor = (sku: string | null | undefined, slug: string): string =>
-  sku && String(sku).trim() ? String(sku).trim() : `${PARENT_SLUG_PREFIX}${slug}`;
 
 /** A row is a variant when it carries a non-empty parentSku, else a base product. */
 export function classifyRow(row: { parentSku?: string }): 'base' | 'variant' {
