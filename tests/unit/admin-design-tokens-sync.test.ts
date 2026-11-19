@@ -23,7 +23,6 @@ import {
   bottomNavClasses,
   CONTROL_HEIGHT,
   NAV_HEIGHT,
-  RADIUS_PX,
 } from '../../apps/admin/src/components/ui/tokens';
 
 const ADMIN = join(__dirname, '../../apps/admin');
@@ -96,7 +95,6 @@ describe('admin consumes the foundation tokens', () => {
   });
 
   it('radius: --radius is the surface radius and rounded-md is the control radius', () => {
-    expect(RADIUS_PX).toBe(RADIUS);
     expect(RADIUS.surface - 2).toBe(RADIUS.control); // tailwind borderRadius.md = calc(var(--radius) - 2px)
   });
 

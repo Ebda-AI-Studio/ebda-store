@@ -11,16 +11,7 @@
  * 12px is for counters/badges only (never the sole carrier of meaning).
  */
 
-import {
-  CONTROL,
-  ELEVATION as FDN_ELEVATION,
-  MOTION,
-  NAV,
-  RADIUS as FDN_RADIUS,
-  SPACE,
-  TYPE as FDN_TYPE,
-  Z,
-} from '@ebda/shared/design';
+import { CONTROL, MOTION, NAV, SPACE, TYPE as FDN_TYPE, Z } from '@ebda/shared/design';
 
 /**
  * Values come from the vendored foundation (@ebda/shared/design, ebda-foundation design language v1); this file only
@@ -40,26 +31,24 @@ export const TYPE = {
   display: { cls: 'text-3xl', ...FDN_TYPE.display },
 } as const;
 
-/** Radii: control (rounded-md), surface (rounded-lg = --radius), pill (rounded-full). Pixel values: foundation RADIUS. */
+/** Radii: control (rounded-md), surface (rounded-lg = --radius), pill (rounded-full). Pixel values: foundation RADIUS (`@ebda/shared/design`). */
 export const RADIUS = {
   control: 'rounded-md',
   surface: 'rounded-lg',
   pill: 'rounded-full',
 } as const;
-export const RADIUS_PX = FDN_RADIUS;
 
 /** Heights in px: every interactive control (button, input, select, nav item) sits on one of these. */
 export const CONTROL_HEIGHT = CONTROL;
 export const NAV_HEIGHT = NAV;
 
-/** Elevation: 0 flat hairline (default), 1 cards, 2 menus/popovers, 3 modals/sheets. No coloured shadows. Shadow values: foundation ELEVATION. */
+/** Elevation: 0 flat hairline (default), 1 cards, 2 menus/popovers, 3 modals/sheets. No coloured shadows. Shadow values: foundation ELEVATION (`@ebda/shared/design`). */
 export const ELEVATION = {
   flat: '',
   card: 'shadow-sm',
   menu: 'shadow-md',
   modal: 'shadow-xl',
 } as const;
-export const ELEVATION_VALUES = FDN_ELEVATION;
 
 export type NavKind = 'sidebar' | 'tab' | 'rail';
 
