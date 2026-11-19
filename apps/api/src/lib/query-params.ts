@@ -64,6 +64,8 @@ export const PUBLIC_PRODUCT_LIST_QUERY_KEYS = [
   'maxPrice',
   'cursor',
   'ids',
+  // Opt-in: `withPriceMax=1` adds `meta.priceMax` (the storefront price filter sizes its slider from it).
+  'withPriceMax',
 ] as const;
 
 /** The `sort` values of GET /public/products. */

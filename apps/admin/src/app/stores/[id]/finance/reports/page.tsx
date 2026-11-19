@@ -15,16 +15,14 @@ import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/sha
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
+import {
+  toTrialBalanceRows,
+  sumTrialBalance,
+  type ApiTrialBalanceRow,
+  type TrialBalanceRow,
+} from './trial-balance';
 
-interface TrialBalanceRow {
-  code: string;
-  nameEn: string;
-  nameAr: string | null;
-  debit: number;
-  credit: number;
-  balance: number;
-}
+type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
 
 interface PnlSection {
   accounts: { code: string; nameEn: string; balance: number }[];
@@ -148,7 +146,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
     const isLatest = beginRequest();
     setLoading(true);
     setError(null);
-    apiGet<TrialBalanceRow[]>(
+    apiGet<ApiTrialBalanceRow[]>(
       `/api/v1/stores/${storeId}/finance/reports/trial-balance?asOf=${asOf}`
     )
       .then(({ data, error: apiError }) => {
@@ -157,7 +155,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
           // Never leave the previous period's figures on screen under an error.
           setRows(null);
           setError(apiError.message);
-        } else setRows(data ?? []);
+        } else setRows(toTrialBalanceRows(data ?? []));
       })
       .catch(() => {
         if (!isLatest()) return;
@@ -173,10 +171,7 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
     fetch();
   }, [fetch]);
 
-  const totals = (rows ?? []).reduce(
-    (acc, r) => ({ debit: acc.debit + r.debit, credit: acc.credit + r.credit }),
-    { debit: 0, credit: 0 }
-  );
+  const totals = sumTrialBalance(rows ?? []);
   const balanced = rows && rows.length > 0 && totals.debit === totals.credit;
 
   function exportCsv() {
