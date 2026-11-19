@@ -106,7 +106,6 @@ function spell(word: string, p: Profile): string {
   const chars = [...word];
   chars.forEach((ch, i) => {
     const first = i === 0;
-    const last = i === chars.length - 1;
     let piece: string;
     let consonant = false;
     let glide = false;
