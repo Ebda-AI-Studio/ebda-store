@@ -319,6 +319,11 @@ describe('an Ebda-started refund is never booked a second time as out-of-band (o
   it('ordering webhook -> API return: in-window webhook gets 503; after refundCharge writes the ref the redelivery settles THAT row once', async () => {
     const db = rig();
     ebdaRefund(db, { status: 'pending', ref: null });
+    // the super-admin chose keepAccess (R-REFUND-PERIOD-1: refundCharge stores it on the row at claim time), so the full
+    // refund returns the money and leaves the period alone
+    db.prepare(
+      `UPDATE billing_events SET raw = '{"keepAccess":true}' WHERE id = '55555555-5555-4555-8555-555555555555'`
+    ).run();
     await expect(applyWebhookEvent('stub', refundHook())).rejects.toMatchObject({
       statusCode: 503,
       code: 'REFUND_NOT_YET_RECORDED',
@@ -330,7 +335,7 @@ describe('an Ebda-started refund is never booked a second time as out-of-band (o
     ).run();
     expect(await applyWebhookEvent('stub', refundHook())).toMatchObject({ outcome: 'processed' });
     expect(refunds(db)).toEqual([{ a: 1000, r: 'txn-rf-1', c: CHARGE, s: 'succeeded' }]);
-    expect(sub(db)).toEqual({ p: 'growth', s: 'active' }); // an Ebda refund is a super-admin decision, no auto-revoke
+    expect(sub(db)).toEqual({ p: 'growth', s: 'active' }); // an Ebda refund is a super-admin decision (keepAccess), not an out-of-band revoke
   });
 
   it('inside the window, no amount stated: the gateway is asked to redeliver (retryable 503), nothing booked', async () => {

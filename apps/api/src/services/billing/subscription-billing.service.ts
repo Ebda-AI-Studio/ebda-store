@@ -1377,6 +1377,8 @@ async function sweepStuckRefunds(now: Date, provider: BillingProvider | null): P
   }
   const unresolved: string[] = [];
   for (const r of rows) {
+    // a settled full refund that ends access pushes its `downgraded` effect here; it runs after the tx commits
+    const effects: BillingEffect[] = [];
     try {
       const settled = await withStore(r.storeId, async tx => {
         const refund = await tx.billingEvent.findUnique({
@@ -1397,9 +1399,10 @@ async function sweepStuckRefunds(now: Date, provider: BillingProvider | null): P
           await linkToBookedReversal(tx, r.storeId, refund.id, refund.provider, refund.providerRef)
         )
           return true;
-        await settleRefundInTx(tx, r.storeId, refund.id, true);
+        await settleRefundInTx(tx, r.storeId, refund.id, true, undefined, effects);
         return true;
       });
+      await runBillingEffects(effects);
       if (!settled) unresolved.push(r.id);
     } catch (err) {
       logger.warn({ err, eventId: r.id }, '[billing] stuck refund lookup failed; left pending');
