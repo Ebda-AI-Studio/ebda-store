@@ -25,6 +25,7 @@ import {
 } from '@/lib/assistant';
 import { Button } from '@/components/ui/Button';
 import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
+import { cn } from '@ebda/ui/cn';
 import { Segments } from './Citation';
 import { ConfirmCard } from './ConfirmCard';
 import { PreviewCard } from './PreviewCard';
@@ -378,7 +379,7 @@ export function AssistantPanel({
               void ask(text);
             }
           }}
-          className={`${TEXTAREA_CLASSES} max-h-36 resize-none`}
+          className={cn(TEXTAREA_CLASSES, 'max-h-36 resize-none')}
         />
         <Button
           type="submit"

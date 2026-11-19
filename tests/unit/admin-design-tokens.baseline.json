@@ -266,7 +266,7 @@
     "app/stores/[id]/reviews/page.tsx": 3,
     "app/stores/[id]/seo/page.tsx": 12,
     "app/stores/[id]/seo/redirects/page.tsx": 1,
-    "app/stores/[id]/settings/page.tsx": 2,
+    "app/stores/[id]/settings/page.tsx": 1,
     "app/stores/[id]/shipping-carriers/_components/CarrierConnectCard.tsx": 8,
     "app/stores/[id]/shipping/_components/AreaRateEditor.tsx": 2,
     "app/stores/[id]/shipping/_components/ReturnPolicyCard.tsx": 2,

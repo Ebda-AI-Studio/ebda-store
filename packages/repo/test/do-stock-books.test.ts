@@ -45,6 +45,23 @@ it('the op name list equals the implemented books ops', () => {
 });
 
 describe('stock adjustments', () => {
+  it('STORE-QA-59: refuses a product-only line for a product with variants, and a variant line moves the variant stock', () => {
+    const r = rig();
+    expect(
+      r.code('createStockAdjustment', {
+        type: 'cycle_count',
+        items: [{ productId: 'pv', newQty: 18 }],
+      })
+    ).toBe('VARIANT_REQUIRED/422');
+    const d = r.op('createStockAdjustment', {
+      type: 'cycle_count',
+      items: [{ productId: 'pv', variantId: 'v1', newQty: 9 }],
+    });
+    r.op('postStockAdjustment', { id: d.id });
+    expect(vinv(r, 'v1')).toBe(9);
+    expect(vinv(r, 'v2')).toBe(4);
+  });
+
   it('creates a numbered draft with the snapshot, posts once, refuses a foreign id and a second post', () => {
     const r = rig();
     expect(

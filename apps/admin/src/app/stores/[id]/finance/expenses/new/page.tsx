@@ -177,7 +177,8 @@ export default function NewExpensePage() {
       const accessToken =
         typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
-      const headers: Record<string, string> = {};
+      // STORE-QA-56: custom header lets a cookie-only multipart POST past the CSRF gate.
+      const headers: Record<string, string> = { 'X-Requested-With': 'XMLHttpRequest' };
       if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 

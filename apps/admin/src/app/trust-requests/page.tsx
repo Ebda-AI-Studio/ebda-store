@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { FIELD_CLASSES } from '@/components/ui/tokens';
+import { cn } from '@ebda/ui/cn';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { apiGet, apiPost } from '../../lib/api';
@@ -115,6 +116,7 @@ function Inner() {
 
   const when = (iso: string) => new Date(iso).toISOString().slice(0, 16).replace('T', ' ');
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => setFilters(f => ({ ...f, [k]: v }));
+
   return (
     <div className="max-w-5xl space-y-6">
       <section aria-labelledby="tr-filters" className="rounded-md border bg-card p-4">
@@ -155,7 +157,7 @@ function Inner() {
           <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             {t('filter.store')}
             <input
-              className={`${FIELD_CLASSES} w-72`}
+              className={cn(FIELD_CLASSES, 'w-72')}
               dir="ltr"
               placeholder={t('filter.storePlaceholder')}
               value={filters.storeId}
@@ -292,7 +294,7 @@ function Inner() {
                     min={3}
                     max={20}
                     step={1}
-                    className={`${FIELD_CLASSES} w-28`}
+                    className={cn(FIELD_CLASSES, 'w-28')}
                     value={limit}
                     onChange={e => setLimit(e.target.value)}
                   />
