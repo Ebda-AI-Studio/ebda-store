@@ -70,6 +70,41 @@ export function scannerTests(root = ROOT, rel = 'tests/unit') {
   return out.sort();
 }
 
+/**
+ * PREPUSH-6 (change class): a push that touches ONLY docs, workflows, i18n/locale JSON or tests cannot change what a source
+ * scanner reads in apps/*, so the 200+ repo-scanning tests are narrowed to those that could notice it: a scanner stays when it
+ * is tree-wide (git ls-files / git grep), when its source names a changed top-level directory or file, or when it is itself
+ * changed. Any other changed file (source, config, lockfile, scripts) keeps the full scanner list. CI runs every scanner.
+ */
+export const LIGHT_CLASS = /^(docs\/|\.github\/|.*\.md$|.*\/(locales|i18n|messages)\/[^/]+\.json$|tests\/|.*\.test\.[a-z]+$)/;
+const TREE_WIDE = /git[ '",]+(ls-files|grep)\b|['"`]ls-files['"`]|['"`]grep['"`]/;
+
+export function isLightPush(files) {
+  const f = files.filter(Boolean);
+  return f.length > 0 && f.every(x => LIGHT_CLASS.test(x));
+}
+
+export function narrowScanners(scanners, files, root = ROOT) {
+  const f = files.filter(Boolean);
+  if (!isLightPush(f)) return scanners;
+  const needles = new Set();
+  for (const x of f) {
+    needles.add(x);
+    if (/^tests\//.test(x) || /\.test\.[a-z]+$/.test(x)) continue; // a test file matters only to a scanner that names it
+    needles.add(path.dirname(x));
+    needles.add(x.split('/')[0]);
+    if (/\.md$/.test(x)) needles.add('.md');
+  }
+  needles.delete('.');
+  return scanners.filter(t => {
+    if (f.includes(t)) return true;
+    const src = readFileSync(path.join(root, t), 'utf8');
+    if (TREE_WIDE.test(src)) return true;
+    for (const n of needles) if (src.includes(n)) return true;
+    return false;
+  });
+}
+
 export function plan(files, workspaces) {
   const changed = files.filter(Boolean);
   const r = classify(changed, workspaces);
@@ -114,7 +149,13 @@ function main(argv) {
       .trim()
       .split('\n');
   }
-  console.log(JSON.stringify({ ...plan(files, loadWorkspaces()), scanners: scannerTests() }));
+  const p = plan(files, loadWorkspaces());
+  const light = isLightPush(files);
+  // lightRelated: every related file is itself a test, few of them: runs in a light slot, never under the heavy lock
+  const lightRelated = light && (p.related || []).length > 0 && (p.related || []).every(f => /(^tests\/|\.test\.)/.test(f));
+  console.log(
+    JSON.stringify({ ...p, light, lightRelated, scanners: narrowScanners(scannerTests(), files) })
+  );
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))

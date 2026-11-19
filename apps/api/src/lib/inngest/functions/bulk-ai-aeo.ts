@@ -526,7 +526,7 @@ No other text, no markdown code fences — pure JSON only.`;
       // (invalidateStoreProductCaches, the `public:products:*` prefix) was the
       // wrong namespace anyway: StoreFaq rows are served off the STORE record's
       // own `public:store:*` cache keys (public.routes.ts's
-      // fetchStoreFaqsAndHowtos, embedded in the `public:store:<slugOrId>` and
+      // fetchStoreExtras via storePayloadParts, embedded in the `public:store:<slugOrId>` and
       // `public:store:resolve:<domain>` payloads), never off `public:products:*`
       // (#1333).
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
