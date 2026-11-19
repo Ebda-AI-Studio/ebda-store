@@ -22,10 +22,10 @@ interface LinkState {
   active: boolean;
 }
 
-type Refusal = 'notIncluded' | 'errRole' | 'errMfa' | 'errSession' | 'errNetwork' | 'errGeneric';
+type RefusalKey = 'notIncluded' | 'errRole' | 'errMfa' | 'errSession' | 'errNetwork' | 'errGeneric';
 
 /** One refusal key per failure; the server's own text is never shown. */
-function refusalKey(error: { code?: string; status?: number }): Refusal {
+function refusalKey(error: { code?: string; status?: number }): RefusalKey {
   if (error.code === 'WHATSAPP_NOT_INCLUDED') return 'notIncluded';
   if (error.code === 'MFA_SETUP_REQUIRED') return 'errMfa';
   if (error.status === 401) return 'errSession';
@@ -42,7 +42,7 @@ export function ConnectChatCard({ storeId }: { storeId: string }) {
   const [state, setState] = useState<LinkState | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [refusal, setRefusal] = useState<Refusal | null>(null);
+  const [refusal, setRefusal] = useState<RefusalKey | null>(null);
   const inFlight = useRef(false);
 
   const load = useCallback(async () => {
