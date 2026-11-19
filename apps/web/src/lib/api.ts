@@ -393,6 +393,8 @@ interface PaginationMeta {
   totalPages: number;
   /** The list is in hybrid relevance order (search with semantic search on, Task 12). */
   ranked?: boolean;
+  /** The store's highest price in minor units, variant-aware (PL1): sizes the price filter's slider. */
+  priceMax?: number;
 }
 
 /**
