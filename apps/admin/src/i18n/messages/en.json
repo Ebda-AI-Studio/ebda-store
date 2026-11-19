@@ -2399,6 +2399,29 @@
       "planChangeFailed": "Could not change the plan",
       "planUpdated": "Plan updated",
       "planUpdatedBody": "Store plan changed to {plan}."
+    },
+    "chatConnect": {
+      "title": "Ebda Chat",
+      "intro": "Reply to your customers on WhatsApp from one inbox.",
+      "whatItDoes": "Connecting only creates your Ebda Chat workspace. There is no charge, no plan change, and no message is sent to anyone.",
+      "connect": "Connect Ebda Chat",
+      "connecting": "Connecting…",
+      "connected": "Connected",
+      "connectedBody": "Your store is connected to Ebda Chat.",
+      "openChat": "Open Ebda Chat",
+      "loading": "Checking Ebda Chat…",
+      "retry": "Try again",
+      "toastTitle": "Ebda Chat connected",
+      "toastBody": "Your Ebda Chat workspace is ready.",
+      "notIncluded": "Your plan does not include Ebda Chat. Upgrade your plan to connect it.",
+      "upgrade": "See plans",
+      "errRole": "Only the store owner or a store admin can connect Ebda Chat. Ask the owner to do it.",
+      "errMfa": "Turn on two-step verification for your account before connecting Ebda Chat.",
+      "errMfaLink": "Open account security",
+      "errSession": "Your session ended. Sign in again to continue.",
+      "errNetwork": "No connection right now. Check your internet and try again.",
+      "errLoad": "We could not check whether Ebda Chat is connected. Try again.",
+      "errGeneric": "Ebda Chat could not be connected. Nothing was changed. Try again in a moment."
     }
   },
   "branding": {
@@ -4906,9 +4929,8 @@
       "sentTitle": "Broadcast sent",
       "sentDescription": "Targeted {count, number, latn} subscriber(s).",
       "sendFailed": "Failed to send broadcast.",
-      "notConfiguredTitle": "Push provider not configured",
-      "notConfiguredDescription": "OneSignal credentials are missing on the API server. Set the env vars below on Railway and redeploy:",
-      "and": "and",
+      "notConfiguredTitle": "Push notifications are not available yet",
+      "notConfiguredDescription": "Push notifications are not available for your store yet. Try again later.",
       "recentTitle": "Recent broadcasts",
       "recentEmpty": "No broadcasts sent yet.",
       "refresh": "Refresh",
@@ -5455,7 +5477,8 @@
         "overridesCleared": "Overrides cleared",
         "overridesClearedDescription": "Store is now using plan defaults.",
         "resetFailed": "Reset failed"
-      }
+      },
+      "baselineTierNote": "Features below are measured against the {plan} feature set, which follows the store's subscription plan."
     }
   },
   "template": {
@@ -6687,6 +6710,12 @@
         "appealOpen": "Your appeal is under review. We will reply by email.",
         "appeal": "Appeal this decision"
       }
+    },
+    "subscriptionPlanRow": {
+      "label": "Store plan",
+      "loading": "Loading the plan…",
+      "loadError": "The plan could not be loaded. Open Billing to see it.",
+      "assignLink": "Assign plan in Billing"
     }
   },
   "finance": {
@@ -7281,6 +7310,8 @@
         "addItem": "+ Add product",
         "selectProduct": "Select product",
         "newQty": "New quantity",
+        "selectVariant": "Select variant",
+        "variantRequired": "This product has variants. Choose a variant for each line.",
         "submitDraft": "Save as draft",
         "submitPost": "Approve adjustment",
         "typeTip": "cycle_count = routine recount correction; damage = damaged, unsellable; theft = lost to theft or shrinkage; loss = lost or misplaced (not theft or damage); write_off = deliberately removed (expired or obsolete); found = previously-missing stock located (increases quantity); return_to_supplier = sent back to supplier.",
@@ -9463,7 +9494,8 @@
     "viewReceipt": "View receipt",
     "receiptProcessing": "Your payment went through. Your receipt will print here in a moment.",
     "cancelObject": "Cancelling your plan subscription",
-    "cancelAction": "Cancel subscription"
+    "cancelAction": "Cancel subscription",
+    "adminPlanHidden": "hidden"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -9780,7 +9812,15 @@
       "privacy": "Privacy",
       "support": "Need help?",
       "footer": "Your store. Your brand.",
-      "back": "Back to Ebda Store"
+      "back": "Back to Ebda Store",
+      "signedInAs": "Signed in as",
+      "signOut": "Sign out"
+    },
+    "platformAdmin": {
+      "title": "You're a platform admin",
+      "body": "You're a platform admin. Sign in again with two-step verification to open the admin console.",
+      "signInAgain": "Sign in again",
+      "signOut": "Sign out"
     },
     "acceptInvite": {
       "title": "Staff invitation",
@@ -9837,7 +9877,9 @@
     "stuck": "Outcome unknown — reconcile",
     "retry": "retry {n}",
     "refund": "Refund",
-    "confirmRefund": "Refund {amount} to the merchant's card?",
+    "confirmRefund": "Refund {amount} to the merchant's card? If this charge paid for their current plan, the plan ends now and the store moves to the free plan. Nothing is charged again.",
+    "refundKeepAccess": "Refund, keep access",
+    "confirmRefundKeepAccess": "Refund {amount} to the merchant's card and let them keep the period they paid for?",
     "refundFailed": "Refund failed: {message}",
     "refundDone": "Refund recorded.",
     "columns": {
@@ -12028,7 +12070,11 @@
       "first_order": "First order",
       "first_fulfilled_order": "First delivered order"
     },
-    "col": { "step": "Step", "store": "Store", "stopped": "Where the order stopped" },
+    "col": {
+      "step": "Step",
+      "store": "Store",
+      "stopped": "Where the order stopped"
+    },
     "funnel": {
       "title": "Funnel by signup date",
       "body": "Stores that signed up in the range: how many reached each step and the median time from signup. Updated once a day.",
@@ -12040,8 +12086,14 @@
       "median": "Median time from signup",
       "help": "Stores that needed help"
     },
-    "stores": { "title": "Stores" },
-    "channel": { "storefront": "Storefront", "whatsapp": "WhatsApp", "admin": "Merchant admin" },
+    "stores": {
+      "title": "Stores"
+    },
+    "channel": {
+      "storefront": "Storefront",
+      "whatsapp": "WhatsApp",
+      "admin": "Merchant admin"
+    },
     "helpKind": {
       "assistant_used": "used the Ebda AI Studio assistant",
       "super_admin_action": "support changed the store",
@@ -12061,7 +12113,11 @@
       "delivered": "Delivered",
       "returned": "Returned"
     },
-    "duration": { "minutes": "{n} min", "hours": "{n} h", "days": "{n} d" }
+    "duration": {
+      "minutes": "{n} min",
+      "hours": "{n} h",
+      "days": "{n} d"
+    }
   },
   "assistant": {
     "title": "Assistant",
