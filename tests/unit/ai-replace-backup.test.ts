@@ -55,6 +55,14 @@ const client = new Proxy(
   }
 );
 const reindex = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const purge = vi.hoisted(() => ({
+  products: vi.fn().mockResolvedValue(undefined),
+  categories: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../apps/api/src/lib/public-cache', () => ({
+  invalidateStoreProductCaches: purge.products,
+  invalidateStoreCategoriesCaches: purge.categories,
+}));
 vi.mock('../../apps/api/src/lib/search/reindex', () => ({ requestStoreReindex: reindex }));
 vi.mock('../../apps/api/src/lib/repo-factory', () => ({
   storeDb: async () => client,
@@ -199,6 +207,30 @@ describe('undo', () => {
     expect(await listBackups(STORE, { productId: 'p1' })).toHaveLength(1);
   });
 
+  it('purges the storefront and public API caches after an undo that restored something, and not after a refused one', async () => {
+    purge.products.mockClear();
+    purge.categories.mockClear();
+    await swap();
+    db.prepare("UPDATE products SET name_ar = 'نسخة التاجر' WHERE id = 'p1'").run();
+    await undoBackups(STORE, 'u1', { productId: 'p1' }); // refused: nothing changed
+    expect(purge.products).not.toHaveBeenCalled();
+    db.prepare("UPDATE products SET name_ar = 'قميص' WHERE id = 'p1'").run();
+    expect((await undoBackups(STORE, 'u1', { productId: 'p1' })).restored).toBe(1);
+    expect(purge.products).toHaveBeenCalledWith(STORE);
+    expect(purge.categories).not.toHaveBeenCalled(); // a product text undo touches no category
+  });
+
+  it('restores a field that was empty before the AI wrote it as NULL, not as an empty string', async () => {
+    db.prepare("UPDATE products SET description_ar = 'وصف ذكي' WHERE id = 'p1'").run();
+    db.prepare(
+      `INSERT INTO ai_replace_backups (id, store_id, job_id, tool, entity_kind, entity_id, product_id, field, previous_value, new_value, created_at)
+       VALUES ('b-null', ?, 'job-null', 'translate_ar', 'product', 'p1', 'p1', 'descriptionAr', NULL, 'وصف ذكي', 1)`
+    ).run(STORE);
+    const res = await undoBackups(STORE, 'u1', { jobId: 'job-null' });
+    expect(res.restored).toBe(1);
+    expect(product('p1').description_ar).toBeNull();
+  });
+
   it('needs a scope', async () => {
     await expect(undoBackups(STORE, 'u1', {})).rejects.toMatchObject({ statusCode: 400 });
   });
@@ -230,7 +262,9 @@ describe('category set and image alt', () => {
       })
     ).toBe('replaced');
     expect(cats()).toEqual(['c3']);
+    purge.categories.mockClear();
     expect((await undoBackups(STORE, 'u1', { productId: 'p1' })).restored).toBe(1);
+    expect(purge.categories).toHaveBeenCalledWith(STORE);
     expect(cats().sort()).toEqual(['c1', 'c2']);
   });
 

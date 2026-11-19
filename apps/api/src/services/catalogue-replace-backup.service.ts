@@ -17,6 +17,7 @@ import { storeDb, storeWriter } from '../lib/repo-factory';
 import { doStoreIdList } from '../lib/store-backend';
 import logger from '../lib/logger';
 import { requestStoreReindex } from '../lib/search/reindex';
+import { invalidateStoreCategoriesCaches, invalidateStoreProductCaches } from '../lib/public-cache';
 import { AppError } from '../middleware/error-handler';
 
 type ReplaceTool = 'translate_ar' | 'translate_en' | 'categorize' | 'image_alt';
@@ -300,12 +301,26 @@ export async function undoBackups(
   });
   const out: UndoResult = { restored: 0, refused: [] };
   let productTextRestored = false;
+  let categoryRestored = false;
   for (const row of rows) {
     const outcome = await restoreOne(storeId, userId, row);
     if (outcome === 'ok') {
       out.restored++;
       if (row.entityKind === 'product') productTextRestored = true;
+      if (row.entityKind === 'category' || row.entityKind === 'product_categories')
+        categoryRestored = true;
     } else out.refused.push({ id: row.id, reason: outcome });
+  }
+  // The storefront and the public API cache what the undo just rewrote (names, descriptions, alt text, category sets): drop
+  // every layer, as every other catalogue write does. A purge failure never fails an undo that already committed.
+  if (out.restored > 0) {
+    await invalidateStoreProductCaches(storeId).catch(err =>
+      logger.warn({ err, storeId }, '[ai-replace] product cache purge after undo failed')
+    );
+    if (categoryRestored)
+      await invalidateStoreCategoriesCaches(storeId).catch(err =>
+        logger.warn({ err, storeId }, '[ai-replace] category cache purge after undo failed')
+      );
   }
   // restored names / descriptions feed the search embedding: one reindex request after the writes, never per row
   if (productTextRestored) await requestStoreReindex(storeId, 'ai-replace-undo');
@@ -328,6 +343,8 @@ async function restoreOne(
   const w = await storeWriter(storeId);
   const prev = row.previousValue ?? '';
   const next = row.newValue ?? '';
+  // a field that was empty before the AI wrote it (null) goes back to null, never to ''
+  const restoredText = row.previousValue;
   const mark = () =>
     w.aiReplaceBackup.updateMany({
       where: { id: row.id, storeId, restoredAt: null },
@@ -372,16 +389,16 @@ async function restoreOne(
     kind === 'product'
       ? w.product.updateMany({
           where: { id: row.entityId, storeId, [field]: next },
-          data: { [field]: prev },
+          data: { [field]: restoredText },
         })
       : kind === 'category'
         ? w.category.updateMany({
             where: { id: row.entityId, storeId, [field]: next },
-            data: { [field]: prev },
+            data: { [field]: restoredText },
           })
         : w.productImage.updateMany({
             where: { id: row.entityId, productId: row.productId ?? undefined, alt: next },
-            data: { alt: prev },
+            data: { alt: restoredText },
           });
   const res = (await restore) as { count: number };
   if (res.count === 0) {
