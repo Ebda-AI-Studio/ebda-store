@@ -121,12 +121,30 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
     productOnlyIds.length > 0
       ? prisma.product.findMany({
           where: { id: { in: productOnlyIds }, storeId: input.storeId },
-          select: { id: true, inventory: true, costPrice: true },
+          select: {
+            id: true,
+            inventory: true,
+            costPrice: true,
+            _count: { select: { variants: true } },
+          },
         })
       : Promise.resolve([]),
   ]);
   const variantById = new Map(variantRows.map(v => [v.id, v]));
   const productById = new Map(productRows.map(p => [p.id, p]));
+
+  // STORE-QA-59: a product with variants keeps its stock on the variants;
+  // `Product.inventory` is not sellable stock. A product-only line would be
+  // "posted" against that dead number (impact +0.00) while every screen kept
+  // showing the variants' total. Refuse it and name the fix — same rule the
+  // CSV import enforces (stock-adjustments.routes.ts).
+  if (productRows.some(p => p._count.variants > 0)) {
+    throw new AppError(
+      422,
+      'VARIANT_REQUIRED',
+      'This product has variants. Adjust stock per variant (choose the variant), not the product.'
+    );
+  }
 
   const snapshots = input.items.map(item => {
     if (item.variantId) {

@@ -10,6 +10,7 @@ import {
   StoreStatus,
   currentStoreId,
   withUser,
+  withStore,
   asPlatformOperator,
 } from '@ebda/database';
 import { StoreService, type SocialLinksPatch } from '../services/store.service';
@@ -32,6 +33,12 @@ import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
 import { auditLog } from '../middleware/security';
 import {
+  clearableStr,
+  clearableUrl,
+  clearableEmail,
+  clearableSafeUrl,
+} from '../lib/clearable-schema';
+import {
   isSafeUrl,
   normalizeEgyptianMobile,
   isValidTimeZone,
@@ -52,6 +59,13 @@ import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { StoreFaqService } from '../services/store-faq.service';
+import { closeClaimsOnSlugGrant } from '../services/trust-grants';
+import {
+  closeAppealsOnReactivation,
+  recordSuspension,
+  rejectAppeal,
+  type TrustDb,
+} from '../services/trust-requests.service';
 
 const router = Router();
 
@@ -329,12 +343,12 @@ const optionalStr = (maxLen: number) =>
 // before validation so the storefront emits a valid meta tag and the
 // verification flow doesn't silently fail.
 const optionalGoogleVerification = z.preprocess(v => {
-  if (typeof v !== 'string') return v === null ? undefined : v;
+  if (typeof v !== 'string') return v;
   const trimmed = v.trim();
-  if (trimmed === '') return undefined;
+  if (trimmed === '') return null;
   const tagMatch = trimmed.match(/content\s*=\s*["']([^"']+)["']/i);
   return tagMatch ? tagMatch[1].trim() : trimmed;
-}, z.string().max(200).optional());
+}, z.string().max(200).nullable().optional());
 
 const optionalUrl = z.preprocess(
   v => (v === '' || v === null ? undefined : v),
@@ -368,15 +382,15 @@ const optionalEmailLocalPart = merchantSenderPrefixInput;
 
 const seoSchema = z
   .object({
-    metaTitle: optionalStr(200),
-    metaTitleAr: optionalStr(200),
-    metaDescription: optionalStr(500),
-    metaDescriptionAr: optionalStr(500),
+    metaTitle: clearableStr(200),
+    metaTitleAr: clearableStr(200),
+    metaDescription: clearableStr(500),
+    metaDescriptionAr: clearableStr(500),
     // AEO — conversational answer-engine copy.
     metaDescriptionAeo: z.string().max(400).optional().nullable(),
     metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
-    ogImage: optionalUrl,
-    twitterHandle: optionalStr(50),
+    ogImage: clearableUrl,
+    twitterHandle: clearableStr(50),
     googleSiteVerification: optionalGoogleVerification,
     emailSenderLocalPart: optionalEmailLocalPart,
     // "Hide my store from search engines": stored as `store.settings.hideFromSearchEngines` (no column, so no
@@ -411,27 +425,27 @@ const optionalWhatsappNumber = z.preprocess(
 
 const contactSchema = z
   .object({
-    email: optionalEmail,
-    phone: optionalStr(50),
-    phoneAr: optionalStr(50),
+    email: clearableEmail,
+    phone: clearableStr(50),
+    phoneAr: clearableStr(50),
     whatsapp: optionalWhatsappNumber,
-    address: optionalStr(500),
-    addressAr: optionalStr(500),
+    address: clearableStr(500),
+    addressAr: clearableStr(500),
     // Phase D.6 — WhatsApp bot "Locations & Hours" branch
-    businessHours: optionalStr(500),
-    googleMapsUrl: optionalStr(2000),
+    businessHours: clearableStr(500),
+    googleMapsUrl: clearableStr(2000),
   })
   .strip();
 
 const brandingSchema = z
   .object({
     name: z.preprocess(v => (v === null ? undefined : v), z.string().min(1).max(200).optional()),
-    nameAr: optionalStr(200),
-    logo: optionalUrl,
-    logoAr: optionalUrl,
-    favicon: optionalUrl,
-    description: optionalStr(1000),
-    descriptionAr: optionalStr(1000),
+    nameAr: clearableStr(200),
+    logo: clearableUrl,
+    logoAr: clearableUrl,
+    favicon: clearableUrl,
+    description: clearableStr(1000),
+    descriptionAr: clearableStr(1000),
   })
   .strip();
 
@@ -470,9 +484,9 @@ const announcementSchema = z
     textAr: z.string().max(500).optional(),
     bgColor: z.string().max(50).optional(),
     textColor: z.string().max(50).optional(),
-    link: safeOptionalUrl,
-    linkText: optionalStr(200),
-    linkTextAr: optionalStr(200),
+    link: clearableSafeUrl,
+    linkText: clearableStr(200),
+    linkTextAr: clearableStr(200),
     dismissible: z.boolean().optional(),
   })
   .strip();
@@ -750,6 +764,8 @@ router.post(
       // provider verifies ownership). Only a super_admin may set one here.
       if (!isSuperAdmin) delete data.domain;
 
+      // A protected address granted by a super admin answers the merchant's open claim for it (before the grant, loud).
+      if (isSuperAdmin) await closeClaimsOnSlugGrant(actor.userId, data.slug);
       const create = () =>
         StoreService.create(
           actor.userId,
@@ -801,6 +817,7 @@ router.put(
       // provider verifies ownership). Only a super_admin may set one here.
       if (user.role !== 'super_admin') delete data.domain;
 
+      if (user.role === 'super_admin') await closeClaimsOnSlugGrant(user.userId, data.slug);
       const store = await StoreService.update(
         id,
         { ...data, settings: data.settings as Prisma.InputJsonValue },
@@ -865,7 +882,11 @@ router.delete(
   }
 );
 
-const storeStatusBody = z.object({ status: z.enum(['active', 'suspended']) });
+// `reason` (suspend only): what the merchant reads at GET /stores/:storeId/suspension (A13).
+const storeStatusBody = z.object({
+  status: z.enum(['active', 'suspended']),
+  reason: z.string().trim().min(1).max(500).optional(),
+});
 const templateBody = z.object({ template: z.string().trim().min(1).max(40) });
 const domainBody = z.object({ domain: z.string().max(253).nullable() });
 
@@ -884,13 +905,40 @@ router.patch(
       }
       const status: StoreStatus = parsedStatus.data.status;
 
+      // A13 ordering (Ruling TRUST-2). The Store row and the request notes cannot share one transaction: the Store is
+      // written through D1 + its Durable Object, the notes through the platform D1 client. So the note write goes FIRST
+      // and FAILS LOUD (no swallowed error): a suspension never lands without its reason row, and a reactivation never
+      // lands with the appeal still open (which would block every future appeal through the one-open-appeal unique).
+      // The failure modes left are harmless and self-healing on retry: an unused note on a store that never got
+      // suspended (getSuspension answers 404 NOT_SUSPENDED), or an appeal closed on a store still suspended (the
+      // merchant can file again).
+      const storeId = req.params.id;
+      const current = await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { status: true } })
+      );
+      if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+      await withStore(storeId, async tx => {
+        const trustDb = tx as unknown as TrustDb;
+        if (status === 'suspended') {
+          await recordSuspension(
+            trustDb,
+            storeId,
+            req.user!,
+            parsedStatus.data.reason,
+            String(current.status) === 'suspended'
+          );
+        } else {
+          await closeAppealsOnReactivation(trustDb, storeId);
+        }
+      });
+
       // StoreService.setStatus owns the write AND the public-cache bust
       // (resolve/slug/id keys + storefront revalidate purge) — account
       // status is NEVER-stale, so the invalidation lives with the write
       // (adversarial audit P1-7; this handler used to bust only the feature
       // cache, leaving a suspended store serving the cached active resolve
       // — checkouts included — for up to the TTL).
-      const store = await StoreService.setStatus(req.params.id, status as 'active' | 'suspended');
+      const store = await StoreService.setStatus(storeId, status as 'active' | 'suspended');
 
       // Invalidate the feature cache — store.status doesn't change the
       // resolved feature map directly, but downstream gates (storefront
@@ -922,6 +970,37 @@ router.patch(
       });
 
       res.json({ success: true, data: toSafeStoreResponse(store) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:id/suspension/appeal/reject - Reject the open suspension appeal (super_admin only).
+// Staff reply to the merchant by e-mail first; this records the decision, starts the merchant's 24 h cooldown
+// (rejected_at) and leaves the store suspended. Reactivating (PATCH /:id/status) is the accept path.
+router.post(
+  '/:id/suspension/appeal/reject',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = req.params.id;
+      const { id } = await withStore(storeId, tx =>
+        rejectAppeal(tx as unknown as TrustDb, storeId)
+      );
+      await insertAuditLog({
+        action: 'store.suspension_appeal_reject',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'trust_request',
+        resourceId: id,
+        details: {},
+        ip: req.ip ?? null,
+        userAgent: req.headers['user-agent'] ?? null,
+      });
+      res.json({ success: true, data: { id, status: 'rejected' } });
     } catch (error) {
       next(error);
     }
