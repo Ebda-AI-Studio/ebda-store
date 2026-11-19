@@ -157,4 +157,4 @@ Design cautions:
 
 ## Owner decision, 2026-10-05
 
-The draft tiers above are superseded by `docs/plans/2026-10-05-pricing-decisions.md`: Basic/Growth/Business, no public free plan, zero platform fees. Amelia stays last.
+The draft tiers above are superseded by `docs/plans/done/2026-10-05-pricing-decisions.md`: Basic/Growth/Business, no public free plan, zero platform fees. Amelia stays last.

@@ -30,7 +30,7 @@ import {
   orderNumberFromScanCode,
 } from '@ebda/shared';
 import { FiscalDocumentService } from './fiscal-document.service';
-import { recordPaymentEvent } from './payment-event.service';
+import { recordPaymentEvent, recordPaymentEventForStore } from './payment-event.service';
 
 /** An address JSON with its `phone` in the one stored form (ruling MONEYB-7). */
 function withStoredPhone(addr: Record<string, unknown>): Record<string, unknown> {
@@ -67,6 +67,7 @@ import {
   COUPON_OVERRIDE_EVENT,
   COUPON_OVERRIDE_ROLES,
 } from '../lib/coupon-override';
+import { STOCK_NOT_TAKEN_EVENT } from '../lib/stock-not-taken';
 import { resolveCustomerContext, resolveBestPromotion } from './promotion-resolver';
 import { socketService } from './socket.service';
 import { featureService } from './feature.service';
@@ -3007,13 +3008,34 @@ export class OrderService {
      * the shelf (a return to origin the merchant chose not to restock,
      * ruling MONEYB-5). Every other caller restores stock as before.
      */
-    opts: { restoreInventory?: boolean; unpaidOnly?: boolean } = {}
+    opts: {
+      restoreInventory?: boolean;
+      unpaidOnly?: boolean;
+      /** Cancel only from these states, decided atomically on a DO store (Fixes #614); see MoneyClient.cancel. */
+      onlyFrom?: string[];
+      exceptionNote?: string;
+    } = {}
   ) {
     // Cancel on a store's Durable Object (Ruling CF-ORDERS-1): the status flip AND the whole reversal (stock, coupon, loyalty,
     // wallet, backorders) are one section there. The state machine is checked on the DO's own status first.
     if (status === 'cancelled') {
       const money = await storeMoney(storeId);
       if (money) return OrderService.cancelOnDo(money, storeId, orderId, opts);
+      // Postgres store: the caller holds the row lock (lib/wa/store-events-consumer.ts), so this read is current.
+      if (opts.onlyFrom) {
+        const cur = await (
+          await storeDb(storeId)
+        ).order.findFirst({
+          where: { id: orderId, storeId },
+          select: { status: true },
+        });
+        if (cur && !opts.onlyFrom.includes(cur.status))
+          throw new AppError(
+            409,
+            'ORDER_STATUS_MOVED',
+            `The order is already ${cur.status}; it was not cancelled`
+          );
+      }
     }
     // Refund by status (Ruling CF-PAY-1) and every other status (Ruling CF-FINAL-1) on a Durable Object store.
     {
@@ -3449,7 +3471,12 @@ export class OrderService {
     money: MoneyClient,
     storeId: string,
     orderId: string,
-    opts: { restoreInventory?: boolean; unpaidOnly?: boolean }
+    opts: {
+      restoreInventory?: boolean;
+      unpaidOnly?: boolean;
+      onlyFrom?: string[];
+      exceptionNote?: string;
+    }
   ) {
     const db = await storeDb(storeId);
     const before = await db.order.findFirst({
@@ -3463,14 +3490,22 @@ export class OrderService {
       },
     });
     if (!before) throw new AppError(404, 'NOT_FOUND', 'Order not found');
-    assertValidTransition(before.status, 'cancelled');
+    // an `onlyFrom` cancel is decided by the DO in its own section (the state read here may already be stale, #614)
+    if (!opts.onlyFrom) assertValidTransition(before.status, 'cancelled');
     const requestedAt = new Date();
     const r = await money.cancel({
       orderId,
       restoreInventory: opts.restoreInventory !== false,
       // the auto-cancel sweep: the DO refuses (ORDER_ALREADY_PAID) when a payment landed first, in the same section
       ...(opts.unpaidOnly ? { unpaidOnly: true } : {}),
+      ...(opts.onlyFrom ? { onlyFrom: opts.onlyFrom, exceptionNote: opts.exceptionNote } : {}),
     });
+    if (r.skipped === 'status_moved')
+      throw new AppError(
+        409,
+        'ORDER_STATUS_MOVED',
+        `The order is already ${r.status}; it was not cancelled`
+      );
     if (!r.replayed) {
       // the same tail as the Postgres path: refund fanout, the status fanout, the customer push
       const hadCapturedPayment = hasCapturedPayment(before);
@@ -3754,6 +3789,18 @@ export class OrderService {
     orderId: string,
     input: { method: string; reference: string | null; actorId: string | null }
   ): Promise<void> {
+    // A Durable Object store records it in one DO section, bounded by the order's one refundable balance (#624): the
+    // Prisma path below cannot run in the Worker (no Postgres since NZ-D23) and had no cross-channel ceiling.
+    const money = await storeMoney(storeId);
+    if (money) {
+      await money.manualRefundRecord({
+        orderId,
+        method: input.method,
+        reference: input.reference,
+        actorUserId: input.actorId,
+      });
+      return;
+    }
     const payments = await prisma.payment.findMany({
       where: {
         orderId,
@@ -3948,6 +3995,90 @@ export class OrderService {
       });
     void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
     return order;
+  }
+
+  /**
+   * Mark a COD order as paid (the merchant collected the cash). Extracted from
+   * POST /:orderId/mark-paid so the route and the merchant assistant share one path.
+   * Throws AppError with the codes the route used to answer with.
+   */
+  static async markCodPaid(storeId: string, orderId: string, userId: string) {
+    const db = await storeDb(storeId);
+    const order = await db.order.findFirst({
+      where: { id: orderId, storeId },
+      include: { payments: true },
+    });
+    if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+
+    const codPayment = order.payments.find(p => p.provider === 'cod');
+    if (!codPayment)
+      throw new AppError(400, 'NOT_COD', 'This order is not a Cash on Delivery order');
+    if (order.paymentStatus === 'paid')
+      throw new AppError(400, 'ALREADY_PAID', 'Order is already marked as paid');
+    // A cancelled / refunded order (incl. a returned-to-origin COD parcel) collected nothing:
+    // marking it paid would book a sale that never happened (sense audit O8).
+    if (order.status === 'cancelled' || order.status === 'refunded')
+      throw new AppError(
+        409,
+        'ORDER_NOT_PAYABLE',
+        'A cancelled or refunded order cannot be marked paid'
+      );
+
+    // Only advance a still-pending order to `confirmed`; COD cash is collected AT delivery, so a
+    // further-along order keeps its fulfilment progress.
+    const money = await storeMoney(storeId);
+    let flipped = { paymentId: codPayment.id, fromStatus: codPayment.status as string };
+    if (money) {
+      // Durable Object store (Ruling NZ-A-2): the same writes in ONE section there.
+      const done = await money.codMarkPaid({ orderIds: [orderId] });
+      if (done.updated.length === 0)
+        throw new AppError(409, 'ORDER_NOT_PAYABLE', 'The order can no longer be marked paid');
+      flipped = { paymentId: done.updated[0].paymentId, fromStatus: done.updated[0].fromStatus };
+    } else {
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: codPayment.id },
+          data: { status: 'completed', paidAt: new Date() },
+        }),
+        prisma.order.update({
+          where: { id: orderId, storeId },
+          data: {
+            paymentStatus: 'paid',
+            ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
+          },
+        }),
+      ]);
+    }
+
+    // Append-only audit row for the COD completion.
+    await (money ? recordPaymentEventForStore : recordPaymentEvent)({
+      paymentId: flipped.paymentId,
+      storeId: order.storeId,
+      orderId,
+      eventType: 'status_change',
+      fromStatus: flipped.fromStatus as typeof codPayment.status,
+      toStatus: 'completed',
+      provider: 'cod',
+      triggeredByUserId: userId,
+      details: { reason: 'cod_marked_paid', orderNumber: order.orderNumber },
+    });
+
+    // Same post-payment fanout the webhook handler fires: the accounting journal relies on it.
+    inngest
+      .send({
+        name: 'order/created',
+        data: {
+          orderId,
+          storeId: order.storeId,
+          paymentMethod: codPayment.provider,
+          locale: undefined,
+        },
+      })
+      .catch((err: unknown) =>
+        logger.error({ err, orderId }, '[COD] Failed to enqueue order/created')
+      );
+
+    return { orderNumber: order.orderNumber, amount: codPayment.amount };
   }
 
   static async getCustomerOrders(
@@ -4594,6 +4725,20 @@ export class OrderService {
           },
         });
       }
+      // #633 (Ruling STOCK-SYMMETRY-1): this order took NO stock; the cancel / refund restock reads this marker and
+      // puts back only what was taken. Same event as the DO's placeAdminOrder (repo-factory-orders-contract parity).
+      await tx.orderEvent.create({
+        data: {
+          storeId,
+          orderId: created.id,
+          fromStatus: null,
+          toStatus: STOCK_NOT_TAKEN_EVENT,
+          actorId: adminUserId,
+          metadata: {
+            items: created.items.map(it => ({ orderItemId: it.id, quantity: it.quantity })),
+          },
+        },
+      });
       // The durable record of a MOQ override, in the order transaction (the audit row below is best-effort).
       if (moqOverride && belowMoqProducts.length > 0) {
         await tx.orderEvent.create({

@@ -1,0 +1,35 @@
+{
+  "id": "shipping.cod-reconciliation",
+  "status": "live",
+  "area": "shipping",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "مطابقة التحصيل من الكوريير",
+  "titleEn": "COD reconciliation (import courier statement)",
+  "screens": ["/stores/[id]/cod-reconciliation"],
+  "api": ["GET /stores/:storeId/cod-reconciliation", "POST .../cod-reconciliation/import"],
+  "mcpTool": null,
+  "planGate": "shipping_carriers",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["الكوريير حولي الفلوس ازاي اطابقها؟"],
+    "en": ["Reconcile my courier statement"]
+  },
+  "steps": ["COD page: upload statement."],
+  "edgeCases": [
+    "Auto-mark-paid from statement OPEN-PR #735",
+    "Statement format per courier",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["No help article; ledger posting of COD remittance planned in #753"]
+}

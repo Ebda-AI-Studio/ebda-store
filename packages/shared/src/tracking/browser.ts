@@ -276,7 +276,7 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
       `position:fixed;inset-inline:${compact ? 8 : 16}px;bottom:${compact ? 8 : 16}px;z-index:2147483000;max-width:640px;margin-inline:auto;` +
       `background:${BRAND.colors.night};color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:12px;` +
       `padding:${compact ? '8px 12px' : '16px'};font:${compact ? '12px/1.5' : '14px/1.6'} ${BRAND.fonts.stacks.arabic};box-shadow:0 8px 32px rgba(0,0,0,.4)`;
-    const linkCss = `color:${BRAND.colors.gold};text-decoration:underline;text-underline-offset:3px;background:none;border:0;padding:0;font:inherit;cursor:pointer`;
+    const linkCss = `color:${BRAND.colors.gold};text-decoration:underline;text-underline-offset:3px;background:none;border:0;padding:7px 6px;margin:-7px -6px;font:inherit;cursor:pointer`; // 32px target, line box unchanged (tap-target floor)
     const p = doc.createElement('p');
     p.style.margin = compact ? '0 0 6px' : '0 0 12px';
     p.textContent = `${t.text} `;

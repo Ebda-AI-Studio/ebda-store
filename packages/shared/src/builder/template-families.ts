@@ -1,6 +1,6 @@
 /**
  * The five storefront template FAMILIES (page presets) the builder will
- * offer (template shortlist, docs/plans/2026-10-07-builder-template-shortlist.md).
+ * offer (template shortlist, docs/plans/done/2026-10-07-builder-template-shortlist.md).
  * Final names: Ahmad, 2026-10-07. Phase 1 declares them only (ids, bilingual
  * labels, which registry sections each one composes); the presets themselves
  * are built and visually evaluated in Phase 2 against the shortlist rubric.

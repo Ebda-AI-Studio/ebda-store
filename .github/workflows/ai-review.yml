@@ -29,7 +29,7 @@ concurrency:
 jobs:
   classify:
     name: AI review classify
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 5
     if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft && github.event.action != 'labeled'
     outputs:
@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ github.base_ref }}
           fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -52,8 +52,9 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
           [ "$(git rev-parse refs/pr/head)" = "$HEAD" ] || { echo "::error::PR head moved while the job started; re-run"; exit 1; }
-          # a new head invalidates any earlier pass: the label must always describe the CURRENT head
-          gh pr edit "$PR" --remove-label ai-review-passed 2>/dev/null || true
+          # Ruling AI-REVIEW-LABEL-1: this step NEVER removes ai-review-passed. A label set by the controller after an independent
+          # review must survive a size refusal or an infra failure; only a real verdict with criticals removes it (step below).
+          # Staleness vs a new head is the merge drain's job (it requires the label set AFTER the head).
           git diff --name-status --no-renames "origin/$BASE_REF...refs/pr/head" > changed.txt
           node .github/ai-review/risky-paths.mjs < changed.txt > risky.txt
           if [ -s risky.txt ]; then
@@ -70,13 +71,14 @@ jobs:
   review:
     name: AI review
     needs: classify
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    # light (Ruling HOST-RUNNERS-3): one CLI install + one tool-less `claude -p`; no heavy lock, no database
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 20
     if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'labeled' && needs.classify.outputs.risky == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ github.base_ref }}
           fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -90,7 +92,16 @@ jobs:
             exit 1
           fi
       - name: Install the Claude CLI (pinned)
-        run: npm install --global --ignore-scripts @anthropic-ai/claude-code@2.1.310
+        # Into this job's RUNNER_TEMP, never --global: a global install writes into the shared Mac host's Homebrew prefix.
+        run: |
+          npm install --prefix "$RUNNER_TEMP/claude-cli" --no-save --ignore-scripts @anthropic-ai/claude-code@2.1.310
+          # --ignore-scripts skips the package's postinstall, which copies the per-platform native binary over the bin/claude.exe
+          # stub ("claude native binary not installed"); link the binary npm installed for this platform ourselves.
+          bin="$(ls "$RUNNER_TEMP"/claude-cli/node_modules/@anthropic-ai/claude-code-*/claude 2>/dev/null | head -1)"
+          [ -n "$bin" ] && [ -x "$bin" ] || { echo "::error::no native claude binary was installed for $(uname -s)-$(uname -m)"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/claude-cli/bin" && ln -sf "$bin" "$RUNNER_TEMP/claude-cli/bin/claude"
+          echo "$RUNNER_TEMP/claude-cli/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/claude-cli/bin/claude" --version
       - name: Build the diff (fail closed when it is too large)
         env:
           PR: ${{ github.event.pull_request.number }}
@@ -103,18 +114,28 @@ jobs:
           git diff --no-renames --unified=3 "origin/$BASE_REF...refs/pr/head" > pr.diff
           size="$(wc -c < pr.diff | tr -d ' ')"
           if [ "$size" -ge 400000 ]; then
-            echo "::error::The diff is $size bytes (limit 400000). A partial review would pass what it never read, so this PR is NOT reviewed automatically: it needs human/controller review, then the label ai-review-passed applied by hand. Splitting the PR is the better fix."
+            echo "::error::The diff is $size bytes (limit 400000). Labels are left untouched (an existing ai-review-passed stays). A partial review would pass what it never read, so this PR is NOT reviewed automatically: it needs human/controller review, then the label ai-review-passed applied by hand. Splitting the PR is the better fix."
             exit 1
           fi
       - name: Review the diff
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
+          CLAUDE_OUTPUT: ${{ runner.temp }}/claude-out.json
         run: |
           set -euo pipefail
           # diff on stdin as data, rules as the prompt; no tools: the reviewer reads, it cannot act
           model=(); [ -n "${AI_REVIEW_MODEL:-}" ] && model=(--model "$AI_REVIEW_MODEL")
-          claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > /tmp/claude-out.json
+          # Ruling AI-REVIEW-HANG-1: a call that hangs on the network is cut at 8 min and retried once, so one hang no
+          # longer burns the whole job timeout and a manual rerun (2026-11-13: #740 timed out twice on a 35 KB diff).
+          # Fail closed: two failed attempts fail the step and no label is applied.
+          for attempt in 1 2; do
+            rc=0
+            timeout 480 claude -p "$(cat .github/ai-review/prompt.md)" "${model[@]}" --output-format json --max-turns 1 --disallowedTools '*' < pr.diff > "$CLAUDE_OUTPUT" || rc=$?
+            [ "$rc" -eq 0 ] && exit 0
+            echo "::warning::review attempt $attempt failed (exit $rc; 124 = cut at 8 min)"
+          done
+          exit 1
       - name: Post findings and gate
         id: gate
         env:
@@ -122,7 +143,15 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           FAIL_CLOSED: 'true'
+          CLAUDE_OUTPUT: ${{ runner.temp }}/claude-out.json
         run: node .github/ai-review/review.mjs
+      - name: Drop ai-review-passed on a real critical verdict
+        # only a real review with criticals (review.mjs sets verdict=critical); a size refusal / crash / timeout never reaches here
+        if: always() && steps.gate.outputs.verdict == 'critical'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr edit "$PR" --remove-label ai-review-passed 2>/dev/null || true
       - name: Label ai-review-passed
         if: steps.gate.outputs.passed == 'true'
         env:
@@ -136,7 +165,7 @@ jobs:
   # newest run on this head (green) supersedes the red one. Passes only while the label is really on the PR.
   manual-pass:
     name: AI review
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 5
     if: github.event.action == 'labeled' && github.event.label.name == 'ai-review-passed' && github.event.pull_request.head.repo.full_name == github.repository
     steps:
@@ -154,7 +183,7 @@ jobs:
   fork-gate:
     # fork-guard-exempt: this job IS the fork handler; it runs only gh label/view commands from the base workflow and never touches PR content
     name: AI review
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 5
     if: github.event.pull_request.head.repo.full_name != github.repository
     steps:

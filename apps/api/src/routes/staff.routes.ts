@@ -20,20 +20,15 @@ import { isStaffRoleConflict } from '../lib/staff-role-conflict';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
-import { getAccountState, getAccountsBrief, inviteIdentity } from '../lib/identity-client';
+import { getAccountState, inviteIdentity } from '../lib/identity-client';
 import { STAFF_INVITE_TTL_MINUTES, signStaffInviteToken } from '../lib/staff-invite-token';
 import { assertWithinLimit } from '../services/plan-limit.service';
 import { getEntitlements } from '../services/plan-entitlements';
-import {
-  addStaffWithinCap,
-  inAccessScope,
-  onAccessD1,
-  removeStaffMember,
-} from '../services/platform/access-d1';
-import { sendAlert } from '../services/alerts.service';
+import { addStaffWithinCap, inAccessScope, onAccessD1 } from '../services/platform/access-d1';
 import { RESET_TOKEN_TTL_MINUTES, storeAppOrigin } from '../services/auth.service';
 import { sendStaffInviteEmail } from '../services/platform-mailer';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { listStaffWithUsers, removeStaffFromStore } from '../services/staff-members.service';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
@@ -83,64 +78,6 @@ const inviteStaffSchema = z.object({
 });
 
 // ─── List staff members ────────────────────────────────────────────────────
-
-interface StaffListUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  status: string;
-  lastLoginAt: Date | string | null;
-  createdAt: Date | string;
-}
-
-/**
- * Memberships plus the people behind them. Before the `access` cutover: the Postgres join, unchanged. After it the
- * membership rows are D1 (no relation to the identity-owned user) and the display facts come from the identity service in
- * ONE batched call; a member the identity no longer knows (erased) is not listed.
- */
-async function listStaffWithUsers(
-  storeId: string
-): Promise<Array<{ id: string; createdAt: Date; user: StaffListUser }>> {
-  if (!(await onAccessD1())) {
-    return withStore(storeId, tx =>
-      tx.storeStaff.findMany({
-        where: { storeId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              status: true,
-              lastLoginAt: true,
-              createdAt: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'asc' },
-      })
-    );
-  }
-  const rows = await inAccessScope(storeId, tx =>
-    tx.storeStaff.findMany({
-      where: { storeId },
-      select: { id: true, userId: true, createdAt: true },
-      orderBy: { createdAt: 'asc' },
-      take: 500,
-    })
-  );
-  const briefs = new Map(
-    (await getAccountsBrief(rows.map((r: { userId: string }) => r.userId))).map(b => [b.id, b])
-  );
-  const out: Array<{ id: string; createdAt: Date; user: StaffListUser }> = [];
-  for (const r of rows as Array<{ id: string; userId: string; createdAt: Date }>) {
-    const b = briefs.get(r.userId);
-    if (b) out.push({ id: r.id, createdAt: r.createdAt, user: b });
-  }
-  return out;
-}
 
 router.get(
   '/',
@@ -533,104 +470,13 @@ router.delete(
     try {
       const { storeId, userId } = req.params;
 
-      const d1Access = await onAccessD1();
-      const found = d1Access
-        ? await inAccessScope(storeId, tx =>
-            tx.storeStaff.findUnique({
-              where: { userId_storeId: { userId, storeId } },
-              select: { id: true },
-            })
-          )
-        : await withStore(storeId, tx =>
-            tx.storeStaff.findUnique({
-              where: { userId_storeId: { userId, storeId } },
-              include: { user: { select: { email: true } } },
-            })
-          );
-
-      if (!found) {
-        throw new AppError(404, 'NOT_FOUND', 'Staff member not found in this store.');
-      }
-      const membership = { id: (found as { id: string }).id };
-      // The address whose pending invitations die with the membership: from the profile row before the cutover, from the
-      // identity service after it (an erased account has no address left, and no live invitation can name it).
-      const memberEmail = d1Access
-        ? ((await getAccountsBrief([userId]))[0]?.email ?? null)
-        : (found as unknown as { user: { email: string } }).user.email;
-
-      // Ruling PASSKEY-11: this ends the person's access to THIS store and nothing else. Sessions and
-      // passkeys are per user, not per store; access is the membership row, re-checked on every request,
-      // so deleting it is immediate. Signing them out (or touching their passkeys) here would let store A's
-      // owner kick the same person out of store B or out of a store they own.
-      if (d1Access) {
-        // One atomic batch: the membership and every pending invitation that could bring the member back (Ruling ID-13).
-        if (!memberEmail)
-          logger.warn(
-            { storeId, userId },
-            'staff removal: no address for the member, invites matched by user only'
-          );
-        await removeStaffMember(storeId, userId, memberEmail);
-      } else {
-        await inAccessScope(storeId, tx =>
-          tx.storeStaff.delete({
-            where: { userId_storeId: { userId, storeId } },
-          })
-        );
-
-        // Any invitation to this address that is still pending dies with the membership (Ruling ID-13): a removed member
-        // cannot come back through an old link.
-        await inAccessScope(storeId, tx =>
-          tx.staffInvite.updateMany({
-            where: { storeId, email: memberEmail!.toLowerCase(), status: 'pending' },
-            data: { status: 'expired', decidedAt: new Date() },
-          })
-        );
-      }
-
-      // Their merchant-MCP keys die with the membership. verifyMerchantKey already
-      // refuses a non-member on every call; revoking here also stops a key
-      // resurrecting if the same person is later re-added to this store.
-      // Access has already ended (membership gone, atomically). The key rows are a Postgres write: after the cutover a failure
-      // is retried and, if it persists, raised as a P1 (never swallowed) so a later re-add cannot resurrect a live key.
-      const revokeKeys = () =>
-        withStore(storeId, tx =>
-          tx.merchantApiKey.updateMany({
-            where: { storeId, userId, revokedAt: null },
-            data: { revokedAt: new Date() },
-          })
-        );
-      if (!d1Access) await revokeKeys();
-      else {
-        let lastErr: unknown;
-        let revoked = false;
-        for (let attempt = 0; attempt < 3 && !revoked; attempt++) {
-          try {
-            await revokeKeys();
-            revoked = true;
-          } catch (err) {
-            lastErr = err;
-          }
-        }
-        if (!revoked) {
-          logger.error(
-            { err: lastErr, storeId, userId },
-            'staff removal: merchant key revoke failed'
-          );
-          void sendAlert({
-            level: 'p1',
-            source: 'staff.remove.key_revoke_failed',
-            title: 'Removed staff member still has live merchant MCP keys',
-            body: 'Membership was removed but the key revoke failed 3 times. Revoke the keys before the user is ever re-added to this store.',
-            context: { storeId, userId },
-          }).catch(() => undefined);
-        }
-      }
+      const { membershipId } = await removeStaffFromStore(storeId, userId);
 
       await auditLog({
         action: 'staff.removed',
         userId: req.user!.userId,
         resourceType: 'store_staff',
-        resourceId: membership.id,
+        resourceId: membershipId,
         details: { storeId, staffUserId: userId },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

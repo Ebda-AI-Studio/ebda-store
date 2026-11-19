@@ -393,3 +393,82 @@ describe('order money operations: the door', () => {
     });
   });
 });
+
+describe('cancel onlyFrom: a COD refusal never cancels a shipped order (Fixes #614)', () => {
+  const NOTE = 'Delivery exception: refused on WhatsApp after it shipped';
+  it('from a pre-ship state it cancels and restocks as before', () => {
+    const r = rig();
+    const o = r.op('createOrder', r.order({ lines: [{ productId: 'sku', quantity: 2 }] }));
+    expect(
+      r.op('cancel', {
+        orderId: o.orderId,
+        onlyFrom: ['pending', 'confirmed'],
+        exceptionNote: NOTE,
+      })
+    ).toMatchObject({
+      status: 'cancelled',
+      replayed: false,
+    });
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(10);
+  });
+
+  it('once shipped (the ship landed first): no cancel, no restock, the refusal is noted; a replay notes again but changes nothing else', () => {
+    const r = rig();
+    const o = r.op('createOrder', r.order({ lines: [{ productId: 'sku', quantity: 2 }] }));
+    r.raw.prepare(`UPDATE orders SET status = 'shipped' WHERE id = ?`).run(o.orderId);
+    const out = r.op('cancel', {
+      orderId: o.orderId,
+      onlyFrom: ['pending', 'confirmed'],
+      exceptionNote: NOTE,
+    });
+    expect(out).toMatchObject({ skipped: 'status_moved', status: 'shipped', replayed: false });
+    const row = r.raw.prepare(`SELECT status, notes FROM orders WHERE id = ?`).get(o.orderId) as {
+      status: string;
+      notes: string;
+    };
+    expect(row.status).toBe('shipped');
+    expect(row.notes).toContain(NOTE);
+    expect(r.n(`SELECT inventory n FROM products`)).toBe(8);
+    expect(r.n(`SELECT count(*) n FROM inventory_history WHERE type = 'return_stock'`)).toBe(0);
+  });
+
+  it.each(['cancelled', 'refunded'])(
+    'an order the merchant already %s gets NO note (it did not leave the store; a false "not restocked" note invites a double restock)',
+    st => {
+      const r = rig();
+      const o = r.op('createOrder', r.order({ lines: [{ productId: 'sku', quantity: 2 }] }));
+      r.raw.prepare(`UPDATE orders SET status = ? WHERE id = ?`).run(st, o.orderId);
+      const out = r.op('cancel', {
+        orderId: o.orderId,
+        onlyFrom: ['pending', 'confirmed'],
+        exceptionNote: NOTE,
+      });
+      expect(out).toMatchObject({ skipped: 'status_moved', status: st });
+      const row = r.raw.prepare(`SELECT notes FROM orders WHERE id = ?`).get(o.orderId) as {
+        notes: string | null;
+      };
+      expect(row.notes ?? '').not.toContain(NOTE);
+    }
+  );
+
+  it('a repeated refusal on a shipped order adds the note once', () => {
+    const r = rig();
+    const o = r.op('createOrder', r.order());
+    r.raw.prepare(`UPDATE orders SET status = 'shipped' WHERE id = ?`).run(o.orderId);
+    for (let i = 0; i < 3; i++)
+      r.op('cancel', {
+        orderId: o.orderId,
+        onlyFrom: ['pending', 'confirmed'],
+        exceptionNote: NOTE,
+      });
+    const row = r.raw.prepare(`SELECT notes FROM orders WHERE id = ?`).get(o.orderId) as {
+      notes: string;
+    };
+    expect(row.notes.split(NOTE).length - 1).toBe(1);
+  });
+
+  it('an unknown order is refused; without onlyFrom the cancel is unchanged', () => {
+    const r = rig();
+    expect(r.code('cancel', { orderId: 'missing', onlyFrom: ['pending'] })).toBe('ORDER_NOT_FOUND');
+  });
+});

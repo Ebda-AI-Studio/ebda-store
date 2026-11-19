@@ -14,7 +14,11 @@ import { expect, test, type Page } from '@playwright/test';
 const API = process.env.EBDA_API ?? 'https://api.ebda.app/api/v1';
 const ACCOUNTS = process.env.EBDA_ACCOUNTS ?? 'https://accounts.ebda.app';
 const WRITE = process.env.PRELAUNCH_WRITE === '1';
-const SEARCH_TERM = process.env.PRELAUNCH_SEARCH ?? 'kaftan';
+// Each store sells different things, so each gets its own term (a term the store does not stock fails for
+// test-data reasons and hides real failures). PRELAUNCH_SEARCH still overrides; unknown slugs fall back to kaftan.
+const SEARCH_TERMS: Record<string, string> = { ameliaaurum: 'ring', storedemo: 'kaftan' };
+const STORE_SLUG = process.env.PRELAUNCH_STORE_SLUG ?? 'ameliaaurum';
+const SEARCH_TERM = process.env.PRELAUNCH_SEARCH ?? SEARCH_TERMS[STORE_SLUG] ?? 'kaftan';
 
 const LANGS = ['ar', 'en'] as const;
 type Lang = (typeof LANGS)[number];

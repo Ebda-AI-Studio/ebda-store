@@ -1,6 +1,6 @@
 /**
  * B2B wholesale tables: strict RLS + FORCE, ebda_app grants, constraints, FK cascades
- * (docs/plans/2026-10-21-b2b-wholesale.md, Task 1; migrations 20261028000100 / 20261028000200).
+ * (docs/plans/done/2026-10-21-b2b-wholesale.md, Task 1; migrations 20261028000100 / 20261028000200).
  *
  * rls-ebda-app.test.ts already walks EVERY store_id table from information_schema (RLS enabled + forced, only ebda_app
  * policies, contextless SELECT = 0 rows, contextless INSERT rejected), so a new table that ships without a policy is

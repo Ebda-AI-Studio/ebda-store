@@ -50,6 +50,11 @@ import {
   type StockAnswer,
   answerAuthOp,
   ensureCustomerAuthSchema,
+  ensureSmartLayerSchema,
+  answerSmartLayerOp,
+  runSmartLayerOp,
+  SMART_LAYER_RETENTION_MS,
+  type SmartLayerAnswer,
   purgeCustomerAuth,
   type AuthAnswer,
   ensureIdempotencySchema,
@@ -97,10 +102,22 @@ import {
   CUSTOMER_AUTH_FILE,
   dumpTables,
   loadBackup,
+  beginLoad,
+  endLoad,
+  goldFlagOf,
+  restoreWrittenTables,
+  loadTableBody,
+  exportChunked,
+  totalRows,
+  tableDigest,
+  tableFiles,
+  BACKUP_SNAPSHOT_ROWS,
+  BACKUP_PART_ROWS,
   sha256Hex,
   backupKey,
   verifyWritten,
   type BackupManifest,
+  type BackupOpts,
 } from './backup';
 
 export type Result<T> = { ok: true; data: T } | { ok: false; code: string; status: number };
@@ -157,6 +174,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       ensureStockOpsSchema(this.sync);
       ensureMoneyOpsSchema(this.sync);
       ensureCustomerAuthSchema(this.sync);
+      ensureSmartLayerSchema(this.sync);
     });
   }
 
@@ -580,6 +598,24 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /**
+   * The assistant's journal (Smart Layer, Ruling SL-STORE-1): audit rows, previews, approvals and counters in this store's own SQLite.
+   * ONE named operation = ONE `transactionSync` section (the compare-and-sets have a single winner). A refusal is an ANSWER. A closed store
+   * keeps its records readable by the erasure path only: every other operation is refused.
+   */
+  async smartLayerOp(storeId: string, op: string, argsJson: string): Promise<SmartLayerAnswer> {
+    try {
+      this.bind(storeId);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
+      return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
+    }
+    if (isStoreClosed(this.sync) && !/^(eraseStore|eraseUser|purgeBefore)$/.test(op))
+      return { ok: false, code: 'STORE_CLOSED', status: 410, message: 'store is closed' };
+    return answerSmartLayerOp(this.sync, op, argsJson);
+  }
+
+  /**
    * The settings copy (Ruling CF-WRITES-2): the API writes the authoritative `Store` row first, then sends the changed
    * fields here as an RPC JSON string. Applied to `store_profile` / `store_config`; D1-only fields are reported, not stored.
    */
@@ -759,10 +795,13 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /** Export every table + manifest to R2 under store-do-backups/<store>/<yyyy-mm-dd>/. */
-  async backupNow(storeId: string): Promise<BackupManifest> {
+  async backupNow(storeId: string, opts: BackupOpts = {}): Promise<BackupManifest> {
     this.bind(storeId);
     const r2 = this.bucket();
     if (!r2) throw new Error('STORE_BACKUPS binding missing');
+    // Large store (P2-4): paged by primary key, parts written one by one, never the whole database in memory.
+    if (totalRows(this.ctx.storage.sql) > (opts.snapshotRows ?? BACKUP_SNAPSHOT_ROWS))
+      return this.backupChunked(storeId, r2, opts.partRows ?? BACKUP_PART_ROWS);
     const dump = dumpTables(this.ctx.storage.sql); // sync read: consistent snapshot
     const authDump = dumpCustomerAuth(this.ctx.storage.sql); // same turn: the same snapshot
     const { manifest, files } = await buildBackup(storeId, dump);
@@ -780,6 +819,45 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     // The manifest goes last: a day folder without one is an incomplete backup and must be ignored.
     await r2.put(backupKey(storeId, day, 'manifest.json'), JSON.stringify(manifest, null, 2));
     // Read-back (rule N11): a backup that is not read back is not a backup.
+    await verifyWritten(r2, storeId, day, manifest);
+    return manifest;
+  }
+
+  /**
+   * Paged export. The pages are read synchronously but R2 is awaited between them, so the store is held in `blockConcurrencyWhile`:
+   * no write can land between two pages and the parts together are still ONE consistent snapshot (a torn read could leave an
+   * order item whose order is in an earlier part's past). The platform resets a DO whose block runs over 30 s: a store too big
+   * for that fails the night loudly (sweep P1) instead of writing a torn backup; the Mac pull of `__export` is the safety net.
+   */
+  private async backupChunked(
+    storeId: string,
+    r2: R2Like,
+    partRows: number
+  ): Promise<BackupManifest> {
+    const now = new Date();
+    const day = now.toISOString().slice(0, 10);
+    const { tables, authDump } = await this.ctx.blockConcurrencyWhile(async () => ({
+      authDump: dumpCustomerAuth(this.ctx.storage.sql),
+      tables: await exportChunked(
+        this.ctx.storage.sql,
+        (file, body) => r2.put(backupKey(storeId, day, file), body),
+        partRows
+      ),
+    }));
+    const manifest: BackupManifest = {
+      version: 1,
+      storeId,
+      takenAt: now.toISOString(),
+      tables,
+      partRows,
+    };
+    const ca = await buildCustomerAuthBackup(
+      authDump,
+      this.env.CUSTOMER_AUTH_BACKUP_KEY as string | undefined
+    );
+    if (ca) manifest.customerAuth = ca.entry;
+    if (ca) await r2.put(backupKey(storeId, day, CUSTOMER_AUTH_FILE), ca.blob);
+    await r2.put(backupKey(storeId, day, 'manifest.json'), JSON.stringify(manifest, null, 2));
     await verifyWritten(r2, storeId, day, manifest);
     return manifest;
   }
@@ -806,6 +884,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         purgeCustomerAuth(this.sync);
       } catch (err) {
         console.error('customer auth purge failed', err);
+      }
+      // The assistant's journal keeps 90 days (spec 6.9).
+      try {
+        runSmartLayerOp(this.sync, 'purgeBefore', [Date.now() - SMART_LAYER_RETENTION_MS]);
+      } catch {
+        /* retried by the next alarm (a day): journal rows older than 90 days simply stay until it works */
       }
       if (backupDue) {
         const storeId = this.boundStoreId();
@@ -850,14 +934,17 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
     const live = new Set(storeTables(this.ctx.storage.sql));
     const missing = tables.filter(t => !live.has(t));
     if (missing.length) throw new Error(`restore target has no table ${missing[0]}`);
+    const paged = tables.some(t => manifest.tables[t].parts);
+    // Legacy / small backups: every file is read and checked first, then one transaction (all or nothing), as before.
     const files: Record<string, string> = {};
-    for (const t of tables) {
-      const f = await r2.get(backupKey(sourceStoreId, day, `${t}.ndjson`));
-      if (!f) throw new Error(`missing ${t}.ndjson`);
-      files[`${t}.ndjson`] = await f.text();
-      if ((await sha256Hex(files[`${t}.ndjson`])) !== manifest.tables[t].sha256)
-        throw new Error(`${t}: file checksum differs from manifest`);
-    }
+    if (!paged)
+      for (const t of tables) {
+        const f = await r2.get(backupKey(sourceStoreId, day, `${t}.ndjson`));
+        if (!f) throw new Error(`missing ${t}.ndjson`);
+        files[`${t}.ndjson`] = await f.text();
+        if ((await sha256Hex(files[`${t}.ndjson`])) !== manifest.tables[t].sha256)
+          throw new Error(`${t}: file checksum differs from manifest`);
+      }
     for (const t of live)
       if (this.ctx.storage.sql.exec(`SELECT count(*) AS n FROM "${t}"`).one().n !== 0)
         throw new Error('restore target must be empty');
@@ -871,23 +958,90 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         this.env.CUSTOMER_AUTH_BACKUP_KEY as string | undefined
       );
     }
-    this.ctx.storage.transactionSync(() => {
-      loadBackup(this.ctx.storage.sql, files, tables);
-      if (authDump) loadCustomerAuth(this.ctx.storage.sql, authDump);
-    });
+    if (!paged)
+      this.ctx.storage.transactionSync(() => {
+        loadBackup(this.ctx.storage.sql, files, tables);
+        if (authDump) loadCustomerAuth(this.ctx.storage.sql, authDump);
+      });
+    else await this.restorePaged(r2, sourceStoreId, day, manifest, tables, [...live], authDump);
     // Re-export the restored DO with the same canonical serialization and compare to the manifest.
-    const again = await buildBackup(sourceStoreId, dumpTables(this.ctx.storage.sql));
+    const got: Record<string, { rows: number; sha256: string }> = paged
+      ? await exportChunked(this.ctx.storage.sql, async () => {}, this.restorePartRows(manifest))
+      : (await buildBackup(sourceStoreId, dumpTables(this.ctx.storage.sql))).manifest.tables;
     const out: Record<string, { rows: number; sha256: string; ok: boolean }> = {};
     for (const t of tables) {
       const want = manifest.tables[t];
-      const got = again.manifest.tables[t];
       out[t] = {
-        rows: got.rows,
-        sha256: got.sha256,
-        ok: got.rows === want.rows && got.sha256 === want.sha256,
+        rows: got[t].rows,
+        sha256: got[t].sha256,
+        ok: got[t].rows === want.rows && got[t].sha256 === want.sha256,
       };
     }
     return out;
+  }
+
+  /** The re-export must page exactly like the backup did (the manifest records the page size). */
+  private restorePartRows(manifest: BackupManifest): number {
+    return manifest.partRows ?? BACKUP_PART_ROWS;
+  }
+
+  /**
+   * Restore a paged backup part by part (P2-4): one R2 read and one transaction per part, so memory is one part. Atomicity is
+   * compensating, not transactional: the target was verified EMPTY, so a failure at any point deletes every row again. Foreign keys
+   * are switched off for the load (parts arrive in table order, a child can precede its parent) and verified with
+   * `foreign_key_check` before the flag is cleared; `PRAGMA foreign_keys` is a no-op inside a transaction, hence outside each one.
+   */
+  private async restorePaged(
+    r2: R2Like,
+    sourceStoreId: string,
+    day: string,
+    manifest: BackupManifest,
+    tables: string[],
+    live: string[],
+    authDump: Awaited<ReturnType<typeof readCustomerAuthBackup>> | undefined
+  ): Promise<void> {
+    const sql = this.ctx.storage.sql;
+    sql.exec('PRAGMA foreign_keys = OFF');
+    const gold = beginLoad(sql, tables);
+    let backupFlag: unknown;
+    try {
+      for (const t of tables) {
+        const tm = manifest.tables[t];
+        for (const file of tableFiles(t, tm)) {
+          const f = await r2.get(backupKey(sourceStoreId, day, file));
+          if (!f) throw new Error(`missing ${file}`);
+          const body = await f.text();
+          const want = tm.parts ? tm.parts.find(p => p.file === file)!.sha256 : tm.sha256;
+          if ((await sha256Hex(body)) !== want)
+            throw new Error(`${t}: file checksum differs from manifest`);
+          this.ctx.storage.transactionSync(() => loadTableBody(sql, t, body));
+          if (t === 'do_flags') backupFlag = goldFlagOf(body) ?? backupFlag;
+        }
+        if (tm.parts && (await tableDigest(tm.parts)) !== tm.sha256)
+          throw new Error(`${t}: part digest differs from manifest`);
+      }
+      this.ctx.storage.transactionSync(() => {
+        if (authDump) loadCustomerAuth(sql, authDump);
+      });
+      const bad = sql.exec('PRAGMA foreign_key_check').toArray();
+      if (bad.length)
+        throw new Error(
+          `restore left ${bad.length} dangling foreign key(s), first in ${String(bad[0].table)}`
+        );
+      endLoad(sql, gold, backupFlag);
+    } catch (e) {
+      // Compensating rollback: the target was empty, so empty it again (a half-restored store must never serve).
+      // (every table the restore wrote: the live tables AND the `_cauth_*` credential tables, which `storeTables` does not list)
+      for (const t of new Set([...live, ...restoreWrittenTables(tables, !!authDump)]))
+        sql.exec(`DELETE FROM "${t}"`);
+      throw e;
+    } finally {
+      // The pragma is a no-op while this turn still has uncommitted writes (measured on workerd): flush, set, then READ IT BACK.
+      await this.ctx.storage.sync();
+      sql.exec('PRAGMA foreign_keys = ON');
+      if (Number(sql.exec('PRAGMA foreign_keys').toArray()[0].foreign_keys) !== 1)
+        throw new Error('restore: foreign keys could not be re-enabled');
+    }
   }
 
   // ---- PDPL export / erasure (G10; cf/erasure). Registry-driven, see cf/erasure/registry.ts ----

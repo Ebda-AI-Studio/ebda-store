@@ -10,7 +10,7 @@ import { ConsentGatedMarketingPixels } from './ConsentGatedMarketingPixels';
 
 /**
  * Track-A (tenant-cacheable) nested layout — Phase 1 of
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6.
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6.
  *
  * Dark-launched: this whole `tenant-store/[tenant]/[locale]` tree is only ever
  * reached when `middleware.ts`'s `STOREFRONT_TENANT_ROUTING` rewrite is on
