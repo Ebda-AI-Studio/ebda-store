@@ -18,6 +18,9 @@ import { renderStatusPage, statusSearchDocs } from './render';
 import { TYPEAHEAD_JS } from './typeahead-bundle';
 import type { Impact, IncidentStatus, Thresholds } from './types';
 
+/** The one place the status worker writes a failure to the Workers log. */
+const logFailure = (what: string, err: unknown) => console.error(`[status] ${what}`, err);
+
 export { StatusStore } from './store';
 
 const SECURITY_HEADERS = {
@@ -58,7 +61,7 @@ const store = (env: Cloudflare.Env) => env.STATUS_STORE.get(env.STATUS_STORE.idF
 
 /** Public reads: served from the edge snapshot cache, BOUNDED-stale (see snapshot-cache.ts). */
 const publicSnapshot = (env: Cloudflare.Env, ctx?: ExecutionContext) =>
-  getSnapshot(() => store(env).snapshot(Date.now()), ctx);
+  getSnapshot(() => store(env).snapshot(Date.now()), ctx, Date.now(), logFailure);
 
 /** One probe round: probe every component, then record. Exported so tests drive it directly. */
 export async function runProbes(
@@ -68,7 +71,7 @@ export async function runProbes(
   const results = await probeAll(COMPONENTS, opts.fetcher, opts.timeoutMs, opts.slowMs);
   const outcome = await store(env).record(results, opts.now ?? Date.now(), thresholdsFrom(env));
   // the new round is on the public page at once in this colo (snapshot-cache.ts: BOUNDED-stale elsewhere)
-  await warmSnapshot(() => store(env).snapshot(opts.now ?? Date.now()));
+  await warmSnapshot(() => store(env).snapshot(opts.now ?? Date.now()), logFailure);
   return outcome;
 }
 
@@ -193,7 +196,7 @@ export default {
       (path === '/api/incidents' || /^\/api\/incidents\/\d+\/updates$/.test(path))
     ) {
       const r = await handleIncidentPost(req, env, path);
-      if (r.ok) await warmSnapshot(() => store(env).snapshot(Date.now()));
+      if (r.ok) await warmSnapshot(() => store(env).snapshot(Date.now()), logFailure);
       return r;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -291,7 +294,7 @@ export default {
     ctx.waitUntil(
       runProbes(env)
         .then(outcome => alertOnOutcome(env, outcome))
-        .catch(err => console.error('[status] probe round failed', err))
+        .catch(err => logFailure('probe round failed', err))
     );
   },
 } satisfies ExportedHandler<Cloudflare.Env>;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FRESH_MS, MAX_STALE_MS, SNAPSHOT_KEY, getSnapshot } from '../src/snapshot-cache';
+import { getSnapshot } from '../src/snapshot-cache';
 import type { Snapshot } from '../src/types';
 
 const snap = (at: number): Snapshot => ({
@@ -10,6 +10,10 @@ const snap = (at: number): Snapshot => ({
   recent: [],
 });
 const NOW = 1_800_000_000_000;
+// the cache's own windows and key, restated so a change to them fails here
+const FRESH_MS = 30_000;
+const MAX_STALE_MS = 10 * 60_000;
+const SNAPSHOT_KEY = 'https://status.ebda.app/__snapshot';
 
 beforeEach(async () => {
   await caches.default.delete(SNAPSHOT_KEY);

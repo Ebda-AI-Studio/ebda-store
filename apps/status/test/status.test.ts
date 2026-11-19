@@ -3,7 +3,6 @@ import { runInDurableObject } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import worker, { alertOnOutcome, runProbes, thresholdsFrom } from '../src/index';
 import { SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
-import { SNAPSHOT_KEY } from '../src/snapshot-cache';
 import { COMPONENTS, DEFAULT_TIMEOUT_MS, SLOW_THRESHOLD_MS } from '../src/config';
 import { probe, probeErrorAr, type Fetcher } from '../src/probe';
 import type { ProbeResult, Snapshot } from '../src/types';
@@ -26,7 +25,7 @@ const res = (
 
 /** Wipe all rows (Durable Object storage persists across tests in a file). */
 beforeEach(async () => {
-  await caches.default.delete(SNAPSHOT_KEY);
+  await caches.default.delete('https://status.ebda.app/__snapshot');
   await runInDurableObject(stub(), (_i, state) => {
     for (const t of ['component_state', 'daily', 'incidents', 'incident_updates']) {
       state.storage.sql.exec(`DELETE FROM ${t}`);
