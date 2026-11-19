@@ -14,6 +14,9 @@ const { accountsFetch, push, replace } = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({ isAuthenticated: false, user: null, logout: () => undefined }),
+}));
 vi.mock('../../lib/accounts', () => ({
   accountsFetch,
   AccountsError: class AccountsError extends Error {
@@ -125,6 +128,57 @@ describe('reset-password page', () => {
     accountsFetch.mockRejectedValue(new AccountsError(400, 'INVALID_CODE', 'x'));
     renderPage();
     await fill(STRONG);
+    expect(await screen.findByText('auth.reset.invalidTitle')).toBeTruthy();
+  });
+
+  it('a REMOUNT after the address bar was cleaned keeps the form, and the submit sends the original link (2026-11-18)', async () => {
+    visit(LINK);
+    accountsFetch.mockResolvedValue({ reset: true });
+    const first = renderPage();
+    await screen.findByLabelText('auth.reset.password');
+    expect(window.location.search).toBe('');
+    // Next re-creates the page segment for the cleaned URL (it landed on the first keystroke): a fresh instance
+    first.unmount();
+    renderPage();
+    fireEvent.change(await screen.findByLabelText('auth.reset.password'), {
+      target: { value: 'N' },
+    });
+    expect(screen.queryByText('auth.reset.invalidTitle')).toBeNull();
+    await fill(STRONG);
+    expect(accountsFetch).toHaveBeenCalledWith('/password/reset', {
+      json: { email: EMAIL, code: CODE, newPassword: STRONG },
+    });
+    expect(await screen.findByText('auth.reset.successTitle')).toBeTruthy();
+  });
+
+  it('the captured link is cleared after a success and after a used code; a new visit without a link is invalid', async () => {
+    visit(LINK);
+    accountsFetch.mockResolvedValue({ reset: true });
+    const a = renderPage();
+    await fill(STRONG);
+    await screen.findByText('auth.reset.successTitle');
+    a.unmount();
+    renderPage(); // same entry, after success: nothing to reuse
+    expect(await screen.findByText('auth.reset.invalidTitle')).toBeTruthy();
+    cleanup();
+
+    visit(LINK);
+    const { AccountsError } = await import('../../lib/accounts');
+    accountsFetch.mockRejectedValue(new AccountsError(400, 'INVALID_CODE', 'x'));
+    const b = renderPage();
+    await fill(STRONG);
+    await screen.findByText('auth.reset.invalidTitle');
+    b.unmount();
+    renderPage(); // same entry, after a used code
+    expect(await screen.findByText('auth.reset.invalidTitle')).toBeTruthy();
+    cleanup();
+
+    visit(LINK); // opened, not submitted
+    const c = renderPage();
+    await screen.findByLabelText('auth.reset.password');
+    c.unmount();
+    visit(''); // a later, separate visit with no link
+    renderPage();
     expect(await screen.findByText('auth.reset.invalidTitle')).toBeTruthy();
   });
 
