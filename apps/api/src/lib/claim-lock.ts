@@ -34,10 +34,11 @@ const RELEASE_SCRIPT = `
  * irreversible write (enable + ledger, the verified flip): past the deadline it throws 409 `CLAIM_EXPIRED` and writes
  * nothing; the caller retries.
  */
-export interface ClaimGuard {
+interface ClaimGuard {
   assertHeld(): void;
 }
 
+// pq-allow(unused-export): test seam, imported by tests/unit/claim-lock.test.ts
 export function claimDeadlineMs(ttlSeconds: number): number {
   const margin = Math.min(5, ttlSeconds * 0.2);
   return Math.max(0, (ttlSeconds - margin) * 1000);
