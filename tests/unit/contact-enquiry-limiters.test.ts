@@ -2,11 +2,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-// The shared store factory pulls the whole database layer; an undefined store is express-rate-limit's in-memory one.
-vi.mock('@api/middleware/security', () => ({
-  makeRateLimitStore: () => undefined,
-  rateLimitRedisClient: () => null,
-}));
+// The shared store factory pulls the whole database layer: the limiter here is express-rate-limit with its in-memory store,
+// built from the same options `plannedRateLimit` passes on (its plan is irrelevant to these limits).
+vi.mock('@api/middleware/security', async () => {
+  const { rateLimit } = await import('express-rate-limit');
+  return {
+    plannedRateLimit: (_name: string, opts: Record<string, unknown>) => {
+      const { keyReadsBody: _body, ...options } = opts;
+      void _body;
+      return rateLimit(options);
+    },
+  };
+});
 
 import {
   contactEmailKey,
