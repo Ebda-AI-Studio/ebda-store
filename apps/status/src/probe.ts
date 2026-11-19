@@ -96,3 +96,19 @@ export function probeErrorAr(error: string | null | undefined): string {
   if (error.startsWith('fetch failed')) return 'الاتصال فشل';
   return 'خطأ مش معروف';
 }
+
+/** "1 probe" / "2 probes" (English). */
+export function probesEn(n: number): string {
+  return `${n} consecutive ${n === 1 ? 'probe' : 'probes'}`;
+}
+
+/**
+ * The Arabic count phrase with correct number agreement: 1 = "فحص واحد", 2 = "فحصين", 3-10 = "N فحوصات", 11+ = "N فحص".
+ * (The old text said "1 فحوصات ورا بعض نجحوا": a plural noun after a singular count, visible on every resolved incident.)
+ */
+export function probesAr(n: number): string {
+  if (n === 1) return 'فحص واحد ورا بعض';
+  if (n === 2) return 'فحصين ورا بعض';
+  if (n >= 3 && n <= 10) return `${n} فحوصات ورا بعض`;
+  return `${n} فحص ورا بعض`;
+}
