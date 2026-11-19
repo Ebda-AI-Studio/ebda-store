@@ -11,7 +11,12 @@
     "GET /admin/billing/claims",
     "POST .../claims/:id/reject",
     "POST /admin/stores/:id/manual-payment",
-    "POST /admin/billing/events/:id/refund|manual-refund"
+    "POST /admin/billing/events/:id/refund|manual-refund",
+    "GET /admin/billing/auto-confirmations",
+    "POST /admin/billing/auto-confirmations/:id/revert",
+    "POST /admin/billing/auto-confirm/backfill",
+    "PUT /admin/billing/auto-confirm/mode",
+    "PUT /admin/stores/:id/auto-confirm"
   ],
   "mcpTool": null,
   "planGate": null,
@@ -37,5 +42,7 @@
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
   ],
-  "gaps": ["Auto-confirm NOT BUILT"]
+  "gaps": [
+    "Auto-confirm is built and ships OFF (INSTAPAY-AUTO-1); super_admin owns the mode, per-store switch, revert and backfill, a merchant never confirms their own payment"
+  ]
 }
