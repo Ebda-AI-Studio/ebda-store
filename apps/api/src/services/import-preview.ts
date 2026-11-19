@@ -137,3 +137,41 @@ export function buildImportPreview(csv: string, existingPrices: number[] = []): 
     truncated: valid + invalid > rows.length,
   };
 }
+
+/**
+ * STORE-QA-64: fold the importer's own row errors (`BulkService.importProducts` with `dryRun`) into the shape-level preview, so the
+ * preview can never say "ready" over rows the real import will fail (barcode owned by another product, missing name, orphan
+ * variant rows ...). Row 0 = a group-level failure (a parent that cannot be found, a bundle pin): it counts as one invalid entry.
+ */
+export function mergeImportCheckErrors(
+  preview: ImportPreview,
+  checkErrors: Array<{ row: number; error: string }>
+): ImportPreview {
+  const failing = new Set<number>();
+  const byRow = new Map<number, string>();
+  for (const e of preview.errors) failing.add(e.row);
+  for (const r of preview.rows) if (r.error) failing.add(r.row);
+  const errors = [...preview.errors];
+  let groupLevel = 0;
+  for (const e of checkErrors) {
+    if (e.row > 0) {
+      if (!byRow.has(e.row)) byRow.set(e.row, e.error);
+      if (failing.has(e.row)) continue;
+      failing.add(e.row);
+    } else groupLevel++;
+    if (errors.length < PREVIEW_ERROR_LIMIT) {
+      errors.push({ row: e.row, column: null, code: null, error: e.error });
+    }
+  }
+  const rows = preview.rows.map(r =>
+    byRow.has(r.row) && !r.error ? { ...r, error: byRow.get(r.row)! } : r
+  );
+  const invalidRows = Math.min(preview.totalRows, failing.size + groupLevel);
+  return {
+    ...preview,
+    rows,
+    errors,
+    invalidRows,
+    validRows: Math.max(0, preview.totalRows - invalidRows),
+  };
+}
