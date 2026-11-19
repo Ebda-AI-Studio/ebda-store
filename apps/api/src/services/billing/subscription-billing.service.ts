@@ -2344,7 +2344,7 @@ export function nextChargeOf(
   return { at, planCode, amountMinor: charge.totalMinor, vat: ledgerVat(charge).vat };
 }
 
-export type TermBasis = 'paid' | 'assigned' | 'comped' | 'trial';
+type TermBasis = 'paid' | 'assigned' | 'comped' | 'trial';
 
 /**
  * What the current term rests on (B2). `comped`/`trial` come from the status. Otherwise the term is `paid` when a
@@ -2352,7 +2352,7 @@ export type TermBasis = 'paid' | 'assigned' | 'comped' | 'trial';
  * with no plan never counts) was made
  * since the current period started (one day of slack), else `assigned`: a super admin set the plan with no payment.
  */
-export async function termBasisOf(
+async function termBasisOf(
   storeId: string,
   sub: { status: string; planCode: string; currentPeriodStart: Date | null },
   /** The plan catalogue's codes (the caller already read the plans). */
