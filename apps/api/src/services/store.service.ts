@@ -1653,17 +1653,17 @@ export class StoreService {
     storeId: string,
     branding: {
       name?: string;
-      nameAr?: string;
-      logo?: string;
-      logoAr?: string;
-      favicon?: string;
-      description?: string;
-      descriptionAr?: string;
+      nameAr?: string | null;
+      logo?: string | null;
+      logoAr?: string | null;
+      favicon?: string | null;
+      description?: string | null;
+      descriptionAr?: string | null;
     }
   ) {
     const store = await this.getById(storeId);
     assertMediaOriginOrUnchanged(
-      { logo: branding.logo, logoAr: branding.logoAr },
+      { logo: branding.logo ?? undefined, logoAr: branding.logoAr ?? undefined },
       store as { logo?: string | null; logoAr?: string | null },
       appConfig.storagePublicUrl
     );
@@ -1719,16 +1719,16 @@ export class StoreService {
   static async updateContactInfo(
     storeId: string,
     contact: {
-      email?: string;
-      phone?: string;
-      phoneAr?: string;
+      email?: string | null;
+      phone?: string | null;
+      phoneAr?: string | null;
       /** E.164 Egyptian mobile; `null` clears it. */
       whatsapp?: string | null;
-      address?: string;
-      addressAr?: string;
+      address?: string | null;
+      addressAr?: string | null;
       /** Phase D.6 — WhatsApp bot "Locations & Hours" branch */
-      businessHours?: string;
-      googleMapsUrl?: string;
+      businessHours?: string | null;
+      googleMapsUrl?: string | null;
     }
   ) {
     const store = await this.getById(storeId);
@@ -1758,7 +1758,9 @@ export class StoreService {
       store.announcementBar && typeof store.announcementBar === 'object'
         ? (store.announcementBar as Record<string, unknown>)
         : {};
-    const merged = { ...existing, ...announcementBar };
+    // STORE-QA-60: a null (the merchant emptied link / link text) REMOVES the stored key; undefined leaves it.
+    const merged: Record<string, unknown> = { ...existing, ...announcementBar };
+    for (const [k, v] of Object.entries(announcementBar)) if (v === null) delete merged[k];
 
     const updatedStore = await updateStoreThrough(storeId, tx =>
       tx.store.update({
@@ -1848,7 +1850,7 @@ export class StoreService {
       const json: Record<string, JsonKeyPatchInput> = {};
       if (parts.branding) {
         assertMediaOriginOrUnchanged(
-          { logo: parts.branding.logo, logoAr: parts.branding.logoAr },
+          { logo: parts.branding.logo ?? undefined, logoAr: parts.branding.logoAr ?? undefined },
           before as { logo?: string | null; logoAr?: string | null },
           appConfig.storagePublicUrl
         );
@@ -1944,15 +1946,15 @@ export class StoreService {
   static async updateSeo(
     storeId: string,
     seo: {
-      metaTitle?: string;
-      metaTitleAr?: string;
-      metaDescription?: string;
-      metaDescriptionAr?: string;
+      metaTitle?: string | null;
+      metaTitleAr?: string | null;
+      metaDescription?: string | null;
+      metaDescriptionAr?: string | null;
       metaDescriptionAeo?: string | null;
       metaDescriptionAeoAr?: string | null;
-      ogImage?: string;
-      twitterHandle?: string;
-      googleSiteVerification?: string;
+      ogImage?: string | null;
+      twitterHandle?: string | null;
+      googleSiteVerification?: string | null;
       emailSenderLocalPart?: string;
       hideFromSearchEngines?: boolean;
     }
@@ -1960,7 +1962,7 @@ export class StoreService {
     const store = await this.getById(storeId);
     const previousOgImage = (store as { ogImage?: string | null }).ogImage ?? null;
     assertMediaOriginOrUnchanged(
-      { ogImage: seo.ogImage },
+      { ogImage: seo.ogImage ?? undefined },
       { ogImage: previousOgImage },
       appConfig.storagePublicUrl
     );
