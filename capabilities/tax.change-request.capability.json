@@ -10,10 +10,7 @@
   "api": [
     "GET /stores/:storeId/tax/change-request",
     "POST /stores/:storeId/tax/change-request",
-    "DELETE /stores/:storeId/tax/change-request",
-    "GET /admin/tax-verification/change-requests",
-    "GET /admin/tax-verification/:storeId/change-request/file",
-    "POST /admin/tax-verification/:storeId/change-decision"
+    "DELETE /stores/:storeId/tax/change-request"
   ],
   "mcpTool": null,
   "planGate": null,
@@ -25,7 +22,11 @@
   },
   "helpArticle": "vat-registration",
   "questions": {
-    "ar": ["عايز اغيّر الرقم الضريبي بعد التوثيق", "ازاي اعدّل الاسم القانوني في التسجيل الضريبي؟"],
+    "ar": [
+      "عايز اغيّر الرقم الضريبي بعد التوثيق",
+      "ازاي اعدّل الاسم القانوني في التسجيل الضريبي؟",
+      "الرقم الضريبي اللي سجلته غلط"
+    ],
     "en": ["How do I change my tax registration number after verification?"]
   },
   "steps": [
