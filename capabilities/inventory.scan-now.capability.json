@@ -18,7 +18,7 @@
   ],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "staff", "super_admin"],
   "policy": "free",
   "undo": {
     "class": "none",
@@ -26,7 +26,11 @@
   },
   "helpArticle": "scan-stock-now",
   "questions": {
-    "ar": ["عايز اشغّل فحص المخزون دلوقتي", "ازاي اعمل scan للمخزون؟"],
+    "ar": [
+      "عايز اشغّل فحص المخزون دلوقتي",
+      "ازاي اعمل scan للمخزون؟",
+      "ازاي اعرف المخزون اللي محتاج طلب جديد؟"
+    ],
     "en": ["How do I run a stock scan now?"]
   },
   "steps": ["Open Stock, press Scan now / Re-scan now"],
@@ -34,5 +38,13 @@
     "One run per scan per store per hour (429 after that); platform staff are not limited",
     "Scans never send messages to customers"
   ],
-  "gaps": []
+  "gaps": [],
+  "readOnlyPost": {
+    "routes": [
+      "POST /stores/:storeId/stock/reorder-scan/run-now",
+      "POST /stores/:storeId/stock/low-stock-scan/run-now",
+      "POST /stores/:storeId/stock/deadstock-scan/run-now"
+    ],
+    "reason": "A scan only reads orders and stock and derives its own reorder, low-stock or dead-stock suggestion rows. It never changes the catalogue, a price, a stock level or sends a message to a customer."
+  }
 }

@@ -10,14 +10,14 @@
   "api": ["DELETE /stores/:storeId/pages/:slug"],
   "mcpTool": null,
   "planGate": null,
-  "roles": ["store_admin", "super_admin"],
+  "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
     "class": "irreversible"
   },
   "helpArticle": "delete-a-custom-page",
   "questions": {
-    "ar": ["ازاي امسح صفحة؟", "عايز اشيل صفحة مخصصة"],
+    "ar": ["ازاي امسح صفحة؟", "عايز اشيل صفحة مخصصة", "ينفع ارجّع صفحة مسحتها؟"],
     "en": ["How do I delete a page I made?"]
   },
   "steps": ["Open the page, press Delete page, confirm"],
