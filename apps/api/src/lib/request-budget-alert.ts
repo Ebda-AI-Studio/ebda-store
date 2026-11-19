@@ -17,18 +17,18 @@ import logger from './logger';
 import { sendAlert } from '../services/alerts.service';
 import { cfBindings, type KVNamespaceLike } from '../cf/bindings';
 
-export const P95_BUDGET_MS = 1500;
-export const ERROR_RATE_MAX = 0.05;
-export const MIN_REQUESTS = 200;
+const P95_BUDGET_MS = 1500;
+const ERROR_RATE_MAX = 0.05;
+const MIN_REQUESTS = 200;
 
-export interface RouteStat {
+interface RouteStat {
   route: string;
   requests: number;
   p95Ms: number;
   errors5xx: number;
 }
 
-export const BUDGET_SQL = `SELECT index1 AS route,
+const BUDGET_SQL = `SELECT index1 AS route,
   sum(double1 * _sample_interval) AS requests,
   quantileWeighted(0.95)(double2, toUInt32(double1 * _sample_interval)) AS p95_ms,
   sumIf(double1 * _sample_interval, blob3 = '5xx') AS errors_5xx
@@ -49,15 +49,15 @@ export function breaches(stats: RouteStat[]): Array<{ route: string; reason: str
   return out;
 }
 
-export const ALERTED_KEY = 'request-budget-alerted';
+const ALERTED_KEY = 'request-budget-alerted';
 const ALERTED_TTL_S = 3 * 86_400;
 
-export interface AlertedStore {
+interface AlertedStore {
   get(): Promise<string[]>;
   put(routes: string[]): Promise<void>;
 }
 
-export function kvAlertedStore(
+function kvAlertedStore(
   kv: Pick<KVNamespaceLike, 'get' | 'put'> | undefined = cfBindings()?.KV_CACHE
 ): AlertedStore | undefined {
   if (!kv) return undefined;

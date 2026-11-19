@@ -15,9 +15,9 @@ import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { cfBindings, type AnalyticsEngineLike } from '../cf/bindings';
 
-export const SAMPLE_RATE = 20;
-export const SLOW_MS = 1500;
-export const STORE_SHARDS = 64;
+const SAMPLE_RATE = 20;
+const SLOW_MS = 1500;
+const STORE_SHARDS = 64;
 
 export function storeShard(storeId: string | undefined): string {
   if (!storeId) return 'none';
@@ -36,7 +36,7 @@ const STORE_SEGMENT = /(^|\/)stores\/([^/]+)/;
  * (`/api/v1/stores/<uuid>/products`), so every param value in it goes back to `:name`, and whatever follows `/stores/` is
  * `:storeId` even when the router did not merge its parent params. Read it while the router stack is intact.
  */
-export function routeTemplate(req: Pick<Request, 'baseUrl' | 'route' | 'params'>): string {
+function routeTemplate(req: Pick<Request, 'baseUrl' | 'route' | 'params'>): string {
   const p = req.route?.path;
   if (typeof p !== 'string') return 'unmatched';
   let base = req.baseUrl || '';
@@ -52,14 +52,14 @@ export function routeTemplate(req: Pick<Request, 'baseUrl' | 'route' | 'params'>
 }
 
 /** The store id of this request, from the params or the mount path. Read while the router stack is intact. */
-export function requestStoreId(req: Pick<Request, 'baseUrl' | 'params'>): string | undefined {
+function requestStoreId(req: Pick<Request, 'baseUrl' | 'params'>): string | undefined {
   const fromParams = req.params?.storeId;
   if (typeof fromParams === 'string' && fromParams) return fromParams;
   return STORE_SEGMENT.exec(req.baseUrl || '')?.[2];
 }
 
 /** 0 = drop; otherwise the weight of the point (requests it represents). Errors and slow requests are always kept at weight 1. */
-export function sampleWeight(status: number, ms: number, rand: () => number = Math.random): number {
+function sampleWeight(status: number, ms: number, rand: () => number = Math.random): number {
   if (status >= 400 || ms >= SLOW_MS) return 1;
   return rand() * SAMPLE_RATE < 1 ? SAMPLE_RATE : 0;
 }

@@ -3,8 +3,10 @@ import express from 'express';
 import request from 'supertest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { requestBudget, sampleWeight, storeShard } from '../../lib/request-budget';
-import { breaches, runRequestBudgetAlert, type AlertedStore } from '../../lib/request-budget-alert';
+import { requestBudget, storeShard } from '../../lib/request-budget';
+import { breaches, runRequestBudgetAlert } from '../../lib/request-budget-alert';
+
+type AlertedStore = NonNullable<Parameters<typeof runRequestBudgetAlert>[3]>;
 
 function appWith(points: Array<Record<string, unknown>>, rand = () => 0) {
   const app = express();
@@ -43,11 +45,25 @@ describe('requestBudget (FOLD-COUNTERS)', () => {
     expect(points.map(p => (p.doubles as number[])[0])).toEqual([1, 1]);
     expect(points[1]!.indexes).toEqual(['unmatched']);
   });
-  it('sample weights stand for the requests they represent', () => {
-    expect(sampleWeight(200, 10, () => 0)).toBe(20);
-    expect(sampleWeight(200, 10, () => 0.5)).toBe(0);
-    expect(sampleWeight(503, 10, () => 0.5)).toBe(1);
-    expect(sampleWeight(200, 5000, () => 0.5)).toBe(1);
+  it('sample weights stand for the requests they represent', async () => {
+    const weightOf = async (path: string, rand: () => number) => {
+      const points: Array<Record<string, unknown>> = [];
+      await request(appWith(points, rand)).get(path);
+      await settle();
+      return points.map(p => (p.doubles as number[])[0]);
+    };
+    expect(await weightOf('/api/v1/stores/s/products/p', () => 0)).toEqual([20]); // kept 1 in 20 stands for 20
+    expect(await weightOf('/api/v1/stores/s/products/p', () => 0.5)).toEqual([]); // dropped
+    expect(await weightOf('/api/v1/boom', () => 0.5)).toEqual([1]); // an error is always kept, weight 1
+  });
+  it('a slow healthy request is always kept at weight 1', async () => {
+    const points: Array<Record<string, unknown>> = [];
+    const now = vi.spyOn(performance, 'now');
+    now.mockReturnValueOnce(0).mockReturnValue(5000);
+    await request(appWith(points, () => 0.5)).get('/api/v1/stores/s/products/p');
+    await settle();
+    now.mockRestore();
+    expect(points.map(p => (p.doubles as number[])[0])).toEqual([1]);
   });
   it('writes nothing and never errors when REQUEST_BUDGET is unbound', async () => {
     const app = express();
