@@ -10,7 +10,7 @@ import {
 } from '../../../shared/src/journal-reconcile';
 
 const WINDOW_MS = JOURNAL_REPAIR_MAX_AGE_HOURS_DEFAULT * 3_600_000;
-const GRACE_MS = JOURNAL_REPAIR_GRACE_MINUTES_DEFAULT * 60_000;
+const JOURNAL_GRACE_MS = JOURNAL_REPAIR_GRACE_MINUTES_DEFAULT * 60_000;
 
 export interface DoMetricDef {
   /** One statement, SELECT only, ONE row with ONE integer column `n`. `?1` is not used: a metric takes no argument. */
@@ -48,7 +48,7 @@ export const DO_METRICS = {
   journal_unrepaired_in_window: {
     doc: "Paid orders (paid 10 min to 72 h ago) with no 'order' sale journal entry: the hourly repair will post them.",
     sql: UNREPAIRED_SQL(
-      `t.paid_at >= (NOW_MS - ${WINDOW_MS}) AND t.paid_at < (NOW_MS - ${GRACE_MS})`
+      `t.paid_at >= (NOW_MS - ${WINDOW_MS}) AND t.paid_at < (NOW_MS - ${JOURNAL_GRACE_MS})`
     ),
   },
   /**
