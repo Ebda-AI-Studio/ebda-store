@@ -11,7 +11,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { warn: h.warn, info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { warnD1OnlySkips } from '@api/lib/repo-factory';
+import { warnD1OnlySkips } from '@api/lib/store-cas-warn';
 
 describe('warnD1OnlySkips', () => {
   beforeEach(() => h.warn.mockClear());

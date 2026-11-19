@@ -45,7 +45,7 @@ import {
   type AppPrismaClient,
 } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
-import logger from './logger';
+import { warnD1OnlySkips } from './store-cas-warn';
 import { backendFor, storeDo, type StoreBackend } from './store-backend';
 import { scheduleStoreDirectorySync } from './store-directory-sync';
 import { platformDb, requirePlatformDb } from './platform-db';
@@ -2239,15 +2239,6 @@ export async function storePatchOnDo(
   if ((await d1StoreWrite({ id: storeId }, d1StorePatch(fields))) === 0)
     throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   return readStoreRowOnDo(storeId, args);
-}
-
-/** A field that lives only in D1 is not served by the DO compare-and-set: say so (ids and field names only, never values). */
-export function warnD1OnlySkips(storeId: string, fields: string[] | undefined, job?: string): void {
-  for (const field of fields ?? [])
-    logger.warn(
-      { storeId, field, job },
-      '[store-cas] field exists only in D1; not written by the DO compare-and-set'
-    );
 }
 
 /**
