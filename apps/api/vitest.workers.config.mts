@@ -17,6 +17,7 @@ const apiVars = {
   NODE_ENV: 'development',
   JWT_SECRET: 'workers-test-jwt-secret-0123456789abcdef',
   SUITE_BUYER_KEY_SECRET: 'workers-test-suite-buyer-key-secret-0123456789',
+  ORDER_STATUS_LINK_SECRET: 'workers-test-order-status-link-secret-0123456789',
   ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000',
   TAP_API_KEY: 'k',
   TAP_SECRET_KEY: 's',
