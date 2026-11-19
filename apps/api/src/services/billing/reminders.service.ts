@@ -191,7 +191,7 @@ async function sendDueReminderInner(subscriptionId: string, now: Date): Promise<
  * and it is won BEFORE anything is sent (inside the transaction that takes the decision where there is one),
  * so a retry, a re-run or a second worker sends nothing twice. `dueAt` is the period end the grace counts from.
  */
-export type GraceStage = 'grace_start' | 'grace_d1' | 'suspended';
+type GraceStage = 'grace_start' | 'grace_d1' | 'suspended';
 
 export async function claimGraceStage(
   tx: Pick<typeof prisma, 'billingReminder'>,

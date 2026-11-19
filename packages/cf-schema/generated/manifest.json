@@ -1335,12 +1335,6 @@
     },
     {
       "kind": "check",
-      "name": "billing_reminders_kind_check",
-      "table": "billing_reminders",
-      "disposition": "d1:billing_reminders"
-    },
-    {
-      "kind": "check",
       "name": "trust_requests_kind_check",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
@@ -1368,6 +1362,12 @@
       "name": "trust_requests_granted_limit_check",
       "table": "trust_requests",
       "disposition": "d1:trust_requests"
+    },
+    {
+      "kind": "check",
+      "name": "billing_reminders_kind_check",
+      "table": "billing_reminders",
+      "disposition": "d1:billing_reminders"
     },
     {
       "kind": "index",
