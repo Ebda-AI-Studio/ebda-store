@@ -9,6 +9,7 @@ import {
 } from '../../scripts/ci/worker-startup-budget.mjs';
 import budget from '../../scripts/ci/worker-startup-budget.json';
 import webBudget from '../../scripts/ci/worker-startup-budget-web.json';
+import adminBudget from '../../scripts/ci/worker-startup-budget-admin.json';
 
 const ok = { startupCpuMs: 90, bundleBytes: 7_518_999, bundleGzipBytes: 2_171_018 };
 
@@ -119,5 +120,31 @@ describe('storefront (web) Worker budget, Ruling WEB-COLD-3', () => {
         webBudget
       )
     ).toHaveLength(2);
+  });
+});
+
+describe('admin Worker startup budget (Ruling ADMIN-STARTUP-BUDGET-1)', () => {
+  const measured = adminBudget.baseline.after;
+  it('the first measurement (20.7 ms, 19.70 MB raw, 3.55 MB gzip) passes with headroom, not exactly at the ceiling', () => {
+    expect(budgetProblems(measured, adminBudget)).toEqual([]);
+    expect(adminBudget.startupCpuMs).toBeGreaterThan(measured.startupCpuMs * 2);
+    expect(adminBudget.bundleBytes).toBeGreaterThan(measured.bundleBytes);
+    expect(adminBudget.bundleBytes).toBeLessThan(measured.bundleBytes * 1.2);
+  });
+  it('a bundle one byte over, a gzip one byte over, or a startup over the ceiling each fail', () => {
+    expect(
+      budgetProblems({ ...measured, bundleBytes: adminBudget.bundleBytes + 1 }, adminBudget)
+    ).toHaveLength(1);
+    expect(
+      budgetProblems({ ...measured, bundleGzipBytes: adminBudget.bundleGzipBytes + 1 }, adminBudget)
+    ).toHaveLength(1);
+    expect(
+      budgetProblems({ ...measured, startupCpuMs: adminBudget.startupCpuMs + 1 }, adminBudget)
+    ).toHaveLength(1);
+  });
+  it('relative mode keeps the shared ratio and slack', () => {
+    expect(adminBudget.relative).toEqual({ ratio: 0.25, slackMs: 15 });
+    expect(relativeProblems(60, 20.7, adminBudget.relative)).toHaveLength(1);
+    expect(relativeProblems(30, 20.7, adminBudget.relative)).toEqual([]);
   });
 });

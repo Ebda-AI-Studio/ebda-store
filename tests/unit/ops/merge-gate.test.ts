@@ -15,6 +15,8 @@ const REQ = [
   'Detect affected workspaces',
   'Repo guards',
   'Scan for leaked secrets',
+  // MERGE-QUEUE-1 part B: always reports on a pull request (skip=false at once), so the drain waits for it like any always-on check
+  'Tested tree check',
   'Unit Tests (affected)',
 ];
 // The gate is bounded by POLL COUNT here, never by wall clock: under host load a wall-clock budget made merge
