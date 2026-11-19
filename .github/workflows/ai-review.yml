@@ -174,7 +174,7 @@ jobs:
   not-risky:
     name: AI review
     needs: classify
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 5
     if: github.event.pull_request.head.repo.full_name == github.repository && needs.classify.outputs.risky == 'false'
     steps:
@@ -182,7 +182,7 @@ jobs:
 
   state-check:
     name: AI review
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 5
     if: github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name != 'ai-review-passed') || (github.event.action == 'edited' && github.event.changes.base.ref.from == null) || (github.event.pull_request.draft && github.event.action != 'labeled'))
     steps:
