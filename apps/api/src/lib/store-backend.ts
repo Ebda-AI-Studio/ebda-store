@@ -143,7 +143,7 @@ interface BatchD1 {
 const batchStorage = new AsyncLocalStorage<Map<string, unknown>>();
 const MAX_IDS_PER_READ = 90; // D1 allows 100 bound parameters per statement
 
-const DIRECTORY_PAGE = 1000;
+const BACKEND_DIRECTORY_PAGE = 1000;
 
 /**
  * The scope's directory snapshot (storeId -> raw `storage_backend`, soft-deleted rows included exactly like the per-id read), or
@@ -168,14 +168,14 @@ function sweepDirectory(
         (
           await d1
             .prepare(
-              `SELECT id, storage_backend FROM stores WHERE id > ?1 ORDER BY id LIMIT ${DIRECTORY_PAGE}`
+              `SELECT id, storage_backend FROM stores WHERE id > ?1 ORDER BY id LIMIT ${BACKEND_DIRECTORY_PAGE}`
             )
             .bind(after)
             .all<{ id?: unknown; storage_backend?: unknown }>()
         ).results ?? [];
       for (const r of rows) if (typeof r.id === 'string') found.set(r.id, r.storage_backend);
       const last = rows[rows.length - 1]?.id;
-      if (rows.length < DIRECTORY_PAGE || typeof last !== 'string') return found;
+      if (rows.length < BACKEND_DIRECTORY_PAGE || typeof last !== 'string') return found;
       after = last;
     }
   })().catch(() => null);
