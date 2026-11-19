@@ -47,7 +47,7 @@ import {
   scrubSentryEvent,
 } from '@ebda/shared';
 import { companyHostRoute } from './company-host-route';
-import { edgeLocaleRedirect } from './locale-redirect-edge';
+import { edgeLocaleRedirect, type RedirectCache } from './locale-redirect-edge';
 import { DEMO_EDGE_API_URL, isDemoStoreHost, serveDemoEdge } from './demo-edge-cache';
 import { edgeBuildId } from './edge-build-id';
 import {
@@ -137,10 +137,22 @@ async function handleRequest(request: Request, env: WorkerEnv, ctx: unknown): Pr
   }
   // An old unprefixed URL of a locale-path store: an empty-body redirect here, never a render (Ruling
   // LOCALE-REDIRECT-EDGE-1). Null = undecidable, Next handles it exactly as before.
-  const localeRedirect = await edgeLocaleRedirect(request, env, async host => {
-    const v = await storeVerdict(host, DEMO_EDGE_API_URL);
-    return v.ok ? (v.defaultLanguage ?? null) : null;
-  });
+  const cacheApi = (globalThis as unknown as { caches?: { default?: RedirectCache } }).caches
+    ?.default;
+  const localeRedirect = await edgeLocaleRedirect(
+    request,
+    env,
+    async host => {
+      const v = await storeVerdict(host, DEMO_EDGE_API_URL);
+      return v.ok ? (v.defaultLanguage ?? null) : null;
+    },
+    cacheApi
+      ? {
+          store: cacheApi,
+          waitUntil: p => (ctx as { waitUntil(p: Promise<unknown>): void }).waitUntil(p),
+        }
+      : undefined
+  );
   if (localeRedirect) return localeRedirect;
   // route.kind === 'next' — all merchant domains + platform subdomains,
   // routed to the Next storefront exactly as before this carve-out.

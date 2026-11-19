@@ -200,7 +200,7 @@ function SearchContent() {
       {/* min-h: the page is a client fetch, so before its results (or its empty state) arrive the footer
           would sit under an empty box and then jump (CLS 0.42 on the empty search, audit 2026-11-03 #8). */}
       <div
-        className="min-h-[70svh] flex-1"
+        className="min-h-[50svh] flex-1 sm:min-h-[70svh]"
         style={darkLookListingBand(store?.theme, store?.look, false)}
       >
         {/* Search results are still product listings — same typography

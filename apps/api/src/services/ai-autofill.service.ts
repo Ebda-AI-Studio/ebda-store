@@ -13,6 +13,7 @@ import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { config } from '../config';
 import { generateProductSearchTerms } from '../lib/ai/product-search-terms-generator';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import { isStoreAiEnabled } from '../lib/store-ai-switch';
 
 /**
@@ -515,6 +516,8 @@ export async function writeAiFieldsGuarded(
       : await guardedAiWriteOnPg(storeId, productId, baseline, writes, opts);
   if (touchesEmbedDoc(result.written))
     await requestStoreReindex(storeId, opts.reindexReason ?? 'ai-autofill');
+  // Storefront-visible copy (name, description, SEO) changed: drop the API cache + the edge HTML copy (STORE-EDGE-4).
+  if (result.written.length > 0) await invalidateStoreProductCaches(storeId);
   return result;
 }
 
@@ -1003,6 +1006,7 @@ export async function revertProductBalance(
   });
 
   await requestStoreReindex(storeId, 'ai-balance-revert');
+  await invalidateStoreProductCaches(storeId);
   logger.info({ storeId, productId }, '[ai-balance] language balance reverted');
   return { reverted: true };
 }

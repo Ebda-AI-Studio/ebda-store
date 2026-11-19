@@ -33,7 +33,7 @@ import { demoHomeDefinition } from '../lib/demo-home';
  *  - `app/tenant-store/[tenant]/[locale]/page.tsx` (new, params-based
  *    `getStoreByTenantParam()` resolver, dark-launched behind
  *    `STOREFRONT_TENANT_ROUTING` — see
- *    docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9).
+ *    docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6/§9).
  *
  * Takes the already-resolved `store` (and, for the legacy caller only, the
  * already-resolved admin preview-draft token) as props instead of resolving

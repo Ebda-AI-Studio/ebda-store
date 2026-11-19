@@ -51,6 +51,11 @@ import {
   type StockAnswer,
   answerAuthOp,
   ensureCustomerAuthSchema,
+  ensureSmartLayerSchema,
+  answerSmartLayerOp,
+  runSmartLayerOp,
+  SMART_LAYER_RETENTION_MS,
+  type SmartLayerAnswer,
   purgeCustomerAuth,
   type AuthAnswer,
   ensureIdempotencySchema,
@@ -170,6 +175,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       ensureStockOpsSchema(this.sync);
       ensureMoneyOpsSchema(this.sync);
       ensureCustomerAuthSchema(this.sync);
+      ensureSmartLayerSchema(this.sync);
     });
   }
 
@@ -593,6 +599,24 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
   }
 
   /**
+   * The assistant's journal (Smart Layer, Ruling SL-STORE-1): audit rows, previews, approvals and counters in this store's own SQLite.
+   * ONE named operation = ONE `transactionSync` section (the compare-and-sets have a single winner). A refusal is an ANSWER. A closed store
+   * keeps its records readable by the erasure path only: every other operation is refused.
+   */
+  async smartLayerOp(storeId: string, op: string, argsJson: string): Promise<SmartLayerAnswer> {
+    try {
+      this.bind(storeId);
+    } catch (e) {
+      if (e instanceof StoreMismatch)
+        return { ok: false, code: 'STORE_MISMATCH', status: 403, message: e.message };
+      return { ok: false, code: 'STORE_NOT_FOUND', status: 404, message: 'store not found' };
+    }
+    if (isStoreClosed(this.sync) && !/^(eraseStore|eraseUser|purgeBefore)$/.test(op))
+      return { ok: false, code: 'STORE_CLOSED', status: 410, message: 'store is closed' };
+    return answerSmartLayerOp(this.sync, op, argsJson);
+  }
+
+  /**
    * The settings copy (Ruling CF-WRITES-2): the API writes the authoritative `Store` row first, then sends the changed
    * fields here as an RPC JSON string. Applied to `store_profile` / `store_config`; D1-only fields are reported, not stored.
    */
@@ -887,6 +911,12 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
         purgeCustomerAuth(this.sync);
       } catch (err) {
         console.error('customer auth purge failed', err);
+      }
+      // The assistant's journal keeps 90 days (spec 6.9).
+      try {
+        runSmartLayerOp(this.sync, 'purgeBefore', [Date.now() - SMART_LAYER_RETENTION_MS]);
+      } catch {
+        /* retried by the next alarm (a day): journal rows older than 90 days simply stay until it works */
       }
       if (backupDue) {
         const storeId = this.boundStoreId();

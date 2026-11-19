@@ -78,6 +78,15 @@ export {
 export type { DeadLetterReport, DeadLetterRow } from './platform/entity-index';
 export { scrubReceiptsForOrders } from './do/instapay-receipts';
 export { purgeErasureLedger } from './do/erase-shopper';
+export {
+  answerSmartLayerOp,
+  ensureSmartLayerSchema,
+  runSmartLayerOp,
+  SMART_LAYER_OPS,
+  SMART_LAYER_TABLES,
+  RETENTION_MS as SMART_LAYER_RETENTION_MS,
+} from './do/smart-layer';
+export type { SmartLayerAnswer, SmartLayerOp } from './do/smart-layer';
 export { scrubUserFromStoreDo } from './platform-erasure';
 export type { ReceiptRow as InstapayReceiptRow } from './do/instapay-receipts';
 export type { VectorWork, VectorizeLike, EmbeddingProviderLike } from './do/search-vectors';

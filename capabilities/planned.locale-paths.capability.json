@@ -1,0 +1,30 @@
+{
+  "id": "planned.locale-paths",
+  "status": "in-pr",
+  "pr": "ebda-store#647",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "لينكات العربي والانجليزي لكل الصفحات",
+  "titleEn": "Storefront /ar /en for cart, checkout, account, search",
+  "screens": ["/stores/[id]/language"],
+  "api": ["(PR)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "store-language-urls",
+  "questions": {
+    "ar": ["اللينك الانجليزي للسلة"],
+    "en": ["English URLs for checkout"]
+  },
+  "steps": ["In review."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)"
+  ],
+  "gaps": ["not merged"]
+}

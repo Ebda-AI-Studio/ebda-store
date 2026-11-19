@@ -1,6 +1,6 @@
 /**
  * resolveUnitPrice - the ONE pure place a tier / wholesale unit price is decided.
- * docs/plans/2026-10-21-b2b-wholesale.md, Task 2 + design review 2026-10-21. Rulings B2B-3b (precedence), B2B-4 (quantity
+ * docs/plans/done/2026-10-21-b2b-wholesale.md, Task 2 + design review 2026-10-21. Rulings B2B-3b (precedence), B2B-4 (quantity
  * scope), B2B-5 (provenance drives coupon exclusion), B2B-2c (identity is decided by the LOADER through
  * customers.user_id; this function only receives the already-bound buyer's group, or null).
  *

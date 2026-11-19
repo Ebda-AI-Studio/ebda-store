@@ -3,6 +3,7 @@
  * Secrets come from the environment only (a Worker secret), never from code or wrangler vars.
  */
 import type { CfBindings } from '../../cf/bindings';
+import { orderStatusLinkSecret } from '../order-status-link-token';
 
 export const WA_EVENTS_QUEUE = 'ebda-wa-events';
 export const STORE_EVENTS_QUEUE = 'ebda-store-events';
@@ -27,6 +28,13 @@ export function suiteBuyerKeySecret(): string {
  * surface as a failed enqueue on the first order, or worse, an unkeyed hash.
  */
 export function assertWhatsAppLinkConfig(env: CfBindings): void {
+  // The COD message's order-status link is signed with its own secret (Ruling WA-COD-V2-2): with the queue bound, missing or short is fatal.
+  const link = process.env.ORDER_STATUS_LINK_SECRET ?? '';
+  if ((env.WA_EVENTS_QUEUE || link.length > 0) && link.length < MIN_SECRET_LENGTH)
+    orderStatusLinkSecret();
+  // A secret that is set but too short is wrong whether or not the queue is bound (the bridge and the erasure use it too): WA-4.
+  const set = process.env.SUITE_BUYER_KEY_SECRET ?? '';
+  if (set.length > 0 && set.length < MIN_SECRET_LENGTH) suiteBuyerKeySecret();
   if (!env.WA_EVENTS_QUEUE) return;
   suiteBuyerKeySecret();
 }

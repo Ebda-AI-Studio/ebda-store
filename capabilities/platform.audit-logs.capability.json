@@ -1,0 +1,36 @@
+{
+  "id": "platform.audit-logs",
+  "status": "live",
+  "area": "platform",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "سجل المراجعة",
+  "titleEn": "Platform audit logs",
+  "screens": ["/audit-logs"],
+  "api": ["GET /admin/audit-logs"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "operatorReason": {
+    "code": null,
+    "text": "security/compliance",
+    "validUnderRule": true
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": [],
+    "en": []
+  },
+  "steps": ["Super-admin console only."],
+  "edgeCases": [
+    "Assistant must refuse and offer a handoff request with context",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
+  ],
+  "gaps": []
+}

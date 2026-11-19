@@ -1,5 +1,5 @@
 /**
- * Plan gate for B2B wholesale pricing (docs/plans/2026-10-21-b2b-wholesale.md, Task 1; Ruling B2B-1, Ahmad 2026-10-21:
+ * Plan gate for B2B wholesale pricing (docs/plans/done/2026-10-21-b2b-wholesale.md, Task 1; Ruling B2B-1, Ahmad 2026-10-21:
  * Business plan only, comped = everything on). Feature key `b2b.wholesale`, plan limit `wholesalePricing`.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

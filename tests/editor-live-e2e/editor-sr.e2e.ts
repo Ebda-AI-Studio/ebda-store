@@ -437,7 +437,7 @@ test.describe('keyboard + IME on the real canvas (ar 1280)', () => {
     const n = await radios.count();
     let picked = -1;
     for (let i = 0; i < n; i++) {
-      if ((await radios.nth(i).getAttribute('aria-checked')) !== 'true') {
+      if (!(await radios.nth(i).isChecked())) {
         picked = i;
         break;
       }
@@ -450,6 +450,7 @@ test.describe('keyboard + IME on the real canvas (ar 1280)', () => {
     // nothing is saved by a preview
     expect(await lookOf()).toBe(before);
     await page.getByTestId('look-apply').click();
+    await page.getByTestId('confirm-ok').click();
     await expect.poll(lookOf, { timeout: 60_000 }).not.toBe(before);
   });
 
