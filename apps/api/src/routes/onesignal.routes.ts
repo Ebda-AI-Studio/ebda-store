@@ -197,12 +197,16 @@ router.post(
       res.json({ success: true, data: result });
     } catch (error) {
       if (error instanceof OneSignalNotConfiguredError) {
+        logger.error(
+          { err: error },
+          'OneSignal is not configured: set ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY in the API environment'
+        );
         res.status(503).json({
           success: false,
           error: {
             code: 'PUSH_NOT_CONFIGURED',
-            message:
-              'OneSignal is not configured on the server. Set ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY in the API environment.',
+            // Merchant-visible: no env-var names or hosting terms (STORE-QA-62). The operator detail is logged just above.
+            message: 'Push notifications are not available for your store yet.',
           },
         });
         return;
@@ -243,12 +247,16 @@ router.get(
       res.json({ success: true, data: { broadcasts } });
     } catch (error) {
       if (error instanceof OneSignalNotConfiguredError) {
+        logger.error(
+          { err: error },
+          'OneSignal is not configured: set ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY in the API environment'
+        );
         res.status(503).json({
           success: false,
           error: {
             code: 'PUSH_NOT_CONFIGURED',
-            message:
-              'OneSignal is not configured on the server. Set ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY in the API environment.',
+            // Merchant-visible: no env-var names or hosting terms (STORE-QA-62). The operator detail is logged just above.
+            message: 'Push notifications are not available for your store yet.',
           },
         });
         return;
