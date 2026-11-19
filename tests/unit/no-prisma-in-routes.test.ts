@@ -56,9 +56,9 @@ const RATCHET: Record<string, { max: number; reason: string }> = {
   'merchant-webhooks.routes.ts': { max: 1, reason: `$executeRaw: ${UNPORTED}` },
   'notification.routes.ts': { max: 4, reason: `notificationLog: ${UNPORTED}` },
   'order.routes.ts': {
-    max: 8,
+    max: 5,
     reason:
-      'payment/order/$transaction: the Postgres branch of mark-paid, bulk-mark-paid and refresh-refund-status, reached ONLY when storeMoney(storeId) is null (a Postgres store); a DO store takes the money op and returns first',
+      'payment/order/$transaction: the Postgres branch of bulk-mark-paid and refresh-refund-status (single mark-paid moved to OrderService.markCodPaid), reached ONLY when storeMoney(storeId) is null (a Postgres store); a DO store takes the money op and returns first',
   },
   'payment-settings.routes.ts': { max: 6, reason: `store: ${D1}` },
   'provider-activation.routes.ts': { max: 1, reason: `store: ${D1}` },

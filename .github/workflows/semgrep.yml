@@ -23,8 +23,7 @@ permissions:
 jobs:
   semgrep:
     name: Semgrep SAST
-    # ubuntu-latest became 26.04 (2026-11); Playwright 1.60 unsupported — Ruling CI-HOSTED-2
-    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '["self-hosted","ebda-mac"]') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m venv "$RUNNER_TEMP/semgrep-venv"
-          "$RUNNER_TEMP/semgrep-venv/bin/pip" install --quiet --upgrade semgrep
+          "$RUNNER_TEMP/semgrep-venv/bin/pip" install --quiet semgrep==1.185.0
           "$RUNNER_TEMP/semgrep-venv/bin/semgrep" scan \
             --config p/default \
             --config p/owasp-top-ten \

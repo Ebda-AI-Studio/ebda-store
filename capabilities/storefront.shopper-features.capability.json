@@ -1,0 +1,46 @@
+{
+  "id": "storefront.shopper-features",
+  "status": "live",
+  "area": "storefront",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ايه اللي العميل يقدر يعمله",
+  "titleEn": "What shoppers can do: search, cart, checkout (guest/account), wishlist, addresses, reviews, track order, compare",
+  "screens": ["storefront"],
+  "api": [
+    "/stores/:id/cart*",
+    "/addresses",
+    "/wishlist",
+    "/payments/*",
+    "/stores/public/:id/orders/:orderId/tracking"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["customer"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "storefront-search",
+  "questions": {
+    "ar": [
+      "العميل مش قادر يكمل الشراء",
+      "العميل نسي الباسورد",
+      "ازاي العميل يتابع اوردره؟",
+      "ليه المنتج مش بيظهر في البحث؟"
+    ],
+    "en": ["A customer cannot check out", "How do customers track orders?"]
+  },
+  "steps": ["Public storefront."],
+  "edgeCases": [
+    "Price changed in cart: acknowledge prices",
+    "Out of stock at checkout",
+    "Payment provider down",
+    "COD min order",
+    "Arabic-default storefront RTL",
+    "Cart merge on login",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Merchant-side 'view as customer' preview not verified"]
+}

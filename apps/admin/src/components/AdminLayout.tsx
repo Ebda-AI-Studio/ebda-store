@@ -11,6 +11,7 @@ import { useCurrentStore } from '../hooks/useCurrentStore';
 import { useFeatures } from '../hooks/useFeatures';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { AssistantDock } from './assistant/AssistantDock';
 import { mergeRegistryIntoPalette, registryPaletteItems } from '../lib/settings-search';
 import { SettingHighlight } from './SettingHighlight';
 import {
@@ -30,6 +31,8 @@ import { SidebarHeader } from './admin-layout/SidebarHeader';
 import { CommandPalette } from './CommandPalette';
 import { SidebarNav } from './admin-layout/SidebarNav';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
+import { ContactEbdaDialog } from './support/ContactEbdaDialog';
+import { SuspensionNotice } from './support/SuspensionNotice';
 import { TopBar } from './admin-layout/TopBar';
 import { SettingsRail } from './admin-layout/SettingsRail';
 import { DocumentTitle } from './DocumentTitle';
@@ -130,6 +133,8 @@ export function AdminLayout({
     platformTaxArchive: t('navPlatformTaxArchive'),
     platformPolicyUpdates: t('navPlatformPolicyUpdates'),
     platformCiInsights: t('navPlatformCiInsights'),
+    platformActivation: t('navPlatformActivation'),
+    platformTrustRequests: t('navPlatformTrustRequests'),
     platformSettings: t('navPlatformSettings'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),
@@ -555,6 +560,8 @@ export function AdminLayout({
           parent={resolvedParent}
         />
 
+        {navStoreId && <SuspensionNotice storeId={navStoreId} />}
+
         {/* Hub tab nav — shown above page content when inside a multi-route hub
             (Catalog, Sales, Stock, Finance, Marketing). Empty for single-page
             hubs (Dashboard, Analytics, Settings). */}
@@ -574,10 +581,14 @@ export function AdminLayout({
         )}
       </main>
 
+      <ContactEbdaDialog storeId={navStoreId || null} />
+
       {/* Mobile Bottom Nav — store-scoped only. Renders nothing at
           md+ widths (its own internal `md:hidden`). When the merchant
           taps "More", we open the existing hamburger drawer rather
           than maintaining a parallel IA. */}
+      {/* The Ebda assistant: renders nothing until the server says it is on for this store (rollout switch, default off). */}
+      {navStoreId && mode === 'store_admin' && <AssistantDock storeId={navStoreId} />}
       {navStoreId && (
         <MobileBottomNav storeId={navStoreId} onOpenMore={() => setIsSidebarOpen(true)} />
       )}

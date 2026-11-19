@@ -48,10 +48,12 @@ import pwaRoutes from './pwa.routes';
 import qrRoutes from './qr.routes';
 import ciRoutes from './ci.routes';
 import adminCiRoutes from './admin-ci.routes';
+import adminTrustRequestsRoutes from './admin-trust-requests.routes';
 import barcodeLabelRoutes from './barcode-labels.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
 import catalogImportRoutes from './catalog-import.routes';
+import supportRoutes from './support.routes';
 import variantRoutes from './variant.routes';
 import productModelRoutes from './product-model.routes';
 import categoryRoutes from './category.routes';
@@ -59,6 +61,7 @@ import tagRoutes from './tag.routes';
 import sizeChartRoutes from './size-chart.routes';
 import goldRateRoutes from './gold-rate.routes';
 import aiRoutes from './ai.routes';
+import { assistantAdminRoutes, assistantRoutes } from './assistant.routes';
 import wishlistRoutes from './wishlist.routes';
 import addressRoutes from './address.routes';
 import featureRoutes from './feature.routes';
@@ -105,6 +108,7 @@ import lifecycleEmailsRoutes from './lifecycle-emails.routes';
 import whatsappLinkRoutes from './whatsapp-link.routes';
 import lifecycleEmailsPublicRoutes from './lifecycle-emails-public.routes';
 import contactEnquiryPublicRoutes from './contact-enquiry-public.routes';
+import orderStatusPublicRoutes from './order-status-public.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
 import realtimeRoutes from './realtime.routes';
@@ -208,6 +212,7 @@ router.use('/admin', adminLegalPolicyRoutes);
 // Customer Intelligence insights + hint kill switches (CI-2/CI-3, Rulings CI-9/CI-10). Same reachability
 // rule: before adminRoutes' catch-all MFA gate; it carries its own authenticate -> MFA -> super_admin chain.
 router.use('/admin', adminCiRoutes);
+router.use('/admin', adminTrustRequestsRoutes);
 
 // Provider activation queue (PROVIDERS-ACTIVATION). Same reachability rule as the tax routes: before
 // adminRoutes' catch-all MFA gate; it carries its own authenticate → MFA → super_admin chain.
@@ -312,6 +317,9 @@ router.use('/stores/:storeId/gold-rates', tenantContext, goldRateRoutes);
 // the `/results/*` endpoints at once — enough to exhaust `connection_limit=15`
 // and make unrelated requests on the pod fail P2024. See `aiRouteContext`.
 router.use('/stores/:storeId/ai', aiRouteContext, aiRoutes);
+// The Ebda assistant: same reason as /ai (a model call must not sit inside a request transaction). Above the bare `/stores/:storeId` mounts below.
+router.use('/stores/:storeId/assistant', aiRouteContext, assistantRoutes);
+router.use('/admin/assistant', assistantAdminRoutes);
 router.use('/stores/:storeId/typography', tenantContext, typographyRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
 // Context per request (SP6b): the admin payment link calls a payment gateway, so it runs
@@ -377,6 +385,8 @@ router.use('/stores', tenantContext, barcodeLabelRoutes);
 router.use('/stores', tenantContext, inventoryRoutes);
 router.use('/stores', tenantContext, bulkRoutes);
 router.use('/stores', tenantContext, catalogImportRoutes);
+// Merchant to Ebda staff: support request, suspension reason + appeal (SELF-SERVICE A13/A14)
+router.use('/stores', tenantContext, supportRoutes);
 router.use('/stores', tenantContext, variantRoutes);
 
 // Loyalty routes. Pulled out of the bare-'/stores'-only block above (fixed
@@ -575,6 +585,8 @@ router.use('/stores/:storeId/whatsapp-link', tenantContext, whatsappLinkRoutes);
 router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
 // Studio enquiry form on the marketing site (Ruling CONTACT-FORM-1): nothing stored, mail only.
 router.use('/public/contact', contactEnquiryPublicRoutes);
+// Guest-safe read-only order summary behind the COD WhatsApp button (Ruling WA-COD-V2-2).
+router.use('/public/order-status', orderStatusPublicRoutes);
 
 // Wishlist routes (user-scoped; store comes from an x-store-id header, not
 // the URL, so `tenantContext` can't reach it via a mount-path param). RLS

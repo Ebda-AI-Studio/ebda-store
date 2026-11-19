@@ -37,6 +37,7 @@ import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { authState } from './helpers';
 import { CATALOGUE_MISS_ROUTES } from '../src/middleware/catalogue-miss';
 import ALL_ROUTES from './route-table.json';
+import { TEST_PASSWORD_HASH } from './fixtures/test-password-hash';
 
 const e = env as unknown as {
   API: { fetch(u: string, i?: RequestInit): Promise<Response> };
@@ -69,8 +70,7 @@ const MARKER_KEYS = [
 ];
 const EMAIL = 'nat-shopper@exit-test.invalid';
 const PW = 'Passw0rd!xyz';
-// bcrypt cost 4 of PW (test fixture only)
-const HASH = '$2b$04$jYDlZaJj/X/kmBmzPXDwsOP4.aIZ2IBm.rDUDGyiC8iKKUZPb/Rzm';
+const HASH = TEST_PASSWORD_HASH;
 const MISS_MAX = 20;
 // fixture products: one live and one DRAFT in the store, one live in ANOTHER store
 const P_LIVE = 'a1a1a1a1-0000-4000-8000-000000000001';
@@ -111,6 +111,9 @@ const COUNTED_ON_ANY_STORE = [
   'GET /public/feed/tiktok.csv',
   'GET /public/health',
   'GET /public/lifecycle-emails/unsubscribe',
+  // LAUNCH-RL-MISS-3: a token-guarded guest read (signed order link, own orderStatusLimiter). Its 404 answers a bad or expired token, i.e. a guess,
+  // so it is a COUNTED miss on any store; it is NOT a catalogue-miss route (that list is for public slugs whose 404 says nothing new).
+  'GET /public/order-status/:token',
   'GET /public/orders',
   'GET /public/orders/:id',
   'GET /public/orders/:id/invoice',

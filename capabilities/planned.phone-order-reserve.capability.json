@@ -1,0 +1,32 @@
+{
+  "id": "planned.phone-order-reserve",
+  "status": "in-pr",
+  "pr": "ebda-store#713 #733 #735 #725",
+  "area": "orders",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تحسينات الاوردرات اليدوية والمخازن",
+  "titleEn": "Phone orders reserve stock; warehouse routing; courier statement marks COD paid; order money edges",
+  "screens": ["/stores/[id]/orders"],
+  "api": ["(PRs)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["اوردر تليفوني بيخصم من المخزون؟"],
+    "en": ["Do phone orders reserve stock?"]
+  },
+  "steps": ["In review."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
+  ],
+  "gaps": ["not merged"]
+}
