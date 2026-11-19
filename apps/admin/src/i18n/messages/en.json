@@ -5454,7 +5454,8 @@
         "overridesCleared": "Overrides cleared",
         "overridesClearedDescription": "Store is now using plan defaults.",
         "resetFailed": "Reset failed"
-      }
+      },
+      "baselineTierNote": "Features below are measured against the {plan} feature set, which follows the store's subscription plan."
     }
   },
   "template": {
@@ -6686,6 +6687,12 @@
         "appealOpen": "Your appeal is under review. We will reply by email.",
         "appeal": "Appeal this decision"
       }
+    },
+    "subscriptionPlanRow": {
+      "label": "Store plan",
+      "loading": "Loading the plan…",
+      "loadError": "The plan could not be loaded. Open Billing to see it.",
+      "assignLink": "Assign plan in Billing"
     }
   },
   "finance": {
@@ -9462,7 +9469,8 @@
     "viewReceipt": "View receipt",
     "receiptProcessing": "Your payment went through. Your receipt will print here in a moment.",
     "cancelObject": "Cancelling your plan subscription",
-    "cancelAction": "Cancel subscription"
+    "cancelAction": "Cancel subscription",
+    "adminPlanHidden": "hidden"
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -9836,7 +9844,9 @@
     "stuck": "Outcome unknown — reconcile",
     "retry": "retry {n}",
     "refund": "Refund",
-    "confirmRefund": "Refund {amount} to the merchant's card?",
+    "confirmRefund": "Refund {amount} to the merchant's card? If this charge paid for their current plan, the plan ends now and the store moves to the free plan. Nothing is charged again.",
+    "refundKeepAccess": "Refund, keep access",
+    "confirmRefundKeepAccess": "Refund {amount} to the merchant's card and let them keep the period they paid for?",
     "refundFailed": "Refund failed: {message}",
     "refundDone": "Refund recorded.",
     "columns": {
@@ -12032,7 +12042,11 @@
       "first_order": "First order",
       "first_fulfilled_order": "First delivered order"
     },
-    "col": { "step": "Step", "store": "Store", "stopped": "Where the order stopped" },
+    "col": {
+      "step": "Step",
+      "store": "Store",
+      "stopped": "Where the order stopped"
+    },
     "funnel": {
       "title": "Funnel by signup date",
       "body": "Stores that signed up in the range: how many reached each step and the median time from signup. Updated once a day.",
@@ -12044,8 +12058,14 @@
       "median": "Median time from signup",
       "help": "Stores that needed help"
     },
-    "stores": { "title": "Stores" },
-    "channel": { "storefront": "Storefront", "whatsapp": "WhatsApp", "admin": "Merchant admin" },
+    "stores": {
+      "title": "Stores"
+    },
+    "channel": {
+      "storefront": "Storefront",
+      "whatsapp": "WhatsApp",
+      "admin": "Merchant admin"
+    },
     "helpKind": {
       "assistant_used": "used the Ebda AI Studio assistant",
       "super_admin_action": "support changed the store",
@@ -12065,7 +12085,11 @@
       "delivered": "Delivered",
       "returned": "Returned"
     },
-    "duration": { "minutes": "{n} min", "hours": "{n} h", "days": "{n} d" }
+    "duration": {
+      "minutes": "{n} min",
+      "hours": "{n} h",
+      "days": "{n} d"
+    }
   },
   "assistant": {
     "title": "Assistant",
