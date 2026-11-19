@@ -679,11 +679,11 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     nameAr: 'أسعار الجملة',
     description:
       'Quantity price breaks, customer-group prices, minimum order quantities, wholesale-only ' +
-      'products and a wholesale account application you approve. Included in Business; the Ebda team can ' +
+      'products and a wholesale account application you approve. Included in Business; our team can ' +
       'enable it for a single store otherwise.',
     descriptionAr:
       'خصومات الكميات وأسعار مجموعات العملاء والحد الأدنى للطلب ومنتجات الجملة فقط ' +
-      'وطلبات حسابات الجملة التي توافق عليها. مضمّن في باقة الأعمال، ويقدر فريق ابدأ يفعّله لمتجر بعينه.',
+      'وطلبات حسابات الجملة التي توافق عليها. مضمّن في باقة الأعمال، ويقدر فريقنا يفعّله لمتجر بعينه.',
     category: 'commerce',
     tier: 'addon',
     // Hidden from the merchant feature list until the merchant + storefront UI ships (Tasks 6-7); a super-admin can
@@ -697,10 +697,10 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     nameAr: 'إزالة «مدعوم من ابدأ ستور»',
     description:
       'Hides the "Powered by Ebda Store" attribution in the storefront footer. Included in Growth ' +
-      'and Business; the Ebda team can enable it for a single store otherwise.',
+      'and Business; our team can enable it for a single store otherwise.',
     descriptionAr:
       'يخفي عبارة «مدعوم من ابدأ ستور» من تذييل المتجر. مضمّن في باقتي النمو والأعمال، ' +
-      'ويقدر فريق ابدأ يفعّله لمتجر بعينه.',
+      'ويقدر فريقنا يفعّله لمتجر بعينه.',
     category: 'storefront',
     tier: 'addon',
   },

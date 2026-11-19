@@ -7987,8 +7987,8 @@
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
     "alsoIncluded": "Also included in this plan",
-    "noSoldPlan": "This feature is not part of a plan you can buy. The Ebda team switches it on for a single store, so get in touch if you need it.",
-    "contactOnlyCta": "Talk to the Ebda team"
+    "noSoldPlan": "This feature is not part of a plan you can buy. Our team switches it on for a single store, so get in touch if you need it.",
+    "contactOnlyCta": "Talk to our team"
   },
   "aiTools": {
     "title": "AI tools",
