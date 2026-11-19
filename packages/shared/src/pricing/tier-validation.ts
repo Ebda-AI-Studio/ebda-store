@@ -1,5 +1,5 @@
 /**
- * Write-time validation for a price tier (docs/plans/2026-10-21-b2b-wholesale.md Task 4; Q3, Rulings B2B-3b and B2B-12).
+ * Write-time validation for a price tier (docs/plans/done/2026-10-21-b2b-wholesale.md Task 4; Q3, Rulings B2B-3b and B2B-12).
  * Pure, no imports. The resolver stays total on bad data (it drops / orders defensively); this is where bad data is REFUSED,
  * so the merchant sees a clear error instead of a silently ignored row.
  *

@@ -8,7 +8,7 @@ import ContactClient from './ContactClient';
  * Phase 1) so the SAME rendering logic serves both `app/contact/page.tsx`
  * (legacy, header-based) and `app/tenant-store/[tenant]/[locale]/contact/page.tsx`
  * (new, params-based, dark-launched). See
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
  */
 export async function ContactPageBody({ store }: { store: ResolvedStore }) {
   const siteUrl = storeAbsoluteUrl(store, '');

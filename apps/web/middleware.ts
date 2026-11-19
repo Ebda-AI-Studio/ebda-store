@@ -25,6 +25,7 @@ import {
   localePathsOn,
   type PathLocale,
 } from './src/lib/locale-paths';
+import { applyOrderLinkHeaders } from './src/lib/order-link-headers';
 
 /**
  * HOST ROUTING (program plan §1, design cloudflare-backend §4).
@@ -48,7 +49,7 @@ import {
 /**
  * Route roots eligible for the tenant-cacheable Track-A rewrite. Dark-
  * launched behind `STOREFRONT_TENANT_ROUTING` — see
- * `docs/plans/2026-07-12-tenant-cacheable-routing.md` §3.3/§4/§9 Phase 1.
+ * `docs/plans/done/2026-07-12-tenant-cacheable-routing.md` §3.3/§4/§9 Phase 1.
  * Anonymous, non-personalized surfaces only (home is handled separately as
  * the empty-path case in `isCacheableTrackARoute`); every other route
  * (cart, checkout, account, auth, wishlist, search, compare, review, and
@@ -334,7 +335,7 @@ function propagateDraftHeader(
  * STOREFRONT_TENANT_ROUTING_ROUTES canary list names (missing/empty/unparseable
  * list = no route), and only for a store that STOREFRONT_TENANT_ROUTING_STORES
  * names (missing/empty/unparseable list = no store, Ruling TRC-6).
- * See docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
+ * See docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
  */
 function isTenantTreeEligible(
   pathname: string,
@@ -578,6 +579,7 @@ export function middleware(request: NextRequest) {
   headers.set('x-nonce', nonce);
   headers.set('Content-Security-Policy', csp);
   const response = routeStorefront(new NextRequest(request, { headers }));
+  applyOrderLinkHeaders(request.nextUrl.pathname, response.headers);
   // The studio pages (ebda.app help/status hosts) already carry their own, stricter CSP: keep it.
   if (!response.headers.has('Content-Security-Policy')) {
     response.headers.set('Content-Security-Policy', csp);

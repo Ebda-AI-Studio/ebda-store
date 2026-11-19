@@ -1,6 +1,6 @@
 /**
  * Ebda AI Studio's own "this address has nothing for you" pages: the Apple-style 404 and the
- * "coming soon" page for every coming-soon software product (crm, erp, invite, ads, quote: ONE template, only the copy
+ * "coming soon" page for every coming-soon software product (crm, erp: ONE template, only the copy
  * differs, Ruling SUBDOMAIN-SOON-2) and the "reserved" page (hub, id). ONE pure renderer, no runtime
  * imports, so the store Worker's middleware, the marketing build and the status Worker share it.
  *
@@ -32,10 +32,11 @@ const COMING_SOON_LABELS: Readonly<Record<string, ComingSoonProduct>> = {
   // every coming-soon software product gets its own page (Ruling SUBDOMAIN-SOON-2); names = BRAND.comingProducts
   crm: 'crm',
   erp: 'erp',
-  invite: 'invite',
-  ads: 'ads',
-  quote: 'quote-studio',
-  'quote-studio': 'quote-studio',
+  // held addresses with no announced product: the neutral reserved page, never "coming soon" (public-copy rule 2026-11-11)
+  invite: 'reserved',
+  ads: 'reserved',
+  quote: 'reserved',
+  'quote-studio': 'reserved',
   hub: 'reserved',
   id: 'reserved',
 };
@@ -120,7 +121,7 @@ const COPY: Record<StudioLang, Copy> = {
     mapLabel: 'Site sections',
     soon: 'Coming soon',
     soonLine: name => `${name} is coming soon.`,
-    reservedLine: 'This address is held for an upcoming service from Ebda AI Studio.',
+    reservedLine: 'This address is reserved by Ebda AI Studio.',
     soonHint: "We're still building it. Here is what is live today.",
     notify: 'Tell me when it is ready',
     backHome: 'Back to ebda.app',
@@ -146,7 +147,7 @@ const COPY: Record<StudioLang, Copy> = {
     mapLabel: 'أقسام الموقع',
     soon: 'قريبًا',
     soonLine: name => `${name} جاي قريب.`,
-    reservedLine: 'العنوان ده محجوز لخدمة جاية من ابدأ ستوديو للذكاء الاصطناعي.',
+    reservedLine: 'العنوان ده محجوز لابدأ ستوديو للذكاء الاصطناعي.',
     soonHint: 'لسه بنشتغل عليه. وده اللي شغال النهارده.',
     notify: 'عرّفني أول ما يجهز',
     backHome: 'ارجع لـ ebda.app',

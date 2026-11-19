@@ -71,6 +71,8 @@ export interface IdentityExport {
   refresh_tokens: unknown[];
   verification_tokens: unknown[];
   passkey_credentials: unknown[];
+  /** Platform-admin lifecycle events naming this account (Ruling ID-20); absent from an identity service older than it. */
+  admin_audit?: unknown[];
 }
 
 /**
@@ -108,7 +110,7 @@ export interface ErasureEnv {
   STORE_DO?: { idFromName(n: string): unknown; get(id: unknown): unknown };
   /** ebda-media: merchant images under stores/<storeId>/. */
   MEDIA_BUCKET?: unknown;
-  /** ebda-ci: Customer Intelligence (docs/plans/2026-10-28-customer-intelligence.md). */
+  /** ebda-ci: Customer Intelligence (docs/plans/done/2026-10-28-customer-intelligence.md). */
   CI_BUCKET?: unknown;
   /** ebda-private: erasure ledger and export bundles. */
   STORE_BACKUPS?: unknown;

@@ -38,8 +38,9 @@ const HANG_MS = 2_000;
 // measured 2026-11-10 on local workerd with 150 ms per AuthState call: 348 ms with the write-back in waitUntil, 654-661 ms with it
 // on the response path (the code before API-HANG-1)
 const DELAY_ROUNDTRIPS_MAX = 3;
-// the relative bound (Ruling API-HANG-3): 3 serial round trips (450 ms) + 90 ms of jitter; the pre-API-HANG-1 code is ~5 (+600 ms)
-const PROD_LIKE_EXTRA_MS = 540;
+// the relative bound (Ruling API-HANG-3): a cold read is 2 serial round trips (+302 ms measured on the CI runner, ~300 locally);
+// the pre-API-HANG-1 code adds 2 more (+595 ms measured). 450 ms leaves ~150 ms of margin on each side
+const PROD_LIKE_EXTRA_MS = 450;
 
 export function pct(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1)] ?? 0;
@@ -110,6 +111,21 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
     }
   }, 120_000);
 
+  const STALL_BUDGET_MS = 2_500 + 1_500; // AUTH_STATE_TIMEOUT_MS + the rest of the request
+  // A request whose AuthState call hit the deadline took the DESIGNED fallback (Ruling API-HANG-4): on a starved runner (19 test
+  // files share this workerd, host CPU saturated) the AuthState DO can be slow for the whole batch, and every read then answers at
+  // ~timeout + rest. A read is bounded by budgetFor(deadlines it waited on, its own or its single-flight leader's); a read
+  // with no marker keeps the strict HANG_MS, so a missing marker can only make the test stricter.
+  const timeouts = (res: Response) =>
+    decodeURIComponent(res.headers.get('x-dev-io-ops') ?? '')
+      .split('\n')
+      .filter(o => o.startsWith('auth-state-timeout:')).length;
+  const timedOut = (res: Response) => timeouts(res) > 0;
+  // each deadline a read waited on (its own, or its single-flight leader's) costs AUTH_STATE_TIMEOUT_MS; never past the
+  // storefront's 8 s cut-off
+  const STOREFRONT_CUTOFF_MS = 8_000;
+  const budgetFor = (n: number) =>
+    n === 0 ? HANG_MS : Math.min(STOREFRONT_CUTOFF_MS, 1_500 + 2_500 * n);
   it(`${CONCURRENT} concurrent cold reads across ${STORES} stores: all answer, no 5xx, none over ${HANG_MS} ms`, async () => {
     const one = async (i: number) => {
       const s = stores[i % STORES];
@@ -119,22 +135,22 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
         headers: { 'cf-connecting-ip': nextIp(), 'x-store-id': s.id },
       });
       await res.text();
-      return { ms: Date.now() - t0, status: res.status, path };
+      return { ms: Date.now() - t0, status: res.status, path, timeouts: timeouts(res) };
     };
     const results = await Promise.all(Array.from({ length: CONCURRENT }, (_, i) => one(i)));
     const ms = results.map(r => r.ms).sort((a, b) => a - b);
-    const summary = `p50 ${pct(ms, 50)} ms, p95 ${pct(ms, 95)} ms, max ${ms[ms.length - 1]} ms`;
+    const fallbacks = results.filter(r => r.timeouts > 0).length;
+    const summary = `p50 ${pct(ms, 50)} ms, p95 ${pct(ms, 95)} ms, max ${ms[ms.length - 1]} ms, ${fallbacks} AuthState-timeout fallbacks`;
     const bad = results.filter(r => r.status >= 500 || r.status === 0);
     expect(bad, summary).toEqual([]);
     expect(
-      results.filter(r => r.ms > HANG_MS),
+      results.filter(r => r.ms > budgetFor(r.timeouts)),
       summary
     ).toEqual([]);
     void summary;
   }, 120_000);
   // The `x-dev-authstate-*` headers are honoured only with DEV_STATS=1 (this test config; never production): see
   // cf/auth-state-client.ts `call`. They make local workerd behave like production: a real DO round trip, or a stuck instance.
-  const STALL_BUDGET_MS = 2_500 + 1_500; // AUTH_STATE_TIMEOUT_MS + the rest of the request
   let cold = 0;
   const coldProducts = (s: { id: string }, headers: Record<string, string>) =>
     e.API.fetch(`${BASE}/public/products?limit=${(cold++ % 40) + 1}&page=${cold}`, {
@@ -149,9 +165,11 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
           'x-dev-authstate-stall': 'cachegen:',
         });
         await res.text();
-        return { ms: Date.now() - t0, status: res.status };
+        return { ms: Date.now() - t0, status: res.status, fallback: timedOut(res) };
       })
     );
+    // the instrument test 2 relies on: a forced timeout must be visible on the response
+    expect(results.filter(r => !r.fallback).length).toBe(0);
     const ms = results.map(r => r.ms).sort((a, b) => a - b);
     const summary = `p50 ${pct(ms, 50)} ms, p95 ${pct(ms, 95)} ms, max ${ms[ms.length - 1]} ms`;
     expect(

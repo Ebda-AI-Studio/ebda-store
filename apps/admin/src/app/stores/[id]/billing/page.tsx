@@ -55,6 +55,8 @@ interface PlanSummary {
   priceMonthlyMinor: number | null;
   priceYearlyMinor: number | null;
   limits: PlanLimits;
+  /** /admin/plans only: false = a hidden compatibility plan (never offered to merchants). */
+  isPublic?: boolean;
 }
 
 interface BillingData {
@@ -1272,7 +1274,10 @@ export default function StoreBillingPage() {
           </section>
 
           {isSuperAdmin && (
-            <section className="rounded-xl border border-dashed bg-card p-4 sm:p-6">
+            <section
+              id="assign-plan"
+              className="scroll-mt-20 rounded-xl border border-dashed bg-card p-4 sm:p-6"
+            >
               <h2 className="mb-3 text-base font-semibold">{t('adminTitle')}</h2>
               <div className="flex flex-wrap items-end gap-3">
                 <div className="w-full sm:w-64">
@@ -1282,7 +1287,16 @@ export default function StoreBillingPage() {
                     onChange={e => setSelectedPlan(e.target.value)}
                     options={allPlans.map(p => ({
                       value: p.code,
-                      label: `${planName(p)} (${p.code})`,
+                      // the priced plan by name, code and monthly price; hidden compatibility plans are marked (B1-PLAN-SOT-1)
+                      label: [
+                        `${planName(p)} (${p.code})`,
+                        p.priceMonthlyMinor !== null
+                          ? `${fmtPrice(p.priceMonthlyMinor)} ${t('perMonth')}`
+                          : null,
+                        p.isPublic === false ? t('adminPlanHidden') : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · '),
                     }))}
                   />
                 </div>

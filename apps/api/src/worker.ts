@@ -37,6 +37,7 @@ import { awaitDeferredWork } from './lib/after-tenant-commit';
 import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
+import { warnMissingStoreResolveBindings } from './middleware/store-resolve-native';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
 import { instrumentBindings } from './lib/io-tally';
 import { dispatchedEvents, trackDispatches } from './lib/jobs/dispatch';
@@ -172,6 +173,7 @@ function prepare(env: CfBindings): void {
     assertCiCaptureConfig(env);
     whatsAppConfigChecked = true;
   }
+  warnMissingStoreResolveBindings(env);
   // No sockets to open: this only flips redis.service to "available" over AuthState + KV.
   redisReady ??= redis.connect();
   const deployment = env.CF_VERSION_METADATA?.id;
@@ -517,32 +519,45 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
   getProducts(storeId: string, ids: string[]) {
     return this.bridge(b => b.getProducts(storeId, ids));
   }
+  searchProducts(
+    storeId: string,
+    query: string,
+    opts: { maxPriceMinor?: number; limit: number; searcher?: string }
+  ) {
+    return this.bridge(b => b.searchProducts(storeId, query, opts));
+  }
+  getStorePolicies(storeId: string) {
+    return this.bridge(b => b.getStorePolicies(storeId));
+  }
+  getCustomerProfile(storeId: string, phoneE164: string) {
+    return this.bridge(b => b.getCustomerProfile(storeId, phoneE164));
+  }
   createCheckoutLink(storeId: string, req: unknown) {
     return this.bridge(b => b.createCheckoutLink(storeId, req));
   }
   createOrderFromChat(storeId: string, req: unknown) {
     return this.bridge(b => b.createOrderFromChat(storeId, req));
   }
-  getPaymentLink(storeId: string, orderId: string) {
-    return this.bridge(b => b.getPaymentLink(storeId, orderId));
+  getPaymentLink(storeId: string, orderId: string, buyerKey?: string) {
+    return this.bridge(b => b.getPaymentLink(storeId, orderId, buyerKey));
   }
   recordCodOutcome(storeId: string, req: unknown) {
     return this.bridge(b => b.recordCodOutcome(storeId, req));
   }
-  attachPaymentProof(storeId: string, orderId: string, mediaUrl: string) {
-    return this.bridge(b => b.attachPaymentProof(storeId, orderId, mediaUrl));
+  attachPaymentProof(storeId: string, orderId: string, mediaUrl: string, buyerKey?: string) {
+    return this.bridge(b => b.attachPaymentProof(storeId, orderId, mediaUrl, buyerKey));
   }
-  getCustomerAddresses(storeId: string, buyerKey: string) {
-    return this.bridge(b => b.getCustomerAddresses(storeId, buyerKey));
+  getCustomerAddresses(storeId: string, buyerKey: string, phoneE164?: string) {
+    return this.bridge(b => b.getCustomerAddresses(storeId, buyerKey, phoneE164));
   }
-  saveCustomerAddress(storeId: string, buyerKey: string, address: unknown) {
-    return this.bridge(b => b.saveCustomerAddress(storeId, buyerKey, address));
+  saveCustomerAddress(storeId: string, buyerKey: string, address: unknown, phoneE164?: string) {
+    return this.bridge(b => b.saveCustomerAddress(storeId, buyerKey, address, phoneE164));
   }
-  getOrderStatus(storeId: string, orderNumber: string, buyerKey: string) {
-    return this.bridge(b => b.getOrderStatus(storeId, orderNumber, buyerKey));
+  getOrderStatus(storeId: string, orderNumber: string, buyerKey: string, phoneE164?: string) {
+    return this.bridge(b => b.getOrderStatus(storeId, orderNumber, buyerKey, phoneE164));
   }
-  listCustomerOrders(storeId: string, buyerKey: string, limit: number) {
-    return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit));
+  listCustomerOrders(storeId: string, buyerKey: string, limit: number, phoneE164?: string) {
+    return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit, phoneE164));
   }
   /** Revocation (v1.4): the live role of a user on a store, or null once removed. WhatsApp calls it on each staff request. */
   async memberRole(storeId: string, userId: string) {

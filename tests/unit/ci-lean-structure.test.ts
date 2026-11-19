@@ -96,33 +96,39 @@ describe('ci.yml triggers', () => {
 
   it('cancels superseded PR runs and superseded main pushes, never a cron or manual run', () => {
     expect(ci.concurrency.group).toMatch(/^ci-/);
-    // PR runs group per ref, every main push has a group per merge sha, anything else is alone (run_id)
+    // PR runs group per ref, every main push AND every merge-queue group (MERGE-QUEUE-1) has a group per sha, anything else is alone (run_id)
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || github.run_id) }}"
+      "ci-${{ github.event_name == 'merge_group' && format('mq-{0}', github.sha) || github.event_name == 'pull_request' && github.ref || (github.event_name == 'push' && format('main-{0}', github.sha) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('full-{0}', github.ref) || github.run_id)) }}"
     );
     // Ruling CI-MAIN-SHA-1: only PR runs are cancelled; a main push (own group per sha) always completes.
-    expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}");
+    // CI-SLIM-1: a pre-merge full-tier dispatch on a PR branch (group per branch) is superseded by the next one too.
+    expect(ci.concurrency['cancel-in-progress']).toBe(
+      "${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}"
+    );
   });
 
-  it('uses Node 22 (wrangler >= 4.110) and caches npm (hosted runners only) in every setup-node that installs', () => {
+  it('uses Node 22 (wrangler >= 4.110) and no setup-node has a `cache:` input (the Mac pool keeps ~/.npm locally; the remote Actions cache is never used)', () => {
     expect(ci.env.NODE_VERSION).toBe('22');
     const steps = raw.split('uses: actions/setup-node@').slice(1);
     expect(steps.length).toBeGreaterThan(8);
-    // Exactly one setup-node skips the cache: the `changes` job, which only
-    // runs the dependency-free scripts/ci-affected.mjs and installs nothing.
-    const uncached = steps.filter(
-      b =>
-        !/^[^\n]*\n\s+with:[\s\S]*?cache: \$\{\{ \(!contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci-umbra'\) && vars\.EBDA_RUNS_ON == ''\) && 'npm' \|\| '' \}\}/.test(
-          b.split('\n\n')[0] + '\n'
-        )
+    // Ahmad 2026-11-16 (no hosted runners): every job runs on a Mac runner, where the remote cache cost 1.5-2.5 min per restore and pulled 14 GB once.
+    const cached = steps.filter(b =>
+      /^[^\n]*\n\s+with:[\s\S]*?\n\s+cache:/.test(b.split('\n\n')[0] + '\n')
     );
-    expect(uncached).toHaveLength(1);
+    expect(cached).toHaveLength(0);
   });
 });
 
 describe('ci.yml lanes', () => {
   it('every job is declared in exactly one lane (a new job must pick one)', () => {
-    const declared = new Set([...PR_LANE, ...MAIN_LANE, 'notify-failure']);
+    // `merge-queue-gate` (MERGE-QUEUE-1) is its own lane: it reports on pull_request and merge_group only; tests/unit/merge-queue-gate.test.ts pins it
+    const declared = new Set([
+      ...PR_LANE,
+      ...MAIN_LANE,
+      'notify-failure',
+      'merge-queue-gate',
+      'tested-tree',
+    ]);
     expect(Object.keys(ci.jobs).sort()).toEqual([...declared].sort());
   });
 
@@ -176,6 +182,8 @@ describe('ci.yml lanes', () => {
         const expr = j.if
           .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
           .replace(/needs\.([\w-]+)\.result == 'success'/g, (_, n) => String(run(n)))
+          // MERGE-QUEUE-1 part B: `tested-tree` answers skip=false unless a merge group proved the tree, so the evaluator's world (no such evidence) is `true`
+          .replace(/needs\.tested-tree\.outputs\.skip != 'true'/g, 'true')
           .replace(/needs\.[\w-]+\.outputs\.\w+ (==|!=) '[^']*'/g, (_, op) =>
             String(op === '!=' ? false : false)
           )
@@ -196,7 +204,8 @@ describe('ci.yml lanes', () => {
   };
   const PR_ONLY = ['changes', 'lint', 'typecheck', 'unit', 'unit-gate', 'app-build', 'app-builds'];
   const FULL_LANE = Object.keys(ci.jobs)
-    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation')
+    // merge-queue-gate (MERGE-QUEUE-1) runs on pull_request and merge_group only, never on push / schedule / dispatch
+    .filter(j => !PR_ONLY.includes(j) && j !== 'mutation' && j !== 'merge-queue-gate')
     .sort();
 
   it('a push to main runs the FULL lane except mutation (build, unit, integration, workerd, e2e, audit)', () => {
@@ -261,7 +270,10 @@ describe('ci.yml lanes', () => {
 
   it('the PR lane runs lint, typecheck and unit tests for changed paths only', () => {
     for (const name of ['lint', 'typecheck', 'unit', 'worker-dry-run']) {
-      expect(ci.jobs[name].needs, name).toEqual(['changes']);
+      // worker-dry-run also waits on `tested-tree` (MERGE-QUEUE-1 part B: skipped on a push whose tree a merge group proved)
+      expect(ci.jobs[name].needs, name).toEqual(
+        name === 'worker-dry-run' ? ['changes', 'tested-tree'] : ['changes']
+      );
       expect(ci.jobs[name].if, name).toMatch(/needs\.changes\.outputs\./);
     }
     expect(ci.jobs.changes.if).toBe("github.event_name == 'pull_request'");
@@ -278,7 +290,8 @@ describe('ci.yml lanes', () => {
 
   it('keeps the integration job on ebda_app (never the superuser) and Redis in the main lane', () => {
     expect(raw).toMatch(/DB role check: current_user=ebda_app rolbypassrls=false/);
-    expect(raw).toMatch(/image: redis:7-alpine/);
+    // Ruling CI-MAC-RUNNER-1: the image is an expression ('' on the Mac runner, where containers cannot run).
+    expect(raw).toMatch(/image: .*'redis:7-alpine'/);
     // Ruling NZ-17-RLS-1: the dedicated RLS proof / payload-parity jobs are gone with the production Postgres
     expect(ci.jobs['test-rls-ebda-app']).toBeUndefined();
     expect(ci.jobs['test-rls-payload-parity']).toBeUndefined();
@@ -514,11 +527,11 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
     const raw = readFileSync(path.join(dir, f), 'utf8');
     const blocks = [
       ...raw.matchAll(
-        /image: (pgvector\/\S+|postgres\S*|redis\S*)\n([\s\S]*?)(?=\n\s{4,6}\w[\w-]*:|\n\s{2}\w)/g
+        /image: (?:\$\{\{[^\n]*?'(pgvector\/[^']+|redis[^']*)'[^\n]*\}\}|(pgvector\/\S+|postgres\S*|redis\S*))\n([\s\S]*?)(?=\n\s{4,6}\w[\w-]*:|\n\s{2}\w)/g
       ),
     ];
     for (const b of blocks) {
-      const image = b[1];
+      const image = b[1] ?? b[2];
       const opts =
         /options: >-\n((?:\s+--.*\n?)+)/.exec(raw.slice(b.index!, b.index! + 1200))?.[1] ?? '';
       it(`${f}: ${image} mounts its data dir on tmpfs`, () => {
@@ -538,10 +551,8 @@ describe('service containers leave no anonymous docker volumes (guest disk leak 
 describe('app-build is one-at-a-time and heavy-lane (guest memory)', () => {
   const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   const job = ci.slice(ci.indexOf('\n  app-build:\n'), ci.indexOf('\n  app-builds:\n'));
-  it('runs one production build at a time on a shared Umbra guest, in parallel on hosted runners', () => {
-    expect(job).toMatch(
-      /max-parallel: \$\{\{ \(vars\.EBDA_RUNS_ON == '' && [^}]*\) && 6 \|\| 1 \}\}/
-    );
+  it('runs one production build at a time on the shared Mac pool (no hosted VMs to parallelise onto)', () => {
+    expect(job).toMatch(/max-parallel: 1\n/);
   });
   it('is not a light-lane job id (umbra DefaultLightJobs globs)', () => {
     const light = [
@@ -559,5 +570,137 @@ describe('app-build is one-at-a-time and heavy-lane (guest memory)', () => {
     ];
     const glob = (g: string) => new RegExp('^' + g.replace(/\*/g, '.*') + '$');
     expect(light.some(g => glob(g).test('app-build'))).toBe(false);
+  });
+});
+
+// Ruling CI-MAC-RUNNER-1 (Ahmad 2026-11-11): the org's hosted minutes ran out, so EBDA_RUNS_ON routes CI to the
+// self-hosted Mac runner (label ebda-mac). macOS runners cannot start service containers, so the jobs that need a
+// database read their URLs from scripts/ci/ci-services.sh, and every heavy test job holds the host-wide heavy lock.
+describe('the Mac runner shape (CI-MAC-RUNNER-1)', () => {
+  const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  const parsed = yaml.load(ci) as {
+    jobs: Record<
+      string,
+      { services?: Record<string, { image: string }>; steps: Array<{ run?: string; if?: string }> }
+    >;
+  };
+  const jobsWithServices = Object.entries(parsed.jobs).filter(([, j]) => j.services);
+  it('finds the jobs with service containers', () =>
+    expect(jobsWithServices.map(([n]) => n).sort()).toEqual(['test-e2e', 'test-integration']));
+  it.each(jobsWithServices.map(([n, j]) => [n, j] as const))(
+    '%s: images are skipped on the Mac and URLs come from ci-services.sh',
+    (_n, j) => {
+      for (const svc of Object.values(j.services!))
+        expect(svc.image).toMatch(
+          /^\$\{\{ !contains\(vars\.EBDA_RUNS_ON, 'ebda-mac'\) && '[^']+' \|\| '' \}\}$/
+        );
+      const runs = j.steps.map(s => s.run ?? '');
+      expect(runs).toContain('bash scripts/ci/ci-services.sh up');
+      const down = j.steps.find(s => s.run === 'bash scripts/ci/ci-services.sh down');
+      expect(down?.if).toBe('always()');
+    }
+  );
+  it('no step URL reads a service port directly (empty on the Mac)', () => {
+    const lines = ci.split('\n').filter(l => /job\.services\./.test(l) && !/^\s*#/.test(l));
+    expect(lines.every(l => /^\s+CI_(PG|REDIS)_PORT:/.test(l))).toBe(true);
+  });
+  it.each([
+    'unit',
+    'builder-e2e',
+    'worker-dry-run',
+    'api-workerd-smoke',
+    'workerd-integration',
+    'test-unit-shard',
+    'test-integration',
+    'test-e2e',
+    'mutation',
+  ])('%s holds the heavy lock and always releases it', name => {
+    const steps = parsed.jobs[name].steps;
+    expect(steps.some(s => s.run === 'bash scripts/ci/heavy-lock.sh acquire')).toBe(true);
+    const rel = steps[steps.length - 1];
+    expect(rel.run).toBe('bash scripts/ci/heavy-lock.sh release');
+    // PR-CI-CHEAP-1: released whenever the lock was taken (the scope step skips it for a PR that cannot move the API Worker)
+    expect(rel.if).toBe(
+      name === 'api-workerd-smoke' ? "always() && steps.scope.outputs.run == 'true'" : 'always()'
+    );
+  });
+  it('Chromium installs through scripts/ci/install-chromium.sh (no apt/--with-deps on the Mac)', () => {
+    const code = ci
+      .split('\n')
+      .filter(l => !/^\s*#/.test(l))
+      .join('\n');
+    expect(code).not.toMatch(/playwright install/);
+    expect(
+      code.match(/bash scripts\/ci\/install-chromium\.sh/g)?.length ?? 0
+    ).toBeGreaterThanOrEqual(4);
+  });
+  // Two runners share the Mac: a fixed /tmp path let one PR's AI review read another PR's verdict.
+  const SHARED_HOST_FILES = [
+    ...readdirSync(path.join(ROOT, '.github/workflows'))
+      .filter(f => /\.ya?ml$/.test(f))
+      .map(f => `.github/workflows/${f}`),
+    '.github/ai-review/review.mjs',
+    '.github/scoped-audit/audit.mjs',
+  ];
+  it.each(SHARED_HOST_FILES)('%s writes to no fixed /tmp path and installs nothing globally', f => {
+    const code = readFileSync(path.join(ROOT, f), 'utf8')
+      .split('\n')
+      .filter(l => !/^\s*(#|\/\/|\*)/.test(l))
+      .join('\n');
+    expect(code).not.toMatch(/[\s'"(=>]\/tmp\//);
+    expect(code).not.toMatch(/npm (install|i) (--global|-g)\b/);
+  });
+  it('the AI review writes and reads its verdict through CLAUDE_OUTPUT in RUNNER_TEMP', () => {
+    const wf = readFileSync(path.join(ROOT, '.github/workflows/ai-review.yml'), 'utf8');
+    expect(wf.match(/CLAUDE_OUTPUT: \$\{\{ runner\.temp \}\}\/claude-out\.json/g)?.length).toBe(2);
+    expect(wf).toContain('> "$CLAUDE_OUTPUT"');
+  });
+  it('PR aggregator jobs skip on a cancelled run (else they hold a scarce runner after every superseded push)', () => {
+    for (const name of ['unit-gate', 'app-builds']) {
+      expect((parsed.jobs[name] as unknown as { if: string }).if).toMatch(
+        /^always\(\) && !cancelled\(\) && /
+      );
+    }
+  });
+  it('secret scan: the docker-based trufflehog action is Linux-only; the Mac runs the same release natively, checksum-pinned', () => {
+    const steps = parsed.jobs.security.steps as Array<{ uses?: string; if?: string; run?: string }>;
+    expect(steps.find(st => (st.uses ?? '').startsWith('trufflesecurity/trufflehog@'))?.if).toBe(
+      "runner.os == 'Linux'"
+    );
+    const mac = steps.find(st => /trufflehog_\$\{V\}_darwin_arm64/.test(st.run ?? ''));
+    expect(mac?.if).toBe("runner.os == 'macOS'");
+    expect(mac?.run).toMatch(/shasum -a 256 -c -/);
+    expect(mac?.run).toMatch(/--only-verified/);
+    // a push scans only before..after in a PRIVATE fresh shallow clone (scripts/ci/scan-clone.sh, Ruling CI-TRUFFLE-FRESH-1), and fails
+    // rather than fall back to a silent whole-tree scan; the Mac skips exactly the listed fixture files
+    // (tests/unit/gitleaks-postgres-url-rule.test.ts pins the list). tests/unit/ci-scan-clone.test.ts pins the clone itself.
+    expect(mac?.run).toMatch(/scripts\/ci\/scan-clone\.sh "\$AFTER" "\$SCAN" \d+/);
+    expect(mac?.run).toMatch(
+      /git -C "\$SCAN" merge-base --is-ancestor "\$RANGE_BASE" "\$AFTER" \|\| \{/
+    );
+    expect(mac?.run).toContain('RANGE_BASE="$MG_BASE"'); // a merge-queue run has no `before`: its base is merge_group.base_sha
+    expect(mac?.run).toContain('--exclude-paths .github/trufflehog-mac-exclude-paths.txt');
+  });
+  it('ai-review links the native claude binary (--ignore-scripts leaves only a stub)', () => {
+    const wf = readFileSync(path.join(ROOT, '.github/workflows/ai-review.yml'), 'utf8');
+    expect(wf).toMatch(/--ignore-scripts @anthropic-ai\/claude-code@/);
+    expect(wf).toMatch(/claude-code-\*\/claude/);
+    expect(wf).toContain('"$RUNNER_TEMP/claude-cli/bin/claude" --version');
+  });
+  it('the Mac path never ALTERs the shared ebda_app role (Ruling CI-MAC-ROLE-1)', () => {
+    const steps = parsed.jobs['test-integration'].steps;
+    expect(steps.find(st => /ALTER ROLE ebda_app/.test(st.run ?? ''))?.if).toBe(
+      "runner.os == 'Linux'"
+    );
+    expect(steps.find(st => st.run === 'bash scripts/ci/ci-services.sh app-login')?.if).toBe(
+      "runner.os == 'macOS'"
+    );
+    // executable lines only: the comments explain the rule and the error message prints the one-time host setup
+    const svc = readFileSync(path.join(ROOT, 'scripts/ci/ci-services.sh'), 'utf8')
+      .split('\n')
+      .filter(l => !/^\s*#/.test(l) && !/echo /.test(l))
+      .join('\n');
+    expect(svc).not.toMatch(/ALTER ROLE/);
+    expect(svc).not.toMatch(/flushall/i);
   });
 });

@@ -40,6 +40,8 @@ import {
 import { useT } from '@/i18n/useT';
 import { ColorField } from '../../../../../components/ColorField';
 import { Toggle } from '../../../../../components/Toggle';
+import { Disclosure } from '../../../../../components/ui/Disclosure';
+import { fieldControlClasses } from '../../../../../components/ui/Field';
 import { apiGet } from '../../../../../lib/api';
 import { ChromeContentPanel } from './ChromeContentPanel';
 import { DividersField } from './DividersField';
@@ -208,7 +210,7 @@ export function SettingsPanel({
           role="tablist"
           aria-label={t('modeLabel')}
           onKeyDown={e => rovingKeyDown(e, 'tab')}
-          className="mt-2 inline-flex rounded-lg bg-muted p-0.5 text-xs"
+          className="mt-2 inline-flex rounded-md bg-muted p-1"
         >
           {(['content', 'design'] as const).map(m => (
             <button
@@ -220,7 +222,7 @@ export function SettingsPanel({
               aria-controls="settings-mode-panel"
               tabIndex={mode === m ? 0 : -1}
               onClick={() => setMode(m)}
-              className={`rounded-md px-3 py-1 ${mode === m ? 'bg-background font-semibold shadow-sm' : 'text-muted-foreground'}`}
+              className={`h-8 rounded-md px-3 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none ${mode === m ? 'bg-card text-primary-ink shadow-sm' : 'text-muted-ink hover:text-foreground'}`}
             >
               {m === 'content' ? t('content') : t('design')}
             </button>
@@ -309,16 +311,12 @@ export function SettingsPanel({
         )}
         {mainDefs.map(renderDef)}
         {advancedDefs.length > 0 && (
-          <details
-            data-testid="advanced-design"
-            open={advancedDefs.some(x => x.id === (focusField ? fieldDefId(focusField) : ''))}
-            className="rounded-lg border border-border p-2"
+          <AdvancedDesign
+            title={t('advanced')}
+            forceOpen={advancedDefs.some(x => x.id === (focusField ? fieldDefId(focusField) : ''))}
           >
-            <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">
-              {t('advanced')}
-            </summary>
-            <div className="mt-3 space-y-4">{advancedDefs.map(renderDef)}</div>
-          </details>
+            {advancedDefs.map(renderDef)}
+          </AdvancedDesign>
         )}
       </div>
     </div>
@@ -466,7 +464,7 @@ export function Field({
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
                     onChange(key, empty(e.target.value))
                   }
-                  className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+                  className={fieldControlClasses()}
                   data-testid={`field-${key}`}
                 />
               </label>
@@ -488,7 +486,7 @@ export function Field({
             aria-invalid={bad}
             onChange={e => onChange(def.id, empty(e.target.value))}
             placeholder={PATH_EXAMPLE}
-            className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+            className={fieldControlClasses()}
           />
           {bad && <span className="mt-1 block text-xs text-destructive-ink">{t('unsafeUrl')}</span>}
         </label>
@@ -561,7 +559,7 @@ export function Field({
               const opt = def.options?.find(o => String(o.value) === e.target.value);
               onChange(def.id, opt ? opt.value : undefined);
             }}
-            className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+            className={fieldControlClasses()}
           >
             <option value="">{t('default')}</option>
             {def.options?.map(o => (
@@ -601,7 +599,7 @@ export function Field({
                     )
               )
             }
-            className="w-28 rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+            className={fieldControlClasses('w-28')}
           />
         </label>
       );
@@ -768,7 +766,7 @@ function CategoryPicker({
       aria-label={label}
       value={value}
       onChange={e => onChange(e.target.value || undefined)}
-      className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+      className={fieldControlClasses()}
     >
       <option value="">{t('pickCategory')}</option>
       {cats.map(c => (
@@ -843,7 +841,7 @@ function ProductListPicker({
         value={query}
         onChange={e => setQuery(e.target.value)}
         placeholder={t('searchProducts')}
-        className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
+        className={fieldControlClasses()}
       />
       <ul className="max-h-40 space-y-0.5 overflow-y-auto">
         {found
@@ -864,5 +862,26 @@ function ProductListPicker({
           ))}
       </ul>
     </div>
+  );
+}
+
+/** The design pane's Advanced group: closed by default, opened for the merchant when a deep link targets it. */
+function AdvancedDesign({
+  title,
+  forceOpen,
+  children,
+}: {
+  title: string;
+  forceOpen: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(forceOpen);
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
+  return (
+    <Disclosure testId="advanced-design" title={title} open={open} onOpenChange={setOpen}>
+      <div className="space-y-4">{children}</div>
+    </Disclosure>
   );
 }
