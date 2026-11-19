@@ -1666,8 +1666,8 @@ export interface WebhookResult {
  * resolves it (`resolveHeldBillingWebhook`). The provider still gets 200: the fact is recorded, a retry adds nothing.
  */
 export const WEBHOOK_HELD = 'held';
-export const WEBHOOK_HELD_RESOLVED = 'held_resolved';
-export interface HeldBillingWebhook {
+const WEBHOOK_HELD_RESOLVED = 'held_resolved';
+interface HeldBillingWebhook {
   reason:
     | 'unknown_order'
     | 'amount_mismatch'
