@@ -2,7 +2,7 @@
 
 /**
  * /stores/[id]/campaigns/[campaignId] — one page, two modes (D2 plan,
- * docs/plans/2026-09-25-email-campaigns.md):
+ * docs/plans/done/2026-09-25-email-campaigns.md):
  *
  *   - `status === 'draft'` → EDITOR: bilingual subject/body, locale
  *     strategy, sanitized preview, audience count, AI draft, send test to

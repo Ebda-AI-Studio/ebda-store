@@ -1,0 +1,37 @@
+{
+  "id": "chat.connect-number",
+  "status": "live",
+  "area": "chat",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ربط رقم واتساب وتوثيق Meta",
+  "titleEn": "Ebda Chat: connect own WhatsApp number / use shared number / verify business on Meta",
+  "screens": ["(Ebda Chat)"],
+  "api": ["(Ebda Chat API)"],
+  "mcpTool": null,
+  "planGate": "whatsapp",
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "disconnect"
+  },
+  "helpArticle": "whatsapp/connect-your-own-number",
+  "questions": {
+    "ar": ["ازاي اربط رقمي بالواتساب؟", "الرقم الموحد ايه؟", "ازاي اوثق البزنس على ميتا؟"],
+    "en": ["How do I connect my WhatsApp number?", "How do I verify my business on Meta?"]
+  },
+  "steps": [
+    "Chat web > numbers: Embedded Signup. See also use-the-shared-number, verify-your-business-on-meta."
+  ],
+  "edgeCases": [
+    "Meta verification delays",
+    "Number already on WhatsApp app must be migrated",
+    "Shared number cannot run marketing campaigns",
+    "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["Different product repo; in scope only for linking questions"]
+}

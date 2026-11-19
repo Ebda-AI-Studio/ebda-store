@@ -729,7 +729,7 @@ async function lenientResolve(
  * raises `StoreTemporarilyUnavailableError` from the fetch layer and is
  * deliberately NOT caught here: it propagates to `app/error.tsx`, which shows
  * retry copy instead of telling the shopper the shop does not exist. See
- * `docs/plans/2026-09-16-store-resolve-transient-not-404.md`.
+ * `docs/plans/done/2026-09-16-store-resolve-transient-not-404.md`.
  */
 export async function getStoreOrNotFound(): Promise<ResolvedStore> {
   const domain = await getStoreDomain();
@@ -750,7 +750,7 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
  * Params-based sibling of {@link getStoreOrNotFound} for the tenant-cacheable
  * Track-A route tree (`app/tenant-store/[tenant]/[locale]/`, dark-launched behind
  * `STOREFRONT_TENANT_ROUTING` — see
- * `docs/plans/2026-07-12-tenant-cacheable-routing.md` §3.6/§9 Phase 1).
+ * `docs/plans/done/2026-07-12-tenant-cacheable-routing.md` §3.6/§9 Phase 1).
  *
  * Track-A pages must resolve the store from the matched `[tenant]` ROUTE
  * PARAM (baked into the pathname by `middleware.ts`) instead of
@@ -810,7 +810,7 @@ export async function getStoreByTenantParam(rawTenant: string): Promise<Resolved
  *
  * NOTE — this one deliberately keeps the old "null on any failure" contract,
  * unlike its `domain`/`slug` siblings above (Ruling SR-1 in
- * `docs/plans/2026-09-16-store-resolve-transient-not-404.md`): it has no
+ * `docs/plans/done/2026-09-16-store-resolve-transient-not-404.md`): it has no
  * production callers today and sits on no shopper's 404 path. If you wire it
  * to a customer-facing surface, give it the same 404-vs-transient split first,
  * or that surface inherits the bug this plan fixed.

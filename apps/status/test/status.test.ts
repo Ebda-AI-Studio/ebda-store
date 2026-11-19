@@ -3,7 +3,7 @@ import { runInDurableObject } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import worker, { alertOnOutcome, runProbes, thresholdsFrom } from '../src/index';
 import { SITE_NAV_JS } from '../../../packages/shared/src/brand/index';
-import { COMPONENTS } from '../src/config';
+import { COMPONENTS, DEFAULT_TIMEOUT_MS, SLOW_THRESHOLD_MS } from '../src/config';
 import { probe, probeErrorAr, type Fetcher } from '../src/probe';
 import type { ProbeResult, Snapshot } from '../src/types';
 
@@ -94,6 +94,81 @@ describe('probe', () => {
   });
 });
 
+describe('slow is degraded, not down (quiet-hour cold renders, 8 s < t <= 15 s)', () => {
+  const api = COMPONENTS.find(c => c.id === 'api')!;
+  const after =
+    (ms: number): Fetcher =>
+    () =>
+      new Promise<Response>(r => setTimeout(() => r(new Response(body)), ms));
+  const slowFor =
+    (id: string): Fetcher =>
+    url =>
+      url.includes(id) ? after(60)(url) : healthy(url);
+
+  it('the hard deadline is 15 s and the slow line 8 s', () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(15000);
+    expect(SLOW_THRESHOLD_MS).toBe(8000);
+  });
+
+  it('a 200 with the right body slower than the slow line is ok + slow, a fast one is not slow', async () => {
+    const slow = await probe(api, after(60), 1000, 30);
+    expect(slow).toMatchObject({ ok: true, slow: true, error: null });
+    expect(slow.latencyMs).toBeGreaterThanOrEqual(30);
+    expect((await probe(api, healthy, 1000, 30)).slow).toBe(false);
+  });
+
+  it('only a response past the hard deadline is a timeout failure', async () => {
+    const r = await probe(api, after(200), 40, 20);
+    expect(r).toMatchObject({ ok: false, status: null });
+    expect(r.error).toMatch(/timeout after 40ms/);
+  });
+
+  it('one slow probe shows DEGRADED with its duration, opens no incident and pages nobody', async () => {
+    const now = Date.now();
+    const outcome = await runProbes(env, { fetcher: slowFor('api.ebda.app'), now, slowMs: 30 });
+    expect(outcome).toEqual({ opened: [], resolved: [] });
+    const snap = await snapshot();
+    const apiC = snap.components.find(c => c.id === 'api')!;
+    expect(apiC).toMatchObject({ status: 'degraded', slow: true });
+    expect(apiC.latencyMs).toBeGreaterThanOrEqual(30);
+    expect(snap.active).toHaveLength(0);
+    expect(snap.overall).toBe('degraded');
+  });
+
+  it('a fast probe after a slow one returns to operational', async () => {
+    const now = Date.now();
+    await runProbes(env, { fetcher: slowFor('api.ebda.app'), now, slowMs: 30 });
+    await runProbes(env, { fetcher: healthy, now: now + 5 * MIN, slowMs: 30 });
+    const apiC = (await snapshot()).components.find(c => c.id === 'api')!;
+    expect(apiC).toMatchObject({ status: 'operational', slow: false });
+  });
+
+  it('two slow probes in a row open ONE incident (DOWN); slow, fast, slow does not', async () => {
+    const now = Date.now();
+    const slowApi = slowFor('api.ebda.app');
+    await runProbes(env, { fetcher: slowApi, now, slowMs: 30 });
+    await runProbes(env, { fetcher: healthy, now: now + 5 * MIN, slowMs: 30 });
+    const broken = await runProbes(env, { fetcher: slowApi, now: now + 10 * MIN, slowMs: 30 });
+    expect(broken.opened).toHaveLength(0); // the fast probe reset the streak
+    const second = await runProbes(env, { fetcher: slowApi, now: now + 15 * MIN, slowMs: 30 });
+    expect(second.opened).toHaveLength(1);
+    const snap = await snapshot();
+    expect(snap.components.find(c => c.id === 'api')!.status).toBe('outage');
+    expect(snap.active[0].updates[0].body).toContain('slow 2 probes in a row');
+  });
+
+  it('the status page shows the response time and the slow marker in both languages', async () => {
+    await runProbes(env, { fetcher: slowFor('api.ebda.app'), now: Date.now(), slowMs: 30 });
+    const en = await (await get('/en')).text();
+    const ar = await (await get('/')).text();
+    expect(has(en, 'Response time:')).toBe(true);
+    expect(has(en, '(slow: over 8 s)')).toBe(true);
+    expect(has(en, 'Degraded')).toBe(true);
+    expect(has(ar, 'زمن الاستجابة:')).toBe(true);
+    expect(has(ar, 'بطيء: أكتر من 8 ثواني')).toBe(true);
+  });
+});
+
 describe('incident lifecycle (fail threshold 3, recover threshold 2)', () => {
   it('opens exactly one incident on the 3rd consecutive failure, not the 2nd', async () => {
     const now = Date.now();
@@ -155,25 +230,24 @@ describe('incident lifecycle (fail threshold 3, recover threshold 2)', () => {
 });
 
 describe('end to end: forced probe failure -> incident on the public page', () => {
-  it('opens an incident after 3 failed cron rounds and shows it in HTML (en + ar) and JSON; recovery resolves it', async () => {
-    expect(thresholdsFrom(env)).toEqual({ fail: 3, recover: 2 });
+  it('opens an incident after 2 failed 5-min cron rounds and shows it in HTML (en + ar) and JSON; recovery resolves it', async () => {
+    expect(thresholdsFrom(env)).toEqual({ fail: 2, recover: 1 });
     const now = Date.now();
 
-    // Two failed rounds: still no incident, page shows everything fine.
+    // One failed round: still no incident, page shows everything fine.
     await runProbes(env, { fetcher: apiDown, now });
-    await runProbes(env, { fetcher: apiDown, now: now + MIN });
     let html = await (await get('/en')).text();
     expect(has(html, 'All systems operational')).toBe(true);
     expect(has(html, 'API is not responding')).toBe(false);
 
-    // Third failed round: incident opens.
-    const out = await runProbes(env, { fetcher: apiDown, now: now + 2 * MIN });
+    // Second failed round (5 min later): incident opens.
+    const out = await runProbes(env, { fetcher: apiDown, now: now + 5 * MIN });
     expect(out.opened).toHaveLength(1);
 
     html = await (await get('/en')).text();
     expect(has(html, 'Some services are down')).toBe(true);
     expect(has(html, 'API is not responding')).toBe(true);
-    expect(has(html, '3 consecutive probes failed')).toBe(true);
+    expect(has(html, '2 consecutive probes failed')).toBe(true);
     const ar = await (await get('/')).text();
     expect(has(ar, 'فيه خدمات واقفة دلوقتي')).toBe(true);
     expect(has(ar, 'مفيش رد من واجهة البرمجة')).toBe(true);
@@ -188,9 +262,8 @@ describe('end to end: forced probe failure -> incident on the public page', () =
     expect(snap.active).toHaveLength(1);
     expect(snap.components.find(c => c.id === 'marketing')!.status).toBe('operational');
 
-    // Recovery: two healthy rounds resolve it.
-    await runProbes(env, { fetcher: healthy, now: now + 3 * MIN });
-    await runProbes(env, { fetcher: healthy, now: now + 4 * MIN });
+    // Recovery: one healthy round resolves it.
+    await runProbes(env, { fetcher: healthy, now: now + 10 * MIN });
     html = await (await get('/en')).text();
     expect(has(html, 'All systems operational')).toBe(true);
     expect(has(html, 'Resolved')).toBe(true);
@@ -284,6 +357,17 @@ describe('trust details (audit UI-2, UI-9)', () => {
       COMPONENTS.some(c => c.id === 'storefront-product' && c.url.includes('/products/'))
     ).toBe(true);
   });
+});
+
+describe('storefront probes measure the page, not a redirect hop', () => {
+  // Unprefixed storefront URLs 308 to /ar|/en (a second Worker round trip, 41 % of probe latency, measured 2026-11-15).
+  for (const id of ['storefront', 'storefront-product']) {
+    it(`${id} probes the locale-prefixed URL directly`, () => {
+      const c = COMPONENTS.find(x => x.id === id);
+      expect(c).toBeDefined();
+      expect(new URL(c!.url).pathname).toMatch(/^\/(ar|en)(\/|$)/);
+    });
+  }
 });
 
 describe('manual incidents (authenticated POST)', () => {
@@ -437,8 +521,8 @@ describe('thresholdsFrom', () => {
       recover: 1,
     });
     expect(thresholdsFrom({ ...env, FAIL_THRESHOLD: '0', RECOVER_THRESHOLD: 'x' })).toEqual({
-      fail: 3,
-      recover: 2,
+      fail: 2,
+      recover: 1,
     });
   });
 });
@@ -490,7 +574,7 @@ describe('human alerting (OPS-5)', () => {
     sent.length = 0;
     const t0 = Date.now();
     let outcome = { opened: [] as number[], resolved: [] as number[] };
-    for (let i = 0; i < 3; i++)
+    for (let i = 0; i < 2; i++)
       outcome = await runProbes(env, { fetcher: apiDown, now: t0 + i * MIN });
     expect(outcome.opened.length).toBe(1);
     expect(await alertOnOutcome(withSecrets, outcome, send)).toBe(true);
@@ -503,9 +587,9 @@ describe('human alerting (OPS-5)', () => {
   it('says RECOVERED when it resolves', async () => {
     sent.length = 0;
     const t0 = Date.now();
-    for (let i = 0; i < 3; i++) await runProbes(env, { fetcher: apiDown, now: t0 + i * MIN });
+    for (let i = 0; i < 2; i++) await runProbes(env, { fetcher: apiDown, now: t0 + i * MIN });
     let outcome = { opened: [] as number[], resolved: [] as number[] };
-    for (let i = 3; i < 5; i++)
+    for (let i = 2; i < 3; i++)
       outcome = await runProbes(env, { fetcher: healthy, now: t0 + i * MIN });
     expect(outcome.resolved.length).toBe(1);
     await alertOnOutcome(withSecrets, outcome, send);

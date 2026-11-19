@@ -1,6 +1,6 @@
 /**
  * CI-2 cells: the pure fold from `commerce_outcomes` envelopes to additive counters
- * (docs/plans/2026-10-28-customer-intelligence.md 3.1, Ruling CI-9). Nothing here reads I/O, a person
+ * (docs/plans/done/2026-10-28-customer-intelligence.md 3.1, Ruling CI-9). Nothing here reads I/O, a person
  * or a buyer: an envelope's `buyerKey` and `orderId` are never looked at, so a cell cannot carry them.
  *
  * A cell is `{ n, hit, sum, first, last }`: `n` outcomes, `hit` of them the thing the metric counts

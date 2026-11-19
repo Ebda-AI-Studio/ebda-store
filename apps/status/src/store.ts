@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
-import { COMPONENTS, HISTORY_DAYS } from './config';
-import { probeErrorAr } from './probe';
+import { COMPONENTS, HISTORY_DAYS, SLOW_STREAK_FAILS } from './config';
+import { HEADLINE_DAYS, uptimeOver } from './uptime';
+import { probeErrorAr, probesAr, probesEn } from './probe';
 import type {
   ComponentSnapshot,
   ComponentStatus,
@@ -28,6 +29,8 @@ interface StateRow extends Record<string, SqlStorageValue> {
   last_checked: number | null;
   last_latency: number | null;
   last_error: string | null;
+  last_slow: number;
+  consec_slow: number;
 }
 
 /**
@@ -61,6 +64,14 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
           id INTEGER PRIMARY KEY AUTOINCREMENT, incident_id INTEGER NOT NULL, at INTEGER NOT NULL,
           status TEXT NOT NULL, body TEXT NOT NULL, body_ar TEXT);
       `);
+      // slow-state columns (added after launch): idempotent for an existing database
+      for (const col of ['last_slow', 'consec_slow']) {
+        try {
+          this.sql.exec(`ALTER TABLE component_state ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`);
+        } catch {
+          /* column already exists */
+        }
+      }
     });
   }
 
@@ -68,7 +79,17 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
   record(results: ProbeResult[], now: number, t: Thresholds): RecordOutcome {
     const outcome: RecordOutcome = { opened: [], resolved: [] };
     const day = utcDay(now);
-    for (const r of results) {
+    for (const raw of results) {
+      let r = raw;
+      this.sql.exec(`INSERT OR IGNORE INTO component_state (id) VALUES (?)`, r.id);
+      const prev = this.sql
+        .exec<StateRow>(`SELECT * FROM component_state WHERE id = ?`, r.id)
+        .one();
+      // Slow (8 s < t <= 15 s) is degraded, not down; only a streak of slow probes counts as a failure.
+      const slowStreak = r.ok && r.slow ? prev.consec_slow + 1 : 0;
+      if (r.ok && slowStreak >= SLOW_STREAK_FAILS) {
+        r = { ...r, ok: false, error: `slow ${slowStreak} probes in a row (${r.latencyMs}ms)` };
+      }
       this.sql.exec(
         `INSERT INTO daily (day, component, checks, ok) VALUES (?, ?, 1, ?)
          ON CONFLICT(day, component) DO UPDATE SET checks = checks + 1, ok = ok + excluded.ok`,
@@ -76,8 +97,7 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
         r.id,
         r.ok ? 1 : 0
       );
-      this.sql.exec(`INSERT OR IGNORE INTO component_state (id) VALUES (?)`, r.id);
-      const s = this.sql.exec<StateRow>(`SELECT * FROM component_state WHERE id = ?`, r.id).one();
+      const s = prev;
 
       let { status, consec_fail: fail, consec_ok: ok } = s;
       if (r.ok) {
@@ -86,6 +106,8 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
       } else {
         fail += 1;
         ok = 0;
+        // two slow probes in a row ARE the down verdict (no further failing round needed)
+        if (slowStreak >= SLOW_STREAK_FAILS) fail = Math.max(fail, t.fail);
       }
 
       if (status === 'up' && fail >= t.fail) {
@@ -107,8 +129,8 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
             impact: 'outage',
             source: 'auto',
             status: 'investigating',
-            body: `${fail} consecutive probes failed (${r.error ?? 'unknown error'}).`,
-            bodyAr: `${fail} فحوصات ورا بعض فشلوا (${probeErrorAr(r.error)}).`,
+            body: `${probesEn(fail)} failed (${r.error ?? 'unknown error'}).`,
+            bodyAr: `${probesAr(fail)} فشلوا (${probeErrorAr(r.error)}).`,
             now,
           });
           outcome.opened.push(id);
@@ -127,8 +149,8 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
           this.addUpdate(
             inc.id,
             'resolved',
-            `Recovered: ${ok} consecutive probes succeeded.`,
-            `رجع اشتغل: ${ok} فحوصات ورا بعض نجحوا.`,
+            `Recovered: ${probesEn(ok)} succeeded.`,
+            `رجع اشتغل: ${probesAr(ok)} نجحوا.`,
             now
           );
           outcome.resolved.push(inc.id);
@@ -137,13 +159,15 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
 
       this.sql.exec(
         `UPDATE component_state SET status = ?, consec_fail = ?, consec_ok = ?, last_checked = ?,
-           last_latency = ?, last_error = ? WHERE id = ?`,
+           last_latency = ?, last_error = ?, last_slow = ?, consec_slow = ? WHERE id = ?`,
         status,
         fail,
         ok,
         now,
         r.latencyMs,
         r.error,
+        r.ok && r.slow ? 1 : 0,
+        slowStreak,
         r.id
       );
     }
@@ -213,6 +237,7 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
       const s = states.get(c.id);
       let status: ComponentStatus = s?.last_checked == null ? 'unknown' : 'operational';
       if (s?.status === 'down') status = 'outage';
+      else if (s?.last_slow) status = 'degraded';
       for (const i of active) {
         if (i.component !== c.id || i.source === 'auto') continue;
         status = worst(status, i.impact === 'outage' ? 'outage' : 'degraded');
@@ -222,8 +247,11 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
         status,
         lastChecked: s?.last_checked ?? null,
         latencyMs: s?.last_latency ?? null,
+        slow: !!s?.last_slow && s?.status !== 'down',
         lastError: s?.status === 'down' ? (s.last_error ?? null) : null,
         uptime: checks ? Math.round((okSum / checks) * 10000) / 100 : null,
+        // STATUS-WINDOW-1: the headline figure, the last 30 days of the same buckets (`uptime` stays the 90-day figure)
+        uptime30d: uptimeOver(days, HEADLINE_DAYS),
         days,
       };
     });
