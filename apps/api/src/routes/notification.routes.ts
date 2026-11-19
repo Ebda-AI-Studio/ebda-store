@@ -75,11 +75,14 @@ const upsertConfigSchema = z.object({
 // key the admin UI uses internally) so the contract is forgiving — drift
 // between admin and API field names is what produced the 400s the
 // merchant saw on every save before this fix.
-const eventConfigShape = z
+// STORE-QA-62: every channel flag is OPTIONAL. The admin page edits SMS and push only (WhatsApp is the separate Ebda WhatsApp
+// product) and never sends `whatsapp`, so a required `whatsapp: boolean` 400'd EVERY save. A flag that is not sent keeps its stored
+// value (merged in the route below), never silently flipped.
+export const eventConfigShape = z
   .object({
     event: z.string().min(1),
-    whatsapp: z.boolean(),
-    sms: z.boolean(),
+    whatsapp: z.boolean().optional(),
+    sms: z.boolean().optional(),
     push: z.boolean().optional(),
     push_notifications: z.boolean().optional(),
   })
@@ -87,10 +90,22 @@ const eventConfigShape = z
     event: v.event,
     whatsapp: v.whatsapp,
     sms: v.sms,
-    // `push` wins when both are sent; defaults to false so a missing
-    // field doesn't accidentally enable a channel.
-    push: typeof v.push === 'boolean' ? v.push : (v.push_notifications ?? false),
+    // `push` wins when both are sent.
+    push: typeof v.push === 'boolean' ? v.push : v.push_notifications,
   }));
+
+/** Fill the flags the client did not send from what is stored (false for a never-configured event). */
+export function mergeEventFlags(
+  stored: Record<string, { whatsapp: boolean; sms: boolean; push: boolean }>,
+  e: { event: string; whatsapp?: boolean; sms?: boolean; push?: boolean }
+) {
+  const cur = stored[e.event];
+  return {
+    whatsapp: e.whatsapp ?? cur?.whatsapp ?? false,
+    sms: e.sms ?? cur?.sms ?? false,
+    push: e.push ?? cur?.push ?? false,
+  };
+}
 
 // Single-event payload (legacy). Bulk payload `{ events: [...] }` is
 // preferred — see the route below — and is what the admin actually sends.
@@ -307,24 +322,26 @@ router.put(
         const { events } = bulkEventConfigSchema.parse(req.body);
         const results: Array<{ event: string; whatsapp: boolean; sms: boolean; push: boolean }> =
           [];
+        const stored = await notificationConfigService.getEventConfigs(storeId);
         for (const e of events) {
-          const updated = await notificationConfigService.upsertEventConfig(storeId, e.event, {
-            whatsapp: e.whatsapp,
-            sms: e.sms,
-            push: e.push,
-          });
+          const updated = await notificationConfigService.upsertEventConfig(
+            storeId,
+            e.event,
+            mergeEventFlags(stored, e)
+          );
           results.push({ event: e.event, ...updated });
         }
         res.json({ success: true, data: { events: results } });
         return;
       }
 
-      const { event, whatsapp, sms, push } = upsertEventConfigSchema.parse(req.body);
-      const updated = await notificationConfigService.upsertEventConfig(storeId, event, {
-        whatsapp,
-        sms,
-        push,
-      });
+      const parsed = upsertEventConfigSchema.parse(req.body);
+      const { event } = parsed;
+      const updated = await notificationConfigService.upsertEventConfig(
+        storeId,
+        event,
+        mergeEventFlags(await notificationConfigService.getEventConfigs(storeId), parsed)
+      );
       res.json({ success: true, data: { event, ...updated } });
     } catch (error) {
       next(error);
