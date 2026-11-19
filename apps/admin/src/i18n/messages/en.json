@@ -9787,7 +9787,15 @@
       "privacy": "Privacy",
       "support": "Need help?",
       "footer": "Your store. Your brand.",
-      "back": "Back to Ebda Store"
+      "back": "Back to Ebda Store",
+      "signedInAs": "Signed in as",
+      "signOut": "Sign out"
+    },
+    "platformAdmin": {
+      "title": "You're a platform admin",
+      "body": "You're a platform admin. Sign in again with two-step verification to open the admin console.",
+      "signInAgain": "Sign in again",
+      "signOut": "Sign out"
     },
     "acceptInvite": {
       "title": "Staff invitation",

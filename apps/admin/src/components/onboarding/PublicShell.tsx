@@ -8,6 +8,37 @@ import { useT } from '@/i18n/useT';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { DocumentTitle } from '../DocumentTitle';
 import { usePinnedLightTheme } from '@/lib/use-pinned-light-theme';
+import { useAuth } from '@/lib/auth';
+import { maskEmail } from '@/lib/mask-email';
+
+/**
+ * A signed-in person on a setup/gate page (onboarding with no store yet, a refused invite, verify-email) must never be stuck on the wrong
+ * account: this shows who is signed in (masked) and a real Sign out button, which ends the session and lands on the sign-in page.
+ */
+export function SignedInStrip() {
+  const t = useT('onboarding.shell');
+  const { user, isAuthenticated, logout } = useAuth();
+  if (!isAuthenticated) return null;
+  return (
+    <div
+      data-testid="signed-in-strip"
+      className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground"
+    >
+      {user?.email && (
+        <span>
+          {t('signedInAs')} <bdi dir="ltr">{maskEmail(user.email)}</bdi>
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => void logout()}
+        className="min-h-11 rounded-lg border border-border px-3 font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        {t('signOut')}
+      </button>
+    </div>
+  );
+}
 
 /** Shared signed-out and setup surface; logical spacing mirrors under RTL. */
 export function PublicShell({
@@ -54,7 +85,10 @@ export function PublicShell({
             <span aria-hidden="true" className="h-4 w-px bg-border" />
             <span className="text-sm font-semibold">{tb('brandAlt')}</span>
           </a>
-          <AdminLanguageSwitcher />
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <SignedInStrip />
+            <AdminLanguageSwitcher />
+          </div>
         </header>
         <div className="grid flex-1 items-center gap-8 py-8 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
           <aside className="mx-auto w-full max-w-xl lg:mx-0">
