@@ -7,7 +7,7 @@
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { decideLocalePath, isLocaleServedRoute } from '../../apps/web/src/lib/locale-paths';
+import { decideLocalePath } from '../../apps/web/src/lib/locale-paths';
 
 const APP = path.join(__dirname, '../../apps/web/src/app');
 /** Folders under app/ that are not storefront pages: file routes, APIs, internals. */
@@ -55,7 +55,7 @@ describe('a locale-prefixed storefront route is never redirected to an unprefixe
             method: 'GET',
           });
           expect(d.kind, `${locale}${rest}`).not.toBe('redirect');
-          expect(isLocaleServedRoute(rest), rest).toBe(true);
+          expect(d.kind, `${locale}${rest} is served under the prefix`).toBe('rewrite');
         }
       });
     }

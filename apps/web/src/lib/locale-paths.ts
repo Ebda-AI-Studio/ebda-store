@@ -43,7 +43,7 @@ const ROOTS = new Set(LOCALE_PATH_ROOTS);
  * on the request; the unprefixed `/cart` is NOT redirected (no `pending`: it is noindex and has no canonical to protect).
  * RULE: every storefront route honours the locale prefix and never strips it (ebda-foundation standard/storefront-locale-routes.md).
  */
-export const LOCALE_SERVED_ROOTS: readonly string[] = [
+const LOCALE_SERVED_ROOTS: readonly string[] = [
   'cart',
   'checkout',
   'account',
@@ -57,6 +57,7 @@ export const LOCALE_SERVED_ROOTS: readonly string[] = [
   'size-guide',
   'affiliate',
   'q',
+  'o', // /o/<token>: the WhatsApp cash-on-delivery confirmation page (#811)
 ];
 const SERVED_ROOTS = new Set(LOCALE_SERVED_ROOTS);
 
@@ -121,7 +122,7 @@ export function isLocalePathRoute(rest: string): boolean {
 }
 
 /** Whether `rest` is a route served under a language prefix, indexable or not. */
-export function isLocaleServedRoute(rest: string): boolean {
+function isLocaleServedRoute(rest: string): boolean {
   if (isLocalePathRoute(rest)) return true;
   return SERVED_ROOTS.has(rest.replace(/^\//, '').split('/')[0]);
 }
