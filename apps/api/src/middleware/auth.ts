@@ -281,6 +281,7 @@ export async function authenticateAccounts(
  * every request that carries one: the impersonator's identity session must not be revoked, and the account must still be an
  * active `super_admin`. Throws AppError (401 revoked/demoted, 503 when the identity service cannot answer: fail closed).
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/session-role-lifecycle.test.ts
 export async function assertImpersonatorLive(p: {
   impersonatedBy?: string;
   impSid?: string;
@@ -331,7 +332,7 @@ export async function authenticate(
       req.user = user;
       (req as any).tokenJti = claims.jti;
       (req as any).accountsSid = claims.sid;
-      (req as any).accountsAuthTime = claims.authTime;
+      (req as Request & { accountsAuthTime?: number }).accountsAuthTime = claims.authTime;
       (req as any).accountsStores = claims.stores;
       return next();
     } catch (err) {

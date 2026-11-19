@@ -58,7 +58,7 @@ async function addStaffMemberD1(storeId: string, userId: string): Promise<{ id: 
  * one that can. A 409 ROLE_CONFLICT told any store owner which e-mails belong to platform administrators. The invite route
  * throws this instead and answers the SAME 202 as a real invitation, sending nothing and writing nothing but an audit row.
  */
-export class SilentInviteRefusal extends Error {
+class SilentInviteRefusal extends Error {
   constructor(public reason: string) {
     super(reason);
   }

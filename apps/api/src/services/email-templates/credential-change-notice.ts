@@ -1,6 +1,6 @@
 import { escapeHtml } from './_util';
 
-export type CredentialChange = 'mfa_disabled' | 'passkey_removed' | 'phone_changed';
+type CredentialChange = 'mfa_disabled' | 'passkey_removed' | 'phone_changed';
 
 export interface CredentialChangeNoticeData {
   email: string;
