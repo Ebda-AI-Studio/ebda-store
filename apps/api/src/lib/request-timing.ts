@@ -63,6 +63,12 @@ export function serverTiming(req: Request, res: Response, next: NextFunction): v
     );
     const stall = String(req.headers['x-dev-authstate-stall'] ?? '').slice(0, 64);
     if (delayMs || stall) io.authStateFault = { delayMs, stall };
+    // PERF-BATCH-1 measurements: a production-like StoreDO round trip (lib/io-tally.ts `wrapCalls`)
+    const storeDoDelay = Math.min(
+      5_000,
+      Math.max(0, Number(req.headers['x-dev-storedo-delay-ms']) || 0)
+    );
+    if (storeDoDelay) io.storeDoDelayMs = storeDoDelay;
   }
   const t: Timings = {
     start: performance.now(),
