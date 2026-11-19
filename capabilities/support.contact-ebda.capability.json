@@ -1,0 +1,31 @@
+{
+  "id": "support.contact-ebda",
+  "status": "live",
+  "area": "support",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ابعت طلب لفريق ابدأ ستور من جوه المنتج",
+  "titleEn": "Send a request to the Ebda Store team from inside the product",
+  "screens": ["every admin page (Contact Ebda Store button, sidebar)"],
+  "api": ["POST /stores/:storeId/support-requests"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible"
+  },
+  "helpArticle": "contact-ebda-store",
+  "questions": {
+    "ar": ["ازاي اكلم الدعم؟", "عايز اتواصل مع ابدأ ستور", "ازاي أكلم فريق ابدأ ستور؟"],
+    "en": ["How do I contact support?"]
+  },
+  "steps": ["Press Contact Ebda Store in the sidebar, pick a topic, write the message, send"],
+  "edgeCases": [
+    "5 requests per store per day, the sixth answers 429",
+    "Another store's id answers 404",
+    "The row is stored even if the email cannot be sent",
+    "Messages go to Ebda staff only, never to customers"
+  ],
+  "gaps": []
+}

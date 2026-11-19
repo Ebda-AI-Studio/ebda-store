@@ -1,14 +1,9 @@
 /**
- * Ebda's CI runs on GitHub-hosted runners only (SP4 task 9, Ahmad's decision):
- * "it needs no Umbra". Umbra is Ebda's self-hosted runner fleet; nothing in
- * Ebda may depend on it, because Ebda's workflows must keep working when no
- * such runner exists (GitHub QUEUES a job whose labels match no online runner
- * for up to ~24h instead of failing it, so a leftover label silently hangs
- * the workflow).
- *
- * This replaces the Ebda-era runner-selector test, which pinned the
- * `vars.USE_SELF_HOSTED` / `vars.SCHEDULED_ON_CLOUD` switch forms. Those
- * switches are gone: every `runs-on` is the literal `ubuntu-latest`.
+ * NO workflow can run on a GitHub-hosted runner (Ahmad 2026-11-16: never hosted runners, no hosted minutes). This file used to pin the OPPOSITE
+ * policy (SP4 task 9 / CI-UMBRA-1: every `runs-on` falls back to hosted `ubuntu-24.04`); that rule is superseded. Every `runs-on` is a repo variable
+ * with a Mac-label fallback: heavy `["self-hosted","ebda-mac"]`, light `["ebda-mac-light"]`. A leftover hosted fallback silently takes over the
+ * moment a variable is unset, and GitHub QUEUES a job whose labels match no online runner instead of failing it, so the guard is the test.
+ * (The file name is historical; it is the repo's runner-policy guard.)
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -45,7 +40,7 @@ function runsOnValues(): Array<{ file: string; line: number; value: string }> {
   );
 }
 
-describe('every workflow job runs on a GitHub-hosted runner', () => {
+describe('no workflow job can run on a GitHub-hosted runner', () => {
   it('actually reads the workflows (the walk is not silently empty)', () => {
     expect(workflowFiles).toEqual(
       expect.arrayContaining(['ci.yml', 'gitleaks.yml', 'semgrep.yml', 'blast-radius.yml'])
@@ -53,27 +48,35 @@ describe('every workflow job runs on a GitHub-hosted runner', () => {
     expect(runsOnValues().length).toBeGreaterThan(10);
   });
 
-  // Ruling CI-UMBRA-1 (Ahmad 2026-10-07): Ebda MAY run on the Umbra org runner
-  // when the repo variable EBDA_RUNS_ON is set; with the variable unset every job
-  // falls back to GitHub-hosted `ubuntu-24.04`. This is the ONLY allowed form,
-  // so deleting the variable is the single switch back to hosted runners.
-  // Ruling CI-ROUTE-1: a pull_request labelled `ci-umbra` routes its WHOLE run to Umbra; every other event is unchanged.
+  // The three allowed forms. Each falls back to a Mac label, never a hosted image.
+  // Ruling CI-ROUTE-1: a pull_request labelled `ci-umbra` routes its WHOLE run to Umbra (retired 2026-11-14; removed in the follow-up PR).
   const ROUTE = `contains(github.event.pull_request.labels.*.name, 'ci-umbra') && '["self-hosted","umbra-ebda"]'`;
-  const ROUTED = `\${{ fromJSON(${ROUTE} || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
+  const HEAVY_FALLBACK = `'["self-hosted","ebda-mac"]'`;
+  const LIGHT_FALLBACK = `'["ebda-mac-light"]'`;
+  const ROUTED = `\${{ fromJSON(${ROUTE} || vars.EBDA_RUNS_ON || ${HEAVY_FALLBACK}) }}`;
   // Push-to-main deploy workflows (cf-*-deploy.yml) keep the plain selector: no PR label can reach them.
-  const PLAIN = `\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
-  // Ruling HOST-RUNNERS-2: light jobs (label checks, PR quality, blast-radius, gitleaks, AI review classify, the CI
-  // affected-paths / guards / aggregator jobs) prefer EBDA_LIGHT_RUNS_ON (the ebda-mac-light runners), then EBDA_RUNS_ON,
-  // then hosted ubuntu-24.04. Deleting both variables is still the single switch back to hosted runners.
-  const LIGHT = `\${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`;
-  it('every runs-on is the EBDA_RUNS_ON switch with an ubuntu-24.04 fallback', () => {
-    // The literal-runner exception db-backup.yml had (Ruling OFFMACHINE-1) went with that workflow (Ruling NZ-17-BACKUP-1).
-    const bad = runsOnValues().filter(
-      r => r.value !== ROUTED && r.value !== PLAIN && r.value !== LIGHT
-    );
+  const PLAIN = `\${{ fromJSON(vars.EBDA_RUNS_ON || ${HEAVY_FALLBACK}) }}`;
+  // Ruling HOST-RUNNERS-2: light jobs prefer EBDA_LIGHT_RUNS_ON, then EBDA_RUNS_ON, then the light Mac label.
+  const LIGHT = `\${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || ${LIGHT_FALLBACK}) }}`;
+  /** GitHub-hosted image names: ubuntu-*, windows-*, macos-* (self-hosted Macs are selected by the ebda-mac labels, never by these). */
+  const HOSTED = /\b(ubuntu|windows|macos)-(latest|\d[\w.-]*)\b/i;
+  it('the hosted-image detector flags hosted runs-on values and passes Mac ones (it cannot rot into a vacuous pass)', () => {
+    expect(HOSTED.test(`\${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}`)).toBe(true);
+    expect(HOSTED.test('ubuntu-latest')).toBe(true);
+    expect(HOSTED.test('macos-14')).toBe(true);
+    expect(HOSTED.test(PLAIN)).toBe(false);
+    expect(HOSTED.test(LIGHT)).toBe(false);
+  });
+  it('every runs-on is one of the three Mac-fallback forms, and none names a hosted image', () => {
+    const values = runsOnValues();
+    expect(
+      values.filter(r => HOSTED.test(r.value)).map(r => `${r.file}:${r.line} -> ${r.value}`),
+      'a hosted runner name in runs-on'
+    ).toEqual([]);
+    const bad = values.filter(r => r.value !== ROUTED && r.value !== PLAIN && r.value !== LIGHT);
     expect(
       bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
-      'runs-on must be exactly the EBDA_RUNS_ON switch (fallback ubuntu-24.04)'
+      'runs-on must be exactly a repo-variable switch with a Mac-label fallback'
     ).toEqual([]);
   });
 });
@@ -115,6 +118,8 @@ describe('nothing under .github mentions a self-hosted runner or its switches', 
     if (exempt) code = code.replace(exempt, '');
     // Ruling CI-ROUTE-1: the one whole-PR label route (exact string) is the only allowed self-hosted/umbra mention in code.
     code = code.split(CI_ROUTE).join('').split("'ci-umbra'").join('');
+    // Ruling NO-HOSTED-RUNNERS-1: the heavy Mac fallback label set is the other allowed self-hosted mention in code (exact string).
+    code = code.split(`'["self-hosted","ebda-mac"]'`).join('');
     for (const re of FORBIDDEN) {
       expect(code, `${_rel} matches ${re}`).not.toMatch(re);
     }
@@ -147,16 +152,51 @@ describe('light jobs route to the light runners, heavy jobs never do (Ruling HOS
         'ai-review.yml:classify',
         'ai-review.yml:fork-gate',
         'ai-review.yml:manual-pass',
+        'ai-review.yml:review',
         'blast-radius.yml:blast-radius',
+        'cf-accounts-deploy.yml:deploy',
+        'cf-accounts-deploy.yml:notify-failure',
+        'cf-accounts-deploy.yml:plan',
+        'cf-admin-deploy.yml:deploy',
+        'cf-admin-deploy.yml:notify-failure',
+        'cf-admin-deploy.yml:plan',
+        'cf-api-deploy.yml:deploy',
+        'cf-api-deploy.yml:notify-failure',
+        'cf-api-deploy.yml:plan',
+        'cf-docs-deploy.yml:deploy',
+        'cf-docs-deploy.yml:notify-failure',
+        'cf-docs-deploy.yml:plan',
+        'cf-help-deploy.yml:deploy',
+        'cf-help-deploy.yml:notify-failure',
+        'cf-help-deploy.yml:plan',
+        'cf-marketing-deploy.yml:deploy',
+        'cf-marketing-deploy.yml:notify-failure',
+        'cf-marketing-deploy.yml:plan',
+        'cf-orders-deploy.yml:deploy',
+        'cf-orders-deploy.yml:notify-failure',
+        'cf-orders-deploy.yml:plan',
+        'cf-status-deploy.yml:deploy',
+        'cf-status-deploy.yml:notify-failure',
+        'cf-status-deploy.yml:plan',
+        'cf-web-deploy.yml:deploy',
+        'cf-web-deploy.yml:notify-failure',
+        'cf-web-deploy.yml:plan',
+        'ci-full-pr.yml:dispatch',
         'ci.yml:app-builds',
         'ci.yml:changes',
         'ci.yml:guards',
+        'ci.yml:lint',
+        'ci.yml:merge-queue-gate',
+        'ci.yml:notify-failure',
+        'ci.yml:tested-tree',
+        'ci.yml:typecheck',
         'ci.yml:unit-gate',
         'deploy-change-label.yml:deploy-label',
         'gitleaks.yml:notify-failure',
         'gitleaks.yml:scan',
         'pr-quality.yml:pr-body',
         'pr-quality.yml:slop-baselines',
+        'pr-quality.yml:capability-ratchet',
       ].sort()
     );
   });

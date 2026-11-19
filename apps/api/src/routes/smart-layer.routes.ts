@@ -27,6 +27,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { createPoFromSuggestion } from '../services/accounting/purchase-order.service';
 import { createClearanceCouponFromFlag } from '../services/accounting/deadstock-scan.service';
+import { acknowledgeProfitAnomaly } from '../services/accounting/profit-anomaly.service';
 import { inngest } from '../lib/inngest/client';
 import { runInStoreCtx } from '../lib/jobs/store-db';
 
@@ -325,16 +326,8 @@ router.post(
   requireFeature('accounting.profit_anomaly'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const anomalyWriter = await storeWriter(req.params.storeId);
       await runInStoreCtx(req.params.storeId, () =>
-        anomalyWriter.profitAnomaly.updateMany({
-          where: { id: req.params.id, storeId: req.params.storeId, acknowledged: false },
-          data: {
-            acknowledged: true,
-            acknowledgedBy: req.user?.userId ?? null,
-            acknowledgedAt: new Date(),
-          },
-        })
+        acknowledgeProfitAnomaly(req.params.storeId, req.params.id, req.user?.userId ?? null)
       );
       res.json({ data: { ok: true } });
     } catch (err) {

@@ -378,7 +378,7 @@ test('section design: typography and dividers are editors in the panel, never a 
   await settings(page);
   await page.getByRole('tab', { name: L('التصميم', 'Design') }).click();
   // typography and dividers sit in the collapsed "Advanced" group of the design tab (#397): open it
-  await page.getByTestId('advanced-design').locator('summary').click();
+  await page.getByTestId('advanced-design').getByRole('button').first().click();
   await expect(page.getByTestId('section-typography-field')).toBeVisible();
   await expect(page.getByTestId('dividers-field')).toBeVisible();
   await expect(page.locator('a[href*="page-builder"]')).toHaveCount(0);
@@ -458,7 +458,7 @@ test('fonts and typography zones are draft edits: they reach the draft, and noth
       | undefined;
 
   // fonts + zones live in the collapsed "Advanced" group of the 3-tier theme pane (#397): open it first
-  await page.getByTestId('theme-advanced').locator('summary').click();
+  await page.getByTestId('theme-advanced').getByRole('button').first().click();
   // add a Google font: the whole library goes into the draft
   await page.getByRole('button', { name: M.fonts.addGoogleFont }).click();
   await page.getByLabel(M.fonts.familyNameLabel).fill('Tajawal');
@@ -473,8 +473,12 @@ test('fonts and typography zones are draft edits: they reach the draft, and noth
   );
 
   // a typography zone edit is a partial patch for that zone only
+  // zone groups and each zone's "more options" are collapsed disclosures (#865): open both, then use the exact-size field
+  await page.getByTestId('zone-group-headings').getByRole('button').first().click();
+  await page.getByTestId('zone-more-sectionTitle').getByRole('button').first().click();
   const zone = page.locator('[data-zone-key="sectionTitle"]');
-  await zone.getByRole('textbox').nth(1).fill('2rem');
+  const Z = (locale() === 'ar' ? arMessages : enMessages).zoneEditor;
+  await zone.getByLabel(Z.exactSizeLabel).fill('2rem');
   await expect
     .poll(async () => Object.keys((await typography())?.typography?.zones ?? {}), {
       timeout: 15_000,
@@ -818,7 +822,7 @@ test('page settings: filters on the collection page start from the baseline, car
       .first()
       .click();
   const filters = page.getByTestId('page-settings-filterSidebar');
-  await filters.locator('summary').click();
+  await filters.getByRole('button').first().click();
   await filters.getByRole('switch').first().click();
   await waitSaved(page);
   // Poll the server-side draft instead of reading it once: `save-status` still says "saved" from the page
@@ -858,6 +862,14 @@ test('page settings: filters on the collection page start from the baseline, car
 
 // ---- Change the look from the editor, with a preview (Task 9, Ruling EP-3) ----
 
+// The radio input is a transparent overlay under the preview image (#865), so click its label card like a user.
+async function pickVitrine(page: Page) {
+  await page
+    .locator('label')
+    .filter({ has: page.getByRole('radio', { name: /Vitrine|فاترينة/ }) })
+    .click();
+}
+
 async function openLookPane(page: Page) {
   // the button also opens the right pane on a narrow screen
   await page.getByTestId('open-look-switch').click();
@@ -873,7 +885,7 @@ test('look switch: the proposal shows in the same canvas, the real page is untou
     .locator('body')
     .evaluate(() => JSON.stringify((window as any).__doc));
   // pick Vitrine and preview
-  await page.getByRole('radio', { name: /Vitrine|فاترينة/ }).click();
+  await pickVitrine(page);
   await page.getByTestId('look-preview').click();
   await expect(page.getByTestId('look-preview-bar')).toBeVisible();
   // the canvas now renders the proposed document (a different section list or settings)
@@ -911,21 +923,25 @@ test('look switch: Apply writes the proposal and the editor reloads it; a moved 
 }) => {
   await openBuilder(page);
   await openLookPane(page);
-  await page.getByRole('radio', { name: /Vitrine|فاترينة/ }).click();
+  await pickVitrine(page);
   await page.getByTestId('look-preview').click();
   await expect(page.getByTestId('look-preview-bar')).toBeVisible();
   // the page moves under the preview (another editor saved)
   await page.request.post(`${API}/__test/bump`);
   await page.getByTestId('look-bar-apply').click();
+  // Apply asks first (plan F60): the confirm dialog names what happens, then applies
+  await page.getByTestId('confirm-ok').click();
   await expect(page.getByTestId('look-preview-bar')).toHaveCount(0);
   expect((await state(page)).look).toBeNull();
 
-  // the pane stays open for the next preview
+  // the gallery opens again for the next preview
   await expect(page.getByTestId('look-switch-pane')).toBeVisible();
-  await page.getByRole('radio', { name: /Vitrine|فاترينة/ }).click();
+  await pickVitrine(page);
   await page.getByTestId('look-preview').click();
   await expect(page.getByTestId('look-preview-bar')).toBeVisible();
   await page.getByTestId('look-bar-apply').click();
+  // Apply asks first (plan F60): the confirm dialog names what happens, then applies
+  await page.getByTestId('confirm-ok').click();
   await expect(page.getByTestId('look-preview-bar')).toHaveCount(0);
   await expect.poll(async () => (await state(page)).look).toBe('qamar.vitrine');
 });

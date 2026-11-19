@@ -17,6 +17,25 @@ export const BUILDER_PREVIEW_PATH = /^\/stores\/[^/]+\/builder$/;
 const PREVIEW_FRAME_SRC = 'https:';
 
 /**
+ * The admin is an SPA: the CSP of the document the browser FIRST loaded governs every client-side navigation after it.
+ * Arriving at the builder through a `<Link>` from any other admin page therefore keeps that page's narrow `frame-src`
+ * (`*.ebda.app`), and Chrome blocks the preview iframe of a CUSTOM-DOMAIN store ("This content is blocked").
+ * True when the document that loaded was not itself the builder route, so the builder must hard-reload once to get
+ * the builder's CSP. After the reload the document IS the builder, so this cannot loop.
+ */
+export function builderNeedsDocumentReload(
+  loadedDocumentUrl: string | undefined,
+  base: string
+): boolean {
+  if (!loadedDocumentUrl) return false;
+  try {
+    return !BUILDER_PREVIEW_PATH.test(new URL(loadedDocumentUrl, base).pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * OneSignal opt-in (audit G-1, 2026-11-03; widened after the pre-push review): the SDK is lazy-loaded ONLY by an explicit
  * "enable order alerts" click, but that click lives on the dashboard card, Settings -> Notifications and My devices, and the
  * admin is a single-page app: the CSP of the FIRST page loaded applies to every client-side navigation after it. A per-route

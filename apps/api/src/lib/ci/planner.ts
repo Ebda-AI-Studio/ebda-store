@@ -10,9 +10,15 @@
  * double every row. Detected by the `order.cod_outcome` audit row the WhatsApp consumer writes.
  */
 import { buyerKeyFor } from '@ebda/shared';
-import { ONBOARDING_STEPS, type CiOutcomeInput, type PAYMENT_FAILURE_CODES } from './envelope';
+import {
+  ONBOARDING_HELP_KINDS,
+  ONBOARDING_STEPS,
+  type CiOutcomeInput,
+  type PAYMENT_FAILURE_CODES,
+} from './envelope';
+import { channelOf, isEarliest, openStep, qualifiedAt } from './activation';
 import { mapReturnReason, scrubFreeText } from './return-reason';
-import type { CiOrderFacts, CiShipmentFacts, CiSource } from './source';
+import type { CiOrderFacts, CiShipmentFacts, CiSource, CiStoreSetupFacts } from './source';
 
 const HOUR = 3_600_000;
 const hoursBetween = (a: Date, b: Date) =>
@@ -93,6 +99,7 @@ export async function planOrderCreated(
       },
     },
     ...paymentCaptured(o, buyerKey),
+    ...(o.paymentStatus === 'paid' ? await planActivationMilestones(ctx, o, ['first_order']) : []),
   ];
 }
 
@@ -107,6 +114,12 @@ export async function planOrderStatusChanged(
   const buyerKey = await buyerKeyOf(ctx, o);
   const out: CiOutcomeInput[] = [...paymentCaptured(o, buyerKey)];
   const when = (to: string) => o.transitions.filter(t => t.to === to).at(-1);
+  const milestones: Array<'first_order' | 'first_fulfilled_order'> = [];
+  if (['confirmed', 'processing', 'shipped', 'delivered'].includes(e.status))
+    milestones.push('first_order');
+  if (e.status === 'delivered') milestones.push('first_fulfilled_order');
+  else if (o.paymentStatus === 'paid' && !milestones.length) milestones.push('first_order');
+  out.push(...(await planActivationMilestones(ctx, o, milestones)));
 
   if (e.status === 'confirmed' && isCod(o)) {
     if (!(await ctx.source.hasWhatsAppCodOutcome(o.storeId, o.id))) {
@@ -234,6 +247,9 @@ export async function planShipmentUpdated(
         break;
       }
       case 'delivered':
+        out.push(
+          ...(await planActivationMilestones(ctx, o, ['first_order', 'first_fulfilled_order']))
+        );
         out.push({
           type: 'shipment.delivered',
           seed: `shipment:${s.id}:delivered`,
@@ -365,6 +381,11 @@ export async function planCartRecovered(
   ];
 }
 
+const secondsSinceSignup = (facts: Pick<CiStoreSetupFacts, 'ownerSignupAt'>, at: Date) =>
+  facts.ownerSignupAt
+    ? Math.max(0, Math.round((at.getTime() - facts.ownerSignupAt.getTime()) / 1000))
+    : null;
+
 /** `ci/onboarding-step`: a milestone of the store setup. One event per (store, step), ever. */
 export async function planOnboardingStep(
   ctx: PlanCtx,
@@ -385,11 +406,99 @@ export async function planOnboardingStep(
       xstore: facts.ciSharing,
       data: {
         step: e.step as (typeof ONBOARDING_STEPS)[number],
-        secondsSinceSignup: facts.ownerSignupAt
-          ? Math.max(0, Math.round((at.getTime() - facts.ownerSignupAt.getTime()) / 1000))
-          : null,
+        secondsSinceSignup: secondsSinceSignup(facts, at),
         template: facts.template,
       },
+    },
+  ];
+}
+
+/**
+ * Activation milestones (Ruling ACT-1), derived from the order events the stream already carries: `first_order` when this
+ * order is the store's earliest real (paid, or COD-confirmed) order, `first_fulfilled_order` when it is the earliest
+ * real order that was delivered. The seed is per store and step, so the stream holds ONE row each, ever; and a later
+ * order is not even planned because an earlier real one is found among its peers. Demo stores and orders placed from the
+ * admin by anyone but the owner never count.
+ */
+export async function planActivationMilestones(
+  ctx: PlanCtx,
+  o: CiOrderFacts,
+  kinds: Array<'first_order' | 'first_fulfilled_order'>
+): Promise<CiOutcomeInput[]> {
+  if (!kinds.length || !o.activation) return [];
+  const setup = await ctx.source.storeSetup(o.storeId);
+  if (!setup || setup.isDemo) return [];
+  const ownerId = setup.ownerId ?? null;
+  const a = o.activation;
+  const out: CiOutcomeInput[] = [];
+  const emit = (step: 'first_order' | 'first_fulfilled_order', at: Date) =>
+    out.push({
+      type: 'merchant.onboarding_step',
+      seed: `onboarding:${o.storeId}:${step}`,
+      occurredAt: at,
+      storeId: o.storeId,
+      orderId: null,
+      buyerKey: null,
+      xstore: setup.ciSharing,
+      data: {
+        step,
+        secondsSinceSignup: secondsSinceSignup(setup, at),
+        template: setup.template,
+        channel: step === 'first_order' ? channelOf(a) : null,
+        orderId: o.id,
+      },
+    });
+  if (kinds.includes('first_order') && qualifiedAt(a, ownerId)) {
+    const peers = await ctx.source.activationPeers(o.storeId, o.id, 'qualified');
+    const first = isEarliest(a, peers, x => qualifiedAt(x, ownerId));
+    if (first) emit('first_order', first.at);
+  }
+  if (kinds.includes('first_fulfilled_order') && qualifiedAt(a, ownerId) && a.fulfilledAt) {
+    const peers = await ctx.source.activationPeers(o.storeId, o.id, 'fulfilled');
+    const when = (x: typeof a) => (qualifiedAt(x, ownerId) ? x.fulfilledAt : null);
+    const first = isEarliest(a, peers, when);
+    if (first) emit('first_fulfilled_order', first.at);
+  }
+  return out;
+}
+
+/**
+ * `ci/onboarding-help`: the merchant used the Ebda AI assistant, or a super admin wrote to the store before it went live.
+ * The step is the FIRST milestone not yet reached at that moment (read from the store's own state, not from the
+ * event), so "help needed at payment methods" means the merchant was stuck there. A store past the 30-day onboarding
+ * window, a demo store and a store with every step done produce nothing. One row per (store, step, kind), ever.
+ */
+export async function planOnboardingHelp(
+  ctx: PlanCtx,
+  e: { storeId?: string; kind?: string; at?: string }
+): Promise<CiOutcomeInput[]> {
+  if (!e.storeId || !e.kind || !(ONBOARDING_HELP_KINDS as readonly string[]).includes(e.kind))
+    return [];
+  const kind = e.kind as (typeof ONBOARDING_HELP_KINDS)[number];
+  const p = await ctx.source.onboardingProgress(e.storeId);
+  if (!p) throw new Error(`store ${e.storeId} not visible yet`);
+  if (p.isDemo) return [];
+  const at = validDate(e.at);
+  const step = openStep({
+    storeAgeDays: p.createdAt ? (at.getTime() - p.createdAt.getTime()) / 86_400_000 : null,
+    paymentConfirmed: p.paymentConfirmed,
+    live: p.live,
+    hasFirstOrder: p.hasFirstOrder,
+    hasFirstFulfilled: p.hasFirstFulfilled,
+  });
+  // A super admin's write only counts as help before the store is live (after that it is routine operation).
+  if (!step || (kind === 'super_admin_action' && p.live)) return [];
+  const facts = await ctx.source.storeSetup(e.storeId);
+  return [
+    {
+      type: 'merchant.onboarding_help',
+      seed: `onboarding-help:${e.storeId}:${step}:${kind}`,
+      occurredAt: at,
+      storeId: e.storeId,
+      orderId: null,
+      buyerKey: null,
+      xstore: facts?.ciSharing ?? false,
+      data: { step, kind },
     },
   ];
 }

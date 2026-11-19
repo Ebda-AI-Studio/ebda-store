@@ -1,6 +1,6 @@
 /**
  * PriceResolver - the server-side loader around the pure `resolveUnitPrice` (@ebda/shared/pricing).
- * docs/plans/2026-10-21-b2b-wholesale.md, Task 2 + design review 2026-10-21. SERVER ONLY: never import this from a client
+ * docs/plans/done/2026-10-21-b2b-wholesale.md, Task 2 + design review 2026-10-21. SERVER ONLY: never import this from a client
  * bundle, and never accept a price, a group id or a buyer identifier from a request body, query or header.
  *
  * Ruling B2B-2c - a wholesale price is granted ONLY through `customers.user_id`, the link between the CRM row and the
