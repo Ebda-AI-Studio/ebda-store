@@ -21,6 +21,8 @@ const h = vi.hoisted(() => ({
   money: {
     accountTotals: vi.fn(),
     ciOrderStamp: vi.fn(),
+    // the funnel rollup reads its revenue through the ONE definition (REVENUE-DEF-1)
+    analyticsNetRevenue: vi.fn(),
   },
   noMoney: { on: false },
   sendAlert: vi.fn(async () => 'sent'),
@@ -528,8 +530,48 @@ describe('watchers, scans and rollups on the DO', () => {
     const { runStoreRollupSteps } =
       await import('@api/lib/inngest/functions/analytics-daily-rollup');
     const d = h.doBox.current;
+    // Realistic net-revenue fixtures for YESTERDAY (Cairo): the fake money client applies the real definition to them
+    // (window, paid-only, status/payment exclusions, partial-refund netting), so the rollup's revenue numbers below fail if the
+    // net-revenue path breaks. Not a zero stub.
+    const { regionDayStart, regionDayStartOffset } = await import('@ebda/shared');
+    const { netOrderRevenueMinor } = await import('@api/lib/revenue-sql');
+    const yStart = regionDayStartOffset(regionDayStart(new Date()), -1).getTime();
+    const at = yStart + 12 * 3_600_000;
+    const fixtures = [
+      { at, total: 5000, status: 'delivered', paymentStatus: 'paid', refundedMinor: 0 }, // counts: 5000
+      { at, total: 4850, status: 'delivered', paymentStatus: 'refunded', refundedMinor: 4850 }, // QA-7 order: 0
+      { at, total: 3000, status: 'delivered', paymentStatus: 'paid', refundedMinor: 1000 }, // partial refund: 2000
+      { at, total: 700, status: 'cancelled', paymentStatus: 'paid', refundedMinor: 0 }, // 0
+      { at, total: 900, status: 'delivered', paymentStatus: 'unpaid', refundedMinor: 0 }, // COD not paid: not paid-only
+    ];
+    h.money.analyticsNetRevenue.mockImplementation(
+      async (a: { startMs?: number; endMs?: number; paidOnly?: boolean }) => {
+        const inWin = fixtures.filter(
+          f => f.at >= (a.startMs ?? 0) && f.at <= (a.endMs ?? Number.MAX_SAFE_INTEGER)
+        );
+        const counted = inWin
+          .filter(f => !a.paidOnly || f.paymentStatus === 'paid')
+          .filter(
+            f =>
+              !['cancelled', 'refunded', 'awaiting_payment_confirmation'].includes(f.status) &&
+              !['failed', 'refunded'].includes(f.paymentStatus)
+          )
+          .map(f => ({ f, net: netOrderRevenueMinor(f) }));
+        return { revenue: counted.reduce((n, x) => n + x.net, 0), orders: counted.length };
+      }
+    );
     const r1 = await runStoreRollupSteps(step, DO_STORE, 'rollup');
     const funnelRows = d.rows('funnelSnapshot').length;
+    const yesterday = d
+      .rows('funnelSnapshot')
+      .find(r => new Date(r.periodDate).getTime() === yStart);
+    expect(yesterday).toMatchObject({ revenueFils: 7000, ordersCompleted: 2 }); // 5000 + (3000 - 1000)
+    expect(
+      d
+        .rows('funnelSnapshot')
+        .filter(r => new Date(r.periodDate).getTime() !== yStart)
+        .every(r => r.revenueFils === 0)
+    ).toBe(true);
     expect(funnelRows).toBeGreaterThan(0);
     expect(r1.funnelDays).toBe(funnelRows);
     expect(d.writes).toEqual(expect.arrayContaining(['funnelSnapshot.createMany']));
@@ -537,6 +579,10 @@ describe('watchers, scans and rollups on the DO', () => {
     expect(d.rows('funnelSnapshot')).toHaveLength(funnelRows); // the same days, updated in place
     expect(r2.funnelDays).toBe(funnelRows);
     expect(d.writes).toEqual(expect.arrayContaining(['funnelSnapshot.update']));
+    // the rerun recomputes (never adds): yesterday still 7000 after the in-place update
+    expect(
+      d.rows('funnelSnapshot').find(r => new Date(r.periodDate).getTime() === yStart)
+    ).toMatchObject({ revenueFils: 7000, ordersCompleted: 2 });
   });
 
   it('answer-engine scan: checks are written to the DO, and a retried scan resumes past the rows it already wrote', async () => {

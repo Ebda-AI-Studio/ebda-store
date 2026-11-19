@@ -28,7 +28,11 @@ import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
 // aborted the transaction and silently doomed every later block's writes.
 import { withSavepoint } from '../../lib/savepoint';
 
+import { netRevenue } from '../revenue.service';
+import { netOrderRevenueMinor } from '../../lib/revenue-sql';
+import { refundedMinorByOrder } from '../../lib/order-refunds';
 import {
+  NON_REVENUE_ORDER_STATUSES,
   regionDayKey,
   regionDayStart,
   regionDayStartOffset,
@@ -247,13 +251,31 @@ export async function forEachPaidOrderPage(
   let cursor: string | undefined;
   for (;;) {
     const page = (await db.order.findMany({
-      where: { storeId, paymentStatus: 'paid', deletedAt: null },
+      // The ONE revenue definition, paid-only (lib/revenue-sql.ts): a paid order later cancelled/refunded is not revenue.
+      where: {
+        storeId,
+        paymentStatus: 'paid',
+        status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+        deletedAt: null,
+      },
       select: { id: true, customerId: true, shippingAddress: true, createdAt: true, total: true },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: pageSize,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     })) as PagedOrder[];
     if (page.length === 0) return;
+    // Net each order of its partial refunds (same rule as the SQL: GREATEST(completed returns, payments.refunded_amount)).
+    const refunded = await refundedMinorByOrder(
+      db,
+      page.map(o => o.id)
+    );
+    for (const o of page)
+      o.total = netOrderRevenueMinor({
+        total: o.total,
+        status: 'delivered',
+        paymentStatus: 'paid',
+        refundedMinor: refunded.get(o.id) ?? 0,
+      });
     onPage(page);
     if (page.length < pageSize) return;
     cursor = page[page.length - 1]!.id;
@@ -504,7 +526,12 @@ export async function runCohortRollup(storeId: string): Promise<number> {
  *
  * Returns the number of day-rows written.
  */
-export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<number> {
+export async function runFunnelRollup(
+  storeId: string,
+  daysBack = 7,
+  /** Recompute ONLY the Cairo day this many days ago (the refund correction); default = every day in the window. */
+  onlyDaysAgo?: number
+): Promise<number> {
   // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
   const db = await storeDb(storeId);
   const sw = await storeWriter(storeId);
@@ -522,7 +549,7 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
   };
   const computedRows: FunnelRow[] = [];
 
-  for (let d = daysBack; d >= 1; d--) {
+  for (let d = onlyDaysAgo ?? daysBack; d >= (onlyDaysAgo ?? 1); d--) {
     const dayStart = daysAgo(d, today);
     const dayEnd = regionDayStartOffset(dayStart, 1); // next Cairo midnight (DST-safe, not +24h)
 
@@ -545,18 +572,14 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     });
 
     // ordersCompleted
-    const ordersCompletedAgg = await db.order.aggregate({
-      where: {
-        storeId,
-        paymentStatus: 'paid',
-        deletedAt: null,
-        createdAt: { gte: dayStart, lt: dayEnd },
-      },
-      _count: { id: true },
-      _sum: { total: true },
+    // The ONE revenue definition, paid-only (lib/revenue-sql.ts, STORE-QA-7): refunded orders drop out, partial refunds net.
+    const completed = await netRevenue(storeId, {
+      from: dayStart,
+      to: new Date(dayEnd.getTime() - 1),
+      paidOnly: true,
     });
-    const ordersCompleted = ordersCompletedAgg._count.id;
-    const revenueFils = ordersCompletedAgg._sum.total ?? 0;
+    const ordersCompleted = completed.orders;
+    const revenueFils = completed.revenue;
 
     // ordersAbandoned (Ruling ANALYTICS-DAY-1, D2): carts that BECAME abandoned on this day, i.e. created exactly 7 Cairo days
     // earlier ([dayStart-7d, dayStart-6d)) and still unrecovered. The tile sums the daily figure over its 7/30/90-day window, so a
@@ -867,4 +890,55 @@ export async function runDailyRollup(storeId: string): Promise<RollupResult> {
 
   logger.info({ storeId, cohortRows, funnelDays, rfmCustomers }, 'analytics-daily-rollup: done');
   return { cohortRows, funnelDays, rfmCustomers };
+}
+
+// ---------------------------------------------------------------------------
+// Funnel revenue drift (REVENUE-DEF-1 backfill)
+// ---------------------------------------------------------------------------
+
+export interface FunnelDriftDay {
+  daysAgo: number;
+  periodDate: string;
+  storedOrders: number;
+  storedRevenueFils: number;
+  correctOrders: number;
+  correctRevenueFils: number;
+}
+
+/**
+ * The stored `funnel_snapshots` days (within `daysBack` Cairo days, newest first) whose revenue / order count differ from the ONE
+ * revenue definition recomputed from the orders. READ-ONLY. The apply path is `runFunnelRollup(storeId, daysBack, daysAgo)` per
+ * returned day: idempotent (it recomputes from the orders, never applies a delta), so a rerun finds nothing left to fix.
+ */
+export async function funnelDriftDays(
+  storeId: string,
+  daysBack: number
+): Promise<FunnelDriftDay[]> {
+  const db = await storeDb(storeId);
+  const today = dayStartOf(new Date());
+  const from = daysAgo(daysBack, today);
+  const rows = await db.funnelSnapshot.findMany({
+    where: { storeId, periodDate: { gte: from, lt: today } },
+    select: { periodDate: true, ordersCompleted: true, revenueFils: true },
+    orderBy: { periodDate: 'desc' },
+  });
+  const out: FunnelDriftDay[] = [];
+  for (const r of rows) {
+    const dayEnd = regionDayStartOffset(r.periodDate, 1);
+    const c = await netRevenue(storeId, {
+      from: r.periodDate,
+      to: new Date(dayEnd.getTime() - 1),
+      paidOnly: true,
+    });
+    if (c.revenue === r.revenueFils && c.orders === r.ordersCompleted) continue;
+    out.push({
+      daysAgo: Math.round((today.getTime() - r.periodDate.getTime()) / 86_400_000),
+      periodDate: r.periodDate.toISOString(),
+      storedOrders: r.ordersCompleted,
+      storedRevenueFils: r.revenueFils,
+      correctOrders: c.orders,
+      correctRevenueFils: c.revenue,
+    });
+  }
+  return out;
 }

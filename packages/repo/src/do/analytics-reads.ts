@@ -2,6 +2,12 @@
 // apps/api/src/services/analytics.service.ts are raw SQL aggregates (distinct customer keys, profit lines, date_trunc buckets,
 // the on-hand twin); each op here is the SQLite spelling of ONE of them, scoped by the `store_id` the DO holds. All are reads.
 import { MoneyError, type SyncSql } from './sync-sql';
+import {
+  netLinesInnerSql,
+  netLinesWrapSql,
+  orderNetRevenueSql,
+  revenueOrderPredicateSql,
+} from '../revenue';
 
 const intArg = (v: unknown, what: string, min = 0, max = Number.MAX_SAFE_INTEGER): number => {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
@@ -30,13 +36,13 @@ const num = (v: unknown): number => Number(v ?? 0);
 export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const start = intArg(a.startMs, 'startMs');
   const end = intArg(a.endMs, 'endMs');
-  const nonRev = statuses(a.nonRevenue);
-  const win = [storeId, start, end, ...nonRev];
-  const notIn = `o.status NOT IN (${marks(nonRev.length, 4)})`;
+  statuses(a.nonRevenue); // validated, not trusted: the population is the ONE revenue definition (../revenue.ts)
+  const win = [storeId, start, end];
+  const counts = revenueOrderPredicateSql('o');
   const agg = db.all(
-    `SELECT COALESCE(SUM(o.total), 0) AS revenue, COUNT(*) AS orders FROM orders o
+    `SELECT COALESCE(SUM(${orderNetRevenueSql('o', 'sqlite')}), 0) AS revenue, COUNT(*) AS orders FROM orders o
       WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
-        AND ${notIn} AND o.payment_status <> 'failed'`,
+        AND ${counts}`,
     win
   )[0] as Record<string, unknown>;
   const cust = db.all(
@@ -52,7 +58,7 @@ export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string
         SUM(CASE WHEN oi.cost_price IS NULL THEN oi.price * oi.quantity END) AS missing_revenue
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
-        AND ${notIn} AND o.payment_status <> 'failed'`,
+        AND ${counts}`,
     win
   )[0] as Record<string, unknown>;
   return {
@@ -82,10 +88,9 @@ export function analyticsSalesOp(db: SyncSql, storeId: string, a: Record<string,
         ? `strftime('%Y-%m', ${sec}, 'unixepoch')`
         : `date(${sec}, 'unixepoch', '-' || ((CAST(strftime('%w', ${sec}, 'unixepoch') AS INTEGER) + 6) % 7) || ' days')`;
   const rows = db.all(
-    `SELECT ${key} AS k, COALESCE(SUM(o.total), 0) AS revenue, COUNT(*) AS orders FROM orders o
+    `SELECT ${key} AS k, COALESCE(SUM(${orderNetRevenueSql('o', 'sqlite')}), 0) AS revenue, COUNT(*) AS orders FROM orders o
       WHERE o.store_id = ?1 AND o.created_at >= ?2 AND o.created_at <= ?3
-        AND o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
-        AND o.payment_status <> 'failed'
+        AND ${revenueOrderPredicateSql('o')}
       GROUP BY k ORDER BY k ASC`,
     [storeId, start, end, offset]
   );
@@ -96,17 +101,19 @@ export function analyticsSalesOp(db: SyncSql, storeId: string, a: Record<string,
 export function analyticsItemsOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const start = intArg(a.startMs, 'startMs');
   const end = intArg(a.endMs, 'endMs');
-  const nonRev = statuses(a.nonRevenue);
-  const base = `FROM order_items oi JOIN orders o ON o.id = oi.order_id
+  statuses(a.nonRevenue);
+  // Line revenue (REVENUE-DEF-1): whole-order exclusions, and a partial refund allocated to the lines pro rata (revenue.ts).
+  const wrap = netLinesWrapSql();
+  const base = `FROM ${wrap.head}${netLinesInnerSql('sqlite')}
       WHERE o.store_id = ?1 AND o.created_at >= ?2 AND o.created_at <= ?3
-        AND o.status NOT IN (${marks(nonRev.length, 4)}) AND o.payment_status <> 'failed'`;
-  const params = [storeId, start, end, ...nonRev];
+        AND ${revenueOrderPredicateSql('o')}${wrap.tail}`;
+  const params = [storeId, start, end];
   if (a.by === 'priceSource') {
     return db
       .all(
-        `SELECT oi.price_source AS priceSource, oi.price_group_applied AS priceGroupApplied,
-                COALESCE(SUM(oi.quantity), 0) AS quantity, COALESCE(SUM(oi.total), 0) AS total ${base}
-          GROUP BY oi.price_source, oi.price_group_applied`,
+        `SELECT l.price_source AS priceSource, l.price_group_applied AS priceGroupApplied,
+                COALESCE(SUM(l.quantity), 0) AS quantity, COALESCE(SUM(l.net_total), 0) AS total ${base}
+          GROUP BY l.price_source, l.price_group_applied`,
         params
       )
       .map(r => ({
@@ -120,8 +127,8 @@ export function analyticsItemsOp(db: SyncSql, storeId: string, a: Record<string,
   const limit = a.limit === undefined ? null : intArg(a.limit, 'limit', 1, 1000);
   return db
     .all(
-      `SELECT oi.product_id AS productId, COALESCE(SUM(oi.quantity), 0) AS quantity, COALESCE(SUM(oi.total), 0) AS total ${base}
-        GROUP BY oi.product_id ORDER BY total DESC, oi.product_id ASC${limit ? ` LIMIT ${limit}` : ''}`,
+      `SELECT l.product_id AS productId, COALESCE(SUM(l.quantity), 0) AS quantity, COALESCE(SUM(l.net_total), 0) AS total ${base}
+        GROUP BY l.product_id ORDER BY total DESC, l.product_id ASC${limit ? ` LIMIT ${limit}` : ''}`,
       params
     )
     .map(r => ({ productId: String(r.productId), quantity: num(r.quantity), total: num(r.total) }));
@@ -155,7 +162,7 @@ export function analyticsOrdersByOp(db: SyncSql, storeId: string, a: Record<stri
 export function analyticsCustomersOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const start = intArg(a.startMs, 'startMs');
   const end = intArg(a.endMs, 'endMs');
-  const nonRev = statuses(a.nonRevenue);
+  statuses(a.nonRevenue);
   const one = (sql: string, p: unknown[]): number =>
     num((db.all(sql, p)[0] as Record<string, unknown>).n);
   // A DO order's `customer_id` is the platform user id (the same id the Postgres `users` row had), so first-time / returning
@@ -172,10 +179,10 @@ export function analyticsCustomersOp(db: SyncSql, storeId: string, a: Record<str
   );
   const top = db
     .all(
-      `SELECT customer_id AS customerId, COALESCE(SUM(total), 0) AS total, COUNT(*) AS count FROM orders
-        WHERE store_id = ?1 AND deleted_at IS NULL AND status NOT IN (${marks(nonRev.length, 2)}) AND payment_status <> 'failed'
-        GROUP BY customer_id ORDER BY total DESC LIMIT 10`,
-      [storeId, ...nonRev]
+      `SELECT o.customer_id AS customerId, COALESCE(SUM(${orderNetRevenueSql('o', 'sqlite')}), 0) AS total, COUNT(*) AS count FROM orders o
+        WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND ${revenueOrderPredicateSql('o')}
+        GROUP BY o.customer_id ORDER BY total DESC LIMIT 10`,
+      [storeId]
     )
     .map(r => ({
       customerId: (r.customerId as string | null) ?? null,
@@ -327,4 +334,20 @@ export function taxReportLinesOp(db: SyncSql, storeId: string, a: Record<string,
       orderTotal: num(r.order_total),
       isSale: num(r.is_sale) === 1,
     }));
+}
+
+/**
+ * Net revenue + order count of the ONE revenue definition over an optional [startMs, endMs] window, optionally paid-only
+ * (the rollup / usage-snapshot / funnel population). The DO twin of `netRevenue` (apps/api/src/services/revenue.service.ts).
+ */
+export function analyticsNetRevenueOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
+  const start = a.startMs === undefined ? 0 : intArg(a.startMs, 'startMs');
+  const end = a.endMs === undefined ? Number.MAX_SAFE_INTEGER : intArg(a.endMs, 'endMs');
+  const r = db.all(
+    `SELECT COALESCE(SUM(${a.gross === true ? 'o.total' : orderNetRevenueSql('o', 'sqlite')}), 0) AS revenue, COUNT(*) AS orders FROM orders o
+      WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
+        AND ${revenueOrderPredicateSql('o', { paidOnly: a.paidOnly === true })}`,
+    [storeId, start, end]
+  )[0] as Record<string, unknown>;
+  return { revenue: num(r.revenue), orders: num(r.orders) };
 }

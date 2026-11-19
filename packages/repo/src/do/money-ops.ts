@@ -102,6 +102,7 @@ import {
   analyticsCustomersOp,
   analyticsItemsOp,
   analyticsLowStockOp,
+  analyticsNetRevenueOp,
   analyticsOrdersByOp,
   analyticsPeriodOp,
   analyticsRepeatBuyersOp,
@@ -300,6 +301,7 @@ export type MoneyOpName =
   | 'analyticsImport'
   | 'analyticsImportFinish'
   | 'analyticsPeriod'
+  | 'analyticsNetRevenue'
   | 'analyticsSales'
   | 'analyticsItems'
   | 'analyticsOrdersBy'
@@ -442,6 +444,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'analyticsImport',
   'analyticsImportFinish',
   'analyticsPeriod',
+  'analyticsNetRevenue',
   'analyticsSales',
   'analyticsItems',
   'analyticsOrdersBy',
@@ -968,6 +971,7 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   analyticsImportFinish: (db, storeId, a) => analyticsImportFinishOp(db, storeId, a),
   /** Merchant analytics reads (analytics-reads.ts): reads, a retry is a fresh read. */
   analyticsPeriod: (db, storeId, a) => analyticsPeriodOp(db, storeId, a),
+  analyticsNetRevenue: (db, storeId, a) => analyticsNetRevenueOp(db, storeId, a),
   analyticsSales: (db, storeId, a) => analyticsSalesOp(db, storeId, a),
   analyticsItems: (db, storeId, a) => analyticsItemsOp(db, storeId, a),
   analyticsOrdersBy: (db, storeId, a) => analyticsOrdersByOp(db, storeId, a),
