@@ -85,7 +85,8 @@ export default function StoresPage() {
   return (
     <AdminLayout
       title={t('title')}
-      subtitle={t('subtitleCount', { count: pagination.total })}
+      // STORE-QA-1: never print a count before the first response lands (state starts at total 0 -> "0 متجر" over 7 listed stores).
+      subtitle={isLoading || error ? undefined : t('subtitleCount', { count: pagination.total })}
       actions={
         <Link href="/stores/new">
           <Button size="sm" className="gap-2 shadow-lg shadow-primary/25">

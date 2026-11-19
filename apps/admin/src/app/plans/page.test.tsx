@@ -96,6 +96,9 @@ describe('super-admin plans page', () => {
     expect(screen.getAllByText('priceNotSet').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('unlimited').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('hidden')).toBeTruthy();
+    // STORE-QA-15: internal keys ("free · free", "comped · free") never render in the table.
+    expect(screen.queryByText(/free · free|comped ·/)).toBeNull();
+    expect(screen.queryByText(/·\s*free$/)).toBeNull();
     expect(screen.getAllByRole('button', { name: 'edit' }).length).toBe(2);
   });
 

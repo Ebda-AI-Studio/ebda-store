@@ -37,3 +37,14 @@ export async function isDemoStore(storeId: string): Promise<boolean> {
     return false;
   }
 }
+
+/** Seeded showroom orders carry this order-number prefix (DEMO-<n>); they are 0.00 "Delivered" fixtures, never trading. */
+export const DEMO_ORDER_PREFIX = 'DEMO-';
+
+/**
+ * Ruling STOREQA-2: the one rule for "does this order count in a platform KPI / recent-orders card" - it belongs to the store
+ * and is not a seeded DEMO- order. Showroom STORES are skipped by the caller via `isDemoStore`. Data is never deleted, only excluded.
+ */
+export function platformKpiOrderWhere(storeId: string) {
+  return { storeId, NOT: { orderNumber: { startsWith: DEMO_ORDER_PREFIX } } } as const;
+}

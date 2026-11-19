@@ -26,6 +26,8 @@ import { PageState } from '@/components/PageState';
 import { formatSpend } from '@/lib/ai-spend';
 import { withNumerals } from '@ebda/shared';
 import { intlLocaleForUi } from '@/lib/format';
+import { tierPlanLabel } from '@/lib/plan-labels';
+import { useLocale } from 'next-intl';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -80,8 +82,8 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function planLabel(plan: string): string {
-  return plan.charAt(0).toUpperCase() + plan.slice(1);
+function planLabel(plan: string, locale: 'ar' | 'en'): string {
+  return tierPlanLabel(plan, locale);
 }
 
 const PLAN_COLORS: Record<string, string> = {
@@ -92,10 +94,11 @@ const PLAN_COLORS: Record<string, string> = {
 };
 
 function PlanBadge({ plan }: { plan: string }) {
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const cls = PLAN_COLORS[plan] ?? 'bg-muted text-muted-foreground';
   return (
     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
-      {planLabel(plan)}
+      {planLabel(plan, locale)}
     </span>
   );
 }
@@ -145,6 +148,7 @@ function StatCard({
 
 function PlatformAiUsagePageInner() {
   const t = useT('aiUsage.platform');
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -298,7 +302,11 @@ function PlatformAiUsagePageInner() {
         />
         <StatCard
           label={t('statCards.cacheHitRatio')}
-          value={`${(platform.cacheHitRatio * 100).toFixed(1)}%`}
+          value={
+            platform.totalCached + platform.totalUncached === 0
+              ? '—'
+              : `${(platform.cacheHitRatio * 100).toFixed(1)}%`
+          }
         />
         <StatCard label={t('statCards.monthSpend')} value={formatSpend(platform.monthCostMicros)} />
         <StatCard
@@ -312,10 +320,7 @@ function PlatformAiUsagePageInner() {
           was never actually priced. */}
       {!platform.ratesConfigured ? (
         <div className="mb-6 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink">
-          <strong>{t('noRatesConfiguredTitle')}</strong>{' '}
-          {t.rich('noRatesConfiguredBody', {
-            code: chunks => <code className="mx-1 rounded bg-warning/10 px-1">{chunks}</code>,
-          })}
+          <strong>{t('noRatesConfiguredTitle')}</strong> {t('noRatesConfiguredBody')}
         </div>
       ) : platform.monthUnpricedCalls > 0 ? (
         <div className="mb-6 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-ink">
@@ -324,9 +329,7 @@ function PlatformAiUsagePageInner() {
               count: platform.monthUnpricedCalls.toLocaleString(undefined, withNumerals()),
             })}
           </strong>{' '}
-          {t.rich('unpricedCallsBody', {
-            code: chunks => <code className="rounded bg-warning/10 px-1">{chunks}</code>,
-          })}
+          {t('unpricedCallsBody')}
         </div>
       ) : null}
 
@@ -346,7 +349,7 @@ function PlatformAiUsagePageInner() {
             <option value="all">{t('filters.allPlans')}</option>
             {allPlans.map(p => (
               <option key={p} value={p}>
-                {planLabel(p)}
+                {planLabel(p, locale)}
               </option>
             ))}
           </select>
@@ -366,7 +369,7 @@ function PlatformAiUsagePageInner() {
             <option value="all">{t('filters.allFeatures')}</option>
             {allFeatures.map(f => (
               <option key={f} value={f}>
-                {f.replace(/_/g, ' ')}
+                {t.has(`featureNames.${f}`) ? t(`featureNames.${f}`) : t('featureNames.other')}
               </option>
             ))}
           </select>

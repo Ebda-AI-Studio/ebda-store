@@ -1,4 +1,10 @@
-import { LOCKED_PUBLIC_PLANS, upgradePlanFor } from '@ebda/shared';
+import {
+  LOCKED_PUBLIC_PLANS,
+  PLAN_LABELS,
+  publicPlanForStorePlan,
+  upgradePlanFor,
+  type StorePlan,
+} from '@ebda/shared';
 
 /**
  * The one source of plan names for admin copy (UX:C-5, QA P2-9). Derived from the locked public plan catalogue
@@ -36,3 +42,15 @@ export function wholesalePlanName(locale: PlanLocale): string {
 
 /** Every plan with a 14-day trial starts on this one. */
 export const TRIAL_PLAN_CODE = 'growth';
+
+/**
+ * The sold-plan name for a legacy `stores.plan` tier ("starter" -> Basic / الأساسية, "enterprise" -> Business / الأعمال, "free" -> Free).
+ * Every admin screen that shows a tier names it through here so one store never has two plan names (STORE-QA-13/15/16).
+ */
+export function tierPlanLabel(tier: string, locale: 'ar' | 'en'): string {
+  const sold = publicPlanForStorePlan(tier as StorePlan);
+  if (sold) return locale === 'ar' ? sold.ar : sold.en;
+  const legacy = PLAN_LABELS[tier as StorePlan];
+  if (legacy) return locale === 'ar' ? legacy.ar : legacy.en;
+  return locale === 'ar' ? 'باقة غير معروفة' : 'Unknown plan';
+}

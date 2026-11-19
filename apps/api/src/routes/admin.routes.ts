@@ -93,6 +93,7 @@ import { onAccessD1, storeBriefsD1 } from '../services/platform/access-d1';
 import { eraseHubUserData } from '../services/platform/hub-user-data';
 import { revokeUserMerchantKeysD1 } from '../services/platform/platform-d1';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
+import { isDemoStore, platformKpiOrderWhere } from '../lib/demo-store';
 import { planService } from '../services/plan.service';
 import { referralSignupCounts } from '../services/lifecycle-emails.service';
 import { storeUpdate } from '../lib/repo-factory';
@@ -1965,8 +1966,10 @@ router.get(
               : asPlatformOperator(req.user!.userId, () => prisma.user.count()),
           acrossStores(
             async storeId => {
+              // Ruling STOREQA-2: platform KPIs cover real trading only. Showroom (is_demo) stores and seeded DEMO- orders are excluded.
+              if (await isDemoStore(storeId)) return { count: 0, revenue: 0 };
               const [count, revenue] = await Promise.all([
-                (await storeDb(storeId)).order.count({ where: { storeId } }),
+                (await storeDb(storeId)).order.count({ where: platformKpiOrderWhere(storeId) }),
                 (await storeDb(storeId)).order.aggregate({
                   where: { storeId, paymentStatus: 'paid' },
                   _sum: { total: true },
@@ -1999,19 +2002,23 @@ router.get(
 
             orderKey: (row: { createdAt: Date }) => row.createdAt,
             fetch: async window => ({
-              rows: await (
-                await storeDb(currentStoreId())
-              ).order.findMany({
-                where: { storeId: currentStoreId() },
-                take: window,
-                orderBy: { createdAt: 'desc' },
-                include: {
-                  ...(HUB_ON
-                    ? {}
-                    : { customer: { select: { email: true, firstName: true, lastName: true } } }),
-                  ...(HUB_ON ? {} : { store: { select: { name: true } } }),
-                },
-              }),
+              rows: (await isDemoStore(currentStoreId()))
+                ? []
+                : await (
+                    await storeDb(currentStoreId())
+                  ).order.findMany({
+                    where: platformKpiOrderWhere(currentStoreId()),
+                    take: window,
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                      ...(HUB_ON
+                        ? {}
+                        : {
+                            customer: { select: { email: true, firstName: true, lastName: true } },
+                          }),
+                      ...(HUB_ON ? {} : { store: { select: { name: true } } }),
+                    },
+                  }),
               total: 0,
             }),
           }),
@@ -2365,10 +2372,24 @@ router.get(
         offset: skip,
       });
 
+      // STORE-QA-17: name the target store (the viewer showed an unlinked row with no store at all).
+      const logStoreIds = new Set(logs.map(l => l.storeId).filter((v): v is string => !!v));
+      const storeNames = new Map<string, string>();
+      if (logStoreIds.size > 0) {
+        for (const s of await storeDirectory(d => logStoreIds.has(d.id)))
+          storeNames.set(s.id, s.name);
+      }
+
       res.json({
         success: true,
         data: {
-          logs,
+          logs: logs.map(l => ({
+            ...l,
+            store:
+              l.storeId && storeNames.has(l.storeId)
+                ? { id: l.storeId, name: storeNames.get(l.storeId)! }
+                : undefined,
+          })),
           meta: {
             page,
             limit,
