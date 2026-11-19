@@ -25,17 +25,35 @@ export interface IoTally {
    */
   waves: number;
   inflight: number;
+  /**
+   * Calls that had FINISHED (and their summed ms) and the slowest single call, per kind. Read when the response head is
+   * written, so `done` is what the response actually waited for; `n - done` is still in flight (or runs after the head, e.g. a
+   * cache write-back in waitUntil). Observability only (PERF-TIMING-SPLIT-1).
+   */
+  done: Record<IoKind, number>;
+  doneMs: Record<IoKind, number>;
+  maxMs: Record<IoKind, number>;
   /** Test / local dev only (DEV_STATS=1): the op labels in call order, for finding what to batch. */
   ops?: string[];
   /** Test / local dev only (DEV_STATS=1): injected AuthState latency / stall (cf/auth-state-client.ts `call`). */
   authStateFault?: { delayMs: number; stall: string };
+  /** Test / local dev only (DEV_STATS=1): injected StoreDO round-trip latency (PERF-BATCH-1 measurements, `wrapCalls`). */
+  storeDoDelayMs?: number;
 }
 
 const als = new AsyncLocalStorage<IoTally>();
 
 export function newIoTally(): IoTally {
   const zero = () => Object.fromEntries(IO_KINDS.map(k => [k, 0])) as Record<IoKind, number>;
-  return { n: zero(), ms: zero(), waves: 0, inflight: 0 };
+  return {
+    n: zero(),
+    ms: zero(),
+    waves: 0,
+    inflight: 0,
+    done: zero(),
+    doneMs: zero(),
+    maxMs: zero(),
+  };
 }
 
 export function runWithIoTally<T>(tally: IoTally, fn: () => T): T {
@@ -56,8 +74,12 @@ function tally<T>(kind: IoKind, start: () => T, label = ''): T {
   t.inflight++;
   const t0 = performance.now();
   const done = () => {
+    const took = performance.now() - t0;
     t.inflight--;
-    t.ms[kind] += performance.now() - t0;
+    t.ms[kind] += took;
+    t.done[kind]++;
+    t.doneMs[kind] += took;
+    if (took > t.maxMs[kind]) t.maxMs[kind] = took;
   };
   const value = start();
   if (value && typeof (value as { then?: unknown }).then === 'function') {
@@ -77,7 +99,11 @@ function wrapCalls<T extends object>(target: T, kind: IoKind, instance = ''): T 
       return (...args: unknown[]) =>
         tally(
           kind,
-          () => Reflect.apply(v, t, args),
+          () => {
+            const delay = kind === 'store-do' ? als.getStore()?.storeDoDelayMs : undefined;
+            if (!delay) return Reflect.apply(v, t, args);
+            return new Promise(r => setTimeout(r, delay)).then(() => Reflect.apply(v, t, args));
+          },
           `${instance ? `@${instance}:` : ''}${String(p)}:${labelArgs(args)}`
         );
     },
@@ -214,5 +240,15 @@ export function formatIoTiming(t: IoTally): string[] {
     k => `${k};desc="${t.n[k]}";dur=${t.ms[k].toFixed(1)}`
   );
   if (t.waves > 0) out.push(`io-waves;desc="${t.waves}"`);
+  // PERF-TIMING-SPLIT-1: for AuthState only (the strongly consistent hop that dominates a cold path), the trips the response
+  // waited for (`crit`: finished before the head), the ones not finished at that moment (`open`: in flight now, or the rest of a
+  // write-back that runs after the response), and the slowest single call.
+  if (t.n['auth-state'] > 0) {
+    out.push(
+      `auth-state-crit;desc="${t.done['auth-state']}";dur=${t.doneMs['auth-state'].toFixed(1)}`,
+      `auth-state-open;desc="${t.n['auth-state'] - t.done['auth-state']}"`,
+      `auth-state-max;dur=${t.maxMs['auth-state'].toFixed(1)}`
+    );
+  }
   return out;
 }

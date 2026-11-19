@@ -38,20 +38,13 @@ describe('workflow wiring', () => {
     expect(a).toMatch(/EBDA_RUNS_ON: \$\{\{ runner\.environment == 'self-hosted'/);
     expect(a).toMatch(/bash scripts\/ci\/npm-ci-reuse\.sh/);
   });
-  it('no actions/cache anywhere; setup-node cache is hosted-only', () => {
+  it('no actions/cache anywhere and no setup-node `cache:` input (every job is on the Mac pool; Ahmad 2026-11-16: no hosted runners)', () => {
     for (const f of files.concat(['../actions/npm-ci/action.yml'])) {
       const t = readFileSync(path.join(WF, f), 'utf8');
       expect(t, f).not.toMatch(/uses:\s*actions\/cache/);
-      for (const m of t.matchAll(/^\s*cache:\s*(.*)$/gm)) {
-        // CI-ROUTE-1: PR workflows add the ci-umbra label term; push-to-main deploy workflows keep the plain form.
-        expect(
-          [
-            "${{ vars.EBDA_RUNS_ON == '' && 'npm' || '' }}",
-            "${{ (!contains(github.event.pull_request.labels.*.name, 'ci-umbra') && vars.EBDA_RUNS_ON == '') && 'npm' || '' }}",
-          ],
-          `${f}: setup-node cache`
-        ).toContain(m[1].trim());
-      }
+      expect(t, `${f}: a setup-node cache input would use the remote Actions cache`).not.toMatch(
+        /^\s*cache:\s*\S/m
+      );
     }
   });
   it('the script is plain npm ci when EBDA_RUNS_ON is empty (first executable branch)', () => {
