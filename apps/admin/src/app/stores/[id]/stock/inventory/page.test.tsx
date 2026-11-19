@@ -16,6 +16,7 @@ const { apiGet, apiPost, calls } = vi.hoisted(() => ({
   calls: [] as Array<{ url: string; resolve: (v: unknown) => void }>,
 }));
 
+vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
 vi.mock('@/lib/api', () => ({ apiGet, apiPost }));
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'store-1' }),

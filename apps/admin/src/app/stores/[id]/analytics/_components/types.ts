@@ -56,6 +56,7 @@ export interface RecentOrder {
 export interface LowStockProduct {
   id: string;
   name: string;
+  nameAr?: string | null;
   sku: string;
   inventory: number;
   images?: { url: string }[];

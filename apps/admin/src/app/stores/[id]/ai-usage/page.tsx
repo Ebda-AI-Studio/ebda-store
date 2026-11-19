@@ -131,7 +131,13 @@ export default function AiUsagePage() {
     },
     {
       header: t('table.feature'),
-      cell: row => <span className="text-foreground">{formatFeature(row.feature)}</span>,
+      cell: row => (
+        <span className="text-foreground">
+          {t.has(`featureNames.${row.feature}`)
+            ? t(`featureNames.${row.feature}`)
+            : formatFeature(row.feature)}
+        </span>
+      ),
     },
     {
       header: t('table.tokens'),
@@ -143,11 +149,7 @@ export default function AiUsagePage() {
         </span>
       ),
     },
-    {
-      header: t('table.model'),
-      hideOnMobile: true,
-      cell: row => <span className="text-muted-foreground text-xs">{row.model ?? '—'}</span>,
-    },
+    // STORE-QA-35: the model id ("gemini-flash-lite-latest") is internal; the merchant sees feature, cost and status.
     {
       header: t('table.cost'),
       alignEnd: true,

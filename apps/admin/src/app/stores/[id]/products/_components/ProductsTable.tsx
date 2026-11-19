@@ -136,7 +136,7 @@ export function ProductsTable({
   const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedIds.has(id));
   const someSelected = allPageIds.some(id => selectedIds.has(id));
 
-  const columns: DataTableColumn<Product>[] = [
+  const allColumns: DataTableColumn<Product>[] = [
     {
       header: '',
       className: 'w-10',
@@ -282,6 +282,13 @@ export function ProductsTable({
       ),
     },
   ];
+
+  // STORE-QA-12: a column that is empty on EVERY row of the page is noise, not data: hide it until a row has a value.
+  const hasSku = products.some(p => !!p.sku);
+  const hasCost = products.some(p => p.costPrice != null);
+  const columns = allColumns.filter(
+    c => !((c.header === t('table.sku') && !hasSku) || (c.header === t('table.profit') && !hasCost))
+  );
 
   return (
     <div className="relative">

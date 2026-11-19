@@ -1090,6 +1090,7 @@ export class AnalyticsService {
       return (await money.analyticsLowStock({ threshold })).map(r => ({
         id: r.id,
         name: r.name,
+        nameAr: r.nameAr ?? null,
         slug: r.slug,
         sku: r.sku,
         inventory: r.inventory,
@@ -1099,13 +1100,14 @@ export class AnalyticsService {
       Array<{
         id: string;
         name: string;
+        name_ar: string | null;
         slug: string;
         sku: string | null;
         inventory: bigint | number;
         image_url: string | null;
       }>
     >`
-      SELECT p.id, p.name, p.slug, p.sku, ${ON_HAND_SQL} AS inventory,
+      SELECT p.id, p.name, p.name_ar, p.slug, p.sku, ${ON_HAND_SQL} AS inventory,
              (SELECT pi.url FROM public.product_images pi
                WHERE pi.product_id = p.id ORDER BY pi.position ASC LIMIT 1) AS image_url
       FROM public.products p
@@ -1121,6 +1123,7 @@ export class AnalyticsService {
     return rows.map(r => ({
       id: r.id,
       name: r.name,
+      nameAr: r.name_ar,
       slug: r.slug,
       sku: r.sku,
       inventory: Number(r.inventory),

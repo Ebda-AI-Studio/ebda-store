@@ -21,7 +21,7 @@ function Preview({ shape }: { shape: string }) {
     <bdi dir="ltr" className="block">
       <span
         aria-hidden="true"
-        className="block text-foreground [&>svg]:mx-auto [&>svg]:h-16 [&>svg]:w-auto"
+        className="block text-foreground [&>svg]:mx-auto [&>svg]:h-16 [&>svg]:w-auto [&>svg]:max-w-full"
         // Built by our own encoder from a constant; nothing user-supplied.
         dangerouslySetInnerHTML={{ __html: svg }}
       />
@@ -119,7 +119,7 @@ export function ReceiptBarcodePicker({
                   : 'border-border bg-background text-muted-foreground hover:bg-muted'
               }`}
             >
-              <span className="flex h-16 w-full items-center justify-center">
+              <span className="flex h-16 w-full min-w-0 items-center justify-center overflow-hidden">
                 {id === 'off' ? (
                   <span className="text-muted-foreground">-</span>
                 ) : (
