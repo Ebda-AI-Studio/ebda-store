@@ -2,6 +2,8 @@
  * Outgoing webhook transport: HMAC signature + replay window, and the SSRF guard that is
  * re-checked at SEND time (not only at registration).
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import ts from 'typescript';
 import { all, callsIn, parseFile, prop, strVal } from './helpers/ast-statements';
@@ -261,5 +263,35 @@ describe('M7 the delivery function has a failure backstop', () => {
     expect(
       callsIn((p as ts.PropertyAssignment).initializer, 'markDeliveryFailed').length
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('S4: Node delivery pins the connection to the validated addresses', () => {
+  it('pinnedLookup ignores the hostname and returns only the checked addresses', async () => {
+    const { pinnedLookup } = await import('@api/lib/webhook-http');
+    const look = pinnedLookup(['93.184.216.34', '2606:2800:220:1::1']);
+    const single = await new Promise<unknown[]>(res =>
+      look('rebind.attacker.example', {}, (_e, a, f) => res([a, f]))
+    );
+    expect(single).toEqual(['93.184.216.34', 4]);
+    const all = await new Promise<unknown>(res =>
+      look('rebind.attacker.example', { all: true }, (_e, a) => res(a))
+    );
+    expect(all).toEqual([
+      { address: '93.184.216.34', family: 4 },
+      { address: '2606:2800:220:1::1', family: 6 },
+    ]);
+  });
+
+  it('refuses to connect when there is no validated address', async () => {
+    const { pinnedLookup } = await import('@api/lib/webhook-http');
+    const err = await new Promise<Error | null>(res => pinnedLookup([])('h', {}, e => res(e)));
+    expect(err?.message).toMatch(/SSRF_BLOCKED/);
+  });
+
+  it('postWebhook without a fetchImpl uses the pinned transport on Node (source guard)', () => {
+    const src = readFileSync(join(__dirname, '../../apps/api/src/lib/webhook-http.ts'), 'utf8');
+    expect(src).toMatch(/args\.fetchImpl \?\? \(isWorkers \? fetch : pinnedNodeFetch\)/);
+    expect(src).toMatch(/lookup: pinnedLookup\(addresses\)/);
   });
 });
