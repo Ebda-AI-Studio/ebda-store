@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { edgeLocaleRedirect, type RedirectCache } from './locale-redirect-edge';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  edgeLocaleRedirect,
+  REDIRECT_CACHE_STALE_S,
+  type RedirectCache,
+} from './locale-redirect-edge';
 
 const env = { STOREFRONT_LOCALE_PATHS: 'true', STOREFRONT_LOCALE_PATHS_STORES: 'all' };
 const req = (path: string, cookie?: string) =>
@@ -39,6 +43,75 @@ describe('edgeLocaleRedirect (WEB-COLD-4)', () => {
     expect(b?.status).toBe(308);
     expect(b?.headers.get('location')).toBe('/en/products/x?a=1');
     expect(b?.headers.get('location')).toBe(a?.headers.get('location'));
+  });
+
+  describe('stale-while-revalidate (WEB-COLD-6)', () => {
+    afterEach(() => vi.useRealTimers());
+    const warmUp = async (lang: () => Promise<'ar' | 'en'>) => {
+      const { store } = memCache();
+      const pending: Promise<unknown>[] = [];
+      const cache = { store, waitUntil: (p: Promise<unknown>) => void pending.push(p) };
+      await edgeLocaleRedirect(req('/about'), env, lang, cache);
+      await Promise.all(pending.splice(0));
+      return { cache, pending };
+    };
+
+    it('an entry older than 60 s is served at once and refreshed in the background', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-11-17T00:00:00Z'));
+      let language: 'ar' | 'en' = 'ar';
+      let calls = 0;
+      const lang = async () => (calls++, language);
+      const { cache, pending } = await warmUp(lang);
+      expect(calls).toBe(1);
+      vi.setSystemTime(Date.now() + 10 * 60_000);
+      language = 'en';
+      const stale = await edgeLocaleRedirect(req('/about'), env, lang, cache);
+      expect(stale?.headers.get('location')).toBe('/ar/about'); // no resolver wait for the visitor
+      await Promise.all(pending.splice(0));
+      expect(calls).toBe(2); // refreshed behind the response
+      const next = await edgeLocaleRedirect(req('/about'), env, lang, cache);
+      expect(next?.headers.get('location')).toBe('/en/about');
+      expect(calls).toBe(2);
+    });
+
+    it('the visitor does not wait for a slow resolver', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-11-17T00:00:00Z'));
+      const { cache } = await warmUp(async () => 'ar');
+      vi.setSystemTime(Date.now() + 5 * 60_000);
+      const never = () => new Promise<'ar' | 'en'>(() => {});
+      const res = await edgeLocaleRedirect(req('/about'), env, never, cache);
+      expect(res?.status).toBe(308);
+    });
+
+    it('a failing refresh keeps serving the old entry and never throws', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-11-17T00:00:00Z'));
+      const { cache, pending } = await warmUp(async () => 'ar');
+      vi.setSystemTime(Date.now() + 5 * 60_000);
+      const res = await edgeLocaleRedirect(
+        req('/about'),
+        env,
+        async () => {
+          throw new Error('api down');
+        },
+        cache
+      );
+      await Promise.all(pending.splice(0));
+      expect(res?.headers.get('location')).toBe('/ar/about');
+    });
+
+    it('an entry past the stale window is decided live again', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-11-17T00:00:00Z'));
+      let calls = 0;
+      const lang = async () => (calls++, 'ar' as const);
+      const { cache } = await warmUp(lang);
+      vi.setSystemTime(Date.now() + (REDIRECT_CACHE_STALE_S + 1) * 1000);
+      await edgeLocaleRedirect(req('/about'), env, lang, cache);
+      expect(calls).toBe(2);
+    });
   });
 
   it('keys per host: another store with another default language is never served the first one', async () => {

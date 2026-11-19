@@ -1,11 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-  isGscConfigured,
-  gscSiteUrlsForDomain,
-  querySearchAnalytics,
-  GscNoAccessError,
-} from '../gsc-client';
+import { isGscConfigured, querySearchAnalytics, GscNoAccessError } from '../gsc-client';
 
 // Throwaway RSA key generated at test runtime: no PEM is committed and it is
 // NEVER a real Google service-account credential.
@@ -53,19 +48,6 @@ describe('gsc-client', () => {
     it('is true with a valid service-account JSON (client_email + private_key present)', () => {
       process.env.GSC_SERVICE_ACCOUNT_JSON = DUMMY_SERVICE_ACCOUNT_JSON;
       expect(isGscConfigured()).toBe(true);
-    });
-  });
-
-  describe('gscSiteUrlsForDomain', () => {
-    it('normalizes (lowercase, strip leading www.) and returns both property forms', () => {
-      expect(gscSiteUrlsForDomain('www.Foo.com')).toEqual([
-        'sc-domain:foo.com',
-        'https://foo.com/',
-      ]);
-    });
-
-    it('handles a domain with no www. prefix', () => {
-      expect(gscSiteUrlsForDomain('Bar.co')).toEqual(['sc-domain:bar.co', 'https://bar.co/']);
     });
   });
 

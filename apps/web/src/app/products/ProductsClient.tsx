@@ -47,6 +47,7 @@ import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
 import { roundToMinor } from '@ebda/shared';
+import { priceSliderCeil } from './price-range';
 import { plpUrlPrice } from '../../lib/plp-url-price';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { countText, RESULTS } from '../../lib/plural';
@@ -56,8 +57,6 @@ import { darkLookListingBand } from '../../templates/shared/section-bg';
  * How many products the user can choose to load per PLP page. Capped at 96
  * because larger pages start to hurt mobile data + LCP without much UX win.
  */
-/** Price-filter slider range, in MAJOR units (EGP). Not a data scale — a UX bound. */
-const PRICE_SLIDER_MAX = 5000;
 const PRICE_SLIDER_STEP = 10;
 
 const PLP_DEFAULT_PER_PAGE = 96;
@@ -159,10 +158,11 @@ export default function ProductsClient({
     }
   }, []);
 
-  // Price range in MAJOR units (EGP). 0–5000 EGP covers most catalogue SKUs;
-  // see PRICE_SLIDER_MAX.
+  // Price range in MAJOR units (EGP). The ceiling is the catalogue's real highest price (priceSliderCeil).
   // Ruling B5-7: the URL seeds the range (lib/plp-url-price.ts), so budget links land filtered.
-  const [urlPrice] = useState(() => plpUrlPrice(searchParams, PRICE_SLIDER_MAX));
+  const [urlPrice] = useState(() =>
+    plpUrlPrice(searchParams, priceSliderCeil(initialMeta?.priceMax))
+  );
   const sliderMax = urlPrice.sliderMax;
   const [priceMin, setPriceMin] = useState(urlPrice.min);
   const [priceMax, setPriceMax] = useState(urlPrice.max || sliderMax);
