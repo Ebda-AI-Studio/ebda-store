@@ -518,6 +518,8 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
               <label className="block text-xs font-medium text-foreground">{t('fieldPhone')}</label>
               <input
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={formData.phone}
                 onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
                 placeholder={t('phPhone')}
@@ -531,6 +533,8 @@ export function LocationsTab({ storeId, branding, onChange }: LocationsTabProps)
               </label>
               <input
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={formData.whatsapp}
                 onChange={e => setFormData(p => ({ ...p, whatsapp: e.target.value }))}
                 placeholder={t('phWhatsapp')}

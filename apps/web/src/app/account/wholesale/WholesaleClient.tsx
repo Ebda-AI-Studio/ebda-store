@@ -177,8 +177,10 @@ export default function WholesaleClient() {
           <label className="block text-sm">
             {t('Business phone', 'هاتف النشاط')}
             <input
-              required
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              required
               minLength={6}
               maxLength={40}
               dir="ltr"

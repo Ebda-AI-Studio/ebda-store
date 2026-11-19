@@ -40,6 +40,8 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
           <label className="block text-sm font-medium text-foreground mb-1">{t('whatsapp')}</label>
           <input
             type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             value={branding.whatsapp || ''}
             onChange={e => onChange({ ...branding, whatsapp: e.target.value })}
             placeholder={t('phonePlaceholder')}
@@ -89,6 +91,8 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
           <label className="block text-sm font-medium text-foreground mb-1">{t('phone')}</label>
           <input
             type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             value={branding.phone || ''}
             onChange={e => onChange({ ...branding, phone: e.target.value })}
             placeholder={t('phonePlaceholder')}
@@ -98,7 +102,9 @@ export function ContactInfoTab({ branding, onChange }: ContactInfoTabProps) {
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">{t('phoneAr')}</label>
           <input
-            type="text"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             lang="ar"
             dir="rtl"
             value={branding.phoneAr || ''}

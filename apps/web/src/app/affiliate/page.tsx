@@ -278,9 +278,11 @@ function AffiliatePageContent() {
                     {t('Phone Number', 'رقم الموبايل')}
                   </label>
                   <input
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     id="phone"
                     name="phone"
-                    type="tel"
                     value={form.phone}
                     onChange={handleChange}
                     placeholder={REGION.phone.placeholderIntl}
