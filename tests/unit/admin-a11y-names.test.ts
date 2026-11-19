@@ -26,7 +26,8 @@ export function unnamedSwitches(file: string, raw: string): string[] {
   const open = /<(?:Toggle|ToggleSwitch)(?=[\s>/])/g;
   let m: RegExpExecArray | null;
   while ((m = open.exec(src)))
-    if (!/\blabel=/.test(openingTag(src, m.index))) out.push(at(m.index));
+    if (!/\b(?:label|aria-label|aria-labelledby)=/.test(openingTag(src, m.index)))
+      out.push(at(m.index));
   const re = /<[A-Za-z.]+(?=[\s>])/g;
   while ((m = re.exec(src))) {
     const tag = openingTag(src, m.index);
@@ -42,6 +43,9 @@ describe('admin switches have accessible names', () => {
   it('self-test: catches a nameless switch, accepts named and label-wrapped ones', () => {
     expect(unnamedSwitches('a.tsx', '<Toggle checked={a} onChange={b} />')).toEqual(['a.tsx:1']);
     expect(unnamedSwitches('a.tsx', '<Toggle checked={a} onChange={b} label="x" />')).toEqual([]);
+    expect(
+      unnamedSwitches('a.tsx', '<Toggle checked={a} onChange={b} aria-labelledby="x" />')
+    ).toEqual([]);
     expect(unnamedSwitches('a.tsx', '<button role="switch" aria-checked={a}>')).toEqual([
       'a.tsx:1',
     ]);
