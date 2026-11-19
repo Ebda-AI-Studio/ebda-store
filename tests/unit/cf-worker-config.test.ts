@@ -57,6 +57,11 @@ describe('wrangler.jsonc', () => {
       expect.arrayContaining(['EMAIL_QUEUE', 'SMS_QUEUE', 'JOBS_QUEUE'])
     );
     expect(config.ratelimits.map((r: any) => r.name)).toContain('RATE_LIMITER');
+    // PERF-AUTHSTATE-2: the store-resolve limiter bindings the code expects (a missing one is a silent Durable Object fallback)
+    for (const n of ['PUBLIC_IP_LIMITER', 'STORE_RESOLVE_LIMITER', 'STORE_MISS_LIMITER'])
+      expect(config.ratelimits.map((r: any) => r.name)).toContain(n);
+    const ids = config.ratelimits.map((r: any) => r.namespace_id);
+    expect(new Set(ids).size).toBe(ids.length);
     expect(config.version_metadata.binding).toBe('CF_VERSION_METADATA');
   });
 
