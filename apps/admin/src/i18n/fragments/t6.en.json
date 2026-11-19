@@ -137,12 +137,12 @@
     }
   },
   "aiTools": {
-    "replaceObject": "Forced AI sweep",
-    "replaceConsequence": "The content this sweep covers is replaced with new results.",
+    "replaceObject": "Replace existing content",
+    "replaceConsequence": "What is already there will be overwritten with new AI text. This can't be undone, except the language fix.",
     "replaceAction": "Replace content",
-    "cancelObject": "The running sweep",
-    "cancelConsequence": "It stops. Items already processed keep their changes.",
-    "cancelAction": "Stop sweep"
+    "cancelObject": "The running tool",
+    "cancelConsequence": "It stops. Items already done keep their changes.",
+    "cancelAction": "Stop it"
   },
   "billing": {
     "cancelObject": "Cancelling your plan subscription",
