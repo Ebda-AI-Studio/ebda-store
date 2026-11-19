@@ -257,7 +257,11 @@ export const HUBS: HubDefinition[] = [
       { label: labels.campaigns, href: `/stores/${storeId}/campaigns` },
       { label: labels.abandonedCarts, href: `/stores/${storeId}/abandoned-carts` },
       { label: labels.paymentAbandonments, href: `/stores/${storeId}/payment-abandonments` },
-      { label: labels.lifecycleEmails, href: `/stores/${storeId}/lifecycle-emails`, ownerOnly: true },
+      {
+        label: labels.lifecycleEmails,
+        href: `/stores/${storeId}/lifecycle-emails`,
+        ownerOnly: true,
+      },
       // Staff may manage order alerts, and the Settings hub is owner-only, so Notifications stays here (Ruling T3-1).
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.affiliates, href: `/stores/${storeId}/affiliates`, groupStart: true },
