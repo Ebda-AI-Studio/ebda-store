@@ -21,10 +21,16 @@
     "class": "reversible",
     "note": "yes (delete = confirm)"
   },
-  "helpArticle": null,
+  "helpArticle": "branches-and-pickup",
   "questions": {
-    "ar": ["ازاي اضيف فرع؟", "عنوان الفرع على الخريطة"],
-    "en": ["Add a branch"]
+    "ar": [
+      "ازاي اضيف فرع؟",
+      "عنوان الفرع على الخريطة",
+      "ضيف فرع جديد",
+      "غير مواعيد الفرع",
+      "امسح فرع"
+    ],
+    "en": ["Add a branch", "Change branch opening hours"]
   },
   "steps": ["Branding > Locations: enable, add address/hours."],
   "edgeCases": [
@@ -36,5 +42,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

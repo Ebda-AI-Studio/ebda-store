@@ -14,6 +14,7 @@ import {
   siteWordmarkHtml,
 } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS, HISTORY_DAYS, PRODUCTS } from './config';
+import { HEADLINE_DAYS } from './uptime';
 import type { ComponentSnapshot, ComponentStatus, Incident, Snapshot } from './types';
 
 export type Lang = 'ar' | 'en';
@@ -37,6 +38,9 @@ const T = {
     },
     components: 'الخدمات',
     uptime: (p: string, d: number) => `نسبة التشغيل في آخر ${d} يوم: ${p}`,
+    uptimeLong: (p: string, d: number) => `آخر ${d} يوم: ${p}`,
+    migrationNote:
+      'من 27 لـ 31 أكتوبر: لوحة التحكم والطلبات والـ API كانت شغّالة جزئيًا بس وإحنا بننقل المنصة. المشكلة اتحلّت.',
     noData: 'مفيش بيانات',
     activeIncidents: 'مشاكل لسه مفتوحة',
     recentIncidents: 'آخر المشاكل (14 يوم)',
@@ -49,9 +53,11 @@ const T = {
       resolved: 'اتحلّت',
     },
     checked: 'آخر فحص',
+    respTime: (ms: number, slow: boolean) =>
+      `زمن الاستجابة: ${(ms / 1000).toFixed(1)} ث${slow ? ' (بطيء: أكتر من 8 ثواني)' : ''}`,
     generated: 'آخر تحديث للصفحة',
     explain:
-      'بنفحص كل خدمة كل دقيقة من برّه منصتنا. لو كذا فحص ورا بعض فشلوا بنفتح مشكلة لوحدها، وبنقفلها أول ما الخدمة ترجع.',
+      'بنفحص كل خدمة كل 5 دقايق من برّه منصتنا. لو كذا فحص ورا بعض فشلوا بنفتح مشكلة لوحدها، وبنقفلها أول ما الخدمة ترجع.',
     bars: 'كل شريط يوم واحد (بتوقيت جرينتش)، من الأقدم للأحدث.',
     days: 'الأيام',
     otherLang: { href: '/en', label: 'English', lang: 'en' },
@@ -75,6 +81,9 @@ const T = {
     },
     components: 'Services',
     uptime: (p: string, d: number) => `${d}-day uptime: ${p}`,
+    uptimeLong: (p: string, d: number) => `${d}-day: ${p}`,
+    migrationNote:
+      'Oct 27-31: admin, orders and the API were partly unavailable during a platform migration; resolved.',
     noData: 'no data',
     activeIncidents: 'Active incidents',
     recentIncidents: 'Recent incidents (14 days)',
@@ -87,9 +96,11 @@ const T = {
       resolved: 'Resolved',
     },
     checked: 'Last checked',
+    respTime: (ms: number, slow: boolean) =>
+      `Response time: ${(ms / 1000).toFixed(1)} s${slow ? ' (slow: over 8 s)' : ''}`,
     generated: 'Page generated',
     explain:
-      'Every service is probed once a minute from outside our platform. An incident opens automatically after several consecutive failed probes and resolves after the service recovers.',
+      'Every service is probed every 5 minutes from outside our platform. An incident opens automatically after several consecutive failed probes and resolves after the service recovers.',
     bars: 'Each bar is one UTC day, oldest to newest.',
     days: 'days',
     otherLang: { href: '/', label: 'العربية', lang: 'ar' },
@@ -126,14 +137,17 @@ function component(c: ComponentSnapshot, lang: Lang): string {
   const t = T[lang];
   const cfg = COMPONENTS.find(x => x.id === c.id);
   const name = cfg ? cfg.name[lang] : c.id;
-  const up = c.uptime === null ? t.noData : `${c.uptime.toFixed(2)}%`;
+  // STATUS-WINDOW-1: the LAST 30 DAYS is the headline; the 90-day figure stays visible beside it as the secondary number
+  const up30 = c.uptime30d === null ? t.noData : `${c.uptime30d.toFixed(2)}%`;
+  const up90 = c.uptime === null ? t.noData : `${c.uptime.toFixed(2)}%`;
   const checked = c.lastChecked
     ? ` · ${t.checked}: <time datetime="${new Date(c.lastChecked).toISOString()}">${fmt(c.lastChecked)}</time>`
     : '';
+  const resp = c.latencyMs === null ? '' : ` · ${esc(t.respTime(c.latencyMs, c.slow))}`;
   return `<li class="comp" id="c-${esc(c.id)}">
 <div class="comp-head"><h3>${esc(name)}</h3><span class="pill ${c.status}"><span class="dot" aria-hidden="true"></span>${esc(t.status[c.status])}</span></div>
 ${bars(c, lang)}
-<p class="muted small">${esc(t.uptime(up, HISTORY_DAYS))}${checked}</p>
+<p class="muted small"><strong class="up30">${esc(t.uptime(up30, HEADLINE_DAYS))}</strong> · <span class="up90">${esc(t.uptimeLong(up90, HISTORY_DAYS))}</span>${checked}${resp}</p>
 </li>`;
 }
 
@@ -296,6 +310,16 @@ function socialHead(
   );
 }
 
+/** A resolved-incident note for the Oct 27-31 2026 platform migration, shown while the shown history (90 days) still covers any of those days. */
+const MIGRATION_DAYS = ['2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31'];
+// pq-allow(unused-export): unit-tested directly (apps/status/test/uptime-window.test.ts)
+export function migrationNote(s: Snapshot, t: { migrationNote: string }): string {
+  const shown = new Set(s.components[0]?.days.map(d => d.day) ?? []);
+  return MIGRATION_DAYS.some(d => shown.has(d))
+    ? `<p class="muted small note" id="migration-note">${esc(t.migrationNote)}</p>`
+    : '';
+}
+
 export function renderStatusPage(
   s: Snapshot,
   lang: Lang,
@@ -339,6 +363,7 @@ ${searchForm(lang)}
 <main id="main" class="wrap tess">
 <div class="banner ${s.overall}" role="status"><span class="dot" aria-hidden="true"></span><h1>${esc(t.overall[s.overall])}</h1></div>
 <p class="muted small">${esc(t.explain)} ${esc(t.bars)}</p>
+${migrationNote(s, t)}
 <h2>${esc(t.activeIncidents)}</h2>
 ${active}
 ${siteMedalHtml('m8')}

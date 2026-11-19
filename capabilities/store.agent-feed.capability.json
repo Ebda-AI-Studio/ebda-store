@@ -22,10 +22,15 @@
     "class": "reversible",
     "note": "yes (revoke key)"
   },
-  "helpArticle": null,
+  "helpArticle": "ai-shopping-agents-llms-txt",
   "questions": {
-    "ar": ["ازاي ChatGPT يقدر يشتري من متجري؟", "ايه مفتاح الوكيل؟"],
-    "en": ["How can AI agents shop on my store?"]
+    "ar": [
+      "ازاي ChatGPT يقدر يشتري من متجري؟",
+      "ايه مفتاح الوكيل؟",
+      "اعمل ملف llms.txt لمتجري",
+      "خلي الذكاء الاصطناعي يعرف متجري"
+    ],
+    "en": ["How can AI agents shop on my store?", "Generate llms.txt for my store"]
   },
   "steps": [
     "Agent key page mints the X-Agent-Key for checkout writes; feed is public when feature on."
@@ -39,6 +44,6 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"],
+  "gaps": [],
   "assistantNote": "key minting: deep-link only (secret shown once)"
 }

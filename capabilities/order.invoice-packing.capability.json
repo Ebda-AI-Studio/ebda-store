@@ -21,14 +21,19 @@
   "mcpTool": null,
   "planGate": "accounting.invoicing (email invoice)",
   "roles": ["owner", "staff", "super_admin"],
-  "policy": "preview",
+  "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "email send = confirm"
+    "class": "irreversible",
+    "note": "an invoice e-mail cannot be recalled; printing is read-only"
   },
   "helpArticle": "invoices-and-credit-notes",
   "questions": {
-    "ar": ["اطبع فاتورة الاوردر", "ابعت الفاتورة للعميل", "اطبع كل قوايم التغليف"],
+    "ar": [
+      "اطبع فاتورة الاوردر",
+      "ابعت الفاتورة للعميل",
+      "اطبع كل قوايم التغليف",
+      "ابعت الفاتورة بالايميل للعميل"
+    ],
     "en": ["Print packing slips for today's orders"]
   },
   "steps": ["Order page > Invoice / Packing slip."],

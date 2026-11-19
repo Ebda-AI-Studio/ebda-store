@@ -19,7 +19,7 @@
     "class": "none",
     "note": "n/a"
   },
-  "helpArticle": null,
+  "helpArticle": "finance-books-and-reports",
   "questions": {
     "ar": ["ارباحي الشهر ده كام؟", "اطلع ميزانية", "تقرير الضريبة للشهر", "المصروفات كام؟"],
     "en": ["What's my profit this month?", "Export a VAT report"]
@@ -34,5 +34,5 @@
     "Plan/feature not allowing it: API returns 403 FEATURE_DISABLED with an upgrade target when the plan is the cause; assistant must name the plan and link Billing, never imply a toggle",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Accounting audit fixes OPEN-PR #755; payouts postings planned #753", "No help article"]
+  "gaps": ["Accounting audit fixes OPEN-PR #755; payouts postings planned #753"]
 }

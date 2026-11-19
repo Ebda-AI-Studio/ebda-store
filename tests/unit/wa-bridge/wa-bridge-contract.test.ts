@@ -73,20 +73,23 @@ describe('WhatsAppBridge contract vectors', () => {
 });
 
 describe('WhatsAppBridge behaviour', () => {
-  it('every one of the 12 RPC names the caller uses exists', () => {
+  it('every one of the 15 RPC names the caller uses exists', () => {
     expect(Object.keys(bridge()).sort()).toEqual([
       'attachPaymentProof',
       'createCheckoutLink',
       'createOrderFromChat',
       'getCustomerAddresses',
+      'getCustomerProfile',
       'getOrderStatus',
       'getPaymentLink',
       'getProducts',
+      'getStorePolicies',
       'getStoreProfile',
       'listCatalog',
       'listCustomerOrders',
       'recordCodOutcome',
       'saveCustomerAddress',
+      'searchProducts',
     ]);
   });
   it('a checkout link carries ids and quantities, no price, and verifies once, then expires', async () => {

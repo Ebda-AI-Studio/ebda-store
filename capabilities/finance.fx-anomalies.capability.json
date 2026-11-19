@@ -11,14 +11,19 @@
   "mcpTool": null,
   "planGate": "accounting.multi_currency; accounting.profit_anomaly",
   "roles": ["owner", "super_admin"],
-  "policy": "preview",
+  "policy": "confirm",
   "undo": {
-    "class": "reversible",
-    "note": "yes"
+    "class": "irreversible",
+    "note": "a rate is a new entry and an acknowledged alert has no un-acknowledge service, so the assistant offers no undo"
   },
-  "helpArticle": null,
+  "helpArticle": "finance-books-and-reports",
   "questions": {
-    "ar": ["بيع بالدولار ازاي؟", "ايه شذوذ الربحية؟"],
+    "ar": [
+      "بيع بالدولار ازاي؟",
+      "ايه شذوذ الربحية؟",
+      "سجّل سعر الدولار",
+      "علّم تنبيه الربحية انه اتشاف"
+    ],
     "en": ["Sell in USD"]
   },
   "steps": ["FX page."],
@@ -30,5 +35,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Storefront multi-currency checkout not verified", "No help article"]
+  "gaps": ["Storefront multi-currency checkout not verified"]
 }

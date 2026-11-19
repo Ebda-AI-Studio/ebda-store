@@ -4,14 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { StoreDO } from '../src/cf/store-do/store-do';
 import { backupKey, decryptBlob, encryptBlob } from '../src/cf/store-do/backup';
+import { TEST_PASSWORD_HASH } from '../workers-test/fixtures/test-password-hash';
 
 const e = env as unknown as {
   STORE_BACKUPS: R2Bucket;
   STORE_DO: DurableObjectNamespace<StoreDO>;
   CUSTOMER_AUTH_BACKUP_KEY: string;
 };
-// bcrypt cost 4 of 'Passw0rd!xyz' (fixture only)
-const HASH = '$2b$04$jYDlZaJj/X/kmBmzPXDwsOP4.aIZ2IBm.rDUDGyiC8iKKUZPb/Rzm';
+const HASH = TEST_PASSWORD_HASH;
 const stub = (n: string) => e.STORE_DO.get(e.STORE_DO.idFromName(n));
 const op = async (n: string, store: string, o: string, args: Record<string, unknown>) => {
   const r = await stub(n).authOp(store, o, JSON.stringify(args));

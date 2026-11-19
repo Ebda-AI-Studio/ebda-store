@@ -16,9 +16,13 @@
     "class": "irreversible",
     "note": "no"
   },
-  "helpArticle": null,
+  "helpArticle": "purchase-orders-and-backorders",
   "questions": {
-    "ar": ["العميل طلب منتج خلصان"],
+    "ar": [
+      "العميل طلب منتج خلصان",
+      "الغي الطلب المتأخر بتاع المنتج الخلصان",
+      "في اوردرات منتظرة بضاعة"
+    ],
     "en": ["Customer ordered an out-of-stock item"]
   },
   "steps": ["Backorders page; enable per product."],
@@ -31,5 +35,5 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

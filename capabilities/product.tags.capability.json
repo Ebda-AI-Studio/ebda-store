@@ -16,7 +16,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "product-tags-faqs-and-variants",
   "questions": {
     "ar": ["ازاي اضيف تاج للمنتج؟"],
     "en": ["Add tags"]
@@ -30,7 +30,6 @@
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
   "gaps": [
-    "Create/delete tag endpoints not seen (tags created via product edit)",
-    "No help article"
+    "Create/delete tag endpoints not seen (tags are set per product only through CSV import, the AI tag sweep and the assistant)"
   ]
 }

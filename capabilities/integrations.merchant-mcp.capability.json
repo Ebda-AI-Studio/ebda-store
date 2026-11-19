@@ -18,13 +18,17 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "keys revocable"
+    "class": "reversible",
+    "note": "The AI write switch toggles back with the same tool; minting or revoking a key is screen-only (secret shown once)."
   },
   "helpArticle": "merchant-mcp-write-tools",
   "questions": {
     "ar": ["ازاي اشغل المتجر من Claude؟", "ايه مفتاح MCP؟", "الغي المفتاح"],
-    "en": ["How do I manage my store from Claude?"]
+    "en": [
+      "How do I manage my store from Claude?",
+      "Stop Claude from editing my store",
+      "Turn off AI writes on my store"
+    ]
   },
   "steps": ["Merchant keys page: mint key (shown once), toggle writes."],
   "edgeCases": [

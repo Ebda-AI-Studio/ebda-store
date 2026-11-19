@@ -18,10 +18,10 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "post = ledger entry (reverse via journal)"
+    "class": "irreversible",
+    "note": "the assistant only creates a draft expense and has no delete or reject tool; a draft is rejected on the Expenses page; posting is the merchant's own step"
   },
-  "helpArticle": null,
+  "helpArticle": "expenses",
   "questions": {
     "ar": ["ازاي اسجل مصروف؟", "صور فاتورة المورد", "اعتمد المصروفات"],
     "en": ["Record an expense from a receipt photo"]
@@ -36,5 +36,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

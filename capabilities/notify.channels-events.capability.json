@@ -21,7 +21,7 @@
     "class": "reversible",
     "note": "yes"
   },
-  "helpArticle": null,
+  "helpArticle": "notifications-and-order-alerts",
   "questions": {
     "ar": ["ازاي يوصلني اشعار لما يجي اوردر؟", "وقف رسايل SMS", "واتساب اشعارات الاوردر"],
     "en": ["Notify me on a new order"]
@@ -37,5 +37,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"]
+  "gaps": []
 }

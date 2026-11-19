@@ -18,8 +18,8 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "resume before period end; downgrade effects not undoable instantly"
+    "class": "irreversible",
+    "note": "An upgrade charges the card at once and a downgrade starts at period end; both are confirmed on a card. Cancelling can be resumed with subscription_resume before the period ends."
   },
   "helpArticle": "plans-and-billing",
   "questions": {
@@ -31,7 +31,10 @@
     ],
     "en": ["How do I upgrade my plan?", "What happens to my data if I downgrade?"]
   },
-  "steps": ["Billing > Change plan / Cancel."],
+  "steps": [
+    "Billing > Change plan / Cancel.",
+    "Assistant: a downgrade is a confirm card; an upgrade shows the exact amounts (before VAT, VAT, total) and opens the payment screen where you confirm the charge. The assistant never charges the saved card itself."
+  ],
   "edgeCases": [
     "Plan downgrade mid-task: features gated on next call, staff over maxStaff, orders over monthly cap (Basic 300/mo)",
     "Store over maxProducts on a Pro-limited plan",
@@ -40,8 +43,9 @@
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
     "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
-    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success",
+    "Ruling E1-PLAN-1: an upgrade is never charged from chat; the card shows net, VAT and total under the current platform VAT and links the billing screen. If VAT is switched on or off between the card and the press the card refreshes with the new amounts."
   ],
   "gaps": [],
-  "assistantNote": "show the feature-loss list in the preview"
+  "assistantNote": "downgrade = confirm card; upgrade = amounts + link to the payment screen (E1-PLAN-1); show the feature-loss list in the preview"
 }

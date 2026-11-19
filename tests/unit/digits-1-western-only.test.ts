@@ -47,6 +47,8 @@ const NORMALISERS = [
   /packages\/shared\/src\/search\//, // search folding + its vectors
   /packages\/shared\/src\/region\/index\.ts$/, // normaliseDigits / phone parsing
   /packages\/shared\/src\/foundation\/(phone|text)\.ts$/, // vendored foundation v0.1.0: phone + Arabic fold input normalisers
+  /packages\/shared\/src\/foundation\/instapay-extract\.ts$/, // vendored foundation v0.3.1: the InstaPay receipt reader folds Arabic-Indic digits in a payment proof
+  /packages\/shared\/src\/foundation\/smart-layer\/rails\/secrets\.ts$/, // vendored Smart Layer rail: a card number or code a merchant types in Arabic-Indic digits must be caught before any model sees it
   /packages\/shared\/src\/barcode\/ean\.ts$/, // scanner/typed barcode input normaliser
   /packages\/shared\/src\/tax-profile\.ts$/,
   /packages\/shared\/src\/instapay-receipt\.ts$/,

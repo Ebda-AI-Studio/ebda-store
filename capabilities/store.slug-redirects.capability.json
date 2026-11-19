@@ -16,10 +16,16 @@
     "class": "irreversible",
     "note": "no (recreate by renaming slug back)"
   },
-  "helpArticle": null,
+  "helpArticle": "url-redirects",
   "questions": {
-    "ar": ["غيرت رابط منتج ولينك قديم بيدي 404", "امسح تحويل قديم"],
-    "en": ["Old product link gives a 404"]
+    "ar": [
+      "غيرت رابط منتج ولينك قديم بيدي 404",
+      "امسح تحويل قديم",
+      "لينك قديم بيفتح صفحة غلط",
+      "امسح التحويل القديم من لينك لينك",
+      "ليه مش عارف استخدم الرابط ده تاني؟"
+    ],
+    "en": ["Old product link gives a 404", "Delete an old redirect"]
   },
   "steps": ["Redirects are auto-created when a slug changes; list/delete here."],
   "edgeCases": [
@@ -31,5 +37,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No merchant-created manual redirect (only auto + delete; inferred)", "No help article"]
+  "gaps": ["No merchant-created manual redirect (only auto + delete; inferred)"]
 }

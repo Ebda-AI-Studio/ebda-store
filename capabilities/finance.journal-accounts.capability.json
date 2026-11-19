@@ -19,12 +19,12 @@
   "roles": ["owner", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "reverse with a reversing entry"
+    "class": "irreversible",
+    "note": "a posted entry is corrected with a reversing entry on the Journal page; the assistant has no undo for it"
   },
-  "helpArticle": null,
+  "helpArticle": "finance-books-and-reports",
   "questions": {
-    "ar": ["اعمل قيد يومية", "ضيف حساب جديد"],
+    "ar": ["اعمل قيد يومية", "ضيف حساب جديد", "رحّل قيد تسوية", "اعمل حساب تحت المصروفات"],
     "en": ["Add a manual journal entry"]
   },
   "steps": ["Journal page."],
@@ -37,5 +37,5 @@
     "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["Role mismatch between UI and API (inferred; verify)", "No help article"]
+  "gaps": ["Role mismatch between UI and API (inferred; verify)"]
 }

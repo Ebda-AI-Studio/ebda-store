@@ -64,7 +64,11 @@ export const COMPONENTS: readonly ComponentConfig[] = [
     // A demo store we control and seed (apps/marketing DEMO_STORES, scripts/storedemo/seed.mjs) stands in for every
     // `<slug>.ebda.app` storefront; it exists whatever merchants do. `data-zone=` is rendered by a real storefront
     // template and is absent from the unknown-store 404 page, so a missing store cannot pass as "up".
-    url: `https://storedemo-souq${d.storeSuffix}/`,
+    // The canonical `/ar` URL, not `/`: `/` is a 308 to `/ar` (LOCALE-REDIRECT-EDGE-1), a second Worker round trip that
+    // measured 41 % of the total (hop1 p50 0.68 s / p90 2.3 s vs page p50 0.61 s, 2026-11-15) and doubled the cold-isolate
+    // exposure of one probe, so two cold starts in a row read as a "slow" page. Real visitors arrive on `/ar` links
+    // (sitemap, canonical, hreflang). The redirect itself is covered by tests/unit/locale-redirect-edge.test.ts.
+    url: `https://storedemo-souq${d.storeSuffix}/ar`,
     expectStatus: 200,
     expectBody: 'data-zone=',
   },
@@ -74,7 +78,8 @@ export const COMPONENTS: readonly ComponentConfig[] = [
     name: { en: 'Storefront product pages', ar: 'صفحات المنتجات في المتاجر' },
     // A product page renders through a different route than the home page (one returned a one-off 500, audit UI-7),
     // so it is probed on its own: the seeded Lamma demo product. `data-zone=` as above.
-    url: `https://storedemo-lamma${d.storeSuffix}/products/mahshi-koronb`,
+    // `/ar/...` for the same reason as `storefront` above (the unprefixed URL is a 308 hop).
+    url: `https://storedemo-lamma${d.storeSuffix}/ar/products/mahshi-koronb`,
     expectStatus: 200,
     expectBody: 'data-zone=',
   },
@@ -105,8 +110,16 @@ export const COMPONENTS: readonly ComponentConfig[] = [
   },
 ];
 
-export const DEFAULT_TIMEOUT_MS = 8000;
-export const DEFAULT_FAIL_THRESHOLD = 3;
-export const DEFAULT_RECOVER_THRESHOLD = 2;
+/**
+ * Hard deadline for one probe. 15 s, not 8 s: in quiet hours a cold isolate answers a storefront page in 2-12 s
+ * (measured 2026-11-14/15, worker ebda-web: p50 2-4 s, p99 6-12 s), which is SLOW, not DOWN.
+ */
+export const DEFAULT_TIMEOUT_MS = 15000;
+/** A successful probe slower than this is `degraded` (shown, never paged); two in a row open an incident. */
+export const SLOW_THRESHOLD_MS = 8000;
+/** Consecutive slow probes that count as one failure. */
+export const SLOW_STREAK_FAILS = 2;
+export const DEFAULT_FAIL_THRESHOLD = 2;
+export const DEFAULT_RECOVER_THRESHOLD = 1;
 /** Days of daily rollups kept and shown. */
 export const HISTORY_DAYS = 90;

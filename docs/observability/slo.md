@@ -2,14 +2,16 @@
 
 _Last updated: 2026-11-10 (rewritten for the Cloudflare stack, Iceberg audit #25). Review cadence: quarterly and after any P0._
 
-Monitoring stack: **status.ebda.app** (Worker `ebda-status`: external probes once a minute, 8 s timeout, incident after
-3 consecutive failures, Telegram on open/resolve) · **Sentry** (errors, api/web/admin/orders) · **Workers Logs +
+Monitoring stack: **status.ebda.app** (Worker `ebda-status`: external probes every 5 min, 15 s timeout, a response over 8 s is shown Degraded (not paged), incident after
+2 consecutive failures or 2 slow probes in a row = detection in 5-10 min, Telegram on open/resolve) · **Sentry** (errors, api/web/admin/orders) · **Workers Logs +
 Logpush** to R2 `ebda-logs` (30 days) · **Cloudflare Web Analytics** (page speed, no cookies) · **API alert bridge →
 Telegram** (`apps/api/src/services/alerts.service.ts`). Neon, Railway, Axiom and UptimeRobot are retired.
 
 **Where we are (measured on status.ebda.app, 2026-11-09/10): storefront probes 90.6-97 %, with "timeout after 8000 ms"
 incidents from cold SSR. The 99.9 % storefront target below is NOT met today**; the perf work (edge redirect, render
 cost, caching) is what closes it. Until it is met, every Telegram probe alert is a real miss, not noise.
+
+**Status page window (Ruling STATUS-WINDOW-1).** status.ebda.app headlines the LAST 30 DAYS per component and shows the 90-day figure beside it; `/api/status.json` has `uptime30d` next to `uptime` (90 days). The SLO tables below are measured on the 30-day figure.
 
 ## 1. api — `ebda-api` (Worker, D1 + Durable Objects)
 

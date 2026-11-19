@@ -13,10 +13,10 @@
   "roles": ["owner", "staff", "super_admin"],
   "policy": "confirm",
   "undo": {
-    "class": "unclassified",
-    "note": "toggle yes (discounts all customers: money)"
+    "class": "reversible",
+    "note": "toggle restores the before state; create: compensating (undo switches the new promotion off); delete is not an assistant tool"
   },
-  "helpArticle": null,
+  "helpArticle": "promotions-automatic-discounts",
   "questions": {
     "ar": ["اعمل عرض 2 بسعر 1", "خصم 20% على كل العبايات", "عرض رمضان", "اوقف العرض"],
     "en": ["Add 10% off all abayas for Eid"]
@@ -31,6 +31,6 @@
     "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
     "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
   ],
-  "gaps": ["No help article"],
+  "gaps": [],
   "assistantNote": "sitewide discount = money impact: confirm with scope + dates"
 }
