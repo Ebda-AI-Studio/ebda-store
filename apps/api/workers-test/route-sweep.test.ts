@@ -355,7 +355,7 @@ describe.skipIf(e.E2E_DB === '1')(
           '/admin/stores/:id/plan',
           `/admin/stores/${storeId}/plan`,
           adm,
-          { plan: 'starter' },
+          { planCode: 'basic' },
         ],
         [
           'PUT',

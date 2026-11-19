@@ -7,6 +7,7 @@ import Link from '../../../components/StoreLink';
 import { Button, Input } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
+import { passwordPolicyError } from '../register/validate-registration';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
@@ -42,10 +43,10 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (formData.newPassword.length < 8) {
-      setError(
-        t('Password must be at least 8 characters.', 'كلمة المرور لازم تكون 8 حروف على الأقل.')
-      );
+    // The API's full policy, not just the length (a weak password got the server's English 400).
+    const weak = passwordPolicyError(formData.newPassword, t);
+    if (weak) {
+      setError(weak);
       return;
     }
 
