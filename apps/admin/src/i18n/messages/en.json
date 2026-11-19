@@ -8336,7 +8336,11 @@
       "seeResults": "See what your store has now",
       "undoHint": "Not happy? Undo the language fix"
     },
-    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote."
+    "fillOnlyNote": "This tool only fills what is empty. It never overwrites what you or the AI already wrote.",
+    "estimate": {
+      "upTo": "{count, plural, one {Up to {count, number, latn} AI call} other {Up to {count, number, latn} AI calls}} for this run",
+      "none": "This run uses no AI calls"
+    }
   },
   "account": {
     "security": {

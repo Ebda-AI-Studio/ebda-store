@@ -7,6 +7,7 @@ import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { aiRunTotal, categoryScope, productScope } from '../../ai-run-estimate';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { requestStoreReindex } from '../../search/reindex';
@@ -113,11 +114,11 @@ const bulkAiTranslateFn = inngest.createFunction(
 
       const items: WorkItem[] = await step.run('load-items', async () => {
         const products = await sdb.product.findMany({
-          where: { storeId, deletedAt: null },
+          where: productScope.live(storeId),
           select: { id: true },
         });
         const cats = await sdb.category.findMany({
-          where: { storeId },
+          where: categoryScope.all(storeId),
           select: { id: true },
         });
         const store = await lazyStoreDb(storeId).store.findUnique({
@@ -131,10 +132,15 @@ const bulkAiTranslateFn = inngest.createFunction(
           ...(store ? [{ kind: 'store' as const, id: storeId }] : []),
         ];
 
-        // Each entity has 2 fields (name + description); upper bound only.
+        // Each entity has 2 fields (name + description); upper bound only (lib/ai-run-estimate.ts is the one formula).
         await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
-          data: { total: work.length * 2 },
+          data: {
+            total: aiRunTotal(direction === 'to_en' ? 'translate-en' : 'translate-ar', {
+              products: products.length,
+              categories: cats.length,
+            }),
+          },
         });
 
         return work;

@@ -8,6 +8,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { aiRunTotal, productScope } from '../../ai-run-estimate';
 import { parseAiJson } from '../../ai/parse-ai-json';
 import { rethrowAsAppError } from '../../ai/gemini-errors';
 import { recordUsage } from '../../../services/ai.service';
@@ -289,7 +290,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
       // batch boundaries never shift across retries.
       const catalogIndex = await step.run('load-items', async () => {
         const products = await sdb.product.findMany({
-          where: { storeId, status: 'active', deletedAt: null },
+          where: productScope.active(storeId),
           select: {
             id: true,
             name: true,
@@ -299,7 +300,9 @@ const bulkAiRecommendationsFn = inngest.createFunction(
 
         await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
-          data: { total: products.length },
+          data: {
+            total: aiRunTotal('recommendations', { products: products.length, categories: 0 }),
+          },
         });
 
         return products.map(p => ({

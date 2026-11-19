@@ -86,6 +86,8 @@ export default function AiToolsPage() {
   const [cancelling, setCancelling] = useState<string | null>(null); // jobId being cancelled
   const [usage, setUsage] = useState<AiUsageSummary | null>(null);
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
+  // Estimated AI calls per tool (a ceiling), from GET /ai/bulk-estimate; absent until it loads or if it fails.
+  const [estimates, setEstimates] = useState<Record<string, number>>({});
   const progressRef = useRef<HTMLDivElement | null>(null);
 
   // Master "replace existing" switches, one per group.
@@ -125,6 +127,24 @@ export default function AiToolsPage() {
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  // What each run would use, shown next to its Run button. Re-read after a run starts or ends (the catalogue changes).
+  const estimateKey = activeJob ? `${activeJob.id}:${activeJob.status}` : 'idle';
+  useEffect(() => {
+    if (!storeId) return;
+    let cancelled = false;
+    apiGet<{ estimates: { tool: string; estimatedCalls: number }[] }>(
+      `/api/v1/stores/${storeId}/ai/bulk-estimate`
+    )
+      .then(({ data }) => {
+        if (cancelled || !data?.estimates) return;
+        setEstimates(Object.fromEntries(data.estimates.map(e => [e.tool, e.estimatedCalls])));
+      })
+      .catch(() => undefined); // advisory only: no number is shown rather than a wrong one
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, estimateKey]);
 
   // Active single-job polling
   useEffect(() => {
@@ -299,6 +319,11 @@ export default function AiToolsPage() {
     },
   ];
 
+  function estimateText(calls: number | undefined): string | undefined {
+    if (calls === undefined) return undefined;
+    return calls === 0 ? t('estimate.none') : t('estimate.upTo', { count: calls });
+  }
+
   function renderTool(tool: ToolSpec) {
     const c = `cards.${tool.copy}`;
     return (
@@ -309,6 +334,7 @@ export default function AiToolsPage() {
         outcome={t(`${c}.outcome`)}
         body={t(`${c}.body`)}
         costLabel={t(`cost.${tool.cost}`)}
+        estimateLabel={estimateText(estimates[tool.key])}
         buttonLabel={t(`${c}.button`)}
         startingLabel={t('starting')}
         loading={starting === tool.key}
@@ -474,6 +500,12 @@ export default function AiToolsPage() {
                 </Button>
                 <p className="max-w-xs text-xs text-muted-foreground">
                   {t(section.id === 'aeo' ? 'masterSweep.aeoNote' : 'masterSweep.geoNote')}
+                  {estimateText(estimates[section.master.key]) && (
+                    <span data-testid={`estimate-${section.master.key}`}>
+                      {' '}
+                      {estimateText(estimates[section.master.key])}
+                    </span>
+                  )}
                 </p>
               </div>
             )}

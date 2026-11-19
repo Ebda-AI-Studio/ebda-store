@@ -37,6 +37,16 @@ import { markJobFailedOnEnqueueError } from '../lib/jobs/enqueue-fail';
 import { BulkAiEnqueueError, enqueueBulkAiJob } from '../services/bulk-ai-job.service';
 import { requestStoreReindex, touchesEmbedDoc } from '../lib/search/reindex';
 import { sendOnboardingHelpToCi } from '../lib/ci/emit';
+import {
+  AI_RUN_TOOLS,
+  DEFAULT_FAQ_COUNT,
+  MAX_FAQ_COUNT,
+  TOOL_SCOPES,
+  aiRunCalls,
+  categoryScope,
+  leavesOf,
+  productScope,
+} from '../lib/ai-run-estimate';
 
 const router = Router({ mergeParams: true });
 
@@ -611,6 +621,61 @@ router.post(
       }
 
       res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /stores/:storeId/ai/bulk-estimate[?tool=<tool>][&faqCount=n]
+ * Read-only: what a run would use, shown next to each Run button. One tool, or every tool when `tool` is omitted
+ * (the page asks once, so a page load is one rate-limited call, not one per card). Counts the SAME rows the sweep walks
+ * (`productScope` / `categoryScope`) and prices them with the SAME function that sets the job total (`aiRunCalls`),
+ * so the number cannot drift from the run. Tenant-scoped: the store comes from the path (requireStoreAccess) and every
+ * count carries `storeId`. A CEILING in AI calls: a smart-skip run fills only what is blank and may use fewer.
+ */
+const bulkEstimateQuery = z.object({
+  tool: z.enum(AI_RUN_TOOLS).optional(),
+  faqCount: z.coerce.number().int().min(1).max(MAX_FAQ_COUNT).optional(),
+});
+
+router.get(
+  '/bulk-estimate',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { tool, faqCount } = bulkEstimateQuery.parse(req.query);
+      const db = await storeDb(storeId);
+      const productCounts = new Map<string, Promise<number>>();
+      const categoryCounts = new Map<string, Promise<number>>();
+      const countProducts = (k: keyof typeof productScope) => {
+        if (!productCounts.has(k))
+          productCounts.set(k, db.product.count({ where: productScope[k](storeId) }));
+        return productCounts.get(k)!;
+      };
+      const countCategories = (k: keyof typeof categoryScope) => {
+        if (!categoryCounts.has(k))
+          categoryCounts.set(k, db.category.count({ where: categoryScope[k](storeId) }));
+        return categoryCounts.get(k)!;
+      };
+      const opts = { faqCount: faqCount ?? DEFAULT_FAQ_COUNT };
+      const estimates: { tool: string; estimatedCalls: number }[] = [];
+      for (const t of tool ? [tool] : AI_RUN_TOOLS) {
+        let calls = 0;
+        for (const leaf of leavesOf(t)) {
+          const scope = TOOL_SCOPES[leaf];
+          const [products, categories] = await Promise.all([
+            scope.products ? countProducts(scope.products) : 0,
+            scope.categories ? countCategories(scope.categories) : 0,
+          ]);
+          calls += aiRunCalls(leaf, { products, categories }, opts);
+        }
+        estimates.push({ tool: t, estimatedCalls: calls });
+      }
+      res.json({ success: true, data: { estimates, isCeiling: true } });
     } catch (error) {
       next(error);
     }

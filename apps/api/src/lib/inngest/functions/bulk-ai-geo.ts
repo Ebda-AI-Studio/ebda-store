@@ -8,6 +8,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { aiRunTotal, productScope } from '../../ai-run-estimate';
 import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
 import { normalizeBrandFacts } from '../../ai/brand-facts';
 import { rethrowAsAppError } from '../../ai/gemini-errors';
@@ -412,12 +413,14 @@ const bulkAiCitationCopyFn = inngest.createFunction(
         });
         if (!store) return { storeFound: false, productIds: [] as string[] };
         const products = await sdb.product.findMany({
-          where: { storeId, deletedAt: null },
+          where: productScope.live(storeId),
           select: { id: true },
         });
         await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
-          data: { total: products.length },
+          data: {
+            total: aiRunTotal('citation-copy', { products: products.length, categories: 0 }),
+          },
         });
         return { storeFound: true, productIds: products.map(p => p.id) };
       });

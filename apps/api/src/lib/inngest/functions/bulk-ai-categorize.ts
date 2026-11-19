@@ -7,6 +7,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { aiRunTotal, productScope } from '../../ai-run-estimate';
 import { suggestProductCategory } from '../../ai/product-category-suggester';
 import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
@@ -125,13 +126,13 @@ const bulkAiCategorizeFn = inngest.createFunction(
           // Only uncategorized products are candidates — categorized products
           // are never touched by this sweep.
           const products = await sdb.product.findMany({
-            where: { storeId, status: 'active', deletedAt: null, categories: { none: {} } },
+            where: productScope.uncategorised(storeId),
             select: { id: true },
           });
 
           await sw.bulkAiJob.update({
             where: { id: jobId, storeId },
-            data: { total: products.length },
+            data: { total: aiRunTotal('categorize', { products: products.length, categories: 0 }) },
           });
 
           return {

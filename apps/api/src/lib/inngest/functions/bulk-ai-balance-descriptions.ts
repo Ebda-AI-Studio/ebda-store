@@ -6,6 +6,7 @@ import { balanceProductLanguages } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { aiRunTotal, productScope } from '../../ai-run-estimate';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 
@@ -94,12 +95,14 @@ const bulkAiBalanceDescriptionsFn = inngest.createFunction(
 
       const productIds = await step.run('load-items', async () => {
         const products = await sdb.product.findMany({
-          where: { storeId, deletedAt: null },
+          where: productScope.live(storeId),
           select: { id: true },
         });
         await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
-          data: { total: products.length },
+          data: {
+            total: aiRunTotal('balance-descriptions', { products: products.length, categories: 0 }),
+          },
         });
         return products.map(p => p.id);
       });

@@ -8,6 +8,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { aiRunTotal, categoryScope, productScope } from '../../ai-run-estimate';
 import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
 import { rethrowAsAppError } from '../../ai/gemini-errors';
 import { recordUsage } from '../../../services/ai.service';
@@ -971,11 +972,11 @@ const bulkAiMetaAeoFn = inngest.createFunction(
         if (!store) return [];
 
         const products = await sdb.product.findMany({
-          where: { storeId, deletedAt: null },
+          where: productScope.live(storeId),
           select: { id: true },
         });
         const cats = await sdb.category.findMany({
-          where: { storeId, deletedAt: null },
+          where: categoryScope.live(storeId),
           select: { id: true },
         });
 
@@ -987,7 +988,9 @@ const bulkAiMetaAeoFn = inngest.createFunction(
 
         await sw.bulkAiJob.update({
           where: { id: jobId, storeId },
-          data: { total: work.length },
+          data: {
+            total: aiRunTotal('meta-aeo', { products: products.length, categories: cats.length }),
+          },
         });
 
         return work;
