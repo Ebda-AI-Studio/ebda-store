@@ -184,6 +184,9 @@ describe('#1862 source gate — every limiter in apps/api/src resolves Redis laz
     for (const file of files) {
       const src = fs.readFileSync(file, 'utf8');
       const configs = src.match(/rateLimit\(\{/g)?.length ?? 0;
+      // PERF-BATCH-1: `plannedRateLimit('<name>', ...)` builds its store with
+      // makeRateLimitStore(rateLimitRedisClient, name) itself (security.ts), so each call site is a lazy limiter too.
+      total += src.match(/plannedRateLimit\(['`]/g)?.length ?? 0;
       if (!configs) continue;
       total += configs;
       const rel = path.relative(process.cwd(), file);
