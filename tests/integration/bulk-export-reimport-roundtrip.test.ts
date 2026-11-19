@@ -40,13 +40,13 @@ beforeAll(async () => {
   // seed through the importer: a barcoded plain product, a SKU'd variant product, and a variant product WITHOUT a sku
   const seed = [
     'name,slug,sku,price,barcode,inventory,status,parentSku,option1Name,option1Value',
-    'Plain,plain,PLAIN-1,1000,6223000000015,5,active,,,',
+    'Plain,plain,PLAIN-1,1000,6223000000014,5,active,,,',
     'Shirt,shirt,SHIRT-1,2000,,0,active,,,',
-    ',,SHIRT-S,2000,6223000000022,3,active,SHIRT-1,Size,Small',
-    ',,SHIRT-L,2000,6223000000039,4,active,SHIRT-1,Size,Large',
+    ',,SHIRT-S,2000,6223000000021,3,active,SHIRT-1,Size,Small',
+    ',,SHIRT-L,2000,6223000000038,4,active,SHIRT-1,Size,Large',
     'Ring,ring,,3000,,0,active,,,',
-    ',,,3000,6223000000046,7,active,slug:ring,Size,7',
-    ',,,3000,6223000000053,8,active,slug:ring,Size,8',
+    ',,,3000,6223000000045,7,active,slug:ring,Size,7',
+    ',,,3000,6223000000052,8,active,slug:ring,Size,8',
   ].join('\n');
   const r = await BulkService.importProducts(storeId, seed, { updateExisting: true }, userId);
   expect(r.failed).toBe(0);
@@ -87,7 +87,7 @@ describe('export -> unchanged re-import', () => {
   it('the preview flags a barcode that belongs to another product (no green preview over a failing import)', async () => {
     const bad = [
       'name,slug,sku,price,barcode,inventory,status',
-      'Thief,thief,THIEF-1,1000,6223000000015,1,active',
+      'Thief,thief,THIEF-1,1000,6223000000014,1,active',
     ].join('\n');
     const checked = await BulkService.importProducts(storeId, bad, {
       updateExisting: true,
