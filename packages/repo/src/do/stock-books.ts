@@ -185,6 +185,21 @@ function createAdjustmentIn(
     productIds: a.items.map(i => i.productId),
     variantIds: a.items.flatMap(i => (i.variantId ? [i.variantId] : [])),
   });
+  // STORE-QA-59: a product with variants keeps its stock on the variants; a product-only line would "post" against the
+  // dead Product.inventory (impact +0.00) while the sellable stock never moved. Same rule as the Postgres path.
+  const productOnly = [...new Set(a.items.filter(i => !i.variantId).map(i => i.productId))];
+  if (
+    productOnly.length > 0 &&
+    (db.all(
+      `SELECT count(*) AS n FROM product_variants WHERE product_id IN (${inList(productOnly.length)})`,
+      productOnly
+    )[0].n as number) > 0
+  )
+    fail(
+      'VARIANT_REQUIRED',
+      'This product has variants. Adjust stock per variant (choose the variant), not the product.',
+      422
+    );
   const now = Date.now();
   const adjustmentNumber = nextSequence(db, storeId, 'adjustment', now);
   const snapshots = a.items.map(item => {
