@@ -196,9 +196,12 @@ describe('PREPUSH-6 change class', () => {
     expect(light).toContain('tests/unit/workflow-hosted-runners-only.test.ts');
   });
 
-  it('the gate runs tests-only related files in a light slot, not under the heavy lock', () => {
+  it('PREPUSH-8: EVERY related run uses a prepush slot with 2 workers and never the heavy host lock (CI jobs hold it back to back)', () => {
     const gate = readSrc('scripts/ci/pre-push-gate.sh', 'utf8');
-    expect(gate).toMatch(/lightRelated[^\n]*\n[\s\S]*prepush-slot\.sh npx vitest related/);
-    expect(gate).toMatch(/host-lock\.sh npx vitest related/);
+    expect(gate).toContain(
+      'prepush-slot.sh npx vitest related --run --passWithNoTests --maxWorkers=2'
+    );
+    expect(gate).not.toMatch(/host-lock\.sh\s+npx vitest/);
+    expect(gate).not.toMatch(/heavy-lock\.sh/);
   });
 });

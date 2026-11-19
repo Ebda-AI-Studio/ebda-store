@@ -1,7 +1,7 @@
 import type { Request } from 'express';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { ipKeyGenerator } from 'express-rate-limit';
 import { normalizeEmail } from '@ebda/shared/contact-enquiry';
-import { makeRateLimitStore, rateLimitRedisClient } from './security';
+import { plannedRateLimit } from './security';
 
 /**
  * Rate limits for the public studio enquiry form (Ruling CONTACT-FORM-1). Two independent budgets, each
@@ -34,8 +34,8 @@ function make(
   keyGenerator: (req: Request) => string,
   skip?: (req: Request) => boolean
 ) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, prefix),
+  return plannedRateLimit(prefix, {
+    keyReadsBody: keyGenerator === contactEmailKey,
     windowMs: 60 * 60 * 1000,
     max: MAX_PER_HOUR,
     message: {
