@@ -35,7 +35,7 @@ export async function ownerHasUsedTrial(email: string): Promise<boolean> {
 
 /**
  * CLAIM the owner's one signup trial BEFORE the store is created: ONE atomic insert-or-skip of the marker row (a unique
- * `system_settings.key`; `createMany ... skipDuplicates` is one D1 statement, `count === 1` only for the request that created it).
+ * `system_settings.key`; `createMany ... skipDuplicates` is one D1 statement, `count > 0` only for the request that created it).
  * Only that request grants the trial, so two concurrent first-store creates (or a create racing an onboarding) can never both
  * get one: the read-then-write it replaces let both pass the read.
  *  - `owned`: THIS request created the marker, so a failed store create must give it back (`releaseOwnerTrial`).
@@ -59,7 +59,7 @@ export async function claimOwnerTrial(email: string): Promise<{ grant: boolean; 
       ],
       skipDuplicates: true,
     });
-    return count === 1 ? { grant: true, owned: true } : { grant: false, owned: false };
+    return count > 0 ? { grant: true, owned: true } : { grant: false, owned: false };
   } catch (err) {
     logger.error(
       { err },
