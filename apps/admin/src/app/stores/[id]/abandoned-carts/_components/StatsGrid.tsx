@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { minorToMajor } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 import type { AbandonedCartStats } from './types';
 
@@ -36,8 +36,6 @@ interface StatsGridProps {
   /** The store takes guest orders — guest carts are never recorded. */
   guestCheckout?: boolean;
 }
-
-const formatMajor = minorToMajor;
 
 /**
  * Four-column summary cards at the top of the abandoned carts page.
@@ -84,11 +82,7 @@ export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
       />
       <StatCard
         label={t('recoveredRevenue')}
-        value={
-          stats?.recoveredRevenue != null
-            ? t('baseValue', { amount: formatMajor(stats.recoveredRevenue) })
-            : notTracked
-        }
+        value={stats?.recoveredRevenue != null ? formatPrice(stats.recoveredRevenue) : notTracked}
         muted={stats?.recoveredRevenue == null}
         sub={sub}
       />
