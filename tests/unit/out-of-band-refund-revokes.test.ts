@@ -496,6 +496,33 @@ describe('stuck-charge sweep also resolves Ebda refunds whose outcome never arri
     expect(status(db)).toBe('succeeded');
   });
 
+  it('an Ebda FULL refund (keepAccess:false) settled by the sweep ends the plan once: effects run once with downgraded, a second sweep changes nothing', async () => {
+    const db = rig();
+    // billing_events is append-only (a trigger refuses an UPDATE of amount/raw), so the full refund is inserted as it is
+    db.prepare(
+      `INSERT INTO billing_events (id, store_id, type, plan_code, amount_minor, provider, provider_ref, idempotency_key, status, related_event_id, raw, created_at) VALUES ('66666666-6666-4666-8666-666666666666', ?, 'refund', 'growth', 1000, 'stub', 'txn-rf-8', ?, 'pending', ?, '{"keepAccess":false}', ?)`
+    ).run(STORE, `refund:${CHARGE}:1`, CHARGE, Date.now() - 20 * 60_000);
+    const stub = new StubBillingProvider();
+    stub.outOfBandReversals.set('txn-pay', {
+      reversals: [{ ref: 'txn-rf-8', operation: 'refund', amountMinor: 1000 }],
+      unknownOperations: [],
+    });
+    await sweepStuckCharges(new Date(), stub);
+    expect(status(db)).toBe('succeeded');
+    expect(sub(db)).toEqual({ p: 'free', s: 'canceled' });
+    expect(chargeStatus(db)).toBe('refunded');
+    const downgrades = () => effectKinds().filter(k => k === 'downgraded');
+    expect(downgrades()).toHaveLength(1);
+    expect(
+      vi.mocked(runBillingEffects).mock.calls.filter(c => (c[0] as unknown[]).length > 0)
+    ).toHaveLength(1);
+    // second sweep: the refund is no longer pending, nothing is settled or run again
+    await sweepStuckCharges(new Date(), stub);
+    expect(sub(db)).toEqual({ p: 'free', s: 'canceled' });
+    expect(downgrades()).toHaveLength(1);
+    expect(refunds(db)).toHaveLength(1);
+  });
+
   it('not listed (or no ref) -> left pending and paged, never failed blindly', async () => {
     const db = rig();
     stuckRefund(db, null);
