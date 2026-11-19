@@ -5,7 +5,7 @@ import { middleware } from '../../apps/web/middleware';
 /**
  * Unit tests for the dark-launched tenant-cacheable routing rewrite added
  * to `apps/web/middleware.ts` (tenant-cacheable routing Phase 1 — see
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9). Covers the
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.3/§9). Covers the
  * dark-launch contract: with the flag unset, every existing request path
  * is untouched; with the flag on, only Track-A routes on non-preview
  * requests get rewritten to `/tenant-store/[tenant]/[locale]/...`.

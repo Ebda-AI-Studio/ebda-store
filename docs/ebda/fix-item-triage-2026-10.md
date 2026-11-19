@@ -25,7 +25,7 @@ Source: `~/Desktop/projects/Ebda-AI-Studio/business/ebda/audits/2026-10-05-ebda-
 
 ### FIX-005 — land approved prices/entitlements (business/pricing call)
 
-**Current state:** already landed. `20261007000000_locked_pricing` + `apps/marketing/src/lib/plans.ts` + `tests/unit/locked-pricing.test.ts` ship Basic/Growth/Business at 1,490/3,490/9,990 EGP/month, 0% platform fee, matching `docs/plans/2026-10-05-pricing-decisions.md`.
+**Current state:** already landed. `20261007000000_locked_pricing` + `apps/marketing/src/lib/plans.ts` + `tests/unit/locked-pricing.test.ts` ship Basic/Growth/Business at 1,490/3,490/9,990 EGP/month, 0% platform fee, matching `docs/plans/done/2026-10-05-pricing-decisions.md`.
 
 This is flagged here only because the task brief treats it as an open business call — my research shows it is not open anymore. Options, for completeness/confirmation:
 

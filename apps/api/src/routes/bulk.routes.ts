@@ -7,7 +7,7 @@ import { BulkService } from '../services/bulk.service';
 import { PRODUCT_SEARCH_MAX_LIMIT, searchProductIds } from '../services/product-search.service';
 import { xlsxBufferToImportCsv } from '../services/xlsx-import';
 import { importCsvToPlatformCsv } from '../services/csv-import';
-import { buildImportPreview } from '../services/import-preview';
+import { buildImportPreview, mergeImportCheckErrors } from '../services/import-preview';
 import { currentStoreId, prisma, ProductStatus } from '@ebda/database';
 import { storeDb, storeWriter } from '../lib/repo-factory';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -24,7 +24,7 @@ const router = Router();
 // NOT populate req.params.storeId at the mount level — every route below
 // declares its own '/:storeId/...' path. router.param runs AFTER Express
 // resolves :storeId for the matched route, so RLS tenant context is set
-// correctly here. See F2, docs/plans/2026-07-02-rls-cutover.md.
+// correctly here. See F2, docs/plans/done/2026-07-02-rls-cutover.md.
 router.param('storeId', tenantContext);
 
 // Scope the feature gate to the bulk subtree only — see inventory.routes.ts
@@ -259,6 +259,12 @@ router.get(
   }
 );
 
+/** `updateExisting` as the real import reads it (default true). */
+function parsedUpdateExisting(options: unknown): boolean {
+  const v = (options as { updateExisting?: unknown } | null | undefined)?.updateExisting;
+  return typeof v === 'boolean' ? v : true;
+}
+
 // POST /stores/:storeId/bulk/import-preview - Dry run of an import. Runs the
 // SAME conversion as /import and /import-xlsx (EGP cells -> piastres, per-row
 // PRICE_* errors) and returns what would be written, with prices in piastres.
@@ -319,13 +325,23 @@ router.post(
         take: 5000,
       });
 
+      // STORE-QA-64: the SAME per-row validation the real import runs (name, barcode ownership, SKU, variants), writing
+      // nothing. A preview that only checked prices said "ready" over an import that then failed most rows.
+      const checked = await BulkService.importProducts(storeId, csv, {
+        updateExisting: parsedUpdateExisting(options),
+        dryRun: true,
+      });
+
       res.json({
         success: true,
         data: {
           format,
-          preview: buildImportPreview(
-            csv,
-            existing.map(p => p.price)
+          preview: mergeImportCheckErrors(
+            buildImportPreview(
+              csv,
+              existing.map(p => p.price)
+            ),
+            checked.errors
           ),
         },
       });

@@ -24,6 +24,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
 import { productSearchSql } from '../../apps/api/src/services/product-search.service';
+import { ORIGINAL_ROOT } from '../helpers/original-repo-root';
 import {
   scanRawProductQueries,
   scanSourceForProductSql,
@@ -31,7 +32,7 @@ import {
   type RawProductQuery,
 } from '../helpers/raw-product-sql-scan';
 
-const API_SRC = process.env.B2B_API_SRC ?? resolve(__dirname, '../../apps/api/src');
+const API_SRC = process.env.B2B_API_SRC ?? resolve(ORIGINAL_ROOT, 'apps/api/src');
 const MIGRATIONS = resolve(__dirname, '../../packages/database/prisma/migrations');
 
 type Kind = 'public' | 'admin' | 'system';

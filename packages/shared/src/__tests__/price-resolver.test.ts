@@ -1,5 +1,5 @@
 /**
- * resolveUnitPrice - the one pure place a wholesale/tier price is decided (docs/plans/2026-10-21-b2b-wholesale.md,
+ * resolveUnitPrice - the one pure place a wholesale/tier price is decided (docs/plans/done/2026-10-21-b2b-wholesale.md,
  * Task 2; Rulings B2B-3 resolution order, B2B-4 quantity scope, B2B-5 provenance). Written BEFORE the implementation.
  *
  * Each describe block is named after the Review Focus item it pins (RF1..RF13). RF items that need a cart, an order, an

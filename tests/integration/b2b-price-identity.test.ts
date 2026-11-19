@@ -1,7 +1,7 @@
 /**
  * Review Focus 2 / Rulings B2B-2 + B2B-2c (design review C1): a typed phone or email is never a price identity; the link is
  * customers.user_id. Real Postgres as `ebda_app`, the
- * real PriceResolver and the real FeatureService (docs/plans/2026-10-21-b2b-wholesale.md, Task 2).
+ * real PriceResolver and the real FeatureService (docs/plans/done/2026-10-21-b2b-wholesale.md, Task 2).
  *
  * The HTTP half of "guest checkout with a wholesaler's phone is charged retail" lands with the cart/order wiring in
  * Task 3 (b2b-price-parity.test.ts); this file proves the resolver can only ever be handed the AUTHENTICATED user id and

@@ -1,0 +1,32 @@
+{
+  "id": "self.delete-store",
+  "status": "planned",
+  "plan": "audit gap 9",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "مسح متجري من الداشبورد",
+  "titleEn": "Delete my own store / close account from the dashboard",
+  "screens": ["/stores/[id]/settings"],
+  "api": ["(planned) guarded delete"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["ازاي امسح المتجر؟"],
+    "en": ["How do I delete my store?"]
+  },
+  "steps": ["Today: not possible from UI; super-admin only. Assistant offers handoff."],
+  "edgeCases": [
+    "Refuse with money in flight / billing parent",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
+  ],
+  "gaps": ["gap 9"]
+}

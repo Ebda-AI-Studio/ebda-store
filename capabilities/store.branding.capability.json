@@ -1,0 +1,44 @@
+{
+  "id": "store.branding",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الشعار والهوية والالوان",
+  "titleEn": "Branding: logo, store name, colours, footer logo",
+  "screens": ["/stores/[id]/branding"],
+  "api": [
+    "PUT /stores/:storeId/branding",
+    "PUT /stores/:storeId/branding-bundle",
+    "PUT /stores/:storeId/theme",
+    "POST /stores/:storeId/ai/palette-from-logo",
+    "POST /uploads/image"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (previous values in builder history for theme)"
+  },
+  "helpArticle": "store-look-controls",
+  "questions": {
+    "ar": ["ازاي ارفع اللوجو؟", "اغير لون المتجر", "الشعار بيظهر صغير", "عايز لوجو بالعربي لوحده"],
+    "en": ["How do I upload my logo?", "Change my store colours"]
+  },
+  "steps": [
+    "Branding > upload logo (AR/EN), size, colours; AI can suggest a palette from the logo."
+  ],
+  "edgeCases": [
+    "Image too large/unsupported type: upload limiter, daily upload cap",
+    "Logo with transparency on dark header",
+    "SVG sanitised",
+    "Hex colour contrast warning (ColorContrastPreview)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

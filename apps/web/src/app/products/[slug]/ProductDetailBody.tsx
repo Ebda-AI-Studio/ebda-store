@@ -37,7 +37,7 @@ import { fetchCodOffer } from '../../../lib/cod-offer';
  * `app/products/[slug]/page.tsx` (legacy, header-based) and
  * `app/tenant-store/[tenant]/[locale]/products/[slug]/page.tsx` (new,
  * params-based, dark-launched). See
- * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
+ * docs/plans/done/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
  */
 
 /**

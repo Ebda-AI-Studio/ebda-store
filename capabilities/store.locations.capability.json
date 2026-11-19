@@ -1,0 +1,46 @@
+{
+  "id": "store.locations",
+  "status": "live",
+  "area": "store",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "الفروع واماكن الاستلام",
+  "titleEn": "Branches / pickup locations",
+  "screens": ["/stores/[id]/branding"],
+  "api": [
+    "GET /stores/:storeId/locations",
+    "POST /stores/:storeId/locations",
+    "PUT /stores/:storeId/locations/:id",
+    "DELETE /stores/:storeId/locations/:id"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes (delete = confirm)"
+  },
+  "helpArticle": "branches-and-pickup",
+  "questions": {
+    "ar": [
+      "ازاي اضيف فرع؟",
+      "عنوان الفرع على الخريطة",
+      "ضيف فرع جديد",
+      "غير مواعيد الفرع",
+      "امسح فرع"
+    ],
+    "en": ["Add a branch", "Change branch opening hours"]
+  },
+  "steps": ["Branding > Locations: enable, add address/hours."],
+  "edgeCases": [
+    "Maps link formats",
+    "Opening hours AR/EN",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

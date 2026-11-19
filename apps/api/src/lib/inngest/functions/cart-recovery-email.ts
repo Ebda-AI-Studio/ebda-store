@@ -6,7 +6,7 @@ import { inngest } from '../client';
 import { deliverCartRecoveryEmail } from '../../../services/cart-recovery-email.service';
 
 /**
- * Abandoned-cart recovery email sender. Plan: docs/plans/2026-10-21-cart-email-campaigns.md.
+ * Abandoned-cart recovery email sender. Plan: docs/plans/done/2026-10-21-cart-email-campaigns.md.
  *
  * Triggered ONLY by `cart-recovery/email-requested`, which only
  * `sweepCartRecoveryEmails` (cron, via abandonedCartService.process) emits for a cart it has

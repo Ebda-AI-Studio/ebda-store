@@ -1,0 +1,31 @@
+{
+  "id": "planned.visual-editor-rest",
+  "status": "planned",
+  "plan": "docs/plans/2026-10-22-visual-editor.md; 2026-10-23-launch-polish.md; 2026-10-25-templates-match-mockups.md",
+  "area": "builder",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "تكملة المحرر البصري",
+  "titleEn": "Visual editor remaining tasks, launch polish, templates match mock-ups",
+  "screens": ["/stores/[id]/builder"],
+  "api": ["(plans)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["الاديتور فيه مشكلة"],
+    "en": ["Editor feels unfinished"]
+  },
+  "steps": ["Partial."],
+  "edgeCases": [
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying"
+  ],
+  "gaps": ["PARTIAL"]
+}
