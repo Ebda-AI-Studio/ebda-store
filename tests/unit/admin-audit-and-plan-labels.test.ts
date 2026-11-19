@@ -5,7 +5,6 @@ import {
   auditActionLabel,
   auditEntityLabel,
   auditActorName,
-  auditKey,
 } from '../../apps/admin/src/lib/audit-labels';
 import { tierPlanLabel } from '../../apps/admin/src/lib/plan-labels';
 
@@ -38,7 +37,9 @@ describe('STORE-QA-17 audit viewer never prints raw keys', () => {
     expect(auditEntityLabel('store', tAr)).toBe('متجر');
   });
   it('normalises keys and names the actor', () => {
-    expect(auditKey('audit.platform_viewed')).toBe('audit_platform_viewed');
+    expect(auditActionLabel('audit.platform_viewed', tAr)).toBe(
+      ar.audit.actionLabels.audit_platform_viewed
+    );
     expect(auditActorName({ firstName: '', lastName: '', email: 'a@b.c' })).toBe('a@b.c');
     expect(auditActorName(null)).toBeNull();
   });

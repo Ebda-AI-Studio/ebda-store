@@ -39,7 +39,7 @@ export async function isDemoStore(storeId: string): Promise<boolean> {
 }
 
 /** Seeded showroom orders carry this order-number prefix (DEMO-<n>); they are 0.00 "Delivered" fixtures, never trading. */
-export const DEMO_ORDER_PREFIX = 'DEMO-';
+const DEMO_ORDER_PREFIX = 'DEMO-';
 
 /**
  * Ruling STOREQA-2: the one rule for "does this order count in a platform KPI / recent-orders card" - it belongs to the store

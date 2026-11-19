@@ -4,7 +4,7 @@
  * The key is normalised once here and looked up in `audit.actionLabels.<key>` / `audit.entityLabels.<type>`;
  * an unknown key renders the generic "other" label (the raw key stays in the expandable details only).
  */
-export function auditKey(raw: string | null | undefined): string {
+function auditKey(raw: string | null | undefined): string {
   return String(raw ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
