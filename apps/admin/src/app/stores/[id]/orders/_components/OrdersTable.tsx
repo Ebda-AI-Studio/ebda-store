@@ -62,7 +62,9 @@ export function summarizeItems(
       const name = locale === 'ar' && row.nameAr ? row.nameAr : row.name;
       return `${row.quantity}x ${name}`;
     }
-    return `${row.item.quantity}x ${row.item.productName}`;
+    const lineName =
+      locale === 'ar' ? row.item.product?.nameAr || row.item.productName : row.item.productName;
+    return `${row.item.quantity}x ${lineName}`;
   });
   const remaining = rows.length - MAX_SHOWN;
   const summary = shown.join(', ');

@@ -71,7 +71,8 @@ export function TaxTimeZoneCard({ storeId }: { storeId: string }) {
         >
           {options.map(z => (
             <option key={z} value={z}>
-              {z}
+              {/* STORE-QA-26: a named zone, not a raw IANA id; an unlisted saved zone still shows as saved. */}
+              {z === 'Africa/Cairo' ? t('zoneCairo') : z === 'UTC' ? t('zoneUtc') : z}
             </option>
           ))}
         </select>

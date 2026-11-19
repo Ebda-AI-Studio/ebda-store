@@ -23,6 +23,8 @@ export interface OrderPayment {
 export interface OrderLineItem {
   id: string;
   productName: string;
+  /** The product's Arabic name (list rows carry only this field of the product). */
+  product?: { nameAr?: string | null } | null;
   variantName?: string | null;
   quantity: number;
   price?: number;

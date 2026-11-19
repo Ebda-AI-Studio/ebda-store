@@ -53,6 +53,7 @@ export default function NewsletterPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const tPage = useT('newsletter.page');
+  const tCloseLabel = useT('common');
   const tTable = useT('newsletter.table');
 
   const [subs, setSubs] = useState<Subscriber[]>([]);
@@ -282,6 +283,7 @@ export default function NewsletterPage() {
               <button
                 type="button"
                 onClick={closeBroadcast}
+                aria-label={tCloseLabel('close')}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
