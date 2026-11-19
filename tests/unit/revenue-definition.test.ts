@@ -49,20 +49,76 @@ describe('netOrderRevenueMinor', () => {
 
 describe('SQL fragments', () => {
   it('the predicate excludes refunded payments and the non-revenue statuses', () => {
-    const sql = api.revenueOrderPredicateSql('o');
+    const sql = api.revenueOrderPredicateSql('o', 'pg');
     expect(sql).toContain("o.payment_status NOT IN ('failed', 'refunded')");
     expect(sql).toContain(
       "o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')"
     );
-    expect(api.revenueOrderPredicateSql('o', { paidOnly: true })).toContain(
+    expect(api.revenueOrderPredicateSql('o', 'pg', { paidOnly: true })).toContain(
       "o.payment_status = 'paid'"
     );
   });
-  it('net revenue subtracts the capped refund, per dialect', () => {
+  it('an UNPAID order counts only when it has no online payment attempt (COD / phone), per dialect', () => {
+    const pg = api.revenueOrderPredicateSql('o', 'pg');
+    expect(pg).toContain("o.payment_status <> 'unpaid' OR NOT EXISTS");
+    expect(pg).toContain('public.payments po');
+    expect(pg).toContain("po.provider NOT IN ('cod', 'cash', 'cash_on_delivery')");
+    // 1b: decided by the LATEST payment row (created_at, then id), not by any online row
+    expect(pg).toContain('pn.created_at > po.created_at');
+    expect(pg).toContain('pn.id > po.id');
+    expect(api.revenueOrderPredicateSql('o', 'sqlite')).not.toContain('public.');
+    // paid-only surfaces do not need it
+    expect(api.revenueOrderPredicateSql('o', 'pg', { paidOnly: true })).not.toContain('EXISTS');
+  });
+  it('net revenue subtracts the capped refund from PRE-AGGREGATED joins, per dialect (no correlated subquery)', () => {
     expect(api.orderNetRevenueSql('o', 'pg')).toMatch(/LEAST\(o\.total, GREATEST\(/);
-    expect(api.orderNetRevenueSql('o', 'pg')).toContain('public.returns');
     expect(api.orderNetRevenueSql('o', 'sqlite')).toMatch(/MIN\(o\.total, MAX\(/);
-    expect(api.orderNetRevenueSql('o', 'sqlite')).not.toContain('public.');
+    expect(api.orderNetRevenueSql('o', 'pg')).not.toContain('SELECT');
+    const joins = api.refundJoinsSql('o', 'pg');
+    expect(joins).toContain('public.returns');
+    expect(joins).toContain('public.payments');
+    expect(joins.match(/GROUP BY order_id/g)).toHaveLength(2);
+    expect(api.refundJoinsSql('o', 'sqlite')).not.toContain('public.');
+  });
+  it('an abandoned online checkout nets to 0, unpaid COD counts (pure twin)', () => {
+    const o = { total: 4910, status: 'pending', paymentStatus: 'unpaid' };
+    expect(api.netOrderRevenueMinor({ ...o, hasOnlinePayment: true })).toBe(0);
+    expect(api.netOrderRevenueMinor({ ...o, hasOnlinePayment: false })).toBe(4910);
+    // a PAID order with an online payment is a sale
+    expect(api.netOrderRevenueMinor({ ...o, paymentStatus: 'paid', hasOnlinePayment: true })).toBe(
+      4910
+    );
+  });
+});
+
+describe('latestPaymentIsOnline (REVENUE-DEF-1b, pure twin)', () => {
+  const t = (n: number) => new Date(2026, 10, 1, 0, n);
+  it('the latest row decides', () => {
+    expect(api.latestPaymentIsOnline([])).toBe(false); // phone / admin order
+    expect(api.latestPaymentIsOnline([{ id: 'a', provider: 'paymob', createdAt: t(1) }])).toBe(
+      true
+    );
+    // failed card, then COD -> not online
+    expect(
+      api.latestPaymentIsOnline([
+        { id: 'b', provider: 'cod', createdAt: t(2) },
+        { id: 'a', provider: 'paymob', createdAt: t(1) },
+      ])
+    ).toBe(false);
+    // COD, then online -> online
+    expect(
+      api.latestPaymentIsOnline([
+        { id: 'a', provider: 'cod', createdAt: t(1) },
+        { id: 'b', provider: 'fawry', createdAt: t(2) },
+      ])
+    ).toBe(true);
+    // same instant: higher id is later; ISO strings and epoch ms work
+    expect(
+      api.latestPaymentIsOnline([
+        { id: 'd1', provider: 'paymob', createdAt: t(5).toISOString() },
+        { id: 'd2', provider: 'cod', createdAt: t(5).getTime() },
+      ])
+    ).toBe(false);
   });
 });
 
@@ -112,10 +168,11 @@ describe('refund correction of a closed rollup day', () => {
     expect(cairoDaysAgo(new Date('2026-10-01T09:00:00Z'), now)).toBe(49);
     expect(cairoDaysAgo(new Date('2026-11-19T09:00:00Z'), now)).toBe(0);
   });
-  it('is registered as an order/refunded consumer and recomputes through runFunnelRollup', () => {
+  it('is registered as an order/refunded consumer and corrects ONLY revenue + ordersCompleted', () => {
     const src = read('apps/api/src/lib/inngest/functions/analytics-refund-correction.ts');
     expect(src).toContain("event: 'order/refunded'");
-    expect(src).toContain('runFunnelRollup(storeId, daysAgo, daysAgo)');
+    expect(src).toContain('correctFunnelRevenueDay(storeId, daysAgo)');
+    expect(src).not.toContain('runFunnelRollup');
     expect(read('apps/api/src/lib/inngest/functions/index.ts')).toContain(
       'analyticsRefundCorrection'
     );
@@ -191,7 +248,7 @@ describe('labels match the population (STORE-QA-54)', () => {
     ])
       expect(read(file), file).toContain('paidOnly: true');
     expect(read('apps/api/src/lib/inngest/functions/store-usage-snapshot.ts')).toContain(
-      "revenueOrderPredicateSql('o', { paidOnly: true })"
+      "revenueOrderPredicateSql('o', 'pg', { paidOnly: true })"
     );
   });
 });

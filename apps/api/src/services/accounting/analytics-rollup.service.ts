@@ -28,7 +28,7 @@ import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
 // aborted the transaction and silently doomed every later block's writes.
 import { withSavepoint } from '../../lib/savepoint';
 
-import { netRevenue } from '../revenue.service';
+import { netRevenue, netRevenueWindows } from '../revenue.service';
 import { netOrderRevenueMinor } from '../../lib/revenue-sql';
 import { refundedMinorByOrder } from '../../lib/order-refunds';
 import {
@@ -267,6 +267,7 @@ export async function forEachPaidOrderPage(
     // Net each order of its partial refunds (same rule as the SQL: GREATEST(completed returns, payments.refunded_amount)).
     const refunded = await refundedMinorByOrder(
       db,
+      storeId,
       page.map(o => o.id)
     );
     for (const o of page)
@@ -526,12 +527,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
  *
  * Returns the number of day-rows written.
  */
-export async function runFunnelRollup(
-  storeId: string,
-  daysBack = 7,
-  /** Recompute ONLY the Cairo day this many days ago (the refund correction); default = every day in the window. */
-  onlyDaysAgo?: number
-): Promise<number> {
+export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<number> {
   // the store's backend (Ruling CF-JOBS-4): Postgres (`prisma`) or its Durable Object
   const db = await storeDb(storeId);
   const sw = await storeWriter(storeId);
@@ -549,7 +545,7 @@ export async function runFunnelRollup(
   };
   const computedRows: FunnelRow[] = [];
 
-  for (let d = onlyDaysAgo ?? daysBack; d >= (onlyDaysAgo ?? 1); d--) {
+  for (let d = daysBack; d >= 1; d--) {
     const dayStart = daysAgo(d, today);
     const dayEnd = regionDayStartOffset(dayStart, 1); // next Cairo midnight (DST-safe, not +24h)
 
@@ -893,7 +889,7 @@ export async function runDailyRollup(storeId: string): Promise<RollupResult> {
 }
 
 // ---------------------------------------------------------------------------
-// Funnel revenue drift (REVENUE-DEF-1 backfill)
+// Funnel revenue correction (REVENUE-DEF-1)
 // ---------------------------------------------------------------------------
 
 interface FunnelDriftDay {
@@ -905,10 +901,12 @@ interface FunnelDriftDay {
   correctRevenueFils: number;
 }
 
+const DAY_MS = 86_400_000;
+
 /**
  * The stored `funnel_snapshots` days (within `daysBack` Cairo days, newest first) whose revenue / order count differ from the ONE
- * revenue definition recomputed from the orders. READ-ONLY. The apply path is `runFunnelRollup(storeId, daysBack, daysAgo)` per
- * returned day: idempotent (it recomputes from the orders, never applies a delta), so a rerun finds nothing left to fix.
+ * revenue definition recomputed from the orders. READ-ONLY and two queries in total (the stored rows, then every day's corrected
+ * totals in ONE grouped query), however many days. The apply path is `correctFunnelRevenueDay` per returned day.
  */
 export async function funnelDriftDays(
   storeId: string,
@@ -921,24 +919,54 @@ export async function funnelDriftDays(
     where: { storeId, periodDate: { gte: from, lt: today } },
     select: { periodDate: true, ordersCompleted: true, revenueFils: true },
     orderBy: { periodDate: 'desc' },
+    take: daysBack,
   });
+  const totals = await netRevenueWindows(
+    storeId,
+    rows.map(r => ({ from: r.periodDate, to: regionDayStartOffset(r.periodDate, 1) })),
+    { paidOnly: true }
+  );
   const out: FunnelDriftDay[] = [];
-  for (const r of rows) {
-    const dayEnd = regionDayStartOffset(r.periodDate, 1);
-    const c = await netRevenue(storeId, {
-      from: r.periodDate,
-      to: new Date(dayEnd.getTime() - 1),
-      paidOnly: true,
-    });
-    if (c.revenue === r.revenueFils && c.orders === r.ordersCompleted) continue;
+  rows.forEach((r, i) => {
+    const c = totals[i]!;
+    if (c.revenue === r.revenueFils && c.orders === r.ordersCompleted) return;
     out.push({
-      daysAgo: Math.round((today.getTime() - r.periodDate.getTime()) / 86_400_000),
+      daysAgo: Math.round((today.getTime() - r.periodDate.getTime()) / DAY_MS),
       periodDate: r.periodDate.toISOString(),
       storedOrders: r.ordersCompleted,
       storedRevenueFils: r.revenueFils,
       correctOrders: c.orders,
       correctRevenueFils: c.revenue,
     });
-  }
+  });
   return out;
+}
+
+/**
+ * Rewrite ONLY `revenueFils` and `ordersCompleted` of the funnel row for the Cairo day `daysAgoN` days ago, from the orders.
+ * Every other column (product views, carts, sessions, checkouts, abandoned) is left exactly as the nightly run wrote it: those
+ * are recomputed from tables that move on (carts expire, views are pruned), so re-running the whole row for an old day would
+ * overwrite real history with today's smaller numbers. A day with no stored row is NOT created. Idempotent. Returns 1 when a
+ * row was updated.
+ */
+export async function correctFunnelRevenueDay(storeId: string, daysAgoN: number): Promise<number> {
+  const db = await storeDb(storeId);
+  const sw = await storeWriter(storeId);
+  const dayStart = daysAgo(daysAgoN, dayStartOf(new Date()));
+  const existing = await db.funnelSnapshot.findFirst({
+    where: { storeId, periodDate: dayStart },
+    select: { id: true, revenueFils: true, ordersCompleted: true },
+  });
+  if (!existing) return 0;
+  const [c] = await netRevenueWindows(
+    storeId,
+    [{ from: dayStart, to: regionDayStartOffset(dayStart, 1) }],
+    { paidOnly: true }
+  );
+  if (c!.revenue === existing.revenueFils && c!.orders === existing.ordersCompleted) return 0;
+  await sw.funnelSnapshot.update({
+    where: { id: existing.id, storeId },
+    data: { revenueFils: c!.revenue, ordersCompleted: c!.orders },
+  });
+  return 1;
 }

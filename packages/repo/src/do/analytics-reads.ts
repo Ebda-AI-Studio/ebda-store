@@ -6,6 +6,7 @@ import {
   netLinesInnerSql,
   netLinesWrapSql,
   orderNetRevenueSql,
+  refundJoinsSql,
   revenueOrderPredicateSql,
 } from '../revenue';
 
@@ -38,9 +39,10 @@ export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string
   const end = intArg(a.endMs, 'endMs');
   statuses(a.nonRevenue); // validated, not trusted: the population is the ONE revenue definition (../revenue.ts)
   const win = [storeId, start, end];
-  const counts = revenueOrderPredicateSql('o');
+  const counts = revenueOrderPredicateSql('o', 'sqlite');
   const agg = db.all(
     `SELECT COALESCE(SUM(${orderNetRevenueSql('o', 'sqlite')}), 0) AS revenue, COUNT(*) AS orders FROM orders o
+      ${refundJoinsSql('o', 'sqlite')}
       WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
         AND ${counts}`,
     win
@@ -89,8 +91,9 @@ export function analyticsSalesOp(db: SyncSql, storeId: string, a: Record<string,
         : `date(${sec}, 'unixepoch', '-' || ((CAST(strftime('%w', ${sec}, 'unixepoch') AS INTEGER) + 6) % 7) || ' days')`;
   const rows = db.all(
     `SELECT ${key} AS k, COALESCE(SUM(${orderNetRevenueSql('o', 'sqlite')}), 0) AS revenue, COUNT(*) AS orders FROM orders o
+      ${refundJoinsSql('o', 'sqlite')}
       WHERE o.store_id = ?1 AND o.created_at >= ?2 AND o.created_at <= ?3
-        AND ${revenueOrderPredicateSql('o')}
+        AND ${revenueOrderPredicateSql('o', 'sqlite')}
       GROUP BY k ORDER BY k ASC`,
     [storeId, start, end, offset]
   );
@@ -106,7 +109,7 @@ export function analyticsItemsOp(db: SyncSql, storeId: string, a: Record<string,
   const wrap = netLinesWrapSql('sqlite');
   const base = `FROM ${wrap.head}${netLinesInnerSql('sqlite')}
       WHERE o.store_id = ?1 AND o.created_at >= ?2 AND o.created_at <= ?3
-        AND ${revenueOrderPredicateSql('o')}${wrap.tail}`;
+        AND ${revenueOrderPredicateSql('o', 'sqlite')}${wrap.tail}`;
   const params = [storeId, start, end];
   if (a.by === 'priceSource') {
     return db
@@ -180,7 +183,8 @@ export function analyticsCustomersOp(db: SyncSql, storeId: string, a: Record<str
   const top = db
     .all(
       `SELECT o.customer_id AS customerId, COALESCE(SUM(${orderNetRevenueSql('o', 'sqlite')}), 0) AS total, COUNT(*) AS count FROM orders o
-        WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND ${revenueOrderPredicateSql('o')}
+      ${refundJoinsSql('o', 'sqlite')}
+        WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND ${revenueOrderPredicateSql('o', 'sqlite')}
         GROUP BY o.customer_id ORDER BY total DESC LIMIT 10`,
       [storeId]
     )
@@ -345,9 +349,46 @@ export function analyticsNetRevenueOp(db: SyncSql, storeId: string, a: Record<st
   const end = a.endMs === undefined ? Number.MAX_SAFE_INTEGER : intArg(a.endMs, 'endMs');
   const r = db.all(
     `SELECT COALESCE(SUM(${a.gross === true ? 'o.total' : orderNetRevenueSql('o', 'sqlite')}), 0) AS revenue, COUNT(*) AS orders FROM orders o
+      ${refundJoinsSql('o', 'sqlite')}
       WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
-        AND ${revenueOrderPredicateSql('o', { paidOnly: a.paidOnly === true })}`,
+        AND ${revenueOrderPredicateSql('o', 'sqlite', { paidOnly: a.paidOnly === true })}`,
     [storeId, start, end]
   )[0] as Record<string, unknown>;
   return { revenue: num(r.revenue), orders: num(r.orders) };
+}
+
+/**
+ * Net revenue + order count of the ONE revenue definition for MANY [fromMs, toMs) windows in ONE query (the funnel rollup's per-day
+ * figures). `windows` is [{ fromMs, toMs }] (at most 400, integers, disjoint); the result is one row per window, in order.
+ */
+export function analyticsNetRevenueDaysOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+) {
+  const raw = Array.isArray(a.windows) ? a.windows : [];
+  if (raw.length === 0 || raw.length > 400) throw new MoneyError('BAD_ARGS', 'windows', 400);
+  const windows = raw.map((w: Record<string, unknown>, i: number) => ({
+    i,
+    fromMs: intArg(w.fromMs, 'fromMs'),
+    toMs: intArg(w.toMs, 'toMs'),
+  }));
+  // integers validated above, so inlining them into the VALUES list is injection-safe
+  const values = windows.map(w => `(${w.i}, ${w.fromMs}, ${w.toMs})`).join(', ');
+  const rows = db.all(
+    `WITH w(i, f, t) AS (VALUES ${values})
+     SELECT w.i AS i, COALESCE(SUM(${orderNetRevenueSql('o', 'sqlite')}), 0) AS revenue, COUNT(*) AS orders
+       FROM w
+       JOIN orders o ON o.created_at >= w.f AND o.created_at < w.t
+       ${refundJoinsSql('o', 'sqlite')}
+      WHERE o.store_id = ?1 AND o.deleted_at IS NULL
+        AND ${revenueOrderPredicateSql('o', 'sqlite', { paidOnly: a.paidOnly === true })}
+      GROUP BY w.i`,
+    [storeId]
+  );
+  const byI = new Map(rows.map(r => [num(r.i), r]));
+  return windows.map(w => ({
+    revenue: num(byI.get(w.i)?.revenue),
+    orders: num(byI.get(w.i)?.orders),
+  }));
 }

@@ -5,11 +5,13 @@ import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { netRevenue } from './revenue.service';
+import { topCustomersNet } from '../lib/order-refunds';
 import {
   netLinesInnerSql,
   netLinesWrapSql,
   NON_REVENUE_PAYMENT_STATUSES,
   orderNetRevenueSql,
+  refundJoinsSql,
   revenueOrderPredicateSql,
 } from '../lib/revenue-sql';
 import { profitAndLoss } from './accounting/reports.service';
@@ -62,7 +64,7 @@ async function pgLineRevenue(
   const inner = Prisma.raw(netLinesInnerSql('pg'));
   const head = Prisma.raw(wrap.head);
   const tail = Prisma.raw(wrap.tail);
-  const counts = Prisma.raw(revenueOrderPredicateSql('o'));
+  const counts = Prisma.raw(revenueOrderPredicateSql('o', 'pg'));
   const rows =
     by === 'product'
       ? await prisma.$queryRaw<Array<Record<string, unknown>>>`
@@ -560,7 +562,7 @@ export class AnalyticsService {
           AND o.deleted_at IS NULL
           AND o.created_at >= ${startDate}
           AND o.created_at <= ${endDate}
-          AND ${Prisma.raw(revenueOrderPredicateSql('o'))}
+          AND ${Prisma.raw(revenueOrderPredicateSql('o', 'pg'))}
       `,
     ]);
 
@@ -653,10 +655,11 @@ export class AnalyticsService {
         COALESCE(SUM(${Prisma.raw(orderNetRevenueSql('o', 'pg'))}), 0) AS revenue,
         COUNT(*)::bigint AS orders
       FROM public.orders o
+      ${Prisma.raw(refundJoinsSql('o', 'pg'))}
       WHERE store_id = ${storeId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
-        AND ${Prisma.raw(revenueOrderPredicateSql('o'))}
+        AND ${Prisma.raw(revenueOrderPredicateSql('o', 'pg'))}
       GROUP BY period
       ORDER BY period ASC
     `;
@@ -1006,19 +1009,8 @@ export class AnalyticsService {
             return { newCustomers, returningCustomers };
           })(),
 
-      // Top customers by total spend — aggregate at DB level, return top 10
-      // Net of refunds (lib/revenue-sql.ts); same row shape the groupBy returned.
-      prisma.$queryRaw<Array<{ customer_id: string | null; total: bigint; n: bigint }>>`
-        SELECT o.customer_id, COALESCE(SUM(${Prisma.raw(orderNetRevenueSql('o', 'pg'))}), 0)::bigint AS total, COUNT(*)::bigint AS n
-          FROM public.orders o
-         WHERE o.store_id = ${storeId} AND o.deleted_at IS NULL AND ${Prisma.raw(revenueOrderPredicateSql('o'))}
-         GROUP BY o.customer_id ORDER BY total DESC LIMIT 10`.then(rows =>
-        rows.map(r => ({
-          customerId: r.customer_id,
-          _sum: { total: Number(r.total) },
-          _count: Number(r.n),
-        }))
-      ),
+      // Top customers by NET spend (REVENUE-DEF-1), through the store's own backend, never raw SQL on public.orders.
+      topCustomersNet(odb, storeId, 10),
     ]);
 
     // Resolve customer details for the top spenders in a single query

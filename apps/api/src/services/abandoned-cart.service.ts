@@ -25,8 +25,10 @@ import {
 } from '@ebda/database';
 import { storefrontOrigin } from '@ebda/shared';
 import {
+  latestPaymentIsOnline,
   netOrderRevenueMinor,
   orderNetRevenueSql,
+  refundJoinsSql,
   revenueOrderPredicateSql,
 } from '../lib/revenue-sql';
 import { refundedMinorByOrder } from '../lib/order-refunds';
@@ -825,11 +827,12 @@ class AbandonedCartService {
       SELECT COALESCE(SUM(${Prisma.raw(orderNetRevenueSql('o', 'pg'))}), 0)::bigint AS revenue
       FROM public.abandoned_carts ac
       JOIN public.orders o ON o.id = ac.recovered_order_id
+      ${Prisma.raw(refundJoinsSql('o', 'pg'))}
       WHERE ac.store_id = ${storeId}
         AND ac.status = 'recovered'
         AND o.store_id = ${storeId}
         AND o.deleted_at IS NULL
-        AND ${Prisma.raw(revenueOrderPredicateSql('o'))}
+        AND ${Prisma.raw(revenueOrderPredicateSql('o', 'pg'))}
     `;
     const recoveredRevenue = Number(revenueRows[0]?.revenue ?? 0);
 
@@ -976,14 +979,29 @@ async function doRecoveredRevenue(db: StoreReads, storeId: string): Promise<numb
   // The ONE revenue definition (lib/revenue-sql.ts): the exclusions AND the partial-refund netting, in TS.
   const orders = await db.order.findMany({
     where: { id: { in: ids }, storeId, deletedAt: null },
-    select: { id: true, total: true, status: true, paymentStatus: true },
+    select: {
+      id: true,
+      total: true,
+      status: true,
+      paymentStatus: true,
+      payments: { select: { id: true, provider: true, createdAt: true } },
+    },
   });
   const refunded = await refundedMinorByOrder(
     db as Parameters<typeof refundedMinorByOrder>[0],
+    storeId,
     ids
   );
   return orders.reduce(
-    (n, o) => n + netOrderRevenueMinor({ ...o, refundedMinor: refunded.get(o.id) ?? 0 }),
+    (n, o) =>
+      n +
+      netOrderRevenueMinor({
+        total: o.total,
+        status: o.status,
+        paymentStatus: o.paymentStatus,
+        refundedMinor: refunded.get(o.id) ?? 0,
+        hasOnlinePayment: latestPaymentIsOnline(o.payments ?? []),
+      }),
     0
   );
 }

@@ -64,6 +64,7 @@ describe('registration', () => {
   it.each([
     'analyticsPeriod',
     'analyticsNetRevenue',
+    'analyticsNetRevenueDays',
     'analyticsSales',
     'analyticsItems',
     'analyticsOrdersBy',
@@ -430,5 +431,83 @@ describe('refunds are not revenue (STORE-QA-7)', () => {
     expect(op('analyticsNetRevenue', {})).toEqual({ revenue: 9760, orders: 2 });
     // "paid" / cash surfaces (rollups, usage snapshot, insights, platform dashboards): paidOnly
     expect(op('analyticsNetRevenue', { paidOnly: true })).toEqual({ revenue: 4850, orders: 1 });
+  });
+
+  const payWith = (
+    raw: any,
+    id: string,
+    orderId: string,
+    provider: string,
+    createdAt = 1,
+    status = 'pending'
+  ) =>
+    raw
+      .prepare(
+        `INSERT INTO payments (id, order_id, provider, status, amount, refunded_amount, created_at) VALUES (?, ?, ?, ?, 5000, 0, ?)`
+      )
+      .run(id, orderId, provider, status, createdAt);
+
+  it('REVENUE-DEF-1: an unpaid order counts only when it is COD / has no online attempt; an abandoned card checkout is 0', () => {
+    const { raw, op, order } = rig();
+    order('cod', T0, 'pending', 'unpaid', 3000, 'u1');
+    payWith(raw, 'pc', 'cod', 'cod');
+    order('phone', T0 + H, 'pending', 'unpaid', 500, 'u2'); // admin/phone order: no payment row at all
+    order('card', T0 + 2 * H, 'pending', 'unpaid', 4910, 'u3'); // abandoned at the gateway
+    payWith(raw, 'pk', 'card', 'paymob');
+    order('wallet', T0 + 3 * H, 'pending', 'unpaid', 700, 'u4');
+    payWith(raw, 'pw', 'wallet', 'fawry');
+    order('cardpaid', T0 + 4 * H, 'confirmed', 'paid', 1000, 'u5'); // an online order that WAS paid is a sale
+    payWith(raw, 'pp', 'cardpaid', 'paymob');
+    expect(op('analyticsPeriod', win)).toMatchObject({ revenue: 3000 + 500 + 1000, orders: 3 });
+    expect(op('analyticsNetRevenue', {})).toEqual({ revenue: 4500, orders: 3 });
+    expect(op('analyticsNetRevenue', { paidOnly: true })).toEqual({ revenue: 1000, orders: 1 });
+    expect(op('analyticsSales', { ...win, offsetMinutes: 0, granularity: 'day' })[0].revenue).toBe(
+      4500
+    );
+    expect(
+      op('analyticsCustomers', win)
+        .top.map((r: any) => r.customerId)
+        .sort()
+    ).toEqual(['u1', 'u2', 'u5']);
+  });
+
+  it('REVENUE-DEF-1b: the LATEST payment row decides: failed card then COD counts, a pending card alone does not', () => {
+    const { raw, op, order } = rig();
+    // card failed, then the shopper chose COD: the latest attempt is COD -> a sale
+    order('switch', T0, 'pending', 'unpaid', 2000, 'u1');
+    payWith(raw, 'a1', 'switch', 'paymob', 100, 'failed');
+    payWith(raw, 'a2', 'switch', 'cod', 200, 'cod_pending');
+    // only a pending card attempt -> abandoned at the gateway
+    order('pending-card', T0 + H, 'pending', 'unpaid', 3000, 'u2');
+    payWith(raw, 'b1', 'pending-card', 'paymob', 100, 'pending');
+    // COD first, then the shopper went online and left: the latest attempt is online -> not a sale
+    order('cod-then-card', T0 + 2 * H, 'pending', 'unpaid', 700, 'u3');
+    payWith(raw, 'c1', 'cod-then-card', 'cod', 100, 'cod_pending');
+    payWith(raw, 'c2', 'cod-then-card', 'fawry', 200, 'pending');
+    // equal created_at: the higher id is the later row
+    order('tie', T0 + 3 * H, 'pending', 'unpaid', 400, 'u4');
+    payWith(raw, 'd1', 'tie', 'paymob', 100, 'failed');
+    payWith(raw, 'd2', 'tie', 'cod', 100, 'cod_pending');
+    expect(op('analyticsPeriod', win)).toMatchObject({ revenue: 2000 + 400, orders: 2 });
+    expect(op('analyticsNetRevenue', {})).toEqual({ revenue: 2400, orders: 2 });
+  });
+
+  it('netRevenueDays: ONE query returns each window own net total (refunds netted, windows disjoint)', () => {
+    const { raw, op, order } = rig();
+    order('d1', T0, 'delivered', 'paid', 5000, 'u1');
+    refund(raw, 'r1', 'd1', 1200);
+    order('d2', T0 + D, 'delivered', 'paid', 700, 'u2');
+    order('d2b', T0 + D + H, 'delivered', 'unpaid', 300, 'u3'); // not paid-only
+    const w = [
+      { fromMs: T0 - H, toMs: T0 + H },
+      { fromMs: T0 + D - H, toMs: T0 + D + 2 * H },
+      { fromMs: T0 + 5 * D, toMs: T0 + 6 * D }, // empty window still returns a row
+    ];
+    expect(op('analyticsNetRevenueDays', { windows: w, paidOnly: true })).toEqual([
+      { revenue: 3800, orders: 1 },
+      { revenue: 700, orders: 1 },
+      { revenue: 0, orders: 0 },
+    ]);
+    expect(op('analyticsNetRevenueDays', { windows: w })[1]).toEqual({ revenue: 1000, orders: 2 });
   });
 });

@@ -4,8 +4,15 @@
  * day left that window (a COD return a month later) would leave the day's revenue overstated forever.
  *
  * On every `order/refunded` (full OR partial, any producer) this recomputes the ONE Cairo day the refunded order was
- * placed in, through the same `runFunnelRollup` the cron uses (so the refund is netted by the ONE revenue definition,
- * lib/revenue-sql.ts). Idempotent: it recomputes from the orders, it never applies a delta.
+ * placed in, through `correctFunnelRevenueDay`, which rewrites ONLY that row's revenueFils and ordersCompleted from the orders by the
+ * ONE revenue definition (lib/revenue-sql.ts); every other column keeps what the nightly run wrote. Idempotent: it recomputes from the orders, it never applies a delta.
+ *
+ * Emit coverage (read, not assumed): every write path that moves a refund sends `order/refunded` through
+ * `OrderService.applyRefundEffects` / `recordRefundOutsideReturn`: provider refunds and webhooks (payment.factory.ts), the InstaPay
+ * recorder (instapay.service.ts, whole order via updateStatus, partial via recordRefundOutsideReturn), a manual refund record
+ * (order.routes.ts: status flip first, then the payment write), full and partial returns (return.service.ts) and the backorder
+ * line cancel. No path was found that changes payments.refunded_amount or a completed return without the event. If a future one
+ * does, the day stays wrong until `insights/funnel-backfill-requested` (apply) runs; this job is a prompt correction, not the only net.
  *
  * Staleness class of the other two rollups (BOUNDED-stale, <= 24 h): cohort + RFM snapshots are rebuilt from the whole
  * paid-order history by the nightly cron (analytics-daily-rollup), so a refund shows up there at the next 02:00 Cairo run.
@@ -15,7 +22,7 @@ import { inngest } from '../client';
 import { runInStoreCtx } from '../../jobs/store-db';
 import { isStoreGoneError } from '../../jobs/store-gone';
 import { storeDb, storeRepo } from '../../repo-factory';
-import { runFunnelRollup } from '../../../services/accounting/analytics-rollup.service';
+import { correctFunnelRevenueDay } from '../../../services/accounting/analytics-rollup.service';
 import { regionDayStart } from '@ebda/shared';
 import logger from '../../logger';
 
@@ -58,7 +65,7 @@ export const analyticsRefundCorrection: JobDef = inngest.createFunction(
         const daysAgo = cairoDaysAgo(order.createdAt);
         // Today's row does not exist yet (the nightly run writes yesterday and earlier): nothing to correct.
         if (daysAgo < 1) return { skipped: 'today' };
-        const rows = await runFunnelRollup(storeId, daysAgo, daysAgo);
+        const rows = await correctFunnelRevenueDay(storeId, daysAgo);
         return { corrected: rows, daysAgo };
       });
     });

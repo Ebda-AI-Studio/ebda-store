@@ -7,7 +7,11 @@ import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
 import { AppError } from '../middleware/error-handler';
 import { NON_REVENUE_ORDER_STATUSES } from '@ebda/shared';
-import { NON_REVENUE_PAYMENT_STATUSES, netOrderRevenueMinor } from '../lib/revenue-sql';
+import {
+  latestPaymentIsOnline,
+  NON_REVENUE_PAYMENT_STATUSES,
+  netOrderRevenueMinor,
+} from '../lib/revenue-sql';
 import { refundedMinorByOrder } from '../lib/order-refunds';
 import { matchingCustomers } from './admin-search.service';
 
@@ -96,25 +100,32 @@ export function formatShippingAddress(addr: ShippingAddressShape | null): string
 
 /**
  * Order statuses that do NOT count toward customer spend in the KPI strip.
- * Same population as the dashboard's revenue (`analytics.service.ts`
- * `getPeriodStats`: `status notIn ['cancelled','refunded']`), so the
- * Customers page and Analytics never disagree about what "spent" means.
+ * The same set as the revenue definition (`lib/revenue-sql.ts`, Ruling REVENUE-DEF-1), so the Customers page and Analytics never
+ * disagree about what "spent" means.
  */
 const KPI_EXCLUDED_STATUSES = new Set<string>(NON_REVENUE_ORDER_STATUSES);
 
 /**
- * An order counts toward spend unless it is cancelled/refunded OR its payment
- * FAILED (owner decision 2026-10-01, issue 2235, ruling AUI-1a). An unpaid
- * order whose payment has not failed — a COD order not yet delivered — still
- * counts. Same population as `analytics.service.ts` revenue.
+ * Whether an order is a sale for customer spend: the revenue definition's POPULATION (Ruling REVENUE-DEF-1). It does not count when
+ * its status is cancelled / refunded / awaiting confirmation, when its payment FAILED or was REFUNDED (STORE-QA-7: a delivered
+ * order whose payment was refunded is not spend), or when it is UNPAID with an online payment attempt (an abandoned card / wallet
+ * checkout). An unpaid cash-on-delivery order, or one with no online attempt (phone/admin), still counts. This only decides
+ * membership; the AMOUNT added for a member is `netOrderRevenueMinor` (total minus refunds already given, partial included), so
+ * the strip nets partial refunds too.
  */
-export function countsTowardSpend(status: string, paymentStatus: string): boolean {
-  // payment_status `refunded` too (STORE-QA-7): a delivered order whose payment was refunded is not spend. The population is the
-  // ONE revenue definition (lib/revenue-sql.ts); a PARTIAL refund is not netted in this per-customer strip (see the PR).
-  return (
-    !KPI_EXCLUDED_STATUSES.has(status) &&
-    !(NON_REVENUE_PAYMENT_STATUSES as readonly string[]).includes(paymentStatus)
-  );
+export function countsTowardSpend(
+  status: string,
+  paymentStatus: string,
+  payments: ReadonlyArray<{
+    provider?: string | null;
+    createdAt?: Date | number | string | null;
+    id?: string;
+  }> = []
+): boolean {
+  if (KPI_EXCLUDED_STATUSES.has(status)) return false;
+  if ((NON_REVENUE_PAYMENT_STATUSES as readonly string[]).includes(paymentStatus)) return false;
+  if (paymentStatus === 'unpaid' && latestPaymentIsOnline(payments)) return false;
+  return true;
 }
 
 /**
@@ -353,7 +364,7 @@ async function aggregateCustomersUncached(
       // Payment method lives on the Payment row(s), not the Order. Pull
       // the provider + method via the relation; first payment wins for the
       // summary string.
-      payments: { select: { provider: true, method: true } },
+      payments: { select: { id: true, provider: true, method: true, createdAt: true } },
       customer: {
         select: { id: true, email: true, firstName: true, lastName: true, phone: true },
       },
@@ -381,6 +392,7 @@ async function aggregateCustomersUncached(
   // whole-order exclusions.
   const refundedByOrder = await refundedMinorByOrder(
     await storeDb(storeId),
+    storeId,
     orders.map(o => o.id)
   );
   const netOf = (o: {
@@ -432,7 +444,7 @@ async function aggregateCustomersUncached(
     }
     if (status) statusSet.add(status);
 
-    const counts = countsTowardSpend(status, paymentStatus);
+    const counts = countsTowardSpend(status, paymentStatus, order.payments ?? []);
     if (counts) {
       const counted = countedByKey.get(key) ?? { orders: 0, spent: 0 };
       counted.orders += 1;
@@ -806,6 +818,8 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
       },
       payments: {
         select: {
+          id: true,
+          createdAt: true,
           provider: true,
           status: true,
           amount: true,
@@ -906,6 +920,7 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
   const orders = truncated ? fetchedOrders.slice(0, MAX_CUSTOMER_ORDERS) : fetchedOrders;
   const refundedByOrder = await refundedMinorByOrder(
     await storeDb(storeId),
+    storeId,
     orders.map(o => o.id)
   );
 
@@ -931,7 +946,7 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
   let countedOrders = 0;
   for (const o of orders) {
     // Same population as the list/KPI (STORE-QA-22): refunded/cancelled/failed orders add no spend.
-    if (countsTowardSpend(o.status, o.paymentStatus)) {
+    if (countsTowardSpend(o.status, o.paymentStatus, o.payments ?? [])) {
       totalSpent += netOrderRevenueMinor({
         total: o.total,
         status: o.status,

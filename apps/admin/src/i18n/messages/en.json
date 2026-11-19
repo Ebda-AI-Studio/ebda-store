@@ -1969,7 +1969,7 @@
         "repeatSub": "{repeat} of {buyers} buyers ordered again",
         "noBuyersSub": "No orders yet",
         "ordersSub": "{count, plural, one {Across {count, number, latn} order} other {Across {count, number, latn} orders}}",
-        "spentSub": "All orders except cancelled, refunded and failed payments (unpaid COD counts)"
+        "spentSub": "All orders except cancelled, refunded and failed payments (unpaid COD counts; abandoned online checkouts do not)"
       },
       "moreMenu": "More customer options"
     },

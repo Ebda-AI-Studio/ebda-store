@@ -43,9 +43,12 @@ export const accountingPeriodReconciliation: JobDef = inngest.createFunction(
     for (const store of stores) {
       // PORTED (Ruling CF-JOBS-4): the operational total and the GL credits both follow the store's backend.
       // REVENUE-DEF-1: the operational side is the ONE revenue definition, paid-only, gross of partial refunds (the GL credits
-      // below are gross of a partial adjustment). Before this it excluded only status cancelled/refunded, so a delivered order
-      // whose payment was refunded sat on BOTH sides and a sale journal that never reversed raised no drift (STORE-QA-7).
-      const ops = await step.run(`ops-${store.id}`, () =>
+      // below are gross of a partial adjustment). The old filter already required payment_status paid and excluded status
+      // cancelled/refunded; the real changes are the soft-delete filter, awaiting_payment_confirmation, and payment_status
+      // `refunded` (a delivered order whose payment was refunded stayed on BOTH sides, so a sale journal that never reversed raised
+      // no drift: STORE-QA-7). The step id is versioned (`ops-v2`): this step's result changed shape from `{ _sum }` to
+      // `{ revenue, orders }`, and a run in flight would otherwise replay the memoized old shape.
+      const ops = await step.run(`ops-v2-${store.id}`, () =>
         netRevenue(store.id, { from: since, paidOnly: true, gross: true })
       );
 
@@ -68,9 +71,10 @@ export const accountingPeriodReconciliation: JobDef = inngest.createFunction(
         return Number(rows[0].total);
       });
 
-      const opsTotal = Number(ops.revenue);
+      const opsTotal = Number(ops?.revenue);
       const drift = opsTotal - gl;
-      if (Math.abs(drift) > 0) {
+      // A non-finite figure (a replayed step result of an unexpected shape) must ALERT, never compare false and skip the store.
+      if (!Number.isFinite(drift) || Math.abs(drift) > 0) {
         drifts += 1;
         await step.run(`alert-${store.id}`, () =>
           sendAlert({

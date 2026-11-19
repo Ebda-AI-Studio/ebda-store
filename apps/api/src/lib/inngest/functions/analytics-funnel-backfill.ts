@@ -4,7 +4,8 @@
  *
  * `insights/funnel-backfill-requested` { storeId, daysBack?: 1..400 (90), apply?: boolean }
  *   DRY RUN BY DEFAULT: with `apply` absent/false it only reports (return value + log) the days whose stored revenue differs.
- *   `apply: true` rewrites exactly those days through `runFunnelRollup` (idempotent: recomputed from the orders, no deltas).
+ *   `apply: true` rewrites exactly those days' revenueFils + ordersCompleted ONLY (correctFunnelRevenueDay: every other column is
+ *   left as the nightly run wrote it), 30 days per step. Idempotent: recomputed from the orders, no deltas.
  * Cohort + RFM rows are rebuilt from the whole paid-order history by every nightly run, so they converge within 24 h with no
  * backfill; only the funnel's per-day rows need this.
  */
@@ -14,13 +15,15 @@ import { runInStoreCtx } from '../../jobs/store-db';
 import { isStoreGoneError } from '../../jobs/store-gone';
 import { storeRepo } from '../../repo-factory';
 import {
+  correctFunnelRevenueDay,
   funnelDriftDays,
-  runFunnelRollup,
 } from '../../../services/accounting/analytics-rollup.service';
 import logger from '../../logger';
 
 const FUNNEL_BACKFILL_DEFAULT_DAYS = 90;
 const FUNNEL_BACKFILL_MAX_DAYS = 400;
+/** days rewritten per Inngest step */
+const FUNNEL_BACKFILL_CHUNK = 30;
 
 // pq-allow(unused-export): imported by tests/unit/revenue-definition.test.ts
 export function clampBackfillDays(n: unknown): number {
@@ -45,24 +48,36 @@ export const analyticsFunnelBackfill: JobDef = inngest.createFunction(
     };
     if (!storeId) return { skipped: 'missing-storeId' };
     const days = clampBackfillDays(daysBack);
-    return step.run('backfill', async () => {
+    const live = await step.run('store-live', async () => {
       try {
         await storeRepo(storeId);
+        return true;
       } catch (err) {
-        if (isStoreGoneError(err)) return { skipped: 'store-gone' };
+        if (isStoreGoneError(err)) return false;
         throw err;
       }
-      return runInStoreCtx(storeId, async () => {
-        const drift = await funnelDriftDays(storeId, days);
-        if (apply !== true) {
-          logger.info({ storeId, days, drift: drift.length }, 'funnel-backfill DRY RUN');
-          return { mode: 'dry-run' as const, days, drift };
-        }
-        let rewritten = 0;
-        for (const d of drift) rewritten += await runFunnelRollup(storeId, d.daysAgo, d.daysAgo);
-        logger.info({ storeId, days, rewritten }, 'funnel-backfill applied');
-        return { mode: 'applied' as const, days, drift, rewritten };
-      });
     });
+    if (!live) return { skipped: 'store-gone' };
+    // ONE read (two queries, however many days), then the rewrite in chunked steps so no step runs 400 writes.
+    const drift = await step.run('drift', () =>
+      runInStoreCtx(storeId, () => funnelDriftDays(storeId, days))
+    );
+    if (apply !== true) {
+      logger.info({ storeId, days, drift: drift.length }, 'funnel-backfill DRY RUN');
+      return { mode: 'dry-run' as const, days, drift };
+    }
+    let rewritten = 0;
+    for (let i = 0; i < drift.length; i += FUNNEL_BACKFILL_CHUNK) {
+      const chunk = drift.slice(i, i + FUNNEL_BACKFILL_CHUNK);
+      rewritten += await step.run(`apply-${i / FUNNEL_BACKFILL_CHUNK}`, () =>
+        runInStoreCtx(storeId, async () => {
+          let n = 0;
+          for (const d of chunk) n += await correctFunnelRevenueDay(storeId, d.daysAgo);
+          return n;
+        })
+      );
+    }
+    logger.info({ storeId, days, rewritten }, 'funnel-backfill applied');
+    return { mode: 'applied' as const, days, drift, rewritten };
   }
 );
