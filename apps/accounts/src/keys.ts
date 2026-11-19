@@ -33,7 +33,7 @@ export async function signingKey(raw: string | undefined): Promise<SigningKey> {
 }
 
 /** A retired key is published for at most this long from now, whatever its `exp` says (a typo'd far-future exp must not keep it alive). */
-export const RETIRED_KEY_MAX_AHEAD_SECONDS = 30 * 24 * 3600;
+const RETIRED_KEY_MAX_AHEAD_SECONDS = 30 * 24 * 3600;
 
 /** Kids of retired keys that are NOT published: no numeric `exp`, or an `exp` more than 30 days ahead (ID-08). Surfaced on /health. */
 export function retiredKeysWithoutExp(env: { JWT_PREVIOUS_PUBLIC_JWKS?: string }): string[] {
