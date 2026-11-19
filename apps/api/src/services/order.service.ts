@@ -531,8 +531,9 @@ function forBackend<const I extends { customer?: unknown }>(onDo: boolean, inclu
 /**
  * `id -> nameAr` for a set of product ids, in ONE query selecting only those two columns, keyed on the primary key
  * (`id IN (...)`, scoped by store): the plan is a PK lookup, so no new index is needed. At most `limit` (<=100) orders
- * x their lines, de-duplicated. Exported for the query-shape test.
+ * x their lines, de-duplicated.
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/storeqa-rest-2.test.ts (asserts the query shape)
 export async function productArabicNames(
   db: { product: { findMany: (args: { where: object; select: object }) => Promise<unknown> } },
   storeId: string,
