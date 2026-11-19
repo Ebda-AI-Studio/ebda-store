@@ -1,0 +1,44 @@
+{
+  "id": "product.list-search",
+  "status": "live",
+  "area": "products",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "شوف وابحث في المنتجات",
+  "titleEn": "List, search and filter products",
+  "screens": ["/stores/[id]/products"],
+  "api": [
+    "GET /stores/:storeId/products",
+    "GET .../products/search",
+    "GET .../products/suggestions",
+    "GET .../products/filters",
+    "GET .../products/:id"
+  ],
+  "mcpTool": "admin_list_products; admin_get_product",
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "free",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": "products-and-csv-import",
+  "questions": {
+    "ar": [
+      "فين منتجاتي؟",
+      "دور على منتج بالاسم او SKU",
+      "اعرضلي المنتجات اللي خلصت",
+      "المنتجات المسودة"
+    ],
+    "en": ["Show my products that are out of stock", "Find a product by SKU"]
+  },
+  "steps": ["Products page: search, filters, status."],
+  "edgeCases": [
+    "5,000+ products: cursor pagination",
+    "Arabic stemming search",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": []
+}

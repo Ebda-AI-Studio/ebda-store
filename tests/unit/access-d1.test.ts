@@ -448,6 +448,7 @@ describe('raw-transaction guard', () => {
       'apps/api/src/services/page-builder.service.ts',
       'apps/api/src/services/plan-limit.service.ts',
       'apps/api/src/services/staff-invite.service.ts',
+      'apps/api/src/services/staff-members.service.ts',
     ];
     // A new caller must be added here on purpose, and reviewed for: scope = prisma/withStore/inAccessScope (routed),
     // never `$transaction`, `withMoneyTx`, `scopeTransaction` or `withTenantContext` (their raw tx bypasses the router).

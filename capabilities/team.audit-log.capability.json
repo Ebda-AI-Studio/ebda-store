@@ -1,0 +1,32 @@
+{
+  "id": "team.audit-log",
+  "status": "live",
+  "area": "team",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "سجل التغييرات",
+  "titleEn": "Store activity / audit log (who changed what)",
+  "screens": [],
+  "api": ["(super-admin /audit-logs only)"],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["super_admin"],
+  "policy": "forbidden",
+  "undo": {
+    "class": "none",
+    "note": "n/a"
+  },
+  "helpArticle": null,
+  "questions": {
+    "ar": ["مين غير السعر ده؟", "مين مسح المنتج؟"],
+    "en": ["Who changed this price?"]
+  },
+  "steps": [
+    "Merchant has no audit-log screen; assistant action journal exists only for assistant actions."
+  ],
+  "edgeCases": [
+    "Team members need to know who edited",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing"
+  ],
+  "gaps": ["NO merchant UI/API for store audit log (platform /audit-logs is super-admin)"]
+}

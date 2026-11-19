@@ -73,7 +73,11 @@ export function median(nums) {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-/** Size guard. Pure: returns the list of problems (empty = fine). */
+/**
+ * Size guard. Pure: returns the list of problems (empty = fine).
+ * `uploaded` and `history` must be DAILY-tier bytes: a weekly/monthly day uploads an extra full copy, which is not growth
+ * (runBackup passes `dailyUploaded` and each ledger run's `daily`, so a Sunday is compared like with like).
+ */
 export function sizeProblems({ uploaded, history, total, cap }) {
   const problems = [];
   const med = median(history.slice(-HISTORY_RUNS));
@@ -339,6 +343,7 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
   }
 
   let uploaded = 0;
+  let dailyUploaded = 0;
   let rawTotal = 0;
   let gzTotal = 0;
   const manifests = Object.fromEntries(tiers.map(t => [t, { artifacts: {} }]));
@@ -382,6 +387,7 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
       await putVerified(io, key, enc, log);
       ledger.objects[key] = { bytes: enc.length, tier, day };
       uploaded += enc.length;
+      if (tier === 'daily') dailyUploaded += enc.length;
       const entry = { ...base, key, reused: false, encBytes: enc.length, encSha256: sha256(enc) };
       manifests[tier].artifacts[a.name] = entry;
       if (tier === 'daily')
@@ -407,6 +413,7 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
     await putVerified(io, key, body, log);
     ledger.objects[key] = { bytes: body.length, tier, day };
     uploaded += body.length;
+    if (tier === 'daily') dailyUploaded += body.length;
   }
 
   // Ledger: forget what the bucket lifecycle has expired, record this run, compute the footprint estimate.
@@ -414,16 +421,16 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
     if (ageDays(o.day, day) > TIERS[o.tier].days) delete ledger.objects[k];
   for (const [n, l] of Object.entries(ledger.last))
     if (!ledger.objects[l.key]) delete ledger.last[n];
-  const history = ledger.runs.map(r => r.uploaded);
+  const history = ledger.runs.map(r => r.daily ?? r.uploaded);
   const total = Object.values(ledger.objects).reduce((a, o) => a + o.bytes, 0);
-  ledger.runs = [...ledger.runs.filter(r => r.day !== day), { day, uploaded }].slice(-30);
+  ledger.runs = [...ledger.runs.filter(r => r.day !== day), { day, uploaded, daily: dailyUploaded }].slice(-30);
   await io.r2Put(LEDGER_KEY, Buffer.from(JSON.stringify(ledger)));
   await io.r2Put(
     LATEST_KEY,
     Buffer.from(JSON.stringify({ day, tiers, takenAt: now.toISOString() }))
   );
 
-  const problems = sizeProblems({ uploaded, history, total, cap });
+  const problems = sizeProblems({ uploaded: dailyUploaded, history, total, cap });
   return {
     ok: problems.length === 0,
     day,
@@ -433,6 +440,7 @@ export async function runBackup({ io, now = new Date(), cap = DEFAULT_CAP_BYTES,
     rawBytes: rawTotal,
     gzBytes: gzTotal,
     uploadedBytes: uploaded,
+    dailyUploadedBytes: dailyUploaded,
     reused: Object.values(manifests.daily.artifacts).filter(e => e.reused).length,
     estimatedCfTotalBytes: total,
     capBytes: cap,

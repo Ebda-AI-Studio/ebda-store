@@ -1,0 +1,48 @@
+{
+  "id": "finance.tax-vat",
+  "status": "live",
+  "area": "tax",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "ضريبة القيمة المضافة",
+  "titleEn": "VAT registration, verification, tax rates, prices include tax",
+  "screens": ["/stores/[id]/tax"],
+  "api": [
+    "GET/PUT .../tax/settings",
+    "GET/POST/PUT/DELETE .../tax/rates",
+    "PATCH .../rates/:id/toggle",
+    "GET/PUT .../tax/profile",
+    "POST .../tax/profile/documents",
+    "POST .../tax/profile/submit"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "irreversible",
+    "note": "no after verified (change needs support)"
+  },
+  "helpArticle": "vat-registration",
+  "questions": {
+    "ar": [
+      "ازاي افعل ضريبة القيمة المضافة؟",
+      "رفعت الورق ولسه ما اتراجعش",
+      "الاسعار شاملة الضريبة؟",
+      "غيرت سجل ضريبي"
+    ],
+    "en": ["How do I enable VAT?", "My VAT documents are still under review"]
+  },
+  "steps": ["Tax page: profile + documents > submit; collection needs verified VAT registration."],
+  "edgeCases": [
+    "Super-admin approves documents (legal) today (audit gap 8)",
+    "Tax rate sum applied to every order",
+    "Store time zone",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["VAT verification by super-admin; no merchant change request (gap 8)"],
+  "assistantNote": "legal: confirm"
+}

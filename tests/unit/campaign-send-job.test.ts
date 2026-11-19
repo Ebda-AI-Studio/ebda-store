@@ -41,6 +41,15 @@ vi.mock('@api/lib/jobs/store-db', async orig => ({
   storeActiveForJob: vi.fn(async () => storeActive.value),
 }));
 
+// The per-batch operational read (Ruling SUSPEND-OUT-1): independent of storeActiveForJob so a store can be suspended MID-send.
+const operational = vi.hoisted(() => ({ value: true, reads: 0 }));
+vi.mock('@api/lib/store-operational', () => ({
+  storeOperational: vi.fn(async () => {
+    operational.reads++;
+    return operational.value;
+  }),
+}));
+
 vi.mock('@ebda/database', () => ({
   get prisma() {
     return holder.prisma;
@@ -151,6 +160,8 @@ beforeEach(() => {
   process.env.CAMPAIGN_SEND_THROTTLE_MS = String(THROTTLE);
   delete process.env.CAMPAIGN_DAILY_SEND_CAP;
   storeActive.value = true;
+  operational.value = true;
+  operational.reads = 0;
 });
 
 afterEach(() => {
@@ -193,6 +204,27 @@ describe('campaign-send', () => {
 
     expect(sendMarketingEmail).not.toHaveBeenCalled();
     expect(campaign().status).toBe('scheduled');
+  });
+
+  it('a store suspended MID-send pauses the campaign: nothing failed, recipients stay queued, one status read per batch', async () => {
+    seed(['a@x.test', 'b@x.test', 'c@x.test']);
+    operational.value = false;
+
+    await expect(runJob()).resolves.toEqual({ paused: 'store-not-operational' });
+
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(db.recipients.map(r => r.status)).toEqual(['queued', 'queued', 'queued']);
+    expect(campaign().status).toBe('draft');
+    expect(campaign().lastError).toBe('STORE_NOT_OPERATIONAL');
+    expect(operational.reads).toBe(1);
+  });
+
+  it('an operational store reads its status once per batch, not once per recipient', async () => {
+    seed(['a@x.test', 'b@x.test', 'c@x.test']);
+    await runJob();
+    expect(sendMarketingEmail).toHaveBeenCalledTimes(3);
+    expect(operational.reads).toBe(1);
+    for (const c of sendMarketingEmail.mock.calls) expect(c[1].operationalChecked).toBe(true);
   });
 
   it('sends ONE email per consented subscriber, to one address each, then marks the campaign sent', async () => {
@@ -311,6 +343,108 @@ describe('campaign-send', () => {
 
     await runJob();
 
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
+  });
+
+  it("a RESUME does not count the campaign's own already-sent recipients twice against the cap", async () => {
+    // cap 10, audience 8, 5 already sent by THIS campaign (paused mid-send): 3 still to send fits; 8 > 10 - 5 did not.
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '10';
+    const emails = Array.from({ length: 8 }, (_, i) => `u${i}@x.test`);
+    seed(emails);
+    for (const e of emails.slice(0, 5))
+      db.recipients.push({
+        id: uuid(),
+        campaignId,
+        storeId: STORE_A,
+        email: e,
+        status: 'sent',
+        sentAt: new Date(),
+      });
+
+    await runJob();
+
+    expect(campaign().lastError).not.toBe('DAILY_CAP_EXCEEDED');
+    expect(sentTo().sort()).toEqual(emails.slice(5).sort());
+  });
+
+  it("a resume with OTHER campaigns' sends today: cap 10, others 4, own 5 sent, audience 8 -> need 3 > headroom 1, refused", async () => {
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '10';
+    const emails = Array.from({ length: 8 }, (_, i) => `u${i}@x.test`);
+    seed(emails);
+    for (const e of emails.slice(0, 5))
+      db.recipients.push({
+        id: uuid(),
+        campaignId,
+        storeId: STORE_A,
+        email: e,
+        status: 'sent',
+        sentAt: new Date(),
+      });
+    for (let i = 0; i < 4; i++)
+      db.recipients.push({
+        id: uuid(),
+        campaignId: 'other',
+        storeId: STORE_A,
+        email: `o${i}@x.test`,
+        status: 'sent',
+        sentAt: new Date(),
+      });
+    await runJob();
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
+  });
+
+  it('a resume that still has more to send than the headroom fails DAILY_CAP_EXCEEDED', async () => {
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '6';
+    const emails = Array.from({ length: 8 }, (_, i) => `u${i}@x.test`);
+    seed(emails);
+    for (const e of emails.slice(0, 5))
+      db.recipients.push({
+        id: uuid(),
+        campaignId,
+        storeId: STORE_A,
+        email: e,
+        status: 'sent',
+        sentAt: new Date(),
+      });
+    await runJob();
+    expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
+  });
+
+  const sentRow = (cid: string, email: string, ago = 0) => ({
+    id: uuid(),
+    campaignId: cid,
+    storeId: STORE_A,
+    email,
+    status: 'sent',
+    sentAt: new Date(Date.now() - ago),
+  });
+  const DAY = 25 * 3600 * 1000;
+
+  it('a resume NEXT DAY: sends outside the 24h window (and one no longer in the audience) never shrink need', async () => {
+    // cap 2, audience 8 of which 5 were sent yesterday; a 6th sent-yesterday recipient has left the audience.
+    // need = 3 > remaining 2 -> refuse. A bare count of own sent (6) gave need 2 -> go.
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '2';
+    const emails = Array.from({ length: 8 }, (_, i) => `u${i}@x.test`);
+    seed(emails);
+    for (const e of emails.slice(0, 5)) db.recipients.push(sentRow(campaignId, e, DAY));
+    db.recipients.push(sentRow(campaignId, 'gone@x.test', DAY));
+    await runJob();
+    expect(sendMarketingEmail).not.toHaveBeenCalled();
+    expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
+  });
+
+  it('sent recipients that unsubscribed and left the audience do not reduce need', async () => {
+    // 5 sent, 3 of them since unsubscribed (not in the audience); audience 6 incl. 2 already sent -> need 4 > remaining 3.
+    // (cap 10, own 2 sent today in-audience + 3 gone = alreadySent 5, remaining 5? use cap 8 -> remaining 3.)
+    process.env.CAMPAIGN_DAILY_SEND_CAP = '8';
+    const emails = Array.from({ length: 6 }, (_, i) => `u${i}@x.test`);
+    seed(emails);
+    for (const e of emails.slice(0, 2)) db.recipients.push(sentRow(campaignId, e));
+    for (const e of ['g0@x.test', 'g1@x.test', 'g2@x.test'])
+      db.recipients.push(sentRow(campaignId, e));
+    await runJob();
     expect(sendMarketingEmail).not.toHaveBeenCalled();
     expect(campaign().lastError).toBe('DAILY_CAP_EXCEEDED');
   });

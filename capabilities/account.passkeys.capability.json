@@ -1,0 +1,43 @@
+{
+  "id": "account.passkeys",
+  "status": "live",
+  "area": "account",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "البصمة والـ passkey",
+  "titleEn": "Manage passkeys (fingerprint / face login)",
+  "screens": ["/account/security"],
+  "api": [
+    "GET /auth/passkeys",
+    "POST /auth/passkeys/register/begin",
+    "POST /auth/passkeys/register/finish",
+    "PATCH /auth/passkeys/:id",
+    "DELETE /auth/passkeys/:id",
+    "POST /auth/passkeys/authenticate/begin",
+    "POST /auth/passkeys/step-up"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "staff"],
+  "policy": "confirm",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "account-security",
+  "questions": {
+    "ar": ["ازاي ادخل بالبصمة؟", "امسح passkey قديم", "passkey مش شغال على الموبايل"],
+    "en": ["How do I add a passkey?"]
+  },
+  "steps": ["Account > Security > Add passkey; the device prompts for biometrics."],
+  "edgeCases": [
+    "Browser/device without WebAuthn",
+    "Passkey bound to old domain after custom domain change (inferred)",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [],
+  "assistantNote": "deep-link only: WebAuthn needs the human"
+}

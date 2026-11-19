@@ -62,6 +62,8 @@ export function workspaceAliases(root: string): Record<string, string> {
     '@shared': path.resolve(root, './packages/shared'),
     // Pure brand module only — keeps marketing bundles free of the shared barrel.
     '@ebda/shared/brand': path.resolve(root, './packages/shared/src/brand'),
+    // The vendored Smart Layer engine (API Worker + its tests); never through the shared barrel.
+    '@ebda/shared/smart-layer': path.resolve(root, './packages/shared/src/smart-layer-kit.ts'),
     // Pure contact-enquiry contract (marketing form + API share it; zero deps).
     '@ebda/shared/contact-enquiry': path.resolve(root, './packages/shared/src/contact-enquiry'),
     // Pure legal-policy registry (marketing imports it without the shared barrel).
