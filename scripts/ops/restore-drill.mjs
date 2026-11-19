@@ -315,6 +315,7 @@ if (a.target === 'harness') {
       'BUILD_COMMIT_SHA=drill',
       `JWT_SECRET=${jwtSecret}`,
       'SUITE_BUYER_KEY_SECRET=drill-only-suite-buyer-key-secret-0123456789',
+      'ORDER_STATUS_LINK_SECRET=drill-only-order-status-link-secret-0123456789',
       `ENCRYPTION_KEY=${'0'.repeat(64)}`,
       'TAP_API_KEY=k',
       'TAP_SECRET_KEY=s',
