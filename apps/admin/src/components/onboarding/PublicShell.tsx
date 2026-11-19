@@ -16,7 +16,7 @@ import { maskEmail } from '@/lib/mask-email';
  * A signed-in person on a setup/gate page (onboarding with no store yet, a refused invite, verify-email) must never be stuck on the wrong
  * account: this shows who is signed in (masked) and a real Sign out button, which ends the session and lands on the sign-in page.
  */
-export function SignedInStrip() {
+function SignedInStrip() {
   const t = useT('onboarding.shell');
   const { user, isAuthenticated, logout } = useAuth();
   if (!isAuthenticated) return null;
