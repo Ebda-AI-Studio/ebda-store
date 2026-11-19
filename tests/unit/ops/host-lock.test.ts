@@ -84,13 +84,15 @@ describe('host-lock.sh', () => {
     holder.kill();
   }, 20000);
 
-  it('MAC-LIGHT-1 / PREPUSH-4: the gate is light and unlocked; only its vitest steps take the host lock', () => {
+  it('MAC-LIGHT-1 / PREPUSH-8: the gate is light and unlocked; the vitest related run is a prepush slot, never the heavy host lock', () => {
     const hook = readFileSync(join(__dirname, '../../../.husky/pre-push'), 'utf8');
     const gate = readFileSync(join(__dirname, '../../../scripts/ci/pre-push-gate.sh'), 'utf8');
     expect(hook).toContain('bash scripts/ci/pre-push-gate.sh');
     expect(hook).not.toContain('host-lock.sh bash scripts/ci/pre-push-gate.sh');
-    // every vitest invocation in the gate is wrapped in the lock; the related run is capped
-    expect(gate).toMatch(/host-lock\.sh npx vitest related/);
+    // PREPUSH-8: the related run is capped AND runs in a prepush slot with 2 workers; self-hosted CI jobs hold the heavy lock back to
+    // back, so a local push must never queue behind it (measured 2026-11-17: 30+ min waits)
+    expect(gate).toMatch(/prepush-slot\.sh npx vitest related[^\n]*--maxWorkers=2/);
+    expect(gate).not.toMatch(/host-lock\.sh\s+npx vitest/);
     // PREPUSH-5: scanners use the 4-slot semaphore + tree-hash cache, never the host-wide heavy lock
     expect(gate).toMatch(/prepush-slot\.sh npx vitest run/);
     expect(gate).not.toMatch(/host-lock\.sh npx vitest run/);
