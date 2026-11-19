@@ -10,29 +10,32 @@ import {
   StoreStatus,
   currentStoreId,
   withUser,
+  withStore,
   asPlatformOperator,
 } from '@ebda/database';
 import { StoreService, type SocialLinksPatch } from '../services/store.service';
 import { acquisitionForAdmin } from '../services/ebda-ads.service';
 import { toSafeStoreResponse } from '../lib/store-response';
-import { resolveDomainService } from '../services/domain-provider';
-import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
+import { resolveDomainService, type DomainProvider } from '../services/domain-provider';
+import {
+  DomainChangeError,
+  fallbackDnsRecords,
+  setStoreDomain,
+} from '../services/store-domain.service';
+import { DomainClaimService } from '../services/domain-claim.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from '../services/store-creation-limit';
 import { merchantSenderPrefixInput } from '../services/email-sender';
-import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { insertAuditLog } from '../lib/definer';
 import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
-import { assertWithinLimit } from '../services/plan-limit.service';
 import { auditLog } from '../middleware/security';
 import {
   isSafeUrl,
   normalizeEgyptianMobile,
   isValidTimeZone,
-  parseStoreHost,
   storeSlugSchema,
   storeSlugIssueCode,
   deliveryDaysSchema,
@@ -48,7 +51,15 @@ import {
 import { preserveMaskedPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 import { themeSchema } from '../lib/theme-schema';
-import { storeDb, storeUpdate, storeWriter } from '../lib/repo-factory';
+import { storeDb, storeWriter } from '../lib/repo-factory';
+import { StoreFaqService } from '../services/store-faq.service';
+import { closeClaimsOnSlugGrant } from '../services/trust-grants';
+import {
+  closeAppealsOnReactivation,
+  recordSuspension,
+  rejectAppeal,
+  type TrustDb,
+} from '../services/trust-requests.service';
 
 const router = Router();
 
@@ -747,6 +758,8 @@ router.post(
       // provider verifies ownership). Only a super_admin may set one here.
       if (!isSuperAdmin) delete data.domain;
 
+      // A protected address granted by a super admin answers the merchant's open claim for it (before the grant, loud).
+      if (isSuperAdmin) await closeClaimsOnSlugGrant(actor.userId, data.slug);
       const create = () =>
         StoreService.create(
           actor.userId,
@@ -798,6 +811,7 @@ router.put(
       // provider verifies ownership). Only a super_admin may set one here.
       if (user.role !== 'super_admin') delete data.domain;
 
+      if (user.role === 'super_admin') await closeClaimsOnSlugGrant(user.userId, data.slug);
       const store = await StoreService.update(
         id,
         { ...data, settings: data.settings as Prisma.InputJsonValue },
@@ -862,7 +876,11 @@ router.delete(
   }
 );
 
-const storeStatusBody = z.object({ status: z.enum(['active', 'suspended']) });
+// `reason` (suspend only): what the merchant reads at GET /stores/:storeId/suspension (A13).
+const storeStatusBody = z.object({
+  status: z.enum(['active', 'suspended']),
+  reason: z.string().trim().min(1).max(500).optional(),
+});
 const templateBody = z.object({ template: z.string().trim().min(1).max(40) });
 const domainBody = z.object({ domain: z.string().max(253).nullable() });
 
@@ -881,13 +899,40 @@ router.patch(
       }
       const status: StoreStatus = parsedStatus.data.status;
 
+      // A13 ordering (Ruling TRUST-2). The Store row and the request notes cannot share one transaction: the Store is
+      // written through D1 + its Durable Object, the notes through the platform D1 client. So the note write goes FIRST
+      // and FAILS LOUD (no swallowed error): a suspension never lands without its reason row, and a reactivation never
+      // lands with the appeal still open (which would block every future appeal through the one-open-appeal unique).
+      // The failure modes left are harmless and self-healing on retry: an unused note on a store that never got
+      // suspended (getSuspension answers 404 NOT_SUSPENDED), or an appeal closed on a store still suspended (the
+      // merchant can file again).
+      const storeId = req.params.id;
+      const current = await withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { status: true } })
+      );
+      if (!current) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+      await withStore(storeId, async tx => {
+        const trustDb = tx as unknown as TrustDb;
+        if (status === 'suspended') {
+          await recordSuspension(
+            trustDb,
+            storeId,
+            req.user!,
+            parsedStatus.data.reason,
+            String(current.status) === 'suspended'
+          );
+        } else {
+          await closeAppealsOnReactivation(trustDb, storeId);
+        }
+      });
+
       // StoreService.setStatus owns the write AND the public-cache bust
       // (resolve/slug/id keys + storefront revalidate purge) — account
       // status is NEVER-stale, so the invalidation lives with the write
       // (adversarial audit P1-7; this handler used to bust only the feature
       // cache, leaving a suspended store serving the cached active resolve
       // — checkouts included — for up to the TTL).
-      const store = await StoreService.setStatus(req.params.id, status as 'active' | 'suspended');
+      const store = await StoreService.setStatus(storeId, status as 'active' | 'suspended');
 
       // Invalidate the feature cache — store.status doesn't change the
       // resolved feature map directly, but downstream gates (storefront
@@ -919,6 +964,37 @@ router.patch(
       });
 
       res.json({ success: true, data: toSafeStoreResponse(store) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:id/suspension/appeal/reject - Reject the open suspension appeal (super_admin only).
+// Staff reply to the merchant by e-mail first; this records the decision, starts the merchant's 24 h cooldown
+// (rejected_at) and leaves the store suspended. Reactivating (PATCH /:id/status) is the accept path.
+router.post(
+  '/:id/suspension/appeal/reject',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = req.params.id;
+      const { id } = await withStore(storeId, tx =>
+        rejectAppeal(tx as unknown as TrustDb, storeId)
+      );
+      await insertAuditLog({
+        action: 'store.suspension_appeal_reject',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'trust_request',
+        resourceId: id,
+        details: {},
+        ip: req.ip ?? null,
+        userAgent: req.headers['user-agent'] ?? null,
+      });
+      res.json({ success: true, data: { id, status: 'rejected' } });
     } catch (error) {
       next(error);
     }
@@ -1444,9 +1520,7 @@ router.get(
       // heading so merchants never see provider names. The fallback when the
       // provider API is unreachable is a single CNAME to the Cloudflare-for-SaaS
       // zone target (www handling is automatic on the Cloudflare side).
-      const providerFallbackRecords = [
-        { type: 'CNAME', name: shownDomain, value: config.cfFallbackOrigin },
-      ];
+      const providerFallbackRecords = fallbackDnsRecords(shownDomain);
       const providerRecords = providerStatus?.dnsRecords ?? providerFallbackRecords;
       const mergedDns = [...providerRecords, ...resendRecords];
 
@@ -1499,85 +1573,19 @@ router.put(
       // Cloudflare hostname; clearing is now an explicit `{ "domain": null }` (or "").
       const { domain: rawDomain } = domainBody.parse(req.body);
 
-      // Normalize domain: lowercase, strip www prefix, trim whitespace
-      const domain = rawDomain ? normalizeDomain(rawDomain) : null;
-
-      const store = await StoreService.getById(id);
-      const oldDomain = store.domain;
-
-      const previousEmailRow = await prisma.store.findUnique({
-        where: { id },
-        select: { domainProvider: true },
-      });
-
-      // Resolve the frontend host provider for this store (Cloudflare-for-SaaS
-      // is the only provider). All attach/remove/status calls go through it.
-      const domainSvc = resolveDomainService({ domainProvider: previousEmailRow?.domainProvider });
-
-      // A custom domain must be a real third-party hostname. Ebda's own hosts
-      // (the apex, `<slug>.ebda.app`, platform labels), IPs, localhost and
-      // malformed names can never be claimed: `<slug>.ebda.app` is already
-      // routed by slug, and letting a store claim one would hijack another
-      // store's (or the platform's) host (Review Focus 1).
-      if (domain && parseStoreHost(domain).kind !== 'custom') {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'DOMAIN_INVALID',
-            message: 'Enter your own domain (for example mystore.com), not an Ebda Store address.',
-          },
-        });
+      let domain: string | null;
+      let claimState: 'pending' | 'active' | null;
+      let domainSvc: DomainProvider;
+      try {
+        // Normalize (lowercase, strip www, trim), refuse Ebda's own hosts, then claim / keep / clear (services/store-domain.service.ts).
+        ({ domain, claimState, provider: domainSvc } = await setStoreDomain(id, rawDomain));
+      } catch (err) {
+        if (!(err instanceof DomainChangeError)) throw err;
+        res
+          .status(err.status)
+          .json({ success: false, error: { code: err.code, message: err.message } });
         return;
       }
-
-      let claimState: 'pending' | 'active' | null = null;
-
-      if (domain && domain !== oldDomain) {
-        // Plan gate (SP5): custom domains are a plan capability. Clearing or
-        // keeping a domain is always allowed; only attaching a new one is gated.
-        await assertWithinLimit(id, 'customDomain');
-
-        // Check platform configuration first — domain feature is unusable
-        // without the resolved provider's API credentials configured on the API
-        if (!domainSvc.isConfigured()) {
-          res.status(503).json({
-            success: false,
-            error: {
-              code: 'DOMAIN_FEATURE_UNAVAILABLE',
-              message:
-                'Custom domain feature is not configured on this platform. Please contact support.',
-            },
-          });
-          return;
-        }
-
-        // Uniqueness (active elsewhere / fresh pending elsewhere -> DOMAIN_TAKEN),
-        // provider add, and the pending claim row. The old active domain keeps
-        // serving until the new one is VERIFIED (the sweep / status poll promotes it).
-        const claim = await DomainClaimService.claim(id, domain, domainSvc);
-        claimState = claim.state === 'active' ? 'active' : 'pending';
-      } else if (domain && domain === oldDomain) {
-        // Re-saving the verified domain: nothing to claim; drop any other pending claim.
-        await DomainClaimService.cancelPending(id, domainSvc);
-        claimState = 'active';
-      } else {
-        // Clearing: drop the verified domain AND any pending claim.
-        await DomainClaimService.cancelPending(id, domainSvc);
-        if (oldDomain) {
-          await storeUpdate(prisma, {
-            where: { id },
-            data: { domain: null, domainStatus: null, domainVerifiedAt: null },
-          });
-          await DomainClaimService.afterDomainChanged({
-            storeId: id,
-            slug: store.slug,
-            oldDomain,
-            newDomain: null,
-            provider: domainSvc,
-          });
-        }
-      }
-
       const updated = await prisma.store.findUnique({
         where: { id },
         include: { owner: { select: { id: true, email: true, firstName: true, lastName: true } } },
@@ -1587,7 +1595,6 @@ router.put(
       const shown = domain;
       let domainStatus: import('../services/domain-provider').DomainStatus | null = null;
       if (shown) domainStatus = await domainSvc.getDomain(shown);
-      const fallbackDnsValue = config.cfFallbackOrigin;
 
       res.json({
         success: true,
@@ -1601,7 +1608,7 @@ router.put(
                   domain: shown,
                   verified: false,
                   misconfigured: true,
-                  dnsRecords: [{ type: 'CNAME', name: shown, value: fallbackDnsValue }],
+                  dnsRecords: fallbackDnsRecords(shown),
                 }
               : null),
         },
@@ -1676,21 +1683,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.parse(req.body);
-      const faq = await (
-        await storeWriter(currentStoreId())
-      ).storeFaq.create({
-        data: {
-          storeId: req.params.id,
-          question: body.question,
-          questionAr: body.questionAr ?? null,
-          answer: body.answer,
-          answerAr: body.answerAr ?? null,
-          orderIndex: body.orderIndex ?? 0,
-          isActive: body.isActive ?? true,
-          aiDrafted: false,
-          manuallyEdited: true,
-        },
-      });
+      const faq = await StoreFaqService.create(req.params.id, body);
       res.status(201).json({ success: true, data: faq });
     } catch (error) {
       next(error);
@@ -1712,28 +1705,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = faqSchema.partial().parse(req.body);
-      const faq = await (
-        await storeWriter(currentStoreId())
-      ).storeFaq.updateMany({
-        where: { id: req.params.faqId, storeId: req.params.id },
-        data: {
-          ...(body.question !== undefined && { question: body.question }),
-          ...(body.questionAr !== undefined && { questionAr: body.questionAr }),
-          ...(body.answer !== undefined && { answer: body.answer }),
-          ...(body.answerAr !== undefined && { answerAr: body.answerAr }),
-          ...(body.orderIndex !== undefined && { orderIndex: body.orderIndex }),
-          ...(body.isActive !== undefined && { isActive: body.isActive }),
-          manuallyEdited: true,
-        },
-      });
-      if (faq.count === 0) {
-        throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
-      }
-      const updated = await (
-        await storeDb(currentStoreId())
-      ).storeFaq.findUnique({
-        where: { id: req.params.faqId, storeId: req.params.id },
-      });
+      const updated = await StoreFaqService.update(req.params.id, req.params.faqId, body);
       res.json({ success: true, data: updated });
     } catch (error) {
       next(error);

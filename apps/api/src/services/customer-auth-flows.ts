@@ -23,6 +23,7 @@ import { storeDb } from '../lib/repo-factory';
 
 const SALT_ROUNDS = 12;
 /** bcrypt of 32 random bytes whose plaintext was discarded: compared when the account is unknown (same constant as auth.service). */
+// nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash -- dummy hash for timing equalisation (random plaintext discarded), not a credential
 const DUMMY_PASSWORD_HASH = '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 const EMAIL_VERIFICATION_EXPIRY_HOURS = 24;
 const DAY_MS = 24 * 60 * 60 * 1000;

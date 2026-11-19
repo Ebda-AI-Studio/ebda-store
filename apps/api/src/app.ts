@@ -11,7 +11,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { isWorkers } from './lib/runtime';
-import rateLimit from 'express-rate-limit';
 import { config } from './config';
 import { errorHandler, AppError } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
@@ -21,9 +20,10 @@ import {
   sanitizeInput,
   csrfProtection,
   restrictPlatformOnlyOrigins,
-  makeRateLimitStore,
-  rateLimitRedisClient,
+  plannedRateLimit,
+  sanitizedBody,
 } from './middleware/security';
+import { prefetchRequestLimits, raiseHeldBodyError } from './middleware/request-limit-prefetch';
 import { writeFreeze } from './middleware/write-freeze';
 import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
@@ -38,6 +38,7 @@ import { lookupStore } from './lib/definer';
 import './services/platform/router';
 import './lib/store-scope-resolver';
 import { redis } from './services/redis.service';
+import { erasureFlagState } from './services/account-closure.wiring';
 import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
 import { SentryService } from './services/sentry.service';
@@ -381,55 +382,70 @@ app.use(
   })
 );
 
-// Global rate limiting
+// The JSON body parser (one instance: the request-level limiter prefetch may parse the body early, PERF-BATCH-1,
+// middleware/request-limit-prefetch.ts) and the cookie parser the prefetch prepares its key-prediction copy with.
+const jsonBody = express.json({ limit: '10mb' });
+const parseCookies = cookieParser();
+
+// Global rate limiting, behind the request-level prefetch that sends every limiter hit of the request in one round trip per
+// AuthState shard (PERF-BATCH-1).
+const globalLimiter = plannedRateLimit('global', {
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  // 2026-05-21 redesign — global limiter now ONLY counts mutations
+  // (POST/PUT/PATCH/DELETE), not safe-method reads (GET/HEAD/OPTIONS).
+  // Reason: legit clients (merchants on admin, customers browsing
+  // storefront) easily issue 100+ GET requests per 15min via normal
+  // page navigation. The previous 100-cap-per-IP false-positived on
+  // every busy session. Mutations are the abuse vector — scraping,
+  // brute-force, mass-create attacks — keep those rate-limited.
+  //
+  // Reads still have per-endpoint targeted limits where appropriate
+  // (publicLimiter, etc.) plus auth chains that gate sensitive data.
+  // 200 mutations per IP per 15min is comfortable for normal use
+  // and still blocks scripted abuse.
+  max: 200,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Fail-OPEN on a Redis store error — see the posture comment on the
+  // limiters in middleware/security.ts (deliberate availability-over-
+  // strictness tradeoff, adversarial audit P2).
+  passOnStoreError: true,
+  // Skip the limiter for two cases:
+  //
+  // 1. Load test bypass token. We only check when LOAD_TEST_BYPASS_TOKEN
+  //    is set on Railway — unset means "no bypass possible", so
+  //    production traffic is always rate limited regardless of header
+  //    values. Use a long random value so the header isn't guessable.
+  //
+  // 2. Admin bulk-AI job-status polling (GET /api/v1/stores/.../ai/bulk
+  //    and /api/v1/stores/.../ai/bulk/<jobId>). These are read-only
+  //    one-row DB lookups that the admin UI polls every 4s while a
+  //    sweep is running. The downstream `authenticate` + `authorize`
+  //    middleware still enforce auth; this just lifts the global IP
+  //    rate cap so a logged-in merchant watching their job progress
+  //    doesn't 429 after ~3 minutes. Safe because:
+  //      - method is GET only (no writes)
+  //      - the auth chain still requires a valid store_admin/super_admin
+  //        JWT cookie, so unauthenticated traffic still hits the limiter
+  //        via the auth middleware's `authLimiter` 5-attempts-per-15min
+  //      - polling endpoints don't trigger expensive work (Gemini calls
+  //        happen inside Inngest, not in the GET handler)
+  skip: skipGlobalRateLimit,
+});
 app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    // 2026-05-21 redesign — global limiter now ONLY counts mutations
-    // (POST/PUT/PATCH/DELETE), not safe-method reads (GET/HEAD/OPTIONS).
-    // Reason: legit clients (merchants on admin, customers browsing
-    // storefront) easily issue 100+ GET requests per 15min via normal
-    // page navigation. The previous 100-cap-per-IP false-positived on
-    // every busy session. Mutations are the abuse vector — scraping,
-    // brute-force, mass-create attacks — keep those rate-limited.
-    //
-    // Reads still have per-endpoint targeted limits where appropriate
-    // (publicLimiter, etc.) plus auth chains that gate sensitive data.
-    // 200 mutations per IP per 15min is comfortable for normal use
-    // and still blocks scripted abuse.
-    max: 200,
-    message: {
-      success: false,
-      error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
+  prefetchRequestLimits({
+    global: globalLimiter,
+    router: routes,
+    mount: '/api/v1',
+    jsonBody,
+    prepare: copy => {
+      if (copy.body && typeof copy.body === 'object') copy.body = sanitizedBody(copy.body);
+      parseCookies(copy, {} as Response, () => undefined);
     },
-    standardHeaders: true,
-    legacyHeaders: false,
-    // Fail-OPEN on a Redis store error — see the posture comment on the
-    // limiters in middleware/security.ts (deliberate availability-over-
-    // strictness tradeoff, adversarial audit P2).
-    passOnStoreError: true,
-    store: makeRateLimitStore(rateLimitRedisClient, 'global'),
-    // Skip the limiter for two cases:
-    //
-    // 1. Load test bypass token. We only check when LOAD_TEST_BYPASS_TOKEN
-    //    is set on Railway — unset means "no bypass possible", so
-    //    production traffic is always rate limited regardless of header
-    //    values. Use a long random value so the header isn't guessable.
-    //
-    // 2. Admin bulk-AI job-status polling (GET /api/v1/stores/.../ai/bulk
-    //    and /api/v1/stores/.../ai/bulk/<jobId>). These are read-only
-    //    one-row DB lookups that the admin UI polls every 4s while a
-    //    sweep is running. The downstream `authenticate` + `authorize`
-    //    middleware still enforce auth; this just lifts the global IP
-    //    rate cap so a logged-in merchant watching their job progress
-    //    doesn't 429 after ~3 minutes. Safe because:
-    //      - method is GET only (no writes)
-    //      - the auth chain still requires a valid store_admin/super_admin
-    //        JWT cookie, so unauthenticated traffic still hits the limiter
-    //        via the auth middleware's `authLimiter` 5-attempts-per-15min
-    //      - polling endpoints don't trigger expensive work (Gemini calls
-    //        happen inside Inngest, not in the GET handler)
-    skip: skipGlobalRateLimit,
   })
 );
 
@@ -446,7 +462,7 @@ app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }), webhookRo
 
 // Body parsing
 // 10mb = API_JSON_BODY_LIMIT_BYTES, the byte cap the guard below also enforces (tests/unit/zod-huge-array-bounds).
-app.use(express.json({ limit: '10mb' }));
+app.use(raiseHeldBodyError, jsonBody);
 app.use(express.urlencoded({ extended: true }));
 // Size and shape caps before any route or schema parses the body (Ruling ITEST-11).
 app.use(requestShapeGuard);
@@ -520,6 +536,10 @@ app.get(
     } catch {
       checks.redis = { status: 'disconnected' };
     }
+
+    // S3: surface the PDPL erasure flag. Informational (does not flip overall health): off = merchant/staff account
+    // closure answers 503 ERASURE_NOT_ENABLED and records the request. Enabling it is an operator decision.
+    checks.pdplErasure = { status: erasureFlagState() };
 
     // Get circuit breaker states
     const circuits = circuitBreaker.getAllStates();

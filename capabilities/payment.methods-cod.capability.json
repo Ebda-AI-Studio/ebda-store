@@ -1,0 +1,44 @@
+{
+  "id": "payment.methods-cod",
+  "status": "live",
+  "area": "payments",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "وسائل الدفع والدفع عند الاستلام",
+  "titleEn": "Turn payment methods on/off (COD, InstaPay, cards) and COD surcharge",
+  "screens": ["/stores/[id]/payment-settings"],
+  "api": [
+    "GET/POST /payment-settings/store/:storeId",
+    "PUT/DELETE .../:provider",
+    "POST .../:provider/toggle"
+  ],
+  "mcpTool": null,
+  "planGate": null,
+  "roles": ["owner", "super_admin"],
+  "policy": "preview",
+  "undo": {
+    "class": "reversible",
+    "note": "yes"
+  },
+  "helpArticle": "orders-and-cod",
+  "questions": {
+    "ar": [
+      "ازاي افعل الدفع عند الاستلام؟",
+      "اضيف رسوم COD 20 جنيه",
+      "اقفل الدفع بالكارت",
+      "مفيش وسيلة دفع شغالة"
+    ],
+    "en": ["How do I enable cash on delivery?", "Add a COD fee"]
+  },
+  "steps": ["Payment settings: toggle COD, set fee."],
+  "edgeCases": [
+    "Disabling the last method blocks checkout",
+    "COD fee shown to customer",
+    "MFA required",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": ["also documented in: payment-providers"]
+}

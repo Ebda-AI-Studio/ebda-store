@@ -1,0 +1,42 @@
+{
+  "id": "order.update-status",
+  "status": "live",
+  "area": "orders",
+  "version": 1,
+  "versionDate": "2026-11-14",
+  "titleAr": "غير حالة الاوردر",
+  "titleEn": "Move an order forward (confirm, process, ship, deliver)",
+  "screens": ["/stores/[id]/orders/[orderId]"],
+  "api": ["PUT /stores/:storeId/orders/:id/status"],
+  "mcpTool": "admin_update_order_status",
+  "planGate": null,
+  "roles": ["owner", "staff", "super_admin"],
+  "policy": "confirm",
+  "undo": {
+    "class": "unclassified",
+    "note": "limited: transitions only forward (shipped -> processing allowed)"
+  },
+  "helpArticle": "orders-and-cod",
+  "questions": {
+    "ar": [
+      "اشحن الاوردر",
+      "علم الاوردر اتسلم",
+      "اعمل confirm لكل طلبات COD",
+      "ليه مش قادر ارجع الحالة؟"
+    ],
+    "en": ["Mark order as shipped", "Why can't I move this order back?"]
+  },
+  "steps": ["Order page > status."],
+  "edgeCases": [
+    "Status change triggers customer notification (email/SMS/WhatsApp): confirm",
+    "InstaPay awaiting_payment_confirmation can only be confirmed or cancelled",
+    "Backwards moves blocked",
+    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
+    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying",
+    "Suspended store is read-only (billing suspension): writes fail, assistant must explain and link Billing",
+    "Team member lacking the permission gets 403: assistant states who can do it (store owner) instead of retrying",
+    "Provider/outage or rate limit (writeLimiter) returns an error: assistant reports the exact failure and does not claim success"
+  ],
+  "gaps": [],
+  "assistantNote": "notifies customers: confirm"
+}

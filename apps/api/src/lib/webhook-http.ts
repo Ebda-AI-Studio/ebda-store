@@ -6,10 +6,11 @@
  * - SSRF: https only, no IP literals, and the host is resolved AGAIN here on every send and every
  *   address checked (`assertPublicHttpUrl`), so a name that was public at registration and was
  *   re-pointed at 127.0.0.1 / 169.254.169.254 afterwards is refused before any connection.
- *   Residual (Ruling WH-6): the fetch re-resolves the name after our check and neither Node nor
- *   Workers can pin the validated address. Production is bounded (a Worker cannot reach private
- *   ranges); on a Node host a rebinding name can read back up to 200 characters of an internal reply
- *   through the delivery log, so a Node deployment must add an address-pinning dispatcher.
+ *   DNS rebinding (S4, 2026-11-12 audit; was Ruling WH-6): under NODE the connection is PINNED to the
+ *   addresses that just passed the check (`node:https` with a `lookup` that returns only those, SNI and the
+ *   Host header stay the merchant's hostname), so a name re-pointed at 127.0.0.1 between check and connect
+ *   cannot be reached. Under WORKERS `fetch` cannot pin an address; there the residual stays documented and is
+ *   bounded because a Worker cannot reach private ranges (no loopback, no metadata service, no VPC).
  * - Redirects are NEVER followed (Ruling WH-2): a 3xx is a failed delivery, so a public host cannot
  *   bounce us to a private address.
  * - 10 s timeout; only the first WEBHOOK_RESPONSE_SNIPPET_CHARS of the response body are read.
@@ -22,7 +23,9 @@ import {
   webhookUrlShapeError,
   type WebhookEventType,
 } from '@ebda/shared';
-import { assertPublicHttpUrl } from './safe-fetch';
+import { Readable } from 'node:stream';
+import { isWorkers } from './runtime';
+import { assertPublicHttpUrl, resolvePublicHttpUrl } from './safe-fetch';
 
 const hmacHex = (secret: string, t: number, body: string) =>
   createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
@@ -57,6 +60,57 @@ export async function assertWebhookUrl(raw: string): Promise<URL> {
   const shape = webhookUrlShapeError(raw);
   if (shape) throw new Error(`WEBHOOK_URL_BLOCKED: ${shape}`);
   return assertPublicHttpUrl(raw);
+}
+
+/**
+ * A `lookup` for `net.connect` that ignores the hostname and answers only with the addresses that already passed
+ * the SSRF check. Handles both callback shapes (`all: true` from happy-eyeballs, single address otherwise).
+ */
+// pq-allow(unused-export): imported by tests/unit/webhook-http.test.ts
+export function pinnedLookup(addresses: readonly string[]) {
+  const entries = addresses.map(address => ({ address, family: address.includes(':') ? 6 : 4 }));
+  return (
+    _hostname: string,
+    opts: { all?: boolean } | undefined,
+    cb: (err: Error | null, address: unknown, family?: number) => void
+  ): void => {
+    if (entries.length === 0) return cb(new Error('SSRF_BLOCKED: no validated address'), '', 0);
+    if (opts?.all) return cb(null, entries);
+    cb(null, entries[0].address, entries[0].family);
+  };
+}
+
+/** Node transport: a `fetch`-shaped POST whose connection is pinned to the validated addresses (S4). */
+async function pinnedNodeFetch(url: string, init: RequestInit): Promise<Response> {
+  const { url: u, addresses } = await resolvePublicHttpUrl(url);
+  const { request } = await import(u.protocol === 'https:' ? 'node:https' : 'node:http');
+  const headers: Record<string, string> = {};
+  new Headers(init.headers).forEach((v, k) => (headers[k] = v));
+  return new Promise<Response>((resolve, reject) => {
+    const req = request(
+      {
+        host: u.hostname,
+        port: u.port || undefined,
+        path: `${u.pathname}${u.search}`,
+        method: init.method ?? 'POST',
+        headers,
+        lookup: pinnedLookup(addresses),
+        signal: init.signal ?? undefined,
+      },
+      (res: import('node:http').IncomingMessage) => {
+        const status = res.statusCode ?? 0;
+        const bodyless = status === 204 || status === 205 || status === 304;
+        if (bodyless) res.resume();
+        resolve(
+          new Response(bodyless ? null : (Readable.toWeb(res) as unknown as ReadableStream), {
+            status,
+          })
+        );
+      }
+    );
+    req.on('error', reject);
+    req.end(init.body as string);
+  });
 }
 
 export interface WebhookPostResult {
@@ -117,7 +171,7 @@ export async function postWebhook(args: {
       error: `blocked: ${msg.replace(/^(WEBHOOK_URL|SSRF)_BLOCKED:\s*/, '').slice(0, 80)}`,
     });
   }
-  const doFetch = args.fetchImpl ?? fetch;
+  const doFetch = args.fetchImpl ?? (isWorkers ? fetch : pinnedNodeFetch);
   try {
     const res = await doFetch(args.url, {
       method: 'POST',

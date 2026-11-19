@@ -29,6 +29,7 @@ import { adminUiLocale, apiDelete, apiGet, apiPut, getApiUrl } from '../../../..
 import { useFeatures } from '../../../../../../hooks/useFeatures';
 import { uploadErrorText } from '../../../../../../hooks/useImageUpload';
 import { ImageUpload } from '../../../../../../components/ImageUpload';
+import { ContactEbdaButton } from '../../../../../../components/support/ContactEbdaDialog';
 import { ColorField } from '../../../../../../components/ColorField';
 import { intlLocaleForUi } from '@/lib/format';
 
@@ -414,9 +415,10 @@ export function Product3dModelCard({ storeId, productId }: { storeId: string; pr
       </p>
 
       {!enabled && (
-        <p className="mb-4 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          {t('disabled')}
-        </p>
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          <p className="min-w-0 flex-1">{t('disabled')}</p>
+          <ContactEbdaButton topic="three_d_models" />
+        </div>
       )}
 
       <input
