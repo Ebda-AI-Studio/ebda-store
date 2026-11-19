@@ -1537,8 +1537,10 @@ interface ChangePlanPreview {
 async function paidForCurrentPeriod(
   storeId: string,
   periodStart: Date,
-  planCodes: string[]
-): Promise<number> {
+  planCodes: string[],
+  /** The plan the store is on and the end of this period: an upgrade INTO that plan priced for this period already paid its difference. */
+  current: { planCode: string; periodEnd: Date | null }
+): Promise<{ paidMinor: number; currentPlanPaidInFull: boolean }> {
   const since = new Date(periodStart.getTime() - 86_400_000);
   const charges = await withStore(storeId, tx =>
     tx.billingEvent.findMany({
@@ -1550,10 +1552,10 @@ async function paidForCurrentPeriod(
         planCode: { in: planCodes },
         createdAt: { gte: since },
       },
-      select: { id: true, amountMinor: true },
+      select: { id: true, amountMinor: true, type: true, planCode: true, forPeriodEnd: true },
     })
   );
-  if (charges.length === 0) return 0;
+  if (charges.length === 0) return { paidMinor: 0, currentPlanPaidInFull: false };
   const refunds = await withStore(storeId, tx =>
     tx.billingEvent.findMany({
       where: {
@@ -1562,11 +1564,26 @@ async function paidForCurrentPeriod(
         status: 'succeeded',
         relatedEventId: { in: charges.map(c => c.id) },
       },
-      select: { amountMinor: true },
+      select: { amountMinor: true, relatedEventId: true },
     })
   );
   const paid = charges.reduce((n, c) => n + c.amountMinor, 0);
-  return Math.max(0, paid - refunds.reduce((n, r) => n + r.amountMinor, 0));
+  const paidMinor = Math.max(0, paid - refunds.reduce((n, r) => n + r.amountMinor, 0));
+  // G35-PRORATE-1: base + the prorated difference of an earlier upgrade of THIS period together bought the current plan's
+  // whole period, but their sum is below the plan's catalogue total (the difference is for the days left only). A second
+  // upgrade must credit that whole total, or it charges the merchant the first upgrade's missing days again. An upgrade
+  // row with any refund against it is not trusted this way: the plain paid-minus-refunds sum applies.
+  const refunded = new Set(refunds.map(r => r.relatedEventId));
+  const currentPlanPaidInFull =
+    current.periodEnd !== null &&
+    charges.some(
+      c =>
+        c.type === 'upgrade' &&
+        c.planCode === current.planCode &&
+        c.forPeriodEnd?.getTime() === current.periodEnd!.getTime() &&
+        !refunded.has(c.id)
+    );
+  return { paidMinor, currentPlanPaidInFull };
 }
 
 /**
@@ -1611,14 +1628,15 @@ export async function previewChangePlan(args: {
     }
     const periodStart =
       sub.currentPeriodStart ?? (periodEnd ? periodStartFor(periodEnd, interval) : now);
-    const paid =
+    const { paidMinor: paid, currentPlanPaidInFull } =
       sub.status === 'active' && periodEnd
         ? await paidForCurrentPeriod(
             args.storeId,
             periodStart,
-            catalogue.map(p => p.code)
+            catalogue.map(p => p.code),
+            { planCode: sub.planCode, periodEnd }
           )
-        : 0;
+        : { paidMinor: 0, currentPlanPaidInFull: false };
     if (paid === 0 || !periodEnd) {
       // C1: a trial or a term the team assigned with no payment: the full new price, a fresh period from now.
       const charge = subscriptionChargeAmount(price, vat);
@@ -1646,7 +1664,8 @@ export async function previewChangePlan(args: {
       periodEnd,
       now,
       vat,
-      paidTotalMinor: paid, // C3: never credit more than was paid for this period
+      // C3: never credit more than was paid for this period; an earlier upgrade INTO the current plan this period = its whole total
+      paidTotalMinor: currentPlanPaidInFull ? null : paid,
     });
     return { planCode: plan.code, interval, basis: 'prorated', quote };
   }

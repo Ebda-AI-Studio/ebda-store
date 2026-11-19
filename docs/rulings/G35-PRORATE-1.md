@@ -21,6 +21,11 @@ the paid period: nothing is charged, refunded or credited.
   than one month's price; fail closed, `grants.service.firstQualifyingPayment`).
 - If the period moved between the quote and the payment (a renewal settled in between) the plan still changes and a
   P1 alert asks an operator to check the difference.
+- **A second upgrade in the same period** (money review of #887): base plus the prorated difference of an earlier upgrade
+  INTO the current plan (a succeeded `upgrade` row, `forPeriodEnd` = this period's end, `planCode` = the current plan, no
+  refund against it) bought the current plan's whole period, so the next upgrade credits that plan's whole catalogue total.
+  Crediting the plain sum (below the total) would charge the first upgrade's missing days again. Residual: a promo base
+  followed by two upgrades credits the catalogue total, not the promo (bounded by the plan price difference).
 
 **Scope.** Card change-plan (this PR). Manual payments / InstaPay for a higher plan while a lower one is paid follow
 the same rule (follow-up PR after #860, which reworks `recordManualPayment`). Ebda Chat packages keep their own

@@ -65,9 +65,14 @@ const hasDb =
 const uniq = crypto.randomUUID().slice(0, 8);
 const PRO = `bpro-${uniq}`; // 49900 / 499000
 const LITE = `blite-${uniq}`; // 19999
+const MAXP = `bmax-${uniq}`; // 99900 / 999000
 const NOPRICE = `bnone-${uniq}`;
 const stub = new StubBillingProvider();
-const created = { stores: [] as string[], users: [] as string[], plans: [PRO, LITE, NOPRICE] };
+const created = {
+  stores: [] as string[],
+  users: [] as string[],
+  plans: [PRO, LITE, MAXP, NOPRICE],
+};
 
 const limits = planLimitsSchema.parse({
   maxProducts: 100,
@@ -207,6 +212,17 @@ beforeAll(async () => {
         limits,
         priceMonthlyMinor: 19999,
         priceYearlyMinor: 199990,
+      },
+      {
+        code: MAXP,
+        nameEn: 'BMax',
+        nameAr: 'أعلى',
+        sort: 903,
+        isPublic: false,
+        featureTier: 'enterprise',
+        limits,
+        priceMonthlyMinor: 99900,
+        priceYearlyMinor: 999000,
       },
       {
         code: NOPRICE,
@@ -964,6 +980,23 @@ describe.skipIf(!hasDb)('cancel, upgrade, downgrade', () => {
     // (49900 - 10000) x 20 / 31 = 25741.9 -> 25742, not (49900 - 19999) x 20 / 31
     expect(q.currentTotalMinor).toBe(10000);
     expect(q.charge.totalMinor).toBe(25742);
+  });
+
+  it("two upgrades in one period: the second credits the current plan's whole total, not base + the first difference (G35-PRORATE-1)", async () => {
+    const end = addDays(T0, 20);
+    const { storeId, subId } = await subscribedStore({ planCode: LITE, periodEnd: end });
+    await paidPeriod(storeId, subId, 19999);
+    const first = await changePlan({ storeId, planCode: PRO, now: T0, provider: stub });
+    expect(first).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 19291 });
+    // PRO's period is now paid in full (19999 base + 19291 for the 20 days left = the whole 49900 for the days left).
+    // The second upgrade credits PRO's whole 49900: (99900 - 49900) x 20 / 31 = 32258.06 -> 32259.
+    // Crediting only 19999 + 19291 = 39290 would charge (99900 - 39290) x 20 / 31 = 39103: an overcharge of 6844.
+    const preview = await previewChangePlan({ storeId, planCode: MAXP, now: T0 });
+    expect(preview.quote.currentTotalMinor).toBe(49900);
+    expect(preview.quote.charge.totalMinor).toBe(32259);
+    const second = await changePlan({ storeId, planCode: MAXP, now: T0, provider: stub });
+    expect(second).toMatchObject({ mode: 'upgraded', status: 'succeeded', amountMinor: 32259 });
+    expect(stub.chargeCalls.map(c => c.amountMinor)).toEqual([19291, 32259]);
   });
 
   it('C4: a second submit while the first upgrade charge is pending returns the first charge, never charges twice', async () => {
