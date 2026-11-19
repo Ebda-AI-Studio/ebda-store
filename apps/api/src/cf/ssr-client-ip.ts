@@ -55,6 +55,8 @@ export const SSR_FORWARD_ROUTES: Readonly<Record<string, 'forward' | 'own'>> = {
   '/cart/whatsapp-optin': 'own',
   '/customers/me/reorder': 'own',
   '/orders': 'own',
+  // The guest order-status page (/o/<token>) renders it server-side: charged to the shopper's own address, one bucket each (Ruling WA-COD-V2-2).
+  '/order-status/:token': 'forward',
   '/orders/:id': 'own',
   '/orders/:id/invoice': 'own',
   '/:storeId/search/suggest': 'own',

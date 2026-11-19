@@ -1799,6 +1799,59 @@ export function doStoreDelegate(
   };
 }
 
+type CoalescedResult = { ok: true; json: string } | { ok: false; code?: string; message?: string };
+
+/**
+ * PERF-BATCH-1 (Ruling PERF-BATCH-1): one store's StoreDO read transport that folds every read batch started in the same
+ * microtask into ONE `query` RPC (the DO runs them in order on one snapshot, `runReads`), then hands each caller exactly its
+ * own slice of the results, encoded as the DO would have. Independent reads run with `Promise.all` (a cold store resolve's
+ * tax, FAQs, pages, opt-ins, locations) therefore cost one round trip instead of one each.
+ *
+ * Errors stay per caller: when the folded call fails (a refused store, a failed query, a thrown RPC) every batch is sent again
+ * on its own, so each caller gets the answer it would have had alone. Reads only: writes go through `mutate`, never here.
+ */
+// pq-allow(unused-export): imported by tests/unit/store-do-read-coalesce.test.ts
+export function coalesceReads(
+  send: (queries: unknown[]) => Promise<CoalescedResult>,
+  encode: (v: unknown) => string,
+  decode: <T>(json: string) => T
+): (queries: unknown[]) => Promise<CoalescedResult> {
+  type Item = {
+    queries: unknown[];
+    resolve: (r: CoalescedResult) => void;
+    reject: (e: unknown) => void;
+  };
+  let queue: Item[] | null = null;
+  const alone = (it: Item) => send(it.queries).then(it.resolve, it.reject);
+  const flush = async (items: Item[]) => {
+    if (items.length === 1) return alone(items[0]);
+    let folded: CoalescedResult | undefined;
+    try {
+      folded = await send(items.flatMap(i => i.queries));
+    } catch {
+      folded = undefined;
+    }
+    if (!folded?.ok) return Promise.all(items.map(alone));
+    const results = decode<unknown[]>(folded.json);
+    let at = 0;
+    for (const it of items) {
+      it.resolve({ ok: true, json: encode(results.slice(at, at + it.queries.length)) });
+      at += it.queries.length;
+    }
+  };
+  return queries =>
+    new Promise<CoalescedResult>((resolve, reject) => {
+      if (!queue) {
+        const items: Item[] = (queue = []);
+        queueMicrotask(() => {
+          queue = null;
+          void flush(items);
+        });
+      }
+      queue.push({ queries, resolve, reject });
+    });
+}
+
 async function doClients(storeId: string): Promise<{
   db: StoreReads;
   writer: StoreWrites;
@@ -1829,7 +1882,12 @@ async function doClients(storeId: string): Promise<{
     if (!r.ok) throw new AppError(r.status, r.code, r.message);
     return JSON.parse(r.json) as unknown;
   };
-  const send = (queries: unknown[]) => stub.query(storeId, queries as never);
+  // PERF-BATCH-1: read batches started in the same microtask (Promise.all over independent reads) share ONE `query` RPC.
+  const send = coalesceReads(
+    queries => stub.query(storeId, queries as never) as Promise<CoalescedResult>,
+    encodeRpc,
+    decodeRpc
+  );
   return {
     // `db` has NO write delegates at all (the read-only guarantee of CF-REPO-1 is runtime, not just types)
     db: withStoreDelegate(

@@ -24,7 +24,7 @@ concurrency:
 jobs:
   dispatch:
     name: Dispatch full CI tier
-    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '"ubuntu-24.04"') }}
+    runs-on: ${{ fromJSON(vars.EBDA_LIGHT_RUNS_ON || vars.EBDA_RUNS_ON || '["ebda-mac-light"]') }}
     timeout-minutes: 5
     permissions:
       actions: write

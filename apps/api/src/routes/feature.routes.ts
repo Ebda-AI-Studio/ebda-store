@@ -9,6 +9,7 @@ import { getAccountsBrief } from '../lib/identity-client';
 import { storeDb } from '../lib/repo-factory';
 import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@ebda/shared';
 import { featureService } from '../services/feature.service';
+import { planService } from '../services/plan.service';
 import { auditLog } from '../middleware/security';
 
 const router = Router();
@@ -285,11 +286,12 @@ router.delete(
 
 /**
  * PUT /admin/stores/:id/plan
- * Change the store's plan. Per the 2026-05-27 architectural decision,
- * this does NOT touch StoreFeature override rows — every existing
- * override is preserved across upgrade and downgrade.
+ * Change the store's plan BY PLAN CODE (Ruling B1-PLAN-SOT-1): the subscription is the single source and the tier on
+ * `stores` is derived from it, so this goes through the same `planService.assignPlan` as the billing page's "Assign plan"
+ * (subscription + derived tier + caches + store allowance + staff seats). A legacy tier body (`{ plan: 'professional' }`)
+ * is refused: a tier names no single priced plan. Per the 2026-05-27 decision, StoreFeature overrides are preserved.
  *
- * Body: { plan: 'free' | 'starter' | 'professional' | 'enterprise' }
+ * Body: { planCode: string }
  */
 router.put(
   '/stores/:id/plan',
@@ -299,49 +301,47 @@ router.put(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const bodySchema = z.object({
-        plan: z.enum(['free', 'starter', 'professional', 'enterprise']),
-      });
-      const parsed = bodySchema.safeParse(req.body);
+      const parsed = z
+        .object({ planCode: z.string().trim().min(1).max(40) })
+        .strict()
+        .safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({
           success: false,
           error: {
-            code: 'VALIDATION_ERROR',
-            message: parsed.error.issues[0]?.message ?? 'Invalid plan',
+            code: 'PLAN_CODE_REQUIRED',
+            message: 'Send { planCode } (a plan from /admin/plans); a plan tier is not accepted',
           },
         });
         return;
       }
-
-      // Capture previous plan so the audit row shows from → to.
-      const prev = await withStore(req.params.id, async () =>
-        (await storeDb(req.params.id)).store.findUnique({
-          where: { id: req.params.id },
-          select: { plan: true },
+      const before = await withStore(req.params.id, tx =>
+        tx.storeSubscription.findUnique({
+          where: { storeId: req.params.id },
+          select: { planCode: true },
         })
       );
-
-      const features = await featureService.setStorePlan(
-        req.params.id,
-        parsed.data.plan,
-        req.user!.userId
-      );
-
+      const result = await planService.assignPlan(req.params.id, {
+        planCode: parsed.data.planCode,
+      });
       await auditLog({
         action: 'store.plan_changed',
         userId: req.user!.userId,
         storeId: req.params.id,
         resourceType: 'store',
         resourceId: req.params.id,
-        details: { fromPlan: prev?.plan ?? null, toPlan: parsed.data.plan },
+        details: {
+          fromPlan: before?.planCode ?? null,
+          toPlan: result.planCode,
+          status: result.status,
+        },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-
+      const features = await featureService.getStoreFeatures(req.params.id);
       res.json({
         success: true,
-        data: { plan: parsed.data.plan, features },
+        data: { planCode: result.planCode, status: result.status, features },
       });
     } catch (error) {
       next(error);
