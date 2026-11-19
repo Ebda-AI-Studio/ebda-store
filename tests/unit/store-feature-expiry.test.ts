@@ -207,7 +207,7 @@ describe('super-admin route', () => {
     const res = await request(app).put(`${base}/bundles`).send({ enabled: true });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(h.rows[0].expiresAt).toBeNull();
-    expect(res.body.data.features.bundles ?? res.body.data.bundles).toBe(true);
+    expect(res.body.data.features.bundles).toBe(true);
     const { featureService } = await import('@api/services/feature.service');
     expect((await featureService.getStoreFeatures(STORE)).bundles).toBe(true);
   });
