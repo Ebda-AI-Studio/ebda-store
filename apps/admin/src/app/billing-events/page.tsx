@@ -124,17 +124,20 @@ function LedgerPanel({
     fetchRows();
   }, [fetchRows, refreshKey, refreshSignal]);
 
-  async function refund(row: LedgerRow) {
+  async function refund(row: LedgerRow, keepAccess = false) {
     const amount = formatMoney(row.amountMinor, locale, { fixedDecimals: true });
     const ok = await askConfirm({
       object: t('refundObject', { amount }),
-      consequence: t('confirmRefund', { amount }),
+      consequence: t(keepAccess ? 'confirmRefundKeepAccess' : 'confirmRefund', { amount }),
       confirmLabel: t('refundAction'),
     });
     if (!ok) return;
     setBusy(row.id);
     setMessage(null);
-    const res = await apiPost(`/api/v1/admin/billing/events/${row.id}/refund`, {});
+    const res = await apiPost(
+      `/api/v1/admin/billing/events/${row.id}/refund`,
+      keepAccess ? { keepAccess: true } : {}
+    );
     setBusy(null);
     if (res.error) {
       setMessage(t('refundFailed', { message: res.error.message || 'error' }));
@@ -294,15 +297,26 @@ function LedgerPanel({
             {t('recordRefund')}
           </Button>
         ) : r.status === 'succeeded' && r.type !== 'refund' && r.providerRef ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="max-md:min-h-11 max-md:px-4"
-            disabled={busy === r.id}
-            onClick={() => refund(r)}
-          >
-            {t('refund')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-md:min-h-11 max-md:px-4"
+              disabled={busy === r.id}
+              onClick={() => refund(r)}
+            >
+              {t('refund')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-md:min-h-11 max-md:px-4"
+              disabled={busy === r.id}
+              onClick={() => refund(r, true)}
+            >
+              {t('refundKeepAccess')}
+            </Button>
+          </div>
         ) : null,
     },
   ];

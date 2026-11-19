@@ -23,6 +23,7 @@ import { WhatsAppLinkService, canLinkWhatsApp, whatsAppLinkState } from '../lib/
  * enqueue failure throws, the transaction rolls back and the merchant sees an error with the old
  * state intact (fail fast, no half-linked store).
  */
+import { storefrontOriginOf } from '../lib/wa/link-origin';
 const router = Router({ mergeParams: true });
 
 const guards = [
@@ -56,7 +57,13 @@ async function change(req: Request, linked: boolean): Promise<{ linked: boolean 
   }
   await WhatsAppLinkService.setLinked(storeId, linked, userId);
   const event = await buildStoreEvent(
-    { type: linked ? 'store.linked' : 'store.unlinked', storeId, data: { ownerUserId: userId } },
+    linked
+      ? {
+          type: 'store.linked',
+          storeId,
+          data: { ownerUserId: userId, ...(await storefrontOriginOf(storeId)) },
+        }
+      : { type: 'store.unlinked', storeId, data: { ownerUserId: userId } },
     { seed: `link:${storeId}:${linked}:${Date.now()}` }
   );
   await sendStoreEvents([event]);
