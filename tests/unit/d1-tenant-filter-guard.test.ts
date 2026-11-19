@@ -23,6 +23,7 @@ const TENANT_TABLES = [
   'merchant_api_keys',
   'slug_redirects',
   'provider_activation_requests',
+  'trust_requests',
   'instapay_receipts',
   'manual_payment_claims',
   'store_usage_snapshots',
@@ -36,6 +37,7 @@ const TENANT_MODELS = [
   'merchantApiKey',
   'slugRedirect',
   'providerActivationRequest',
+  'trustRequest',
   'instapayReceipt',
   'manualPaymentClaim',
   'storeUsageSnapshot',
@@ -69,6 +71,10 @@ const EXEMPT_CALLS: Record<string, string> = {
     'the shared `scope` is built with { storeId, ... } one statement above',
   'services/payment-providers/instapay-receipt.service.ts::instapayReceipt.updateMany':
     'the shared `scope` is built with { storeId, ... } one statement above',
+  'services/trust-requests.service.ts::trustRequest.findFirst':
+    'super_admin review by request id (getTrustRequest), behind authorize(super_admin) + MFA; see trust-requests-d1-filter.test.ts',
+  'services/trust-requests.service.ts::trustRequest.updateMany':
+    'closeGrantedRequests: a super-admin grant answers every merchant open claim for one address (cross-user by design)',
   'services/merchant-signup.service.ts::legalAcceptance.createMany':
     'insert of the new merchant profile acceptances (profileId is the owner key of the rows)',
 };

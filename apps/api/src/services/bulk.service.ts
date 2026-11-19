@@ -1,4 +1,5 @@
 import { isFreeActiveProduct, PRICE_REQUIRED_MESSAGE } from '../lib/sellable-price';
+import { PARENT_SLUG_PREFIX, parentKeyFor } from './bulk-parent-key';
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@ebda/database';
 import { storeDb, storeMoney, storeWriter } from '../lib/repo-factory';
 import logger from '../lib/logger';
@@ -602,7 +603,7 @@ export class BulkService {
           '', // tags
           csvField(variant.imageUrl || ''),
           ...blanks(5), // meta fields + searchTerms (inherited)
-          csvField(product.sku || ''), // parentSku
+          csvField(parentKeyFor(product.sku, product.slug)), // parentSku (sku, else slug:<slug>)
           ...optionCols, // option1Name/Value, option2..., option3...
           ...blanks(3), // pricing_mode, gold_karat, gold_weight_g (product-level only)
         ].join(',');
@@ -751,7 +752,11 @@ export class BulkService {
   static async importProducts(
     storeId: string,
     csvData: string,
-    options: { updateExisting: boolean } = { updateExisting: true },
+    options: {
+      updateExisting: boolean;
+      /** Validate only: run every Phase 1-2.5 check the real import runs, write nothing (the preview uses it). */
+      dryRun?: boolean;
+    } = { updateExisting: true },
     userId?: string
   ): Promise<ImportResult> {
     const result: ImportResult = {
@@ -876,7 +881,7 @@ export class BulkService {
         const codes = [...wanted];
         // Serialise with every other barcode writer in this store until the request commits. A store on its Durable Object
         // has no advisory lock (no Postgres): the partial unique barcode indexes refuse a duplicate (Ruling BARCODE-DO-1).
-        if (!money)
+        if (!money && !options.dryRun)
           await lockStoreBarcodes(
             prisma as unknown as Parameters<typeof lockStoreBarcodes>[0],
             storeId
@@ -900,6 +905,11 @@ export class BulkService {
         }
       }
     }
+    /** An existing product by `parentSku`: its sku, or `slug:<slug>` for a product that has none. */
+    const resolveParent = (key: string) =>
+      key.startsWith(PARENT_SLUG_PREFIX)
+        ? productBySlug.get(key.slice(PARENT_SLUG_PREFIX.length))
+        : productBySku.get(key);
     /** Returns the normalised barcode, undefined when blank, or an error message for the row. */
     const checkBarcode = (
       raw: unknown,
@@ -1011,7 +1021,7 @@ export class BulkService {
           const variantBarcode = checkBarcode(
             row.barcode,
             `variant:${parentSku}:${rowIndex}`,
-            productBySku.get(parentSku) ? `v:${productBySku.get(parentSku)!.id}` : undefined
+            resolveParent(parentSku) ? `v:${resolveParent(parentSku)!.id}` : undefined
           );
           if (variantBarcode.error) {
             result.failed++;
@@ -1170,10 +1180,12 @@ export class BulkService {
         }
 
         if (row.barcode) {
+          // `barcodeHeldBy` records holders as `p:<productId>`: the product's OWN code is the one holder it may keep
+          // (STORE-QA-64: comparing against the bare id made every product collide with itself on a re-import).
           const checked = checkBarcode(
             row.barcode,
             existing?.id ?? `new:${rowIndex}`,
-            existing?.id
+            existing ? `p:${existing.id}` : undefined
           );
           if (checked.error) {
             result.failed++;
@@ -1241,7 +1253,7 @@ export class BulkService {
     // product row and every other row in the file still import.
     const parentIdBySku = new Map<string, string>();
     for (const parentSku of variantsByParent.keys()) {
-      const existingParent = productBySku.get(parentSku);
+      const existingParent = resolveParent(parentSku);
       if (existingParent) parentIdBySku.set(parentSku, existingParent.id);
     }
     // #1560: `productBySku` is keyed by the DB's CURRENT sku for each
@@ -1252,8 +1264,8 @@ export class BulkService {
     // variant rows reference, and that Phase 2 matched to a real existing
     // product, is a parent this bundle-pinned-variant check must not miss.
     for (const parsed of validRows) {
-      const rowSku = parsed.row.sku?.toString().trim();
-      if (rowSku && parsed.existing && variantsByParent.has(rowSku)) {
+      const rowSku = parentKeyFor(parsed.row.sku?.toString().trim(), parsed.slug);
+      if (parsed.existing && variantsByParent.has(rowSku)) {
         parentIdBySku.set(rowSku, parsed.existing.id);
       }
     }
@@ -1268,6 +1280,14 @@ export class BulkService {
         result.failed += skipped.length;
         result.errors.push({ row: 0, error: skip.message });
       }
+    }
+
+    // STORE-QA-64: the preview ran only a price/shape pass, so it said "16 of 16 ready" over an import that then failed 13 rows.
+    // A dry run stops here: every per-row check above (name, barcode, SKU, variants, gold, bundle pins) has run, nothing is written.
+    if (options.dryRun) {
+      result.created = validRows.filter(r => !r.existing).length;
+      result.updated = validRows.filter(r => r.existing).length;
+      return result;
     }
 
     // ---- Phase 2.9: plan ceiling for the WHOLE batch (SP5) ----
@@ -1384,7 +1404,9 @@ export class BulkService {
                     .filter((id): id is string => !!id)
                 : null,
               imageUrls: row.images ? names(row.images) : null,
-              variants: sku && variantsByParent.has(sku) ? variantsByParent.get(sku)! : null,
+              variants: variantsByParent.has(parentKeyFor(sku, slug))
+                ? variantsByParent.get(parentKeyFor(sku, slug))!
+                : null,
             };
           });
           const applied = await money.importBatch({
@@ -1392,7 +1414,9 @@ export class BulkService {
             aiFields: [...AI_AUTOFILL_FIELD_NAMES],
             userId: userId ?? null,
           });
-          for (const p of plan) if (p.variants) variantsByParent.delete(String(p.fields.sku));
+          for (const p of plan)
+            if (p.variants)
+              variantsByParent.delete(parentKeyFor(p.fields.sku as string | null, p.slug));
           batchVariants += applied.variantsCreated;
           const productIdByRow = new Map(applied.products.map(p => [p.rowIndex, p.productId]));
           for (const { rowIndex, row } of batch) {
@@ -1576,16 +1600,17 @@ export class BulkService {
                 // Attach any variant rows that referenced this product's sku.
                 // Created in the SAME transaction so a batch rollback also
                 // rolls back the variants.
-                if (productFields.sku && variantsByParent.has(productFields.sku)) {
+                const parentKey = parentKeyFor(productFields.sku, slug);
+                if (variantsByParent.has(parentKey)) {
                   const made = await createVariantsForProductTx(
                     tx,
                     storeId,
                     productId,
-                    variantsByParent.get(productFields.sku)!,
+                    variantsByParent.get(parentKey)!,
                     userId
                   );
                   batchVariants += made;
-                  variantsByParent.delete(productFields.sku); // mark consumed
+                  variantsByParent.delete(parentKey); // mark consumed
                 }
                 const goldMode = String(row.pricing_mode ?? '')
                   .trim()
@@ -1689,7 +1714,7 @@ export class BulkService {
     // Reconcile variant groups whose parent product was NOT in this file but
     // already exists in the store. Each runs in its own transaction.
     for (const [parentSku, variants] of variantsByParent.entries()) {
-      const existing = productBySku.get(parentSku);
+      const existing = resolveParent(parentSku);
       if (!existing) {
         result.failed += variants.length;
         result.errors.push({

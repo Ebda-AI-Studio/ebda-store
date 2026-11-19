@@ -72,7 +72,7 @@
   "services/loyalty.service.ts": 44,
   "services/onboarding.service.ts": 1,
   "services/onesignal.service.ts": 3,
-  "services/order.service.ts": 16,
+  "services/order.service.ts": 19,
   "services/page-builder.service.ts": 3,
   "services/payment-confirm.service.ts": 6,
   "services/payment-event.service.ts": 2,
