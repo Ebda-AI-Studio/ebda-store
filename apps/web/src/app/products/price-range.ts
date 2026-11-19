@@ -3,6 +3,12 @@
  * the keyboard and pointer rules are unit-tested without a DOM.
  */
 
+import { fromMinor } from '@ebda/shared';
+
+/** Slider ceiling used only when the API gave no highest price, in MAJOR units. */
+const FALLBACK_CEIL = 5000;
+const SLIDER_STEP = 10;
+
 export type Thumb = 'min' | 'max';
 
 /** Snap `v` to the step grid anchored at `floor` and clamp it into [floor, ceil]. */
@@ -53,4 +59,15 @@ export function valueForKey(
   else if (key === 'End') next = o.ceil;
   else return null;
   return snap(next, o.floor, o.ceil, o.step);
+}
+
+/**
+ * The slider's natural ceiling in MAJOR units (PL1): the store's real highest price (variant-aware, from the
+ * list answer's `meta.priceMax`, minor units) rounded UP to the step, so the dearest product is always inside
+ * the range. A fixed 5,000 hid everything above it the moment the slider moved. Falls back to the old bound
+ * only when the API gave no figure (an older cached answer, an empty store).
+ */
+export function priceSliderCeil(priceMaxMinor: number | undefined): number {
+  if (!priceMaxMinor || !Number.isFinite(priceMaxMinor) || priceMaxMinor <= 0) return FALLBACK_CEIL;
+  return Math.max(SLIDER_STEP, Math.ceil(fromMinor(priceMaxMinor) / SLIDER_STEP) * SLIDER_STEP);
 }
