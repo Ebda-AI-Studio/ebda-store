@@ -40,7 +40,7 @@ import {
 } from '../../../../components/billing/format';
 import { EbdaBillingReceipt } from '../../../../components/billing/EbdaBillingReceipt';
 import { pickReceiptCharge } from '../../../../components/billing/receipt-charge';
-import { billingNotice, noticeText } from '../../../../components/billing/notice';
+import { billingNotice, isRenewalOnly, noticeText } from '../../../../components/billing/notice';
 import { startCardSetup, useCardReturn } from '../../../../components/billing/useCardReturn';
 import type {
   BillingInfo,
@@ -506,7 +506,8 @@ export default function StoreBillingPage() {
   const instapayChosen = info?.billingMethod === 'instapay';
   // InstaPay-only deployment (BILLING_PROVIDER=none) or a store that pays by transfer: a payment is DUE, nothing is
   // charged automatically (Ruling BILLING-NONE-COPY-1).
-  const instapayDue = info?.cardBilling === false || instapayChosen;
+  const renewalOnly = isRenewalOnly(data?.subscription.status, info, !!quote);
+  const instapayDue = !renewalOnly && (info?.cardBilling === false || instapayChosen);
   // What the merchant is shown to transfer: the plan just picked, else the stored quote.
   const payDetails = instapay && quote ? { ...instapay, ...quote } : instapay;
   const showCardControls =
@@ -808,24 +809,41 @@ export default function StoreBillingPage() {
                 {info.nextCharge && (
                   <div className="flex justify-between gap-2 sm:col-span-2">
                     <dt className="text-muted-foreground">
-                      {t(instapayDue ? 'trial.instapayDue' : 'trial.nextCharge')}
+                      {t(
+                        instapayDue
+                          ? 'trial.instapayDue'
+                          : renewalOnly
+                            ? 'trial.nextRenewal'
+                            : 'trial.nextCharge'
+                      )}
                     </dt>
                     <dd className="text-end tabular-nums">
                       {info.nextCharge.amountMinor !== null
-                        ? t(instapayDue ? 'trial.instapayDueLine' : 'trial.nextChargeLine', {
-                            amount: formatMoney(info.nextCharge.amountMinor, locale, {
-                              fixedDecimals: true,
-                            }),
-                            interval: t(
-                              info.billingInterval === 'yearly'
-                                ? 'intervalYearly'
-                                : 'intervalMonthly'
-                            ),
-                            plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
-                            date: fmtBillingDate(info.nextCharge.at, locale),
-                          })
+                        ? t(
+                            instapayDue
+                              ? 'trial.instapayDueLine'
+                              : renewalOnly
+                                ? 'trial.renewalLine'
+                                : 'trial.nextChargeLine',
+                            {
+                              amount: formatMoney(info.nextCharge.amountMinor, locale, {
+                                fixedDecimals: true,
+                              }),
+                              interval: t(
+                                info.billingInterval === 'yearly'
+                                  ? 'intervalYearly'
+                                  : 'intervalMonthly'
+                              ),
+                              plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
+                              date: fmtBillingDate(info.nextCharge.at, locale),
+                            }
+                          )
                         : t(
-                            instapayDue ? 'trial.instapayDueNoAmount' : 'trial.nextChargeNoAmount',
+                            instapayDue
+                              ? 'trial.instapayDueNoAmount'
+                              : renewalOnly
+                                ? 'trial.renewalNoAmount'
+                                : 'trial.nextChargeNoAmount',
                             {
                               plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
                               date: fmtBillingDate(info.nextCharge.at, locale),
@@ -899,6 +917,13 @@ export default function StoreBillingPage() {
                     >
                       {t('pay.useInstapay')}
                     </Button>
+                  ) : renewalOnly ? (
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-testid="instapay-renewal-note"
+                    >
+                      {t('pay.instapayRenewalNote')}
+                    </p>
                   ) : (
                     <div id="instapay-pay" className="space-y-4">
                       {quote && (

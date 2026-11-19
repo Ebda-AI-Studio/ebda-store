@@ -9367,7 +9367,7 @@
     "stubPay": "Simulate success",
     "stubDecline": "Simulate decline",
     "trial": {
-      "title": "Plan & trial",
+      "title": "Your plan and renewal",
       "chosenPlan": "Chosen plan",
       "nextCharge": "Next charge",
       "nextChargeLine": "{amount} ({interval}) for {plan} on {date}",
@@ -9375,7 +9375,10 @@
       "instapayDue": "Payment due",
       "instapayDueLine": "InstaPay payment due by {date}: {amount} ({interval}) for {plan}",
       "instapayDueNoAmount": "InstaPay payment due by {date} for {plan}",
-      "returnsToFree": "Your plan returns to Free if it is not paid by then."
+      "returnsToFree": "Your plan returns to Free if it is not paid by then.",
+      "nextRenewal": "Next renewal",
+      "renewalLine": "Next renewal on {date}: {amount} {interval} for {plan}",
+      "renewalNoAmount": "Next renewal on {date} for {plan}"
     },
     "pay": {
       "title": "Payment method",
@@ -9403,7 +9406,8 @@
       "claimSent": "Thanks. The Ebda Store team will review your transfer and activate your plan once it is confirmed.",
       "instapayUnavailable": "InstaPay is not available right now",
       "instapayFailed": "We could not set up InstaPay",
-      "reviewerNote": "The Ebda Store team will review your transfer. Nothing changes until it is confirmed."
+      "reviewerNote": "The Ebda Store team will review your transfer. Nothing changes until it is confirmed.",
+      "instapayRenewalNote": "Nothing is due right now. We remind you before the renewal date, and the transfer details and receipt upload appear here then."
     },
     "claims": {
       "title": "Payment confirmations",
