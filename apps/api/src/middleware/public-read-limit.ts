@@ -2,6 +2,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { cfBindings } from '../cf/bindings';
 import { ssrWithinLocalBudget, publicIpKey, skipPublicLimiters } from './public-limiter-keys';
 import { resolvePublicStoreId } from '../utils/store-helpers';
+import { storeResolveIsNative } from './store-resolve-native';
 
 /**
  * Anonymous public READS are limited by the Workers Rate Limiting bindings (a local, in-colo
@@ -66,6 +67,19 @@ export function publicReadLimit(exactLimiters: RequestHandler): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
     if (skipPublicLimiters(req) || ssrWithinLocalBudget(req)) return next();
     const b = cfBindings();
+    // Store resolve (Ruling PERF-AUTHSTATE-1): the host is not a store yet, so only the per-address bucket applies (the same 300/min
+    // as the exact limiter); no tenant bucket keyed on an attacker-supplied host. A binding error falls back to the exact limiters.
+    if (storeResolveIsNative(req)) {
+      if (!req.ip) return next();
+      return void b!
+        .PUBLIC_IP_LIMITER!.limit({ key: publicIpKey(req) })
+        .then(ip => {
+          if (ip.success) return next();
+          res.setHeader('Retry-After', '60');
+          res.status(429).json(BODY);
+        })
+        .catch(() => exactLimiters(req, res, next));
+    }
     if (!isAnonymousPublicRead(req) || !b?.PUBLIC_IP_LIMITER || !b.PUBLIC_TENANT_LIMITER) {
       return exactLimiters(req, res, next);
     }

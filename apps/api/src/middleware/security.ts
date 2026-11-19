@@ -15,6 +15,7 @@ import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
 import { isWorkers } from '../lib/runtime';
 import { CfRateLimitStore } from '../cf/rate-limit-store';
+import { withLimitPlan, withoutLimitPlan } from './limit-plan';
 import { cfWaitUntil } from '../cf/bindings';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { config } from '../config';
@@ -26,6 +27,7 @@ import {
   recordSharedCounting,
 } from '../lib/rate-limit-telemetry';
 import { withSavepoint } from '../lib/savepoint';
+import { storeResolveIsNative } from './store-resolve-native';
 import { insertAuditLog } from '../lib/definer';
 import { currentImpersonator } from '../lib/impersonation-context';
 
@@ -750,6 +752,7 @@ type RedisCaller = { call: (...args: any[]) => unknown };
  * reconnecting, and `maxRetriesPerRequest: 3` would hold the request for
  * seconds before failing. A limiter must never make a request wait on Redis.
  */
+// pq-allow(unused-export): imported by tests/unit/rate-limit-redis-at-boot.test.ts
 export const rateLimitRedisClient = (): RedisCaller | null =>
   rateLimitSharedEnabled() && redis.isAvailable() ? redis.getClient() : null;
 
@@ -880,6 +883,38 @@ export function makeRateLimitStore(
   return new RedisOrMemoryStore(resolve, prefix);
 }
 
+type PlannedRateLimitOptions = Omit<
+  Partial<Options>,
+  'store' | 'keyGenerator' | 'skip' | 'windowMs'
+> & {
+  windowMs: number;
+  keyGenerator?: (req: Request) => string;
+  skip?: (req: Request) => boolean;
+  /** The key reads `req.body` (the request-level prefetch then predicts it from the parsed, sanitised body). */
+  keyReadsBody?: boolean;
+};
+
+/**
+ * PERF-BATCH-1 (Ruling PERF-BATCH-1): an express-rate-limit limiter on the `rl:<name>:` store that also declares its plan
+ * (middleware/limit-plan.ts), built from the SAME options object: name, window, key function and skip predicate. The
+ * request-level prefetch (middleware/request-limit-prefetch.ts) reads the plan to send this limiter's hit in the request's ONE
+ * batched AuthState call per shard; the limiter then takes the prefetched result instead of its own round trip. Limit, window,
+ * key, headers, 429 body and fail mode (Ruling API-HANG-2) are the limiter's own, unchanged. With no `keyGenerator` the
+ * limiter keeps express-rate-limit's default (client IP, IPv6 /56) and the plan uses the same `ipKeyGenerator(ip, 56)`.
+ */
+export function plannedRateLimit(name: string, opts: PlannedRateLimitOptions): RequestHandler {
+  const { keyReadsBody, ...options } = opts;
+  const limiter = rateLimit({ ...options, store: makeRateLimitStore(rateLimitRedisClient, name) });
+  return withLimitPlan(limiter, {
+    name,
+    windowMs: opts.windowMs,
+    key: req =>
+      opts.keyGenerator ? opts.keyGenerator(req) : req.ip ? ipKeyGenerator(req.ip, 56) : null,
+    skip: req => opts.skip?.(req) ?? false,
+    body: keyReadsBody,
+  });
+}
+
 // Strict limiter for auth endpoints.
 //
 // Two-layer brute-force defense: this 15-attempt window is the
@@ -923,8 +958,8 @@ export function authLimiterKey(req: Request): string {
 }
 
 export function createAuthLimiter(opts?: { skip?: (req: Request) => boolean; prefix?: string }) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, opts?.prefix ?? 'auth'),
+  return plannedRateLimit(opts?.prefix ?? 'auth', {
+    keyReadsBody: true,
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 15,
     message: {
@@ -967,8 +1002,7 @@ export function createAuthIpLimiter(opts: {
   prefix?: string;
   skip?: (req: Request) => boolean;
 }) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, opts.prefix ?? 'auth-ip'),
+  return plannedRateLimit(opts.prefix ?? 'auth-ip', {
     windowMs: 15 * 60 * 1000,
     max: opts.max ?? (opts.countSuccess ? 30 : 60),
     message: {
@@ -1039,6 +1073,8 @@ export function createStoreMissLimiter(opts?: {
   };
   return async (req, res, next) => {
     if (skip(req)) return next();
+    // Store resolve on the native limiters (Ruling PERF-AUTHSTATE-1): the miss is counted lazily, on the 404 path, by the handler.
+    if (storeResolveIsNative(req)) return next();
     const key = ipKeyGenerator(req.ip ?? '');
     let misses = 0;
     let resetAt = 0;
@@ -1090,8 +1126,7 @@ export function createPublicSearchLimiter(opts?: {
   skip?: (req: Request) => boolean;
   max?: number;
 }) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, 'public-search'),
+  return plannedRateLimit('public-search', {
     windowMs: 60 * 1000,
     max: opts?.max ?? 60,
     message: {
@@ -1150,8 +1185,7 @@ export function createPasskeyLimiter(
   kind: 'begin' | 'finish',
   opts?: { skip?: (req: Request) => boolean }
 ) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, `passkey-${kind}`),
+  return plannedRateLimit(`passkey-${kind}`, {
     windowMs: 15 * 60 * 1000,
     max: kind === 'begin' ? 300 : 20,
     skipSuccessfulRequests: kind === 'finish',
@@ -1177,20 +1211,23 @@ export function passkeyStepUpLimiterKey(req: Request): string {
 }
 
 export function createPasskeyStepUpLimiter(opts?: { skip?: (req: Request) => boolean }) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, 'passkey-stepup'),
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    message: {
-      success: false,
-      error: { code: 'RATE_LIMITED', message: 'Too many attempts, please try again later.' },
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    passOnStoreError: true,
-    skip: opts?.skip ?? skipForLoadTestOrTests,
-    keyGenerator: passkeyStepUpLimiterKey,
-  });
+  return withoutLimitPlan(
+    rateLimit({
+      store: makeRateLimitStore(rateLimitRedisClient, 'passkey-stepup'),
+      windowMs: 15 * 60 * 1000,
+      max: 10,
+      message: {
+        success: false,
+        error: { code: 'RATE_LIMITED', message: 'Too many attempts, please try again later.' },
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      passOnStoreError: true,
+      skip: opts?.skip ?? skipForLoadTestOrTests,
+      keyGenerator: passkeyStepUpLimiterKey,
+    }),
+    'keyed on req.user (set by authenticate, after the request-level prefetch)'
+  );
 }
 export const passkeyBeginLimiter = createPasskeyLimiter('begin');
 export const passkeyFinishLimiter = createPasskeyLimiter('finish');
@@ -1250,8 +1287,8 @@ export function createResetEmailLimiter(opts?: {
   skip?: (req: Request) => boolean;
   prefix?: string;
 }) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, opts?.prefix ?? 'reset-email'),
+  return plannedRateLimit(opts?.prefix ?? 'reset-email', {
+    keyReadsBody: true,
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 3,
     message: {
@@ -1294,8 +1331,8 @@ export function authEmailAddressLimiterKey(req: Request): string {
   return `auth-email-any-${email.slice(0, 320) || 'unknown'}`;
 }
 
-export const authEmailAddressLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'auth-email-any'),
+export const authEmailAddressLimiter = plannedRateLimit('auth-email-any', {
+  keyReadsBody: true,
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 6,
   message: {
@@ -1347,8 +1384,8 @@ export function verifyEmailLimiterKey(req: Request): string {
   return `verify-email-${ipKeyGenerator(req.ip ?? '')}`;
 }
 
-export const verifyEmailLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'verify-email'),
+export const verifyEmailLimiter = plannedRateLimit('verify-email', {
+  keyReadsBody: true,
   windowMs: 15 * 60 * 1000,
   max: 60,
   message: {
@@ -1387,8 +1424,7 @@ export function createMerchantSignupIpLimiter(opts?: {
   max?: number;
   prefix?: string;
 }) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, opts?.prefix ?? 'merchant-signup-ip'),
+  return plannedRateLimit(opts?.prefix ?? 'merchant-signup-ip', {
     windowMs: 60 * 60 * 1000,
     max: opts?.max ?? 20,
     message: {
@@ -1434,8 +1470,7 @@ function signupVelocityLimiter(opts: {
   message: string;
   skip?: (req: Request) => boolean;
 }) {
-  return rateLimit({
-    store: makeRateLimitStore(rateLimitRedisClient, opts.prefix),
+  return plannedRateLimit(opts.prefix, {
     windowMs: 60 * 60 * 1000,
     max: opts.max,
     message: { success: false, error: { code: 'RATE_LIMITED', message: opts.message } },
@@ -1582,8 +1617,8 @@ export function verifyRefreshJwt(
  * Credential stuffing is what `authLimiter` is for, and /refresh is no longer
  * in its bucket.
  */
-export const refreshLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'refresh'),
+export const refreshLimiter = plannedRateLimit('refresh', {
+  keyReadsBody: true,
   windowMs: 15 * 60 * 1000,
   max: 120,
   message: {
@@ -1615,8 +1650,7 @@ export const refreshLimiter = rateLimit({
  * 200/15min global mutation cap /refresh sat under before the bypass, so no
  * office NAT that worked yesterday starts 429-ing today.
  */
-export const refreshIpLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'refresh-ip'),
+export const refreshIpLimiter = plannedRateLimit('refresh-ip', {
   windowMs: 15 * 60 * 1000,
   max: 600,
   message: {
@@ -1632,8 +1666,7 @@ export const refreshIpLimiter = rateLimit({
 });
 
 // Limiter for API writes (orders, payments)
-export const writeLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'write'),
+export const writeLimiter = plannedRateLimit('write', {
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 writes per minute
   message: {
@@ -1656,24 +1689,26 @@ export const writeLimiter = rateLimit({
 // office IP), generous for typing (the palette debounces to ~5/s at most) and a hard stop for a
 // held key or a script. A merchant who hits it sees a distinct "slow down" state in the palette.
 export const ADMIN_SEARCH_LIMIT_PER_MINUTE = 120;
-export const adminSearchLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'admin-search'),
-  windowMs: 60 * 1000,
-  max: ADMIN_SEARCH_LIMIT_PER_MINUTE,
-  message: {
-    success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many searches, please slow down.' },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  passOnStoreError: true,
-  skip: skipForLoadTest,
-  keyGenerator: req => `admin-search-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`,
-});
+export const adminSearchLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'admin-search'),
+    windowMs: 60 * 1000,
+    max: ADMIN_SEARCH_LIMIT_PER_MINUTE,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many searches, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: skipForLoadTest,
+    keyGenerator: req => `admin-search-${req.user?.userId ?? ipKeyGenerator(req.ip ?? '')}`,
+  }),
+  'keyed on req.user (set by authenticate, after the request-level prefetch)'
+);
 
 // Stricter limiter for payment operations
-export const paymentLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'payment'),
+export const paymentLimiter = plannedRateLimit('payment', {
   windowMs: 60 * 1000, // 1 minute
   max: 10, // 10 payment attempts per minute
   message: {
@@ -1692,36 +1727,38 @@ export const paymentLimiter = rateLimit({
 });
 
 // File upload limiter - more restrictive
-export const uploadLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'upload'),
-  windowMs: 60 * 1000, // 1 minute
-  max: 20, // 20 uploads per minute
-  message: {
-    success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many upload requests, please slow down.' },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
-  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
-  // false, which rethrew a Redis blip into a 500 on every limited route —
-  // Redis became a single point of failure for the whole write surface while
-  // the cache layer deliberately fails open. Unlimited-but-up beats down.
-  passOnStoreError: true,
-  skip: skipForLoadTest,
-  keyGenerator: req => {
-    // Limit per user, not per IP. ipKeyGenerator() applied to the IP
-    // fallback so anonymous IPv6 callers can't bypass via lower-64-bit
-    // rotation (ERR_ERL_KEY_GEN_IPV6).
-    return req.user?.userId || ipKeyGenerator(req.ip ?? '') || 'anonymous';
-  },
-});
+export const uploadLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'upload'),
+    windowMs: 60 * 1000, // 1 minute
+    max: 20, // 20 uploads per minute
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many upload requests, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+    // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+    // false, which rethrew a Redis blip into a 500 on every limited route —
+    // Redis became a single point of failure for the whole write surface while
+    // the cache layer deliberately fails open. Unlimited-but-up beats down.
+    passOnStoreError: true,
+    skip: skipForLoadTest,
+    keyGenerator: req => {
+      // Limit per user, not per IP. ipKeyGenerator() applied to the IP
+      // fallback so anonymous IPv6 callers can't bypass via lower-64-bit
+      // rotation (ERR_ERL_KEY_GEN_IPV6).
+      return req.user?.userId || ipKeyGenerator(req.ip ?? '') || 'anonymous';
+    },
+  }),
+  'keyed on req.user (set by authenticate, after the request-level prefetch)'
+);
 
 // Catalogue import: uploads per STORE per hour (a staff pile-on or a looping client cannot spend a
 // store's AI budget). Keyed on the store from the route, never the body. The page ledger and the
 // active-jobs cap are the money-side limits; this is the request-rate side.
-export const catalogImportStoreLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'catalog-import-store'),
+export const catalogImportStoreLimiter = plannedRateLimit('catalog-import-store', {
   windowMs: 60 * 60 * 1000,
   max: parseInt(process.env.CATALOG_IMPORT_UPLOADS_PER_HOUR || '10', 10),
   message: {
@@ -1737,32 +1774,34 @@ export const catalogImportStoreLimiter = rateLimit({
 });
 
 // Daily upload limit per user
-export const dailyUploadLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'upload-daily'),
-  windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  max: 500, // 500 uploads per day per user
-  message: {
-    success: false,
-    error: { code: 'DAILY_LIMIT', message: 'Daily upload limit reached. Try again tomorrow.' },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
-  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
-  // false, which rethrew a Redis blip into a 500 on every limited route —
-  // Redis became a single point of failure for the whole write surface while
-  // the cache layer deliberately fails open. Unlimited-but-up beats down.
-  passOnStoreError: true,
-  skip: skipForLoadTest,
-  keyGenerator: req => {
-    // ipKeyGenerator() normalizes IPv6 to /64 prefix (ERR_ERL_KEY_GEN_IPV6).
-    return req.user?.userId || ipKeyGenerator(req.ip ?? '') || 'anonymous';
-  },
-});
+export const dailyUploadLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'upload-daily'),
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    max: 500, // 500 uploads per day per user
+    message: {
+      success: false,
+      error: { code: 'DAILY_LIMIT', message: 'Daily upload limit reached. Try again tomorrow.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+    // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+    // false, which rethrew a Redis blip into a 500 on every limited route —
+    // Redis became a single point of failure for the whole write surface while
+    // the cache layer deliberately fails open. Unlimited-but-up beats down.
+    passOnStoreError: true,
+    skip: skipForLoadTest,
+    keyGenerator: req => {
+      // ipKeyGenerator() normalizes IPv6 to /64 prefix (ERR_ERL_KEY_GEN_IPV6).
+      return req.user?.userId || ipKeyGenerator(req.ip ?? '') || 'anonymous';
+    },
+  }),
+  'keyed on req.user (set by authenticate, after the request-level prefetch)'
+);
 
 // Public API rate limiter - protect public endpoints from abuse
-export const publicLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'public'),
+export const publicLimiter = plannedRateLimit('public', {
   windowMs: 60 * 1000, // 1 minute
   // Storefront browsing burns through this fast on real mobile sessions:
   // home + Next.js App Router RSC prefetches on link hover/viewport entry +
@@ -1791,8 +1830,7 @@ export const publicLimiter = rateLimit({
 });
 
 // Store resolver rate limiter - stricter for domain resolution
-export const storeResolveLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'store-resolve'),
+export const storeResolveLimiter = plannedRateLimit('store-resolve', {
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 requests per minute
   message: {
@@ -1815,8 +1853,7 @@ export const storeResolveLimiter = rateLimit({
 });
 
 // Cart rate limiter - prevent cart bombing
-export const cartLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'cart'),
+export const cartLimiter = plannedRateLimit('cart', {
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 cart operations per minute
   message: {
@@ -1844,8 +1881,7 @@ export const cartLimiter = rateLimit({
 // signup form has no spam mitigations (no captcha, no email confirmation
 // loop). 5 attempts per minute per IP+session is generous for a real human
 // who fat-fingered their address but cuts off bot enumeration.
-export const newsletterLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'newsletter'),
+export const newsletterLimiter = plannedRateLimit('newsletter', {
   windowMs: 60 * 1000, // 1 minute
   max: 5,
   message: {
@@ -1870,45 +1906,50 @@ export const newsletterLimiter = rateLimit({
 
 // WhatsApp marketing-consent: per-CALLER ceiling (the signed-in customer), applied to grants AND
 // revocations so one customer cannot spam, but keyed on the user so nobody else's traffic can exhaust it.
-export const whatsappConsentUserLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-user'),
-  windowMs: 60 * 1000,
-  max: 30,
-  message: {
-    success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  passOnStoreError: true,
-  skip: skipForLoadTestOrTests,
-  keyGenerator: req => `u:${req.user?.userId ?? 'anon'}`,
-});
+export const whatsappConsentUserLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-user'),
+    windowMs: 60 * 1000,
+    max: 30,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: skipForLoadTestOrTests,
+    keyGenerator: req => `u:${req.user?.userId ?? 'anon'}`,
+  }),
+  'keyed on req.user (set by authenticate, after the request-level prefetch)'
+);
 
 // WhatsApp marketing-consent GRANTS: a per-STORE ceiling, keyed on the RESOLVED store id (set by the
 // opt-in chain before this runs), never on a raw client header.
-export const whatsappConsentStoreLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-store'),
-  windowMs: 60 * 1000,
-  max: Number(process.env.WA_CONSENT_STORE_RATE_LIMIT_PER_MIN) || 120,
-  message: {
-    success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  passOnStoreError: true,
-  skip: skipForLoadTestOrTests,
-  keyGenerator: (req, res) =>
-    `s:${(res.locals.waStoreId as string | undefined) ?? ipKeyGenerator(req.ip ?? '')}`,
-});
+export const whatsappConsentStoreLimiter = withoutLimitPlan(
+  rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, 'wa-consent-store'),
+    windowMs: 60 * 1000,
+    max: Number(process.env.WA_CONSENT_STORE_RATE_LIMIT_PER_MIN) || 120,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: skipForLoadTestOrTests,
+    keyGenerator: (req, res) =>
+      `s:${(res.locals.waStoreId as string | undefined) ?? ipKeyGenerator(req.ip ?? '')}`,
+  }),
+  'keyed on res.locals.waStoreId (set by the handler chain, after the request-level prefetch)'
+);
 
 // Coupon validate limiter — public brute-force discovery protection.
 // 20 attempts per minute per IP is enough for a legitimate checkout flow
 // but prevents rapid enumeration of valid coupon codes.
 // ipKeyGenerator() collapses IPv6 /128 → /64 (ERR_ERL_KEY_GEN_IPV6).
-export const couponValidateLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'coupon-validate'),
+export const couponValidateLimiter = plannedRateLimit('coupon-validate', {
   windowMs: 60 * 1000, // 1 minute
   max: 20,
   message: {
@@ -1993,8 +2034,7 @@ export const couponValidateDistinctLimiter = couponDistinctGate('code');
 // legitimate checkout flow (recomputed on every cart mutation) while
 // bounding scrape/enumeration volume against the targeting resolver.
 // ipKeyGenerator() collapses IPv6 /128 → /64 (ERR_ERL_KEY_GEN_IPV6).
-export const promotionPreviewLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'promotion-preview'),
+export const promotionPreviewLimiter = plannedRateLimit('promotion-preview', {
   windowMs: 60 * 1000, // 1 minute
   max: 20,
   message: {
@@ -2028,8 +2068,7 @@ export const promotionPreviewLimiter = rateLimit({
 // (sessionId, productId) per 10-minute window regardless of IP rotation.
 // Key by normalized IP so IPv6 /128 bots can't bypass via address churn
 // (ipKeyGenerator collapses to /64 prefix — ERR_ERL_KEY_GEN_IPV6).
-export const viewIngestLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'view-ingest'),
+export const viewIngestLimiter = plannedRateLimit('view-ingest', {
   windowMs: 60 * 1000, // 1 minute
   max: 60, // 60 view beacons per minute per IP (generous for real browsing)
   message: {
@@ -2059,8 +2098,7 @@ export const viewIngestLimiter = rateLimit({
 // distributed burn, not a per-user fairness limit. Keyed on the RAW header
 // (no DB lookup — limiters must stay cheap); requests with no tenant header
 // fall back to the normalized IP so they never share one global bucket.
-export const publicTenantLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'public-tenant'),
+export const publicTenantLimiter = plannedRateLimit('public-tenant', {
   windowMs: 60 * 1000,
   max: Number(process.env.PUBLIC_TENANT_RATE_LIMIT_PER_MIN) || 6000,
   message: {
@@ -2154,6 +2192,14 @@ export async function auditLog(entry: AuditLogEntry) {
 // ==========================================
 // Input Sanitization
 // ==========================================
+
+/** A sanitised copy of a request body, exactly as `sanitizeInput` rewrites it (PERF-BATCH-1: key prediction before it runs). */
+export function sanitizedBody(body: unknown): unknown {
+  if (!body || typeof body !== 'object') return body;
+  return Array.isArray(body)
+    ? sanitizeArray(body)
+    : sanitizeObject(body as Record<string, unknown>);
+}
 
 export function sanitizeInput(req: Request, _res: Response, next: NextFunction) {
   // Recursively sanitize strings in body. A top-level ARRAY body (a JSON-RPC batch on the MCP
