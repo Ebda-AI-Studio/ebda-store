@@ -887,9 +887,29 @@ router.post(
   }
 );
 
+/**
+ * STORE-QA-43: the storefront's "is anyone signed in?" probe. With `?probe=anon` and NO credential at all (no access
+ * cookie, no refresh cookie, no Authorization header) the honest answer is 200 `{ user: null }`, not a red 401 in every
+ * guest's console. Any credential present falls through to the normal 401/refresh path, so an expired session still refreshes.
+ */
+function anonymousProbe(req: Request, res: Response, next: NextFunction): void {
+  if (
+    req.query.probe === 'anon' &&
+    !req.cookies?.token &&
+    !req.cookies?.refresh_token &&
+    !req.headers.authorization
+  ) {
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json({ success: true, data: { user: null } });
+    return;
+  }
+  next();
+}
+
 // GET /auth/me
 router.get(
   '/me',
+  anonymousProbe,
   authenticate,
   rejectAdminOnMerchantOrigin,
   async (req: Request, res: Response, next: NextFunction) => {

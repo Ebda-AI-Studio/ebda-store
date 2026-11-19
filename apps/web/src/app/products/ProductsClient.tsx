@@ -195,6 +195,22 @@ export default function ProductsClient({
     return initial;
   });
   const [error, setError] = useState<string | null>(null);
+
+  // STORE-QA-50: category / tag / sort live in the query string so the back button works and a filtered
+  // list can be shared. replaceState (no navigation, no refetch) keeps every other param as it was.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const set = (k: string, v: string | null) =>
+      v ? url.searchParams.set(k, v) : url.searchParams.delete(k);
+    set('category', categoryFilter || null);
+    set('tag', tagFilter || null);
+    set('sort', sortBy && sortBy !== 'default' ? sortBy : null);
+    const next = url.pathname + url.search + url.hash;
+    if (next !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history.replaceState(window.history.state, '', next);
+    }
+  }, [categoryFilter, tagFilter, sortBy]);
   // Track which product ids are in the compare list so buttons re-render on change
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const { addItem, items: cartItems } = useCart();

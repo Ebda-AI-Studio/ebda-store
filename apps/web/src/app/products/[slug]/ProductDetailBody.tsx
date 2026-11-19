@@ -128,7 +128,8 @@ export function buildProductMetadata(
     openGraph: {
       title: `${title} | ${localizedStoreName}`,
       description,
-      type: 'website',
+      // STORE-QA-49: Next's OpenGraph type has no 'product'; og:type is emitted from `other` below.
+      locale: locale === 'ar' ? 'ar_EG' : 'en_US',
       url: canonicalUrl,
       ...(ogImages.length ? { images: ogImages } : {}),
     },
@@ -145,6 +146,7 @@ export function buildProductMetadata(
       ...(ogImages.length ? { images: [ogImages[0].url] } : {}),
     },
     other: {
+      'og:type': 'product',
       ...(category ? { 'product:category': category } : {}),
       'product:price:amount': String(fromMinor(product.price)),
       'product:price:currency': REGION.currency,

@@ -209,8 +209,28 @@ export default function CartClient() {
     } else {
       try {
         await updateCartQuantity(itemId, newQuantity);
-      } catch {
-        cartErrorToast();
+      } catch (err) {
+        // STORE-QA-45: say WHY. A stock cap and a throttle are different from "check your connection".
+        const e = err as { code?: string; message?: string };
+        if (e?.code === 'RATE_LIMITED') {
+          errorToast(
+            t('Slow down a little', 'براحة شوية'),
+            t(
+              'Too many changes at once. Try again in a moment.',
+              'تغييرات كتير ورا بعض. جرّب تاني بعد لحظة.'
+            )
+          );
+        } else if (e?.code && e.code !== 'SERVER_ERROR' && e.code !== 'NETWORK_ERROR') {
+          info(
+            t('Limit reached', 'وصلت للحد'),
+            t(
+              'No more of this item is available right now.',
+              'مفيش أكتر من الكمية دي متاحة دلوقتي.'
+            )
+          );
+        } else {
+          cartErrorToast();
+        }
       }
     }
   };
@@ -245,6 +265,11 @@ export default function CartClient() {
         ...document.querySelectorAll<HTMLInputElement>('#cart-promo-code, #cart-promo-code-t'),
       ].find(el => el.offsetParent !== null);
       field?.focus();
+      // STORE-QA-52: an empty code is "enter a code", not "invalid".
+      info(
+        t('Enter a code', 'ادخل الكود'),
+        t('Type your discount code first.', 'اكتب كود الخصم الأول.')
+      );
       return;
     }
     setIsValidating(true);

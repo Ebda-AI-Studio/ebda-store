@@ -151,7 +151,12 @@ export function ActionFooter({
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span className="min-w-0">{tStatus(nextStatus) || t('processed')}</span>
+                {/* STORE-QA-31: a button is an ACTION. "Refunded" is a state; the refund step reads "Refund order". */}
+                <span className="min-w-0">
+                  {nextStatus === 'refunded'
+                    ? t('refundOrder')
+                    : tStatus(nextStatus) || t('processed')}
+                </span>
               </>
             )}
           </Button>

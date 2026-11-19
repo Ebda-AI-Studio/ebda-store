@@ -620,7 +620,8 @@ const SESSION_PROBE_KEY = 'authProbe';
 
 function claimSessionProbe(endpoint: string, options: RequestInit): boolean {
   if (typeof window === 'undefined') return false;
-  if (endpoint !== '/auth/me' || (options.method || 'GET').toUpperCase() !== 'GET') return false;
+  if (!endpoint.startsWith('/auth/me') || (options.method || 'GET').toUpperCase() !== 'GET')
+    return false;
   try {
     const ss = window.sessionStorage;
     if (!ss || ss.getItem(SESSION_PROBE_KEY) !== null) return false;
@@ -1177,14 +1178,27 @@ class ApiClient {
   }
 
   async getProfile() {
-    const result = await this.request<{ user: User }>('/auth/me');
+    // Anonymous-safe probe: a browser holding no refresh token of its own asks `?probe=anon`, so a guest gets 200 {user:null}
+    // instead of a console 401 (STORE-QA-43). Callers must treat `data.user === null` as "signed out".
+    const soft =
+      typeof window !== 'undefined' &&
+      (() => {
+        try {
+          return !window.localStorage.getItem('refreshToken');
+        } catch {
+          return false;
+        }
+      })();
+    const result = await this.request<{ user: User | null }>(
+      soft ? '/auth/me?probe=anon' : '/auth/me'
+    );
     // A 200 here is the other proof a session lives in this browser — it covers
     // sessions established before the marker existed, and it re-arms one whose
     // localStorage was cleared while the cookies survived.
-    if (result.success && result.data) {
+    if (result.success && result.data?.user) {
       markSessionEstablished();
     }
-    return result;
+    return result as typeof result & { data?: { user: User } };
   }
 
   async updateProfile(data: { firstName?: string; lastName?: string; phone?: string }) {

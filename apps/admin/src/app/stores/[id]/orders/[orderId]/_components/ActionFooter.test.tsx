@@ -206,8 +206,8 @@ describe('ActionFooter — status action for a cancelled order (#1947)', () => {
     const onStatusChange = vi.fn();
     renderFooter(baseOrder({ status: 'cancelled', paymentStatus: 'paid' }), onStatusChange);
 
-    // useT is mocked to echo the key, so the status label renders as 'refunded'.
-    fireEvent.click(screen.getByText('refunded'));
+    // useT is mocked to echo the key: the refund step is named as an ACTION (STORE-QA-31), not the status word.
+    fireEvent.click(screen.getByText('refundOrder'));
     expect(onStatusChange).toHaveBeenCalledWith('refunded');
     expect(screen.queryByText('cancel')).toBeNull();
   });
@@ -228,7 +228,7 @@ describe('ActionFooter — status action for a cancelled order (#1947)', () => {
   it('offers Refunded on a PAID delivered order', () => {
     const onStatusChange = vi.fn();
     renderFooter(baseOrder({ status: 'delivered', paymentStatus: 'paid' }), onStatusChange);
-    fireEvent.click(screen.getByText('refunded'));
+    fireEvent.click(screen.getByText('refundOrder'));
     expect(onStatusChange).toHaveBeenCalledWith('refunded');
   });
 
