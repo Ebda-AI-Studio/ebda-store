@@ -3,8 +3,8 @@
 # This keeps ONLY the fast checks (a few seconds): the action-pin check, gitleaks on the push range, and prettier on
 # the files this push changed, plus `vitest related` on the changed source files (unit tier only, no full suite).
 # Lint, typecheck, prisma generate, package builds and the full suite run in CI, not here.
-# Only the `vitest related` step takes the host lock (scripts/ci/host-lock.sh, PREPUSH-4); NEVER call host-lock.sh
-# from inside this script (not re-entrant). The scanner step uses a 4-slot semaphore + pass cache instead (PREPUSH-5). Planner kept for reference: scripts/ci/pre-push-plan.mjs (unused here).
+# NOTHING here takes the host-wide heavy lock (PREPUSH-8: self-hosted CI jobs hold it back to back, so a push waited 30+ min):
+# `vitest related` and the scanners both run in prepush slots (scripts/ci/prepush-slot.sh, 2 workers). The scanner step uses a 4-slot semaphore + pass cache instead (PREPUSH-5). Planner kept for reference: scripts/ci/pre-push-plan.mjs (unused here).
 set -euo pipefail
 
 # Mirrors CI's client-secret-scan job: every `uses:` pinned to a 40-hex SHA (#1517).
@@ -45,7 +45,11 @@ if [ "$MODE" = "affected" ]; then
       echo "! vitest related skipped: $NREL changed files > ${PREPUSH_RELATED_MAX:-6}; CI runs it, sharded"
     else
       echo "-> vitest related (changed source files only, $NREL files)"
-      bash scripts/ci/host-lock.sh npx vitest related --run --passWithNoTests --maxWorkers=50% "${EXCLUDE_ARGS[@]}" $RELATED
+      # PREPUSH-8: related tests (<= PREPUSH_RELATED_MAX files, integration/E2E excluded) are plain unit tests: they bind no fixed port and
+      # need no exclusive host. They run in a prepush slot with 2 workers, NEVER behind the host-wide heavy lock: self-hosted CI jobs
+      # take that lock back to back, so a local push waited 30+ min (measured 2026-11-17, owner "ci ... unit/ebda-mac-2"). The slot count
+      # (default 4) x 2 workers bounds the CPU a push burst can add next to a running CI job.
+      bash scripts/ci/prepush-slot.sh npx vitest related --run --passWithNoTests --maxWorkers=2 "${EXCLUDE_ARGS[@]}" $RELATED
     fi
   else
     echo "! related tests skipped (nothing related, or packages not built); CI runs them"

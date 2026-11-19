@@ -150,3 +150,38 @@ describe('request memo', () => {
     expect(loads).toBe(4);
   });
 });
+
+describe('Server-Timing split of AuthState trips (PERF-TIMING-SPLIT-1)', () => {
+  const stubWith = (ms: number) => ({
+    AUTH_STATE: {
+      idFromName: (n: string) => n,
+      get: () => ({ apply: () => new Promise(r => setTimeout(() => r('ok'), ms)) }),
+    },
+  });
+
+  it('reports finished trips as crit, unfinished as open, and the slowest call', async () => {
+    const b = instrumentBindings(stubWith(15)) as any;
+    const t = newIoTally();
+    let st: string[] = [];
+    await runWithIoTally(t, async () => {
+      await b.AUTH_STATE.get('a').apply(); // finishes before the head
+      await b.AUTH_STATE.get('a').apply();
+      void b.AUTH_STATE.get('a').apply(); // still running when the head is written
+      st = formatIoTiming(t);
+    });
+    const line = st.join(', ');
+    expect(line).toContain('auth-state;desc="3"');
+    expect(line).toMatch(/auth-state-crit;desc="2";dur=\d+\.\d/);
+    expect(line).toContain('auth-state-open;desc="1"');
+    expect(line).toMatch(/auth-state-max;dur=(1[5-9]|[2-9]\d)\.\d/);
+  });
+
+  it('adds nothing when AuthState was not called', async () => {
+    const b = instrumentBindings(stubWith(1)) as any;
+    const t = newIoTally();
+    await runWithIoTally(t, async () => {
+      void b;
+    });
+    expect(formatIoTiming(t).join(',')).not.toContain('auth-state');
+  });
+});
