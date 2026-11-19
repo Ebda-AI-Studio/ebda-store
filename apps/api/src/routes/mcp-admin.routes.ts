@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { ipKeyGenerator } from 'express-rate-limit';
 import { hashMerchantKey, hasPlausibleMerchantKeyShape } from '../mcp/merchant-auth';
 import { featureService } from '../services/feature.service';
 import { resolveStoreBySlug } from '../mcp/resolve-store';
@@ -7,7 +7,7 @@ import { verifyMerchantKey, MERCHANT_MCP_FEATURE, MERCHANT_KEY_HEADER } from '..
 import { AppError } from '../middleware/error-handler';
 import { rejectBatches } from '../mcp/reject-batches';
 import { mcpRequestGuard } from '../mcp/request-guard';
-import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
+import { plannedRateLimit } from '../middleware/security';
 import { ADMIN_WRITE_TOOL_NAMES } from '../mcp/tools/admin-write.tools';
 import logger from '../lib/logger';
 
@@ -78,9 +78,8 @@ export function merchantMcpIpLimiterKey(req: Request): string {
   return `${ipKeyGenerator(req.ip ?? '')}-mmcp-ip`;
 }
 
-export const merchantMcpIpLimiter = rateLimit({
+export const merchantMcpIpLimiter = plannedRateLimit('mmcp-ip', {
   // Resolved per request (#1862): redis.getClient() at module load is null.
-  store: makeRateLimitStore(rateLimitRedisClient, 'mmcp-ip'),
   windowMs: 15 * 60 * 1000,
   max: 300,
   standardHeaders: true,
@@ -117,10 +116,9 @@ export function merchantMcpLimiterKey(req: Request): string {
   return `mmcp:${ip}:none`;
 }
 
-export const merchantMcpLimiter = rateLimit({
+export const merchantMcpLimiter = plannedRateLimit('mmcp', {
   // Shared across replicas via Redis (F8, #1862), resolved per request;
   // fail-OPEN on a Redis store error (see middleware/security.ts).
-  store: makeRateLimitStore(rateLimitRedisClient, 'mmcp'),
   windowMs: 60_000,
   max: 120,
   standardHeaders: true,
@@ -157,8 +155,8 @@ function isAdminWriteToolCall(req: Request): boolean {
   return isWriteCallMessage(req.body as unknown);
 }
 
-export const merchantMcpWriteLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'mmcp-write'),
+export const merchantMcpWriteLimiter = plannedRateLimit('mmcp-write', {
+  keyReadsBody: true,
   windowMs: 60 * 1000,
   max: 30,
   standardHeaders: true,
