@@ -384,8 +384,17 @@ export class DomainClaimService {
   ): Promise<{ examined: number; activated: number; failed: number; released: number }> {
     // `stores` is under RLS (R-EBDA-005): the cron lists claimants through the store
     // directory (id order; the per-store `sync` reads each claim in its own scope).
-    // pending claims AND stores that hold a domain (a domain stuck short of 'active' is reconciled too; an active one is a cheap no-op read)
-    const rows = (await storeDirectory(s => s.hasPendingDomain || s.hasDomain)).slice(0, limit);
+    // Pending claims FIRST (they are the work), then stores that merely hold a domain (a stuck-short-of-active one is reconciled;
+    // an active one is a cheap no-op read). The directory summary carries no domain status, so the holders are taken from a
+    // window that ROTATES each run: pending claims can never be starved by active domains, and every holder is reached over time.
+    const all = await storeDirectory(s => s.hasPendingDomain || s.hasDomain);
+    const pendingRows = all.filter(s => s.hasPendingDomain).slice(0, limit);
+    const holders = all.filter(s => !s.hasPendingDomain && s.hasDomain);
+    const room = Math.max(0, limit - pendingRows.length);
+    const start =
+      holders.length > 0 ? (Math.floor(now.getTime() / HOUR_MS) * room) % holders.length : 0;
+    const rotated = [...holders.slice(start), ...holders.slice(0, start)].slice(0, room);
+    const rows = [...pendingRows, ...rotated];
     const out = { examined: rows.length, activated: 0, failed: 0, released: 0 };
     for (const { id } of rows) {
       try {

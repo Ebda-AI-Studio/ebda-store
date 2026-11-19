@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({
 vi.mock('@ebda/database', () => ({
   prisma: {},
   Prisma: { PrismaClientKnownRequestError: class extends Error {} },
-  storeDirectory: vi.fn(async () => []),
+  storeDirectory: vi.fn(async () => state.directory),
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({ store: { findUnique: async () => state.store } }),
 }));
@@ -72,5 +72,30 @@ describe('STORE-QA-40 a served domain stuck short of active gets reconciled', ()
     expect(
       (p as unknown as { getDomain: ReturnType<typeof vi.fn> }).getDomain
     ).not.toHaveBeenCalled();
+  });
+});
+
+describe('sweep ordering', () => {
+  it('limit=2, 3 active-domain stores + 1 pending: the pending one is reconciled', async () => {
+    const entry = (id: string, pending: boolean) => ({
+      id,
+      hasDomain: !pending,
+      hasPendingDomain: pending,
+    });
+    state.directory = [
+      entry('a1', false),
+      entry('a2', false),
+      entry('a3', false),
+      entry('p1', true),
+    ];
+    const seen: string[] = [];
+    vi.spyOn(DomainClaimService, 'sync').mockImplementation(async (id: string) => {
+      seen.push(id);
+      return { action: 'none' } as never;
+    });
+    const r = await DomainClaimService.sweep(provider(false), new Date(), 2);
+    expect(seen).toContain('p1');
+    expect(seen).toHaveLength(2);
+    expect(r.examined).toBe(2);
   });
 });
