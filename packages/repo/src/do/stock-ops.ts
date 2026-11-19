@@ -476,7 +476,7 @@ function setVariantInventory(db: SyncSql, storeId: string, a: Record<string, unk
       variantId,
       productId,
     ]);
-    if (r.changes === 1 && before && (before.inventory as number) !== inventory)
+    if (r.changes > 0 && before && (before.inventory as number) !== inventory)
       history(db, {
         storeId,
         productId,
