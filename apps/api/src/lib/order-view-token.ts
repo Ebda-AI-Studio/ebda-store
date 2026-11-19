@@ -73,7 +73,8 @@ export function requestHoldsOrderViewToken(
  * the COD/WhatsApp "order details" button, `order-status-link-token.ts`) also opens THIS order's InstaPay payment flow,
  * so a guest who reopens the order from WhatsApp on another device can pay. It must name exactly this order AND the
  * store the order belongs to (`orderStoreId`, the route's own lookup). Never throws: a missing secret, a malformed or
- * expired token, another order or another store is simply "no".
+ * expired token, another order or another store is simply "no". It opens instructions, upload and submit only: the receipt
+ * payer's PII stays masked for a link holder (a forwarded URL is not the shopper), only the view token unmasks it.
  */
 export async function requestHoldsOrderStatusLink(
   req: { get(name: string): string | undefined },

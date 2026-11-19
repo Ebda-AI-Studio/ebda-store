@@ -12,3 +12,5 @@ Done once the order-status link existed (Ruling WA-COD-V2-2). The InstaPay instr
 - Evidence: `tests/unit/guest-order-view-token.test.ts` (G54 block), `tests/unit/order-status-link.test.ts` (instapayPayable), `apps/web/src/lib/order-status-link-header.test.ts`.
 
 Cost if wrong (part b): anyone who holds the WhatsApp message within its 14 days could upload a receipt to that order's hold. A receipt sent with the link goes through exactly the same checks (duplicate reference refused, amount and payee read, owner review) as one sent with the view token; the link adds no way to confirm a payment that did not happen.
+
+- Part b, money review of #978: the signed order-status link never unmasks the receipt poll's payer name / address / mobile / bank (a forwarded bearer URL; SEC-15 keeps PII behind the header-only view token). It still opens instructions, upload and submit.

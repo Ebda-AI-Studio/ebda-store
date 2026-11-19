@@ -1131,11 +1131,12 @@ router.get(
       const storeId = await getOrderStoreId(orderId);
       if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
       const receipt = await InstapayService.getReceipt(storeId, orderId, receiptId);
-      // SEC-15: the payer's name / address / mobile / bank only with the order's view token.
+      // SEC-15: the payer's name / address / mobile / bank only with the order's view token (a header, never a URL).
       res.json({
         success: true,
         data: {
-          receipt: (await holdsOrderCredential(req, orderId))
+          // The signed order-status link is a bearer URL that gets forwarded (WhatsApp): it never unmasks the payer.
+          receipt: requestHoldsOrderViewToken(req, orderId)
             ? receipt
             : maskReceiptPayerPii(receipt),
         },

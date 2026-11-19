@@ -187,8 +187,10 @@ describe('SEC-15 follow-ups', () => {
       'utf8'
     );
     expect(pay).toContain('maskReceiptPayerPii(receipt)');
-    // the view token OR (G54) the order's signed status link unmasks the shopper's own receipt
-    expect(pay).toMatch(/\(await holdsOrderCredential\(req, orderId\)\)\s*\?\s*receipt/);
+    // ONLY the view token unmasks the receipt payer; the signed status link (a forwarded bearer URL) never does (G54 review)
+    expect(pay).toMatch(
+      /requestHoldsOrderViewToken\(req, orderId\) \? receipt : maskReceiptPayerPii\(receipt\)/
+    );
     expect(pay).toMatch(
       /requestHoldsOrderViewToken\(req, orderId\) \|\|\s*\(await requestHoldsOrderStatusLink\(req, orderId, getOrderStoreId\)\)/
     );
