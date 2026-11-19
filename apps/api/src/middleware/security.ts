@@ -2039,8 +2039,10 @@ const GUEST_RETURN_BODY = {
   success: false,
   error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
 };
-const GUEST_RETURN_IP_MAX = 10;
-const GUEST_RETURN_ORDER_MAX = 5;
+// pq-allow(unused-export): test seam, imported by apps/api/src/middleware/__tests__/guest-return-limiter.test.ts
+export const GUEST_RETURN_IP_MAX = 10;
+// pq-allow(unused-export): test seam, imported by apps/api/src/middleware/__tests__/guest-return-limiter.test.ts
+export const GUEST_RETURN_ORDER_MAX = 5;
 export const guestReturnIpLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'guest-return-ip'),
   windowMs: GUEST_RETURN_WINDOW_MS,
