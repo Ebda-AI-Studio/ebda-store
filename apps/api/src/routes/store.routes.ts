@@ -33,6 +33,12 @@ import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
 import { auditLog } from '../middleware/security';
 import {
+  clearableStr,
+  clearableUrl,
+  clearableEmail,
+  clearableSafeUrl,
+} from '../lib/clearable-schema';
+import {
   isSafeUrl,
   normalizeEgyptianMobile,
   isValidTimeZone,
@@ -332,21 +338,27 @@ const lookPreviewBody = lookBody.omit({ revisionToken: true });
 // Helpers that coerce empty strings and nulls to undefined before validation
 const optionalStr = (maxLen: number) =>
   z.preprocess(v => (v === '' || v === null ? undefined : v), z.string().max(maxLen).optional());
-// A phone-shaped setting (G12): blank clears it, anything else must be a real phone number.
+// A phone-shaped setting (G12): blank means no change, anything else must be a real phone number.
 const optionalPhone = () =>
   z.preprocess(v => (v === '' || v === null ? undefined : v), phoneSchema.optional());
+// A phone-shaped setting (G12 + STORE-QA-60): blank CLEARS it (null), anything else must be a real phone number.
+const clearablePhone = () =>
+  z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? null : v),
+    phoneSchema.nullable().optional()
+  );
 
 // Merchants routinely paste the entire `<meta name="google-site-verification"
 // content="..." />` tag instead of just the content token. Extract the token
 // before validation so the storefront emits a valid meta tag and the
 // verification flow doesn't silently fail.
 const optionalGoogleVerification = z.preprocess(v => {
-  if (typeof v !== 'string') return v === null ? undefined : v;
+  if (typeof v !== 'string') return v;
   const trimmed = v.trim();
-  if (trimmed === '') return undefined;
+  if (trimmed === '') return null;
   const tagMatch = trimmed.match(/content\s*=\s*["']([^"']+)["']/i);
   return tagMatch ? tagMatch[1].trim() : trimmed;
-}, z.string().max(200).optional());
+}, z.string().max(200).nullable().optional());
 
 const optionalUrl = z.preprocess(
   v => (v === '' || v === null ? undefined : v),
@@ -380,15 +392,15 @@ const optionalEmailLocalPart = merchantSenderPrefixInput;
 
 const seoSchema = z
   .object({
-    metaTitle: optionalStr(200),
-    metaTitleAr: optionalStr(200),
-    metaDescription: optionalStr(500),
-    metaDescriptionAr: optionalStr(500),
+    metaTitle: clearableStr(200),
+    metaTitleAr: clearableStr(200),
+    metaDescription: clearableStr(500),
+    metaDescriptionAr: clearableStr(500),
     // AEO — conversational answer-engine copy.
     metaDescriptionAeo: z.string().max(400).optional().nullable(),
     metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
-    ogImage: optionalUrl,
-    twitterHandle: optionalStr(50),
+    ogImage: clearableUrl,
+    twitterHandle: clearableStr(50),
     googleSiteVerification: optionalGoogleVerification,
     emailSenderLocalPart: optionalEmailLocalPart,
     // "Hide my store from search engines": stored as `store.settings.hideFromSearchEngines` (no column, so no
@@ -423,27 +435,27 @@ const optionalWhatsappNumber = z.preprocess(
 
 const contactSchema = z
   .object({
-    email: optionalEmail,
-    phone: optionalPhone(),
-    phoneAr: optionalPhone(),
+    email: clearableEmail,
+    phone: clearablePhone(),
+    phoneAr: clearablePhone(),
     whatsapp: optionalWhatsappNumber,
-    address: optionalStr(500),
-    addressAr: optionalStr(500),
+    address: clearableStr(500),
+    addressAr: clearableStr(500),
     // Phase D.6 — WhatsApp bot "Locations & Hours" branch
-    businessHours: optionalStr(500),
-    googleMapsUrl: optionalStr(2000),
+    businessHours: clearableStr(500),
+    googleMapsUrl: clearableStr(2000),
   })
   .strip();
 
 const brandingSchema = z
   .object({
     name: z.preprocess(v => (v === null ? undefined : v), z.string().min(1).max(200).optional()),
-    nameAr: optionalStr(200),
-    logo: optionalUrl,
-    logoAr: optionalUrl,
-    favicon: optionalUrl,
-    description: optionalStr(1000),
-    descriptionAr: optionalStr(1000),
+    nameAr: clearableStr(200),
+    logo: clearableUrl,
+    logoAr: clearableUrl,
+    favicon: clearableUrl,
+    description: clearableStr(1000),
+    descriptionAr: clearableStr(1000),
   })
   .strip();
 
@@ -482,9 +494,9 @@ const announcementSchema = z
     textAr: z.string().max(500).optional(),
     bgColor: z.string().max(50).optional(),
     textColor: z.string().max(50).optional(),
-    link: safeOptionalUrl,
-    linkText: optionalStr(200),
-    linkTextAr: optionalStr(200),
+    link: clearableSafeUrl,
+    linkText: clearableStr(200),
+    linkTextAr: clearableStr(200),
     dismissible: z.boolean().optional(),
   })
   .strip();

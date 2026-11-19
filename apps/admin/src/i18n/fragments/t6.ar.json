@@ -256,21 +256,14 @@
     }
   },
   "aiTools": {
-    "replaceObject": "مسح الذكاء الاصطناعي بالإجبار",
-    "replaceConsequence": "المحتوى الحالي اللي المسح ده بيغطيه هيتستبدل بنتيجة جديدة.",
+    "replaceObject": "استبدال المحتوى الموجود",
+    "replaceConsequence": "اللي موجود دلوقتي هيتكتب فوقه نص جديد من الذكاء الاصطناعي. ومش هتقدر ترجّعه، إلا تصليح اللغات.",
     "replaceAction": "استبدل المحتوى",
-    "cancelObject": "المسح الشغّال دلوقتي",
-    "cancelConsequence": "هيقف. اللي اتعالج قبل كده بيحتفظ بتعديلاته.",
-    "cancelAction": "وقّف المسح",
+    "cancelObject": "الأداة الشغّالة",
+    "cancelConsequence": "هتقف. اللي خلص قبل كده بيفضل زي ما اتغيّر.",
+    "cancelAction": "أوقفها",
     "activeJob": {
-      "statusCancelled": "اتوقّف",
-      "viewFilled": "شوف {count} منتج اتعبّى",
-      "viewFilledPlural": "شوف {count} منتجات اتعبّت"
-    },
-    "cards": {
-      "revertBalance": {
-        "forceTooltip": "بيرجّع القيم الأصلية قبل الموازنة حتى لو الحقول اتعدّلت بعدها."
-      }
+      "statusCancelled": "اتوقّف"
     },
     "sweepResults": {
       "copied": "اتنسخ!"

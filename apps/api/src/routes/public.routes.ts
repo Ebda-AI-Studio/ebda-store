@@ -115,6 +115,7 @@ import type { PaymentProvider } from '../services/payment-providers/types';
 import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 import { inParallel } from '../lib/run-in-parallel';
 import { publicReadLimit } from '../middleware/public-read-limit';
+import { countStoreMiss, storeResolveLimit } from '../middleware/store-resolve-native';
 import { prefetchPublicLimits } from '../middleware/public-limit-prefetch';
 /**
  * The guest view token for a just-created order, or undefined when it cannot be signed. The order
@@ -400,6 +401,8 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       cursor: validCursor,
       ids: idsParam?.sort(),
       optionFilters: hasOptionFilters ? optionFilters : undefined,
+      // Opt-in (Ruling SEARCH-T12-2: the default listing payload is unchanged): the PLP asks for `meta.priceMax`.
+      withPriceMax: req.query.withPriceMax === '1' ? true : undefined,
     };
     // `on_sale` is a short merchandising row: it ignores page and cursor and caps the limit, so
     // none of them is in its key (a crafted ?page=N, or a negative limit, cannot mint a fresh SQL
@@ -2230,9 +2233,44 @@ async function fetchStoreExtras(storeId: string) {
   });
 }
 
-async function fetchStoreFaqsAndHowtos(storeId: string) {
-  const { faqs, howtos } = await fetchStoreExtras(storeId);
-  return { faqs, howtos };
+/**
+ * RESOLVE-PARALLEL-1 + PERF-BATCH-1 (Rulings RESOLVE-PARALLEL-1, PERF-BATCH-1): every per-store read a public store payload needs (`/stores/:slugOrId` and
+ * `/store/resolve`), started at once. They are independent of each other (each reads its own table or flag), so a cold
+ * resolve waits on ONE wave of StoreDO / D1 calls instead of one per read (9 serial StoreDO round trips on a cold
+ * `/stores/:slugOrId`, measured 2026-11-11). FAQs, how-tos and the unpublished page slugs come from ONE `fetchStoreExtras`
+ * read (`/stores/:slugOrId` read the slugs a second time with the same query). Same values, keys and key order as before.
+ */
+async function storePayloadParts(store: {
+  id: string;
+  locationsEnabled: boolean | null;
+  theme: unknown;
+}) {
+  const [
+    tax,
+    extras,
+    smsMarketingOptIn,
+    cartEmailOptIn,
+    whatsappMarketingOptIn,
+    enabledFeatures,
+    locations,
+  ] = await Promise.all([
+    resolveActiveTaxRate(store.id),
+    fetchStoreExtras(store.id),
+    notificationDispatcher.isSmsMarketingAvailable(store.id),
+    cartEmailOptInAvailable(store.id),
+    whatsappOptInAvailable(store.id),
+    featureService.getEnabledFeatureKeys(store.id),
+    fetchFooterLocations(store),
+  ]);
+  return {
+    tax,
+    extras,
+    smsMarketingOptIn,
+    cartEmailOptIn,
+    whatsappMarketingOptIn,
+    enabledFeatures,
+    locations,
+  };
 }
 
 /**
@@ -2391,6 +2429,8 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
 
         if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
+        const parts = await storePayloadParts(store);
+
         // Strip server-only marketing-pixel secrets (Meta CAPI / TikTok Events
         // access tokens) before this store object reaches the public storefront
         // (and the edge cache). The browser pixel snippets only use the public
@@ -2409,32 +2449,29 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
           // VAT line NOR charged one, even with `taxEnabled` set and old TaxRate
           // rows still `isActive: true`. `taxEnabled` is overwritten with the
           // EFFECTIVE value so no storefront code can key on the merchant's wish.
-          ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
-          ...(await fetchStoreFaqsAndHowtos(store.id)),
+          ...effectiveTaxFields(parts.tax),
+          faqs: parts.extras.faqs,
+          howtos: parts.extras.howtos,
           // Issue 206: the storefront renders the SMS-offers opt-in ONLY when
           // this is true (sms feature on + provider configured + a promotional
           // event enabled), so a store without SMS marketing shows no new UI.
           // BOUNDED-stale: rides this 120s cache + the edge s-maxage 120 /
           // SWR 600; a provider switched on/off shows up within that window.
           // It is display-only — the send gate re-checks everything live.
-          smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
-          cartEmailOptIn: await cartEmailOptInAvailable(store.id),
-          whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
+          smsMarketingOptIn: parts.smsMarketingOptIn,
+          cartEmailOptIn: parts.cartEmailOptIn,
+          whatsappMarketingOptIn: parts.whatsappMarketingOptIn,
         };
 
-        const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
         // Mirror the /store/resolve endpoint: surface explicitly-disabled
         // CMS pages so the storefront footer can hide their links rather
-        // than rendering a "Page unavailable" landing on click.
-        const disabledPages = await readInStoreContext(store.id, async () =>
-          (await storeDb(store.id)).storePage.findMany({
-            where: { storeId: store.id, isPublished: false },
-            select: { slug: true },
-          })
-        );
-        const disabledCmsSlugs = disabledPages.map(p => p.slug);
-        const locations = await fetchFooterLocations(store);
-        return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+        // than rendering a "Page unavailable" landing on click (read once, in `fetchStoreExtras`).
+        return {
+          store: publicStore,
+          enabledFeatures: parts.enabledFeatures,
+          disabledCmsSlugs: parts.extras.disabledCmsSlugs,
+          locations: parts.locations,
+        };
       });
     });
 
@@ -2488,7 +2525,7 @@ async function resolveBuilderPreviewStoreId(
 // GET /store/resolve - Resolve store by domain header (for multi-tenant)
 router.get(
   '/store/resolve',
-  storeResolveLimiter,
+  storeResolveLimit(storeResolveLimiter),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rawDomain = req.headers['x-store-domain'] as string;
@@ -2507,6 +2544,7 @@ router.get(
       // database — they are a 404, and there is NO default-store fallback.
       const lookup = storeLookupForHost(rawDomain);
       if (!lookup) {
+        if (await countStoreMiss(req, res)) return;
         res.status(404).json({
           success: false,
           error: { code: 'STORE_NOT_FOUND', message: 'No store found for the specified domain' },
@@ -2621,7 +2659,7 @@ router.get(
 
         // Durable Object store: the rest of the fill runs in a bare store scope (no Postgres transaction), see /stores/:slugOrId.
         return inDoStoreScope(store.id, async () => {
-          const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+          const parts = await storePayloadParts(store);
 
           // Surface CMS pages that the merchant has explicitly turned off
           // ("Show on storefront" toggle in /content). The storefront uses
@@ -2631,8 +2669,7 @@ router.get(
           // simply not being there. Only rows that exist AND are unpublished
           // need to be reported; if the row is missing the storefront falls
           // back to its built-in copy and the link should still work.
-          const extras = await fetchStoreExtras(store.id);
-          const disabledCmsSlugs = extras.disabledCmsSlugs;
+          const extras = parts.extras;
 
           // Strip server-only marketing-pixel secrets before the store reaches the
           // public storefront + edge cache (browser pixels use public IDs only).
@@ -2642,17 +2679,21 @@ router.get(
             marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
             settings: publicStoreSettings(store.settings),
             // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
-            ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
+            ...effectiveTaxFields(parts.tax),
             faqs: extras.faqs,
             howtos: extras.howtos,
             // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
-            smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),
-            cartEmailOptIn: await cartEmailOptInAvailable(store.id),
-            whatsappMarketingOptIn: await whatsappOptInAvailable(store.id),
+            smsMarketingOptIn: parts.smsMarketingOptIn,
+            cartEmailOptIn: parts.cartEmailOptIn,
+            whatsappMarketingOptIn: parts.whatsappMarketingOptIn,
           };
 
-          const locations = await fetchFooterLocations(store);
-          return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
+          return {
+            store: publicStore,
+            enabledFeatures: parts.enabledFeatures,
+            disabledCmsSlugs: extras.disabledCmsSlugs,
+            locations: parts.locations,
+          };
         });
       };
 
@@ -2676,6 +2717,7 @@ router.get(
       );
 
       if (!result) {
+        if (await countStoreMiss(req, res)) return;
         res.status(404).json({
           success: false,
           error: { code: 'STORE_NOT_FOUND', message: 'No store found for the specified domain' },
@@ -2693,6 +2735,9 @@ router.get(
         data: result,
       });
     } catch (error) {
+      // An unknown store surfaces as an AppError 404 out of the fill: count it (native limiters only) before it is answered.
+      if (error instanceof AppError && error.statusCode === 404 && (await countStoreMiss(req, res)))
+        return;
       next(error);
     }
   }

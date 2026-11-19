@@ -28,7 +28,7 @@ vi.mock('@/i18n/useT', () => ({
 import { ThemeSettingsPanel } from './ThemeSettingsPanel';
 
 const legends = () =>
-  [...document.querySelectorAll('[data-testid^="tier2-"] > summary')].map(l =>
+  [...document.querySelectorAll('[data-testid^="tier2-"] > button')].map(l =>
     l.textContent?.trim()
   );
 afterEach(cleanup);
