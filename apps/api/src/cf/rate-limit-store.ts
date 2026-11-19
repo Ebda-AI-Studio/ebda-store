@@ -40,20 +40,27 @@ interface Prefetched {
   consumed: boolean;
   landed: boolean;
   peek?: true;
+  /**
+   * PERF-BATCH-1: the batched call this entry rode carries at least one fail-CLOSED key (Ruling API-HANG-2), so a timeout of
+   * that call fails every member closed, a public read key included: the strictest class among the members of one call wins.
+   */
+  batchFailsClosed: boolean;
 }
 export type PrefetchedHits = Map<string, Prefetched>;
 const prefetched = new AsyncLocalStorage<PrefetchedHits>();
 
 export function prefetchHits(
   entries: Array<{ key: string; windowMs: number }>,
-  peeks: string[] = []
+  peeks: string[] = [],
+  into: PrefetchedHits = new Map()
 ): PrefetchedHits {
-  const map: PrefetchedHits = new Map();
+  // PERF-BATCH-1: `into` is the request's map when an earlier batch already prefetched some keys; those are not sent again.
+  const map = into;
   const byShard = new Map<
     number,
     { hits: Array<{ key: string; windowMs: number }>; reads: string[] }
   >();
-  const seen = new Set<string>();
+  const seen = new Set<string>(map.keys());
   const slot = (key: string) => {
     let s = byShard.get(shardOf(key));
     if (!s) byShard.set(shardOf(key), (s = { hits: [], reads: [] }));
@@ -70,6 +77,7 @@ export function prefetchHits(
     slot(key).reads.push(key);
   }
   for (const { hits: list, reads } of byShard.values()) {
+    const batchFailsClosed = [...list.map(e => e.key), ...reads].some(k => !failsOpen(k));
     // hits first: the reads follow them in the same call
     const call = applyOn(
       list[0]?.key ?? reads[0],
@@ -86,6 +94,7 @@ export function prefetchHits(
         consumed: true,
         landed: false,
         peek: true,
+        batchFailsClosed,
         result: call.then(out => {
           const count = Number(out[at] ?? 0);
           const ttl = Number(out[at + 1]);
@@ -100,6 +109,7 @@ export function prefetchHits(
         windowMs: e.windowMs,
         consumed: false,
         landed: false,
+        batchFailsClosed,
         result: call.then(out => {
           entry.landed = true;
           return out[j] as [number, number];
@@ -114,6 +124,11 @@ export function prefetchHits(
 
 export function runWithPrefetchedHits<T>(hits: PrefetchedHits, fn: () => T): T {
   return prefetched.run(hits, fn);
+}
+
+/** The prefetched hits of the running request, if a batch was sent for it (PERF-BATCH-1: a later batch adds to it). */
+export function currentPrefetchedHits(): PrefetchedHits | undefined {
+  return prefetched.getStore();
 }
 
 /** Take back every prefetched hit no limiter consumed (once it has landed). One call per shard; never throws. */
@@ -176,8 +191,12 @@ export class CfRateLimitStore implements Store {
    * OTP, reset, refresh, signup, passkey, writes, payments, coupons, uploads, the global one) fails CLOSED: the store answers
    * "over the limit", so the limiter's own handler sends its normal 429 body with `Retry-After` for the rest of the window.
    */
-  private onTimeout(redisKey: string, err: AuthStateTimeoutError): ClientRateLimitInfo {
-    if (failsOpen(redisKey)) throw err;
+  private onTimeout(
+    redisKey: string,
+    err: AuthStateTimeoutError,
+    batchFailsClosed = false
+  ): ClientRateLimitInfo {
+    if (failsOpen(redisKey) && !batchFailsClosed) throw err;
     return { totalHits: FAIL_CLOSED_HITS, resetTime: new Date(Date.now() + this.windowMs) };
   }
 
@@ -191,7 +210,8 @@ export class CfRateLimitStore implements Store {
         if (hits <= 0) return undefined;
         return { totalHits: hits, resetTime: new Date(resetAt || Date.now() + this.windowMs) };
       } catch (err) {
-        if (err instanceof AuthStateTimeoutError) return this.onTimeout(redisKey, err);
+        if (err instanceof AuthStateTimeoutError)
+          return this.onTimeout(redisKey, err, read.batchFailsClosed);
         // the batched call failed: read directly below (a store error there fails open at the caller)
       }
     }
@@ -221,7 +241,8 @@ export class CfRateLimitStore implements Store {
         const [hits, resetAt] = await pre.result;
         return { totalHits: hits, resetTime: new Date(resetAt) };
       } catch (err) {
-        if (err instanceof AuthStateTimeoutError) return this.onTimeout(redisKey, err);
+        if (err instanceof AuthStateTimeoutError)
+          return this.onTimeout(redisKey, err, pre.batchFailsClosed);
         // the batched call failed: count directly below (a store error there fails open as before)
       }
     }

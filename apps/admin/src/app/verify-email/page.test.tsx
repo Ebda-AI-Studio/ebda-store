@@ -76,6 +76,22 @@ describe('verify-email page', () => {
     });
   });
 
+  it('a REMOUNT after the address bar was cleaned keeps the password form and verifies with the original link (2026-11-18)', async () => {
+    visit(LINK);
+    accountsFetch.mockResolvedValue({ verified: true });
+    const first = renderPage();
+    await screen.findByLabelText('onboarding.verify.password');
+    first.unmount(); // Next re-creates the page for the cleaned URL
+    renderPage();
+    const pw = await screen.findByLabelText('onboarding.verify.password');
+    fireEvent.change(pw, { target: { value: 'Str0ng!Passw0rd' } });
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.verify.verifyButton' }));
+    expect(await screen.findByText('onboarding.verify.successTitle')).toBeTruthy();
+    expect(accountsFetch).toHaveBeenCalledWith('/otp/verify', {
+      json: { email: EMAIL, code: '123456', password: 'Str0ng!Passw0rd' },
+    });
+  });
+
   it('PRE-8: the password step says what to do when the link was opened on another device (reset also confirms)', async () => {
     visit(LINK);
     renderPage();

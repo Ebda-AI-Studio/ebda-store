@@ -108,6 +108,7 @@ import lifecycleEmailsRoutes from './lifecycle-emails.routes';
 import whatsappLinkRoutes from './whatsapp-link.routes';
 import lifecycleEmailsPublicRoutes from './lifecycle-emails-public.routes';
 import contactEnquiryPublicRoutes from './contact-enquiry-public.routes';
+import orderStatusPublicRoutes from './order-status-public.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
 import realtimeRoutes from './realtime.routes';
@@ -586,6 +587,8 @@ router.use('/stores/:storeId/whatsapp-link', tenantContext, whatsappLinkRoutes);
 router.use('/public/lifecycle-emails', lifecycleEmailsPublicRoutes);
 // Studio enquiry form on the marketing site (Ruling CONTACT-FORM-1): nothing stored, mail only.
 router.use('/public/contact', contactEnquiryPublicRoutes);
+// Guest-safe read-only order summary behind the COD WhatsApp button (Ruling WA-COD-V2-2).
+router.use('/public/order-status', orderStatusPublicRoutes);
 
 // Wishlist routes (user-scoped; store comes from an x-store-id header, not
 // the URL, so `tenantContext` can't reach it via a mount-path param). RLS

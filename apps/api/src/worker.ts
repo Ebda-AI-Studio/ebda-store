@@ -37,6 +37,7 @@ import { awaitDeferredWork } from './lib/after-tenant-commit';
 import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';
 import logger from './lib/logger';
+import { warnMissingStoreResolveBindings } from './middleware/store-resolve-native';
 import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings';
 import { instrumentBindings } from './lib/io-tally';
 import { dispatchedEvents, trackDispatches } from './lib/jobs/dispatch';
@@ -172,6 +173,7 @@ function prepare(env: CfBindings): void {
     assertCiCaptureConfig(env);
     whatsAppConfigChecked = true;
   }
+  warnMissingStoreResolveBindings(env);
   // No sockets to open: this only flips redis.service to "available" over AuthState + KV.
   redisReady ??= redis.connect();
   const deployment = env.CF_VERSION_METADATA?.id;
