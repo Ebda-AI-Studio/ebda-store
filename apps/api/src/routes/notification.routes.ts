@@ -79,7 +79,8 @@ const upsertConfigSchema = z.object({
 // Single-event payload (legacy). Bulk payload `{ events: [...] }` is
 // preferred — see the route below — and is what the admin actually sends.
 const upsertEventConfigSchema = eventConfigShape;
-const bulkEventConfigSchema = z.object({
+// pq-allow(unused-export): imported by tests/unit/notification-events-contract.test.ts (the admin/API contract)
+export const bulkEventConfigSchema = z.object({
   events: z.array(eventConfigShape).min(1).max(50),
 });
 

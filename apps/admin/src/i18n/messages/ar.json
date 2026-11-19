@@ -4901,9 +4901,12 @@
     },
     "push": {
       "title": "الإشعارات الفورية",
-      "subtitle": "Web Push قياسي (W3C Push API)",
+      "subtitle": "ابعت تحديثات الطلبات والعروض للعملاء اللي سمحوا بالإشعارات في متصفحهم.",
+      "statusAvailable": "الإشعارات متاحة",
+      "statusUnavailable": "الإشعارات لسه مش متاحة",
+      "unavailableHint": "إحنا بنجهّز الإشعارات لكل المتاجر. مش مطلوب منك أي حاجة، وهنبلّغك أول ما تبقى جاهزة.",
       "subscribers": "{count, number, latn} مشترك",
-      "platformNote": "تستخدم الإشعارات الفورية إعداد VAPID الخاص بالمنصة. لا يلزم إعداد لكل متجر — فقط فعّل الخيار."
+      "platformNote": "مفيش حاجة تظبطها من عندك. شغّل الخيار والعملاء اللي يسمحوا بالإشعارات هيبدأ يوصلهم."
     },
     "broadcast": {
       "title": "إرسال إشعار جماعي",
@@ -4926,17 +4929,19 @@
       "send": "إرسال الإشعار",
       "sending": "جارٍ الإرسال…",
       "sentTitle": "تم إرسال الإشعار",
-      "sentDescription": "تم استهداف {count, number, latn} مشترك.",
+      "sentDescription": "الإشعار اتبعت لـ {count, number, latn} مشترك.",
+      "channelOffTitle": "الإشعارات مقفولة",
+      "channelOffDescription": "شغّل الإشعارات لمتجرك من فوق، وبعدها ابعت تاني.",
       "sendFailed": "معرفناش نبعت الإشعار.",
-      "notConfiguredTitle": "الإشعارات مش متاحة لسه",
-      "notConfiguredDescription": "الإشعارات مش متاحة لمتجرك لسه. جرّب تاني بعدين.",
+      "notConfiguredTitle": "الإشعارات لسه مش متاحة",
+      "notConfiguredDescription": "إحنا بنجهّز الإشعارات لكل المتاجر. النموذج ده هيتفتح أول ما تبقى جاهزة، ومش مطلوب منك أي حاجة.",
       "recentTitle": "آخر الإشعارات المُرسَلة",
       "recentEmpty": "لسه مفيش أي إشعار اتبعت.",
       "refresh": "تحديث",
       "refreshing": "جارٍ التحديث…",
       "untitled": "(بدون عنوان)",
       "deliveredCount": "تم تسليم {count, number, latn}",
-      "clickedCount": "{count, number, latn} نقرة"
+      "failedCount": "{count, number, latn} ماوصلش"
     },
     "events": {
       "title": "إعدادات الأحداث",

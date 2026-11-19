@@ -43,6 +43,7 @@ vi.mock('@api/services/notification-config.service', () => ({
     getEventConfigs: async () => ({}),
   },
 }));
+vi.mock('@api/lib/store-operational', () => ({ assertStoreOperational: async () => undefined }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -68,6 +69,39 @@ describe('PushService: the shopper push is addressed, never broadcast', () => {
     const where = (h.findMany.mock.calls[0]![0] as { where: Record<string, unknown> }).where;
     expect(where).toEqual({ storeId: 's1', customerId: 'u1', audience: 'storefront' });
     expect(h.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('merchant broadcast (the ONE store-wide push): reaches EVERY consented storefront device, not one customer', async () => {
+    const devices = [1, 2, 3].map(n => ({
+      id: `sub${n}`,
+      endpoint: `https://push.example/${n}`,
+      p256dh: 'k',
+      auth: 'a',
+    }));
+    h.findMany.mockResolvedValueOnce(devices);
+    const res = await pushService.broadcastToStore('s1', {
+      titleEn: 'Sale',
+      titleAr: 'تخفيضات',
+      bodyEn: 'Today',
+      bodyAr: 'النهاردة',
+    });
+    const where = (h.findMany.mock.calls[0]![0] as { where: Record<string, unknown> }).where;
+    // every storefront device of the store (the shopper's own subscription is the consent), no customer filter, no staff devices
+    expect(where).toEqual({ storeId: 's1', audience: 'storefront' });
+    expect(h.send).toHaveBeenCalledTimes(3);
+    expect(res).toMatchObject({ recipients: 3, delivered: 3, failed: 0 });
+  });
+
+  it('and the transactional push right after it still reaches only the one customer', async () => {
+    await pushService.sendToStore(
+      's1',
+      't',
+      'b',
+      { event: 'order_confirmed' },
+      { customerId: 'u9' }
+    );
+    const where = (h.findMany.mock.calls[0]![0] as { where: Record<string, unknown> }).where;
+    expect(where).toEqual({ storeId: 's1', customerId: 'u9', audience: 'storefront' });
   });
 
   it('staff class: the orders-app push reads only orders_app subscriptions (never shoppers)', async () => {
