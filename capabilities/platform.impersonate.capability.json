@@ -7,7 +7,7 @@
   "titleAr": "دخول بحساب التاجر",
   "titleEn": "Impersonate a merchant",
   "screens": ["/users/[id]"],
-  "api": ["POST /admin/impersonate"],
+  "api": ["POST /admin/impersonate", "POST /auth/impersonation/end"],
   "mcpTool": null,
   "planGate": null,
   "roles": ["super_admin"],

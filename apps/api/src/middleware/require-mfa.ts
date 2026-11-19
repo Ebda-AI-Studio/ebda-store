@@ -57,6 +57,7 @@ export async function requireMfaEnrolled(
 }
 
 /** How recent the interactive login behind a session must be for a credential-class change (TEN-4). */
+// pq-allow(unused-export): test seam, imported by tests/unit/session-role-lifecycle.test.ts
 export const STEP_UP_MAX_AGE_SECONDS = 30 * 60;
 
 /**

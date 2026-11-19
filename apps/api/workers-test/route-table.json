@@ -500,6 +500,7 @@
   "POST /admin/webhook-events/:id/replay",
   "POST /auth/change-password",
   "POST /auth/forgot-password",
+  "POST /auth/impersonation/end",
   "POST /auth/login",
   "POST /auth/logout",
   "POST /auth/logout-all",
