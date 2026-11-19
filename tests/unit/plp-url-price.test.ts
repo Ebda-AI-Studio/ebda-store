@@ -42,6 +42,7 @@ describe('plpUrlPrice', () => {
     );
     expect(src).toContain('if (priceMax < sliderMax) params.maxPrice');
     expect(src).toContain('setPriceMax(sliderMax)');
-    expect(src).toContain('plpUrlPrice(searchParams, PRICE_SLIDER_MAX)');
+    // PL1: the natural ceiling is the catalogue's real highest price, not a fixed 5,000
+    expect(src).toContain('plpUrlPrice(searchParams, priceSliderCeil(initialMeta?.priceMax))');
   });
 });

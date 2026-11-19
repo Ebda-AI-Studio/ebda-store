@@ -280,3 +280,12 @@ failure alerts on main and cron runs; without them the notify jobs skip.
   did not happen and nothing retries it. `deploy-plan.mjs` needs only trees (`diff --name-only`) plus two lazy
   `git show` of `package-lock.json`, and already deploys when that read fails. Cost if wrong: a blob fetched lazily
   per `git show` on a slow link; worst case the plan deploys when it could have skipped.
+
+## G56: PR head with no `CI` / gitleaks / blast-radius run
+
+Symptom: `AI review` and `PR quality` (both `pull_request_target`) ran on a head, but nothing triggered by `pull_request` did, so
+`ops/merge-gate.sh` waits for required checks that never report. Seen on #776, #804, #865, #872. Config is not the cause (the
+workflows' triggers, paths and concurrency are fine; every missing run is a `pull_request` event, none a `push` or target event),
+so GitHub dropped the `pull_request` event for that push. Closing and reopening always emits a fresh one.
+Self-heal: `node scripts/ci/reopen-ciless-prs.mjs [--dry-run] [--minutes 10]` closes + reopens every open non-draft PR into main
+whose head is older than N minutes and has zero `CI` runs. Run it from the drain loop before the gate gives up.
