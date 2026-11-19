@@ -139,7 +139,7 @@ export interface Outcome {
 }
 
 /** The marker a held charge carries on its own ledger row (`billing_events.failure_reason`), so NO settle path takes it. */
-export const HELD_ROW_PREFIX = 'held:';
+const HELD_ROW_PREFIX = 'held:';
 
 /**
  * #627: THE one predicate every settle path goes through (settleInTx). A row with an open hold is never settled, either

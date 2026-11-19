@@ -10,7 +10,7 @@ import { apiGet, apiPost } from '../../../lib/api';
 import { useT } from '../../../i18n/useT';
 import { fmtDate } from '../../../components/billing/format';
 
-export interface HeldRow {
+interface HeldRow {
   id: string;
   provider: string;
   eventId: string;
