@@ -6788,8 +6788,8 @@
       "viewAll": "View all",
       "salesOrdersTitle": "Sales (from Orders)",
       "salesOrdersSource": "Orders",
-      "salesOrdersRevenue": "Paid Orders Revenue",
-      "salesOrdersCount": "Paid Orders",
+      "salesOrdersRevenue": "Net Sales (unpaid COD included)",
+      "salesOrdersCount": "Orders Counted",
       "salesOrdersCountUnit": "orders in period",
       "couldntLoad": "Couldn't load",
       "loadFailedShort": "Could not load the finance dashboard."

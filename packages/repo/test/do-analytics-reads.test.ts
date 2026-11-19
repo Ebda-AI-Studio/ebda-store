@@ -392,4 +392,43 @@ describe('refunds are not revenue (STORE-QA-7)', () => {
     });
     expect(op('analyticsNetRevenue', { paidOnly: true })).toEqual({ revenue: 3500, orders: 1 });
   });
+
+  it('line allocation never goes negative: refund > line sum (shipping in the refund) leaves every line at 0', () => {
+    const { raw, op, order, item } = rig();
+    // total 4910 = lines 4850 + 60 shipping; the full 4910 is recorded on the payment while payment_status is still 'paid'
+    order('o1', T0, 'delivered', 'paid', 4910, 'u1');
+    item('a', 'o1', 'p1', 1, 1850, null);
+    item('b', 'o1', 'p2', 1, 3000, null);
+    pay(raw, 'pm', 'o1', 4910);
+    const rows = op('analyticsItems', { ...win, by: 'product' });
+    expect(rows.map((r: any) => r.total)).toEqual([0, 0]);
+    expect(
+      op('analyticsItems', { ...win, by: 'priceSource' }).reduce(
+        (n: number, r: any) => n + r.total,
+        0
+      )
+    ).toBe(0);
+  });
+
+  it('refund exactly equal to the line sum leaves every line at 0', () => {
+    const { raw, op, order, item } = rig();
+    order('o1', T0, 'delivered', 'paid', 4850, 'u1');
+    item('a', 'o1', 'p1', 1, 1850, null);
+    item('b', 'o1', 'p2', 1, 3000, null);
+    refund(raw, 'r1', 'o1', 4850);
+    expect(op('analyticsItems', { ...win, by: 'product' }).map((r: any) => r.total)).toEqual([
+      0, 0,
+    ]);
+  });
+
+  it('STORE-QA-54: one unpaid COD + one paid: sales surfaces count both, paid surfaces count the paid one only', () => {
+    const { op, order } = rig();
+    order('paid', T0, 'delivered', 'paid', 4850, 'u1');
+    order('cod', T0 + H, 'pending', 'unpaid', 4910, 'u2'); // pending unpaid COD
+    // "sales" (analytics KPI, chart): base definition, unpaid COD included
+    expect(op('analyticsPeriod', win)).toMatchObject({ revenue: 9760, orders: 2 });
+    expect(op('analyticsNetRevenue', {})).toEqual({ revenue: 9760, orders: 2 });
+    // "paid" / cash surfaces (rollups, usage snapshot, insights, platform dashboards): paidOnly
+    expect(op('analyticsNetRevenue', { paidOnly: true })).toEqual({ revenue: 4850, orders: 1 });
+  });
 });

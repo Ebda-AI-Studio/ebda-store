@@ -103,7 +103,7 @@ export function analyticsItemsOp(db: SyncSql, storeId: string, a: Record<string,
   const end = intArg(a.endMs, 'endMs');
   statuses(a.nonRevenue);
   // Line revenue (REVENUE-DEF-1): whole-order exclusions, and a partial refund allocated to the lines pro rata (revenue.ts).
-  const wrap = netLinesWrapSql();
+  const wrap = netLinesWrapSql('sqlite');
   const base = `FROM ${wrap.head}${netLinesInnerSql('sqlite')}
       WHERE o.store_id = ?1 AND o.created_at >= ?2 AND o.created_at <= ?3
         AND ${revenueOrderPredicateSql('o')}${wrap.tail}`;

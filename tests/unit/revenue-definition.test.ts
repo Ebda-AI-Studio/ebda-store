@@ -127,6 +127,17 @@ describe('refund allocation to lines', () => {
     }
     expect(api.allocateRefundToLines([100, 200], 0)).toEqual([100, 200]);
   });
+
+  it('caps the refund at the line sum: refund > lines or == lines gives every line 0, never negative', () => {
+    expect(api.allocateRefundToLines([1850, 3000], 4910)).toEqual([0, 0]); // 4910 refund over 4850 of lines
+    expect(api.allocateRefundToLines([1850, 3000], 4850)).toEqual([0, 0]);
+    expect(api.allocateRefundToLines([1000, 2000], 1000)).toEqual([667, 1333]); // partial case unchanged
+  });
+
+  it('the SQL caps the allocated refund per dialect', () => {
+    expect(api.netLinesWrapSql('pg').head).toContain('LEAST(l.ref_minor, l.line_sum)');
+    expect(api.netLinesWrapSql('sqlite').head).toContain('MIN(l.ref_minor, l.line_sum)');
+  });
 });
 
 describe('funnel backfill', () => {
@@ -147,5 +158,52 @@ describe('reconciliation uses the definition (detector for an unreversed refund 
     const src = read('apps/api/src/lib/inngest/functions/accounting-period-reconciliation.ts');
     expect(src).toContain('netRevenue(store.id, { from: since, paidOnly: true, gross: true })');
     expect(src).not.toMatch(/notIn: \['cancelled'/);
+  });
+});
+
+describe('labels match the population (STORE-QA-54)', () => {
+  it('the finance sales panel (base definition, unpaid COD included) is not labelled paid', () => {
+    for (const f of ['en', 'ar']) {
+      const j = JSON.parse(read(`apps/admin/src/i18n/messages/${f}.json`));
+      const d = j.finance.dashboard;
+      expect(d.salesOrdersRevenue).not.toMatch(/(?<!un)paid|مدفوع/i);
+      expect(d.salesOrdersCount).not.toMatch(/(?<!un)paid|مدفوع/i);
+    }
+  });
+  it('every paid-only surface passes paidOnly (rollups, usage snapshot, insights, platform dashboards)', () => {
+    for (const file of [
+      'apps/api/src/services/accounting/analytics-rollup.service.ts',
+      'apps/api/src/routes/insights.routes.ts',
+      'apps/api/src/routes/admin.routes.ts',
+      'apps/api/src/services/provisioning.service.ts',
+    ])
+      expect(read(file), file).toContain('paidOnly: true');
+    expect(read('apps/api/src/lib/inngest/functions/store-usage-snapshot.ts')).toContain(
+      "revenueOrderPredicateSql('o', { paidOnly: true })"
+    );
+  });
+});
+
+describe('assistant / MCP text states which revenue definition it uses (STORE-QA-54)', () => {
+  it('the analytics tools say net sales INCLUDING unpaid COD', () => {
+    for (const file of [
+      'apps/api/src/mcp/tools/admin-read.tools.ts',
+      'apps/api/src/smart-layer/tools/read.tools.ts',
+    ]) {
+      const src = read(file).replace(/'\s*\+\s*\n\s*'/g, '');
+      expect(src, file).toMatch(/NET SALES/);
+      expect(src, file).toMatch(/INCLUDING unpaid\s+cash-on-delivery/);
+    }
+    expect(read('capabilities/analytics.dashboard.capability.json')).toContain(
+      'INCLUDING unpaid COD'
+    );
+  });
+  it('the finance tools say the figure is the ledger, not order-based sales', () => {
+    const src = read('apps/api/src/smart-layer/tools/finance-suggest.tools.ts');
+    expect(src).toContain('come from the LEDGER');
+    expect(src).toContain('from the LEDGER (posted journal entries');
+    expect(read('capabilities/finance.overview-reports.capability.json')).toContain(
+      'from the ledger'
+    );
   });
 });

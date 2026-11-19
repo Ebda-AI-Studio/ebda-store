@@ -6788,8 +6788,8 @@
       "viewAll": "عرض الكل",
       "salesOrdersTitle": "المبيعات (من الطلبات)",
       "salesOrdersSource": "الطلبات",
-      "salesOrdersRevenue": "إيرادات الطلبات المدفوعة",
-      "salesOrdersCount": "الطلبات المدفوعة",
+      "salesOrdersRevenue": "صافي المبيعات (يشمل الدفع عند الاستلام غير المحصَّل)",
+      "salesOrdersCount": "الطلبات المحتسبة",
       "salesOrdersCountUnit": "طلب في الفترة",
       "couldntLoad": "معرفناش نحمّل",
       "loadFailedShort": "معرفناش نحمّل لوحة الأرباح والمصروفات."

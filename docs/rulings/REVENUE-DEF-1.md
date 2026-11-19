@@ -16,4 +16,6 @@ spend strip net a partial refund too: the refund is allocated across the order's
 proportion to line total (largest-remainder, so the lines add back to the order's net).
 Tile captions say "all orders except cancelled, refunded and failed payments" (the Customers page
 caption is the model).
+Per-line allocation caps the refund at the sum of the order's lines (the refund may include shipping), so a line's net is never below 0.
+Residual (accepted): a payment_status `disputed` still counts as revenue until the dispute resolves to refunded.
 Cost if wrong: dashboards overstate by undelivered COD until a collected-cash tile ships.

@@ -58,7 +58,7 @@ async function pgLineRevenue(
     total: number;
   }>
 > {
-  const wrap = netLinesWrapSql();
+  const wrap = netLinesWrapSql('pg');
   const inner = Prisma.raw(netLinesInnerSql('pg'));
   const head = Prisma.raw(wrap.head);
   const tail = Prisma.raw(wrap.tail);

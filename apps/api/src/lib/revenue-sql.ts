@@ -84,8 +84,11 @@ export function netLinesInnerSql(dialect: RevenueSqlDialect): string {
      JOIN ${dialect === 'pg' ? 'public.orders' : 'orders'} o ON o.id = oi.order_id`;
 }
 
-export function netLinesWrapSql(): { head: string; tail: string } {
-  const alloc = (cum: string) => `(2 * l.ref_minor * ${cum} + l.line_sum) / (2 * l.line_sum)`;
+export function netLinesWrapSql(dialect: RevenueSqlDialect): { head: string; tail: string } {
+  // The refund is capped at orders.total (shipping included, net of discounts) but allocated over the LINES, so cap it at
+  // line_sum too: a line's net is never below 0 and the lines never go below 0 in total.
+  const cap = dialect === 'pg' ? 'LEAST(l.ref_minor, l.line_sum)' : 'MIN(l.ref_minor, l.line_sum)';
+  const alloc = (cum: string) => `(2 * ${cap} * ${cum} + l.line_sum) / (2 * l.line_sum)`;
   return {
     head: `(SELECT l.id, l.order_id, l.product_id, l.quantity, l.price_source, l.price_group_applied,
        l.total - CASE WHEN l.ref_minor = 0 OR l.line_sum = 0 THEN 0
@@ -99,6 +102,7 @@ export function netLinesWrapSql(): { head: string; tail: string } {
 export function allocateRefundToLines(lineTotals: number[], refundedMinor: number): number[] {
   const sum = lineTotals.reduce((a, b) => a + b, 0);
   if (refundedMinor <= 0 || sum <= 0) return lineTotals.slice();
+  refundedMinor = Math.min(refundedMinor, sum); // same cap as the SQL: never below 0 in total
   let cum = 0;
   let prev = 0;
   return lineTotals.map(t => {
