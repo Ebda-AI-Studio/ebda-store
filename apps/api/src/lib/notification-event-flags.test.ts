@@ -1,9 +1,7 @@
 /** STORE-QA-62: the admin sends only sms/push; that must validate (was 400) and must not flip the stored WhatsApp flag. */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
-vi.mock('../../services/notification-config.service', () => ({ notificationConfigService: {} }));
-
-import { eventConfigShape, mergeEventFlags } from '../notification.routes';
+import { eventConfigShape, mergeEventFlags } from './notification-event-flags';
 
 describe('event config payload', () => {
   it('accepts the admin payload without `whatsapp`', () => {
