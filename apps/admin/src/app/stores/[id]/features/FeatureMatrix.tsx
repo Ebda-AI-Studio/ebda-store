@@ -8,7 +8,6 @@ import { useLocale } from 'next-intl';
 import { apiGet, apiPut, apiDelete, apiPatch } from '@/lib/api';
 import {
   PLAN_LABELS,
-  STORE_PLANS,
   isInBaseline,
   getSuperAdminFeatures,
   type StorePlan,
@@ -19,6 +18,7 @@ import {
 import { ToggleSwitch } from './_components/ToggleSwitch';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';
+import { SubscriptionPlanRow } from '@/components/billing/SubscriptionPlanRow';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -73,7 +73,6 @@ const CATEGORY_ORDER: FeatureCategory[] = [
 ];
 
 import { formatDate } from '@/lib/format';
-import { FIELD_CLASSES } from '@/components/ui/tokens';
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
@@ -253,11 +252,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   // Per-key in-flight set
   const [inFlightKeys, setInFlightKeys] = useState<Set<string>>(new Set());
 
-  // Plan change modal
-  const [planModalOpen, setPlanModalOpen] = useState(false);
-  const [pendingPlan, setPendingPlan] = useState<StorePlan | null>(null);
-  const [planChanging, setPlanChanging] = useState(false);
-
   // Suspend modal
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
   const [statusChanging, setStatusChanging] = useState(false);
@@ -323,39 +317,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
     },
     [inFlightKeys, storeId, fetchFeatures, refreshFeatureContext, toastError, t]
   );
-
-  // ── Plan change ────────────────────────────────────────────────────────────
-  const handlePlanChange = useCallback(async () => {
-    if (!pendingPlan) return;
-    setPlanChanging(true);
-    const { error: apiErr } = await apiPut(`/api/v1/admin/stores/${storeId}/plan`, {
-      plan: pendingPlan,
-    });
-    if (apiErr) {
-      toastError(t('toasts.planChangeFailed'), apiErr.message);
-    } else {
-      toastSuccess(
-        t('toasts.planUpdated'),
-        t('toasts.planUpdatedDescription', { plan: planLabelFor(pendingPlan) })
-      );
-      // A plan change moves the feature BASELINE, so the matrix and the
-      // store-wide context both change even with no override touched.
-      await Promise.all([fetchStore(), fetchFeatures(), refreshFeatureContext()]);
-    }
-    setPlanChanging(false);
-    setPlanModalOpen(false);
-    setPendingPlan(null);
-  }, [
-    pendingPlan,
-    storeId,
-    fetchStore,
-    fetchFeatures,
-    refreshFeatureContext,
-    toastSuccess,
-    toastError,
-    t,
-    planLabelFor,
-  ]);
 
   // ── Suspend / reactivate ───────────────────────────────────────────────────
   const handleStatusChange = useCallback(async () => {
@@ -437,38 +398,12 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
 
   return (
     <div className="space-y-8">
-      {/* ── Plan Picker ─────────────────────────────────────────────────────── */}
-      <div className="bg-card rounded-xl border border-border p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-foreground">{t('storePlanHeading')}</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">{t('storePlanSubtitle')}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary-ink px-3 py-1 text-sm font-medium">
-              {planLabelFor(plan)}
-            </span>
-            <select
-              className={FIELD_CLASSES}
-              value=""
-              onChange={e => {
-                const val = e.target.value as StorePlan;
-                if (val && val !== plan) {
-                  setPendingPlan(val);
-                  setPlanModalOpen(true);
-                }
-              }}
-            >
-              <option value="">{t('changePlanOption')}</option>
-              {STORE_PLANS.filter(p => p !== plan).map(p => (
-                <option key={p} value={p}>
-                  {planLabelFor(p)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">{t('planChangeNote')}</p>
+      {/* ── Plan: the subscription's priced plan + the one place to assign it (Ruling B1-PLAN-SOT-1) ── */}
+      <div className="space-y-2">
+        <SubscriptionPlanRow storeId={storeId} />
+        <p className="text-xs text-muted-foreground">
+          {t('baselineTierNote', { plan: planLabelFor(plan) })}
+        </p>
       </div>
 
       {/* ── Feature Matrix ───────────────────────────────────────────────────── */}
@@ -548,44 +483,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       </div>
 
       {/* ── Modals ───────────────────────────────────────────────────────────── */}
-
-      {/* Plan change confirm */}
-      <Modal
-        isOpen={planModalOpen}
-        onClose={() => {
-          setPlanModalOpen(false);
-          setPendingPlan(null);
-        }}
-        title={t('modals.changePlanTitle')}
-        size="sm"
-      >
-        <p className="text-sm text-muted-foreground">
-          {t.rich('modals.changePlanBody', {
-            b: chunks => <strong>{chunks}</strong>,
-            plan: pendingPlan ? planLabelFor(pendingPlan) : '',
-          })}
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setPlanModalOpen(false);
-              setPendingPlan(null);
-            }}
-            disabled={planChanging}
-          >
-            {tCommon('cancel')}
-          </Button>
-          <Button
-            variant="default"
-            onClick={handlePlanChange}
-            disabled={planChanging}
-            isLoading={planChanging}
-          >
-            {tCommon('confirm')}
-          </Button>
-        </div>
-      </Modal>
 
       {/* Suspend / reactivate confirm */}
       <Modal

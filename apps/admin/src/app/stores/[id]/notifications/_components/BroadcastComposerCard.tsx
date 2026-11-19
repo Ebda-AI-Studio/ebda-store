@@ -180,14 +180,6 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
         >
           <p className="font-medium mb-1">{t('notConfiguredTitle')}</p>
           <p className="text-muted-foreground">{t('notConfiguredDescription')}</p>
-          <p className="text-muted-foreground mt-2">
-            {/* i18n-gate-allow: environment variable name */}
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded-md">ONESIGNAL_APP_ID</code>{' '}
-            {t('and')} {/* i18n-gate-allow: environment variable name */}
-            <code className="text-xs bg-muted px-1.5 py-0.5 rounded-md">
-              ONESIGNAL_REST_API_KEY
-            </code>
-          </p>
         </div>
       )}
 
