@@ -669,6 +669,60 @@ describe('D1 stores vs DO store_profile mirror (template / look / name / nameAr,
     expect(pushed).toEqual([{ template: 'souq' }]);
   });
 
+  it('B1-PLAN-SOT-1: a DO whose plan copy is LOWER than D1 is re-pushed from D1 (the Amelia case: DO professional, D1 enterprise)', async () => {
+    sqlite.prepare("UPDATE stores SET plan='enterprise' WHERE id=?").run(A);
+    const pushed: Array<[string, Record<string, unknown>]> = [];
+    const r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ ...inSync, plan: 'professional', billingSuspendedReason: null }),
+      repairMirror: async (id, f) => void pushed.push([id, f]),
+      alert: () => undefined,
+    });
+    expect(pushed).toEqual([[A, { plan: 'enterprise' }]]);
+    expect(r.corrected[0].why).toMatch(/plan/);
+  });
+
+  it('B1-PLAN-SOT-1: a DO whose plan copy is HIGHER than D1 is pushed down too (a stale paid tier must not fail open)', async () => {
+    sqlite.prepare("UPDATE stores SET plan='starter' WHERE id=?").run(A);
+    const pushed: Array<Record<string, unknown>> = [];
+    await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ ...inSync, plan: 'enterprise', billingSuspendedReason: null }),
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: () => undefined,
+    });
+    expect(pushed).toEqual([{ plan: 'starter' }]);
+  });
+
+  it('B1-PLAN-SOT-1: a billing suspension that never reached the DO is re-pushed; an in-sync plan is silent', async () => {
+    sqlite
+      .prepare(
+        "UPDATE stores SET plan='professional', billing_suspended_reason='unpaid' WHERE id=?"
+      )
+      .run(A);
+    const pushed: Array<Record<string, unknown>> = [];
+    let r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ ...inSync, plan: 'professional', billingSuspendedReason: null }),
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: () => undefined,
+    });
+    expect(pushed).toEqual([{ billingSuspendedReason: 'unpaid' }]);
+    pushed.length = 0;
+    r = await reconcileStoreDirectory({
+      pgAll: down,
+      pgLive: down,
+      doRecord: async () => ({ ...inSync, plan: 'professional', billingSuspendedReason: 'unpaid' }),
+      repairMirror: async (_id, f) => void pushed.push(f),
+      alert: () => undefined,
+    });
+    expect(pushed).toEqual([]);
+    expect(r.corrected).toEqual([]);
+  });
+
   it('a repair that fails is alert-only, never thrown', async () => {
     const r = await reconcileStoreDirectory({
       pgAll: down,
