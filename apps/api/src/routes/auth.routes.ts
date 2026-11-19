@@ -150,7 +150,7 @@ function clearSessionCookies(res: Response): void {
 const registerSchema = z
   .object({
     email: z.string().email('Invalid email address'),
-    password: z.string().superRefine(addPasswordPolicyIssues),
+    password: z.string().max(200).superRefine(addPasswordPolicyIssues),
     name: z.string().min(1).optional(),
     firstName: z.string().min(1).optional(),
     lastName: z.string().optional(),

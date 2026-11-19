@@ -107,4 +107,24 @@ describe('every consumer uses the shared policy (no private copy)', () => {
       expect(src(f), f).toMatch(/PasswordChecklist|PasswordRules/);
     }
   });
+  it('every API password field uses the shared policy: no bare min(8) is left, and the register field is bounded like accounts (200)', () => {
+    for (const f of [
+      'apps/api/src/routes/staff.routes.ts',
+      'apps/api/src/routes/admin.routes.ts',
+      'apps/api/src/routes/auth.routes.ts',
+    ]) {
+      expect(src(f), f).not.toMatch(/password:\s*z\.string\(\)\.min\(8\)/);
+    }
+    expect(src('apps/api/src/routes/staff.routes.ts')).toMatch(
+      /password: z\.string\(\)\.max\(128\)\.superRefine\(addPasswordPolicyIssues\)/
+    );
+    expect(
+      src('apps/api/src/routes/admin.routes.ts').match(
+        /password: z\.string\(\)\.max\(255\)\.superRefine\(addPasswordPolicyIssues\)\.optional\(\)/g
+      )
+    ).toHaveLength(2);
+    expect(src('apps/api/src/routes/auth.routes.ts')).toMatch(
+      /password: z\.string\(\)\.max\(200\)\.superRefine\(addPasswordPolicyIssues\)/
+    );
+  });
 });

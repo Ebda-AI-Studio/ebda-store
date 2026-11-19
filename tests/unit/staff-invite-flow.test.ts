@@ -211,6 +211,26 @@ describe('POST /stores/:id/staff: an invite never binds to an existing identity'
     expect(h.staffCreates).toEqual([{ storeId: 'store-a', userId: sent.id }]);
   });
 
+  it('an invite with an initial password follows the shared policy: a weak one is refused naming every unmet rule', async () => {
+    const res = await request(app)
+      .post('/api/v1/stores/store-a/staff')
+      .send({ ...INVITE, password: 'abcdefgh' });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain(
+      'Password must contain at least one uppercase letter'
+    );
+    expect(JSON.stringify(res.body)).toContain('Password must contain at least one number');
+    expect(h.invite).not.toHaveBeenCalled();
+  });
+
+  it('an invite with a policy-meeting initial password goes through', async () => {
+    h.invite.mockImplementation(async (i: any) => ({ id: i.id, created: true }));
+    const res = await request(app)
+      .post('/api/v1/stores/store-a/staff')
+      .send({ ...INVITE, password: 'Abcd123!' });
+    expect(res.status).toBe(201);
+  });
+
   it('TAKEOVER ATTEMPT: unverified merchant identity of another tenant -> no profile row, no membership, a pending invite + accept mail only', async () => {
     h.invite.mockResolvedValue({
       id: 'victim-id',

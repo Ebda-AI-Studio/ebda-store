@@ -12,7 +12,7 @@ import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { authRefusalText } from '../../../lib/auth-refusal';
 import { PasswordChecklist } from '../../../components/PasswordChecklist';
-import { isPasswordPolicyMet, passwordUnmetSentence } from '@ebda/shared';
+import { isPasswordPolicyMet } from '@ebda/shared';
 
 function ResetPasswordForm() {
   const { isLoading, error, setError, submit } = useAuthFormSubmit();

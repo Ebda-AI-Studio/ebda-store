@@ -12,6 +12,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { withStore, withUser, UserRole } from '@ebda/database';
+import { addPasswordPolicyIssues } from '@ebda/shared';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -64,7 +65,7 @@ const inviteStaffSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   /** Optional initial password; if omitted, a random one is generated and must be reset. */
-  password: z.string().min(8).max(128).optional(),
+  password: z.string().max(128).superRefine(addPasswordPolicyIssues).optional(),
 });
 
 // ─── List staff members ────────────────────────────────────────────────────
