@@ -231,7 +231,9 @@ describe('wiring', () => {
   });
   it('the numbers equal the exact limiters they replace on this route', () => {
     const sec = src('apps/api/src/middleware/security.ts');
-    expect(sec).toMatch(/storeResolveLimiter = rateLimit\(\{[\s\S]*?max: 30,/);
+    expect(sec).toMatch(
+      /storeResolveLimiter = plannedRateLimit\('store-resolve', \{[\s\S]*?max: 30,/
+    ); // PERF-BATCH-1 planned the same limiter: same numbers
     expect(sec).toMatch(/const max = opts\?\.max \?\? 20;/);
   });
 });

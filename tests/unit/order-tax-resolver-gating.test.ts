@@ -246,17 +246,19 @@ describe('resolveActiveTaxRate is the ONLY resolver — both call sites use it',
     expect(occurrences.length).toBe(2); // storefront checkout + the admin manual-order path
   });
 
-  it('public.routes.ts (the display) calls resolveActiveTaxRate at both call sites', () => {
+  // PERF-BATCH-1: both display sites (/stores/:slugOrId + /store/resolve) read their per-store data through ONE helper,
+  // `storePayloadParts`, which calls the resolver; each site spreads its result.
+  it('public.routes.ts (the display) calls resolveActiveTaxRate for both call sites', () => {
     const occurrences = publicRoutes.match(/resolveActiveTaxRate\(store\.id\)/g) ?? [];
-    expect(occurrences.length).toBe(2); // /stores/:slugOrId + /store/resolve
+    expect(occurrences.length).toBe(1); // inside storePayloadParts
+    expect(publicRoutes).toMatch(
+      /async function storePayloadParts[\s\S]{0,600}resolveActiveTaxRate\(store\.id\)/
+    );
+    expect(publicRoutes.match(/await storePayloadParts\(store\)/g) ?? []).toHaveLength(2);
   });
 
   it('public.routes.ts derives taxRatePercent AND the effective taxEnabled from the same resolver (ruling TAX-2)', () => {
-    // RESOLVE-PARALLEL-1: the resolver runs inside the concurrent fill (`resolveActiveTaxRate(store.id)` as a Promise.all
-    // member) and its result feeds `effectiveTaxFields(taxRate)`. Both halves must be present in BOTH public payloads.
-    const calls = publicRoutes.match(/^\s+resolveActiveTaxRate\(store\.id\),$/gm) ?? [];
-    expect(calls.length).toBe(2);
-    const occurrences = publicRoutes.match(/\.\.\.effectiveTaxFields\(taxRate\)/g) ?? [];
+    const occurrences = publicRoutes.match(/\.\.\.effectiveTaxFields\(parts\.tax\)/g) ?? [];
     expect(occurrences.length).toBe(2);
   });
 

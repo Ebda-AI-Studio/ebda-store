@@ -8,6 +8,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 
 const { accountsFetch } = vi.hoisted(() => ({ accountsFetch: vi.fn() }));
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({ isAuthenticated: false, user: null, logout: () => undefined }),
+}));
 vi.mock('../../lib/accounts', () => ({
   accountsFetch,
   AccountsError: class AccountsError extends Error {
