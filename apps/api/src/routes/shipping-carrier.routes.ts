@@ -227,7 +227,13 @@ router.put(
         throw new AppError(422, 'MODE_REQUIRED', 'Say which mode (sandbox or live) these are for');
       }
       // Checkout-visible: a merchant turns a carrier ON through /provider-activation/.../activate (confirm step).
-      if (body.enabled === true) refuseUnconfirmedEnable(req.user?.role, carrier);
+      // Only the OFF -> ON transition: re-sending enabled:true for a carrier that is already on (a settings save) is not an enable.
+      if (body.enabled === true) {
+        const existing = (await shippingCarrierService.getPublicCarrierConfigs(storeId)).find(
+          c => c.carrier === carrier
+        );
+        if (!existing?.enabled) refuseUnconfirmedEnable(req.user?.role, carrier);
+      }
       const result = await shippingCarrierService.upsertCarrierConfig(storeId, carrier, {
         credentials: body.credentials
           ? { mode: body.mode!, fields: body.credentials }

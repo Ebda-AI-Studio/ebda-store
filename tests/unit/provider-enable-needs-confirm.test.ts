@@ -175,8 +175,9 @@ describe('legacy enable routes need the confirm step', () => {
       join(__dirname, '../../apps/api/src/routes/shipping-carrier.routes.ts'),
       'utf8'
     );
+    // gated on the off -> on transition only: behaviour is proven in carrier-put-enable-transition.test.ts
     expect(src).toMatch(
-      /body\.enabled === true\) refuseUnconfirmedEnable\(req\.user\?\.role, carrier\)/
+      /if \(!existing\?\.enabled\) refuseUnconfirmedEnable\(req\.user\?\.role, carrier\)/
     );
   });
 });
