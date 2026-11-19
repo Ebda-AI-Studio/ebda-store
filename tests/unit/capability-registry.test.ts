@@ -28,4 +28,21 @@ describe('capability registry rules (lens 192)', () => {
     );
     expect(r.violations.map(v => v.rule)).toContain('policy-free-writes');
   });
+
+  it('credential and money-adjacent capabilities keep their stricter assistant policy', () => {
+    const pinned: Record<string, string> = {
+      'account.login': 'forbidden',
+      'onboarding.signup': 'forbidden',
+      'account.verify-email': 'forbidden',
+      'account.staff-accept-invite': 'forbidden',
+      'integrations.shopper-mcp': 'confirm',
+      'self.instapay-auto-confirm': 'confirm',
+      'onboarding.create-store': 'confirm',
+      'storefront.contact-enquiry': 'preview',
+    };
+    const actual = Object.fromEntries(
+      Object.keys(pinned).map(id => [id, entries.find(e => e.id === id)?.policy])
+    );
+    expect(actual).toEqual(pinned);
+  });
 });
