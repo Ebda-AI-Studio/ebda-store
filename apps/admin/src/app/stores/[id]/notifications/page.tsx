@@ -20,6 +20,7 @@ import Link from 'next/link';
 import {
   DEFAULT_CONFIGS,
   DEFAULT_EVENTS,
+  mergeStoredEvents,
   type ChannelConfig,
   type ChannelKey,
   type EventConfig,
@@ -93,12 +94,10 @@ export default function NotificationsPage() {
   }, [storeId]);
 
   const fetchEvents = useCallback(async () => {
-    const { data } = await apiGet<{ events: EventConfig[] }>(
+    const { data } = await apiGet<{ events: unknown }>(
       `/api/v1/stores/${storeId}/notifications/events`
     );
-    if (data?.events && data.events.length > 0) {
-      setEvents(data.events);
-    }
+    if (data?.events) setEvents(mergeStoredEvents(data.events));
   }, [storeId]);
 
   const fetchLogs = useCallback(async () => {
