@@ -217,7 +217,7 @@ vi.mock('@api/lib/logger', () => ({
 
 import publicRoutes from '@api/routes/public.routes';
 import { errorHandler } from '@api/middleware/error-handler';
-import { invalidateCachedPrefix, invalidateCached, swrSettled } from '@api/lib/public-cache';
+import { invalidateCachedPrefix, invalidateCached } from '@api/lib/public-cache';
 import { invalidateStoreDirectory } from '@api/lib/store-directory';
 
 function buildApp() {
@@ -469,6 +469,11 @@ describe('GET /public/stores/:slugOrId', () => {
 
 // RESOLVE-SWR-1: the resolved payload is served stale-while-revalidate (120 s soft age, 600 s hard max). A write of a
 // NEVER-stale field is cleared by its bust, so a bust is never followed by the old payload, at any age.
+/** Lets an un-awaited background refresh (in-memory mocks only, no real I/O) run to its end. */
+const settleRefresh = async () => {
+  for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r));
+};
+
 describe('GET /public/store/resolve: stale-while-revalidate, NEVER-stale cleared by the bust', () => {
   const HOST = 'amelia.ebda.app';
   const KEY = 'public:store:resolve:amelia.ebda.app';
@@ -490,7 +495,7 @@ describe('GET /public/store/resolve: stale-while-revalidate, NEVER-stale cleared
     clock += 200_000;
     suspend(); // a write that was NOT busted (the BOUNDED-stale case the window is for)
     expect(await status()).toBe('active'); // stale, served without waiting on the refill
-    await swrSettled();
+    await settleRefresh();
     expect(await status()).toBe('suspended'); // the background refresh landed
   });
 

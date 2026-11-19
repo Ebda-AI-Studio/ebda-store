@@ -283,12 +283,6 @@ function isSwrEnvelope(v: unknown): v is SwrEnvelope<unknown> {
   );
 }
 const swrRefreshing = new Set<string>();
-const swrPending = new Set<Promise<void>>();
-
-/** Resolves when every background refresh started so far has finished (tests; never awaited on the request path). */
-export async function swrSettled(): Promise<void> {
-  while (swrPending.size) await Promise.allSettled([...swrPending]);
-}
 
 export async function getCachedSwr<T>(
   key: string,
@@ -340,9 +334,7 @@ function refreshInBackground<T>(
     })
     .finally(() => {
       swrRefreshing.delete(key);
-      swrPending.delete(run);
     });
-  swrPending.add(run);
   if (isWorkers) cfWaitUntil(run);
 }
 

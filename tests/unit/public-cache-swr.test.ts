@@ -36,7 +36,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import { getCachedSwr, invalidateCached, swrSettled } from '@api/lib/public-cache';
+import { getCachedSwr, invalidateCached } from '@api/lib/public-cache';
 
 const SOFT = 120;
 const HARD = 600;
@@ -49,6 +49,10 @@ let fetches: number;
 const fetchFn = async (): Promise<Payload> => {
   fetches++;
   return { ...db };
+};
+/** Lets an un-awaited background refresh (in-memory mocks only, no real I/O) run to its end. */
+const settleRefresh = async () => {
+  for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r));
 };
 const read = () => getCachedSwr(KEY, SOFT, HARD, fetchFn);
 
@@ -77,7 +81,7 @@ describe('read windows', () => {
     db = { ...db, v: 2 };
     const stale = await read();
     expect(stale.v).toBe(1); // no wait on the refetch
-    await swrSettled();
+    await settleRefresh();
     expect(fetches).toBe(2);
     expect((await read()).v).toBe(2);
     expect(fetches).toBe(2);
@@ -87,7 +91,7 @@ describe('read windows', () => {
     await read();
     advance(SOFT + 30);
     await Promise.all([read(), read(), read(), read(), read()]);
-    await swrSettled();
+    await settleRefresh();
     expect(fetches).toBe(2);
   });
 
@@ -107,7 +111,7 @@ describe('read windows', () => {
       throw new Error('D1 down');
     };
     expect((await getCachedSwr(KEY, SOFT, HARD, boom)).v).toBe(1);
-    await swrSettled();
+    await settleRefresh();
     expect((await getCachedSwr(KEY, SOFT, HARD, boom)).v).toBe(1);
   });
 
@@ -165,7 +169,7 @@ describe('NEVER-stale: a bust is never followed by an old value', () => {
     db = { ...db, status: 'suspended', v: 2 }; // the write
     await invalidateCached(KEY); // its bust
     release();
-    await swrSettled();
+    await settleRefresh();
     expect(phase).toBe(1);
     // the refresh finished with the pre-write snapshot but must not have stored it
     expect((await read()).status).toBe('suspended');
@@ -182,7 +186,7 @@ describe('NEVER-stale: a bust is never followed by an old value', () => {
     });
     await invalidateCached(KEY);
     release();
-    await swrSettled();
+    await settleRefresh();
     db = { ...db, v: 5 };
     expect((await read()).v).toBe(5);
   });
