@@ -11,6 +11,7 @@ import { featureService } from '../services/feature.service';
 import { notificationConfigService } from '../services/notification-config.service';
 import { pushService } from '../services/push.service';
 import logger from '../lib/logger';
+import { eventConfigShape, mergeEventFlags } from '../lib/notification-event-flags';
 
 // TWO routers, deliberately (#1993): the admin half is mounted ONLY at the
 // bare '/stores' prefix; `publicRouter` is the only thing mounted at
@@ -75,25 +76,6 @@ const upsertConfigSchema = z.object({
 // key the admin UI uses internally) so the contract is forgiving — drift
 // between admin and API field names is what produced the 400s the
 // merchant saw on every save before this fix.
-const eventConfigShape = z
-  .object({
-    event: z.string().min(1),
-    // WhatsApp is the separate Ebda Chat product and has no switch on this page: the admin never sends it, so it is
-    // optional (an omitted value leaves the stored one alone). It used to be required, which 400'd every save.
-    whatsapp: z.boolean().optional(),
-    sms: z.boolean(),
-    push: z.boolean().optional(),
-    push_notifications: z.boolean().optional(),
-  })
-  .transform(v => ({
-    event: v.event,
-    whatsapp: v.whatsapp,
-    sms: v.sms,
-    // `push` wins when both are sent; defaults to false so a missing
-    // field doesn't accidentally enable a channel.
-    push: typeof v.push === 'boolean' ? v.push : (v.push_notifications ?? false),
-  }));
-
 // Single-event payload (legacy). Bulk payload `{ events: [...] }` is
 // preferred — see the route below — and is what the admin actually sends.
 const upsertEventConfigSchema = eventConfigShape;
@@ -310,24 +292,26 @@ router.put(
         const { events } = bulkEventConfigSchema.parse(req.body);
         const results: Array<{ event: string; whatsapp: boolean; sms: boolean; push: boolean }> =
           [];
+        const stored = await notificationConfigService.getEventConfigs(storeId);
         for (const e of events) {
-          const updated = await notificationConfigService.upsertEventConfig(storeId, e.event, {
-            whatsapp: e.whatsapp,
-            sms: e.sms,
-            push: e.push,
-          });
+          const updated = await notificationConfigService.upsertEventConfig(
+            storeId,
+            e.event,
+            mergeEventFlags(stored, e)
+          );
           results.push({ event: e.event, ...updated });
         }
         res.json({ success: true, data: { events: results } });
         return;
       }
 
-      const { event, whatsapp, sms, push } = upsertEventConfigSchema.parse(req.body);
-      const updated = await notificationConfigService.upsertEventConfig(storeId, event, {
-        whatsapp,
-        sms,
-        push,
-      });
+      const parsed = upsertEventConfigSchema.parse(req.body);
+      const { event } = parsed;
+      const updated = await notificationConfigService.upsertEventConfig(
+        storeId,
+        event,
+        mergeEventFlags(await notificationConfigService.getEventConfigs(storeId), parsed)
+      );
       res.json({ success: true, data: { event, ...updated } });
     } catch (error) {
       next(error);

@@ -114,38 +114,22 @@ export const DEFAULT_EVENTS: EventConfig[] = [
 ];
 
 /**
- * The events endpoint answers `{ events: { [event]: { sms, push } } }` (a map of the rows the store saved); an older
- * shape was an array. Accept both and lay the saved switches over DEFAULT_EVENTS, so a saved config always shows.
- * Returns null when nothing usable came back (the defaults stay).
+ * STORE-QA-62: `GET /notifications/events` answers `{ events: { [event]: { whatsapp, sms, push } } }` (a record), but the page read
+ * it as an array, so a saved toggle never came back after a reload. Fold the stored record (or a legacy array) over the defaults.
  */
-export function mergeEventConfigs(raw: unknown): EventConfig[] | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const saved = new Map<string, { sms?: boolean; push?: boolean }>();
-  if (Array.isArray(raw)) {
-    for (const r of raw as Array<{
-      event?: string;
-      sms?: boolean;
-      push?: boolean;
-      push_notifications?: boolean;
-    }>) {
-      if (r?.event) saved.set(r.event, { sms: r.sms, push: r.push ?? r.push_notifications });
-    }
-  } else {
-    for (const [event, v] of Object.entries(
-      raw as Record<string, { sms?: boolean; push?: boolean }>
-    )) {
-      saved.set(event, { sms: v?.sms, push: v?.push });
-    }
+export function mergeStoredEvents(stored: unknown): EventConfig[] {
+  type Flags = { sms?: boolean; push?: boolean; push_notifications?: boolean };
+  const byEvent = new Map<string, Flags>();
+  if (Array.isArray(stored)) {
+    for (const e of stored as Array<Flags & { event: string }>) byEvent.set(e.event, e);
+  } else if (stored && typeof stored === 'object') {
+    for (const [event, v] of Object.entries(stored as Record<string, object>))
+      byEvent.set(event, v);
   }
-  if (saved.size === 0) return null;
   return DEFAULT_EVENTS.map(d => {
-    const s = saved.get(d.event);
-    return s
-      ? {
-          ...d,
-          sms: s.sms ?? d.sms,
-          push_notifications: s.push ?? d.push_notifications,
-        }
+    const v = byEvent.get(d.event);
+    return v
+      ? { ...d, sms: v.sms === true, push_notifications: (v.push ?? v.push_notifications) === true }
       : d;
   });
 }
