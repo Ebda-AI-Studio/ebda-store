@@ -39,16 +39,20 @@ describe('public store payload fill is concurrent (RESOLVE-PARALLEL-1)', () => {
     }
   });
 
-  it('both fills use one Promise.all over the independent reads', () => {
-    const fills = SRC.split('RESOLVE-PARALLEL-1').length - 1;
-    expect(fills).toBeGreaterThanOrEqual(2);
+  it('both fills use ONE Promise.all over the independent reads: the shared storePayloadParts (PERF-BATCH-1 on top of RESOLVE-PARALLEL-1)', () => {
+    // Merge of #868 (one shared helper) and #902 (two inline Promise.all): the reads live ONCE, in `storePayloadParts`, and both public
+    // payloads call it. Same concurrency, no duplicated list that can drift apart.
+    expect(SRC.split('RESOLVE-PARALLEL-1').length - 1).toBeGreaterThanOrEqual(1);
+    expect(SRC.match(/await storePayloadParts\(store\)/g) ?? []).toHaveLength(2);
+    const start = SRC.indexOf('async function storePayloadParts');
+    const body = SRC.slice(start, SRC.indexOf('\n}\n', start));
+    const all = body.slice(body.indexOf('Promise.all(['));
     for (const fn of FILL_READS) {
       const name = fn.split('.').pop() as string;
-      const hits = SRC.split('\n').filter(l => new RegExp(`^\\s+(\\w+\\.)?${name}\\(`).test(l));
-      expect(
-        hits.length,
-        `${fn} appears as a Promise.all member in both fills`
-      ).toBeGreaterThanOrEqual(2);
+      const hits = all.split('\n').filter(l => new RegExp(`^\\s+(\\w+\\.)?${name}\\(`).test(l));
+      expect(hits.length, `${fn} is a Promise.all member of storePayloadParts exactly once`).toBe(
+        1
+      );
     }
   });
 });

@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { COMPONENTS, HISTORY_DAYS, SLOW_STREAK_FAILS } from './config';
+import { HEADLINE_DAYS, uptimeOver } from './uptime';
 import { probeErrorAr, probesAr, probesEn } from './probe';
 import type {
   ComponentSnapshot,
@@ -249,6 +250,8 @@ export class StatusStore extends DurableObject<Cloudflare.Env> {
         slow: !!s?.last_slow && s?.status !== 'down',
         lastError: s?.status === 'down' ? (s.last_error ?? null) : null,
         uptime: checks ? Math.round((okSum / checks) * 10000) / 100 : null,
+        // STATUS-WINDOW-1: the headline figure, the last 30 days of the same buckets (`uptime` stays the 90-day figure)
+        uptime30d: uptimeOver(days, HEADLINE_DAYS),
         days,
       };
     });

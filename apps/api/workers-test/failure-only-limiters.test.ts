@@ -108,6 +108,9 @@ const COUNTED_ON_ANY_STORE = [
   'GET /public/feed/products.json',
   'GET /public/health',
   'GET /public/lifecycle-emails/unsubscribe',
+  // LAUNCH-RL-MISS-3: a token-guarded guest read (signed order link, own orderStatusLimiter). Its 404 answers a bad or expired token, i.e. a guess,
+  // so it is a COUNTED miss on any store; it is NOT a catalogue-miss route (that list is for public slugs whose 404 says nothing new).
+  'GET /public/order-status/:token',
   'GET /public/orders',
   'GET /public/orders/:id',
   'GET /public/orders/:id/invoice',

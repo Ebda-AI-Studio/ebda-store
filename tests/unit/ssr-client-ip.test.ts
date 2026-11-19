@@ -180,6 +180,13 @@ describe('API: forwarded shopper address (cf/ssr-client-ip.ts)', () => {
       const src = readFileSync(join(ROOT, 'apps/api/src', f), 'utf8');
       for (const m of src.matchAll(/router\.(?:get|head)\(\s*'([^']+)'/g)) routes.add(m[1]);
     }
+    // The guest order-status router is mounted at /public/order-status, so its paths carry that prefix (Ruling WA-COD-V2-2).
+    const status = readFileSync(
+      join(ROOT, 'apps/api/src/routes/order-status-public.routes.ts'),
+      'utf8'
+    );
+    for (const m of status.matchAll(/router\.(?:get|head)\(\s*'([^']+)'/g))
+      routes.add(`/order-status${m[1]}`);
     expect(routes.size).toBeGreaterThan(10);
     const unclassified = [...routes].filter(r => !(r in SSR_FORWARD_ROUTES));
     expect(unclassified, 'classify these in SSR_FORWARD_ROUTES (cf/ssr-client-ip.ts)').toEqual([]);
