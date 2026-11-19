@@ -12,7 +12,7 @@ import { apiGet } from '@/lib/api';
 import { useT } from '@/i18n/useT';
 import { buttonVariants } from '@/components/ui/Button';
 
-export interface StorePlanInfo {
+interface StorePlanInfo {
   code: string;
   nameEn: string;
   nameAr: string;

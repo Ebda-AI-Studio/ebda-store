@@ -2,7 +2,7 @@ import { isInBaseline, type FeatureKey, type StorePlan } from '@ebda/shared';
 
 export type TriState = 'baseline_on' | 'override_on' | 'override_off' | 'baseline_off';
 
-export interface OverrideRow {
+interface OverrideRow {
   featureKey: string;
   enabled: boolean;
 }
