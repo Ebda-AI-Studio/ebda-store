@@ -2039,8 +2039,8 @@ const GUEST_RETURN_BODY = {
   success: false,
   error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
 };
-export const GUEST_RETURN_IP_MAX = 10;
-export const GUEST_RETURN_ORDER_MAX = 5;
+const GUEST_RETURN_IP_MAX = 10;
+const GUEST_RETURN_ORDER_MAX = 5;
 export const guestReturnIpLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'guest-return-ip'),
   windowMs: GUEST_RETURN_WINDOW_MS,
@@ -2052,7 +2052,7 @@ export const guestReturnIpLimiter = rateLimit({
   skip: skipForLoadTest,
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
-export function guestReturnOrderKey(req: Request): string {
+function guestReturnOrderKey(req: Request): string {
   const raw = (req.body as Record<string, unknown> | undefined)?.orderNumber;
   const num = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
   const store = String((req.params as Record<string, string> | undefined)?.storeId ?? '');

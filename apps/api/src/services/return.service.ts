@@ -285,6 +285,7 @@ async function withCustomer<T extends { customerId: string | null }>(
  * Constant-time compare of a guest's second factor: both sides are hashed first so the buffers are equal length
  * and the time does not depend on where they differ. An empty factor never matches (nothing on the order to prove).
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/guest-return-request.test.ts
 export function guestFactorEquals(onOrder: string, given: string): boolean {
   const h = (v: string) => crypto.createHash('sha256').update(v).digest();
   const equal = crypto.timingSafeEqual(h(onOrder), h(given));
