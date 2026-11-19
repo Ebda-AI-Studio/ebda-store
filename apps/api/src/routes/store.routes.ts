@@ -36,6 +36,7 @@ import {
   clearableStr,
   clearableUrl,
   clearableEmail,
+  clearablePhone,
   clearableSafeUrl,
 } from '../lib/clearable-schema';
 import {
@@ -341,12 +342,6 @@ const optionalStr = (maxLen: number) =>
 // A phone-shaped setting (G12): blank means no change, anything else must be a real phone number.
 const optionalPhone = () =>
   z.preprocess(v => (v === '' || v === null ? undefined : v), phoneSchema.optional());
-// A phone-shaped setting (G12 + STORE-QA-60): blank CLEARS it (null), anything else must be a real phone number.
-const clearablePhone = () =>
-  z.preprocess(
-    v => (typeof v === 'string' && v.trim() === '' ? null : v),
-    phoneSchema.nullable().optional()
-  );
 
 // Merchants routinely paste the entire `<meta name="google-site-verification"
 // content="..." />` tag instead of just the content token. Extract the token
