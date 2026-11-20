@@ -1560,6 +1560,9 @@
       "paid": "مدفوع",
       "unpaid": "غير مدفوع",
       "remain": "المتبقي {amount}",
+      "refunded": "مُسترد",
+      "partiallyRefunded": "مُسترد جزئيًا",
+      "refundedAmount": "المبلغ المسترد {amount} · لا يوجد مبلغ مستحق",
       "paymentMethod": "طريقة الدفع",
       "methodCod": "الدفع عند الاستلام",
       "paymentTransactionId": "رقم العملية",
@@ -4901,9 +4904,9 @@
     },
     "push": {
       "title": "الإشعارات الفورية",
-      "subtitle": "Web Push قياسي (W3C Push API)",
+      "subtitle": "تنبيهات فورية على الموبايل والمتصفح",
       "subscribers": "{count, number, latn} مشترك",
-      "platformNote": "تستخدم الإشعارات الفورية إعداد VAPID الخاص بالمنصة. لا يلزم إعداد لكل متجر — فقط فعّل الخيار."
+      "platformNote": "التنبيهات الفورية جاهزة من غير أي إعداد. بس فعّلها."
     },
     "broadcast": {
       "title": "إرسال إشعار جماعي",

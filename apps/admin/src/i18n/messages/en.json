@@ -1560,6 +1560,9 @@
       "paid": "Paid",
       "unpaid": "Unpaid",
       "remain": "Remain {amount}",
+      "refunded": "Refunded",
+      "partiallyRefunded": "Partially refunded",
+      "refundedAmount": "Refunded {amount} · nothing outstanding",
       "paymentMethod": "Payment method",
       "methodCod": "Cash on delivery",
       "paymentTransactionId": "Transaction ID",
@@ -4901,9 +4904,9 @@
     },
     "push": {
       "title": "Push Notifications",
-      "subtitle": "Standards-based Web Push (W3C Push API)",
+      "subtitle": "Instant alerts on phones and browsers",
       "subscribers": "{count, number, latn} subscribers",
-      "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+      "platformNote": "Instant alerts are already set up for you. Nothing to configure — just turn them on."
     },
     "broadcast": {
       "title": "Send a broadcast",

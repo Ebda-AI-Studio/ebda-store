@@ -55,6 +55,38 @@ export function customerKeyOf(order: OrderIdentity): string | null {
   return email || phone || null;
 }
 
+/** Phone reduced to its last 10 digits so `+20 100…`, `0100…` and `20100…` compare equal. '' when too short. */
+export function canonicalPhone(phone: unknown): string {
+  const digits = typeof phone === 'string' ? phone.replace(/\D/g, '') : '';
+  return digits.length >= 10 ? digits.slice(-10) : '';
+}
+
+/**
+ * QA-98: the Customers list keys a guest by email, else phone, so one guest who ordered once with an
+ * email and again without (or with the phone spelled differently) showed as two rows. The resolver
+ * folds a guest's phone-only orders into the row that already carries that phone: the first guest key
+ * seen for a canonical phone wins (orders arrive newest-first, so the newest key stays the row key).
+ * Registered customers and distinct-email guests are untouched.
+ */
+export function guestKeyResolver(orders: OrderIdentity[]): (order: OrderIdentity) => string | null {
+  const keyByPhone = new Map<string, string>();
+  for (const o of orders) {
+    if (o.customer?.id || o.customerId) continue;
+    const base = customerKeyOf(o);
+    const cp = canonicalPhone(contactOf(o.shippingAddress).phone);
+    if (base && cp && !keyByPhone.has(cp)) keyByPhone.set(cp, base);
+  }
+  return order => {
+    const base = customerKeyOf(order);
+    if (!base || order.customer?.id || order.customerId) return base;
+    const { email, phone } = contactOf(order.shippingAddress);
+    const cp = canonicalPhone(phone);
+    // Only an order WITHOUT its own email folds by phone; a different email is a different identity.
+    if (email || !cp) return base;
+    return keyByPhone.get(cp) ?? base;
+  };
+}
+
 /** True when `customerKeyOf` fell back to the guest contact. */
 export function isGuestOrder(order: OrderIdentity): boolean {
   return !(order.customer?.id || order.customerId);

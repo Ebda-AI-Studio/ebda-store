@@ -3,7 +3,7 @@ import { customerRow, customerRows, pickSelected } from '../lib/customer-directo
 import { customerAuthRoute } from '../lib/customer-auth';
 import { storeDb, storeRepo } from '../lib/repo-factory';
 import { getCached, customersCacheKey } from '../lib/public-cache';
-import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
+import { customerKeyOf, guestKeyResolver, rfmKeyFor } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
 import { AppError } from '../middleware/error-handler';
 import { NON_REVENUE_ORDER_STATUSES } from '@ebda/shared';
@@ -416,6 +416,7 @@ async function aggregateCustomersUncached(
   const countedByKey = new Map<string, { orders: number; spent: number }>();
 
   const map = new Map<string, AggregatedCustomer>();
+  const resolveKey = guestKeyResolver(orders);
   for (const order of orders) {
     const shipping = (order.shippingAddress ?? null) as ShippingAddressShape | null;
     // A guest is an order with no customer ACCOUNT on it (customerId null), not one whose account row failed to join.
@@ -423,7 +424,7 @@ async function aggregateCustomersUncached(
     // `customerKeyOf` is the grouping the RFM rollup also uses, so a segment's
     // members resolve to these rows. A guest order with no contact is its own
     // row, keyed by the order.
-    const key = customerKeyOf(order) ?? `guest:${order.id}`;
+    const key = resolveKey(order) ?? `guest:${order.id}`;
 
     const firstName = order.customer?.firstName ?? shipping?.firstName ?? '';
     const lastName = order.customer?.lastName ?? shipping?.lastName ?? '';

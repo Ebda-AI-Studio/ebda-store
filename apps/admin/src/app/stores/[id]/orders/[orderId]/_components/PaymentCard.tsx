@@ -4,6 +4,7 @@ import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { PaymentEventsTimeline } from '../../../../../../components/payment-events/PaymentEventsTimeline';
 import { formatMoney } from './format';
+import { paymentDisplay } from './payment-display';
 import type { OrderDetail } from './types';
 
 import { Button } from '@/components/ui/Button';
@@ -18,10 +19,16 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   const t = useT('orders.detail');
   const tInstapay = useT('orders.detail.instapay');
   const locale = useLocale();
-  const isPaid = order.paymentStatus === 'paid';
-  // What is still to be collected: the order value less any part paid from
-  // the customer wallet at checkout (D1). === order.total without a wallet.
-  const remain = isPaid ? 0 : Math.max(0, order.total - (order.walletAmount ?? 0));
+  const { state, remain, refunded } = paymentDisplay(order);
+  const isPaid = state !== 'unpaid';
+  const stateLabel =
+    state === 'refunded'
+      ? t('refunded')
+      : state === 'partially_refunded'
+        ? t('partiallyRefunded')
+        : state === 'paid'
+          ? t('paid')
+          : t('unpaid');
   const link = order.payments?.find(p => p.paymentLink)?.paymentLink ?? null;
   const expiresAt = order.paymentConfirmationExpiresAt
     ? new Date(order.paymentConfirmationExpiresAt)
@@ -101,11 +108,16 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
-            <div className="font-semibold text-foreground">{isPaid ? t('paid') : t('unpaid')}</div>
+            <div className="font-semibold text-foreground">{stateLabel}</div>
             <div className="font-semibold text-foreground">
               {formatMoney(order.total, order.currency)}
             </div>
           </div>
+          {refunded > 0 && (
+            <div className="mt-1 text-sm text-muted-foreground text-end">
+              {t('refundedAmount', { amount: formatMoney(refunded, order.currency) })}
+            </div>
+          )}
           {!isPaid && (
             <div className="mt-1 text-sm text-muted-foreground text-end">
               {t('remain', { amount: formatMoney(remain, order.currency) })}
