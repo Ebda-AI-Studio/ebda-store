@@ -43,6 +43,9 @@ vi.mock('@api/lib/repo-factory', () => ({
     order: { findMany: h.orderFindMany },
     smsMarketingConsent: { findMany: vi.fn().mockResolvedValue([]) },
     store: { findUnique: vi.fn() },
+    // spend is netted of refunds already given (REVENUE-DEF-1, lib/order-refunds.ts): none in these fixtures
+    return: { groupBy: vi.fn().mockResolvedValue([]) },
+    payment: { groupBy: vi.fn().mockResolvedValue([]) },
   }),
   storeRepo: async () => ({ backend: 'pg' }),
 }));
