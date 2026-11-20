@@ -11,6 +11,7 @@ import {
   settleFiscalOnReversal,
 } from '../src/do/fiscal';
 import { MoneyError } from '../src/do/sync-sql';
+import { codMarkPaidOp } from '../src/do/job-ops-b';
 
 function rig() {
   const raw = openSqlite();
@@ -200,5 +201,64 @@ describe('cancel and credit notes', () => {
     expect(credits.reduce((n, d) => n + d.total_amount, 0)).toBe(1140);
     expect(credits.reduce((n, d) => n + d.vat_amount, 0)).toBe(140);
     expect(r.counter('credit_note')).toBe(2);
+  });
+});
+
+describe('COD-RECEIPT-NUMBER-AT-PAYMENT-1: the receipt number exists only once the cash is in', () => {
+  const cod = (r: ReturnType<typeof rig>, orderId: string) =>
+    r.raw
+      .prepare(
+        `INSERT INTO payments (id, order_id, provider, method, status, amount, currency, created_at, updated_at) VALUES (?, ?, 'cod', 'cod', 'cod_pending', 1140, 'EGP', 1, 1)`
+      )
+      .run(`pay-${orderId}`, orderId);
+
+  it('an unpaid COD order gets NO receipt and burns no serial', () => {
+    const r = rig();
+    const o = r.order();
+    cod(r, o);
+    expect(r.issue(o)).toBeNull();
+    expect(r.docs()).toHaveLength(0);
+    expect(r.counter('receipt')).toBe(0);
+  });
+
+  it('marking it paid allocates the next gapless RCT serial (once, idempotent); an unpaid sibling leaves no gap', () => {
+    const r = rig();
+    const a = r.order();
+    const b = r.order();
+    cod(r, a);
+    cod(r, b);
+    expect(r.issue(a)).toBeNull();
+    expect(r.issue(b)).toBeNull();
+    // b is collected first: it takes RCT-000001, a later takes RCT-000002 (no number was reserved at placement)
+    r.db.transactionSync(() => codMarkPaidOp(r.db, 's1', { orderIds: [b] }));
+    r.db.transactionSync(() => codMarkPaidOp(r.db, 's1', { orderIds: [a] }));
+    r.db.transactionSync(() => codMarkPaidOp(r.db, 's1', { orderIds: [a] })); // replay
+    expect(r.docs().map(d => [d.order_id, d.number])).toEqual([
+      [b, 'RCT-000001'],
+      [a, 'RCT-000002'],
+    ]);
+  });
+
+  it('a cancelled unpaid COD order never had a number to cancel', () => {
+    const r = rig();
+    const o = r.order();
+    cod(r, o);
+    r.issue(o);
+    r.db.transactionSync(() => settleFiscalOnReversal(r.db, { storeId: 's1', orderId: o, now: 5 }));
+    expect(r.docs()).toHaveLength(0);
+  });
+
+  it('a COD tax invoice (verified VAT seller) still issues at placement: it is a tax document, not proof of payment', () => {
+    const r = rig();
+    const o = r.order({ trn: '123456789' });
+    cod(r, o);
+    expect(r.issue(o)).toMatchObject({ docType: 'tax_invoice', number: 'INV-000001' });
+  });
+
+  it('a paid order or a non-COD order is unaffected', () => {
+    const r = rig();
+    const o = r.order({ paid: true });
+    cod(r, o);
+    expect(r.issue(o)).toMatchObject({ number: 'RCT-000001' });
   });
 });

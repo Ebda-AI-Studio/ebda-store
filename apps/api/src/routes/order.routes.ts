@@ -1,4 +1,5 @@
 import { readAuditByResource } from '../lib/audit-read';
+import { FiscalDocumentService } from '../services/fiscal-document.service';
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod/v3';
@@ -1232,6 +1233,15 @@ router.post(
         ]);
 
         await prisma.$transaction(updates);
+        // COD-RECEIPT-NUMBER-AT-PAYMENT-1: the cash is in, so each receipt's gapless serial is allocated now (a Durable Object
+        // store did this inside its codMarkPaid section).
+        await prisma.$transaction(async tx => {
+          for (const o of codOrders)
+            await FiscalDocumentService.issueSaleDocument(tx, storeId, o.id, {
+              cod: true,
+              paid: true,
+            });
+        });
       }
 
       // Append-only audit rows — one per payment flipped. Fire-and-forget

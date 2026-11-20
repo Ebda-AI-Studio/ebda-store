@@ -2386,7 +2386,9 @@ export class OrderService {
           // The sale's fiscal document (tax invoice or receipt) with its gap-free
           // serial, in THIS transaction: the order and its number commit or roll
           // back together (ruling MONEYB-1).
-          await FiscalDocumentService.issueSaleDocument(tx, storeId, newOrder.id);
+          await FiscalDocumentService.issueSaleDocument(tx, storeId, newOrder.id, {
+            cod: data.paymentMethod === 'cod',
+          });
 
           // Check for abandoned cart recovery
           try {
@@ -3189,6 +3191,10 @@ export class OrderService {
         triggeredByUserId: null,
         details: { reason: 'cod_collected_on_delivery', orderNumber: order.orderNumber },
       });
+      // COD-RECEIPT-NUMBER-AT-PAYMENT-1: delivered = the cash is collected, so the receipt number is allocated now.
+      await prisma.$transaction(tx =>
+        FiscalDocumentService.issueSaleDocument(tx, storeId, orderId, { cod: true, paid: true })
+      );
       // Same post-payment fan-out as "Mark paid" (journal posting); its
       // notification half is deduped by orderCreatedNotifiedAt.
       void deferAfterTenantCommit('order.codCollectedOnDelivery', () =>
@@ -4084,6 +4090,13 @@ export class OrderService {
         }),
       ]);
     }
+
+    // COD-RECEIPT-NUMBER-AT-PAYMENT-1: the cash is in, so the receipt's gapless serial is allocated now. A Durable Object
+    // store did this inside its own section (codMarkPaid); here it is the Postgres twin (idempotent either way).
+    if (!money)
+      await prisma.$transaction(tx =>
+        FiscalDocumentService.issueSaleDocument(tx, storeId, orderId, { cod: true, paid: true })
+      );
 
     // Append-only audit row for the COD completion.
     await (money ? recordPaymentEventForStore : recordPaymentEvent)({

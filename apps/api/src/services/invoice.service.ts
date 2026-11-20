@@ -299,8 +299,9 @@ function documentHeading(
   const sale = docs?.sale;
   if (sale?.number) {
     return {
-      // STORE-QA-67: a receipt says money was received. A COD order is numbered (RCT-) when it is placed, but until
-      // it is paid the printed document is an ORDER CONFIRMATION under the same gap-free number, never a "sales receipt".
+      // STORE-QA-67: a receipt says money was received. Since COD-RECEIPT-NUMBER-AT-PAYMENT-1 an unpaid COD order has no
+      // RCT- number at all; this guard only covers a legacy COD receipt issued at placement (before that ruling) that is
+      // still unpaid: it prints as an ORDER CONFIRMATION under its number, never a "sales receipt".
       title:
         sale.docType === 'tax_invoice'
           ? labels.taxInvoice
@@ -315,7 +316,15 @@ function documentHeading(
     };
   }
   return {
-    title: isTax ? labels.taxInvoice : labels.orderSummary,
+    // no sale document: an unpaid order (cash on delivery before collection, COD-RECEIPT-NUMBER-AT-PAYMENT-1) is an ORDER
+    // CONFIRMATION numbered by its order number; the RCT- receipt exists only once the cash is in
+    title: isTax
+      ? labels.taxInvoice
+      : ['paid', 'refunded', 'partially_refunded'].includes(
+            (order as { paymentStatus?: string }).paymentStatus ?? ''
+          )
+        ? labels.orderSummary
+        : labels.orderConfirmation,
     number: `${labels.orderNo} ${order.orderNumber}`,
     issuedAt: new Date(order.createdAt),
     cancelled: false,

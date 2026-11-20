@@ -309,7 +309,16 @@ export class FiscalDocumentService {
    * gets that one back. Throws (rolling the order back) if the document would
    * not balance — an invoice whose lines do not add up is never issued.
    */
-  static async issueSaleDocument(tx: Prisma.TransactionClient, storeId: string, orderId: string) {
+  static async issueSaleDocument(
+    tx: Prisma.TransactionClient,
+    storeId: string,
+    orderId: string,
+    /**
+     * `cod`: the order is cash on delivery (its payment row may not exist yet at placement). `paid`: the caller has just
+     * collected the cash in a transaction this read may not see yet, so the receipt is due now.
+     */
+    opts: { cod?: boolean; paid?: boolean } = {}
+  ) {
     const existing = await tx.fiscalDocument.findFirst({
       where: { storeId, orderId, docType: { in: [...SALE_TYPES] } },
     });
@@ -331,6 +340,12 @@ export class FiscalDocumentService {
     if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
 
     const isTaxInvoice = !!order.sellerTaxRegistrationNumber;
+    // Ruling COD-RECEIPT-NUMBER-AT-PAYMENT-1: a receipt says money was received. An unpaid cash-on-delivery order gets NO
+    // receipt number at placement (its order number is its confirmation number); the RCT- serial is allocated when the cash is
+    // collected (the settle paths call this again, idempotently). A tax invoice is a tax document, not proof of payment: it
+    // still issues at placement.
+    const isCod = opts.cod === true || order.payments[0]?.provider === 'cod';
+    if (!isTaxInvoice && isCod && !opts.paid && order.paymentStatus !== 'paid') return null;
     const docType = isTaxInvoice ? 'tax_invoice' : 'receipt';
     const { lines, discounts } = buildSaleLines(order);
     const off = documentBalance({

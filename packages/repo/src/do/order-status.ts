@@ -1,4 +1,5 @@
 import { ORDER_STATUS_TRANSITIONS } from '../../../shared/src/order-status-transitions';
+import { issueSaleDocument } from './fiscal';
 import { addOrderEvent, addPaymentEvent } from './payments';
 import { MoneyError, type SyncSql } from './sync-sql';
 
@@ -87,6 +88,8 @@ export function changeOrderStatus(
         details: { reason: 'cod_collected_on_delivery', orderNumber: o.order_number },
         now,
       });
+      // COD-RECEIPT-NUMBER-AT-PAYMENT-1: delivered = cash collected, so the receipt's gapless serial is allocated now
+      issueSaleDocument(db, { storeId: a.storeId, orderId: a.orderId, now });
     }
     addOrderEvent(db, a.storeId, a.orderId, from, a.status, {}, now);
     return {
