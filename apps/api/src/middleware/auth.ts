@@ -255,8 +255,16 @@ export async function authenticateAccounts(
     if (opts.timing) opts.timing.identityMs = performance.now() - identityStart;
   } catch (err) {
     // Cannot confirm the session is alive: refuse, but as an outage (503), not as a bad credential (401 would log users out).
+    const f = identityFailureFields(err);
     logger.error(
-      { err: (err as Error).message, ...identityFailureFields(err) },
+      {
+        err: (err as Error).message,
+        errName: f.errName,
+        call: f.call,
+        elapsedMs: f.elapsedMs,
+        budgetMs: f.budgetMs,
+        timedOut: f.timedOut,
+      },
       '[auth] identity live check failed'
     );
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
