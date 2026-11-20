@@ -8,6 +8,7 @@ import { RootShell } from '@/components/RootShell';
 import { BRAND } from '@ebda/shared/brand';
 import { NOT_FOUND, sourcesAttr } from '@/lib/not-found-copy';
 import { LOCALES, demoLookUrl, type Locale } from '@/lib/site';
+import '@/app/route-notfound.css';
 
 export const metadata: Metadata = {
   title: 'الصفحة مش موجودة | ابدأ ستوديو للذكاء الاصطناعي',

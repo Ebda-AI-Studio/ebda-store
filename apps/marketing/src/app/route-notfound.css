@@ -1,0 +1,142 @@
+/* the 404 page only: loaded only by global-not-found. Split out of globals.css and motifs.css (Ruling CSS-BUDGET-726-1): a route loads only its own CSS. Blocks keep their original relative order. */
+/* ---------- 404 ---------- */
+.not-found {
+  min-height: 60svh;
+  padding-block: clamp(48px, 9vw, 112px);
+}
+.nf-body {
+  display: grid;
+  gap: 48px 64px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+/* One static 404.html for every path: show the language block that matches the URL (set on <html> by a
+   tiny inline script; Arabic when it never runs). */
+.nf-body[data-l='en'],
+html[data-nf='en'] .nf-body[data-l='ar'] {
+  display: none;
+}
+html[data-nf='en'] .nf-body[data-l='en'] {
+  display: grid;
+}
+.nf-main h1 {
+  font-size: clamp(1.9rem, 5vw, 3rem);
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+  margin: 0 0 12px;
+}
+.nf-main .lead {
+  margin: 0 0 28px;
+}
+.nf-search {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  max-inline-size: 640px;
+}
+.nf-search input {
+  flex: 1;
+  min-inline-size: 0;
+  block-size: 52px;
+  padding-inline: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+}
+.nf-search input:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.nf-search button {
+  block-size: 52px;
+  padding-inline: 22px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--gold);
+  color: var(--night);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nf-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 28px 32px;
+}
+.nf-map h2 {
+  margin: 0 0 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.nf-map ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.nf-soon {
+  color: var(--muted);
+}
+.nf-soon b {
+  margin-inline-start: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--accent-text);
+}
+.nf-phone {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.nf-phone-frame {
+  --w: 132px;
+  transition: translate 0.4s var(--ease);
+}
+.nf-phone:hover .nf-phone-frame,
+.nf-phone:focus-visible .nf-phone-frame {
+  translate: 0 -6px;
+}
+.nf-phone img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-phone-frame {
+    transition: none;
+  }
+  .nf-phone:hover .nf-phone-frame,
+  .nf-phone:focus-visible .nf-phone-frame {
+    translate: none;
+  }
+}
+@media (min-width: 900px) {
+  .nf-body {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .nf-map {
+    grid-column: 1;
+  }
+  .nf-phone {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+@media (max-width: 520px) {
+  .nf-search {
+    flex-direction: column;
+  }
+}
+.not-found h1 {
+  line-height: 1.4;
+  margin-bottom: 12px;
+}

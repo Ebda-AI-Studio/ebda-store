@@ -195,7 +195,10 @@ describe('viewer CSS shim', () => {
       path.resolve(__dirname, '../../packages/ui/src/model3d/ProductModelViewer.tsx'),
       'utf8'
     );
-    const css = readFileSync(path.join(MK, 'src/app/globals.css'), 'utf8');
+    // the viewer shim moved with the /store route CSS (Ruling CSS-BUDGET-726-1)
+    const css = ['globals.css', 'route-store.css']
+      .map(f => readFileSync(path.join(MK, 'src/app', f), 'utf8'))
+      .join('\n');
     const classes = new Set<string>();
     for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g))
       for (const c of (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, ' ').split(/\s+/))

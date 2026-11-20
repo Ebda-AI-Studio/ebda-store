@@ -1,0 +1,284 @@
+/* plans, FAQ and teasers shared by /store, /whatsapp and /features: loaded by those pages. Split out of globals.css and motifs.css (Ruling CSS-BUDGET-726-1): a route loads only its own CSS. Blocks keep their original relative order. */
+/* pricing cards rise in, staggered, once they scroll into view (visible without it) */
+@media (prefers-reduced-motion: no-preference) {
+  .plans-wrap.in .plan {
+    animation: plan-in 0.9s var(--ease) both;
+    animation-delay: calc(var(--i) * 120ms);
+  }
+}
+/* pricing */
+.plans {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+@media (min-width: 900px) {
+  .plans {
+    grid-template-columns: 1fr 1.08fr 1fr;
+    align-items: center;
+  }
+}
+.plan {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 32px 28px 26px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  overflow: hidden;
+  transition: border-color 0.4s var(--ease);
+}
+.plan:hover,
+.plan:focus-within {
+  border-color: var(--fg);
+}
+.plan[data-plan='growth'] {
+  border: 2px solid var(--gold);
+  padding-block: 44px 34px;
+}
+.plan h3 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+.plan-tag {
+  margin: 0 0 12px;
+}
+.price {
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 4vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  margin: 0;
+}
+html[lang='ar'] .price {
+  font-family: var(--font-ar);
+  letter-spacing: 0;
+}
+.price .per {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 24px;
+  display: grid;
+  gap: 8px;
+}
+.plan-features li {
+  position: relative;
+  padding-inline-start: 20px;
+}
+.plan-features li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.75em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.plan .btn {
+  margin-top: auto;
+}
+
+/* plan switcher: a native radio group drawn as a segmented control, only on phones (no JS needed) */
+.plan-pick {
+  position: relative;
+  display: none;
+  margin: 0 0 16px;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+}
+.plan-pick legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.plan-pick input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.plan-pick label {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+.plan-pick input:checked + label {
+  background: var(--fg);
+  color: var(--canvas);
+}
+.plan-pick input:focus-visible + label {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .plan-pick {
+    display: grid;
+  }
+  /* one plan card at a time; the checked radio picks it (growth is checked in the markup) */
+  .plans-wrap .plan {
+    display: none;
+  }
+  .plans-wrap:has(#pick-basic:checked) .plan[data-plan='basic'],
+  .plans-wrap:has(#pick-growth:checked) .plan[data-plan='growth'],
+  .plans-wrap:has(#pick-business:checked) .plan[data-plan='business'] {
+    display: flex;
+  }
+  .plan[data-plan='growth'] {
+    padding-block: 44px 28px;
+  }
+}
+.faq details {
+  border-top: 1px solid var(--line);
+}
+.faq details:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.faq summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: '+';
+  color: var(--accent-text);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.faq details[open] summary::after {
+  content: '−';
+}
+.faq details p {
+  color: var(--muted);
+  margin: 0 0 22px;
+  max-width: 56ch;
+}
+
+/* ---------- capabilities (home section + /features) ---------- */
+.cap-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 28px;
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 760px) {
+  .cap-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1040px) {
+  .cap-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.cap-card {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.cap-card h2,
+.cap-card h3 {
+  font-size: 1.2rem;
+  line-height: 1.4;
+  margin: 0 0 8px;
+}
+.cap-card p {
+  margin: 0;
+  color: var(--muted);
+}
+.cap-card .cap-plan {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: var(--accent-text);
+}
+.cap-plan span {
+  font-weight: 600;
+}
+.cmp-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.cmp-links a {
+  font-weight: 600;
+}
+.cap-card[data-status='coming'] {
+  border-style: dashed;
+}
+.cap-card .cap-badge {
+  display: table;
+  margin: 0 0 10px;
+}
+.cap-card .cap-soon {
+  padding-inline-start: 14px;
+  border-inline-start: 2px solid var(--gold);
+  color: var(--muted);
+}
+.cap-card .cap-soon .cap-badge {
+  display: inline-block;
+  margin: 0 0 0 0;
+  margin-inline-end: 8px;
+}
+.wa-teaser {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  max-width: 68ch;
+}
+.wa-teaser p {
+  color: var(--muted);
+}
+.wa-teaser .actions {
+  margin-top: 4px;
+}
+
+body:has(main > .hero) .plan::after,
+body:has(.wa-head) .plan::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-start: 10px;
+  width: 16px;
+  height: 16px;
+  background: url(/motifs/corner.svg) center / contain no-repeat;
+  pointer-events: none;
+}

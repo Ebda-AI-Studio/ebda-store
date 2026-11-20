@@ -369,6 +369,7 @@ describe('scripts/ci-affected.mjs', () => {
     expect(run('apps/marketing/src/app/chrome.css').workers).toEqual(['marketing']);
     expect(run('apps/marketing/src/components/LegalPage.tsx').workers).toEqual(['marketing']);
     expect(run('scripts/ci/marketing-perf-budget.json').workers).toEqual(['marketing']);
+    expect(run('scripts/ci/marketing-css-route-coverage.mjs').workers).toEqual(['marketing']);
     // the API is a Worker app since SP4 Stage 1 (apps/api/wrangler.jsonc)
     expect(run('apps/api/wrangler.jsonc').workers).toEqual(['api']);
     // root manifest / cf-* scripts hit every Worker app

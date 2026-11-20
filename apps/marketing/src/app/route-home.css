@@ -1,0 +1,472 @@
+/* Ebda AI Studio home (/): loaded only by StudioHome. Split out of globals.css and motifs.css (Ruling CSS-BUDGET-726-1): a route loads only its own CSS. Blocks keep their original relative order. */
+/* ---------- Ebda AI Studio home (Rulings MKT-HOME-1, MKT-STUDIO-C-1): living geometry on ivory ----------
+   The ground is the brand gold mixed into near-white (ivory, not cream), text is near-night ink, the girih is drawn in gold with
+   brass and silver accents. Text contrast (ink / accent-text / muted on #F5F5F2) is 17 / 5.3 / 6.0, all AA. Lines are decoration. */
+body:has(.studio-home) {
+  --canvas: #f5f5f2;
+  --panel: #fbfbf9;
+  --raise: #ecebe6;
+  --line: #ddd6c8;
+  --fg: #14130f;
+}
+.studio-home {
+  --sh-gold-rgb: 176, 141, 87;
+  --sh-brass-rgb: 138, 106, 54;
+  --sh-silver-rgb: 125, 133, 141;
+  --sh-rule: color-mix(in srgb, var(--gold) 55%, transparent);
+  color: var(--fg);
+}
+.g-gold {
+  fill: none;
+  stroke: rgb(var(--sh-gold-rgb));
+  stroke-opacity: 0.42;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.g-brass {
+  fill: none;
+  stroke: rgb(var(--sh-brass-rgb));
+  stroke-opacity: 0.4;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.g-silver {
+  fill: none;
+  stroke: rgb(var(--sh-silver-rgb));
+  stroke-opacity: 0.46;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.sh-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: calc(100svh - var(--sticky-h));
+  display: grid;
+  align-items: end;
+}
+.sh-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  -webkit-mask-image: linear-gradient(#000 80%, transparent);
+  mask-image: linear-gradient(#000 80%, transparent);
+}
+.sh-poster,
+.sh-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* the canvas takes over the field; only the field rect is hidden, the pattern defs the window svgs use must stay painted */
+.sh-hero[data-live] .sh-poster > rect {
+  display: none;
+}
+.sh-hero-in {
+  display: grid;
+  gap: clamp(32px, 5vw, 64px);
+  padding-block: clamp(40px, 6vw, 80px) clamp(32px, 5vw, 56px);
+  width: 100%;
+}
+.sh-head {
+  position: relative;
+  max-width: 62rem;
+}
+.sh-head::before {
+  content: '';
+  position: absolute;
+  inset: -48px -80px;
+  z-index: -1;
+  /* the calm zone: the lattice is hidden behind the kicker, headline and paragraph and returns in the open areas */
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--canvas) 96%, transparent) 62%,
+    transparent 100%
+  );
+}
+.sh-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 clamp(16px, 2.4vw, 28px);
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.sh-eyebrow::before {
+  content: '';
+  width: 44px;
+}
+.studio-home h1 {
+  margin: 0 0 clamp(16px, 2.4vw, 28px);
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  font-weight: 600;
+  line-height: 1.12;
+  max-width: 14ch;
+  color: var(--fg);
+}
+html[lang='ar'] .studio-home h1 {
+  line-height: 1.25;
+  max-width: 13ch;
+}
+html[lang='en'] .studio-home h1 {
+  letter-spacing: -0.025em;
+  max-width: 19ch;
+}
+.sh-lead,
+.sh-win-p,
+.sh-trio p,
+.sh-steps p {
+  text-wrap: pretty;
+}
+/* the steps sit on the tessellation watermark: darker body text keeps 4.5:1 against its gold lines */
+.sh-steps li p {
+  color: color-mix(in srgb, var(--fg) 78%, transparent);
+}
+.sh-lead {
+  margin: 0;
+  max-width: 38ch;
+  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  color: color-mix(in srgb, var(--fg) 82%, transparent);
+}
+.sh-windows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: clamp(20px, 3.4vw, 44px);
+}
+@media (min-width: 760px) {
+  .sh-windows {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.sh-win {
+  position: relative;
+  border: 1px solid var(--sh-rule);
+  border-top: 0;
+  background: var(
+    --canvas
+  ); /* the window is cut into the field: opaque paper under its own lattice */
+  clip-path: var(--arch-poly-56);
+}
+.sh-win-art {
+  position: absolute;
+  inset: 0;
+  opacity: 0.75; /* with the wash over it the inner lattice sits near 12% strength so the text reads cleanly */
+}
+.sh-win-in {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  height: 100%;
+  padding: calc(clamp(22px, 3vw, 40px) + 16px) clamp(22px, 3vw, 40px) clamp(22px, 3vw, 40px);
+  background: color-mix(in srgb, var(--canvas) 60%, transparent);
+  transition: background-color 0.4s var(--ease);
+}
+.sh-win:hover .sh-win-in,
+.sh-win:focus-within .sh-win-in {
+  background: color-mix(in srgb, var(--canvas) 44%, transparent);
+}
+.sh-win h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: clamp(1.7rem, 3.2vw, 2.5rem);
+  font-weight: 600;
+}
+.sh-win h2 svg {
+  flex: none;
+  color: var(--accent-text);
+}
+.sh-win-p {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 1.125rem;
+}
+.sh-win-saving {
+  margin: 0;
+  max-width: 40ch;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+.sh-win .actions {
+  margin-top: 8px;
+}
+.sh-win .btn-lg {
+  min-height: 48px;
+  padding: 0 22px;
+  font-size: 1rem;
+}
+.sh-win .btn-ghost {
+  background: color-mix(in srgb, var(--canvas) 70%, transparent);
+}
+
+.sh-sec {
+  border-top: 1px solid var(--sh-rule);
+  padding-block: clamp(56px, 9vw, 128px);
+}
+.sh-grid {
+  display: grid;
+  gap: 28px;
+}
+@media (min-width: 900px) {
+  .sh-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 9fr);
+    gap: 48px;
+  }
+}
+.sh-label {
+  margin: 0;
+  /* 16px at 390 up to about 19px at 1440; accent-text on the ivory ground is 5.3:1 */
+  font-size: clamp(1rem, 0.6rem + 0.9vw, 1.2rem);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--accent-text);
+}
+html[lang='en'] .sh-label {
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.sh-statement {
+  margin: 0 0 clamp(36px, 5vw, 72px);
+  max-width: 24em;
+  font-size: clamp(1.7rem, 4.2vw, 3.1rem);
+  font-weight: 500;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+html[lang='ar'] .sh-statement {
+  line-height: 1.55;
+  max-width: 100%;
+}
+.sh-trio,
+.sh-steps {
+  list-style: none;
+  margin: 0 0 clamp(32px, 4vw, 56px);
+  padding: 0;
+  display: grid;
+  gap: 28px;
+}
+@media (min-width: 760px) {
+  .sh-trio,
+  .sh-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px;
+  }
+}
+.sh-trio li,
+.sh-steps li {
+  border-top: 1px solid var(--sh-rule);
+  padding-top: 18px;
+}
+.sh-trio h3,
+.sh-steps h3 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.sh-trio p,
+.sh-steps p {
+  margin: 0;
+  max-width: 32ch;
+  color: var(--muted);
+}
+.sh-no {
+  display: block;
+  margin-bottom: 14px;
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+.sh-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sh-rows > li {
+  display: grid;
+  gap: 14px 48px;
+  padding-block: 28px;
+  border-top: 1px solid var(--sh-rule);
+}
+.sh-rows > li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+@media (min-width: 760px) {
+  .sh-rows > li {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
+  .sh-rows > li > h3 {
+    grid-row: 1 / span 3;
+  }
+}
+.sh-rows h3 {
+  margin: 0;
+  font-size: clamp(2rem, 4.4vw, 3.4rem);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.sh-rows > li > p {
+  margin: 0;
+  max-width: 40ch;
+  font-size: 1.125rem;
+}
+.sh-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 40ch;
+}
+.sh-facts li {
+  padding-block: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 28%, transparent);
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sh-win-in {
+    transition: none;
+  }
+}
+
+/* ---------- studio home: one motif per section ---------- */
+.sh-sec {
+  position: relative;
+  isolation: isolate;
+}
+.sh-sec::before {
+  content: '';
+  position: absolute;
+  inset-block-start: -22px;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translateX(-50%);
+  background: var(--sh-medal) center / contain no-repeat;
+}
+#studio {
+  --sh-medal: url(/motifs/m8.svg);
+}
+#products {
+  --sh-medal: url(/motifs/mr.svg);
+}
+#trust {
+  --sh-medal: url(/motifs/mr.svg);
+}
+.sh-label::after {
+  content: '';
+  display: block;
+  width: 168px;
+  height: 17px;
+  margin-top: 16px;
+  background: url(/motifs/orn.svg) center / contain no-repeat;
+}
+.studio-home #start::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url(/motifs/tess8.svg) 0 0 / 96px 96px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 15%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 15%, transparent 78%);
+}
+.sh-facts li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.sh-facts li::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  align-self: center;
+  background: url(/motifs/bullet.svg) center / contain no-repeat;
+}
+.sh-win-in::before,
+.sh-win-in::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: url(/motifs/corner.svg) center / contain no-repeat;
+  pointer-events: none;
+}
+.sh-win-in::before {
+  inset-block-start: 14px;
+  left: 50%;
+  margin-left: -9px;
+}
+.sh-win-in::after {
+  inset-block-end: 9px;
+  inset-inline-end: 9px;
+}
+
+/* ---------- the mihrab arch: ONE signature use, the two hero windows of the studio home (generic pointed arch; no dome, minaret or crescent) ---------- */
+.sh-win::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 56px;
+  z-index: 2;
+  pointer-events: none;
+  background: url(/motifs/arch-cap.svg) 0 0 / 100% 100% no-repeat;
+}
+
+/* ---------- the official Arabic wordmark as a soft watermark (Ruling MKT-SCRIPT-1): ONE placement, the hero's empty side, never repeated, rotated or over copy ---------- */
+.sh-hero::before {
+  content: '';
+  display: none;
+  position: absolute;
+  z-index: -2;
+  pointer-events: none;
+  width: clamp(260px, 22vw, 340px);
+  aspect-ratio: 1.111;
+  inset-block-start: 6%;
+  inset-inline-end: clamp(48px, 6vw, 96px);
+  background: url(/motifs/mark-studio.svg) center / contain no-repeat;
+}
+@media (min-width: 1360px) {
+  .sh-hero::before {
+    display: block;
+  }
+}
+.sh-eyebrow::before {
+  height: 2px;
+  background: url(/motifs/foil.svg) 0 0 / 256px 256px;
+}
+
+/* ---------- W2 editorial pacing (UI audit 2026-11-11, Apple band rhythm) ----------
+   Five cream sections in a row read as one page-long list. The products band is the one that has to land, so it takes
+   the night ground (night + gold, the Ebda surface) and the neighbours stay cream: cream, cream, NIGHT, cream, cream.
+   It re-points the shared neutrals, so every component inside keeps using --fg/--muted/--line and nothing is restyled. */
+.studio-home #products {
+  --canvas: #0a0b0c;
+  --panel: #15140f;
+  --raise: #1a1916;
+  --line: #2c2a26;
+  --line-strong: #8a8579;
+  --fg: #efe9dd;
+  --muted: #b3ad9f;
+  --accent-text: var(--lift);
+  background: var(--canvas);
+  color: var(--fg);
+  color-scheme: dark;
+}
+.studio-home #products .btn-ghost,
+.studio-home #products .btn-outline {
+  color: var(--fg);
+  border-color: var(--line-strong);
+}

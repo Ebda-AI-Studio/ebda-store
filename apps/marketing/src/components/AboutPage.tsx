@@ -16,6 +16,7 @@ import { OfficeBlock } from './OfficeBlock';
 import { SiteLink } from './SiteLink';
 import { JsonLd } from './JsonLd';
 import { studioJsonLd } from '../lib/seo';
+import '@/app/about.css';
 
 /**
  * The About page, a STUDIO page: what Ebda AI Studio is (an Egyptian studio for AI and software), what
