@@ -80,14 +80,33 @@ async function readStoreMode(storeId: string): Promise<Mode> {
   return MODES.includes(m as Mode) ? (m as Mode) : 'off';
 }
 
-export async function storeControls(
+/** Why the assistant is off for a store (QA-112): the ONE explanation both the merchant `/status` and the super-admin card read. */
+export type AssistantOffReason =
+  | 'global_kill'
+  | 'product_kill'
+  | 'platform_cap_off'
+  | 'store_ai_off'
+  | 'store_mode_off'
+  | 'unreadable';
+
+export interface AssistantState {
+  controls: Controls;
+  enabled: boolean;
+  /** null when the assistant is on. */
+  reason: AssistantOffReason | null;
+  /** The per-store rollout flag the super admin set (before the kill switches, the platform cap and the merchant's AI switch). */
+  storeFlag: Mode;
+}
+
+/** The single source of truth for "what is the assistant's state for this store, and if off, why". */
+export async function assistantState(
   storeId: string,
   deps: {
     flags?: typeof readPlatformFlags;
     mode?: typeof readStoreMode;
     aiOn?: typeof isStoreAiEnabled;
   } = {}
-): Promise<Controls> {
+): Promise<AssistantState> {
   try {
     const [flags, storeFlag, aiOn] = await Promise.all([
       (deps.flags ?? readPlatformFlags)(),
@@ -95,14 +114,41 @@ export async function storeControls(
       (deps.aiOn ?? isStoreAiEnabled)(storeId),
     ]);
     // The platform cap is part of the rollout: an UNSET cap is the most restrictive one (off), never "no cap". A super admin opens the product by setting it.
-    return resolveControls({
+    const cap = flags.global?.mode ?? 'off';
+    const controls = resolveControls({
       storeFlag: aiOn ? storeFlag : 'off',
       ...flags,
-      global: { ...flags.global, mode: flags.global?.mode ?? 'off' },
+      global: { ...flags.global, mode: cap },
     });
+    let reason: AssistantOffReason | null = null;
+    if (controls.mode === 'off') {
+      reason = controls.killGlobal
+        ? 'global_kill'
+        : controls.killProduct
+          ? 'product_kill'
+          : !aiOn
+            ? 'store_ai_off'
+            : storeFlag === 'off'
+              ? 'store_mode_off'
+              : 'platform_cap_off';
+    }
+    return { controls, enabled: controls.mode !== 'off', reason, storeFlag };
   } catch {
-    return resolveControls({ storeFlag: 'off', global: { kill: true } }); // fail closed
+    // fail closed
+    return {
+      controls: resolveControls({ storeFlag: 'off', global: { kill: true } }),
+      enabled: false,
+      reason: 'unreadable',
+      storeFlag: 'off',
+    };
   }
+}
+
+export async function storeControls(
+  storeId: string,
+  deps: Parameters<typeof assistantState>[1] = {}
+): Promise<Controls> {
+  return (await assistantState(storeId, deps)).controls;
 }
 
 export async function setPlatformFlag(

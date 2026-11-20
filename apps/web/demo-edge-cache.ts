@@ -35,6 +35,7 @@
  */
 import { getLook } from '@ebda/shared';
 import { retryableUnavailable } from './resolve-unavailable-edge';
+import { suspendedStore503 } from './suspended-store-edge';
 import { DEMO_HOSTS } from './src/lib/demo-hosts';
 import { renewNonce } from './csp-nonce-renew';
 import { buildScopedKey } from './edge-build-id';
@@ -224,7 +225,7 @@ export async function serveDemoEdge(
   cache: Pick<Cache, 'match' | 'put'> = (caches as unknown as { default: Cache }).default
 ): Promise<Response> {
   // Ruling RESOLVE-BULLETPROOF-1: a store-unresolvable render leaves as 503 + Retry-After, never 500 (and never stored).
-  const origin = (r: Request) => render(r).then(retryableUnavailable);
+  const origin = (r: Request) => render(r).then(retryableUnavailable).then(suspendedStore503);
   const requestKey = build ? demoEdgeKey(request) : null;
   if (!requestKey || !build) return origin(request);
   const key = buildScopedKey(requestKey, build);

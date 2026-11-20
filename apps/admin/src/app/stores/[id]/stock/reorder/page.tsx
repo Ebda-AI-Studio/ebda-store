@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import { ArrowStart, ArrowEnd } from '@/components/ArrowStart';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
+import { useQueuedScan } from '@/hooks/useQueuedScan';
 import { VariantText, useToast } from '@ebda/ui';
 import { withNumerals } from '@ebda/shared';
 
@@ -205,29 +206,30 @@ export default function ReorderPage() {
   const [meta, setMeta] = useState<ListMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rescanning, setRescanning] = useState(false);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
 
   const load = useCallback(
-    async (page = 1) => {
-      if (!storeId) return;
-      setLoading(true);
+    async (page = 1, silent = false): Promise<string | null> => {
+      if (!storeId) return null;
+      if (!silent) setLoading(true);
       const { data, error: apiError } = await apiGet<{
         data: ReorderSuggestion[];
         meta: ListMeta;
       }>(`/api/v1/stores/${storeId}/stock/reorder-suggestions?status=open&page=${page}&perPage=20`);
       setLoading(false);
       if (apiError) {
-        setError(apiError.message);
-        return;
+        if (!silent) setError(apiError.message);
+        return null;
       }
       if (data) {
         setItems(data.data);
         setMeta(data.meta);
         if (data.data.length > 0) {
           setLastScanned(data.data[0].scannedAt);
+          return data.data[0].scannedAt;
         }
       }
+      return null;
     },
     [storeId]
   );
@@ -259,12 +261,12 @@ export default function ReorderPage() {
     }
   }
 
-  async function handleRescan() {
-    if (rescanning) return;
-    setRescanning(true);
-    await apiPost(`/api/v1/stores/${storeId}/stock/reorder-scan/run-now`, {});
-    setRescanning(false);
-  }
+  const { running: rescanning, start: handleRescan } = useQueuedScan({
+    path: `/api/v1/stores/${storeId}/stock/reorder-scan/run-now`,
+    reload: () => load(1, true),
+    currentStamp: lastScanned,
+    t,
+  });
 
   return (
     <AdminLayout title={t('title')}>
