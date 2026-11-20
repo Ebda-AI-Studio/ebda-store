@@ -151,11 +151,6 @@ ol {
   display: inline-block;
   padding-block: var(--space-1);
 }
-/* links in a small print line that is only links (the setup-guides line, the legal notice): a 24px+ target, not a 21px text line */
-.small a {
-  display: inline-block;
-  padding-block: var(--space-1);
-}
 .skip {
   position: absolute;
   inset-inline-start: 8px;
