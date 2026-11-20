@@ -24,3 +24,7 @@ Production rule (controller ruling, 2026-11-10): no agent signs in as a merchant
 
 Credentials come from the environment only (the QA passwords live in the operator's keychain), never from the repo.
 The journey inventory (automated / needs a phone / blocked on papers) and the findings live in the operator's handoff, not here.
+
+## Shopper session journey (STORE-QA-119)
+
+`tests/prelaunch/shopper-session.spec.ts` (step in `prod-smoke-journey`) signs a dedicated QA shopper in on a `<slug>.ebda.app` host and a custom domain, opens `/account`, reloads, and asserts the `refresh_token` cookie is host-only on the browsed host. Needs GitHub secrets `PRELAUNCH_SHOPPER_EMAIL` and `PRELAUNCH_SHOPPER_PASSWORD` (a verified shopper that exists on each store in `PRELAUNCH_SESSION_HOSTS`); without them it prints "NOT RUN". Browser traffic goes through the storefront's same-origin `/api/v1` proxy (`apps/web/src/app/api/v1/[...path]/route.ts`), which re-issues the API's session cookies host-only + `SameSite=Lax`; unit matrix + static guards: `tests/unit/storefront-first-party-api.test.ts`.

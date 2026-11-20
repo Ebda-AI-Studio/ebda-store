@@ -38,7 +38,15 @@ import type {
   PublicSizeChart,
 } from '@ebda/shared';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+/** The real API (server-side fetches and the same-origin proxy's upstream). */
+const UPSTREAM_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+/**
+ * Where code calls the API. On the server: the real API. In the BROWSER: this origin's own `/api/v1` proxy
+ * (app/api/v1/[...path]/route.ts), so the shopper session cookie is first-party on every host (custom domain
+ * or <slug>.ebda.app) and Safari/ITP cannot drop it (STORE-QA-119). Never read NEXT_PUBLIC_API_URL elsewhere
+ * in the storefront: tests/unit/storefront-first-party-api.test.ts fails on it.
+ */
+const API_URL = typeof window === 'undefined' ? UPSTREAM_API_URL : '/api/v1';
 
 // Common types
 interface User {
@@ -1765,7 +1773,7 @@ class ApiClient {
 }
 
 export const api = new ApiClient(API_URL);
-export { API_URL };
+export { API_URL, UPSTREAM_API_URL };
 
 /**
  * `/auth/me` answers that say nothing about the session: the server (or the

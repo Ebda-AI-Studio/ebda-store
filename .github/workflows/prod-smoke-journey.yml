@@ -56,6 +56,19 @@ jobs:
           done
           node -e "const fs=require('fs');const r=fs.readdirSync('prelaunch-results').filter(f=>f.endsWith('.result.json')).map(f=>JSON.parse(fs.readFileSync('prelaunch-results/'+f)));fs.writeFileSync('prod-smoke-result.json',JSON.stringify({ok:r.length>0&&r.every(x=>x.ok),runs:r},null,2))"
           echo "rc=$rc" >> "$GITHUB_ENV"
+      - name: Shopper session journey (STORE-QA-119)
+        # Signs a dedicated QA shopper in on a slug host AND a custom domain and opens the account page. Needs two
+        # secrets Ahmad creates once (a verified QA shopper on the QA store): PRELAUNCH_SHOPPER_EMAIL,
+        # PRELAUNCH_SHOPPER_PASSWORD. Without them the spec skips and says so - it does not pass silently.
+        env:
+          PRELAUNCH_SHOPPER_EMAIL: ${{ secrets.PRELAUNCH_SHOPPER_EMAIL }}
+          PRELAUNCH_SHOPPER_PASSWORD: ${{ secrets.PRELAUNCH_SHOPPER_PASSWORD }}
+        run: |
+          set +e
+          if [ -z "$PRELAUNCH_SHOPPER_EMAIL" ]; then echo "::warning::shopper-session journey NOT RUN: secrets PRELAUNCH_SHOPPER_EMAIL/PASSWORD are not set"; exit 0; fi
+          PRELAUNCH_JSON="prelaunch-results/shopper-session.json" \
+            "$PW_DIR"/node_modules/.bin/playwright test -c playwright.prelaunch.config.ts shopper-session --project=phone
+          [ $? -eq 0 ] || echo "rc=1" >> "$GITHUB_ENV"
       - name: Job summary
         if: always()
         run: |

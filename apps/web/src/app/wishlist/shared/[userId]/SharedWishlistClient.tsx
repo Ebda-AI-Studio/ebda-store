@@ -6,7 +6,7 @@ import { isOnSale } from '../../../../lib/product-pricing';
 import Link from '../../../../components/StoreLink';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, API_URL } from '@/lib/api';
 import { MinimalChrome } from '../../../../components';
 import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
@@ -60,10 +60,9 @@ export default function SharedWishlistClient({ userId }: Props) {
 
     setError(null);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/public/${store.id}/wishlist/${userId}`,
-        { credentials: 'include' }
-      );
+      const response = await fetch(`${API_URL}/public/${store.id}/wishlist/${userId}`, {
+        credentials: 'include',
+      });
       const data = await response.json();
 
       if (data.success) {
