@@ -123,6 +123,21 @@ function PolicyUpdatesInner() {
 
   return (
     <div className="space-y-4">
+      <section
+        aria-labelledby="policy-howto-title"
+        className="rounded-lg border border-border bg-muted/40 p-4 text-sm"
+      >
+        <h2 id="policy-howto-title" className="font-medium">
+          {t('howToTitle')}
+        </h2>
+        <p className="mt-1 text-muted-foreground">{t('howToIntro')}</p>
+        <ol className="mt-2 list-decimal space-y-1 ps-5 text-muted-foreground">
+          <li>{t('howToStep1')}</li>
+          <li>{t('howToStep2')}</li>
+          <li>{t('howToStep3')}</li>
+        </ol>
+        <p className="mt-2 text-muted-foreground">{t('howToNotMaterial')}</p>
+      </section>
       {message && (
         <p role="status" className="text-sm">
           {message}

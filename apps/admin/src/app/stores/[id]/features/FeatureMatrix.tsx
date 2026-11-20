@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Modal, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
-import { apiGet, apiPut, apiDelete, apiPatch } from '@/lib/api';
+import { apiGet, apiPut, apiDelete } from '@/lib/api';
 import {
   PLAN_LABELS,
   isInBaseline,
@@ -18,6 +18,7 @@ import {
 import { ToggleSwitch } from './_components/ToggleSwitch';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';
+import { StoreStatusControl } from '@/components/store-status/StoreStatusControl';
 import { SubscriptionPlanRow } from '@/components/billing/SubscriptionPlanRow';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -251,10 +252,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   // Per-key in-flight set
   const [inFlightKeys, setInFlightKeys] = useState<Set<string>>(new Set());
 
-  // Suspend modal
-  const [suspendModalOpen, setSuspendModalOpen] = useState(false);
-  const [statusChanging, setStatusChanging] = useState(false);
-
   // Reset modal
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -317,31 +314,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
     [inFlightKeys, storeId, fetchFeatures, refreshFeatureContext, toastError, t]
   );
 
-  // ── Suspend / reactivate ───────────────────────────────────────────────────
-  const handleStatusChange = useCallback(async () => {
-    if (!storeInfo) return;
-    setStatusChanging(true);
-    const newStatus = storeInfo.status === 'suspended' ? 'active' : 'suspended';
-    const { error: apiErr } = await apiPatch(`/api/v1/stores/${storeId}/status`, {
-      status: newStatus,
-    });
-    if (apiErr) {
-      toastError(t('toasts.statusChangeFailed'), apiErr.message);
-    } else {
-      toastSuccess(
-        newStatus === 'suspended' ? t('toasts.storeSuspended') : t('toasts.storeReactivated'),
-        t('toasts.storeStatusDescription', {
-          name: storeInfo.name,
-          status:
-            newStatus === 'suspended' ? t('toasts.statusSuspended') : t('toasts.statusActive'),
-        })
-      );
-      await fetchStore();
-    }
-    setStatusChanging(false);
-    setSuspendModalOpen(false);
-  }, [storeInfo, storeId, fetchStore, toastSuccess, toastError, t]);
-
   // ── Reset overrides ────────────────────────────────────────────────────────
   const handleReset = useCallback(async () => {
     setResetting(true);
@@ -393,7 +365,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   }
 
   const plan = storeInfo.plan as StorePlan;
-  const isSuspended = storeInfo.status === 'suspended';
 
   return (
     <div className="space-y-8">
@@ -428,28 +399,13 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       <div className="mt-8">
         <h2 className="mb-4 font-semibold text-destructive-ink">{t('dangerZone.heading')}</h2>
         <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-6 space-y-4">
-          {/* Suspend / Reactivate */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {isSuspended ? t('dangerZone.reactivateTitle') : t('dangerZone.suspendTitle')}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {isSuspended
-                  ? t('dangerZone.reactivateDescription')
-                  : t('dangerZone.suspendDescription')}
-              </p>
-            </div>
-            <div className="shrink-0">
-              <Button
-                variant={isSuspended ? 'default' : 'destructive'}
-                onClick={() => setSuspendModalOpen(true)}
-                disabled={statusChanging}
-              >
-                {isSuspended ? t('dangerZone.reactivateTitle') : t('dangerZone.suspendTitle')}
-              </Button>
-            </div>
-          </div>
+          {/* Suspend / Reinstate: the shared super-admin control (reason + in-page confirm) */}
+          <StoreStatusControl
+            storeId={storeId}
+            storeName={storeInfo.name}
+            status={storeInfo.status}
+            onChanged={fetchStore}
+          />
 
           <div className="border-t border-destructive/20" />
 
@@ -482,37 +438,6 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       </div>
 
       {/* ── Modals ───────────────────────────────────────────────────────────── */}
-
-      {/* Suspend / reactivate confirm */}
-      <Modal
-        isOpen={suspendModalOpen}
-        onClose={() => setSuspendModalOpen(false)}
-        title={isSuspended ? t('dangerZone.reactivateTitle') : t('dangerZone.suspendTitle')}
-        size="sm"
-      >
-        <p className="text-sm text-muted-foreground">
-          {isSuspended
-            ? t('modals.reactivateBody', { name: storeInfo.name })
-            : t('modals.suspendBody', { name: storeInfo.name })}
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setSuspendModalOpen(false)}
-            disabled={statusChanging}
-          >
-            {tCommon('cancel')}
-          </Button>
-          <Button
-            variant={isSuspended ? 'default' : 'destructive'}
-            onClick={handleStatusChange}
-            disabled={statusChanging}
-            isLoading={statusChanging}
-          >
-            {isSuspended ? t('modals.confirmReactivate') : t('modals.confirmSuspend')}
-          </Button>
-        </div>
-      </Modal>
 
       {/* Reset confirm */}
       <Modal

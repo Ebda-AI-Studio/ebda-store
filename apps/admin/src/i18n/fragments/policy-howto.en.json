@@ -1,0 +1,10 @@
+{
+  "policyUpdates": {
+    "howToTitle": "How a new policy version is published",
+    "howToIntro": "Versions are not edited on this page. They live in the code, so a new version goes out with a deploy, and then you announce it here.",
+    "howToStep1": "An engineer edits the text and adds a new version to the document in LEGAL_POLICIES (version, dates, a short summary, and whether it is a material change). One pull request.",
+    "howToStep2": "Merge it, and deploy the marketing site and the API. The new version then appears in the list below.",
+    "howToStep3": "If the version is material, press Send notice on its row the same day. Every store owner gets an email and a banner until they press Got it. It can be sent once per version.",
+    "howToNotMaterial": "A version that is not marked material has no Send notice button, by design: merchants are not told about typo and formatting fixes. To announce one, mark it material in the code and deploy again."
+  }
+}

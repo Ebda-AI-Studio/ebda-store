@@ -298,13 +298,6 @@
         "title": "Settings & Configuration",
         "description": "Branding, SEO, shipping, tax, payments, PWA, and more"
       },
-      "suspendModal": {
-        "title": "Suspend Store",
-        "message": "Are you sure you want to suspend {name}? This will disable customer access to the store.",
-        "cancel": "Cancel",
-        "confirm": "Suspend Store",
-        "confirming": "Suspending..."
-      },
       "dangerZone": {
         "title": "Danger zone",
         "description": "Delete this store and everything it contains.",
@@ -11256,7 +11249,13 @@
     "notCurrent": "This version is no longer the current one, so it cannot be sent, resumed or retried. Reload the page.",
     "unknownTitle": "May have been delivered: check before re-sending",
     "unknownHint": "{n} emails timed out and the provider may still have delivered them. Retry failed does not send these again. Check with the owner first.",
-    "unknownRow": "{email} ({time} UTC)"
+    "unknownRow": "{email} ({time} UTC)",
+    "howToTitle": "How a new policy version is published",
+    "howToIntro": "Versions are not edited on this page. They live in the code, so a new version goes out with a deploy, and then you announce it here.",
+    "howToStep1": "An engineer edits the text and adds a new version to the document in LEGAL_POLICIES (version, dates, a short summary, and whether it is a material change). One pull request.",
+    "howToStep2": "Merge it, and deploy the marketing site and the API. The new version then appears in the list below.",
+    "howToStep3": "If the version is material, press Send notice on its row the same day. Every store owner gets an email and a banner until they press Got it. It can be sent once per version.",
+    "howToNotMaterial": "A version that is not marked material has no Send notice button, by design: merchants are not told about typo and formatting fixes. To announce one, mark it material in the code and deploy again."
   },
   "legalAcceptances": {
     "adminTitle": "Policy acceptances",
@@ -12195,5 +12194,25 @@
         "error": "I could not apply it. Nothing was changed, try again."
       }
     }
+  },
+  "storeStatus": {
+    "suspendTitle": "Suspend store",
+    "suspendDescription": "Customers cannot open or buy from the store, and messages to customers and payouts pause. Nothing is deleted.",
+    "reinstateTitle": "Reinstate store",
+    "reinstateDescription": "The store opens to customers again, and the merchant's open appeal is marked resolved.",
+    "appealsLink": "Open the appeals and requests from merchants",
+    "suspendBody": "Suspend {name}? The merchant sees your reason in a banner on every page of their dashboard, and can appeal once.",
+    "reasonLabel": "Reason (the merchant reads this)",
+    "reasonHint": "Write it the way you would say it to them. Up to 500 characters.",
+    "reasonRequired": "Write the reason first. The merchant needs to know why.",
+    "reinstateBody": "Reinstate {name}? Customers can open and buy from it again straight away.",
+    "cancel": "Cancel",
+    "suspendConfirm": "Suspend store",
+    "reinstateConfirm": "Reinstate store",
+    "failed": "The change did not go through. Nothing was changed. Try again.",
+    "suspendedToast": "Store suspended",
+    "suspendedToastBody": "{name} is suspended. The merchant can see the reason and appeal.",
+    "reinstatedToast": "Store reinstated",
+    "reinstatedToastBody": "{name} is open to customers again."
   }
 }

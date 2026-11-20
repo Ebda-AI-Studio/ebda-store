@@ -93,8 +93,8 @@ Audit log records every toggle: action, user, store, ip, timestamp. Visible in t
 
 Suspension is for missed renewals + AUP violations. **The decision is super-admin only.** The merchant can read the reason and appeal once; they cannot lift it.
 
-1. Go to the store's **Settings** page → Danger Zone (visible only to super-admin).
-2. Click **"Suspend Store"**, type the **reason** (it is shown to the merchant, so write it as you would say it to them; up to 500 characters) and confirm. The API takes it as `reason` on `PATCH /stores/:id/status`.
+1. Open the store, then its **Danger zone** (store dashboard, **Settings** and **Features** all show the same control, visible only to super-admin). It offers **Suspend store** for an active or an inactive store.
+2. Click **"Suspend store"**, type the **reason** (required: an empty or blank one is not sent; it is shown to the merchant, so write it as you would say it to them; up to 500 characters) and confirm. The API takes it as `reason` on `PATCH /stores/:id/status`.
 3. Internal effects:
    - `Store.status = 'suspended'`
    - Feature cache invalidated
@@ -132,7 +132,7 @@ Staff notices (support request, appeal, address claim, store-limit request): the
 
 ## How to reactivate
 
-Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request. Reactivating also marks the store's open appeal `resolved`.
+Same control, the button reads "Reinstate store" when status is suspended (and links to **Support and trust requests** to see the appeal). Click → confirm in the page → `status` flips to `active`. Storefront returns immediately on the next request. Reactivating also marks the store's open appeal `resolved`.
 
 ## Requests merchants send you
 
@@ -194,7 +194,7 @@ Ebda AI Studio WhatsApp is a **separate product** with its own 3-tier plan syste
 Follow `docs/runbooks/legal-policy-change.md`: edit the text + bump `LEGAL_POLICIES` in one PR,
 deploy marketing AND the API, then for a material version press **Send notice** on
 **Policy updates** (`/policy-updates`). It emails every store owner once (bilingual, Arabic first)
-and shows a banner until they press "Got it". It cannot be sent twice, and a fee change cannot be
+and shows a banner until they press "Got it". The **Policy updates** page itself explains these steps at its top, and it never edits a policy: versions come from code. A version not marked `material` has no Send notice button by design (to announce one, mark it material in `LEGAL_POLICIES` and redeploy). It cannot be sent twice, and a fee change cannot be
 sent with less than 30 days to its effective date (send it the day it deploys). Watch the counts
 and the failed list. A run that stalls or did not start: **Resume**; failed emails: fix the cause,
 then **Retry failed** (runbook § Recover a stalled or failed run; nobody is mailed twice). A row
