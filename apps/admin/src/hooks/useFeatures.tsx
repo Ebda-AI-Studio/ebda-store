@@ -25,6 +25,12 @@ interface FeaturesContextType {
    */
   loadFailed: boolean;
   /**
+   * The API answered the FIRST entitlements fetch with 404 STORE_NOT_FOUND / 403 FORBIDDEN: the id in the URL is not a
+   * store this user can open (QA-91). The store layout renders a proper not-found, never the admin shell, and never
+   * falls back to another store.
+   */
+  storeMissing: boolean;
+  /**
    * Re-fetch the flags now. Call it after ANY write that can change what the
    * store has access to (a feature toggle, a reset, a plan change) — the
    * provider is mounted once in `stores/[id]/layout.tsx` and survives every
@@ -34,6 +40,17 @@ interface FeaturesContextType {
    * to true, so consumers do not flash their skeletons on a refresh.
    */
   refresh: () => Promise<void>;
+}
+
+/** 404 STORE_NOT_FOUND (no such store) or 403 FORBIDDEN (not yours): both read as "not found" to the merchant. */
+export function isStoreMissingError(
+  error: { status?: number; code?: string } | null | undefined
+): boolean {
+  if (!error) return false;
+  return (
+    (error.status === 404 && error.code === 'STORE_NOT_FOUND') ||
+    (error.status === 403 && error.code === 'FORBIDDEN')
+  );
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -67,6 +84,7 @@ export function AdminFeatureProvider({ storeId, children }: AdminFeatureProvider
   const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [storeMissing, setStoreMissing] = useState(false);
   const hasFlags = useRef(false);
   // Monotonic request id: a slow earlier response (e.g. the mount fetch)
   // must never overwrite a newer one (e.g. the refresh after a toggle).
@@ -85,7 +103,7 @@ export function AdminFeatureProvider({ storeId, children }: AdminFeatureProvider
         ? `/api/v1/admin/stores/${storeId}/features`
         : `/api/v1/stores/${storeId}/my-features`;
 
-    const { data } = await apiGet<{ features: Record<string, boolean> }>(endpoint);
+    const { data, error } = await apiGet<{ features: Record<string, boolean> }>(endpoint);
 
     if (seq !== requestSeq.current) return;
     // A failed refresh keeps the last known flags rather than blanking them.
@@ -93,8 +111,10 @@ export function AdminFeatureProvider({ storeId, children }: AdminFeatureProvider
       setFeatures(data.features);
       hasFlags.current = true;
       setLoadFailed(false);
+      setStoreMissing(false);
     } else if (!hasFlags.current) {
-      setLoadFailed(true);
+      if (isStoreMissingError(error)) setStoreMissing(true);
+      else setLoadFailed(true);
     }
     setIsLoading(false);
   }, [storeId, userId, role]);
@@ -146,7 +166,9 @@ export function AdminFeatureProvider({ storeId, children }: AdminFeatureProvider
   }
 
   return (
-    <FeaturesContext.Provider value={{ isEnabled, isLoading, loadFailed, refresh: fetchFeatures }}>
+    <FeaturesContext.Provider
+      value={{ isEnabled, isLoading, loadFailed, storeMissing, refresh: fetchFeatures }}
+    >
       {children}
     </FeaturesContext.Provider>
   );
@@ -169,6 +191,7 @@ export function useFeatures(): FeaturesContextType {
       isEnabled: () => true,
       isLoading: false,
       loadFailed: false,
+      storeMissing: false,
       refresh: async () => {},
     };
   }
