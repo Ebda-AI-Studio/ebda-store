@@ -134,7 +134,7 @@ export default function ReturnsPage() {
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
       <div className="mb-4 flex justify-end">
-        <Button type="button" onClick={() => setNewReturnOpen(true)} className="min-h-11">
+        <Button type="button" onClick={() => setNewReturnOpen(true)}>
           {tPage('newReturn')}
         </Button>
       </div>

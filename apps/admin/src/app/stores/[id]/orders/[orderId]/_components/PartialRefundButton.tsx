@@ -142,7 +142,7 @@ export function PartialRefundButton({
           setAttemptKey(crypto.randomUUID());
           setOpen(true);
         }}
-        className="min-h-11 w-full justify-center font-semibold"
+        className="w-full justify-center"
       >
         {t('button')}
       </Button>

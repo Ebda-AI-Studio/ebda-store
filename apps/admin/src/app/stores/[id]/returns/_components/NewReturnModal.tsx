@@ -175,14 +175,15 @@ export function NewReturnModal({ open, storeId, onClose, onCreated }: Props) {
               <ul className="divide-y divide-border rounded-lg border border-border">
                 {found.map(o => (
                   <li key={o.id}>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => setOrder(o)}
-                      className="flex min-h-11 w-full cursor-pointer items-center justify-between px-4 text-start text-sm text-foreground hover:bg-muted"
+                      className="w-full justify-between"
                     >
                       <span className="font-medium">{o.orderNumber ?? o.id}</span>
                       <span className="text-muted-foreground">{t('pick')}</span>
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
