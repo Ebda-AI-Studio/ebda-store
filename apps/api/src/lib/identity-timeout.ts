@@ -32,3 +32,17 @@ export async function withIdentityTimeout<T>(
     if (timer) clearTimeout(timer);
   }
 }
+
+/**
+ * True when an identity RPC failed BECAUSE the session or account is expired / revoked / unknown (the service replied),
+ * as opposed to our own timeout (an AppError 503) or a network / 5xx failure (anything else). Only a message that names
+ * the session or token state counts; an unrecognised error stays an outage (fail closed, never log users out on a guess).
+ */
+export function isDeadSessionError(err: unknown): boolean {
+  if (err instanceof AppError) return false;
+  const msg = err instanceof Error ? err.message : '';
+  if (/\b(timed? ?out|network|fetch failed|unavailable|5\d\d|binding)\b/i.test(msg)) return false;
+  return /\b(session|token|account|user)\b.*\b(expired|revoked|invalid|not found|unknown|deleted)\b|\b(expired|revoked)\b.*\b(session|token)\b/i.test(
+    msg
+  );
+}
