@@ -5,7 +5,6 @@
 import { cfBindings, type AccountBrief, type AccountsRpc, type AccountState } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { getUserState } from './definer';
-import { isDeadSessionError } from './identity-timeout';
 import { invalidateAccountState, resetLiveIdentityCache } from './identity-live-cache';
 
 let override: AccountsRpc | undefined;
@@ -31,8 +30,6 @@ async function call<T>(
     return await p;
   } catch (e) {
     if (e instanceof AppError) throw e;
-    // QA-105: keep the identity service's own "session expired / revoked" answer so `authenticate` can map it to 401.
-    if (name === 'getAccountState' && isDeadSessionError(e)) throw e;
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
   }
 }

@@ -5,7 +5,7 @@ import { AppError } from './error-handler';
 import { redis } from '../services/redis.service';
 import { getUserState } from '../lib/definer';
 import { getAccountState } from '../lib/identity-client';
-import { withIdentityTimeout, isDeadSessionError } from '../lib/identity-timeout';
+import { withIdentityTimeout } from '../lib/identity-timeout';
 import { accountStateCached } from '../lib/identity-live-cache';
 import { needsLiveIdentity } from '../lib/auth-sensitivity';
 import logger from '../lib/logger';
@@ -254,11 +254,6 @@ export async function authenticateAccounts(
     }
     if (opts.timing) opts.timing.identityMs = performance.now() - identityStart;
   } catch (err) {
-    // QA-105: the identity service ANSWERED that this session/account is gone or expired (an RPC error naming it, not a
-    // timeout or a transport failure): that is a dead credential, 401 -> the admin redirects to login with returnTo.
-    if (isDeadSessionError(err)) {
-      throw new AppError(401, 'TOKEN_REVOKED', 'Session has expired or been revoked');
-    }
     // Cannot confirm the session is alive: refuse, but as an outage (503), not as a bad credential (401 would log users out).
     logger.error({ err: (err as Error).message }, '[auth] identity live check failed');
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
