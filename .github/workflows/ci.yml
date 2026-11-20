@@ -583,6 +583,11 @@ jobs:
         if: matrix.app == 'marketing'
         run: node scripts/ci/marketing-perf-budget.mjs --record "$RUNNER_TEMP/marketing-perf-budget.json"
 
+      # Per-route CSS (Ruling CSS-BUDGET-726-1): every page still loads every rule its markup matches after the split.
+      - name: Marketing per-route CSS coverage
+        if: matrix.app == 'marketing'
+        run: node scripts/ci/marketing-css-route-coverage.mjs
+
       # Mobile LCP < 2.5 s (Lighthouse mobile, simulated throttling, median of 3). Needs Chromium, so it installs the one
       # Playwright already caches on the runner; a stalled install or run is bounded by the step timeout.
       - name: Marketing mobile LCP budget

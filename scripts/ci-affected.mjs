@@ -114,7 +114,7 @@ const WORKER_ENTRY = {
   // move its page weight, so the page-weight budget fails the PR that grows it, not a later unrelated one (#511/#525
   // pushed css over 16 KB unmeasured; Ruling MKT-LEGAL-HTML-BUDGET-2).
   'apps/marketing':
-    /^(apps\/marketing\/(src|public|scripts)\/|scripts\/ci\/marketing-perf-budget\.(mjs|json)$)/,
+    /^(apps\/marketing\/(src|public|scripts)\/|scripts\/ci\/marketing-(perf-budget\.(mjs|json)|css-route-coverage\.mjs)$)/,
 };
 const WORKER_CONFIG = dir =>
   new RegExp(

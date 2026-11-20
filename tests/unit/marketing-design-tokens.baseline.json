@@ -3,18 +3,31 @@
     "about.css": 13,
     "chrome.css": 8,
     "contact.css": 10,
-    "globals.css": 194,
+    "globals.css": 57,
+    "route-home.css": 27,
+    "route-notfound.css": 9,
+    "route-store-wa.css": 18,
+    "route-store.css": 78,
+    "route-whatsapp.css": 5,
     "services-chrome.css": 2,
     "services.css": 25
   },
   "T2": {
-    "globals.css": 26,
+    "globals.css": 6,
+    "route-devices.css": 2,
+    "route-store-wa.css": 3,
+    "route-store.css": 13,
+    "route-whatsapp.css": 2,
     "services-chrome.css": 1,
     "services.css": 4
   },
   "T3": {
     "about.css": 2,
-    "globals.css": 30,
+    "globals.css": 5,
+    "route-home.css": 7,
+    "route-notfound.css": 1,
+    "route-store-wa.css": 1,
+    "route-store.css": 16,
     "services.css": 5
   }
 }

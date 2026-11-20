@@ -11,6 +11,7 @@ import { Header } from './Header';
 import { WhatsAppTeaser } from './WhatsAppPage';
 import { WHATSAPP_PAGE } from '../lib/whatsapp-page';
 import { JsonLd } from './JsonLd';
+import '@/app/route-store-wa.css';
 
 export function FeaturesPage({ locale }: { locale: Locale }) {
   const p = FEATURES_PAGE[locale];

@@ -15,6 +15,7 @@ import { ServicesGrid } from './ServicesGrid';
 import { GirihPoster, WindowGirih } from './GirihPoster';
 import { JsonLd } from './JsonLd';
 import { SiteLink } from './SiteLink';
+import '@/app/route-home.css';
 
 function Icon({ id, mirror = false }: { id: SiteNavProductId; mirror?: boolean }) {
   return (

@@ -164,8 +164,9 @@ is not run for ordinary source edits. Apps without a wrangler config (apps/api
 today) are skipped, not failed.
 `apps/marketing` is the exception: a static export with no OpenNext build, it
 dry-runs on any change under its `src/`, `public/` or `scripts/`, or to
-`scripts/ci/marketing-perf-budget.{mjs,json}`, so its page-weight budget fails
-the PR that grows it.
+`scripts/ci/marketing-perf-budget.{mjs,json}` or `marketing-css-route-coverage.mjs`, so its page-weight
+budget fails the PR that grows it. The CSS is split per route (`route-*.css`, Ruling CSS-BUDGET-726-1); the
+coverage script fails a page whose markup uses a class no loaded stylesheet carries.
 
 In the FULL lane (main push, nightly, dispatch) `worker-dry-run` always runs
 for `marketing` alone, so the marketing page-weight budget

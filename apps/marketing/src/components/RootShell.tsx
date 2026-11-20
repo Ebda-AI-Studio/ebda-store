@@ -7,8 +7,6 @@ import { EbdaTracking } from './EbdaTracking';
 import '@/app/globals.css';
 import '@/app/motifs.css';
 import '@/app/chrome.css';
-import '@/app/about.css';
-import '@/app/contact.css';
 import '@/app/services-chrome.css';
 
 /**
