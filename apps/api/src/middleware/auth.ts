@@ -5,7 +5,7 @@ import { AppError } from './error-handler';
 import { redis } from '../services/redis.service';
 import { getUserState } from '../lib/definer';
 import { getAccountState } from '../lib/identity-client';
-import { withIdentityTimeout } from '../lib/identity-timeout';
+import { withIdentityTimeout, identityFailureFields } from '../lib/identity-timeout';
 import { accountStateCached } from '../lib/identity-live-cache';
 import { needsLiveIdentity } from '../lib/auth-sensitivity';
 import logger from '../lib/logger';
@@ -255,7 +255,10 @@ export async function authenticateAccounts(
     if (opts.timing) opts.timing.identityMs = performance.now() - identityStart;
   } catch (err) {
     // Cannot confirm the session is alive: refuse, but as an outage (503), not as a bad credential (401 would log users out).
-    logger.error({ err: (err as Error).message }, '[auth] identity live check failed');
+    logger.error(
+      { err: (err as Error).message, ...identityFailureFields(err) },
+      '[auth] identity live check failed'
+    );
     throw new AppError(503, 'IDENTITY_UNAVAILABLE', 'Sign-in service unavailable, try again');
   }
   if (revoked) throw new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked');
