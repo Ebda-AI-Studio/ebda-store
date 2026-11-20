@@ -239,6 +239,19 @@ describe('COD-RECEIPT-NUMBER-AT-PAYMENT-1: the receipt number exists only once t
     ]);
   });
 
+  it('placement passes cod: a COD order whose payment row does not exist yet is deferred too', () => {
+    const r = rig();
+    const o = r.order();
+    expect(
+      r.db.transactionSync(() =>
+        issueSaleDocument(r.db, { storeId: 's1', orderId: o, now: 1, cod: true })
+      )
+    ).toBeNull();
+    expect(r.docs()).toHaveLength(0);
+    // a non-COD placement (no flag, no payment row) still issues at once
+    expect(r.issue(r.order())).toMatchObject({ number: 'RCT-000001' });
+  });
+
   it('a cancelled unpaid COD order never had a number to cancel', () => {
     const r = rig();
     const o = r.order();

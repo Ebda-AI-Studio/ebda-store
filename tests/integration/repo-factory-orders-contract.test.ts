@@ -173,6 +173,34 @@ async function place(w: World, qty: number, extra: Record<string, unknown> = {},
 }
 const inlineStep = { run: <T>(_id: string, fn: () => Promise<T>) => fn() };
 
+/**
+ * COD-RECEIPT-NUMBER-AT-PAYMENT-1: a COD order placed unpaid has NO receipt; the cash being collected (the merchant marks it
+ * paid) allocates the gapless RCT serial. The COD payment row is what the courier flow creates after placement (the store's
+ * own `payments/create`), written here through the backend-neutral seam, then the real `markCodPaid` path settles it.
+ */
+async function collectCod(o: { id: string; total: number }) {
+  const { storeMoney } = await import('../../apps/api/src/lib/repo-factory');
+  const money = await storeMoney(STORE);
+  if (money) await money.paymentCreate({ orderId: o.id, provider: 'cod', amount: o.total });
+  else
+    await prisma.payment.create({
+      data: {
+        orderId: o.id,
+        provider: 'cod',
+        status: 'cod_pending',
+        amount: o.total,
+        currency: 'EGP',
+      },
+    });
+  await OrderService.markCodPaid(STORE, o.id, ownerId);
+}
+const fiscalCount = async () =>
+  (
+    (await (await import('../../apps/api/src/lib/repo-factory')).storeDb(STORE)) as any
+  ).fiscalDocument.count({
+    where: { storeId: STORE },
+  }) as Promise<number>;
+
 /** The rows that matter, read through whichever backend is current, in a backend-neutral shape. */
 async function state(w: World) {
   const { storeDb } = await import('../../apps/api/src/lib/repo-factory');
@@ -559,33 +587,42 @@ describe.skipIf(!hasDb)('orders (OrderService) on Postgres vs the DO', () => {
     expect(t.state.orders[0].status).toBe('cancelled');
   });
 
-  it('fiscal: each order gets one receipt with the next gapless number; the document and its payload are the same on both backends', async () => {
+  it('fiscal: a COD order has NO receipt until its cash is collected, then each gets the next gapless number in collection order; the document and its payload are the same on both backends', async () => {
     const t = await parity(20, async w => {
-      await place(w, 2, { couponCode: w.coupon }, 1); // a discount line in the payload
-      await place(w, 1, {}, 2);
+      const a = (await place(w, 2, { couponCode: w.coupon }, 1)) as { id: string; total: number }; // a discount line in the payload
+      const b = (await place(w, 1, {}, 2)) as { id: string; total: number };
       await place(w, 99, {}, 3).catch(() => undefined); // refused: burns no number
-      return place(w, 1, {}, 4);
+      const c = (await place(w, 1, {}, 4)) as { id: string; total: number };
+      const atPlacement = await fiscalCount();
+      await collectCod(c);
+      await collectCod(a);
+      await collectCod(b);
+      return { atPlacement, afterCollection: await fiscalCount() };
     });
+    expect(t.out.ok).toEqual({ atPlacement: 0, afterCollection: 3 });
     expect(t.state.fiscal.map((d: any) => d.docType)).toEqual(['receipt', 'receipt', 'receipt']);
     const serials = t.state.fiscal.map((d: any) => d.serial).sort((a: number, b: number) => a - b);
     expect(serials.slice(1).every((x: number, i: number) => x === serials[i] + 1)).toBe(true); // no gap
-    expect(t.state.fiscal[0].payload.lines[0].kind).toBe('item');
+    expect(t.state.fiscal.some((d: any) => d.payload.lines[0].kind === 'item')).toBe(true);
   });
 
-  it('fiscal: an unpaid order that is cancelled keeps its number, marked cancelled; the next order takes the next number', async () => {
+  it('fiscal: an unpaid COD order that is cancelled never had a number, so the next collected order takes the next one with no gap', async () => {
     const t = await parity(10, async w => {
       const o = (await place(w, 1, {}, 1)) as { id: string };
       await OrderService.updateStatus(STORE, o.id, 'cancelled');
       if ((await (await import('../../apps/api/src/lib/repo-factory')).storeMoney(STORE)) === null)
         await handleOrderRefunded(o.id, STORE, true, false, inlineStep);
-      return place(w, 1, {}, 2);
+      const next = (await place(w, 1, {}, 2)) as { id: string; total: number };
+      await collectCod(next);
+      return 'done';
     });
-    expect(t.state.fiscal.map((d: any) => d.status).sort()).toEqual(['cancelled', 'issued']);
+    expect(t.state.fiscal.map((d: any) => d.status)).toEqual(['issued']); // no cancelled receipt row, no burned serial
   });
 
   it('fiscal: partial refunds get credit notes keyed on the refund, capped at what is left; a replay issues nothing', async () => {
     const t = await parity(10, async w => {
-      const o = (await place(w, 1, {}, 1)) as { id: string };
+      const o = (await place(w, 1, {}, 1)) as { id: string; total: number };
+      await collectCod(o); // a refund credits a receipt, which exists once the cash was collected
       const refund = async (refundKey: string, refundAmount: number) => {
         const partial = { items: [], refundKey, refundAmount, amountOnly: true };
         if (

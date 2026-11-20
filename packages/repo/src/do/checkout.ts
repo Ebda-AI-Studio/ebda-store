@@ -1006,7 +1006,12 @@ export function placeOrder(db: SyncSql, input: CheckoutInput): PlacedOrder {
     indexEntity(db, input.storeId, 'order', orderId, now);
     // The sale's fiscal document (tax invoice or receipt) with its gapless serial, in THIS section: the order and its number
     // commit or roll back together (Ruling MONEYB-1, CF-R2-1).
-    issueSaleDocument(db, { storeId: input.storeId, orderId, now });
+    issueSaleDocument(db, {
+      storeId: input.storeId,
+      orderId,
+      now,
+      cod: input.paymentMethod === 'cod',
+    });
     // Abandoned-cart recovery (best effort on Postgres, a plain UPDATE here): the cart's own row, else the same customer's open
     // one. A guest cart (no customer) matches only its own row.
     if (input.cart)

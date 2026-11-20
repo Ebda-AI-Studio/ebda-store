@@ -420,7 +420,8 @@ const saleDoc = (db: SyncSql, storeId: string, orderId: string): DocRow | undefi
  */
 export function issueSaleDocument(
   db: SyncSql,
-  a: { storeId: string; orderId: string; now: number }
+  /** `cod`: placement of a cash-on-delivery order (its payment row is created later, so it cannot be read here yet). */
+  a: { storeId: string; orderId: string; now: number; cod?: boolean }
 ): { id: string; number: string; docType: SaleDocType } | null {
   const { storeId, orderId, now } = a;
   const existing = saleDoc(db, storeId, orderId);
@@ -437,7 +438,11 @@ export function issueSaleDocument(
   // Ruling COD-RECEIPT-NUMBER-AT-PAYMENT-1: a receipt says money was received. An unpaid cash-on-delivery order gets NO
   // receipt number at placement (its order number is its confirmation number); the RCT- serial is allocated when the cash is
   // collected, by the settle paths calling this again. A tax invoice is a tax document, not a payment proof: it still issues now.
-  if (!isTaxInvoice && order.paymentProvider === 'cod' && order.paymentStatus !== 'paid')
+  if (
+    !isTaxInvoice &&
+    (a.cod === true || order.paymentProvider === 'cod') &&
+    order.paymentStatus !== 'paid'
+  )
     return null;
   const docType: SaleDocType = isTaxInvoice ? 'tax_invoice' : 'receipt';
   const { lines, discounts } = buildSaleLines(order);
