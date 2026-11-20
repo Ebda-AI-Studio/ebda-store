@@ -58,6 +58,9 @@ const store = (settings: Record<string, unknown>, extra: Record<string, unknown>
     ...extra,
   }) as never;
 
+// Mirrors robots.ts: bare roots plus the locale-served twins (#647).
+const PRIVATE_ROOTS = ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'];
+
 describe.each([
   ['platform host', 'shop.ebda.app'],
   ['custom domain', 'shop.example'],
@@ -75,7 +78,11 @@ describe.each([
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/account/', '/checkout/', '/cart/', '/auth/', '/affiliate/'],
+        disallow: [
+          ...PRIVATE_ROOTS,
+          ...PRIVATE_ROOTS.map(p => `/ar${p}`),
+          ...PRIVATE_ROOTS.map(p => `/en${p}`),
+        ],
       },
     ]);
     expect(JSON.stringify(r.rules)).not.toContain('"disallow":"/"');
