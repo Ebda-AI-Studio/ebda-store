@@ -35,18 +35,29 @@ export function moneyOpMayChangeRevenue(op: string): boolean {
   return !READ_ONLY_MONEY_OP.test(op) && !BOUNDED_STALE_MONEY_OP.has(op);
 }
 
-/** Drop every cached revenue-derived figure of a store. Never throws: a Redis outage must not fail the write that already committed. */
+/**
+ * Drop every cached revenue-derived figure of a store. NEVER throws, on any step (the lazy import, either invalidator): the money op
+ * it follows has already committed, and a cache problem must not turn that into an error for the caller. A failure is logged and the
+ * TTL bounds the stale window.
+ */
 export async function invalidateStoreRevenueCaches(storeId: string): Promise<void> {
-  // lazy: `repo-factory` (imported by nearly everything) must not statically pull the public-cache module chain
-  const { invalidateCachedPrefix, invalidateCustomersCache } = await import('./public-cache.js');
-  const results = await Promise.allSettled([
-    invalidateCachedPrefix(analyticsDashboardPrefix(storeId)),
-    invalidateCustomersCache(storeId),
-  ]);
-  for (const r of results)
-    if (r.status === 'rejected')
-      logger.warn(
-        { err: r.reason, storeId },
-        '[revenue-cache] invalidation failed; the TTL bounds the stale window'
-      );
+  try {
+    // lazy: `repo-factory` (imported by nearly everything) must not statically pull the public-cache module chain
+    const { invalidateCachedPrefix, invalidateCustomersCache } = await import('./public-cache.js');
+    const results = await Promise.allSettled([
+      invalidateCachedPrefix(analyticsDashboardPrefix(storeId)),
+      invalidateCustomersCache(storeId),
+    ]);
+    for (const r of results)
+      if (r.status === 'rejected')
+        logger.warn(
+          { err: r.reason, storeId },
+          '[revenue-cache] invalidation failed; the TTL bounds the stale window'
+        );
+  } catch (err) {
+    logger.warn(
+      { err, storeId },
+      '[revenue-cache] invalidation failed; the TTL bounds the stale window'
+    );
+  }
 }

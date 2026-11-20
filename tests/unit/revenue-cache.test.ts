@@ -89,4 +89,25 @@ describe('invalidateStoreRevenueCaches', () => {
     await expect(invalidateStoreRevenueCaches('s1')).resolves.toBeUndefined();
     expect(h.customers).toHaveBeenCalled();
   });
+
+  it('a synchronously throwing invalidator never fails the caller either', async () => {
+    h.customers.mockImplementation(() => {
+      throw new Error('boom');
+    });
+    await expect(invalidateStoreRevenueCaches('s1')).resolves.toBeUndefined();
+  });
+});
+
+describe('a failing import of the cache module never fails the money op', () => {
+  it('invalidateStoreRevenueCaches swallows a throwing dynamic import and logs it', async () => {
+    vi.resetModules();
+    vi.doMock('@api/lib/public-cache', () => {
+      throw new Error('module failed to load');
+    });
+    const logger = (await import('@api/lib/logger')).default;
+    const { invalidateStoreRevenueCaches: inv } = await import('@api/lib/revenue-cache');
+    await expect(inv('s1')).resolves.toBeUndefined();
+    expect(logger.warn).toHaveBeenCalled();
+    vi.doUnmock('@api/lib/public-cache');
+  });
 });
