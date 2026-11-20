@@ -21,6 +21,9 @@ const h = vi.hoisted(() => ({
   money: {
     accountTotals: vi.fn(),
     ciOrderStamp: vi.fn(),
+    // the funnel rollup reads its revenue through the ONE definition (REVENUE-DEF-1)
+    analyticsNetRevenue: vi.fn(),
+    analyticsNetRevenueDays: vi.fn(),
   },
   noMoney: { on: false },
   sendAlert: vi.fn(async () => 'sent'),
@@ -528,8 +531,48 @@ describe('watchers, scans and rollups on the DO', () => {
     const { runStoreRollupSteps } =
       await import('@api/lib/inngest/functions/analytics-daily-rollup');
     const d = h.doBox.current;
+    // Realistic net-revenue fixtures for YESTERDAY (Cairo): the fake money client applies the real definition to them
+    // (window, paid-only, status/payment exclusions, partial-refund netting), so the rollup's revenue numbers below fail if the
+    // net-revenue path breaks. Not a zero stub.
+    const { regionDayStart, regionDayStartOffset } = await import('@ebda/shared');
+    const { netOrderRevenueMinor } = await import('@api/lib/revenue-sql');
+    const yStart = regionDayStartOffset(regionDayStart(new Date()), -1).getTime();
+    const at = yStart + 12 * 3_600_000;
+    const fixtures = [
+      { at, total: 5000, status: 'delivered', paymentStatus: 'paid', refundedMinor: 0 }, // counts: 5000
+      { at, total: 4850, status: 'delivered', paymentStatus: 'refunded', refundedMinor: 4850 }, // QA-7 order: 0
+      { at, total: 3000, status: 'delivered', paymentStatus: 'paid', refundedMinor: 1000 }, // partial refund: 2000
+      { at, total: 700, status: 'cancelled', paymentStatus: 'paid', refundedMinor: 0 }, // 0
+      { at, total: 900, status: 'delivered', paymentStatus: 'unpaid', refundedMinor: 0 }, // COD not paid: not paid-only
+    ];
+    h.money.analyticsNetRevenue.mockImplementation(
+      async (a: { startMs?: number; endMs?: number; paidOnly?: boolean }) => {
+        const inWin = fixtures.filter(
+          f => f.at >= (a.startMs ?? 0) && f.at <= (a.endMs ?? Number.MAX_SAFE_INTEGER)
+        );
+        const counted = inWin
+          .filter(f => !a.paidOnly || f.paymentStatus === 'paid')
+          .filter(
+            f =>
+              !['cancelled', 'refunded', 'awaiting_payment_confirmation'].includes(f.status) &&
+              !['failed', 'refunded'].includes(f.paymentStatus)
+          )
+          .map(f => ({ f, net: netOrderRevenueMinor(f) }));
+        return { revenue: counted.reduce((n, x) => n + x.net, 0), orders: counted.length };
+      }
+    );
     const r1 = await runStoreRollupSteps(step, DO_STORE, 'rollup');
     const funnelRows = d.rows('funnelSnapshot').length;
+    const yesterday = d
+      .rows('funnelSnapshot')
+      .find(r => new Date(r.periodDate).getTime() === yStart);
+    expect(yesterday).toMatchObject({ revenueFils: 7000, ordersCompleted: 2 }); // 5000 + (3000 - 1000)
+    expect(
+      d
+        .rows('funnelSnapshot')
+        .filter(r => new Date(r.periodDate).getTime() !== yStart)
+        .every(r => r.revenueFils === 0)
+    ).toBe(true);
     expect(funnelRows).toBeGreaterThan(0);
     expect(r1.funnelDays).toBe(funnelRows);
     expect(d.writes).toEqual(expect.arrayContaining(['funnelSnapshot.createMany']));
@@ -537,6 +580,77 @@ describe('watchers, scans and rollups on the DO', () => {
     expect(d.rows('funnelSnapshot')).toHaveLength(funnelRows); // the same days, updated in place
     expect(r2.funnelDays).toBe(funnelRows);
     expect(d.writes).toEqual(expect.arrayContaining(['funnelSnapshot.update']));
+    // the rerun recomputes (never adds): yesterday still 7000 after the in-place update
+    expect(
+      d.rows('funnelSnapshot').find(r => new Date(r.periodDate).getTime() === yStart)
+    ).toMatchObject({ revenueFils: 7000, ordersCompleted: 2 });
+  });
+
+  it('funnel revenue correction rewrites ONLY revenueFils + ordersCompleted; every other column of an old day is untouched', async () => {
+    const { correctFunnelRevenueDay } =
+      await import('@api/services/accounting/analytics-rollup.service');
+    const { regionDayStart, regionDayStartOffset } = await import('@ebda/shared');
+    const d = h.doBox.current;
+    const dayStart = regionDayStartOffset(regionDayStart(new Date()), -40);
+    const stored = {
+      id: 'fs-old',
+      storeId: DO_STORE,
+      periodDate: dayStart,
+      productViews: 321,
+      cartsCreated: 77,
+      cartItemsAdded: 150,
+      checkoutsStarted: 40,
+      ordersCompleted: 9,
+      ordersAbandoned: 12,
+      revenueFils: 99_000,
+      computedAt: new Date('2026-10-11T00:00:00Z'),
+    };
+    d.seed('funnelSnapshot', { ...stored });
+    h.money.analyticsNetRevenueDays.mockResolvedValue([{ revenue: 7000, orders: 2 }]);
+    expect(await correctFunnelRevenueDay(DO_STORE, 40)).toBe(1);
+    const row = d.rows('funnelSnapshot').find(r => r.id === 'fs-old')!;
+    expect(row).toMatchObject({ revenueFils: 7000, ordersCompleted: 2 });
+    // nothing else moved: views / carts / checkouts / abandoned / computedAt keep what the nightly run wrote
+    for (const k of [
+      'productViews',
+      'cartsCreated',
+      'cartItemsAdded',
+      'checkoutsStarted',
+      'ordersAbandoned',
+      'computedAt',
+    ])
+      expect(row[k], k).toEqual(stored[k as keyof typeof stored]);
+    // idempotent: a rerun finds nothing to change
+    expect(await correctFunnelRevenueDay(DO_STORE, 40)).toBe(0);
+    // a day with no stored row is never created
+    expect(await correctFunnelRevenueDay(DO_STORE, 41)).toBe(0);
+    expect(d.rows('funnelSnapshot')).toHaveLength(1);
+  });
+
+  it('funnelDriftDays is two reads however many days: the stored rows, then ONE grouped net-revenue call', async () => {
+    const { funnelDriftDays } = await import('@api/services/accounting/analytics-rollup.service');
+    const { regionDayStart, regionDayStartOffset } = await import('@ebda/shared');
+    const d = h.doBox.current;
+    const today = regionDayStart(new Date());
+    for (let n = 1; n <= 60; n++)
+      d.seed('funnelSnapshot', {
+        id: `fd-${n}`,
+        storeId: DO_STORE,
+        periodDate: regionDayStartOffset(today, -n),
+        ordersCompleted: 1,
+        revenueFils: 1000,
+      });
+    h.money.analyticsNetRevenueDays.mockClear();
+    h.money.analyticsNetRevenueDays.mockImplementation(async (a: { windows: unknown[] }) =>
+      a.windows.map((_, i) =>
+        i === 3 ? { revenue: 400, orders: 1 } : { revenue: 1000, orders: 1 }
+      )
+    );
+    const drift = await funnelDriftDays(DO_STORE, 90);
+    expect(h.money.analyticsNetRevenueDays).toHaveBeenCalledTimes(1); // not one per day
+    expect(h.money.analyticsNetRevenueDays.mock.calls[0]![0].windows).toHaveLength(60);
+    expect(drift).toHaveLength(1);
+    expect(drift[0]).toMatchObject({ storedRevenueFils: 1000, correctRevenueFils: 400 });
   });
 
   it('answer-engine scan: checks are written to the DO, and a retried scan resumes past the rows it already wrote', async () => {

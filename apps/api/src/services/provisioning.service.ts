@@ -17,6 +17,7 @@ import { bustStoreCaches } from './store.service';
 import { syncStoreDirectoryFromPg } from '../lib/store-directory-sync';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial, type TrialChoice } from './billing/trial';
+import { netRevenue } from './revenue.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -634,17 +635,15 @@ export class ProvisioningService {
           where: { storeId },
         })
         .then(r => r.length),
-      db.order.aggregate({
-        where: { storeId, paymentStatus: 'paid' },
-        _sum: { total: true },
-      }),
+      // The ONE revenue definition, paid-only (services/revenue.service.ts): a refunded paid order is not revenue.
+      netRevenue(storeId, { paidOnly: true }),
     ]);
 
     return {
       products: productCount,
       orders: orderCount,
       customers: customerCount,
-      revenue: revenueResult._sum.total || 0,
+      revenue: revenueResult.revenue,
     };
   }
 
