@@ -1,4 +1,4 @@
-import { prisma, type Prisma } from '@ebda/database';
+import { prisma, withStore, type Prisma } from '@ebda/database';
 import { RETENTION_YEARS } from '../config/retention';
 import { priceLineLabel, struckListPrice } from '../lib/order-pricing';
 import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
@@ -303,6 +303,16 @@ function buyerName(order: { shippingAddress: unknown; billingAddress: unknown })
 }
 
 export class FiscalDocumentService {
+  /**
+   * COD-RECEIPT-NUMBER-AT-PAYMENT-1: the cash of a cash-on-delivery order was just collected (marked paid, bulk-marked paid
+   * or delivered), so its receipt's gapless serial is allocated now, in its own store-scoped transaction. Idempotent.
+   */
+  static async issueOnCodPayment(storeId: string, orderId: string) {
+    return withStore(storeId, tx =>
+      FiscalDocumentService.issueSaleDocument(tx, storeId, orderId, { cod: true, paid: true })
+    );
+  }
+
   /**
    * Issue the sale document (tax invoice or receipt) for an order, inside the
    * caller's transaction. Idempotent: an order already holding a sale document

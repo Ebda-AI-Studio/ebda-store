@@ -3192,9 +3192,7 @@ export class OrderService {
         details: { reason: 'cod_collected_on_delivery', orderNumber: order.orderNumber },
       });
       // COD-RECEIPT-NUMBER-AT-PAYMENT-1: delivered = the cash is collected, so the receipt number is allocated now.
-      await prisma.$transaction(tx =>
-        FiscalDocumentService.issueSaleDocument(tx, storeId, orderId, { cod: true, paid: true })
-      );
+      await FiscalDocumentService.issueOnCodPayment(storeId, orderId);
       // Same post-payment fan-out as "Mark paid" (journal posting); its
       // notification half is deduped by orderCreatedNotifiedAt.
       void deferAfterTenantCommit('order.codCollectedOnDelivery', () =>
@@ -4093,10 +4091,7 @@ export class OrderService {
 
     // COD-RECEIPT-NUMBER-AT-PAYMENT-1: the cash is in, so the receipt's gapless serial is allocated now. A Durable Object
     // store did this inside its own section (codMarkPaid); here it is the Postgres twin (idempotent either way).
-    if (!money)
-      await prisma.$transaction(tx =>
-        FiscalDocumentService.issueSaleDocument(tx, storeId, orderId, { cod: true, paid: true })
-      );
+    if (!money) await FiscalDocumentService.issueOnCodPayment(storeId, orderId);
 
     // Append-only audit row for the COD completion.
     await (money ? recordPaymentEventForStore : recordPaymentEvent)({
