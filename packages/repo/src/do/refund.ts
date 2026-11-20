@@ -623,6 +623,8 @@ export function refundOrder(
      */
     external?: boolean;
     keepPaymentStatus?: boolean;
+    /** partial `lines` only: order items whose goods are NOT going back on the shelf (the merchant's per-line choice, STORE-QA-76). */
+    skipRestock?: ReadonlySet<string>;
     now?: number;
   }
 ): RefundResult {
@@ -765,6 +767,7 @@ export function refundOrder(
           throw new MoneyError('UNKNOWN_LINE', 'a listed line does not belong to this order', 400);
       for (const l of a.lines) {
         const item = items.get(l.orderItemId)!;
+        if (a.skipRestock?.has(item.id)) continue;
         const qty = Math.min(
           l.quantity,
           item.quantity - (already.get(item.id) ?? 0) - (neverTaken.get(item.id) ?? 0)

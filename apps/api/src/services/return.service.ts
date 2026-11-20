@@ -26,6 +26,7 @@ import {
 import { featureService } from './feature.service';
 import { WalletService } from './wallet.service';
 import { evaluateReturnWindow } from '../lib/return-window';
+import { opKey } from '../lib/money-idempotency';
 import { storeDb, storeMoney, type MoneyClient } from '../lib/repo-factory';
 
 import {
@@ -532,6 +533,116 @@ export class ReturnService {
   /**
    * Create a return request
    */
+  /**
+   * STORE-QA-76: the MERCHANT opens a return for an order (a phone request, the admin "New return"). Durable Object stores only
+   * (the Postgres path has no DO to hold the claim and is retired). The lines are validated against the order's own remaining
+   * quantity; the shopper is not mailed (the merchant already knows). `restock: false` keeps a line's goods off the shelf.
+   */
+  static async adminCreate(
+    storeId: string,
+    data: {
+      orderId: string;
+      type: 'return' | 'refund';
+      reason: string;
+      reasonDetail?: string;
+      items: Array<{ orderItemId: string; quantity: number; restock?: boolean }>;
+    },
+    idempotencyKey?: string
+  ) {
+    const money = await storeMoney(storeId);
+    if (!money)
+      throw new AppError(409, 'RETURNS_NEED_DO_STORE', 'Returns for this store are not available');
+    const quote = await money.analyticsRefundQuote({ orderId: data.orderId, items: data.items });
+    const byId = new Map(quote.lines.map(l => [l.orderItemId, l]));
+    const { returnId } = await money.returnCreate(
+      {
+        orderId: data.orderId,
+        type: data.type,
+        reason: data.reason,
+        reasonDetail: data.reasonDetail,
+        byMerchant: true,
+        items: data.items.map(i => ({
+          orderItemId: i.orderItemId,
+          productId: byId.get(i.orderItemId)!.productId,
+          productName: byId.get(i.orderItemId)!.name,
+          quantity: i.quantity,
+          restock: i.restock,
+        })),
+      },
+      idempotencyKey
+    );
+    return ReturnService.getById(storeId, returnId);
+  }
+
+  /**
+   * STORE-QA-76: refund PART of an order from the order page: the chosen lines, per-line restock, one method. It IS a return
+   * (type `refund`) opened by the merchant, approved, marked received and completed in one request, so the whole partial-return
+   * engine applies unchanged: pro-rata discount/tax allocation, the line quantity cap, the ONE refundable balance (#624), the
+   * provider refund with its claim, the partial-return journal and the restock. If completion fails BEFORE money may have moved
+   * the return is rejected so its lines are free to retry; an indeterminate provider failure keeps it for reconciliation.
+   */
+  static async adminPartialRefund(
+    storeId: string,
+    userId: string,
+    data: {
+      orderId: string;
+      reason: string;
+      refundMethod: string;
+      items: Array<{ orderItemId: string; quantity: number; restock?: boolean }>;
+    },
+    idempotencyKey: string
+  ) {
+    const money = await storeMoney(storeId);
+    if (!money)
+      throw new AppError(409, 'RETURNS_NEED_DO_STORE', 'Returns for this store are not available');
+    const quote = await money.analyticsRefundQuote({ orderId: data.orderId, items: data.items });
+    if (quote.refundable <= 0)
+      throw new AppError(409, 'NOTHING_REFUNDABLE', 'This order has nothing left to refund.');
+    if (quote.coversWholeOrder && data.items.some(i => i.restock === false))
+      throw new AppError(
+        409,
+        'FULL_RETURN_RESTOCK_ALL',
+        'Refunding every line restocks every line. Leave one unit out, or restock all lines.'
+      );
+    const created = await ReturnService.adminCreate(
+      storeId,
+      {
+        orderId: data.orderId,
+        type: 'refund',
+        reason: data.reason,
+        items: data.items,
+      },
+      opKey('partial-refund-create', idempotencyKey)
+    );
+    const returnId = created.id as string;
+    try {
+      if (created.status === 'pending')
+        await ReturnService.updateStatusOnDo(money, storeId, returnId, 'approved', userId);
+      if (created.status === 'pending' || created.status === 'approved')
+        await ReturnService.updateStatusOnDo(money, storeId, returnId, 'received', userId);
+      return await ReturnService.complete(storeId, returnId, userId, data.refundMethod);
+    } catch (err) {
+      const indeterminate =
+        refundMayHaveExecuted(err) ||
+        (err instanceof AppError && err.code === 'PROVIDER_REFUND_INDETERMINATE');
+      if (!indeterminate)
+        await ReturnService.updateStatusOnDo(
+          money,
+          storeId,
+          returnId,
+          'rejected',
+          userId,
+          'Partial refund did not complete'
+        ).catch(rejectErr =>
+          logger.error(
+            { rejectErr, storeId, returnId },
+            '[ReturnService] failed partial refund left a received return behind'
+          )
+        );
+      throw err;
+    }
+  }
+
   static async create(storeId: string, data: CreateReturnData) {
     const doMoney = await storeMoney(storeId);
     if (doMoney) return ReturnService.createOnDo(doMoney, storeId, data);

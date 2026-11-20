@@ -73,6 +73,7 @@ import {
   finishReturn,
   postAmountOnlyRefundJournal,
   postPartialReturnJournal,
+  quoteOrderRefund,
   releaseReturn,
   setReturnStatus,
   setReturnTracking,
@@ -303,6 +304,7 @@ export type MoneyOpName =
   | 'analyticsImportFinish'
   | 'analyticsPeriod'
   | 'analyticsNetRevenue'
+  | 'analyticsRefundQuote'
   | 'analyticsNetRevenueDays'
   | 'analyticsSales'
   | 'analyticsItems'
@@ -447,6 +449,7 @@ export const MONEY_OP_NAMES: readonly MoneyOpName[] = [
   'analyticsImportFinish',
   'analyticsPeriod',
   'analyticsNetRevenue',
+  'analyticsRefundQuote',
   'analyticsNetRevenueDays',
   'analyticsSales',
   'analyticsItems',
@@ -975,6 +978,15 @@ const OPS: Record<MoneyOpName, (db: SyncSql, storeId: string, a: Args) => unknow
   /** Merchant analytics reads (analytics-reads.ts): reads, a retry is a fresh read. */
   analyticsPeriod: (db, storeId, a) => analyticsPeriodOp(db, storeId, a),
   analyticsNetRevenue: (db, storeId, a) => analyticsNetRevenueOp(db, storeId, a),
+  /** STORE-QA-76: the admin refund / new-return dialogs' read (remaining refundable, per-line remaining qty, estimate for a selection). */
+  analyticsRefundQuote: (db, storeId, a) =>
+    quoteOrderRefund(db, {
+      storeId,
+      orderId: id(a.orderId, 'orderId'),
+      items: Array.isArray(a.items)
+        ? (a.items as { orderItemId: string; quantity: number }[])
+        : undefined,
+    }),
   analyticsNetRevenueDays: (db, storeId, a) => analyticsNetRevenueDaysOp(db, storeId, a),
   analyticsSales: (db, storeId, a) => analyticsSalesOp(db, storeId, a),
   analyticsItems: (db, storeId, a) => analyticsItemsOp(db, storeId, a),
