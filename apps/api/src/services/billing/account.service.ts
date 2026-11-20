@@ -29,6 +29,7 @@ import {
   isGrantedPlan,
   isInterval,
   intervalOfPeriod,
+  priceFor,
   type BillingInterval,
   addIntervalAnchored,
 } from './period';
@@ -581,7 +582,7 @@ async function paymentNotDueYet(
   // loadPayablePlan throws for a free/granted/unpriced plan: no known current price = fail open to the existing rule
   const listPrice = interval
     ? await loadPayablePlan(sub.planCode, interval).then(
-        r => r.price,
+        r => priceFor(r.plan, interval),
         () => null
       )
     : null;
