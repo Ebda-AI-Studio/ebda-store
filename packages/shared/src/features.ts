@@ -219,6 +219,10 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr: 'تتبع مستويات المخزون وتعيين تنبيهات انخفاض المخزون وإدارة المستودعات.',
     category: 'commerce',
     tier: 'core',
+    // F2 (live QA 2026-11-17): the legacy PARENT flag gates nothing. It is in no plan baseline and no route, page or
+    // nav item reads it (inventory.routes.ts gates each handler on its `inventory.*` sub-key). Shown in the matrix it
+    // said "not included" while every inventory page worked. Hidden; the `inventory.*` sub-features are the gates.
+    hidden: true,
   },
   tax: {
     key: 'tax',
@@ -592,7 +596,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     name: 'Accounting — Profit Anomaly Watch',
     nameAr: 'المحاسبة — مراقبة شذوذ الأرباح',
     description:
-      'Runs a daily AI scan of margins (06:30 KWT); flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline.',
+      'Runs a daily AI scan of margins (06:30 Cairo time); flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline.',
     descriptionAr:
       'فحص يومي بالذكاء الاصطناعي للهوامش (06:30 بتوقيت القاهرة)؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
     category: 'operations',
