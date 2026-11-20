@@ -22,7 +22,9 @@ import {
   INSTAPAY_RECEIPT_MAX_BYTES,
   REGION,
   hasInstructionLikeText,
+  normalizeEgyptianMobile,
   normalizeInstapayReceiver,
+  toAsciiDigits,
   normalizeInstapayReference,
   zonedLocalToUtc,
   type InstapayReceiptExtraction,
@@ -112,7 +114,22 @@ export interface FlagInput {
   notBefore: Date | null;
   notBeforeFlag: 'DATE_BEFORE_ORDER' | 'DATE_TOO_OLD';
   sameImageSeenBefore: boolean;
+  /** QA-123: a downgrade payment received before its due window; flagged, never refused (the money is already sent). */
+  notDue?: boolean;
   now: Date;
+}
+
+/**
+ * The comparable form of a payee for the wrong-account FLAG: an InstaPay address lower-cased, a mobile in FULL E.164
+ * (`normalizeEgyptianMobile`: 01207761882 / +201207761882 / 201207761882 / Arabic-Indic digits all agree). A last-10-digits
+ * match let a foreign number that merely ends the same pass; anything that is not an Egyptian mobile or an address is null.
+ */
+export function comparableReceiver(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = toAsciiDigits(raw).trim().toLowerCase();
+  if (!v) return null;
+  if (v.includes('@')) return v.replace(/\s+/g, '');
+  return normalizeEgyptianMobile(v);
 }
 
 /** The automatic checks for the approver (pure). They flag; they never block. */
@@ -122,10 +139,10 @@ export function computeReceiptFlags(i: FlagInput): InstapayReceiptFlag[] {
     flags.push('AMOUNT_MISMATCH');
   }
   const expected = i.expectedReceivers
-    .map(r => normalizeInstapayReceiver(r))
+    .map(r => comparableReceiver(r))
     .filter((r): r is string => !!r);
   const shown = [i.fields.receiverHandle, i.fields.receiverMobile]
-    .map(r => normalizeInstapayReceiver(r))
+    .map(r => comparableReceiver(r))
     .filter((r): r is string => !!r);
   // RECEIVER-CHECK-1: the model compared the screenshot's receiver with the store's expected account(s) and answered
   // yes / no. A "no" flags RECEIVER_MISMATCH whatever the payer typed; a "yes" stands in for the typed fields (a payer who
@@ -141,6 +158,7 @@ export function computeReceiptFlags(i: FlagInput): InstapayReceiptFlag[] {
     // masked number that agrees on a few digits) never hides that
     flags.push('RECEIVER_MISMATCH');
   }
+  if (i.notDue) flags.push('PAYMENT_NOT_DUE');
   if (i.notBefore && i.transferredAt.getTime() < i.notBefore.getTime()) flags.push(i.notBeforeFlag);
   if (i.transferredAt.getTime() > i.now.getTime() + FUTURE_TOLERANCE_MS)
     flags.push('DATE_IN_FUTURE');
@@ -630,6 +648,7 @@ export class InstapayReceiptService {
     expectedAmountMinor: number | null;
     expectedReceivers: string[];
     notBefore: Date | null;
+    notDue?: boolean;
     now?: Date;
   }): Promise<ReceiptRow> {
     const now = args.now ?? new Date();
@@ -657,6 +676,7 @@ export class InstapayReceiptService {
       notBefore: args.notBefore,
       notBeforeFlag: args.scope.kind === 'order' ? 'DATE_BEFORE_ORDER' : 'DATE_TOO_OLD',
       sameImageSeenBefore: seen > 0,
+      notDue: args.notDue,
       now,
     });
     // One uniqueness space with the Durable Object stores (Ruling INSTAPAY-DO-1): the reference is also claimed in D1

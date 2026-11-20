@@ -88,6 +88,8 @@ interface BillingData {
 
 /** `POST /billing/instapay-plan`: what to transfer for the plan just picked. */
 interface InstapayQuote {
+  notDue?: boolean;
+  mobile?: string | null;
   handle: string | null;
   qrUrl?: string | null;
   reference: string | null;

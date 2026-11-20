@@ -26,9 +26,14 @@ vi.mock('@ebda/database', async importOriginal => {
   return { ...real, withStore: (_id: string, fn: (t: unknown) => unknown) => fn(tx) };
 });
 
-import { computeReceiptFlags } from '@api/services/payment-providers/instapay-receipt.service';
+import {
+  comparableReceiver,
+  computeReceiptFlags,
+} from '@api/services/payment-providers/instapay-receipt.service';
 import {
   downgradePaymentNotDue,
+  maskIfNotDue,
+  manualPeriodFor,
   DOWNGRADE_PAYMENT_WINDOW_DAYS,
 } from '@api/services/billing/account.service';
 import { instapayMobile, instapayPayees } from '@api/services/billing/manual-config';
@@ -168,5 +173,79 @@ describe('InstaPay payee = handle OR mobile of the one Ebda account', () => {
   it('any other recipient still goes to review', () => {
     expect(flags('someone@instapay', null)).toContain('RECEIVER_MISMATCH');
     expect(flags(null, '01099999999')).toContain('RECEIVER_MISMATCH');
+  });
+});
+
+describe('QA-123 (b) money is never refused: a not-due downgrade receipt is FLAGGED, and its approval keeps the period rule', () => {
+  const base = {
+    fields: {
+      amountMinor: 149_000,
+      receiverHandle: 'voidengineer911@instapay',
+      receiverMobile: null,
+    } as never,
+    transferredAt: D('2026-11-20'),
+    extraction: null,
+    extractionStatus: 'failed',
+    expectedAmountMinor: 149_000,
+    expectedReceivers: ['voidengineer911@instapay'],
+    notBefore: null,
+    notBeforeFlag: 'DATE_TOO_OLD' as const,
+    sameImageSeenBefore: false,
+    now: D('2026-11-20'),
+  };
+  it('notDue adds PAYMENT_NOT_DUE and nothing else is dropped', () => {
+    expect(computeReceiptFlags({ ...base, notDue: true })).toContain('PAYMENT_NOT_DUE');
+    expect(computeReceiptFlags(base)).not.toContain('PAYMENT_NOT_DUE');
+  });
+  it('the approval period of an in-window downgrade starts at the CURRENT end (EBDA-MONEYA-6 unchanged)', () => {
+    const sub = {
+      status: 'active',
+      trialEndsAt: null,
+      currentPeriodEnd: D('2027-11-12'),
+      billingAnchorDay: 12,
+    };
+    const p = manualPeriodFor(sub, 'monthly', D('2027-11-09'));
+    expect(p.periodStart.toISOString()).toBe('2027-11-12T00:00:00.000Z');
+    expect(p.periodEnd.toISOString()).toBe('2027-12-12T00:00:00.000Z');
+  });
+  it('the merchant view of a not-due downgrade carries no amount, payee or QR', () => {
+    const d = {
+      notDue: true,
+      handle: 'a@instapay',
+      mobile: '0120',
+      qrUrl: 'https://x',
+      amountMinor: 1,
+      vat: {},
+      reference: 'EBD-1',
+    };
+    expect(maskIfNotDue(d)).toMatchObject({
+      handle: null,
+      mobile: null,
+      qrUrl: null,
+      amountMinor: null,
+      vat: null,
+      reference: 'EBD-1',
+    });
+    const due = { ...d, notDue: false };
+    expect(maskIfNotDue(due)).toBe(due);
+  });
+});
+
+describe('payee compare is full E.164, not the last 10 digits', () => {
+  it('forms of the same mobile agree; a number that only shares the last 10 digits does not', () => {
+    const want = comparableReceiver('01207761882');
+    expect(want).toBe('+201207761882');
+    for (const f of [
+      '+201207761882',
+      '201207761882',
+      '00201207761882',
+      '٠١٢٠٧٧٦١٨٨٢',
+      '0120 776 1882',
+    ])
+      expect(comparableReceiver(f)).toBe(want);
+    expect(comparableReceiver('+441207761882')).toBeNull();
+    expect(comparableReceiver('1207761882')).toBe(want); // the reader's last-10 form
+    expect(comparableReceiver('01207761883')).not.toBe(want);
+    expect(comparableReceiver('VoidEngineer911@InstaPay')).toBe('voidengineer911@instapay');
   });
 });

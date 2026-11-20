@@ -36,6 +36,14 @@ export function InstapayPanel({
     [t('reference'), instapay.reference],
   ] as const;
 
+  if (instapay.notDue) {
+    return (
+      <p className="text-sm text-muted-foreground" data-testid="instapay-not-due">
+        {t('notDue')}
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-3 text-sm">
       <ol

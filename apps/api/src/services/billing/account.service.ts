@@ -390,7 +390,14 @@ export async function instapayDetails(storeId: string) {
   // Through the ONE charge-amount seam (Ebda platform VAT applied there).
   const charge = listPrice === null ? null : await chargeFor(listPrice);
   const vat: LedgerVat | null = charge ? ledgerVat(charge).vat : null;
+  const notDue = await paymentNotDueYet(
+    sub,
+    { planCode, amountMinor: charge ? charge.totalMinor : null },
+    new Date()
+  );
   return {
+    /** A pending downgrade that is not due yet: callers that SHOW payment details to the merchant hide them (QA-123). */
+    notDue,
     handle,
     mobile: instapayMobile(),
     qrUrl: handle ? instapayQrUrl() : null,
@@ -493,6 +500,21 @@ export async function chooseInstapay(storeId: string) {
   throw new AppError(503, 'REFERENCE_UNAVAILABLE', 'Try again');
 }
 
+/** QA-123 (b): what the merchant sees for a pending downgrade that is not due yet: no amount, no payee, no QR. */
+export function maskIfNotDue<
+  T extends {
+    notDue: boolean;
+    handle: string | null;
+    mobile: string | null;
+    qrUrl: string | null;
+    amountMinor: number | null;
+    vat: unknown;
+  },
+>(d: T | null): T | null {
+  if (!d || !d.notDue) return d;
+  return { ...d, handle: null, mobile: null, qrUrl: null, amountMinor: null, vat: null };
+}
+
 /**
  * InstaPay plan choice (audit M3): the plan + interval the NEXT InstaPay payment
  * buys, for any state — trialing (billed at trial end), active/past_due (upgrade or
@@ -531,7 +553,7 @@ export async function chooseInstapayPlan(args: {
     });
   });
   await chooseInstapay(args.storeId);
-  return instapayDetails(args.storeId);
+  return maskIfNotDue(await instapayDetails(args.storeId));
 }
 
 // ───────────────────────────── period rule ────────────────────────────────
@@ -566,7 +588,7 @@ export function downgradePaymentNotDue(
 }
 
 /** `downgradePaymentNotDue` with the current period's price looked up (the interval from the period's own dates). */
-async function paymentNotDueYet(
+export async function paymentNotDueYet(
   sub: {
     status: string;
     planCode: string;
@@ -694,13 +716,9 @@ async function submitSubscriptionReceiptInner(args: {
   const reference = normalizeInstapayReference(args.fields.reference)!;
   return withStore(args.storeId, async tx => {
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: args.storeId } });
-    if (await paymentNotDueYet(sub, details, now)) {
-      throw new AppError(
-        409,
-        'PAYMENT_NOT_DUE_YET',
-        'This plan change starts when your current plan ends, so there is nothing to pay yet'
-      );
-    }
+    // QA-123 (b): InstaPay is transfer first, receipt second, so the money may already be sent. NEVER refuse the
+    // receipt: it becomes a claim flagged PAYMENT_NOT_DUE and waits for the operator (never-reject-an-external-money-fact).
+    const notDue = await paymentNotDueYet(sub, details, now);
     const pending = await tx.manualPaymentClaim.count({
       where: { storeId: args.storeId, status: 'pending' },
     });
@@ -726,6 +744,7 @@ async function submitSubscriptionReceiptInner(args: {
       expectedAmountMinor: details.amountMinor,
       expectedReceivers: instapayPayees(),
       notBefore,
+      notDue,
       now,
     });
     // The receipt is a draft again: its D1 reference claim (Ruling INSTAPAY-DO-1) is freed once this transaction commits.

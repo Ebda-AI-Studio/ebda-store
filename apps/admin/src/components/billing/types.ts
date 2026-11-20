@@ -56,6 +56,8 @@ export interface BillingInfo {
     handle: string | null;
     /** The same InstaPay account's mobile; null/absent = none. */
     mobile?: string | null;
+    /** A pending downgrade that is not due yet: no payee/amount is sent, show the wait notice instead. */
+    notDue?: boolean;
     reference: string | null;
     amountMinor: number | null;
     /** VAT inside `amountMinor`; null/absent = no VAT line. */

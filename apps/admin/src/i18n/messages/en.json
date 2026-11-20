@@ -9420,6 +9420,7 @@
       "instapay": "InstaPay",
       "useInstapay": "Pay by InstaPay",
       "handle": "InstaPay address",
+      "notDue": "Your plan change starts when your current plan ends, so there is nothing to transfer yet. The payment details appear 7 days before then.",
       "mobile": "InstaPay mobile number (same account)",
       "amount": "Exact amount",
       "reference": "Your reference",
@@ -9469,6 +9470,7 @@
     "taxInvoiceSeller": "Tax invoices issued by {name}, tax registration number {trn}.",
     "instapay": {
       "handle": "InstaPay address",
+      "notDue": "Your plan change starts when your current plan ends, so there is nothing to transfer yet. The payment details appear 7 days before then.",
       "mobile": "InstaPay mobile number (same account)",
       "amount": "Exact amount",
       "reference": "Your reference",
@@ -10846,7 +10848,8 @@
       "FIELDS_CORRECTED": "Details were changed after the automatic read",
       "SAME_IMAGE_USED_BEFORE": "This image was used before",
       "AI_UNAVAILABLE": "Automatic read was unavailable",
-      "SUSPICIOUS_TEXT": "Text on the image reads like an instruction, not a receipt"
+      "SUSPICIOUS_TEXT": "Text on the image reads like an instruction, not a receipt",
+      "PAYMENT_NOT_DUE": "Plan change is not due yet: the transfer is held until 7 days before the current plan ends"
     },
     "review": {
       "status": {

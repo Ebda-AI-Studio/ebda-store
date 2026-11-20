@@ -89,7 +89,12 @@ import {
   shiftedByGrants,
   sweepFreeMonthGrants,
 } from './grants.service';
-import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
+import {
+  assertPayableStore,
+  isBillableStoreId,
+  paymentNotDueYet,
+  suspendForBilling,
+} from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayMobile, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
@@ -2385,6 +2390,12 @@ export async function getSubscriptionBillingState(storeId: string) {
   const now = Date.now();
   const daysLeft = next ? Math.ceil((next.at.getTime() - now) / 86_400_000) : null;
   const handle = instapayHandle();
+  // QA-123 (b): a pending downgrade is paid from 7 days before the period ends; until then no amount / payee is shown.
+  const notDue = await paymentNotDueYet(
+    sub,
+    { planCode: next?.planCode ?? sub?.planCode ?? '', amountMinor: next?.amountMinor ?? null },
+    new Date(now)
+  );
   const support = supportContact();
   return {
     billingInterval: sub?.billingInterval ?? 'monthly',
@@ -2398,15 +2409,17 @@ export async function getSubscriptionBillingState(storeId: string) {
     /** InstaPay instructions; `handle` null = InstaPay not offered (not configured). */
     instapay: {
       available: !!handle,
-      handle,
+      /** A pending downgrade not due yet: payee, amount and QR are withheld (QA-123). */
+      notDue,
+      handle: notDue ? null : handle,
       /** The same account's mobile (EBDA_INSTAPAY_MOBILE); null = none configured. */
-      mobile: instapayMobile(),
+      mobile: notDue ? null : instapayMobile(),
       reference: sub?.paymentReference ?? null,
-      amountMinor: next?.amountMinor ?? null,
+      amountMinor: notDue ? null : (next?.amountMinor ?? null),
       /** Ebda VAT inside the amount + Ebda's TRN/legal name; null = no VAT line. */
-      vat: next?.vat ?? null,
+      vat: notDue ? null : (next?.vat ?? null),
       /** Ebda's InstaPay QR image (EBDA_INSTAPAY_QR_URL); null = no QR shown. */
-      qrUrl: handle ? instapayQrUrl() : null,
+      qrUrl: handle && !notDue ? instapayQrUrl() : null,
       pendingClaims,
     },
     /** Banner input: the next due date when it is within 7 days (or already past). */
