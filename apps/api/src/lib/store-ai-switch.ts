@@ -15,23 +15,46 @@ import { prisma } from '@ebda/database';
 import { storeDb, storeUpdate } from './repo-factory';
 import { AppError } from '../middleware/error-handler';
 import { readInStoreContext } from './store-scoped-read';
+import { isStoreOperational } from './store-operational';
 
 export const AI_DISABLED_BY_MERCHANT_CODE = 'AI_DISABLED_BY_MERCHANT';
+/** An admin-suspended store (or any non-active one) is refused AI spend. */
+export const STORE_AI_SUSPENDED_CODE = 'STORE_AI_SUSPENDED';
 
-/** A store that cannot be read is NOT enabled: fail closed. */
-export async function isStoreAiEnabled(storeId: string): Promise<boolean> {
+/** The merchant switch and the store's status in ONE uncached read (the never-stale gate); no row = both fail closed. */
+async function readAiGate(
+  storeId: string
+): Promise<{ aiFeaturesEnabled: boolean; status: string | null }> {
   // Through the store's backend (Ruling NZ-INTEG-1, NZ-AN-2): a DO store answers from its profile / D1 directory, never Postgres.
   const row = await readInStoreContext(storeId, async () =>
     (await storeDb(storeId)).store.findUnique({
       where: { id: storeId },
-      select: { aiFeaturesEnabled: true },
+      select: { aiFeaturesEnabled: true, status: true },
     })
   );
-  return row?.aiFeaturesEnabled === true;
+  return { aiFeaturesEnabled: row?.aiFeaturesEnabled === true, status: row?.status ?? null };
 }
 
+/** A store that cannot be read is NOT enabled: fail closed. This is the MERCHANT's switch only (what the AI settings page shows). */
+export async function isStoreAiEnabled(storeId: string): Promise<boolean> {
+  return (await readAiGate(storeId)).aiFeaturesEnabled;
+}
+
+/**
+ * The AI SPEND gate: the merchant's switch AND the store being operational. A store an admin suspended must not keep spending the
+ * platform's AI budget (Ruling SUSPEND-AI-1): interactive routes, bulk sweeps and the autopilot all pass here through `assertAiQuota` /
+ * `requireAiEnabled`. Status is read uncached with the switch (NEVER-stale: a suspension is obeyed on the very next call); an
+ * unknown status is not operational (fail closed).
+ */
 export async function assertStoreAiEnabled(storeId: string): Promise<void> {
-  if (await isStoreAiEnabled(storeId)) return;
+  const gate = await readAiGate(storeId);
+  if (!isStoreOperational(gate.status))
+    throw new AppError(
+      403,
+      STORE_AI_SUSPENDED_CODE,
+      'This store is suspended, so AI features are paused. Contact support to get it reactivated.'
+    );
+  if (gate.aiFeaturesEnabled) return;
   throw new AppError(
     403,
     AI_DISABLED_BY_MERCHANT_CODE,

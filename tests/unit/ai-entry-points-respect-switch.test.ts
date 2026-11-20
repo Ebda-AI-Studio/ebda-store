@@ -31,7 +31,7 @@ vi.mock('@api/lib/store-scoped-read', () => ({
 vi.mock('@api/lib/repo-factory', async importOriginal => ({
   ...(await importOriginal<typeof import('@api/lib/repo-factory')>()),
   storeDb: async () => ({
-    store: { findUnique: async () => ({ aiFeaturesEnabled: sw.enabled }) },
+    store: { findUnique: async () => ({ aiFeaturesEnabled: sw.enabled, status: 'active' }) },
   }),
 }));
 
