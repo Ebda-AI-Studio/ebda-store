@@ -19,6 +19,7 @@ import { isStoreOperational } from './store-operational';
 
 export const AI_DISABLED_BY_MERCHANT_CODE = 'AI_DISABLED_BY_MERCHANT';
 /** An admin-suspended store (or any non-active one) is refused AI spend. */
+// pq-allow(unused-export): test seam, imported by tests/unit/ai-store-switch.test.ts
 export const STORE_AI_SUSPENDED_CODE = 'STORE_AI_SUSPENDED';
 
 /** The merchant switch and the store's status in ONE uncached read (the never-stale gate); no row = both fail closed. */
