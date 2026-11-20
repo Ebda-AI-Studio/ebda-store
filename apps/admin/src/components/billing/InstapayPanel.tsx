@@ -31,6 +31,7 @@ export function InstapayPanel({
   const showQr = !!instapay.qrUrl && !qrFailed;
   const rows = [
     [t('handle'), instapay.handle],
+    [t('mobile'), instapay.mobile ?? null],
     [t('amount'), amount],
     [t('reference'), instapay.reference],
   ] as const;

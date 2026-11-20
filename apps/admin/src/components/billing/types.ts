@@ -54,6 +54,8 @@ export interface BillingInfo {
   instapay: {
     available: boolean;
     handle: string | null;
+    /** The same InstaPay account's mobile; null/absent = none. */
+    mobile?: string | null;
     reference: string | null;
     amountMinor: number | null;
     /** VAT inside `amountMinor`; null/absent = no VAT line. */

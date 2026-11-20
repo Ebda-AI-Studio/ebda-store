@@ -79,6 +79,7 @@ import {
   upgradeKey,
   type BillingInterval,
   addIntervalAnchored,
+  intervalOfPeriod,
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
 import {
@@ -90,7 +91,7 @@ import {
 } from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
 import { auditLog } from '../../middleware/security';
-import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
+import { instapayHandle, instapayMobile, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
 import {
   chargeFor,
@@ -1555,10 +1556,17 @@ export async function resumeSubscription(args: { storeId: string }): Promise<voi
   if (!sub || !['active', 'trialing'].includes(sub.status)) {
     throw new AppError(409, 'NOTHING_TO_RESUME', 'Nothing to resume');
   }
+  // QA-123 (a): a scheduled plan change also overwrote `billingInterval` with the new plan's interval, so "keep my plan"
+  // must put the interval back too - read from the period the store actually paid (its own dates), else left as is.
+  const restored = sub.status === 'active' ? intervalOfPeriod(sub) : null;
   await withStore(args.storeId, tx =>
     tx.storeSubscription.update({
       where: { storeId: args.storeId },
-      data: { cancelAtPeriodEnd: false, pendingPlanCode: null },
+      data: {
+        cancelAtPeriodEnd: false,
+        pendingPlanCode: null,
+        ...(sub.pendingPlanCode && restored ? { billingInterval: restored } : {}),
+      },
     })
   );
 }
@@ -2391,6 +2399,8 @@ export async function getSubscriptionBillingState(storeId: string) {
     instapay: {
       available: !!handle,
       handle,
+      /** The same account's mobile (EBDA_INSTAPAY_MOBILE); null = none configured. */
+      mobile: instapayMobile(),
       reference: sub?.paymentReference ?? null,
       amountMinor: next?.amountMinor ?? null,
       /** Ebda VAT inside the amount + Ebda's TRN/legal name; null = no VAT line. */

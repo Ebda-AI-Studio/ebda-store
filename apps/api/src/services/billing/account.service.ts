@@ -28,6 +28,7 @@ import {
   addInterval,
   isGrantedPlan,
   isInterval,
+  intervalOfPeriod,
   type BillingInterval,
   addIntervalAnchored,
 } from './period';
@@ -43,7 +44,7 @@ import { runBillingEffects } from './billing-notify';
 import { getEntityStoreId, lookupStore } from '../../lib/definer';
 import { withSavepoint } from '../../lib/savepoint';
 import { loadPayablePlan } from './subscription-billing.service';
-import { instapayHandle, instapayQrUrl } from './manual-config';
+import { instapayHandle, instapayMobile, instapayPayees, instapayQrUrl } from './manual-config';
 import { sendAlert } from '../alerts.service';
 import {
   commitManualPaymentD1,
@@ -390,6 +391,7 @@ export async function instapayDetails(storeId: string) {
   const vat: LedgerVat | null = charge ? ledgerVat(charge).vat : null;
   return {
     handle,
+    mobile: instapayMobile(),
     qrUrl: handle ? instapayQrUrl() : null,
     reference: sub.paymentReference,
     planCode,
@@ -533,6 +535,65 @@ export async function chooseInstapayPlan(args: {
 
 // ───────────────────────────── period rule ────────────────────────────────
 
+/** Reminders start this many days before the due date; a downgrade payment is accepted from then on (QA-123). */
+export const DOWNGRADE_PAYMENT_WINDOW_DAYS = 7;
+
+/**
+ * QA-123 (b): a payment for a pending DOWNGRADE is not due until the current paid period nearly ends. Without this a
+ * Business-yearly store that picked "Basic monthly" and paid at once got its tier cut immediately while the paid time
+ * began a year ahead (period rule, Ruling EBDA-MONEYA-6 starts an early payer at the current end). Upgrades are
+ * unaffected (their tier gain at once is the accepted MONEYA-6 behaviour). Pure.
+ */
+export function downgradePaymentNotDue(
+  sub: {
+    status: string;
+    planCode: string;
+    pendingPlanCode: string | null;
+    currentPeriodEnd: Date | null;
+  } | null,
+  paying: { planCode: string; amountMinor: number },
+  currentPeriodAmountMinor: number | null,
+  now: Date
+): boolean {
+  if (!sub || !['active', 'past_due'].includes(sub.status) || !sub.currentPeriodEnd) return false;
+  if (paying.planCode === sub.planCode && !sub.pendingPlanCode) return false;
+  if (currentPeriodAmountMinor === null || paying.amountMinor >= currentPeriodAmountMinor) {
+    return false;
+  }
+  const dueFrom = sub.currentPeriodEnd.getTime() - DOWNGRADE_PAYMENT_WINDOW_DAYS * 86_400_000;
+  return now.getTime() < dueFrom;
+}
+
+/** `downgradePaymentNotDue` with the current period's price looked up (the interval from the period's own dates). */
+async function paymentNotDueYet(
+  sub: {
+    status: string;
+    planCode: string;
+    pendingPlanCode: string | null;
+    currentPeriodStart: Date | null;
+    currentPeriodEnd: Date | null;
+  } | null,
+  paying: { planCode: string; amountMinor: number | null },
+  now: Date
+): Promise<boolean> {
+  if (!sub || !paying.amountMinor) return false;
+  const interval = intervalOfPeriod(sub);
+  // loadPayablePlan throws for a free/granted/unpriced plan: no known current price = fail open to the existing rule
+  const listPrice = interval
+    ? await loadPayablePlan(sub.planCode, interval).then(
+        r => r.price,
+        () => null
+      )
+    : null;
+  const currentAmount = listPrice === null ? null : (await chargeFor(listPrice)).totalMinor;
+  return downgradePaymentNotDue(
+    sub,
+    { planCode: paying.planCode, amountMinor: paying.amountMinor },
+    currentAmount,
+    now
+  );
+}
+
 /**
  * Where a manually paid period starts (audit M2): never before the time the store
  * already has. Paying early (reminders start 7 days ahead) starts at the current period
@@ -632,6 +693,13 @@ async function submitSubscriptionReceiptInner(args: {
   const reference = normalizeInstapayReference(args.fields.reference)!;
   return withStore(args.storeId, async tx => {
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: args.storeId } });
+    if (await paymentNotDueYet(sub, details, now)) {
+      throw new AppError(
+        409,
+        'PAYMENT_NOT_DUE_YET',
+        'This plan change starts when your current plan ends, so there is nothing to pay yet'
+      );
+    }
     const pending = await tx.manualPaymentClaim.count({
       where: { storeId: args.storeId, status: 'pending' },
     });
@@ -655,7 +723,7 @@ async function submitSubscriptionReceiptInner(args: {
       scope: { kind: 'subscription' },
       fields: args.fields,
       expectedAmountMinor: details.amountMinor,
-      expectedReceivers: details.handle ? [details.handle] : [],
+      expectedReceivers: instapayPayees(),
       notBefore,
       now,
     });
@@ -1045,6 +1113,17 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     // period computed below is never from a read a grant is about to change.
     await lockSubscription(tx, input.storeId);
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
+    // QA-123 (b): a downgrade is not paid for a year ahead; an operator who really means it gives the period explicitly.
+    if (
+      !explicit &&
+      (await paymentNotDueYet(sub, { planCode: plan.code, amountMinor: input.amountMinor }, now))
+    ) {
+      throw new AppError(
+        409,
+        'PAYMENT_NOT_DUE_YET',
+        'This plan change starts when the current plan ends, so there is nothing to pay yet'
+      );
+    }
     const { periodStart, periodEnd } = explicit
       ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
       : manualPeriodFor(sub, input.interval, now);

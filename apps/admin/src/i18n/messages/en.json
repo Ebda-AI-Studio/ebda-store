@@ -9420,6 +9420,7 @@
       "instapay": "InstaPay",
       "useInstapay": "Pay by InstaPay",
       "handle": "InstaPay address",
+      "mobile": "InstaPay mobile number (same account)",
       "amount": "Exact amount",
       "reference": "Your reference",
       "copy": "Copy",
@@ -9468,6 +9469,7 @@
     "taxInvoiceSeller": "Tax invoices issued by {name}, tax registration number {trn}.",
     "instapay": {
       "handle": "InstaPay address",
+      "mobile": "InstaPay mobile number (same account)",
       "amount": "Exact amount",
       "reference": "Your reference",
       "copy": "Copy",

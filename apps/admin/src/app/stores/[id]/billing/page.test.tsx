@@ -452,7 +452,7 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
           { ...plans[0], code: 'growth' },
         ],
         plan: { code: 'basic', nameEn: 'Basic', nameAr: 'أساسي', subscribedPlanCode: 'basic' },
-        billing: { ...instapayChosen, pendingPlanCode: null },
+        billing: { ...instapayChosen, pendingPlanCode: null, billingInterval: 'monthly' },
       })
     );
     apiPost.mockImplementation(async (url: string) => ({
@@ -479,6 +479,24 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     );
     expect(await screen.findByTestId('instapay-quote')).toBeTruthy();
     expect(document.getElementById('plans')).toBeTruthy();
+  });
+
+  it('QA-123: on a yearly plan the CURRENT plan card offers the monthly switch (and not the yearly one it already has)', async () => {
+    mockApi(
+      billing({
+        subscription: { ...trialing, status: 'active' },
+        availablePlans: [{ ...plans[0], code: 'growth' }],
+        plan: { code: 'growth', nameEn: 'Growth', nameAr: 'نمو', subscribedPlanCode: 'growth' },
+        billing: { ...instapayChosen, pendingPlanCode: null, billingInterval: 'yearly' },
+      })
+    );
+    render(<StoreBillingPage />);
+    // picker opens on monthly while the store is yearly: the current plan can be switched to monthly
+    expect(await screen.findByRole('button', { name: 'chooseThisPlan' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'intervalYearly' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'chooseThisPlan' })).toBeNull()
+    );
   });
 
   it('canceled store: "subscription ended" copy, never "Free plan limits apply", plan picker shown', async () => {

@@ -53,7 +53,7 @@ import { isP2002 } from '../../lib/prisma-errors';
 import { withSavepoint } from '../../lib/savepoint';
 import { StorageService } from '../storage.service';
 import { readInstapayReceipt } from '../../lib/ai/instapay-receipt-reader';
-import { instapayHandle } from '../billing/manual-config';
+import { instapayPayees } from '../billing/manual-config';
 
 export type ReceiptKind = 'subscription' | 'order';
 
@@ -549,7 +549,7 @@ export class InstapayReceiptService {
       ) as Record<string, unknown>;
       raw.push(m.handle, m.phone);
     } else if (row.kind === 'subscription') {
-      raw.push(instapayHandle());
+      raw.push(...instapayPayees());
     }
     return [
       ...new Set(

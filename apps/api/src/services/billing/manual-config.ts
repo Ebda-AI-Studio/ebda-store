@@ -12,6 +12,24 @@ export function instapayHandle(
   return v ? v.slice(0, 120) : null;
 }
 
+/**
+ * Ebda's InstaPay account is ONE account with two identifiers: the handle (EBDA_INSTAPAY_HANDLE) and the mobile
+ * (EBDA_INSTAPAY_MOBILE, any Egyptian format). A transfer to either is a transfer to the right account. The mobile is
+ * optional; unset = handle only. Returned in the canonical local form 01XXXXXXXXX; junk is dropped.
+ */
+export function instapayMobile(
+  env: Record<string, string | undefined> = process.env
+): string | null {
+  const raw = (env.EBDA_INSTAPAY_MOBILE ?? '').trim();
+  const e164 = raw ? normalizeEgyptianMobile(raw) : null;
+  return e164 ? e164.replace(/^\+20/, '0') : null;
+}
+
+/** Every identifier that is Ebda's InstaPay account (handle first). The receipt check passes on ANY of them. */
+export function instapayPayees(env: Record<string, string | undefined> = process.env): string[] {
+  return [instapayHandle(env), instapayMobile(env)].filter((v): v is string => !!v);
+}
+
 /** wa.me link to Ebda support (EBDA_SUPPORT_WHATSAPP); null when unset. No WhatsApp API is used. */
 export function supportWhatsappUrl(
   text?: string,
