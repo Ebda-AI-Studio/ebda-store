@@ -89,7 +89,16 @@ fiscalDocumentRoutes.get(
         ((store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'en'
           ? 'en'
           : 'ar');
-      res.type('html').send(renderFiscalDocumentHtml(doc, lang, store?.timezone || 'Africa/Cairo'));
+      res
+        .type('html')
+        .send(
+          renderFiscalDocumentHtml(
+            doc,
+            lang,
+            store?.timezone || 'Africa/Cairo',
+            (store?.settings as { receiptBarcodeShape?: unknown } | null)?.receiptBarcodeShape
+          )
+        );
     } catch (error) {
       next(error);
     }
