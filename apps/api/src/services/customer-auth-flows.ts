@@ -10,7 +10,6 @@ import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { PASSWORD_RESET_TTL_MINUTES } from '@ebda/shared';
-import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
@@ -79,7 +78,7 @@ async function sendVerification(
     {
       email: u.email,
       name: `${u.firstName} ${u.lastName}`.trim() || u.email,
-      verificationUrl: `${config.webUrl}/auth/verify-email?token=${token}`,
+      token,
       expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
     },
     lang(u.language)
@@ -367,7 +366,7 @@ export const CustomerAuthFlows = {
         {
           email: u.email,
           name: `${u.firstName} ${u.lastName}`.trim() || u.email,
-          resetUrl: `${config.webUrl}/auth/reset-password?token=${t.token}`,
+          token: t.token,
           expiresInMinutes: PASSWORD_RESET_TTL_MINUTES,
         },
         lang(u.language)

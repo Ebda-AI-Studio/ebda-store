@@ -158,6 +158,8 @@ const registerSchema = z
     // Storefront sends the current tenant's storeId so registrations
     // are isolated per store. Admin app omits it.
     storeId: z.string().uuid().optional(),
+    /** The shopper's storefront language at sign-up; picks the verification email's language. */
+    language: z.enum(['en', 'ar']).optional(),
   })
   .refine(data => data.name || data.firstName, {
     message: 'Name or firstName is required',

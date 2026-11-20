@@ -80,6 +80,7 @@ import {
 import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
 import { resolveDefaultLanguage } from '@ebda/shared';
+import { storefrontBase, storefrontTokenLink } from '../lib/storefront-link';
 // ==========================================
 // Email Service
 // Transactional email handling
@@ -181,12 +182,14 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   const font = isArabic ? EMAIL_FONT_AR : EMAIL_FONT;
   const displayName = isArabic && store.nameAr ? store.nameAr : store.name;
   const storeName = escapeHtml(displayName);
-  const platformMark = store.logo === BRAND_EMAIL_LOGO_URL;
+  // A relative / non-https logo cannot load in a mail client (it paints as an empty square): fall back to the wordmark.
+  const logoSrc = store.logo && /^https:\/\//i.test(store.logo.trim()) ? store.logo.trim() : null;
+  const platformMark = logoSrc === BRAND_EMAIL_LOGO_URL;
   // Merchant logos retain their own identity. The platform mark is abbreviated,
   // so it also displays the full localized product name.
-  const header = store.logo
+  const header = logoSrc
     ? emailImage({
-        src: store.logo,
+        src: logoSrc,
         alt: displayName,
         // The platform mark is portrait (135x256 PNG): width 34 = 64 * 135/256, so Outlook (which reads only the
         // width attribute) renders it at the same 34x64 every other client scales it to.
@@ -781,7 +784,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true },
+        select: { name: true, settings: true, slug: true, domain: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -791,7 +794,7 @@ export class EmailService {
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
     const subject = paymentFailedTemplate.subject[lang](data, store.name);
-    const content = paymentFailedTemplate[lang](data, store.name, config.webUrl);
+    const content = paymentFailedTemplate[lang](data, store.name, storefrontBase(store, lang));
     await this.sendForStore(storeId, { to: data.customerEmail, subject, content, language: lang });
   }
 
@@ -839,7 +842,8 @@ export class EmailService {
     data: {
       email: string;
       name: string;
-      resetUrl: string;
+      /** The raw one-time token; the link is built here on the store's storefront host. */
+      token: string;
       expiresInMinutes: number;
     },
     language?: 'en' | 'ar'
@@ -847,7 +851,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true },
+        select: { name: true, settings: true, slug: true, domain: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -856,8 +860,14 @@ export class EmailService {
       resolveDefaultLanguage(
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
-    const subject = passwordResetTemplate.subject[lang](data, store.name);
-    const content = passwordResetTemplate[lang](data, store.name);
+    const tpl = {
+      email: data.email,
+      name: data.name,
+      expiresInMinutes: data.expiresInMinutes,
+      resetUrl: storefrontTokenLink(store, lang, 'reset-password', data.token),
+    };
+    const subject = passwordResetTemplate.subject[lang](tpl, store.name);
+    const content = passwordResetTemplate[lang](tpl, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
   }
 
@@ -889,7 +899,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true },
+        select: { name: true, settings: true, slug: true, domain: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -899,7 +909,7 @@ export class EmailService {
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
     const subject = welcomeTemplate.subject[lang](data, store.name);
-    const content = welcomeTemplate[lang](data, store.name, config.webUrl);
+    const content = welcomeTemplate[lang](data, store.name, storefrontBase(store, lang));
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
   }
 
@@ -911,7 +921,8 @@ export class EmailService {
     data: {
       email: string;
       name: string;
-      verificationUrl: string;
+      /** The raw one-time token; the link is built here on the store's storefront host, never by the caller. */
+      token: string;
       expiresInHours: number;
     },
     language?: 'en' | 'ar'
@@ -919,7 +930,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true },
+        select: { name: true, settings: true, slug: true, domain: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -928,8 +939,14 @@ export class EmailService {
       resolveDefaultLanguage(
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
-    const subject = emailVerificationTemplate.subject[lang](data, store.name);
-    const content = emailVerificationTemplate[lang](data, store.name);
+    const tpl = {
+      email: data.email,
+      name: data.name,
+      expiresInHours: data.expiresInHours,
+      verificationUrl: storefrontTokenLink(store, lang, 'verify-email', data.token),
+    };
+    const subject = emailVerificationTemplate.subject[lang](tpl, store.name);
+    const content = emailVerificationTemplate[lang](tpl, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
   }
 
@@ -950,7 +967,7 @@ export class EmailService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { name: true, settings: true },
+        select: { name: true, settings: true, slug: true, domain: true },
       })
     );
     if (!store) throw new Error(`Store ${storeId} not found`);
@@ -960,7 +977,11 @@ export class EmailService {
         (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
       );
     const subject = duplicateRegistrationTemplate.subject[lang](data, store.name);
-    const content = duplicateRegistrationTemplate[lang](data, store.name, config.webUrl);
+    const content = duplicateRegistrationTemplate[lang](
+      data,
+      store.name,
+      storefrontBase(store, lang)
+    );
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
   }
 

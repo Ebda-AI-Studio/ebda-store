@@ -64,6 +64,17 @@ describe('register / verify', () => {
     // the expired token was deleted (committed)
     expect(A.counts(db2)._cauth_tokens).toBe(0);
   });
+  it("a token minted for store A is refused by store B's DO and not consumed in A", () => {
+    const a = fx();
+    const b = fx();
+    reg(a);
+    expect(A.verifyEmail(b, { tokenHash: 'v1' }, T0 + 5)).toMatchObject({
+      ok: false,
+      code: 'TOKEN_INVALID',
+    });
+    const r = A.verifyEmail(a, { tokenHash: 'v1' }, T0 + 6);
+    expect(r.ok && r.data.already).toBe(false);
+  });
   it('resend: unknown -> none, recent -> refused, later -> issued', () => {
     const db = fx();
     reg(db);

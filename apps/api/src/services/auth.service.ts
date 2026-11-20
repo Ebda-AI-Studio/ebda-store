@@ -612,13 +612,12 @@ export class AuthService {
 
     // Send verification email
     if (storeId) {
-      const verificationUrl = `${config.webUrl}/auth/verify-email?token=${token}`;
       await EmailService.sendEmailVerification(
         storeId,
         {
           email,
           name,
-          verificationUrl,
+          token,
           expiresInHours: EMAIL_VERIFICATION_EXPIRY_HOURS,
         },
         language
@@ -2065,7 +2064,7 @@ export class AuthService {
           {
             email: user.email,
             name,
-            resetUrl: `${config.webUrl}/auth/reset-password?token=${resetToken}`,
+            token: resetToken,
             expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
           },
           language
