@@ -9,7 +9,6 @@
  * status write of a Durable Object store passes through is the money-op transport (`repo-factory.ts` `callMoney`), so this is
  * called there after the op committed, not from each of the ~50 call sites.
  */
-import { invalidateCachedPrefix, invalidateCustomersCache } from './public-cache';
 import logger from './logger';
 
 /** Cache key prefix of the analytics dashboard payload of ONE store (every date range). */
@@ -38,6 +37,8 @@ export function moneyOpMayChangeRevenue(op: string): boolean {
 
 /** Drop every cached revenue-derived figure of a store. Never throws: a Redis outage must not fail the write that already committed. */
 export async function invalidateStoreRevenueCaches(storeId: string): Promise<void> {
+  // lazy: `repo-factory` (imported by nearly everything) must not statically pull the public-cache module chain
+  const { invalidateCachedPrefix, invalidateCustomersCache } = await import('./public-cache.js');
   const results = await Promise.allSettled([
     invalidateCachedPrefix(analyticsDashboardPrefix(storeId)),
     invalidateCustomersCache(storeId),
