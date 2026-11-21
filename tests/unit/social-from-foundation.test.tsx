@@ -17,6 +17,9 @@ describe('social profiles come from EBDA.social', () => {
     expect(SOCIAL_SAME_AS).toContain('https://www.instagram.com/ebdaai.studio/');
     expect(JSON.stringify(SOCIAL_SAME_AS)).not.toMatch(CLOSED);
     expect(SOCIAL_SAME_AS).toEqual(profiles.map(a => a.url));
+    expect(siteFooter('en').brand.social.map(a => [a.id, a.label])).toEqual(
+      profiles.map(a => [a.id, a.label])
+    );
   });
   for (const lang of ['ar', 'en'] as const) {
     it(`${lang}: footer data, support-site HTML and marketing footer render every profile with an aria-label`, () => {
