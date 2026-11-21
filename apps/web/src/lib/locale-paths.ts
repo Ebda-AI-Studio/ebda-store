@@ -3,10 +3,12 @@
  * indexable pages at `/ar/...` and `/en/...`; the old unprefixed URLs answer a 301 to them. Pure functions, no
  * `next/*` imports: `middleware.ts` (a relative import), the sitemap and the metadata helpers all use the same rules.
  *
- * Scope: ONLY the anonymous, indexable routes (`LOCALE_PATH_ROOTS` plus the home). Cart, checkout, account, auth,
- * search, compare, wishlist, review, the API and every file route (robots, sitemap, llms.txt, favicon...) keep their
- * URLs; their language stays the `force-language` cookie. The URL wins on a prefixed page, and the middleware writes
- * the cookie to match, so the next unprefixed page (the cart) opens in the same language.
+ * Scope (Ruling LOCALE-PATHS-4): EVERY storefront page is served under both prefixes. The indexable routes
+ * (`LOCALE_PATH_ROOTS` plus the home) are the canonical ones: their unprefixed form is redirected to the prefix. The
+ * transactional routes (`LOCALE_SERVED_ROOTS`: cart, checkout, account, auth, search, wishlist, compare, ...) are
+ * rewritten under the prefix too and their unprefixed form is NOT redirected (noindex, nothing to canonicalise). A prefix is
+ * never stripped by a redirect. Only the API and the file routes (robots, sitemap, llms.txt, favicon...) have no prefix.
+ * The URL wins on a prefixed page, and the middleware writes the `force-language` cookie to match.
  *
  * Gate: `STOREFRONT_LOCALE_PATHS=true` AND the store named in `STOREFRONT_LOCALE_PATHS_STORES` (store keys only:
  * `demo-boutique,shop.example`, or a lone `all` for every store host (LOCALE-PATHS-2); and NO language suffix: the default language is the store's own
@@ -14,7 +16,7 @@
  * Missing, empty or unparseable = no store: it only ever fails closed.
  *
  * The middleware is synchronous and has no store, so it cannot answer "which language is the default". It therefore
- * only (a) rewrites a prefixed URL, (b) 301s `/ar/cart` to `/cart`, and (c) marks an unprefixed indexable URL
+ * only (a) rewrites a prefixed URL, (b) 301s a prefixed non-route (`/ar/nope`) to `/nope`, and (c) marks an unprefixed indexable URL
  * `x-locale-pending`; the root layout, which has the store, turns that into the redirect (`pendingRedirect`).
  */
 

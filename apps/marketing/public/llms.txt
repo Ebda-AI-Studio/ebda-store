@@ -47,7 +47,6 @@ Besides its two products, Ebda AI Studio offers services in three categories: so
 ### AI inside everything, not a button on the side.
 - AI that writes, translates and optimises (Included in every paid plan, within fair-use limits.)
 - Search that understands Egyptian Arabic and Franco
-  - Search by meaning: shoppers type what they have in mind and search understands what they mean. We are rolling it out gradually, and it only switches on for your store once its results pass our quality check on a real catalogue. (coming soon)
 - Run your store from an AI assistant (Growth and Business plans)
 - Your books close faster (Receipt reading is on the Growth and Business plans.)
 - Your stock tells you what to do (The low-stock warning email is on the Growth and Business plans.)
@@ -73,7 +72,6 @@ Besides its two products, Ebda AI Studio offers services in three categories: so
 - 0% commission on your orders
 
 ## Not there yet (stated plainly)
-- Search by meaning: Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue.
 - App marketplace: There is no app marketplace.
 - Custom code: You edit in the page builder without code, and there is no custom code editor.
 - Point of sale (POS): There is no in-store point of sale.
