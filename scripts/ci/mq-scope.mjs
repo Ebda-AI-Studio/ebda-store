@@ -12,7 +12,6 @@
  * Output: `heavy=true|false` to $GITHUB_OUTPUT and a reason on stdout. The merge queue gate accepts `skipped` for HEAVY_ONLY_JOBS iff heavy=false.
  */
 import { appendFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { classify, integrationPlan, loadWorkspaces } from '../ci-affected.mjs';
 
 /** Workspaces whose change cannot move any heavy-only job (verified: test:e2e, builder-e2e and integration never open these). */
@@ -69,6 +68,21 @@ async function labelsOf(ref, repo, token) {
   return (await r.json()).map(l => l.name);
 }
 
+/** Changed files via the compare API (no shallow `git fetch`: tests/unit/migration-order-gate.test.ts bans it). >=300 files = truncated = heavy. */
+async function changedFiles(base, head, repo, token) {
+  const r = await fetch(
+    `https://api.github.com/repos/${repo}/compare/${base}...${head}?per_page=100`,
+    {
+      headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json' },
+    }
+  );
+  if (!r.ok) throw new Error(`compare answered ${r.status}`);
+  const j = await r.json();
+  if ((j.files ?? []).length >= 100 || j.total_commits > 250)
+    throw new Error('compare list may be truncated');
+  return j.files.flatMap(f => [f.filename, f.previous_filename]).filter(Boolean);
+}
+
 async function main() {
   const { EVENT, BASE_SHA, HEAD_SHA, HEAD_REF, GITHUB_REPOSITORY, GITHUB_TOKEN } = process.env;
   let out;
@@ -77,12 +91,7 @@ async function main() {
       out = { heavy: true, reason: `event ${EVENT}: full lane rules apply` };
     else {
       if (!BASE_SHA || !HEAD_SHA) throw new Error('missing merge group shas');
-      execFileSync('git', ['fetch', '--no-tags', '--depth=1', 'origin', BASE_SHA], {
-        stdio: 'inherit',
-      });
-      const files = execFileSync('git', ['diff', '--name-only', BASE_SHA, HEAD_SHA], {
-        encoding: 'utf8',
-      }).split('\n');
+      const files = await changedFiles(BASE_SHA, HEAD_SHA, GITHUB_REPOSITORY, GITHUB_TOKEN);
       const labels = await labelsOf(HEAD_REF, GITHUB_REPOSITORY, GITHUB_TOKEN);
       out = decideScope({ files, labels });
     }
