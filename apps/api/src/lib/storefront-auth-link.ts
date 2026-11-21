@@ -27,3 +27,18 @@ export function storefrontAuthLink(
     throw new Error('storefrontAuthLink: path must be a single-slash storefront path');
   return `${storefrontBase(store, lang, env)}${pathAndQuery}`;
 }
+
+/**
+ * Where a shopper returns after paying (success, failure) when the API, not the page, names the URL: the store's own origin
+ * in the shopper's language. The platform `WEB_URL` serves no store (measured 2026-11-11: `store.ebda.app/checkout/success` is a 404).
+ */
+export function storefrontReturnUrls(
+  store: { slug: string; domain?: string | null },
+  lang: 'en' | 'ar',
+  env: Record<string, string | undefined> = process.env
+): { callbackUrl: string; errorUrl: string } {
+  return {
+    callbackUrl: storefrontAuthLink(store, lang, '/checkout/success', env),
+    errorUrl: storefrontAuthLink(store, lang, '/checkout/error', env),
+  };
+}
