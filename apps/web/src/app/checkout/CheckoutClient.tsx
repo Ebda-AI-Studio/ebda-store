@@ -52,6 +52,7 @@ import {
   daysAheadSchema,
   deliveryDateChoices,
   checkDeliveryPick,
+  catalogueItemId,
   fromMinor,
   REGION,
   isValidEgyptianMobile,
@@ -338,7 +339,9 @@ export default function CheckoutClient() {
     pixelFiredRef.current = true;
     trackInitiateCheckout({
       contentIds: [
-        ...cartContextItems.map(item => item.productId),
+        ...cartContextItems.map(item =>
+          catalogueItemId({ productId: item.productId, variantId: item.variantId })
+        ),
         ...cartContextBundles.map(b => b.bundleId),
       ],
       numItems:

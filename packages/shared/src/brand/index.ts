@@ -9,7 +9,8 @@
  * elsewhere; `tests/unit/no-force-branding.test.ts` guards against inherited third-party brand strings.
  */
 
-import { EBDA } from '../foundation/brand';
+// Raw-TS entry: no relative imports (shared-raw-ts-entries-self-contained). The foundation data is its own raw entry, reached by package name.
+import { EBDA } from '@ebda/shared/foundation-brand';
 
 /**
  * The studio's public profiles (Instagram, Facebook, TikTok, LinkedIn, YouTube), straight from the foundation's

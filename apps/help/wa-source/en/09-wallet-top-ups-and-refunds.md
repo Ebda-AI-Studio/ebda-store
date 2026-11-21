@@ -49,7 +49,6 @@ While card payment is not switched on for your account, you pay by InstaPay tran
 From **Wallet > Statement** choose a month to see every entry (top-up, message, credits, refund) with totals by category, and download it as CSV. Figures are shown as recorded at the time of the entry.
 
 ## Refunds
-*(Subject to the final terms of service.)*
 - The wallet balance is refundable for **12 months** after cancellation, after any debt is settled.
 - Refunds go to the original payment method through Kashier; otherwise by bank transfer or InstaPay after an identity check.
 - **The minimum refund is 50 EGP.**
@@ -64,4 +63,4 @@ To request one, write to the Ebda AI Studio team at ahlan@ebda.app, or use the r
 - **I was charged for a message that did not arrive:** we only charge messages Meta counts as billable.
 
 ---
-Last checked: 2026-10-25. Refunds and fees are subject to the final terms of service. Meta's rules change.
+Last checked: 2026-10-25. Refunds and fees follow our terms of service. Meta's rules change.
