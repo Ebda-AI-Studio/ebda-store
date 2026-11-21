@@ -23,6 +23,7 @@ vi.mock('../../apps/web/src/lib/api', () => ({ API_URL: 'https://api.test' }));
 
 import robots from '../../apps/web/src/app/robots';
 import sitemap from '../../apps/web/src/app/sitemap';
+import { clearStoreCache } from '../../apps/web/src/lib/store-resolver';
 import { buildStorefrontMetadata } from '../../apps/web/src/lib/storefront-metadata';
 import { perStoreResponse } from '../../apps/web/src/app/llms.txt/route';
 
@@ -33,7 +34,10 @@ function stubApi(settings: Record<string, unknown>) {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ data: { store: { id: 's1', slug: 'shop', settings } } }),
+        json: async () => ({
+          success: true,
+          data: { store: { id: 's1', slug: 'shop', settings } },
+        }),
       };
     if (url.pathname.endsWith('/public/products'))
       return {
@@ -98,11 +102,14 @@ describe.each([
   });
 
   it('sitemap.xml: no URLs, no product fetch; OFF lists the store', async () => {
+    // R1: the sitemap resolves its host through the storefront resolver (memory + durable copy, purged by the host / id EPOCHS the
+    // API's revalidate writes: RESOLVE-BULLETPROOF-1), so the toggle is purge-reachable through the epoch, not a fetch tag.
+    clearStoreCache(host);
     const on = stubApi({ hideFromSearchEngines: true });
     await expect(sitemap()).resolves.toEqual([]);
     expect(on.mock.calls.some(c => String(c[0]).includes('/public/products'))).toBe(false);
-    expect((on.mock.calls[0][1] as any).next.tags).toContain(`store-domain:${host}`);
 
+    clearStoreCache(host); // the purge: the next resolve asks the API again
     stubApi({});
     expect((await sitemap()).length).toBeGreaterThan(0);
   });

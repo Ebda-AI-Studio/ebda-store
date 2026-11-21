@@ -26,7 +26,7 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/08-campaigns-and-opt-out.md':
     '2b059c59937e0b71b09bdc88198224829e38787cb175fac36a7582a196d4b6f0',
   'ar/09-wallet-top-ups-and-refunds.md':
-    '8af45b9a4f5c5965b03f06408e8f067cf2696b617cee09772bbf7141bff87f6d',
+    '66689d53792f703a836c12961edc87cb56069bd42f9bbcb5c93f425634c6e85c',
   'ar/10-meta-fees-explained.md':
     'a91a05bbb7ddbdc236b6b4f5c0557d5e8f763a43fae09c450498b90750a0659f',
   'ar/11-service-menu-hours-and-location.md':
@@ -52,7 +52,7 @@ const PINNED_SHA256: Record<string, string> = {
   'en/08-campaigns-and-opt-out.md':
     '380b45e446e026e57e4c3d03f9ba1b5eff4c5b4a9d8bb0adb522434aef467f32',
   'en/09-wallet-top-ups-and-refunds.md':
-    '9ab15f3fa80da14c19c814d6fb870e5aad240a9624dd533ea6734d9f38532667',
+    '0769db0f07284206d84209c2cfb66ef34f6ddd82e1dbc6c8262cdf112dd70595',
   'en/10-meta-fees-explained.md':
     '2f79f146fa6fc55f8c137d8a5af96dfcec0e50612f16062b15c69246aadd7693',
   'en/11-service-menu-hours-and-location.md':
