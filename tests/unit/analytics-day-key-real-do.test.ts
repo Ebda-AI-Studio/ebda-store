@@ -60,6 +60,17 @@ vi.mock('@api/lib/analytics-backend', () => ({
 }));
 vi.mock('@api/lib/repo-factory', () => ({
   storeDb: async () => h.lite,
+  // REVENUE-DEF-1: the net-revenue read (revenue.service) goes through the DO money ops, here the REAL ops on the real schema
+  storeMoney: async () =>
+    new Proxy(
+      {},
+      {
+        get: (_t, op: string) =>
+          op === 'then'
+            ? undefined
+            : async (a: Record<string, unknown>) => runMoneyOp(h.sync as never, STORE, op, a),
+      }
+    ),
   storeWriter: async () => ({
     funnelSnapshot: {
       createMany: async ({ data }: { data: Array<Record<string, number | Date>> }) => {

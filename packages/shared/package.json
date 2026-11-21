@@ -35,8 +35,11 @@
     },
     "./brand": {
       "types": "./src/brand/index.ts",
-      "require": "./dist/brand/index.js",
       "default": "./src/brand/index.ts"
+    },
+    "./foundation-brand": {
+      "types": "./src/foundation/brand.ts",
+      "default": "./src/foundation/brand.ts"
     },
     "./contact-enquiry": {
       "types": "./src/contact-enquiry.ts",
