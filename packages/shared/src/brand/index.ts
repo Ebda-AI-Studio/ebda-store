@@ -9,14 +9,19 @@
  * elsewhere; `tests/unit/no-force-branding.test.ts` guards against inherited third-party brand strings.
  */
 
-// Raw-TS entry: no relative imports (shared-raw-ts-entries-self-contained). The foundation data is its own raw entry, reached by package name.
-import { EBDA } from '@ebda/shared/foundation-brand';
-
 /**
- * The studio's public profiles (Instagram, Facebook, TikTok, LinkedIn, YouTube), straight from the foundation's
- * `EBDA.social` so a handle change is one `sync` away. WhatsApp is a contact line, not a profile, so it is excluded.
+ * The studio's public profiles (Instagram, Facebook, TikTok, LinkedIn, YouTube). This file is a raw-TS entry with no imports
+ * (shared-raw-ts-entries-self-contained; the Workers test runtime and wrangler alias `@ebda/shared` as a FILE, so a subpath
+ * import cannot resolve there), so the list is mirrored from the foundation's `EBDA.social`, and
+ * tests/unit/social-from-foundation.test.tsx fails on any drift from the vendored data. WhatsApp is a contact line, not a profile.
  */
-const SOCIAL_PROFILES = EBDA.social.accounts.filter(a => a.id !== 'whatsapp');
+const SOCIAL_PROFILES: readonly { id: string; label: string; url: string }[] = [
+  { id: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/ebdaai.studio/' },
+  { id: 'facebook', label: 'Facebook', url: 'https://www.facebook.com/ebdaaistudio' },
+  { id: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/@ebdaaistudio' },
+  { id: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/company/ebda-ai-studio/' },
+  { id: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@EbdaAIStudio' },
+];
 /** Organization JSON-LD `sameAs`: the same list, as URLs. */
 export const SOCIAL_SAME_AS: string[] = SOCIAL_PROFILES.map(a => a.url);
 

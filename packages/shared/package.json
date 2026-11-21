@@ -37,10 +37,6 @@
       "types": "./src/brand/index.ts",
       "default": "./src/brand/index.ts"
     },
-    "./foundation-brand": {
-      "types": "./src/foundation/brand.ts",
-      "default": "./src/foundation/brand.ts"
-    },
     "./contact-enquiry": {
       "types": "./src/contact-enquiry.ts",
       "require": "./dist/contact-enquiry.js",
