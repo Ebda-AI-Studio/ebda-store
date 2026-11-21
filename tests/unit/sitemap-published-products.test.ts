@@ -3,7 +3,7 @@
  * (ebda-foundation standard/storefront-sitemap-hreflang.md). Exception by design: a store whose merchant switched on
  * "hide from search engines" (or the demo showroom) lists nothing and advertises no sitemap.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ hidden: false }));
 vi.mock('next/navigation', () => ({
@@ -26,6 +26,7 @@ vi.stubGlobal(
     const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
     if (url.pathname.endsWith('/public/store/resolve'))
       return json({
+        success: true,
         data: {
           store: {
             id: 's1',
@@ -47,8 +48,11 @@ vi.stubGlobal(
 
 import sitemap from '../../apps/web/src/app/sitemap';
 import robots from '../../apps/web/src/app/robots';
+import { clearStoreCache } from '../../apps/web/src/lib/store-resolver';
 
 describe('sitemap + robots', () => {
+  // #910: the resolver memoises per host; the hidden flag flips between cases, so start each cold.
+  beforeEach(() => clearStoreCache());
   it('lists home, products, static pages and every product for both locales, with hreflang and lastmod', async () => {
     state.hidden = false;
     const urls = await sitemap();
