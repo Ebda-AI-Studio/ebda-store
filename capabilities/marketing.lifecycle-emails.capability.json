@@ -14,7 +14,7 @@
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "staff", "super_admin"],
-  "policy": "free",
+  "policy": "confirm",
   "undo": {
     "class": "none",
     "note": "n/a"
