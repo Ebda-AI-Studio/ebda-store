@@ -409,6 +409,7 @@ describe('cutover switch', () => {
         'providerVerification',
         'providerVerificationEvent',
         'providerActivationRequest',
+        'trustRequest',
         'merchantApiKey',
         'slugRedirect',
         'webhookEvent',

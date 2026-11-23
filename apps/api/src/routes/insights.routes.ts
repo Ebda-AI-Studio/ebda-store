@@ -18,6 +18,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v3';
 import { currentStoreId, prisma, RfmSegment } from '@ebda/database';
 import { storeDb, storeMoney } from '../lib/repo-factory';
+import { netRevenue } from '../services/revenue.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
@@ -30,6 +31,7 @@ import { storeTakesGuestOrders } from '../lib/guest-checkout';
 import { customerKeyOf } from '../lib/customer-key';
 import { listFunnelSnapshots } from '../services/accounting/funnel-report.service';
 import {
+  NON_REVENUE_ORDER_STATUSES,
   PRODUCT_VELOCITY_WINDOW_DAYS,
   type ProductVelocityResponse,
   type ProductVelocityRow,
@@ -163,34 +165,19 @@ router.get(
       const [orderStats, prevOrderStats, topSegmentRaw, yesterdayFunnel, topSkus, narration] =
         await Promise.all([
           // AOV + MRR-equiv (last 30d)
-          readInStoreContext(storeId, async () =>
-            (await storeDb(storeId)).order.aggregate({
-              where: {
-                storeId,
-                paymentStatus: 'paid',
-                createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-              },
-              _avg: { total: true },
-              _sum: { total: true },
-              _count: true,
-            })
-          ),
+          // The ONE revenue definition, paid-only (STORE-QA-7): excludes refunded/cancelled, nets partial refunds.
+          netRevenue(storeId, {
+            from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+            paidOnly: true,
+          }),
 
           // AOV for the PREVIOUS 30d window (days 30–60 ago) — drives the
           // period-over-period change shown on the dashboard AOV tile.
-          readInStoreContext(storeId, async () =>
-            (await storeDb(storeId)).order.aggregate({
-              where: {
-                storeId,
-                paymentStatus: 'paid',
-                createdAt: {
-                  gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-                  lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-                },
-              },
-              _avg: { total: true },
-            })
-          ),
+          netRevenue(storeId, {
+            from: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+            to: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000 - 1),
+            paidOnly: true,
+          }),
 
           // Top segment by count + revenue contribution
           readInStoreContext(storeId, async () =>
@@ -220,6 +207,7 @@ router.get(
                 order: {
                   storeId,
                   paymentStatus: 'paid',
+                  status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
                   createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
                 },
               },
@@ -277,11 +265,12 @@ router.get(
           // Page contract: aov is an object with this/last-period piastres so the
           // tile can render a period-over-period delta (dashboard/page.tsx).
           aov: {
-            thisPeriodFils: orderStats._avg?.total ?? 0,
-            lastPeriodFils: prevOrderStats._avg?.total ?? 0,
+            thisPeriodFils: orderStats.orders > 0 ? orderStats.revenue / orderStats.orders : 0,
+            lastPeriodFils:
+              prevOrderStats.orders > 0 ? prevOrderStats.revenue / prevOrderStats.orders : 0,
           },
-          mrr30d: orderStats._sum?.total ?? 0,
-          orderCount30d: orderStats._count,
+          mrr30d: orderStats.revenue,
+          orderCount30d: orderStats.orders,
           repeatPurchaseRate,
           repeatPurchaseBuyers: identifiedBuyers,
           // Page contract: topSegment is an object (segment/count/revenue) — the
@@ -521,7 +510,14 @@ router.get(
       const top30d = await readInStoreContext(storeId, async () =>
         (await storeDb(storeId)).orderItem.groupBy({
           by: ['productId'],
-          where: { order: { storeId, paymentStatus: 'paid', createdAt: { gte: since30d } } },
+          where: {
+            order: {
+              storeId,
+              paymentStatus: 'paid',
+              status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+              createdAt: { gte: since30d },
+            },
+          },
           _sum: { total: true, quantity: true },
           orderBy: [{ _sum: { quantity: 'desc' } }, { productId: 'asc' }],
           take: perPage,
@@ -536,7 +532,12 @@ router.get(
                 by: ['productId'],
                 where: {
                   productId: { in: productIds },
-                  order: { storeId, paymentStatus: 'paid', createdAt: { gte: since7d } },
+                  order: {
+                    storeId,
+                    paymentStatus: 'paid',
+                    status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
+                    createdAt: { gte: since7d },
+                  },
                 },
                 _sum: { quantity: true },
               }),

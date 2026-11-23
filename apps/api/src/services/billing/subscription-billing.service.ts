@@ -165,6 +165,8 @@ interface ClaimInput {
   provider: string;
   idempotencyKey: string;
   relatedEventId?: string | null;
+  /** Operator choices that must survive until the row settles (e.g. a refund's keepAccess). */
+  raw?: Record<string, unknown>;
 }
 
 /**
@@ -234,6 +236,7 @@ export async function claimEvent(input: ClaimInput): Promise<string | null> {
           idempotencyKey: input.idempotencyKey,
           status: 'pending',
           relatedEventId: input.relatedEventId ?? null,
+          ...(input.raw ? { raw: input.raw as Prisma.InputJsonValue } : {}),
           ...vatColumns(input.charge),
         },
       ],
@@ -2017,13 +2020,50 @@ async function confirmAndApplyWebhook(
 
 // ───────────────────────────── refunds ────────────────────────────────────
 
+/**
+ * R-REFUND-PERIOD-1 (amended): a FULL refund of the latest paid charge (checkout / renewal / upgrade) that bought the
+ * CURRENT period ends that access at once: the subscription moves to free / `canceled` (`downgradeToFree`), with no
+ * provider and no saved card, so NO automatic charge ever follows the refund. Putting the store into dunning instead
+ * would charge the same card again ~3 days after the money went back. `keepAccess` (goodwill refund) skips it; a
+ * partial refund never changes the plan; an older charge (a newer paid charge exists) bought a period already used.
+ */
+async function endAccessForRefund(
+  tx: Tx,
+  charge: { id: string; storeId: string; type: string; createdAt: Date },
+  keepAccess: boolean,
+  now: Date,
+  effects: BillingEffect[]
+): Promise<void> {
+  if (keepAccess || !['checkout', 'renewal', 'upgrade'].includes(charge.type)) return;
+  const { storeId } = charge;
+  const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
+  if (!sub || !['active', 'past_due', 'trialing'].includes(sub.status)) return;
+  if (sub.planCode === FREE_PLAN_CODE || isGrantedPlan(sub.planCode)) return;
+  // only the NEWEST paid charge can own the current period: an older one bought a period already used up
+  const newer = await tx.billingEvent.findFirst({
+    where: {
+      storeId,
+      id: { not: charge.id },
+      type: { in: ['checkout', 'renewal', 'upgrade'] },
+      status: { in: ['succeeded', 'refunded'] },
+      createdAt: { gt: charge.createdAt },
+    },
+    select: { id: true },
+  });
+  if (newer) return;
+  // the free months this payment earned go too (FOUNDING-3)
+  await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
+  await downgradeToFree(tx, storeId, 'canceled', effects);
+}
+
 async function settleRefundInTx(
   tx: Tx,
   storeId: string,
   refundId: string,
   succeeded: boolean,
-  reason?: string,
-  effects?: BillingEffect[]
+  reason: string | undefined,
+  /** a full refund that ends access pushes its `downgraded` effect here; the caller runs it after the tx */
+  effects: BillingEffect[]
 ): Promise<void> {
   const upd = await tx.billingEvent.updateMany({
     where: { id: refundId, storeId, status: 'pending' },
@@ -2047,6 +2087,11 @@ async function settleRefundInTx(
       where: { id: charge.id, storeId, status: 'succeeded' },
       data: { status: 'refunded' },
     });
+    // R-REFUND-PERIOD-1: a full refund of the charge that paid the current period takes the period back.
+    if (flipped.count > 0) {
+      const keep = (refund.raw as { keepAccess?: unknown } | null)?.keepAccess === true;
+      await endAccessForRefund(tx, charge, keep, new Date(), effects);
+    }
     // FOUNDING-3: the payment behind any free month is gone, so the free months go too (own store inline; a
     // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
     if (flipped.count === 1) {
@@ -2058,12 +2103,15 @@ async function settleRefundInTx(
 }
 
 /**
- * Refund (part of) a succeeded charge. Super-admin only (route). Does NOT
- * change the subscription — plan changes are separate decisions.
+ * Refund (part of) a succeeded charge. Super-admin only (route). A FULL refund of the charge that paid the
+ * current period also rolls that period back unless `keepAccess` (R-REFUND-PERIOD-1); a partial refund never
+ * touches the subscription — plan changes are separate decisions.
  */
 export async function refundCharge(args: {
   eventId: string;
   amountMinor?: number;
+  /** Goodwill refund: money goes back, the paid period stays (R-REFUND-PERIOD-1). */
+  keepAccess?: boolean;
   provider?: BillingProvider;
 }): Promise<{ refundEventId: string; status: 'succeeded' | 'failed' | 'pending' }> {
   const provider = args.provider ?? getBillingProvider();
@@ -2115,19 +2163,27 @@ export async function refundCharge(args: {
     provider: charge.provider,
     idempotencyKey: key,
     relatedEventId: charge.id,
+    // stored at claim time, so an async (webhook) confirmation applies the same choice (R-REFUND-PERIOD-1)
+    raw: { keepAccess: args.keepAccess === true },
   });
   if (!refundId) throw new AppError(409, 'REFUND_IN_PROGRESS', 'A refund is already in progress');
+  const effects: BillingEffect[] = [];
   try {
     const res = await provider.refund({
       chargeId: charge.providerRef,
       amountMinor: amount,
       idempotencyKey: key,
     });
-    const refundEffects: BillingEffect[] = [];
     await withStore(charge.storeId, async tx => {
       await tx.billingEvent.updateMany({
         where: { id: refundId, storeId: charge.storeId, status: 'pending' },
-        data: { providerRef: res.refundId ?? undefined, raw: res.raw as Prisma.InputJsonValue },
+        data: {
+          providerRef: res.refundId ?? undefined,
+          raw: {
+            ...((res.raw ?? {}) as object),
+            keepAccess: args.keepAccess === true,
+          } as Prisma.InputJsonValue,
+        },
       });
       if (res.status !== 'pending') {
         await settleRefundInTx(
@@ -2136,11 +2192,11 @@ export async function refundCharge(args: {
           refundId,
           res.status === 'succeeded',
           res.failureReason,
-          refundEffects
+          effects
         );
       }
     });
-    await runBillingEffects(refundEffects);
+    await runBillingEffects(effects);
     // the referrer's side of a revoked grant lives in another tenant: take it back now, the sweep retries a miss
     await restoreRevokedGrants().catch(() => undefined);
     return { refundEventId: refundId, status: res.status };

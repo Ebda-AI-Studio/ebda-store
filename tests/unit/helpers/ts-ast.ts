@@ -8,8 +8,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { ORIGINAL_ROOT } from '../../helpers/original-repo-root';
 
-export const ROOT = path.resolve(__dirname, '../../..');
+// Original checkout, not the Stryker sandbox (instrumented text): tests/helpers/original-repo-root.ts
+export const ROOT = ORIGINAL_ROOT;
 
 export function parseSource(file: string, src = fs.readFileSync(file, 'utf8')): ts.SourceFile {
   const kind = /\.tsx$/.test(file)
