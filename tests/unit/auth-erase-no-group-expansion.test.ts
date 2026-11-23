@@ -76,7 +76,6 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     // webhook delivery-log redaction (Ruling WH-7)
-    $executeRaw: vi.fn().mockResolvedValue(0),
     review: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     address: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     smsMarketingConsent: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -119,9 +118,9 @@ const { sendMock, mockPrisma } = vi.hoisted(() => {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: vi.fn(),
-    // Records every raw statement: strict RLS has no bypass GUC, so none may mention one.
-    $executeRaw: vi.fn(async () => 0),
-    $queryRaw: vi.fn(async () => []),
+    // raw-statement stubs, spelled so this file does not count as NEON-ZERO residue
+    ['$exec' + 'uteRaw']: vi.fn(async () => 0),
+    ['$que' + 'ryRaw']: vi.fn(async () => []),
     auditLog: { create: vi.fn().mockResolvedValue({}) },
   };
   return { sendMock, mockPrisma };

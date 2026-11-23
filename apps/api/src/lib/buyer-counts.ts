@@ -13,7 +13,7 @@ interface BuyerIdentityRow {
 /**
  * QA98-ALIAS-1: the customer counts the dashboard shows (distinct customers, repeat buyers) fold guests through
  * `CustomerGroups`, the ONE grouping the Customers list uses, instead of re-deriving a key in SQL. Both backends return identity
- * rows and the grouping happens here, once: a Durable Object store through its `analyticsBuyerIdentities` op, a Postgres store through
+ * rows and the grouping happens here, once: a Durable Object store through its `analyticsBuyerIdentities` op, a legacy SQL store through
  * the exact SQL aggregation its caller passes in (`pgRows`: a GROUP BY, never a row scan, so nothing is silently truncated).
  */
 function buyerKey(r: BuyerIdentityRow, groups: CustomerGroups): string | null {

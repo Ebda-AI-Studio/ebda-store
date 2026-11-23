@@ -461,29 +461,27 @@ export class AnalyticsService {
     endDate?: Date
   ): Promise<number> {
     // QA98-ALIAS-1: both backends return identity rows and the ONE customer grouping folds them (lib/buyer-counts.ts).
-    const start = startDate && endDate ? startDate : new Date(0);
-    const end = startDate && endDate ? endDate : new Date(8_640_000_000_000_000);
-    return countDistinctCustomersGrouped(storeId, start, end, async () =>
+    const windowed = !!(startDate && endDate);
+    const start = windowed ? startDate! : new Date(0);
+    const end = windowed ? endDate! : new Date(8_640_000_000_000_000);
+    return countDistinctCustomersGrouped(storeId, start, end, async () => {
       // Postgres store: exact GROUP BY of the (customer id, email, phone) buckets, grouped in JS by the one customer grouping.
-      (
-        await prisma.$queryRaw<
-          Array<{
-            customerId: string | null;
-            email: string | null;
-            phone: string | null;
-            n: number;
-          }>
-        >`
-          SELECT NULLIF(o.customer_id::text, '') AS "customerId",
-                 LOWER(CASE WHEN jsonb_typeof(o.shipping_address -> 'email') = 'string' THEN o.shipping_address ->> 'email' END) AS email,
-                 CASE WHEN jsonb_typeof(o.shipping_address -> 'phone') = 'string' THEN o.shipping_address ->> 'phone' END AS phone,
-                 COUNT(*)::int AS n
-          FROM public.orders o
-          WHERE o.store_id = ${storeId} AND o.deleted_at IS NULL
-            AND o.created_at >= ${start} AND o.created_at <= ${end}
-          GROUP BY 1, 2, 3`
-      ).map(r => ({ ...r, n: Number(r.n) }))
-    );
+      // All-time has no window clause (an extreme Date does not serialise as a query parameter).
+      const windowSql = windowed
+        ? Prisma.sql`AND o.created_at >= ${start} AND o.created_at <= ${end}`
+        : Prisma.empty;
+      const rows = await prisma.$queryRaw<
+        Array<{ customerId: string | null; email: string | null; phone: string | null; n: number }>
+      >`
+        SELECT NULLIF(o.customer_id::text, '') AS "customerId",
+               LOWER(CASE WHEN jsonb_typeof(o.shipping_address -> 'email') = 'string' THEN o.shipping_address ->> 'email' END) AS email,
+               CASE WHEN jsonb_typeof(o.shipping_address -> 'phone') = 'string' THEN o.shipping_address ->> 'phone' END AS phone,
+               COUNT(*)::int AS n
+        FROM public.orders o
+        WHERE o.store_id = ${storeId} AND o.deleted_at IS NULL ${windowSql}
+        GROUP BY 1, 2, 3`;
+      return rows.map(r => ({ ...r, n: Number(r.n) }));
+    });
   }
 
   /**

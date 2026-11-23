@@ -23,7 +23,7 @@ function toIdentity(email: unknown, phone: unknown): GuestIdentity | null {
 
 async function scanGroups(storeId: string): Promise<CustomerGroups> {
   const seen = new Map<string, GuestIdentity>();
-  // The store's own backend client (Postgres or its Durable Object), newest first by KEYSET (cursor on the id, never skip/offset): a
+  // The store's own backend client (its Durable Object or the legacy SQL backend), newest first by KEYSET (cursor on the id, never skip/offset): a
   // guest order placed while the scan runs cannot shift a page and make it skip or repeat a member.
   const odb = await storeDb(storeId);
   let cursor: string | undefined;
