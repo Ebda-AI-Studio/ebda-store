@@ -811,13 +811,13 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             <div className="rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalInputTax')}</p>
               <p className="text-2xl font-semibold font-mono">
-                {major(data.summary.totalInputTax ?? 0)} {tc('egp')}
+                {formatPrice(data.summary.totalInputTax ?? 0)}
               </p>
             </div>
             <div className="rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('netTaxPayable')}</p>
               <p className="text-2xl font-semibold font-mono">
-                {major(data.summary.netTaxPayable ?? data.summary.totalTaxCollected)} {tc('egp')}
+                {formatPrice(data.summary.netTaxPayable ?? data.summary.totalTaxCollected)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">{tt('netTaxPayableHint')}</p>
             </div>
