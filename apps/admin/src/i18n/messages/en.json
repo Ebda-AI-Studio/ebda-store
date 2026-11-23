@@ -5517,7 +5517,7 @@
       "backToSettings": "Back to Settings",
       "manageRedirects": "Open redirects",
       "redirectsTitle": "Slug Redirects",
-      "redirectsSubtitle": "Old URLs that 301-redirect to a renamed product, category, or blog post.",
+      "redirectsSubtitle": "Old URLs that permanently (308) redirect to a renamed product, category, or blog post.",
       "redirectsFromSlug": "From",
       "redirectsToSlug": "To",
       "redirectsEntityType": "Type",

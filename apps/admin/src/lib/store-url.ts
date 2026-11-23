@@ -17,6 +17,20 @@ export function getStoreDisplayUrl(store: StoreUrlInput): string {
   return store.domain || storeHost(store.slug);
 }
 
+/**
+ * Host a visitor really lands on, for previews: the custom domain once it is
+ * verified, otherwise the free `<slug>.ebda.app` address. `domainVerifiedAt`
+ * explicitly `null` means the domain is not live yet; absent means the payload
+ * does not carry it, so the stored domain is trusted.
+ */
+export function getStorePublicHost(
+  store: StoreUrlInput & { domainVerifiedAt?: string | null }
+): string {
+  const domain = store.domain?.trim().toLowerCase();
+  if (domain && store.domainVerifiedAt !== null) return domain;
+  return storeHost(store.slug);
+}
+
 /** The free `<slug>.ebda.app` host for a slug (display form, no scheme). */
 export function getPlatformStoreUrl(slug: string): string {
   return storeHost(slug);
