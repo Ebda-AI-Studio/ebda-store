@@ -219,6 +219,42 @@ export function analyticsRepeatBuyersOp(db: SyncSql, storeId: string, a: Record<
   return { repeat: num(row?.repeat), buyers: num(row?.buyers) };
 }
 
+/**
+ * Buyer identities (QA98-ALIAS-1): orders grouped by (customer id, lowercased shipping email, shipping phone) with a count each,
+ * so the API can fold guests into the ONE customer grouping (`CustomerGroups`) and count customers the way the list does.
+ * `all` = not deleted, created in [startMs, endMs] (distinct customers); `paid` = paid since `sinceMs` (repeat buyers, the
+ * same population `analyticsRepeatBuyersOp` reads). Returns identity rows, never order rows.
+ */
+export function analyticsBuyerIdentitiesOp(
+  db: SyncSql,
+  storeId: string,
+  a: Record<string, unknown>
+) {
+  const email = `LOWER(CASE WHEN json_type(o.shipping_address, '$.email') = 'text' THEN json_extract(o.shipping_address, '$.email') END)`;
+  const phone = `CASE WHEN json_type(o.shipping_address, '$.phone') = 'text' THEN json_extract(o.shipping_address, '$.phone') END`;
+  let where: string;
+  let params: unknown[];
+  if (a.mode === 'paid') {
+    where = `o.store_id = ?1 AND o.payment_status = 'paid' AND o.created_at >= ?2`;
+    params = [storeId, intArg(a.sinceMs, 'sinceMs')];
+  } else if (a.mode === 'all') {
+    where = `o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3`;
+    params = [storeId, intArg(a.startMs, 'startMs'), intArg(a.endMs, 'endMs')];
+  } else throw new MoneyError('BAD_ARGS', 'mode', 400);
+  return db
+    .all(
+      `SELECT NULLIF(o.customer_id, '') AS customerId, ${email} AS email, ${phone} AS phone, COUNT(*) AS n
+         FROM orders o WHERE ${where} GROUP BY 1, 2, 3`,
+      params
+    )
+    .map(r => ({
+      customerId: (r.customerId as string | null) ?? null,
+      email: (r.email as string | null) ?? null,
+      phone: (r.phone as string | null) ?? null,
+      n: num(r.n),
+    }));
+}
+
 /** getLowStockProducts: active, inventory-tracked products whose on-hand (variant-aware, active variants only) is <= threshold. */
 export function analyticsLowStockOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const threshold = intArg(a.threshold, 'threshold', -1_000_000, 1_000_000);

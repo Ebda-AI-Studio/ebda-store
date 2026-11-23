@@ -3,7 +3,9 @@ import { customerRow, customerRows, pickSelected } from '../lib/customer-directo
 import { customerAuthRoute } from '../lib/customer-auth';
 import { storeDb, storeRepo } from '../lib/repo-factory';
 import { getCached, customersCacheKey } from '../lib/public-cache';
-import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
+import { rfmKeyFor } from '../lib/customer-key';
+import { CustomerGroups } from '../lib/customer-groups';
+import { loadCustomerGroups } from '../lib/customer-groups-store';
 import { SmsConsentService } from './sms-consent.service';
 import { AppError } from '../middleware/error-handler';
 import { NON_REVENUE_ORDER_STATUSES } from '@ebda/shared';
@@ -416,6 +418,8 @@ async function aggregateCustomersUncached(
   const countedByKey = new Map<string, { orders: number; spent: number }>();
 
   const map = new Map<string, AggregatedCustomer>();
+  // QA98-ALIAS-1: guests who share an email or a phone (transitively) are ONE row, addressed by the group's smallest key.
+  const groups = CustomerGroups.fromOrders(orders);
   for (const order of orders) {
     const shipping = (order.shippingAddress ?? null) as ShippingAddressShape | null;
     // A guest is an order with no customer ACCOUNT on it (customerId null), not one whose account row failed to join.
@@ -423,7 +427,7 @@ async function aggregateCustomersUncached(
     // `customerKeyOf` is the grouping the RFM rollup also uses, so a segment's
     // members resolve to these rows. A guest order with no contact is its own
     // row, keyed by the order.
-    const key = customerKeyOf(order) ?? `guest:${order.id}`;
+    const key = groups.keyOf(order) ?? `guest:${order.id}`;
 
     const firstName = order.customer?.firstName ?? shipping?.firstName ?? '';
     const lastName = order.customer?.lastName ?? shipping?.lastName ?? '';
@@ -719,7 +723,11 @@ export async function aggregateCustomers(storeId: string): Promise<{
  * `key`: newest first, at most MAX_CUSTOMER_ORDERS + 1. Postgres answers with its JSON operators; a Durable Object store has
  * no JSON-path filter, so its guest orders are scanned newest-first in bounded pages (the same 20k cap as the list's scan).
  */
-async function guestOrderIdsForKey(storeId: string, key: string): Promise<Array<{ id: string }>> {
+async function guestOrderIdsForKeys(
+  storeId: string,
+  keys: string[]
+): Promise<Array<{ id: string }>> {
+  const keySet = new Set(keys);
   if ((await storeRepo(storeId)).backend === 'do') {
     const odb = await storeDb(storeId);
     const out: Array<{ id: string }> = [];
@@ -740,7 +748,8 @@ async function guestOrderIdsForKey(storeId: string, key: string): Promise<Array<
         const a = (o.shippingAddress ?? {}) as Record<string, unknown>;
         const email = typeof a.email === 'string' ? a.email : '';
         const phone = typeof a.phone === 'string' ? a.phone : '';
-        if (email.toLowerCase() === key || (email === '' && phone === key)) out.push({ id: o.id });
+        if (keySet.has(email.toLowerCase()) || (email === '' && keySet.has(phone)))
+          out.push({ id: o.id });
       }
       if (page.length < PAGE) break;
     }
@@ -753,9 +762,9 @@ async function guestOrderIdsForKey(storeId: string, key: string): Promise<Array<
         AND deleted_at IS NULL
         AND customer_id IS NULL
         AND (
-              LOWER(shipping_address->>'email') = ${key}
+              LOWER(shipping_address->>'email') = ANY(${keys}::text[])
            OR (COALESCE(shipping_address->>'email', '') = ''
-               AND shipping_address->>'phone' = ${key})
+               AND shipping_address->>'phone' = ANY(${keys}::text[]))
         )
       ORDER BY created_at DESC
       LIMIT ${MAX_CUSTOMER_ORDERS + 1}
@@ -778,10 +787,13 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
   // row the merchant clicked. Resolved by id first (a JSON-path equality in
   // Prisma cannot lowercase), then loaded through the one typed query below.
   let orderScope: Prisma.OrderWhereInput;
+  let guestGroups: CustomerGroups | null = null;
   if (isUuid) {
     orderScope = { customerId: decodedKey };
   } else {
-    const guestOrderIds = await guestOrderIdsForKey(storeId, decodedKey);
+    // QA98-ALIAS-1: the key may be any stored spelling of a guest group (bookmarks keep working); the profile is the whole group.
+    guestGroups = await loadCustomerGroups(storeId);
+    const guestOrderIds = await guestOrderIdsForKeys(storeId, guestGroups.memberKeysOf(decodedKey));
     orderScope = { id: { in: guestOrderIds.map(r => r.id) } };
   }
 
@@ -972,7 +984,7 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
   }
 
   const customer = {
-    id: newest.customer?.id ?? decodedKey,
+    id: newest.customer?.id ?? guestGroups?.keyOf(newest) ?? decodedKey,
     isGuest: !newest.customer?.id,
     firstName: newest.customer?.firstName ?? newestShipping?.firstName ?? '',
     lastName: newest.customer?.lastName ?? newestShipping?.lastName ?? '',
@@ -1046,7 +1058,8 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
   const smsMarketingConsent = await SmsConsentService.getForCustomerKey(
     storeId,
     newest.customer?.id ?? decodedKey,
-    customer.phone
+    customer.phone,
+    guestGroups?.groupOfMemberKey(customer.id) ?? undefined
   );
 
   return { customer: { ...customer, groupId, group }, orders, truncated, smsMarketingConsent };

@@ -2,7 +2,7 @@ import { currentStoreId, prisma, Prisma } from '@ebda/database';
 import { customerRows } from '../lib/customer-directory';
 import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
 import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
-import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
+import { countDistinctCustomersGrouped } from '../lib/buyer-counts';
 import { redis } from './redis.service';
 import { netRevenue } from './revenue.service';
 import { topCustomersNet } from '../lib/order-refunds';
@@ -460,28 +460,12 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date
   ): Promise<number> {
-    // Ruling NZ-INTEG-1: a Durable Object store answers from its DO (no Postgres)
-    const money = await storeMoney(storeId);
-    if (money)
-      return (
-        await money.analyticsPeriod({
-          startMs: startDate && endDate ? startDate.getTime() : 0,
-          endMs: startDate && endDate ? endDate.getTime() : 8_640_000_000_000_000,
-          nonRevenue: NON_REVENUE,
-        })
-      ).customers;
-    const windowSql =
-      startDate && endDate
-        ? Prisma.sql`AND o.created_at >= ${startDate} AND o.created_at <= ${endDate}`
-        : Prisma.empty;
-    const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
-      SELECT COUNT(DISTINCT ${CUSTOMER_KEY_SQL})::bigint AS n
-      FROM public.orders o
-      WHERE o.store_id = ${storeId}
-        AND o.deleted_at IS NULL
-        ${windowSql}
-    `;
-    return Number(rows[0]?.n ?? 0);
+    // QA98-ALIAS-1: both backends return identity rows and the ONE customer grouping folds them (lib/buyer-counts.ts).
+    return countDistinctCustomersGrouped(
+      storeId,
+      startDate && endDate ? startDate : new Date(0),
+      startDate && endDate ? endDate : new Date(8_640_000_000_000_000)
+    );
   }
 
   /**
@@ -522,7 +506,7 @@ export class AnalyticsService {
       return {
         revenue: d.revenue,
         orders: d.orders,
-        customers: d.customers,
+        customers: await countDistinctCustomersGrouped(storeId, startDate, endDate),
         profit: d.costedLines === 0 ? (d.missingLines > 0 ? null : 0) : (d.profit ?? 0),
         itemsMissingCost: d.missingLines,
         revenueMissingCost: d.missingRevenue,

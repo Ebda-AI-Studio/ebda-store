@@ -28,7 +28,8 @@ import { generateInsightNarration } from '../services/accounting/insights-narrat
 import { inngest } from '../lib/inngest/client';
 import { EFFECTIVE_STOCK_SELECT, effectiveInventory } from '../lib/effective-inventory';
 import { storeTakesGuestOrders } from '../lib/guest-checkout';
-import { customerKeyOf } from '../lib/customer-key';
+import { CustomerGroups } from '../lib/customer-groups';
+import { repeatBuyersGrouped } from '../lib/buyer-counts';
 import { listFunnelSnapshots } from '../services/accounting/funnel-report.service';
 import {
   NON_REVENUE_ORDER_STATUSES,
@@ -89,8 +90,9 @@ export function computeRepeatPurchase(
   orders: Array<{ customerId: string | null; shippingAddress: unknown }>
 ): { repeatPurchaseRate: number | null; identifiedBuyers: number } {
   const ordersPerBuyer = new Map<string, number>();
+  const groups = CustomerGroups.fromOrders(orders);
   for (const o of orders) {
-    const key = customerKeyOf(o);
+    const key = groups.keyOf(o);
     if (!key) continue;
     ordersPerBuyer.set(key, (ordersPerBuyer.get(key) ?? 0) + 1);
   }
@@ -113,38 +115,10 @@ export async function repeatPurchaseInDb(
   storeId: string,
   since: Date
 ): Promise<{ repeatPurchaseRate: number | null; identifiedBuyers: number }> {
-  // A store on its Durable Object (the Worker has no Postgres): the SQLite twin of the query below, same key, same counts.
-  const money = await storeMoney(storeId);
-  if (money) {
-    const r = await money.analyticsRepeatBuyers({ sinceMs: since.getTime() });
-    if (r.buyers === 0) return { repeatPurchaseRate: null, identifiedBuyers: 0 };
-    return { repeatPurchaseRate: r.repeat / r.buyers, identifiedBuyers: r.buyers };
-  }
-  const rows = await prisma.$queryRaw<Array<{ repeat: number; buyers: number }>>`
-    SELECT
-      COUNT(*) FILTER (WHERE n >= 2)::int AS repeat,
-      COUNT(*)::int AS buyers
-    FROM (
-      SELECT
-        COALESCE(
-          NULLIF(o.customer_id, ''),
-          NULLIF(CASE WHEN jsonb_typeof(o.shipping_address -> 'email') = 'string'
-                      THEN lower(o.shipping_address ->> 'email') END, ''),
-          NULLIF(CASE WHEN jsonb_typeof(o.shipping_address -> 'phone') = 'string'
-                      THEN o.shipping_address ->> 'phone' END, '')
-        ) AS buyer_key,
-        COUNT(*) AS n
-      FROM orders o
-      WHERE o.store_id = ${storeId}
-        AND o.payment_status = 'paid'
-        AND o.created_at >= ${since}
-      GROUP BY 1
-    ) per_buyer
-    WHERE buyer_key IS NOT NULL
-  `;
-  const buyers = rows[0]?.buyers ?? 0;
-  if (buyers === 0) return { repeatPurchaseRate: null, identifiedBuyers: 0 };
-  return { repeatPurchaseRate: (rows[0]?.repeat ?? 0) / buyers, identifiedBuyers: buyers };
+  // QA98-ALIAS-1: both backends return buyer identity rows; the ONE customer grouping folds them (lib/buyer-counts.ts).
+  const r = await repeatBuyersGrouped(storeId, since);
+  if (r.buyers === 0) return { repeatPurchaseRate: null, identifiedBuyers: 0 };
+  return { repeatPurchaseRate: r.repeat / r.buyers, identifiedBuyers: r.buyers };
 }
 
 // ---------------------------------------------------------------------------
