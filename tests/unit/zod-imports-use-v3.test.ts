@@ -15,6 +15,8 @@ const ALLOWED = new Set([
   // The vendored @ebda/foundation capability schema is byte-pinned (sha256, foundation-parity test) and written against
   // the zod 4 API on purpose: it is a shared module with Ebda Chat, so this repo cannot rewrite it alone.
   'packages/shared/src/foundation/capability.ts',
+  // Same for the vendored wa-v1 contract (foundation contracts/, F5): byte-pinned by the lock, shared with Ebda Chat, plain z.object / z.enum.
+  'packages/shared/src/foundation/contracts/wa-v1.ts',
   'tests/unit/zod-huge-array-bounds.test.ts',
   'tests/unit/zod-imports-use-v3.test.ts',
 ]);
