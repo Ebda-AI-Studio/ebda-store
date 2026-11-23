@@ -68,6 +68,20 @@ This is the path the migration comments in `20260808120000_fk_only_indexes`,
 `20260902120000_products_search_trgm_gin` and `20261002090000_order_search_trgm_and_fk_indexes`
 refer to.
 
+### Hamza fold re-index (`20261123000100_search_fold_hamza`, Ruling F7-HAMZA-1)
+
+The migration replaces the body of `public.ebda_ar_norm` (hamza seats unified, NFKC first) and `REINDEX`es the five indexes built on it
+(`products_search_doc_trgm_idx`, `products_name_doc_trgm_idx`, `products_sku_norm_trgm_idx`, `users_name_norm_trgm_idx`,
+`orders_guest_name_norm_trgm_idx`). Pre-launch or on small tables the plain `REINDEX` inside the migration is fine. Post-launch, off-peak, on
+`DIRECT_URL` in psql autocommit (no BEGIN), BEFORE the deploy that carries the new vendored fold:
+
+1. the `CREATE OR REPLACE FUNCTION public.ebda_ar_norm` statement copied verbatim from the migration;
+2. `REINDEX INDEX CONCURRENTLY public.<each of the five>;`
+3. the `NOT i.indisvalid` check above must return 0 rows.
+
+Until step 2 finishes a search can miss rows whose index entries still hold the old fold. After the deploy, run `reindexStore` per store for the
+Durable Object search index (`verifyProductIndex` lists the stale rows). Rollback: the migration's `rollback.sql`.
+
 ### Pre-build: search normalisation (`20261019000100_search_normalisation`)
 
 **Pre-launch this is waived (Ruling SEARCH-16):** `products` is empty before launch, so the plain

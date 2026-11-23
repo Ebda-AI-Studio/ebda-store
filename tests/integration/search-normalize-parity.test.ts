@@ -16,7 +16,7 @@ import { productSearchSql } from '../../apps/api/src/services/product-search.ser
 
 const MIGRATION = path.resolve(
   __dirname,
-  '../../packages/database/prisma/migrations/20261019000100_search_normalisation/migration.sql'
+  '../../packages/database/prisma/migrations/20261123000100_search_fold_hamza/migration.sql'
 );
 
 /** mulberry32: deterministic, so a failing generated case reproduces. */
@@ -38,6 +38,19 @@ function rng(seed: number) {
 const ALPHABET: string[] = [
   ...AR_FOLD_FROM,
   ...AR_FOLD_TO,
+  // F7-HAMZA-1: hamza seats, the waw that collapses, and NFKC inputs (lam-alef ligature, presentation forms, fullwidth, ideographic space)
+  'ء',
+  'ئ',
+  'ؤ',
+  'و',
+  'و',
+  '\uFEFB',
+  '\uFEE3',
+  '\uFEA3',
+  '\uFF11',
+  '\uFF21',
+  '\uFDF2',
+  '\u2009',
   // strip class U+064B..U+065F, U+0670, U+0640, and its neighbours U+064A, U+0660, U+066F, U+0671
   ...Array.from({ length: 0x065f - 0x064b + 1 }, (_, i) => String.fromCodePoint(0x064b + i)),
   'ٰ',
@@ -80,7 +93,8 @@ function generatedSample(n: number, seed: number): string[] {
 describe('ebda_ar_norm migration mirrors the TS fold table', () => {
   it('the translate() strings are AR_FOLD_FROM / AR_FOLD_TO byte for byte', () => {
     const sql = fs.readFileSync(MIGRATION, 'utf8');
-    expect(sql).toContain(`'${AR_FOLD_FROM}',\n      '${AR_FOLD_TO}'`);
+    expect(sql).toContain(`'${AR_FOLD_FROM}',\n        '${AR_FOLD_TO}'`);
+    expect(sql).toContain('normalize(t, NFKC)');
   });
 });
 

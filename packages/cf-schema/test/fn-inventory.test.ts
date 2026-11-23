@@ -30,8 +30,8 @@ describe('docs/cf/fn-map.json', () => {
   const defs = definitions();
   const names = [...new Set(defs)].sort();
 
-  it('finds the 96 definitions (89 distinct names; one read-only inbox lookup came with NEON-ZERO N-10b; several are redefinitions, one legacy bridge function was dropped by 20261103000100, two came with WA-GRACE-1, three with FOUNDING-1)', () => {
-    expect(defs.length).toBe(96);
+  it('finds the 97 definitions (89 distinct names; one read-only inbox lookup came with NEON-ZERO N-10b; several are redefinitions, one legacy bridge function was dropped by 20261103000100, two came with WA-GRACE-1, three with FOUNDING-1, one redefinition of ebda_ar_norm with F7-HAMZA-1)', () => {
+    expect(defs.length).toBe(97);
     expect(names.length).toBe(89);
   });
 
