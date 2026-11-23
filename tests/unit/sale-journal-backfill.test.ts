@@ -24,20 +24,23 @@ import { runSaleJournalBackfill } from '@api/lib/accounting/sale-journal-backfil
 
 // s1: o1 paid, no sale, no refunds | o2 paid, sale exists | o3 paid, no sale, a return (items) THEN an amount-only refund
 //     o4 fully refunded | o5 cancelled | o6 paid, no sale, accounting declines at journalSale
-const journalled = new Set<string>(['o2']);
+// source ids of journal entries -> createdAt (ms); the sale of a run is stamped AFTER every refund event below
+const journalled = new Map<string, number>([['o2', 500]]);
 const calls: string[] = [];
 const journalSale = vi.fn(async ({ orderId }: { orderId: string }) => {
   calls.push(`sale:${orderId}`);
   if (orderId === 'o6') return { posted: false, skipped: 'accounting_disabled', entries: 0 };
-  journalled.add(orderId);
+  journalled.set(orderId, 5000);
   return { posted: true, entries: 2 };
 });
-const journalPartialReturn = vi.fn(async (a: { refundKey: string }) => {
+const journalPartialReturn = vi.fn(async (a: { orderId: string; refundKey: string }) => {
   calls.push(`return:${a.refundKey}`);
+  journalled.set(`${a.orderId}:partial:${a.refundKey}`, 5001);
   return { posted: 2 };
 });
-const journalAmountOnlyRefund = vi.fn(async (a: { refundKey: string }) => {
+const journalAmountOnlyRefund = vi.fn(async (a: { orderId: string; refundKey: string }) => {
   calls.push(`amount:${a.refundKey}`);
+  journalled.set(`${a.orderId}:partial:${a.refundKey}`, 5001);
   return { posted: 1 };
 });
 
@@ -57,6 +60,12 @@ const EVENTS: Record<string, Record<string, unknown[]>> = {
         metadata: { refundKey: 'ret-1', items: [{ orderItemId: 'i1', quantity: 1 }] },
       },
     ],
+    backorder_line_cancelled: [
+      {
+        createdAt: new Date(1500),
+        metadata: { refundKey: 'backorder:line1', items: [{ orderItemId: 'i2', quantity: 2 }] },
+      },
+    ],
     partial_refund_recorded: [
       { createdAt: new Date(2000), metadata: { refundKey: 'refund:re_9', amount: 3000 } },
     ],
@@ -67,8 +76,11 @@ const repoFor = () => ({
   db: {
     order: { findMany: async () => ORDERS },
     journalEntry: {
-      findFirst: async ({ where }: { where: { sourceId: string } }) =>
-        journalled.has(where.sourceId) ? { id: 'je' } : null,
+      findFirst: async ({ where }: { where: { sourceId: string | { in: string[] } } }) => {
+        const ids = typeof where.sourceId === 'string' ? [where.sourceId] : where.sourceId.in;
+        const hit = ids.find(i => journalled.has(i));
+        return hit ? { id: 'je', createdAt: new Date(journalled.get(hit)!) } : null;
+      },
     },
     orderEvent: {
       findMany: async ({ where }: { where: { orderId: string; toStatus: string } }) =>
@@ -79,7 +91,7 @@ const repoFor = () => ({
 
 beforeEach(() => {
   journalled.clear();
-  journalled.add('o2');
+  journalled.set('o2', 500);
   calls.length = 0;
   for (const f of [journalSale, journalPartialReturn, journalAmountOnlyRefund, h.send])
     f.mockClear();
@@ -136,11 +148,23 @@ describe('runSaleJournalBackfill', () => {
 
   it('apply posts the sale then replays the skipped refunds oldest-first; a fully paid order has no replay', async () => {
     const r = await runSaleJournalBackfill({ dryRun: false });
-    expect(calls).toEqual(['sale:o1', 'sale:o3', 'return:ret-1', 'amount:refund:re_9', 'sale:o6']);
+    expect(calls).toEqual([
+      'sale:o1',
+      'sale:o3',
+      'return:ret-1',
+      'return:backorder:line1',
+      'amount:refund:re_9',
+      'sale:o6',
+    ]);
     expect(journalPartialReturn).toHaveBeenCalledWith({
       orderId: 'o3',
       refundKey: 'ret-1',
       items: [{ orderItemId: 'i1', quantity: 1 }],
+    });
+    expect(journalPartialReturn).toHaveBeenCalledWith({
+      orderId: 'o3',
+      refundKey: 'backorder:line1',
+      items: [{ orderItemId: 'i2', quantity: 2 }],
     });
     expect(journalAmountOnlyRefund).toHaveBeenCalledWith({
       orderId: 'o3',
@@ -149,7 +173,7 @@ describe('runSaleJournalBackfill', () => {
     });
     const s1 = r.stores.find(s => s.storeId === 's1')!;
     expect(s1.posted).toBe(2);
-    expect(s1.reasons).toMatchObject({ refunds_replayed: 2, sale_skipped_accounting_disabled: 1 });
+    expect(s1.reasons).toMatchObject({ refunds_replayed: 3, sale_skipped_accounting_disabled: 1 });
     expect(h.send).not.toHaveBeenCalled(); // never order/created: no email / push re-sent
   });
 
@@ -158,6 +182,38 @@ describe('runSaleJournalBackfill', () => {
     calls.length = 0;
     await runSaleJournalBackfill({ dryRun: false });
     expect(calls).toEqual(['sale:o6']); // only the one journalSale declines
+  });
+
+  it('a replay that failed after the sale posted is retried on the next run', async () => {
+    journalPartialReturn
+      .mockImplementationOnce(async (a: { orderId: string; refundKey: string }) => {
+        calls.push(`return:${a.refundKey}`);
+        journalled.set(`${a.orderId}:partial:${a.refundKey}`, 5001);
+        return { posted: 2 };
+      })
+      .mockImplementationOnce(async () => {
+        throw Object.assign(new Error('x'), { code: 'DO_DOWN' });
+      });
+    const first = await runSaleJournalBackfill({ dryRun: false });
+    expect(first.stores[0].errors).toEqual([{ orderId: 'o3', code: 'DO_DOWN' }]);
+    calls.length = 0;
+    const dry = await runSaleJournalBackfill({ dryRun: true });
+    expect(dry.stores[0].reasons.refund_replay_needed).toBe(1);
+    expect(calls).toEqual([]);
+    const second = await runSaleJournalBackfill({ dryRun: false });
+    expect(calls).toEqual(['return:backorder:line1', 'amount:refund:re_9', 'sale:o6']);
+    expect(second.stores[0].reasons.refunds_replayed).toBe(2);
+    calls.length = 0;
+    await runSaleJournalBackfill({ dryRun: false });
+    expect(calls).toEqual(['sale:o6']);
+  });
+
+  it('a refund made AFTER the sale existed is never replayed', async () => {
+    journalled.set('o3', 100); // the sale predates every refund event (t >= 1000)
+    const r = await runSaleJournalBackfill({ dryRun: false });
+    expect(journalPartialReturn).not.toHaveBeenCalled();
+    expect(journalAmountOnlyRefund).not.toHaveBeenCalled();
+    expect(r.stores[0].reasons.refund_replay_needed).toBeUndefined();
   });
 
   it('a failing order is listed and does not stop the run', async () => {

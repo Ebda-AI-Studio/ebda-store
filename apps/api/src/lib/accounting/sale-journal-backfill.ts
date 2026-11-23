@@ -64,7 +64,10 @@ const PAGE = 200;
 export const SALE_BACKFILL_MAX_BUDGET = 500;
 const DEFAULT_BUDGET = 200;
 const LIST_CAP = 200;
-const PARTIAL_MARKERS = ['partial_return_restored', 'partial_refund_recorded'] as const;
+// Item-level markers (a return's partial restore, a cancelled backorder line `backorder:<lineId>`) route to journalPartialReturn;
+// the amount-only marker to journalAmountOnlyRefund: the same routing as accounting-post-refund-journal.
+const ITEM_MARKERS = ['partial_return_restored', 'backorder_line_cancelled'] as const;
+const PARTIAL_MARKERS = [...ITEM_MARKERS, 'partial_refund_recorded'] as const;
 
 const encodeSaleCursor = (c: Cursor): string =>
   Buffer.from(JSON.stringify(c)).toString('base64url');
@@ -83,6 +86,8 @@ const codeOf = (err: unknown): string =>
 const bump = (r: Record<string, number>, k: string, n = 1): void => {
   r[k] = (r[k] ?? 0) + n;
 };
+
+const isItemMarker = (m: string): boolean => (ITEM_MARKERS as readonly string[]).includes(m);
 
 type Repo = Awaited<ReturnType<typeof storeRepo>>;
 type Money = NonNullable<Awaited<ReturnType<typeof storeMoney>>>;
@@ -119,12 +124,12 @@ async function partialRefunds(
         : [];
       const amount = typeof m.amount === 'number' ? m.amount : 0;
       // Same routing as accounting-post-refund-journal: items => pro-rata adjustment; no items => an amount-only refund.
-      if (marker === 'partial_return_restored' && items.length === 0) continue;
+      if (isItemMarker(marker) && items.length === 0) continue;
       if (marker === 'partial_refund_recorded' && amount <= 0) continue;
       out.push({
         refundKey: m.refundKey,
         at: new Date(r.createdAt as string | Date).getTime(),
-        items: marker === 'partial_return_restored' ? items : [],
+        items: isItemMarker(marker) ? items : [],
         amount,
       });
     }
@@ -213,10 +218,29 @@ async function backfillStore(
           }
           const has = await repo.db.journalEntry.findFirst({
             where: { storeId, source: 'order', sourceId: o.id },
-            select: { id: true },
+            select: { id: true, createdAt: true },
           });
           if (has) {
-            bump(report.reasons, 'already_journaled');
+            // RETRY: a run that posted the sale but failed mid-replay leaves refunds without their journal. Only refunds that
+            // happened BEFORE the sale existed could have been skipped for want of it; one made after was journalled normally.
+            const saleAt = new Date(has.createdAt as string | Date).getTime();
+            const pending: PartialRefund[] = [];
+            for (const r of await partialRefunds(repo, storeId, o.id)) {
+              if (!(r.at < saleAt)) continue;
+              const base = `${o.id}:partial:${r.refundKey}`;
+              const done = await repo.db.journalEntry.findFirst({
+                where: { storeId, source: 'order', sourceId: { in: [base, `${base}:cogs`] } },
+                select: { id: true },
+              });
+              if (!done) pending.push(r);
+            }
+            if (pending.length === 0) {
+              bump(report.reasons, 'already_journaled');
+              continue;
+            }
+            bump(report.reasons, 'refund_replay_needed');
+            if (report.orderIds.length < LIST_CAP) report.orderIds.push(o.id);
+            if (!dryRun) await replayRefunds(money, o.id, pending, report.reasons);
             continue;
           }
           report.candidates++;
