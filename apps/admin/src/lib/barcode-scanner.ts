@@ -23,8 +23,10 @@ const SCAN_FORMATS: ScanFormat[] = [
 /** Formats the products/labels actually use; native is only trusted when it covers all of these. */
 const REQUIRED_FORMATS: ScanFormat[] = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'];
 
-const ZXING_WASM_VERSION = '3.1.7';
-const ZXING_WASM_URL = `/vendor/zxing-wasm-${ZXING_WASM_VERSION}/zxing_reader.wasm`;
+// pq-allow(unused-export): test seam, imported by tests/unit/admin-barcode-scanner.test.ts
+export const ZXING_WASM_VERSION = '3.1.7';
+// pq-allow(unused-export): test seam, imported by tests/unit/admin-barcode-scanner.test.ts
+export const ZXING_WASM_URL = `/vendor/zxing-wasm-${ZXING_WASM_VERSION}/zxing_reader.wasm`;
 
 export interface ScanDetector {
   detect(source: ImageBitmapSource): Promise<Array<{ rawValue: string; format: string }>>;
