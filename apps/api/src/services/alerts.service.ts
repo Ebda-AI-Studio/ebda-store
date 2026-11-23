@@ -5,6 +5,7 @@ import logger from '../lib/logger';
 import { cfWaitUntil } from '../cf/bindings';
 import { isDemoStore } from '../lib/demo-store';
 import { redis } from './redis.service';
+import { buildAlertText, telegramAlert, type AlertMessage } from '@ebda/shared/observe';
 
 /**
  * Out-of-band alerting channel (iceberg item #12 / CLAUDE.md rule #6).
@@ -79,15 +80,6 @@ export interface AlertOptions {
 // new event class.
 const THROTTLE_TTL_SECONDS = 300;
 
-const LEVEL_EMOJI: Record<AlertLevel, string> = {
-  p0: '🔴',
-  p1: '🟠',
-  info: '🔵',
-};
-
-const TELEGRAM_MAX_LEN = 4096;
-const BODY_MAX_LEN = 3500;
-
 let bootWarningEmitted = false;
 
 function emitBootWarningOnce(reason: string): void {
@@ -104,61 +96,34 @@ function isConfigured(): boolean {
 }
 
 /**
- * MarkdownV2 needs every reserved character escaped, even inside code
- * blocks for some clients. We use plain text mode (no parse_mode) to
- * sidestep escaping bugs that would silently drop messages.
- *
- * Header shape:
- *   🔴 [P0 PLATFORM] uncaughtException
- *   env=production · source=process.uncaughtException
- *
- *   🔴 [P0 STORE] payment.webhook.hmac_fail
+ * The alert as the foundation's shared shape (Ruling FDN-OBSERVE-1: ONE message layout for every product, title/body/context masked for
+ * phones and e-mails, credential keys dropped from context). Header:
+ *   🔴 Ebda Store: payment.webhook.hmac_fail
+ *   [P0 STORE]
  *   store=Demo Shop (demo-shop · 00000000…)
  *   env=production · source=payment.webhook.hmac_fail
- *
- * The scope-prefixed tag (`PLATFORM` or `STORE`) makes "is this everyone
- * or just one merchant?" the first thing the operator sees. Store
- * identity gets its own line so the slug can be copy-pasted into an
- * admin URL without parsing the rest of the message.
+ * The scope tag (`PLATFORM` or `STORE`) makes "is this everyone or just one merchant?" the first thing the operator sees; the store line
+ * carries the slug so it can be copy-pasted into an admin URL. Plain text, no parse_mode (MarkdownV2 escaping bugs silently drop messages).
  */
-function buildMessage(opts: AlertOptions): string {
-  const emoji = LEVEL_EMOJI[opts.level];
+function toAlertMessage(opts: AlertOptions): AlertMessage {
   const scope = opts.scope ?? 'platform';
-  const env = config.nodeEnv;
-
-  const lines: string[] = [
-    // Product name FIRST (Ahmad 2026-10-14): one Ebda AI Studio bot serves every
-    // product (Store, WhatsApp, CRM, ERP…), so each alert says which one broke.
-    `${emoji} ${BRAND.product.nameEn}: ${opts.title}`,
-    `[${opts.level.toUpperCase()} ${scope.toUpperCase()}]`,
-  ];
-
+  let scopeLine: string | undefined;
   if (scope === 'store' && opts.store) {
     const idSuffix = opts.store.id.length > 8 ? `${opts.store.id.slice(0, 8)}…` : opts.store.id;
-    const slugPart = opts.store.slug ? `${opts.store.slug} · ` : '';
-    lines.push(`store=${opts.store.name} (${slugPart}${idSuffix})`);
+    scopeLine = `${opts.store.name} (${opts.store.slug ? `${opts.store.slug} · ` : ''}${idSuffix})`;
   }
-
-  const meta = [`env=${env}`];
-  if (opts.source) meta.push(`source=${opts.source}`);
-  lines.push(meta.join(' · '));
-
-  if (opts.body) {
-    const trimmed =
-      opts.body.length > BODY_MAX_LEN ? `${opts.body.slice(0, BODY_MAX_LEN)}…` : opts.body;
-    lines.push('', trimmed);
-  }
-  if (opts.context && Object.keys(opts.context).length > 0) {
-    try {
-      const ctx = JSON.stringify(opts.context, null, 2);
-      lines.push('', ctx);
-    } catch {
-      // context unrenderable (circular refs etc) — skip silently
-    }
-  }
-
-  const message = lines.join('\n');
-  return message.length > TELEGRAM_MAX_LEN ? `${message.slice(0, TELEGRAM_MAX_LEN - 1)}…` : message;
+  return {
+    // Product name FIRST (Ahmad 2026-10-14): one Ebda AI Studio bot serves every product, so each alert says which one broke.
+    product: BRAND.product.nameEn,
+    level: opts.level,
+    scope,
+    ...(scopeLine ? { scopeLine } : {}),
+    title: opts.title,
+    ...(opts.source ? { source: opts.source } : {}),
+    env: config.nodeEnv,
+    ...(opts.body ? { body: opts.body } : {}),
+    ...(opts.context ? { context: opts.context } : {}),
+  };
 }
 
 /**
@@ -342,58 +307,36 @@ async function deliverAlert(opts: AlertOptions): Promise<AlertOutcome> {
     return 'throttled';
   }
 
-  const text = buildMessage(opts);
+  const message = toAlertMessage(opts);
+  const text = buildAlertText(message);
   // Mirror to the AI OS brain in parallel with Telegram. It is AWAITED before returning (it never throws and has its own 5 s cap):
   // on Workers a fetch still pending when the request or cron handler finishes is cancelled, so a fire-and-forget mirror was lost
   // (2026-11-11: the Sentry-bridge test alert reached Telegram but not the brain while the mirror was fire-and-forget). Its result never changes the outcome.
   const mirror = mirrorToBrain(opts, text);
-  const url = `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`;
 
-  const outcome = await (async (): Promise<AlertOutcome> => {
-    try {
-      // Telegram occasionally hangs on the connection — cap with a 5s
-      // timeout so a P0 alert path doesn't block on a flaky network.
-      // The abort stays armed through the error-body read too (issue 2393): a
-      // non-2xx whose body stalls after the headers is the same hang.
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: config.telegramAlertChatId,
-            text,
-            disable_web_page_preview: true,
-          }),
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          const detail = await res.text().catch(() => '');
+  // The foundation owns the POST (5 s abort armed through the error-body read too, issue 2393; never throws); this file keeps the Redis throttle,
+  // the demo-store skip, the brain mirror and the in-flight tracking above.
+  const outcome = await telegramAlert(
+    {
+      token: config.telegramBotToken,
+      chatId: config.telegramAlertChatId,
+      timeoutMs: TELEGRAM_TIMEOUT_MS,
+      disableWebPagePreview: true,
+      onError: ({ status, detail, err }) => {
+        if (status !== undefined)
           logger.error(
-            {
-              status: res.status,
-              level: opts.level,
-              title: opts.title,
-              detail: detail.slice(0, 500),
-            },
+            { status, level: opts.level, title: opts.title, detail },
             'alerts.service: Telegram sendMessage rejected'
           );
-          return 'failed';
-        }
-        return 'sent';
-      } finally {
-        clearTimeout(timer);
-      }
-    } catch (err) {
-      logger.error(
-        { err, level: opts.level, title: opts.title },
-        'alerts.service: Telegram sendMessage threw'
-      );
-      return 'failed';
-    }
-  })();
+        else
+          logger.error(
+            { err, level: opts.level, title: opts.title },
+            'alerts.service: Telegram sendMessage threw'
+          );
+      },
+    },
+    message
+  );
   await mirror;
   return outcome;
 }
