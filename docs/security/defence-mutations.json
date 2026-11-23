@@ -2134,22 +2134,32 @@
     {
       "id": "demo-owner-never-mailed",
       "domain": "consent",
-      "tier": "integration",
-      "why": "a password reset for the demo store's seeded owner (storedemo-owner@ebda.app, no mailbox) issues a reset token and mails a dead address, a bounce on the platform sender's reputation on demand (Ruling B1-13)",
+      "tier": "unit",
+      "why": "on the Worker (no Postgres) a password reset for the demo store's seeded owner (storedemo-owner@ebda.app, no mailbox) is handed to the identity service, which mails a dead address: a bounce on the platform sender's reputation on demand (Ruling B1-13, NZ-DEMO-OWNER-1; live gap verified 2026-11-23: the identity row exists, active and verified)",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "    if (!user || (await ownsDemoStore(user.id))) {\n      // Silently return",
-      "replace": "    if (!user) {\n      // Silently return",
-      "test": "tests/integration/demo-store.test.ts"
+      "find": "          .then(demoOwner => (demoOwner ? undefined : forgotIdentityPassword(email)))",
+      "replace": "          .then(() => forgotIdentityPassword(email))",
+      "test": "tests/unit/demo-owner-never-mailed-worker.test.ts"
     },
     {
       "id": "demo-owner-never-mailed-resend",
       "domain": "consent",
-      "tier": "integration",
-      "why": "a verification resend for the demo store's seeded owner (storedemo-owner@ebda.app, no mailbox) issues a verification token and mails a dead address, the resend twin of demo-owner-never-mailed (Ruling B1-13, T9 review minor)",
-      "source": "apps/api/src/services/auth.service.ts",
-      "find": "    if (!user || (await ownsDemoStore(user.id))) {\n      // Don't reveal",
-      "replace": "    if (!user) {\n      // Don't reveal",
-      "test": "tests/integration/demo-store.test.ts"
+      "tier": "unit",
+      "why": "a verification resend for the demo store's seeded owner (storedemo-owner@ebda.app, no mailbox) is handed to the identity service on the merchant-signup resend path, the resend twin of demo-owner-never-mailed (Ruling B1-13, NZ-DEMO-OWNER-1)",
+      "source": "apps/api/src/services/merchant-signup.service.ts",
+      "find": "    if (await isDemoOwnerEmail(email)) return GENERIC_SIGNUP_RESULT;\n",
+      "replace": "",
+      "test": "tests/unit/demo-owner-never-mailed-worker.test.ts"
+    },
+    {
+      "id": "demo-owner-guard-reads-demo-flag",
+      "domain": "consent",
+      "tier": "unit",
+      "why": "the Worker demo-owner guard stops consulting the platform directory (is_demo ownership), so it refuses nobody and the demo owner is mailed again (NZ-DEMO-OWNER-1)",
+      "source": "apps/api/src/services/demo-owner-guard.ts",
+      "find": "    return row !== null;",
+      "replace": "    return false;",
+      "test": "tests/unit/demo-owner-never-mailed-worker.test.ts"
     },
     {
       "id": "r2-delete-refuses-foreign-store-key",

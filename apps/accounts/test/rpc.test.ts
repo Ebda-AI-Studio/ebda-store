@@ -353,6 +353,13 @@ describe('Accounts RPC for the Store', () => {
     expect(Object.values(await rpc().exportUser(u.id)).every(a => a.length === 0)).toBe(true);
   });
 
+  it('accountIdByEmail returns the live account id (case-insensitive) and null for an unknown address', async () => {
+    const u = await seedUser();
+    expect(await rpc().accountIdByEmail(u.email.toUpperCase())).toBe(u.id);
+    expect(await rpc().accountIdByEmail('nobody@example.com')).toBeNull();
+    await expect(rpc().accountIdByEmail('not an email')).rejects.toThrow();
+  });
+
   it('forgotPassword mails a reset code for an active account and is silent for an unknown address', async () => {
     const u = await seedUser();
     const before = fakes.mails.length;
