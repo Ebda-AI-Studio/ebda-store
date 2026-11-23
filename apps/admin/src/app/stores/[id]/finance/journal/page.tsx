@@ -10,7 +10,7 @@ import { apiGet, apiGetPage, apiPut, type PageMeta } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { Button } from '@/components/ui/Button';
 import { PageControls } from '../../../../../components/PageControls';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, formatDate } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -194,11 +194,7 @@ export default function JournalListPage() {
     },
     {
       header: t('postedAt'),
-      cell: entry => (
-        <span className="text-muted-foreground">
-          {new Date(entry.postedAt).toLocaleDateString(undefined, withNumerals())}
-        </span>
-      ),
+      cell: entry => <span className="text-muted-foreground">{formatDate(entry.postedAt)}</span>,
     },
     {
       header: t('source'),
