@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   RECEIPT_BARCODE_SHAPES,
   BARCODE_SHAPE_CREDIT,
@@ -11,23 +11,9 @@ import {
 import { apiPut } from '../lib/api';
 import { checkSvgBarcode } from '../lib/label-export';
 import { useT } from '@/i18n/useT';
+import { BarcodeStyleGrid, BarcodeStyleTile } from './BarcodeStyleTile';
 
 const SAMPLE = 'ORD-48213';
-
-/** Live preview: a real, scannable Code 128 of a sample number in that shape. */
-function Preview({ shape }: { shape: string }) {
-  const svg = useMemo(() => renderBarcodeSvg({ value: SAMPLE, shape, label: false }), [shape]);
-  return (
-    <bdi dir="ltr" className="block max-w-full overflow-hidden">
-      <span
-        aria-hidden="true"
-        className="block max-w-full text-foreground [&>svg]:mx-auto [&>svg]:h-16 [&>svg]:w-auto [&>svg]:max-w-full"
-        // Built by our own encoder from a constant; nothing user-supplied.
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
-    </bdi>
-  );
-}
 
 /**
  * Pick how the order barcode prints on the receipt, packing slip and invoice:
@@ -99,38 +85,18 @@ export function ReceiptBarcodePicker({
         <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">{t('hint')}</p>
       </div>
-      <div
-        role="radiogroup"
-        aria-label={t('title')}
-        className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4"
-      >
-        {options.map(id => {
-          const on = choice === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => setChoice(id)}
-              className={`flex min-w-0 flex-col items-center gap-1 overflow-hidden rounded-lg border p-2 text-xs ${
-                on
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-border bg-background text-muted-foreground hover:bg-muted'
-              }`}
-            >
-              <span className="flex h-16 w-full min-w-0 items-center justify-center overflow-hidden">
-                {id === 'off' ? (
-                  <span className="text-muted-foreground">-</span>
-                ) : (
-                  <Preview shape={id} />
-                )}
-              </span>
-              <span className="font-medium">{t(`shape.${id}`)}</span>
-            </button>
-          );
-        })}
-      </div>
+      <BarcodeStyleGrid label={t('title')}>
+        {options.map(id => (
+          <BarcodeStyleTile
+            key={id}
+            id={id}
+            name={t(`shape.${id}`)}
+            sample={SAMPLE}
+            selected={choice === id}
+            onSelect={() => setChoice(id)}
+          />
+        ))}
+      </BarcodeStyleGrid>
       <div className="flex items-center gap-3">
         <Button
           size="sm"

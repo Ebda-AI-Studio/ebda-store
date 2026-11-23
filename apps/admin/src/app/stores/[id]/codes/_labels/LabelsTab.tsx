@@ -1,8 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { LABEL_PRESETS, layoutLabel } from '@ebda/shared';
+import {
+  LABEL_PRESETS,
+  RECEIPT_BARCODE_SHAPES,
+  labelPresetById,
+  layoutLabel,
+  shapePrintability,
+  type ShapePrintability,
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import {
   canvasToRgb,
@@ -32,6 +39,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
   const ti = useT('labels.items');
   const tc = useT('labels.content');
   const tp = useT('labels.preview');
+  const tf = useT('labels.fix');
   const ta = useT('labels.actions');
   const locale = useLocale();
   const L = useLabels(storeId);
@@ -75,6 +83,23 @@ export function LabelsTab({ storeId }: { storeId: string }) {
     el.height = labelCanvas.height;
     el.getContext('2d')?.drawImage(labelCanvas, 0, 0);
   }, [labelCanvas]);
+
+  // Printability of every style on the CURRENT label size, from the same layout the preview uses.
+  const printability = useMemo(() => {
+    const out: Record<string, ShapePrintability> = {};
+    for (const id of ['plain', ...RECEIPT_BARCODE_SHAPES])
+      out[id] = shapePrintability(preset, L.previewItem, settings, id);
+    return out;
+  }, [preset, L.previewItem, settings]);
+  // A roll that prints the current style, offered as a one-click way out of the thin-bar error.
+  const rollId = useMemo(
+    () =>
+      LABEL_PRESETS.filter(p => p.continuous).find(
+        p => shapePrintability(p, L.previewItem, settings, settings.shape).printable
+      )?.id,
+    [L.previewItem, settings]
+  );
+  const onRoll = !!labelPresetById(settings.preset)?.continuous;
 
   const printable = L.chosen.filter(c => c.item.barcode);
   const missing = L.chosen.length - printable.length;
@@ -258,7 +283,12 @@ export function LabelsTab({ storeId }: { storeId: string }) {
             <h2 id="lb-shape" className="text-base font-semibold text-foreground">
               {t('shape.title')}
             </h2>
-            <ShapePicker value={settings.shape} onChange={shape => set({ shape })} />
+            <ShapePicker
+              value={settings.shape}
+              onChange={shape => set({ shape })}
+              printability={printability}
+              heightMm={preset.heightMm}
+            />
           </section>
 
           <section className="space-y-3 border-t border-border pt-5" aria-labelledby="lb-content">
@@ -297,6 +327,7 @@ export function LabelsTab({ storeId }: { storeId: string }) {
               {t('size.title')}
             </h2>
             <select
+              id="lb-size-select"
               aria-label={t('size.title')}
               value={settings.preset}
               onChange={e => set({ preset: e.target.value })}
@@ -368,6 +399,31 @@ export function LabelsTab({ storeId }: { storeId: string }) {
           >
             {tp(status)}
           </p>
+          {status === 'notPrintable' && (
+            <div className="flex flex-wrap gap-2">
+              {settings.shape !== 'plain' && (
+                <button type="button" className={btn} onClick={() => set({ shape: 'plain' })}>
+                  {tf('usePlain')}
+                </button>
+              )}
+              <button
+                type="button"
+                className={btn}
+                onClick={() => {
+                  const el = document.getElementById('lb-size-select');
+                  el?.scrollIntoView({ block: 'center' });
+                  el?.focus();
+                }}
+              >
+                {tf('biggerLabel')}
+              </button>
+              {rollId && !onRoll && (
+                <button type="button" className={btn} onClick={() => set({ preset: rollId })}>
+                  {tf('onRoll')}
+                </button>
+              )}
+            </div>
+          )}
           {layout.dropped.length > 0 && (
             <p className="text-xs text-muted-foreground">
               {tp('dropped', {

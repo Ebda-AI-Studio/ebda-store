@@ -1,65 +1,60 @@
 'use client';
 
-import { useMemo } from 'react';
-import { BARCODE_SHAPE_CREDIT, RECEIPT_BARCODE_SHAPES, renderBarcodeSvg } from '@ebda/shared';
+import { BARCODE_SHAPE_CREDIT, RECEIPT_BARCODE_SHAPES, type ShapePrintability } from '@ebda/shared';
+import { BarcodeStyleGrid, BarcodeStyleTile } from '@/components/BarcodeStyleTile';
 import { useT } from '@/i18n/useT';
 
 const SAMPLE = '2000000000015';
-
-function Mini({ shape }: { shape: string }) {
-  const svg = useMemo(() => renderBarcodeSvg({ value: SAMPLE, shape, label: false }), [shape]);
-  return (
-    <bdi dir="ltr" className="block">
-      <span
-        aria-hidden="true"
-        className="block text-foreground [&>svg]:mx-auto [&>svg]:h-14 [&>svg]:w-auto"
-        // Built by our own encoder from a constant; nothing user-supplied.
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
-    </bdi>
-  );
-}
 
 /** Plain bars + the 24 BARKOD shapes (always a real Code 128 scan zone). */
 export function ShapePicker({
   value,
   onChange,
+  printability,
+  heightMm,
 }: {
   value: string;
   onChange: (shape: string) => void;
+  /** Per-shape printability on the CURRENT label size; a missing entry means printable. */
+  printability?: Record<string, ShapePrintability>;
+  /** Current label height, mm (for the "your label is Y mm" line). */
+  heightMm?: number;
 }) {
   const t = useT('receiptBarcode');
   const tl = useT('labels.shape');
+  const have = heightMm === undefined ? '' : String(Math.round(heightMm * 10) / 10);
+  const blocked = Object.entries(printability ?? {}).filter(([, v]) => !v.printable);
+  const heights = blocked.map(([, v]) => v.minHeightMm).filter((n): n is number => n !== null);
+  const minAll = heights.length ? Math.min(...heights) : null;
   return (
     <div className="space-y-2">
-      <div
-        role="radiogroup"
-        aria-label={tl('title')}
-        className="grid max-h-72 grid-cols-3 gap-2 overflow-auto sm:grid-cols-4"
-      >
+      <BarcodeStyleGrid label={tl('title')} className="max-h-72 overflow-auto">
         {['plain', ...RECEIPT_BARCODE_SHAPES].map(id => {
-          const on = value === id;
+          const p = printability?.[id];
+          const bad = p && !p.printable ? p : null;
+          const reason = bad
+            ? bad.minHeightMm !== null
+              ? tl('needsHeightTile', { min: String(bad.minHeightMm), have })
+              : tl('needsWidthTile')
+            : undefined;
           return (
-            <button
+            <BarcodeStyleTile
               key={id}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => onChange(id)}
-              className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
-                on
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-border bg-background text-muted-foreground hover:bg-muted'
-              }`}
-            >
-              <span className="flex h-14 w-full items-center justify-center">
-                <Mini shape={id} />
-              </span>
-              <span className="font-medium">{t(`shape.${id}`)}</span>
-            </button>
+              id={id}
+              name={t(`shape.${id}`)}
+              sample={SAMPLE}
+              selected={value === id}
+              blockedReason={reason}
+              onSelect={() => onChange(id)}
+            />
           );
         })}
-      </div>
+      </BarcodeStyleGrid>
+      {blocked.length > 0 && (
+        <p className="text-xs font-medium text-foreground">
+          {minAll !== null ? tl('needsHeight', { min: String(minAll), have }) : tl('needsWidth')}
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">{tl('hint')}</p>
       <p className="text-xs text-muted-foreground">{BARCODE_SHAPE_CREDIT}</p>
     </div>
