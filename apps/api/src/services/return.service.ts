@@ -257,6 +257,7 @@ async function lockOrderReturnsBounded(orderId: string): Promise<void> {
  * A merchant-opened return on a GUEST order carries `guest:<orderId>` as its customer (GUEST-RET-1): no account exists, so the
  * identity shown is the order's own shipping-address snapshot (name / email / phone). Null when the order was not joined.
  */
+// pq-allow(unused-export): test seam, imported by __tests__/return-guest.test.ts
 export function guestCustomerOf(order: unknown): Record<string, unknown> | null {
   let addr = (order as { shippingAddress?: unknown } | null | undefined)?.shippingAddress;
   if (typeof addr === 'string') {
