@@ -205,6 +205,7 @@
   "GET /stores/:storeId/abandoned-carts/:id",
   "GET /stores/:storeId/abandoned-carts/config",
   "GET /stores/:storeId/abandoned-carts/stats",
+  "GET /stores/:storeId/activity/",
   "GET /stores/:storeId/affiliates",
   "GET /stores/:storeId/affiliates/:id",
   "GET /stores/:storeId/affiliates/:id/audit-trail",

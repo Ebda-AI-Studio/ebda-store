@@ -2365,6 +2365,10 @@
         "title": "Newsletter Subscribers",
         "description": "View and export the email list captured from your storefront"
       },
+      "activity": {
+        "title": "Activity log",
+        "description": "See who changed what in your store"
+      },
       "staff": {
         "title": "Team",
         "description": "Add staff with limited permissions"
@@ -8540,6 +8544,22 @@
       "firstFactorEmailHint": "To add your first sign-in method we e-mail a code to this account (enter your password, then press the button).",
       "signInAgainAfterEnrol": "You will be signed out now. Sign in again with your new sign-in method: that is what carries platform-admin access.",
       "savedSignInAgainButton": "Saved, sign me out",
+      "recovery": {
+        "title": "Recovery codes",
+        "description": "One-time codes that let you sign in if you lose your authenticator app. Each code works once. Making a new set cancels every old code, so save the new ones before you close this page.",
+        "remaining": "Unused codes left: {count}",
+        "passwordLabel": "Your password",
+        "codeLabel": "Authenticator code (6 digits)",
+        "regenerate": "Make new recovery codes",
+        "working": "Working…",
+        "done": "New recovery codes created. The old ones no longer work.",
+        "saveNow": "Save these codes now. They are shown only once.",
+        "saved": "I saved them",
+        "errorPassword": "That password is not right.",
+        "errorCode": "That authenticator code is not right. A recovery code cannot be used here.",
+        "errorThrottle": "Too many attempts. Wait a few minutes and try again.",
+        "errorGeneric": "Could not make new codes. Try again."
+      },
       "phone": {
         "title": "Phone number",
         "description": "The number on your account. It is where a password-reset code goes over WhatsApp when that is switched on, so changing it needs your password (and your authenticator code if 2FA is on).",
@@ -8747,6 +8767,20 @@
       "dateApply": "Apply",
       "guest": "Guest"
     }
+  },
+  "activity": {
+    "title": "Store activity",
+    "subtitle": "Who changed what in your store, newest first. Read only. Contact details are hidden.",
+    "tableLabel": "Store activity",
+    "colWhen": "When",
+    "colWho": "Who",
+    "colWhat": "What",
+    "colNetwork": "Network",
+    "system": "System",
+    "empty": "No activity yet.",
+    "error": "Could not load the activity. Try again in a moment.",
+    "loading": "Loading…",
+    "loadMore": "Load more"
   },
   "staff": {
     "page": {
