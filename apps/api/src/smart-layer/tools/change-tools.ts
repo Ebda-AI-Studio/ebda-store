@@ -22,6 +22,7 @@ import { accountBillingTools } from './account-billing.tools';
 import { productsConfirmTools } from './products-confirm.tools';
 import { marketingConfirmTools } from './marketing-confirm.tools';
 import { trustTools } from './trust.tools';
+import { addonCheckoutTools } from './addon-checkout.tools';
 
 export function changeTools(): ToolSpec[] {
   return [
@@ -47,5 +48,6 @@ export function changeTools(): ToolSpec[] {
     ...productsConfirmTools(),
     ...marketingConfirmTools(),
     ...trustTools(),
+    ...addonCheckoutTools(),
   ];
 }

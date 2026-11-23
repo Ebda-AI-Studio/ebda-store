@@ -100,7 +100,6 @@
     "undo-unclassified|order.update-status",
     "undo-unclassified|planned.ai-finance",
     "undo-unclassified|product.csv-import-export",
-    "undo-unclassified|self.addon-purchase",
     "undo-unclassified|self.chat-templates",
     "undo-unclassified|self.instapay-auto-confirm"
   ]
