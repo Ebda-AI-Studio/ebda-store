@@ -2,7 +2,7 @@
   "name": "@ebda/web",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
