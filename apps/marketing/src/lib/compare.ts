@@ -81,20 +81,6 @@ const ROWS: readonly RowDef[] = [
     },
   },
   {
-    id: 'meaning',
-    group: 'gap',
-    needs: 'meaning',
-    label: { ar: 'بحث بالمعنى', en: 'Search by meaning' },
-    ebda: {
-      ar: 'العميل يكتب اللي في دماغه والبحث يفهم قصده.',
-      en: 'Shoppers type what they have in mind and search understands what they mean.',
-    },
-    soon: {
-      ar: 'قريبًا: بنطرحه تدريجيًا، ومش بيتفعّل على متجرك غير لما نتأكد إن نتايجه ممتازة على منتجات حقيقية.',
-      en: 'Coming soon: rolling out gradually, and only switched on for your store once its results pass our quality check on a real catalogue.',
-    },
-  },
-  {
     id: 'ai',
     group: 'strength',
     label: { ar: 'الذكاء الاصطناعي', en: 'AI tools' },
@@ -286,10 +272,6 @@ const vendorCells = (nameEn: string, nameAr: string) =>
       `Check ${nameEn}'s site for its themes and editor.`,
       `راجع موقع ${nameAr} للقوالب والمحرر.`
     ),
-    meaning: same(
-      `Check ${nameEn}'s site for how its search handles meaning.`,
-      `راجع موقع ${nameAr} لمعرفة هل البحث بيفهم المعنى.`
-    ),
     integrations: same(
       `Check ${nameEn}'s site for webhooks and integrations.`,
       `راجع موقع ${nameAr} للتكاملات وإشعارات الأدوات.`
@@ -475,10 +457,6 @@ export const COMPARE: Record<CompareSlug, CompareDef> = (() => {
       ),
       builder: same('A very large theme store and a theme editor.', 'متجر قوالب ضخم ومحرر قوالب.'),
       growth: same('Available, built in or through apps.', 'متاحة، جاهزة أو من خلال تطبيقات.'),
-      meaning: same(
-        "Check Shopify's site for how its search handles meaning.",
-        'راجع موقع شوبيفاي لمعرفة هل البحث بيفهم المعنى.'
-      ),
       integrations: same(
         'Webhooks and a developer API are available, alongside the app store.',
         'فيه Webhooks وواجهة للمطورين مع متجر التطبيقات.'
@@ -852,7 +830,7 @@ export const COMPARE_PAGE: Record<
 > = {
   ar: {
     strongH: 'فين ابدأ ستور أقوى أو مساوي',
-    gapH: 'اللي لسه مش موجود في ابدأ ستور، واللي جاي قريبًا',
+    gapH: 'اللي لسه مش موجود في ابدأ ستور',
     colWhat: 'الموضوع',
     colEbda: 'ابدأ ستور',
     asOf: `المقارنة بتاريخ ${COMPARE_AS_OF_AR}.`,
@@ -869,7 +847,7 @@ export const COMPARE_PAGE: Record<
   },
   en: {
     strongH: 'Where Ebda Store is stronger or comparable',
-    gapH: 'What Ebda Store does not have yet, and what is coming soon',
+    gapH: 'What Ebda Store does not have yet',
     colWhat: 'Topic',
     colEbda: 'Ebda Store',
     asOf: `Comparison as of ${COMPARE_AS_OF}.`,

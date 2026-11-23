@@ -74,7 +74,7 @@ jobs:
         run: npm run build -w apps/marketing
       - name: Require the built SEO surface
         run: |
-          for f in out/index.html out/en/index.html out/sitemap.xml out/robots.txt out/llms.txt out/_redirects out/.well-known/security.txt; do
+          for f in out/index.html out/en/index.html out/__next._tree.txt out/en/__next._tree.txt out/sitemap.xml out/robots.txt out/llms.txt out/_redirects out/.well-known/security.txt; do
             test -s "apps/marketing/$f" || { echo "::error::missing build output $f"; exit 1; }
           done
       - name: Record the version serving production (rollback target)
