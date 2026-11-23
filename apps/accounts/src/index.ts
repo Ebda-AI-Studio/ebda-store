@@ -10,6 +10,7 @@ import {
 import {
   eraseIdentity,
   exportIdentity,
+  findUserByEmail,
   isSessionRevoked,
   revokeAllForUser,
   revokeSession,
@@ -304,6 +305,18 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
       })
       .parse(input);
     return inviteFor(this.env, v);
+  }
+
+  /**
+   * The id of the live admin-namespace account for an address, or null. Store-internal (Service Binding only): the Store uses
+   * it to ask "does this address belong to the demo showroom's owner?" before it hands a mail job to this service (Ruling B1-13).
+   */
+  async accountIdByEmail(email: string): Promise<string | null> {
+    const row = await findUserByEmail(
+      this.env.DB,
+      z.string().trim().toLowerCase().email().max(254).parse(email)
+    );
+    return row?.id ?? null;
   }
 
   /** Mail a password-reset code (generic: silent for an unknown or inactive address). */

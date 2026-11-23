@@ -77,6 +77,8 @@ export const revokeIdentityUser = (userId: string, reason: string) =>
   thenInvalidate({ userId }, () => call('revokeUser', r => r.revokeUser?.(userId, reason)));
 export const createIdentity = (input: Parameters<NonNullable<AccountsRpc['createUser']>>[0]) =>
   call('createUser', r => r.createUser?.(input));
+export const identityAccountIdByEmail = (email: string) =>
+  call('accountIdByEmail', r => r.accountIdByEmail?.(email));
 export const resendIdentityVerification = (email: string) =>
   call('resendVerification', r => r.resendVerification?.(email));
 export const inviteIdentity = (input: Parameters<NonNullable<AccountsRpc['inviteUser']>>[0]) =>

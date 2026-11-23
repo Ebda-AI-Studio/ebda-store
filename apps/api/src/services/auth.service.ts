@@ -11,6 +11,7 @@ import {
   getAccountsBrief,
   revokeIdentityIfManaged,
 } from '../lib/identity-client';
+import { isDemoOwnerEmail } from './demo-owner-guard';
 import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 import { hubOnD1, hubOwnedStores } from '../lib/platform-hub';
 import { eraseHubUserData, exportHubUserPlatform } from './platform/hub-user-data';
@@ -2010,10 +2011,12 @@ export class AuthService {
     // identity service, which issues + mails its own code (and answers generically for an unknown address). Never
     // reach `withUser`; return null (the route's generic response) as a missing user does.
     if (postgresRemovedOnThisWorker()) {
+      // Ruling B1-13 / NZ-DEMO-OWNER-1: the demo owner's address is never handed over (it has no mailbox). The check runs inside
+      // the deferred job so the answer's timing does not depend on whether the address exists.
       cfWaitUntil(
-        forgotIdentityPassword(email).catch(err =>
-          logger.error({ err }, 'identity password-reset request failed')
-        )
+        isDemoOwnerEmail(email)
+          .then(demoOwner => (demoOwner ? undefined : forgotIdentityPassword(email)))
+          .catch(err => logger.error({ err }, 'identity password-reset request failed'))
       );
       return null;
     }

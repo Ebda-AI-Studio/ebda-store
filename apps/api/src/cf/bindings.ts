@@ -110,6 +110,8 @@ export interface AccountsRpc {
     | { id: string; created: false; emailVerified: boolean; role: AccountState['role'] }
   >;
   forgotPassword?(email: string): Promise<void>;
+  /** Live admin-namespace account id for an address, null when none (apps/accounts `accountIdByEmail`). */
+  accountIdByEmail?(email: string): Promise<string | null>;
   createUser?(input: {
     id?: string;
     email: string;

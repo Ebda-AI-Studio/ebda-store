@@ -23,6 +23,8 @@ import {
   getAccountState,
   resendIdentityVerification,
 } from '../lib/identity-client';
+import { cfWaitUntil } from '../cf/bindings';
+import { isDemoOwnerEmail } from './demo-owner-guard';
 import { sendMerchantDuplicateSignupNotice } from './platform-mailer';
 import { buildAcquisition, signupTrackingSchema } from './ebda-ads.service';
 import { signupAcceptanceRows } from './legal-notice.service';
@@ -217,8 +219,14 @@ export class MerchantSignupService {
   static async resendVerification(email: string): Promise<typeof GENERIC_SIGNUP_RESULT> {
     // The identity service owns verification codes (and their throttles); it answers nothing for an unknown or verified address.
     await bcrypt.compare('x', DUMMY_HASH); // uniform cost with the signup paths
-    await resendIdentityVerification(email).catch(err =>
-      logger.error({ err, email: maskEmail(email) }, 'merchant resend verification failed')
+    // Ruling B1-13 / NZ-DEMO-OWNER-1: the demo showroom's owner has no mailbox and is never handed over. The guard AND the
+    // hand-over both run in the background, so every address takes the same code path inside the request (no timing oracle).
+    cfWaitUntil(
+      isDemoOwnerEmail(email)
+        .then(demoOwner => (demoOwner ? undefined : resendIdentityVerification(email)))
+        .catch(err =>
+          logger.error({ err, email: maskEmail(email) }, 'merchant resend verification failed')
+        )
     );
     return GENERIC_SIGNUP_RESULT;
   }

@@ -80,6 +80,7 @@ describe('merchant e-mail flows with no store on a Postgres-less Worker', () => 
   it('forgot-password delegates to identity, returns null (a missing user answer) and never reads a user', async () => {
     const r = await AuthService.requestPasswordReset('m@example.com', null);
     expect(r).toBeNull();
+    await new Promise(res => setTimeout(res, 0)); // the hand-over runs in cfWaitUntil, after the demo-owner guard (B1-13)
     expect(h.forgot).toHaveBeenCalledWith('m@example.com');
     expect(withUser).not.toHaveBeenCalled();
   });
