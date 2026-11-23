@@ -8,11 +8,16 @@ export interface ChatMemberAddedData {
   chatUrl: string;
 }
 
+/** A header value must be one line: drop CR/LF and every other control character (the body is HTML-escaped; the subject is not). */
+const oneLine = (v: string): string =>
+  // eslint-disable-next-line no-control-regex
+  v.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').trim();
+
 /** An existing identity was added to a standalone Ebda Chat workspace (Ruling CHAT-SA-6). No code: they sign in as usual. */
 export const chatMemberAddedTemplate = {
   subject: {
-    en: (d: ChatMemberAddedData) => `You were added to ${d.workspaceName} on Ebda Chat`,
-    ar: (d: ChatMemberAddedData) => `اتضفت إلى ${d.workspaceName} في ابدأ شات`,
+    en: (d: ChatMemberAddedData) => `You were added to ${oneLine(d.workspaceName)} on Ebda Chat`,
+    ar: (d: ChatMemberAddedData) => `اتضفت إلى ${oneLine(d.workspaceName)} في ابدأ شات`,
   },
   en: (d: ChatMemberAddedData) => `
     <h2>You were added to a workspace</h2>

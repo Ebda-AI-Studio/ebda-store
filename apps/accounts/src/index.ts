@@ -323,7 +323,12 @@ export class Accounts extends WorkerEntrypoint<Cloudflare.Env> {
         email: z.string().trim().toLowerCase().email().max(254),
         firstName: z.string().trim().min(1).max(100),
         language: z.enum(['en', 'ar']).default('ar'),
-        workspaceName: z.string().trim().min(1).max(200),
+        workspaceName: z
+          .string()
+          // one line: a workspace name ends up in mail subjects (no CR/LF or other control characters)
+          // eslint-disable-next-line no-control-regex
+          .transform(v => v.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').trim())
+          .pipe(z.string().min(1).max(200)),
       })
       .strict()
       .parse(input);

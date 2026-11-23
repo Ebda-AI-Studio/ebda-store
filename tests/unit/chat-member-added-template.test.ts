@@ -19,4 +19,11 @@ describe('chat-member-added template', () => {
       expect(t.subject[lang](d)).toContain('Acme');
     }
   });
+
+  it('keeps the subject on one line even if the workspace name carries CR/LF', () => {
+    const evil = { ...d, workspaceName: 'Acme\r\nBcc: x@evil.example\u2028y' };
+    for (const lang of ['en', 'ar'] as const) {
+      expect(t.subject[lang](evil)).not.toMatch(/[\r\n\u2028\u2029]/);
+    }
+  });
 });

@@ -123,6 +123,19 @@ describe('inviteChatMember', () => {
     expect(fakes.notices).toHaveLength(5);
   });
 
+  it('strips CR/LF and control characters from the workspace name before it reaches any mail', async () => {
+    const email = mail();
+    await rpc().inviteChatMember({
+      email,
+      firstName: 'X',
+      workspaceName: 'Acme\r\nBcc: a@b.c\u0007',
+    });
+    expect(fakes.mails[0].storeName).toBe('Acme Bcc: a@b.c');
+    await expect(
+      rpc().inviteChatMember({ email: mail(), firstName: 'X', workspaceName: '\r\n\t' })
+    ).rejects.toThrow();
+  });
+
   it('validates input strictly (bad email, empty workspace, unknown field)', async () => {
     await expect(
       rpc().inviteChatMember({ email: 'nope', firstName: 'X', workspaceName: WS })
