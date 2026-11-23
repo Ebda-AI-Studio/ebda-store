@@ -141,11 +141,14 @@ const refundTx: any = {
   billingEvent: {
     findUnique: vi.fn(),
     findMany: async () => [],
+    findFirst: async () => null,
     createMany: async () => ({ count: 1 }),
     updateMany: async () => ({ count: 1 }),
     aggregate: async () => ({ _sum: { amountMinor: 9900 } }),
   },
   billingGrant: { findMany: async () => [], updateMany: async () => ({ count: 0 }) },
+  // endAccessForRefund (R-REFUND-PERIOD-1, from main) reads the subscription of a full refund; none here.
+  storeSubscription: { findUnique: async () => null },
 };
 
 describe('refund of an add-on payment', () => {

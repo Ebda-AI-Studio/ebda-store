@@ -435,6 +435,7 @@ model Store {
   shipments                  Shipment[]
   shipmentPickups            ShipmentPickup[]
   providerActivationRequests ProviderActivationRequest[]
+  trustRequests              TrustRequest[]
   codRemittances             CodRemittance[]
   pageRevisions              StorePageRevision[]
   productModels              ProductModel[]
@@ -5038,7 +5039,7 @@ model Warehouse {
   storeId   String   @map("store_id")
   name      String
   nameAr    String?  @map("name_ar")
-  code      String // Short code e.g. "MAIN", "KWT-2"
+  code      String // Short code e.g. "MAIN", "CAI-2"
   isDefault Boolean  @default(false) @map("is_default")
   priority  Int      @default(0) // Higher = preferred in priority routing
   lat       Float? // Optional: enables proximity routing
@@ -5717,6 +5718,43 @@ model ProviderActivationRequest {
   @@index([storeId])
   @@index([status, requestedAt])
   @@map("provider_activation_requests")
+}
+
+// SELF-SERVICE trust and support (A13/A14/A16): one small table for the requests a merchant files with Ebda staff.
+// `kind`: support (in-product "Contact Ebda Store"), suspension (the reason a super admin gave when suspending,
+// readable by the merchant), suspension_appeal, slug_claim (protected brand slug), store_cap (more stores per day).
+// Staff decide; a merchant has no route that sets a decision. `store_id` is null for the two kinds filed before a
+// store exists (slug_claim, store_cap); `user_id` is the requester (no FK: identity lives outside this database).
+model TrustRequest {
+  id          String   @id @default(uuid())
+  kind        String
+  storeId     String?  @map("store_id")
+  userId      String?  @map("user_id")
+  topic       String?
+  message     String?
+  pageUrl     String?  @map("page_url")
+  slug        String?
+  evidenceUrl String?  @map("evidence_url")
+  // open | resolved | rejected
+  status      String   @default("open")
+  // set by the super-admin reject route; the merchant's appeal cooldown keys on it (never on updated_at)
+  rejectedAt  DateTime? @map("rejected_at")
+  // support requests only: claim one of 5 slots per store per UTC day through a partial UNIQUE (store_id, cap_day,
+  // cap_slot); a lost race is a unique violation, so the daily cap is atomic on Postgres and D1 alike
+  capDay      String?  @map("cap_day")
+  capSlot     Int?     @map("cap_slot")
+  // store_cap requests only: the owner's self-serve store limit granted when staff RESOLVED it (> the previous limit,
+  // <= STORE_LIMIT_MAX). The owner's effective limit is the largest granted_limit among their resolved requests,
+  // else MAX_SELF_SERVE_STORES_PER_OWNER (services/owner-store-limit.ts).
+  grantedLimit Int?    @map("granted_limit")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, kind, createdAt(sort: Desc)])
+  @@index([userId, kind, status])
+  @@map("trust_requests")
 }
 
 // PROVIDERS-3: what the first merchants' real traffic proves about a provider. GLOBAL (no tenant
