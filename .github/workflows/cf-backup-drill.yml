@@ -26,6 +26,7 @@ jobs:
           node-version: '24'
       - uses: ./.github/actions/npm-ci
       - name: Install age
+        timeout-minutes: 5
         run: command -v age-keygen >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null; }
       - name: Build the fixture backup with the real pipeline
         run: node scripts/ops/drill-fixture.mjs "$RUNNER_TEMP/fixture"

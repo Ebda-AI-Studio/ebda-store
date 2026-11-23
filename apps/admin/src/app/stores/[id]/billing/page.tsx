@@ -41,7 +41,7 @@ import {
 } from '../../../../components/billing/format';
 import { EbdaBillingReceipt } from '../../../../components/billing/EbdaBillingReceipt';
 import { pickReceiptCharge } from '../../../../components/billing/receipt-charge';
-import { billingNotice, noticeText } from '../../../../components/billing/notice';
+import { billingNotice, isRenewalOnly, noticeText } from '../../../../components/billing/notice';
 import { startCardSetup, useCardReturn } from '../../../../components/billing/useCardReturn';
 import type {
   BillingInfo,
@@ -497,6 +497,9 @@ export default function StoreBillingPage() {
   const planPrice = (p: PlanSummary) =>
     interval === 'yearly' ? p.priceYearlyMinor : p.priceMonthlyMinor;
 
+  // Clock read after mount (render stays deterministic); 0 = not yet known -> no renewal wording.
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => setNowMs(Date.now()), []);
   const info = data?.billing;
   const notice = billingNotice(info);
   const noticeCopy = info && notice ? noticeText(notice, info, tNotice, locale) : null;
@@ -507,7 +510,13 @@ export default function StoreBillingPage() {
   const instapayChosen = info?.billingMethod === 'instapay';
   // InstaPay-only deployment (BILLING_PROVIDER=none) or a store that pays by transfer: a payment is DUE, nothing is
   // charged automatically (Ruling BILLING-NONE-COPY-1).
-  const instapayDue = info?.cardBilling === false || instapayChosen;
+  // Renewal wording only while the next charge is still ahead: a charge already at/behind today with nothing paid is a
+  // payment awaited (#1042/#896: awaiting badge, no "renews on" date), whatever the 7-day notice window says.
+  const nextChargeAhead = !!info?.nextCharge && Date.parse(info.nextCharge.at) > nowMs;
+  const renewalOnly =
+    isRenewalOnly(data?.subscription.status, info, !!quote) &&
+    (nextChargeAhead || !info?.nextCharge);
+  const instapayDue = !renewalOnly && (info?.cardBilling === false || instapayChosen);
   // QA-88: a payment is due and nothing is paid yet -> say so instead of "active".
   const displayStatus = data
     ? billingDisplayStatus(data.subscription.status, !!info?.nextCharge && instapayDue)
@@ -832,24 +841,41 @@ export default function StoreBillingPage() {
                 {info.nextCharge && (
                   <div className="flex justify-between gap-2 sm:col-span-2">
                     <dt className="text-muted-foreground">
-                      {t(instapayDue ? 'trial.instapayDue' : 'trial.nextCharge')}
+                      {t(
+                        instapayDue
+                          ? 'trial.instapayDue'
+                          : renewalOnly
+                            ? 'trial.nextRenewal'
+                            : 'trial.nextCharge'
+                      )}
                     </dt>
                     <dd className="text-end tabular-nums">
                       {info.nextCharge.amountMinor !== null
-                        ? t(instapayDue ? 'trial.instapayDueLine' : 'trial.nextChargeLine', {
-                            amount: formatMoney(info.nextCharge.amountMinor, locale, {
-                              fixedDecimals: true,
-                            }),
-                            interval: t(
-                              info.billingInterval === 'yearly'
-                                ? 'intervalYearly'
-                                : 'intervalMonthly'
-                            ),
-                            plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
-                            date: fmtBillingDate(info.nextCharge.at, locale),
-                          })
+                        ? t(
+                            instapayDue
+                              ? 'trial.instapayDueLine'
+                              : renewalOnly
+                                ? 'trial.renewalLine'
+                                : 'trial.nextChargeLine',
+                            {
+                              amount: formatMoney(info.nextCharge.amountMinor, locale, {
+                                fixedDecimals: true,
+                              }),
+                              interval: t(
+                                info.billingInterval === 'yearly'
+                                  ? 'intervalYearly'
+                                  : 'intervalMonthly'
+                              ),
+                              plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
+                              date: fmtBillingDate(info.nextCharge.at, locale),
+                            }
+                          )
                         : t(
-                            instapayDue ? 'trial.instapayDueNoAmount' : 'trial.nextChargeNoAmount',
+                            instapayDue
+                              ? 'trial.instapayDueNoAmount'
+                              : renewalOnly
+                                ? 'trial.renewalNoAmount'
+                                : 'trial.nextChargeNoAmount',
                             {
                               plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
                               date: fmtBillingDate(info.nextCharge.at, locale),
@@ -857,6 +883,18 @@ export default function StoreBillingPage() {
                           )}
                     </dd>
                   </div>
+                )}
+                {info.nextCharge && info.pendingBillingInterval && (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    {t('trial.switchingInterval', {
+                      interval: t(
+                        info.pendingBillingInterval === 'yearly'
+                          ? 'intervalYearly'
+                          : 'intervalMonthly'
+                      ),
+                      date: fmtBillingDate(info.nextCharge.at, locale),
+                    })}
+                  </p>
                 )}
                 {info.nextCharge && instapayDue && (
                   <p className="text-xs text-muted-foreground sm:col-span-2">
@@ -923,6 +961,13 @@ export default function StoreBillingPage() {
                     >
                       {t('pay.useInstapay')}
                     </Button>
+                  ) : renewalOnly ? (
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-testid="instapay-renewal-note"
+                    >
+                      {t('pay.instapayRenewalNote')}
+                    </p>
                   ) : (
                     <div id="instapay-pay" className="space-y-4">
                       {quote && (

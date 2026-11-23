@@ -17,6 +17,7 @@
  * Route guard: super_admin only (RequireSuperAdmin + the API's requireRole).
  */
 
+import { formatDate } from '@/lib/format';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge } from '@ebda/ui';
@@ -233,10 +234,7 @@ function LedgerPanel({
             {r.tax.etaSubmittedAt && (
               <span className="block text-muted-foreground">
                 {t('etaSubmittedAt', {
-                  date: new Date(r.tax.etaSubmittedAt).toLocaleDateString(
-                    undefined,
-                    withNumerals()
-                  ),
+                  date: formatDate(r.tax.etaSubmittedAt),
                 })}
               </span>
             )}
