@@ -443,7 +443,10 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
     {
       description:
         'Dashboard figures for this store: revenue, order count, average order ' +
-        'value, top products, and low-stock items. The numbers behind the admin ' +
+        'value, top products, and low-stock items. Revenue is NET SALES: all orders except ' +
+        'cancelled, refunded and failed/refunded payments, net of refunds, INCLUDING unpaid ' +
+        'cash-on-delivery orders (sales, not cash collected). ' +
+        'The numbers behind the admin ' +
         'dashboard, without opening it. Customers are counted like the Customers ' +
         'page (registered user, else shipping email, else phone — guests count). ' +
         'totalProfit is null when sold lines have no cost price (unknown, not 0); ' +

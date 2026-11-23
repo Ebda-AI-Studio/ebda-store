@@ -95,7 +95,8 @@ const ALLOW: Record<string, AllowEntry> = {
   'routes/promotion.routes.ts': {
     category: 'resolver-input',
     reason: 'preview lines priced via priceCart',
-    reads: { 'POST /public/:storeId/promotions/preview': 2 },
+    // One shared handler serves the checkout route (/preview) and the browse route (/preview-browse).
+    reads: { makePreviewHandler: 2 },
   },
   'services/cart-recovery-email.service.ts': {
     category: 'resolver-output',
@@ -224,6 +225,31 @@ const ALLOW: Record<string, AllowEntry> = {
     category: 'persisted',
     reason: 'declared value from persisted lines',
     reads: { createShipmentForOrder: 1 },
+  },
+  'lib/catalogue-feed/build.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds (Google/Meta/TikTok): retail price, anonymous-safe',
+    reads: { buildProductItems: 3, buildBundleItems: 4 },
+  },
+  'lib/catalogue-feed/load.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds: retail price select, public-audience products only',
+    reads: { '<module>': 2 },
+  },
+  'lib/catalogue-feed/service.ts': {
+    category: 'retail-display',
+    reason: 'public ad feeds: purchasable bundle price',
+    reads: { getMeta: 1 },
+  },
+  'lib/inngest/functions/order-capi-conversion.ts': {
+    category: 'persisted',
+    reason: 'server-side Purchase lines from persisted order items',
+    reads: { '<module>': 1 },
+  },
+  'services/pixels-capi.service.ts': {
+    category: 'persisted',
+    reason: 'server-side Purchase lines from persisted order items',
+    reads: { purchaseContents: 1, sendMetaCAPI: 1, sendTikTokCAPI: 1 },
   },
   'lib/product-feed.ts': {
     category: 'retail-display',
@@ -603,10 +629,8 @@ describe('B2B (M-4): every known bypass is PLANTED and goes red', () => {
     // promotion preview: all reads live in one handler. A read added to a second handler is reported under ITS route, not hidden.
     const v = planted(
       'routes/promotion.routes.ts',
-      "router.post('/public/:storeId/promotions/preview', async () => { " +
-        'a.price;'.repeat(
-          ALLOW['routes/promotion.routes.ts']!.reads['POST /public/:storeId/promotions/preview']!
-        ) +
+      'const makePreviewHandler = (browse) => async () => { ' +
+        'a.price;'.repeat(ALLOW['routes/promotion.routes.ts']!.reads['makePreviewHandler']!) +
         " });\nrouter.get('/preview', async () => { b.price; });"
     );
     expect(v.join()).toMatch(/new symbol "GET \/preview" reads a price/);

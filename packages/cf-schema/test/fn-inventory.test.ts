@@ -30,9 +30,9 @@ describe('docs/cf/fn-map.json', () => {
   const defs = definitions();
   const names = [...new Set(defs)].sort();
 
-  it('finds the 96 definitions (89 distinct names; one read-only inbox lookup came with NEON-ZERO N-10b; several are redefinitions, one legacy bridge function was dropped by 20261103000100, two came with WA-GRACE-1, three with FOUNDING-1)', () => {
-    expect(defs.length).toBe(96);
-    expect(names.length).toBe(89);
+  it('finds the 100 definitions (93 distinct names; one read-only inbox lookup came with NEON-ZERO N-10b; several are redefinitions, one legacy bridge function was dropped by 20261103000100, two came with WA-GRACE-1, three with FOUNDING-1, four fold-A functions with F7-HAMZA-2)', () => {
+    expect(defs.length).toBe(100);
+    expect(names.length).toBe(93);
   });
 
   it('maps every defined name, and names nothing that is not defined (a new SQL function fails until mapped)', () => {
