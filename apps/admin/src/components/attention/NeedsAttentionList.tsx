@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
+import { buttonVariants } from '@/components/ui/Button';
 import { useAttention } from '../../hooks/useAttention';
 import { AttentionBadge } from './AttentionBadge';
 
@@ -29,11 +30,10 @@ export function NeedsAttentionList({ storeId }: { storeId: string }) {
       </div>
       <Link
         href={href(i.section)}
-        className={`inline-flex h-11 shrink-0 items-center justify-center rounded-md px-4 text-sm font-medium sm:h-10 ${
-          isAction
-            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-            : 'border border-border text-foreground hover:bg-accent'
-        }`}
+        className={buttonVariants({
+          variant: isAction ? 'default' : 'outline',
+          className: 'shrink-0',
+        })}
       >
         {isAction ? t('fix') : t('view')}
       </Link>
