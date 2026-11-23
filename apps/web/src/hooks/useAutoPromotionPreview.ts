@@ -17,7 +17,9 @@ type PreviewLine = { productId: string; quantity: number };
 export function useAutoPromotionPreview(
   storeId: string | undefined,
   lines: readonly PreviewLine[],
-  who: { phone?: string; email?: string } = {}
+  who: { phone?: string; email?: string } = {},
+  /** PDP / cart: their own rate bucket, so browsing never spends checkout's. A 429 just hides the hint. */
+  browse = false
 ): AutoPromotion | null {
   const [promotion, setPromotion] = useState<AutoPromotion | null>(null);
   // The last signature actually sent: an unrelated re-render does not refire.
@@ -41,16 +43,19 @@ export function useAutoPromotionPreview(
     const timeoutId = setTimeout(() => {
       sentRef.current = signature;
       api
-        .post<{ promotion: AutoPromotion | null }>(`/stores/public/${storeId}/promotions/preview`, {
-          items,
-          phone,
-          email,
-        })
+        .post<{ promotion: AutoPromotion | null }>(
+          `/stores/public/${storeId}/promotions/${browse ? 'preview-browse' : 'preview'}`,
+          {
+            items,
+            phone,
+            email,
+          }
+        )
         .then(r => setPromotion(r.success ? (r.data?.promotion ?? null) : null))
         .catch(() => setPromotion(null));
     }, 400);
     return () => clearTimeout(timeoutId);
-  }, [storeId, linesKey, phone, email]);
+  }, [storeId, linesKey, phone, email, browse]);
 
   return promotion;
 }

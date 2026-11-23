@@ -26,7 +26,7 @@ describe('PDP automatic promotion line', () => {
     render(<AutoPromotionLine productId="prod-1" quantity={2} />);
     expect(await screen.findByTestId('pdp-auto-promotion')).toBeTruthy();
     expect(screen.getByTestId('pdp-auto-promotion').textContent).toContain('EGP 15');
-    expect(post).toHaveBeenCalledWith('/stores/public/store-1/promotions/preview', {
+    expect(post).toHaveBeenCalledWith('/stores/public/store-1/promotions/preview-browse', {
       items: [{ productId: 'prod-1', quantity: 2 }],
       phone: undefined,
       email: undefined,
@@ -37,6 +37,16 @@ describe('PDP automatic promotion line', () => {
     render(<AutoPromotionLine productId="prod-1" />);
     await waitFor(() => expect(post).toHaveBeenCalled());
     expect(screen.queryByTestId('pdp-auto-promotion')).toBeNull();
+  });
+});
+
+describe('PDP automatic promotion line: rate limit', () => {
+  it('a 429 hides the hint without an error UI', async () => {
+    post.mockResolvedValue({ success: false, error: { code: 'RATE_LIMITED' } });
+    render(<AutoPromotionLine productId="prod-1" />);
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    expect(screen.queryByTestId('pdp-auto-promotion')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 

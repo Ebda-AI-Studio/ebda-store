@@ -76,7 +76,9 @@ export default function CartClient() {
   // Loose items only, like the coupon basis: a bundle is already discounted.
   const autoPromotion = useAutoPromotionPreview(
     store.id,
-    cartItems.map(i => ({ productId: i.productId, quantity: i.quantity }))
+    cartItems.map(i => ({ productId: i.productId, quantity: i.quantity })),
+    {},
+    true
   );
   // The cart page's section document (Ruling VE-3): which sections go around the cart itself.
   const pageDoc = usePageDocument('cart');

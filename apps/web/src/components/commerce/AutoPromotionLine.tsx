@@ -25,7 +25,9 @@ export function AutoPromotionLine({
   const enabled = !!store.id && store.id !== 'demo';
   const promotion = useAutoPromotionPreview(
     enabled ? store.id : undefined,
-    enabled ? [{ productId, quantity }] : []
+    enabled ? [{ productId, quantity }] : [],
+    {},
+    true
   );
   if (!promotion || promotion.discount <= 0) return null;
   const amount = formatPrice(promotion.discount);
