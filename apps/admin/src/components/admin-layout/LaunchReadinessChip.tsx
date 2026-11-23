@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { Button } from '@/components/ui/Button';
 import { SETUP_GUIDE_ITEMS, type SetupGuideState } from '@ebda/shared';
 import { apiGet } from '../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -62,13 +63,15 @@ export function LaunchReadinessChip() {
 
   return (
     <div ref={wrap} className="relative" data-testid="launch-chip" data-phase={p.phase}>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label={t('openAria', { label })}
-        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:px-3"
+        className="gap-2"
       >
         <svg
           width="22"
@@ -94,7 +97,7 @@ export function LaunchReadinessChip() {
           {p.done}/{p.total}
         </span>
         <span className="hidden whitespace-nowrap sm:inline">{label}</span>
-      </button>
+      </Button>
 
       {open && (
         <div
