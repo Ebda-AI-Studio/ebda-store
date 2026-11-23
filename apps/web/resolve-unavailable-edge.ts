@@ -12,7 +12,26 @@
 export const STORE_UNAVAILABLE_MARKER = 'STORE_TEMPORARILY_UNAVAILABLE';
 export const UNAVAILABLE_RETRY_AFTER_S = 30;
 
-export async function retryableUnavailable(res: Response): Promise<Response> {
+/**
+ * R1: a sitemap that could not ask its API (`SitemapSourceUnavailableError`, app/sitemap.ts) fails the render on purpose so
+ * Google keeps its last-good sitemap. Next answers that with a bare 500 that carries no marker; on a sitemap path the only
+ * expected 500 IS that error, so it leaves as the same 503 + Retry-After a page gets (Search Console retries both).
+ */
+const SITEMAP_PATH = /^\/sitemap[^/]*\.xml$/;
+
+export async function retryableUnavailable(res: Response, path?: string): Promise<Response> {
+  if (res.status === 500 && path && SITEMAP_PATH.test(path)) {
+    const headers = new Headers(res.headers);
+    headers.set('Retry-After', String(UNAVAILABLE_RETRY_AFTER_S));
+    headers.set('Cache-Control', 'private, no-store');
+    headers.set('Content-Type', 'text/plain; charset=utf-8');
+    headers.delete('content-length');
+    return new Response('Service Unavailable', {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers,
+    });
+  }
   const type = res.headers.get('content-type') ?? '';
   // A full page (text/html) or a client navigation's RSC payload (text/x-component) carry the same digest.
   if (res.status !== 500 || !(type.includes('text/html') || type.includes('text/x-component')))
