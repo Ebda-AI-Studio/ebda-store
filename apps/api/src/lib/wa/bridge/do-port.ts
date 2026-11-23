@@ -541,7 +541,7 @@ export function createDoPort(): BridgePort {
         where: { id: { in: wanted }, product: { storeId, deletedAt: null } },
         select: { id: true, productId: true },
       });
-      const vById = new Map(variants.map(v => [v.id as string, v.productId as string]));
+      const vById = new Map(variants.map(v => [v.id, v.productId]));
       const simple: any[] = await d.product.findMany({
         where: { storeId, id: { in: wanted.filter(w => !vById.has(w)) }, deletedAt: null },
         select: { id: true },
@@ -850,11 +850,11 @@ export function createDoPort(): BridgePort {
     async recommend(storeId, a) {
       const d = await db(storeId);
       // Seeds resolve inside THIS store only (a variant id of another store resolves to nothing).
-      const variants: any[] = await d.productVariant.findMany({
+      const variants: Array<{ id: string; productId: string }> = await d.productVariant.findMany({
         where: { id: { in: a.seedIds }, product: { storeId, deletedAt: null } },
         select: { id: true, productId: true },
       });
-      const vById = new Map(variants.map(v => [v.id as string, v.productId as string]));
+      const vById = new Map(variants.map(v => [v.id, v.productId]));
       const direct: Array<{ id: string }> = await d.product.findMany({
         where: { storeId, id: { in: a.seedIds.filter(i => !vById.has(i)) }, deletedAt: null },
         select: { id: true },
@@ -881,7 +881,7 @@ export function createDoPort(): BridgePort {
       }
       const ids = [...new Set(ranked)].filter(id => !seeds.includes(id));
       if (ids.length === 0) return [];
-      const products: any[] = await d.product.findMany({
+      const products: Array<{ id: string }> = await d.product.findMany({
         where: {
           storeId,
           id: { in: ids },
