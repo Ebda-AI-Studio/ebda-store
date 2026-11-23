@@ -203,6 +203,7 @@ export async function claimGraceStage(
     data: [args],
     skipDuplicates: true,
   });
+  // d1-exact-ok: prisma-lite createMany count is the inserted-row count of a single-row insert (no trigger rows)
   return count === 1;
 }
 

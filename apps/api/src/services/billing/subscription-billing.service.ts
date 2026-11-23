@@ -1159,6 +1159,7 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
         data: { status: 'past_due', currentPeriodEnd: periodEnd, nextRetryAt: suspendAt },
       });
       const won =
+        // d1-exact-ok: prisma-lite updateMany count is a row count; the where is keyed by id (at most one row)
         upd.count === 1 &&
         (await claimGraceStage(tx, {
           storeId: sub.storeId,
