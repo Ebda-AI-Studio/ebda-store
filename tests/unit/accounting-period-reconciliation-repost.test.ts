@@ -34,6 +34,10 @@ vi.mock('@api/lib/inngest/client', () => ({
     createFunction: (options: unknown, handler: unknown) => ({ options, handler }),
   },
 }));
+// REVENUE-DEF-1 (main): the operational side is the shared revenue definition.
+vi.mock('@api/services/revenue.service', () => ({
+  netRevenue: async () => ({ revenue: 0, orders: 0 }),
+}));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

@@ -383,6 +383,13 @@ export const PAGES: PageEntry[] = [
       ar: 'فيسبوك تيك توك سناب بكسل تتبع اعلانات',
     },
   }),
+  page('/product-feeds', `${HUB}.productFeeds`, 'staff', {
+    feature: 'product_feeds',
+    syn: {
+      en: 'google merchant center shopping meta commerce manager facebook instagram tiktok catalog catalogue feed xml csv',
+      ar: 'جوجل ميرتشنت شوبينج ميتا فيسبوك انستجرام تيك توك كتالوج خلاصة منتجات',
+    },
+  }),
   page('/affiliates', `${HUB}.affiliates`, 'staff', {
     feature: 'affiliate',
     syn: { en: 'referral partners commission', ar: 'تسويق بالعمولة شركاء احالة' },

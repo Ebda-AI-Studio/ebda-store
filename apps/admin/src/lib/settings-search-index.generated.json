@@ -765,6 +765,17 @@
     "feature": "marketing_pixels"
   },
   {
+    "id": "page:/product-feeds",
+    "kind": "page",
+    "route": "/product-feeds",
+    "access": "staff",
+    "en": "Product feeds",
+    "ar": "خلاصات المنتجات",
+    "synEn": "google merchant center shopping meta commerce manager facebook instagram tiktok catalog catalogue feed xml csv",
+    "synAr": "جوجل ميرتشنت شوبينج ميتا فيسبوك انستجرام تيك توك كتالوج خلاصة منتجات",
+    "feature": "product_feeds"
+  },
+  {
     "id": "page:/affiliates",
     "kind": "page",
     "route": "/affiliates",

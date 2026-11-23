@@ -4,8 +4,9 @@ import { storeFilter } from '../../jobs/store-scope';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
-import { storeMoney, storeDb } from '../../repo-factory';
+import { storeMoney } from '../../repo-factory';
 import { featureService } from '../../../services/feature.service';
+import { netRevenue } from '../../../services/revenue.service';
 
 import { REGION } from '@ebda/shared';
 /**
@@ -66,18 +67,15 @@ export const accountingPeriodReconciliation: JobDef = inngest.createFunction(
       }
 
       // PORTED (Ruling CF-JOBS-4): the operational total and the GL credits both follow the store's backend.
-      const ops = await step.run(`ops-${store.id}`, async () => {
-        const where = {
-          storeId: store.id,
-          paymentStatus: 'paid' as const,
-          status: { notIn: ['cancelled' as const, 'refunded' as const] },
-          createdAt: { gte: since },
-        };
-        const money = await storeMoney(store.id);
-        if (money)
-          return (await storeDb(store.id)).order.aggregate({ where, _sum: { total: true } });
-        return withStore(store.id, tx => tx.order.aggregate({ where, _sum: { total: true } }));
-      });
+      // REVENUE-DEF-1: the operational side is the ONE revenue definition, paid-only, gross of partial refunds (the GL credits
+      // below are gross of a partial adjustment). The old filter already required payment_status paid and excluded status
+      // cancelled/refunded; the real changes are the soft-delete filter, awaiting_payment_confirmation, and payment_status
+      // `refunded` (a delivered order whose payment was refunded stayed on BOTH sides, so a sale journal that never reversed raised
+      // no drift: STORE-QA-7). The step id is versioned (`ops-v2`): this step's result changed shape from `{ _sum }` to
+      // `{ revenue, orders }`, and a run in flight would otherwise replay the memoized old shape.
+      const ops = await step.run(`ops-v2-${store.id}`, () =>
+        netRevenue(store.id, { from: since, paidOnly: true, gross: true })
+      );
 
       const gl = await step.run(`gl-${store.id}`, async () => {
         const money = await storeMoney(store.id);
@@ -98,9 +96,10 @@ export const accountingPeriodReconciliation: JobDef = inngest.createFunction(
         return Number(rows[0].total);
       });
 
-      const opsTotal = Number(ops._sum.total ?? 0);
+      const opsTotal = Number(ops?.revenue);
       const drift = opsTotal - gl;
-      if (Math.abs(drift) > 0) {
+      // A non-finite figure (a replayed step result of an unexpected shape) must ALERT, never compare false and skip the store.
+      if (!Number.isFinite(drift) || Math.abs(drift) > 0) {
         drifts += 1;
         await step.run(`alert-${store.id}`, () =>
           sendAlert({
