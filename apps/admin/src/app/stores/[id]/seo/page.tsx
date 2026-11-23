@@ -10,6 +10,7 @@ import { apiGet, apiPost, apiPut, unwrapObject } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { StickySaveBar } from '../../../../components/StickySaveBar';
+import { getStorePublicHost } from '@/lib/store-url';
 import { applyAiSeoSuggestion, arabicInEnglishFields } from './language-guard';
 
 interface SeoSettings {
@@ -125,6 +126,8 @@ export default function StoreSeoPage() {
   // Social & Knowledge Graph state
   const [socialLinks, setSocialLinks] = useState<SocialLinks>(DEFAULT_SOCIAL);
 
+  const [previewHost, setPreviewHost] = useState<string | null>(null);
+
   const fetchSeo = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
@@ -132,9 +135,23 @@ export default function StoreSeoPage() {
       const [seoRes, storeRes] = await Promise.all([
         apiGet<{ seo?: Partial<SeoSettings> }>(`/api/v1/stores/${storeId}/seo`),
         apiGet<{
-          store?: { socialLinks?: Partial<SocialLinks>; settings?: { defaultLanguage?: string } };
+          store?: {
+            slug?: string;
+            domain?: string | null;
+            domainVerifiedAt?: string | null;
+            socialLinks?: Partial<SocialLinks>;
+            settings?: { defaultLanguage?: string };
+          };
         }>(`/api/v1/stores/${storeId}`),
       ]);
+
+      const storeInfo = (
+        storeRes.data as {
+          store?: { slug?: string; domain?: string | null; domainVerifiedAt?: string | null };
+        } | null
+      )?.store;
+      if (storeInfo?.slug)
+        setPreviewHost(getStorePublicHost({ ...storeInfo, slug: storeInfo.slug }));
 
       const loadedLang = (
         storeRes.data as { store?: { settings?: { defaultLanguage?: string } } } | null
@@ -444,7 +461,9 @@ export default function StoreSeoPage() {
               className="max-w-xl rounded-lg border border-border p-4"
               dir={defaultLang === 'ar' ? 'rtl' : 'ltr'}
             >
-              <p className="mb-1 text-xs text-muted-foreground">{t('previewDomain')}</p>
+              <p className="mb-1 text-xs text-muted-foreground">
+                {previewHost ?? t('previewDomain')}
+              </p>
               <p className="line-clamp-1 text-lg font-medium leading-tight text-info-ink">
                 {previewTitle}
               </p>

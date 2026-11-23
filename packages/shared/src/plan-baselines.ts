@@ -269,6 +269,7 @@ export function isInBaseline(plan: StorePlan, key: FeatureKey): boolean {
  * they show up in proposals, contracts, and the merchant-facing
  * "Current plan: X" badge.
  */
+// pq-allow(unused-export): test seam, imported by tests/__tests__/plan-baselines.test.ts (the admin feature matrix now reads the plan name from billing)
 export const PLAN_LABELS: Record<StorePlan, { en: string; ar: string }> = {
   free: { en: 'Free', ar: 'مجاني' },
   starter: { en: 'Starter', ar: 'المبدئية' },

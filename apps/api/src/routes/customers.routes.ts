@@ -18,7 +18,7 @@ import { requirePermission } from '../middleware/rbac';
 import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { invalidateCustomersCache } from '../lib/public-cache';
-import { customerKeyOf } from '../lib/customer-key';
+import { CustomerGroups } from '../lib/customer-groups';
 import { searchTermOf } from '../lib/search-term';
 import { SmsConsentService } from '../services/sms-consent.service';
 import {
@@ -147,10 +147,14 @@ router.get(
       // of the customers exported. A row's id IS its `customerKeyOf` key
       // (customer-aggregate.service), so the same key selects its orders.
       const exportedIds = new Set(customers.map(c => c.id));
+      // QA98-ALIAS-1: the one grouping (guests sharing an email or phone are one row), built from ALL orders.
+      const exportGroups = CustomerGroups.fromOrders(aggregated.orders);
       const orders =
         customers.length === aggregated.customers.length
           ? aggregated.orders
-          : aggregated.orders.filter(o => exportedIds.has(customerKeyOf(o) ?? `guest:${o.id}`));
+          : aggregated.orders.filter(o =>
+              exportedIds.has(exportGroups.keyOf(o) ?? `guest:${o.id}`)
+            );
 
       const workbook = new (await loadExcelJS()).Workbook();
       workbook.creator = BRAND.product.nameEn;
@@ -394,7 +398,7 @@ router.get(
           .join(' ');
         const email = order.customer?.email ?? shipping?.email ?? '';
         // Same grouping as the Customers sheet and the RFM rollup.
-        const key = customerKeyOf(order) ?? `guest:${order.id}`;
+        const key = exportGroups.keyOf(order) ?? `guest:${order.id}`;
         const totalItemQty = order.items.reduce((s, i) => s + i.quantity, 0);
         const orderSpend = order.items.reduce((s, i) => s + i.total, 0);
 

@@ -198,28 +198,44 @@ export function FeatureUpgradeGate({ featureKey, storeId, pageTitle }: Props) {
               )}
 
               {/* CTA buttons */}
+              {/* STORE-QA-25: a feature no sold plan unlocks has no upgrade path. Say so; offer contact only. */}
+              {!planLabel && (
+                <p
+                  className="text-sm font-medium text-foreground/80 mb-6"
+                  dir={isAr ? 'rtl' : 'ltr'}
+                  data-testid="no-sold-plan"
+                >
+                  {t('noSoldPlan')}
+                </p>
+              )}
               <div className="flex flex-col sm:flex-row gap-3">
-                {/* Primary: upgrade (the billing page plan picker; card + InstaPay) */}
-                <Link href={billingLink} className="flex-1">
+                {planLabel && (
+                  <Link href={billingLink} className="flex-1">
+                    <Button
+                      type="button"
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold"
+                    >
+                      {t('upgradeCta', { plan: planLabel })}
+                    </Button>
+                  </Link>
+                )}
+
+                {planLabel && (
+                  /* buy just this one feature without changing plan (flow lives in the add-ons stack) */
+                  <Link href={addLink} className="flex-1" data-testid="feature-add-link">
+                    <Button type="button" variant="outline" className="w-full">
+                      {t('addJustThisCta')}
+                    </Button>
+                  </Link>
+                )}
+
+                <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">
                   <Button
                     type="button"
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 font-semibold"
+                    variant={planLabel ? 'outline' : 'default'}
+                    className="w-full"
                   >
-                    {planLabel ? t('upgradeCta', { plan: planLabel }) : t('seePlansCta')}
-                  </Button>
-                </Link>
-
-                {/* Secondary: buy just this one feature without changing plan (flow lives in the add-ons stack) */}
-                <Link href={addLink} className="flex-1" data-testid="feature-add-link">
-                  <Button type="button" variant="outline" className="w-full">
-                    {t('addJustThisCta')}
-                  </Button>
-                </Link>
-
-                {/* Tertiary: talk to us */}
-                <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">
-                  <Button type="button" variant="outline" className="w-full">
-                    {t('contactCta')}
+                    {planLabel ? t('contactCta') : t('contactOnlyCta')}
                   </Button>
                 </a>
               </div>

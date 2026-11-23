@@ -42,6 +42,30 @@ const DELAY_ROUNDTRIPS_MAX = 3;
 // the pre-API-HANG-1 code adds 2 more (+595 ms measured). 450 ms leaves ~150 ms of margin on each side
 const PROD_LIKE_EXTRA_MS = 450;
 
+// Ruling HANG-BUDGET-RELATIVE-1: the guard catches requests SERIALISING or hanging, not runner speed.
+const BASELINE_WARMUP = 5;
+const BASELINE_N = 10;
+type Sample = { ms: number; status: number; path: string; timeouts: number };
+async function runSequential(one: (i: number) => Promise<Sample>, n: number): Promise<Sample[]> {
+  const out: Sample[] = [];
+  for (let i = 0; i < n; i++) out.push(await one(i));
+  return out;
+}
+const runBatch = (one: (i: number) => Promise<Sample>): Promise<Sample[]> =>
+  Promise.all(Array.from({ length: CONCURRENT }, (_, i) => one(i)));
+
+// Arithmetic (measured locally 2026-11-23, 3 runs): baseline median 3 ms, concurrent batch p95 219-257 ms = ~80-85x baseline
+// (the batch is CPU-bound on one workerd, so even a healthy batch is ~80 serial-read-equivalents). A true serialisation of
+// 200 reads costs ~200 x baseline for max and ~190 x for p95. K = 140 sits between: 1.7x headroom over healthy, 0.74x of
+// serial p95 -> serial fails by ~36 %. On a 10x slower runner (baseline 30 ms) the budget is 4200 ms (healthy ~2500 ms passes;
+// serial ~5700 ms fails). The 2000 ms floor stays for fast machines; the 10 s ceiling catches a real hang whatever the baseline.
+// The strict absolute 2000 ms budget has no nightly tier to live in (no nightly/perf workflow exists in this repo); it is the
+// floor here, so a fast runner still gets it.
+const K_BASELINE = 140;
+const HARD_CEILING_MS = 10_000;
+export const p95Budget = (baselineMs: number) =>
+  Math.max(HANG_MS, K_BASELINE * Math.max(baselineMs, 1));
+
 export function pct(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1)] ?? 0;
 }
@@ -126,7 +150,7 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
   const STOREFRONT_CUTOFF_MS = 8_000;
   const budgetFor = (n: number) =>
     n === 0 ? HANG_MS : Math.min(STOREFRONT_CUTOFF_MS, 1_500 + 2_500 * n);
-  it(`${CONCURRENT} concurrent cold reads across ${STORES} stores: all answer, no 5xx, none over ${HANG_MS} ms`, async () => {
+  it(`${CONCURRENT} concurrent cold reads across ${STORES} stores: all answer, no 5xx, p95 within max(${HANG_MS} ms, ${K_BASELINE} x baseline), none over ${HARD_CEILING_MS / 1000} s`, async () => {
     const one = async (i: number) => {
       const s = stores[i % STORES];
       const path = i % 2 === 0 ? `/public/stores/${s.slug}` : '/public/products?limit=24';
@@ -137,19 +161,44 @@ describe.skipIf(e.E2E_DB === '1')('API-HANG-1: concurrent public reads never han
       await res.text();
       return { ms: Date.now() - t0, status: res.status, path, timeouts: timeouts(res) };
     };
-    const results = await Promise.all(Array.from({ length: CONCURRENT }, (_, i) => one(i)));
+    // Baseline (Ruling HANG-BUDGET-RELATIVE-1): the same harness, same runner, measured one read at a time after a warmup.
+    for (let i = 0; i < BASELINE_WARMUP; i++) await one(i);
+    const base = (await runSequential(one, BASELINE_N)).map(r => r.ms).sort((a, b) => a - b);
+    const baseline = pct(base, 50);
+    const results = await runBatch(one);
     const ms = results.map(r => r.ms).sort((a, b) => a - b);
     const fallbacks = results.filter(r => r.timeouts > 0).length;
-    const summary = `p50 ${pct(ms, 50)} ms, p95 ${pct(ms, 95)} ms, max ${ms[ms.length - 1]} ms, ${fallbacks} AuthState-timeout fallbacks`;
+    const summary = `baseline ${baseline} ms (sequential median), p50 ${pct(ms, 50)} ms, p95 ${pct(ms, 95)} ms, max ${ms[ms.length - 1]} ms, ${fallbacks} AuthState-timeout fallbacks`;
     const bad = results.filter(r => r.status >= 500 || r.status === 0);
     expect(bad, summary).toEqual([]);
+    // (2) p95 relative to this runner's own sequential baseline; reads that took the designed AuthState fallback are judged by
+    // budgetFor below, so they are excluded here (API-HANG-4 allowance unchanged)
+    const clean = results
+      .filter(r => r.timeouts === 0)
+      .map(r => r.ms)
+      .sort((a, b) => a - b);
+    expect(pct(clean, 95), summary).toBeLessThanOrEqual(p95Budget(baseline));
+    // (3) per-read hard ceiling (real hang) + the AuthState-timeout allowance
     expect(
-      results.filter(r => r.ms > budgetFor(r.timeouts)),
+      results.filter(r => r.ms > HARD_CEILING_MS),
+      summary
+    ).toEqual([]);
+    expect(
+      results.filter(r => r.timeouts > 0 && r.ms > budgetFor(r.timeouts)),
       summary
     ).toEqual([]);
     // eslint-disable-next-line no-console -- CI shows the measured p50/p95/max on success (Ahmad/coordinator 2026-11-16)
     console.info(`API-HANG-1 cold reads: ${summary}`);
   }, 120_000);
+  it('p95Budget: a slow runner passes a healthy batch, a serialised batch fails (arithmetic of Ruling HANG-BUDGET-RELATIVE-1)', () => {
+    // #1036/45147191074: p95 3031 ms on a loaded runner; healthy batch ~ 85 x baseline, serial 200 reads ~ 190 x baseline
+    for (const baseline of [3, 15, 30, 60]) {
+      expect(85 * baseline <= p95Budget(baseline) || 85 * baseline <= HANG_MS).toBe(true);
+      expect(190 * baseline <= p95Budget(baseline)).toBe(baseline * 190 <= HANG_MS);
+    }
+    expect(p95Budget(30)).toBe(4200);
+    expect(190 * 30).toBeGreaterThan(p95Budget(30));
+  });
   // The `x-dev-authstate-*` headers are honoured only with DEV_STATS=1 (this test config; never production): see
   // cf/auth-state-client.ts `call`. They make local workerd behave like production: a real DO round trip, or a stuck instance.
   let cold = 0;
