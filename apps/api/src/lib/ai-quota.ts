@@ -52,6 +52,9 @@ const AI_QUOTA_STOP_CODES = new Set([
   AI_DISABLED_BY_MERCHANT_CODE,
   // the store has no paid plan (ai-plan-gate.ts; a literal, not an import: many tests mock that module)
   'AI_PLAN_REQUIRED',
+  // the store is suspended for billing (store-ai-switch AI_BILLING_SUSPENDED_CODE; a literal so the many test mocks
+  // of that module need no new export): a sweep must stop, not fail every remaining product
+  'AI_STORE_BILLING_SUSPENDED',
   'AI_QUOTA_EXCEEDED',
   'AI_BUDGET_EXCEEDED',
 ]);

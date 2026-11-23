@@ -11,6 +11,8 @@ export interface NeedsAction {
   lowStock: NeedCount;
   pendingReturns: NeedCount;
   pendingReviews: NeedCount;
+  /** 1 when the store has no SEO title/description in any language (STORE-QA-29), else 0. */
+  seoMissing: NeedCount;
 }
 
 const LOADING: NeedsAction = {
@@ -18,6 +20,7 @@ const LOADING: NeedsAction = {
   lowStock: null,
   pendingReturns: null,
   pendingReviews: null,
+  seoMissing: null,
 };
 
 /**
@@ -52,6 +55,19 @@ export function useNeedsAction(storeId: string): { counts: NeedsAction; reload: 
     void apiGet<{ meta?: { total?: number } }>(`${base}/reviews/admin?status=pending&limit=1`).then(
       ({ data, error }) => set('pendingReviews')(error ? 'error' : (data?.meta?.total ?? 0))
     );
+    void apiGet<{
+      seo?: {
+        metaTitle?: string;
+        metaTitleAr?: string;
+        metaDescription?: string;
+        metaDescriptionAr?: string;
+      };
+    }>(`${base}/seo`).then(({ data, error }) => {
+      const seo = data?.seo;
+      const empty =
+        !seo?.metaTitle && !seo?.metaTitleAr && !seo?.metaDescription && !seo?.metaDescriptionAr;
+      set('seoMissing')(error || !seo ? 'error' : empty ? 1 : 0);
+    });
 
     return () => {
       cancelled = true;

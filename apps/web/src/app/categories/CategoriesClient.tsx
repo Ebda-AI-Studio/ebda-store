@@ -98,23 +98,27 @@ export default function CategoriesClient({
               </Link>
             </div>
           ) : T && !templateLoading ? (
-            <T.CategoryGrid
-              categories={templateCategories}
-              title="Shop by Category"
-              titleAr="تسوق حسب الفئة"
-              isRtl={isRtl}
-              urlPrefix={urlPrefix}
-              // The band is the INVERSE surface: SectionHeading must measure against it, not the
-              // dark page, or it paints a page-light heading onto the light band (1.1:1).
-              sectionBgColor={lookBand ? INVERSE_SURFACE : undefined}
-              headingZone={scaleZone(catHeadingZone, catScale)}
-              categoryLabelZone={scaleZone(catLabelZone, catScale)}
-              showCardFrame={layout?.categories?.showCardFrame}
-              cardFrameStyle={layout?.categories?.cardFrameStyle}
-              cardFrameWidth={layout?.categories?.cardFrameWidth}
-              cardFrameSize={layout?.categories?.cardFrameSize}
-              cardFrameColor={layout?.categories?.cardFrameColor}
-            />
+            <>
+              {/* STORE-QA-42: the grid's heading is a styled element, not a heading. One real h1 per page. */}
+              <h1 className="sr-only">{t('Shop by Category', 'تسوق حسب الفئة')}</h1>
+              <T.CategoryGrid
+                categories={templateCategories}
+                title="Shop by Category"
+                titleAr="تسوق حسب الفئة"
+                isRtl={isRtl}
+                urlPrefix={urlPrefix}
+                // The band is the INVERSE surface: SectionHeading must measure against it, not the
+                // dark page, or it paints a page-light heading onto the light band (1.1:1).
+                sectionBgColor={lookBand ? INVERSE_SURFACE : undefined}
+                headingZone={scaleZone(catHeadingZone, catScale)}
+                categoryLabelZone={scaleZone(catLabelZone, catScale)}
+                showCardFrame={layout?.categories?.showCardFrame}
+                cardFrameStyle={layout?.categories?.cardFrameStyle}
+                cardFrameWidth={layout?.categories?.cardFrameWidth}
+                cardFrameSize={layout?.categories?.cardFrameSize}
+                cardFrameColor={layout?.categories?.cardFrameColor}
+              />
+            </>
           ) : (
             // Skeleton while template loads.
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
