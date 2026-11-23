@@ -129,7 +129,6 @@
     "app/stores/[id]/loyalty/_components/LoyaltyStatsCards.tsx": 1,
     "app/stores/[id]/loyalty/_components/TierSettings.tsx": 2,
     "app/stores/[id]/merchant-keys/page.tsx": 4,
-    "app/stores/[id]/notifications/_components/BroadcastComposerCard.tsx": 2,
     "app/stores/[id]/notifications/_components/EventConfigTable.tsx": 2,
     "app/stores/[id]/orders/[orderId]/_components/ItemsCard.tsx": 1,
     "app/stores/[id]/orders/_components/OrdersTable.tsx": 1,
