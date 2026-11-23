@@ -64,6 +64,10 @@ export const COMPLETE_ERROR_CODES = new Set([
   // InstaPay has no provider to refund through (SP6a): the merchant sends the money
   // back from their own app and completes the return with a record-only refund.
   'MANUAL_PROVIDER_REFUND',
+  // A merchant-opened return that covers every line cannot skip a restock (STORE-QA-76): refused at the claim, before money moves.
+  'FULL_RETURN_RESTOCK_ALL',
+  // REFUND-GATE-1: restock needs the `returns` plan feature; the money refund itself is never plan-gated.
+  'RETURNS_FEATURE_REQUIRED_FOR_RESTOCK',
 ]);
 
 /**
@@ -277,5 +281,7 @@ export function useReturns({ storeId, requestRejectReason, requestRefundMethod }
     complete,
     changeFilter,
     setPage,
+    /** refetch the list + stats (after the merchant opens a return from the admin) */
+    refresh: refreshAll,
   };
 }
