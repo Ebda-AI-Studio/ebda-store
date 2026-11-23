@@ -10,18 +10,22 @@ import { join } from 'node:path';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import express, { type RequestHandler } from 'express';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   CLIENT_IP_HEADER,
   NO_CLIENT_ADDRESS_HEADER,
   SSR_AUTH_HEADER,
   SSR_FORWARD_ROUTES,
+  SSR_V2_HEADER,
+  TRUSTED_SSR_HEADER,
+  trustedSsrRequests,
   __resetSsrClientIpForTests,
   isForwardableRead,
   resolveClientAddress,
   shouldWarnNoSecret,
 } from '@api/cf/ssr-client-ip';
 import { publicLimiter, storeResolveLimiter } from '@api/middleware/security';
+import { isTrustedSsr, ssrWithinLocalBudget } from '@api/middleware/public-limiter-keys';
 import {
   __resetForTests as resetStorefront,
   installApiFetchForwarding,
@@ -30,6 +34,9 @@ import {
 } from '../../apps/web/ssr-client-address';
 
 const SECRET = 'test-revalidate-secret';
+// public-limiter-keys.ts LOCAL_MAX_KEYS, restated: the test must fill the map past it
+const LOCAL_KEY_CAP = 20_000;
+const realFetchForTest = globalThis.fetch;
 const API = 'https://api.ebda.app';
 const WORKER_EGRESS = '2a06:98c0:3600::103';
 const ROOT = join(__dirname, '../..');
@@ -129,29 +136,19 @@ describe('API: forwarded shopper address (cf/ssr-client-ip.ts)', () => {
     }
   );
 
-  it('a signed `none` (storefront render, no shopper) on a storefront read = no address; unsigned or on a write = ignored', async () => {
+  it('a signed `none` is NOT honoured any more: an unknown client address keeps full limiting (DO-BUDGET-2)', async () => {
     const none = await signClientIp(SECRET, 'none');
-    const base = {
-      'cf-connecting-ip': WORKER_EGRESS,
-      'x-forwarded-for': '6.6.6.6',
-      [CLIENT_IP_HEADER]: 'none',
-    };
-    const ok = await resolveClientAddress(
-      apiRequest('/api/v1/public/store/resolve', { ...base, [SSR_AUTH_HEADER]: none }),
+    const r = await resolveClientAddress(
+      apiRequest('/api/v1/public/store/resolve', {
+        'cf-connecting-ip': WORKER_EGRESS,
+        [CLIENT_IP_HEADER]: 'none',
+        [SSR_AUTH_HEADER]: none,
+      }),
       SECRET
     );
-    expect(ok).toMatchObject({ ip: null, forwarded: true });
-    expect(ok.request.headers.has('x-forwarded-for')).toBe(false);
-    const unsigned = await resolveClientAddress(
-      apiRequest('/api/v1/public/store/resolve', { ...base, [SSR_AUTH_HEADER]: 'ab'.repeat(32) }),
-      SECRET
-    );
-    expect(unsigned).toMatchObject({ ip: WORKER_EGRESS, forwarded: false });
-    const write = await resolveClientAddress(
-      apiRequest('/api/v1/auth/login', { ...base, [SSR_AUTH_HEADER]: none }, 'POST'),
-      SECRET
-    );
-    expect(write).toMatchObject({ ip: WORKER_EGRESS, forwarded: false });
+    expect(r).toMatchObject({ ip: WORKER_EGRESS, forwarded: false });
+    expect(r.request.headers.get('x-forwarded-for')).toBe(WORKER_EGRESS);
+    expect(r.request.headers.has(TRUSTED_SSR_HEADER)).toBe(false);
   });
 
   it('deletes a typed X-Forwarded-For when there is no cf-connecting-ip and no valid forward', async () => {
@@ -244,7 +241,29 @@ describe('storefront: API-origin fetches carry the signed shopper address (apps/
     expect(outside.headers.has(CLIENT_IP_HEADER)).toBe(false);
   });
 
-  it('adds neither header with no secret; with no shopper address it forwards the signed `none`', async () => {
+  it('the signature the real web fetch wrapper sends is trusted by the API, and only under that secret and request', async () => {
+    const shopper = new Request('https://storedemo.ebda.app/', {
+      headers: { 'cf-connecting-ip': '203.0.113.7' },
+    });
+    await withClientAddress(shopper, SECRET, () =>
+      fetch(`${API}/api/v1/public/products?page=2`, {
+        headers: { 'x-store-domain': 'shop.ebda.app' },
+      })
+    );
+    const sent = Object.fromEntries(seen[0].headers);
+    const arrive = async (path: string, secret: string) =>
+      (
+        await resolveClientAddress(
+          apiRequest(path, { ...sent, 'cf-connecting-ip': WORKER_EGRESS }),
+          secret
+        )
+      ).request.headers.get(TRUSTED_SSR_HEADER) === '1';
+    expect(await arrive('/api/v1/public/products?page=2', SECRET)).toBe(true);
+    expect(await arrive('/api/v1/public/products?page=2', 'other')).toBe(false);
+    expect(await arrive('/api/v1/public/products?page=3', SECRET)).toBe(false);
+  });
+
+  it('adds neither header with no secret; with no shopper address it forwards nothing', async () => {
     const withIp = new Request('https://storedemo.ebda.app/', {
       headers: { 'cf-connecting-ip': '203.0.113.7' },
     });
@@ -253,8 +272,8 @@ describe('storefront: API-origin fetches carry the signed shopper address (apps/
     await withClientAddress(noIp, SECRET, () => fetch(`${API}/api/v1/public/store/resolve`));
     expect(seen[0].headers.has(CLIENT_IP_HEADER)).toBe(false);
     expect(seen[0].headers.has(SSR_AUTH_HEADER)).toBe(false);
-    expect(seen[1].headers.get(CLIENT_IP_HEADER)).toBe('none');
-    expect(seen[1].headers.get(SSR_AUTH_HEADER)).toBe(await signClientIp(SECRET, 'none'));
+    expect(seen[1].headers.has(CLIENT_IP_HEADER)).toBe(false);
+    expect(seen[1].headers.has(SSR_AUTH_HEADER)).toBe(false);
   });
 
   it('does not follow a redirect with the signed headers unless the caller asked to', async () => {
@@ -424,12 +443,12 @@ describe('limiters key on the resolved address (real storefront wrapper -> API r
     expect((await renderFor('203.0.113.62', '/api/v1/public/store/resolve')).status).toBe(200);
   });
 
-  it('a storefront render with no shopper is counted in NO per-address bucket (store resolve + public reads)', async () => {
-    for (let i = 0; i < 35; i++) {
-      const r = await renderFor(null, '/api/v1/public/store/resolve');
-      expect(r.status).toBe(200);
-      expect(r.headers.has('ratelimit-remaining')).toBe(false);
-    }
+  it('a storefront render with no shopper is fully limited (counted in the storefront egress bucket, never exempt)', async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 31; i++)
+      statuses.push((await renderFor(null, '/api/v1/public/store/resolve')).status);
+    expect(statuses.slice(0, 30).every(c => c === 200)).toBe(true);
+    expect(statuses[30]).toBe(429);
   });
 
   it.each([
@@ -456,5 +475,221 @@ describe('limiters key on the resolved address (real storefront wrapper -> API r
     expect(res.status).toBe(200);
     expect(res.headers.has('ratelimit-remaining')).toBe(false);
     await new Promise<void>(r => srv.close(() => r()));
+  });
+});
+
+describe('Ruling DO-BUDGET-2 (v2): only a fresh, request-bound, derived-key signature is trusted', () => {
+  const addr = '203.0.113.7';
+  const path = '/api/v1/public/store/resolve';
+  const HOST = 'shop.ebda.app';
+  const v1 = async () => ({
+    [CLIENT_IP_HEADER]: addr,
+    [SSR_AUTH_HEADER]: await signClientIp(SECRET, addr),
+  });
+  // An independent oracle for the v2 wire format (HKDF-SHA256 key, MAC over the bound request), so a bug in the web signer cannot hide.
+  const hex = (b: ArrayBuffer) =>
+    Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
+  const v2Message = (p: {
+    method: string;
+    pathAndQuery: string;
+    host: string;
+    ip: string;
+    ts: number;
+  }) => `ebda-ssr-forward.v2\n${p.method}\n${p.pathAndQuery}\n${p.host}\n${p.ip}\n${p.ts}`;
+  const v2 = async (
+    over: Partial<{ method: string; pathAndQuery: string; host: string; ip: string }> = {},
+    now = Date.now()
+  ) => {
+    const base = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(SECRET),
+      'HKDF',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'HKDF',
+        hash: 'SHA-256',
+        salt: new Uint8Array(0),
+        info: new TextEncoder().encode('ebda-ssr-forward.v2'),
+      },
+      base,
+      { name: 'HMAC', hash: 'SHA-256', length: 256 },
+      false,
+      ['sign']
+    );
+    const msg = v2Message({
+      method: 'GET',
+      pathAndQuery: path,
+      host: HOST,
+      ip: addr,
+      ...over,
+      ts: now,
+    });
+    return `${now}.${hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)))}`;
+  };
+  const resolve = async (
+    sig: string | null,
+    o: { path?: string; method?: string; v1?: boolean; host?: string } = {}
+  ) => {
+    const h: Record<string, string> = {
+      'cf-connecting-ip': WORKER_EGRESS,
+      'x-store-domain': o.host ?? HOST,
+      ...(o.v1 === false ? { [CLIENT_IP_HEADER]: addr } : await v1()),
+    };
+    if (sig) h[SSR_V2_HEADER] = sig;
+    return resolveClientAddress(apiRequest(o.path ?? path, h, o.method ?? 'GET'), SECRET);
+  };
+  const trusted = (r: { request: Request }) => r.request.headers.get(TRUSTED_SSR_HEADER) === '1';
+
+  it('trusts a fresh v2 signature and strips every internal header', async () => {
+    const r = await resolve(await v2());
+    expect(trusted(r)).toBe(true);
+    expect(r).toMatchObject({ ip: addr, forwarded: true });
+    expect(r.request.headers.has(SSR_V2_HEADER)).toBe(false);
+  });
+
+  it('replay: valid at +59 s, rejected at 61 s (past) and for a future-dated stamp', async () => {
+    expect(trusted(await resolve(await v2({}, Date.now() - 59_000)))).toBe(true);
+    expect(trusted(await resolve(await v2({}, Date.now() - 61_000)))).toBe(false);
+    expect(trusted(await resolve(await v2({}, Date.now() + 61_000)))).toBe(false);
+  });
+
+  it('a signature for path A does not work on path B, another query, method, store host or address', async () => {
+    const sig = await v2();
+    expect(trusted(await resolve(sig, { path: '/api/v1/public/products' }))).toBe(false);
+    expect(trusted(await resolve(sig, { path: path + '?x=1' }))).toBe(false);
+    expect(trusted(await resolve(sig, { method: 'HEAD' }))).toBe(false);
+    expect(trusted(await resolve(sig, { host: 'other.ebda.app' }))).toBe(false);
+    expect(trusted(await resolve(await v2({ ip: '198.51.100.9' })))).toBe(false);
+  });
+
+  it('a v1 header (revalidate secret, no v2) forwards the address but is never trusted', async () => {
+    const r = await resolve(null);
+    expect(r).toMatchObject({ ip: addr, forwarded: true });
+    expect(trusted(r)).toBe(false);
+  });
+
+  it('a v2 MAC made directly with REVALIDATE_SECRET (no HKDF) is rejected: key separation', async () => {
+    const ts = Date.now();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const msg = v2Message({ method: 'GET', pathAndQuery: path, host: HOST, ip: addr, ts });
+    const mac = Array.from(
+      new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg))),
+      b => b.toString(16).padStart(2, '0')
+    ).join('');
+    expect(trusted(await resolve(`${ts}.${mac}`))).toBe(false);
+  });
+
+  it('a typed marker or a v2 header with no valid address / secret / on a write is never trusted', async () => {
+    const sig = await v2();
+    const typed = await resolveClientAddress(
+      apiRequest(path, { 'cf-connecting-ip': '198.51.100.50', [TRUSTED_SSR_HEADER]: '1' }),
+      SECRET
+    );
+    expect(typed.request.headers.has(TRUSTED_SSR_HEADER)).toBe(false);
+    expect(trusted(await resolve(sig, { method: 'POST' }))).toBe(false);
+    const noSecret = await resolveClientAddress(
+      apiRequest(path, {
+        'cf-connecting-ip': WORKER_EGRESS,
+        'x-store-domain': HOST,
+        ...(await v1()),
+        [SSR_V2_HEADER]: sig,
+      }),
+      undefined
+    );
+    expect(trusted(noSecret)).toBe(false);
+  });
+
+  it('a v2 signature made under another secret is not trusted', async () => {
+    const sig = await v2();
+    const r = await resolveClientAddress(
+      apiRequest(path, {
+        'cf-connecting-ip': WORKER_EGRESS,
+        'x-store-domain': HOST,
+        ...(await v1()),
+        [SSR_V2_HEADER]: sig,
+      }),
+      'other-secret'
+    );
+    expect(trusted(r)).toBe(false);
+  });
+
+  it('isTrustedSsr is WeakSet membership: a header on the Express request means nothing', () => {
+    expect(isTrustedSsr({ headers: { [TRUSTED_SSR_HEADER]: '1' } } as never)).toBe(false);
+    const ok = {} as never;
+    trustedSsrRequests.add(ok);
+    expect(isTrustedSsr(ok)).toBe(true);
+  });
+
+  it('isolate-first: a verified shopper is limited like any client. 400/min through SSR hits the cap; the first 60 cost no exact-limiter hit', async () => {
+    const app = express();
+    app.set('trust proxy', 1);
+    app.use((req, _res, next) => {
+      if (req.headers['x-test-trusted']) trustedSsrRequests.add(req);
+      next();
+    });
+    app.get(
+      '/p',
+      (req, res, next) => (ssrWithinLocalBudget(req) ? next() : publicLimiter(req, res, next)),
+      (_q, r) => r.json({ ok: 1 })
+    );
+    const srv: Server = await new Promise(r => {
+      const x = app.listen(0, () => r(x));
+    });
+    const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/p`;
+    const scraper = {
+      'x-test-trusted': '1',
+      'x-forwarded-for': '203.0.113.99',
+      Connection: 'close',
+    };
+    let ok = 0;
+    let blocked = 0;
+    for (let i = 0; i < 400; i++) {
+      const res = await realFetchForTest(url, { headers: scraper });
+      if (res.status === 200) ok++;
+      else if (res.status === 429) blocked++;
+      if (i === 59) expect(res.headers.has('ratelimit-remaining')).toBe(false);
+    }
+    expect(blocked).toBeGreaterThan(0);
+    expect(ok).toBeLessThanOrEqual(60 + 300);
+    await new Promise<void>(r => srv.close(() => r()));
+  }, 60_000);
+
+  it('an UNtrusted caller never gets the local budget', () => {
+    expect(ssrWithinLocalBudget({ ip: '203.0.113.5', headers: {} } as never)).toBe(false);
+  });
+
+  it('at the key cap an existing hot key keeps its count (no full clear); expired windows are swept first', () => {
+    // a base far past every window the earlier tests opened, so those entries are expired and the clock is ours
+    vi.useFakeTimers({ toFake: ['Date'] });
+    let now = Date.now() + 3_600_000;
+    vi.setSystemTime(now);
+    const fake = (ip: string) => {
+      const r = { ip, headers: { 'x-store-id': 'cap-store' }, params: {} } as never;
+      trustedSsrRequests.add(r);
+      return r;
+    };
+    // the hot shopper: 61 hits = over the 60/min line
+    for (let i = 0; i < 61; i++) ssrWithinLocalBudget(fake('198.51.100.1'));
+    expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(false);
+    // a botnet fills the map well past the cap (one new key per request, plus the shared store key)
+    for (let i = 0; i < LOCAL_KEY_CAP + 500; i++) {
+      ssrWithinLocalBudget(fake(`10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}`));
+      if (i % 1000 === 0) ssrWithinLocalBudget(fake('198.51.100.1')); // the scraper keeps going
+    }
+    expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(false); // still hot, count intact
+    // once the window ends everything is cold again (swept, not leaked)
+    now += 61_000;
+    vi.setSystemTime(now);
+    expect(ssrWithinLocalBudget(fake('198.51.100.1'))).toBe(true);
+    vi.useRealTimers();
   });
 });

@@ -64,6 +64,47 @@ async function observe(res: Response): Promise<Seen> {
 const rlCalls = (s: Seen) => s.calls.filter(c => c.op.includes('"rl:'));
 const cachegenCalls = (s: Seen) => s.calls.filter(c => c.op.includes('"cachegen:'));
 
+/** The headers ebda-web adds to an API fetch (apps/web/ssr-client-address.ts): v1 address + v2 request-bound signature. */
+async function signedRender(
+  path: string,
+  shopper: string,
+  host: string,
+  secret = 'workers-test-revalidate-secret',
+  at = Date.now()
+) {
+  const enc = new TextEncoder();
+  const hex = (b: ArrayBuffer) =>
+    Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
+  const k1 = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const v1 = hex(
+    await crypto.subtle.sign('HMAC', k1, enc.encode(`ebda-ssr-client-ip.v1\n${shopper}`))
+  );
+  const base = await crypto.subtle.importKey('raw', enc.encode(secret), 'HKDF', false, [
+    'deriveKey',
+  ]);
+  const k2 = await crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new Uint8Array(0),
+      info: enc.encode('ebda-ssr-forward.v2'),
+    },
+    base,
+    { name: 'HMAC', hash: 'SHA-256', length: 256 },
+    false,
+    ['sign']
+  );
+  const msg = `ebda-ssr-forward.v2\nGET\n/api/v1${path}\n${host.toLowerCase()}\n${shopper}\n${at}`;
+  const v2 = `${at}.${hex(await crypto.subtle.sign('HMAC', k2, enc.encode(msg)))}`;
+  return { 'x-ebda-client-ip': shopper, 'x-ebda-ssr-auth': v1, 'x-ebda-ssr-v2': v2 };
+}
+
 describe.skipIf(e.E2E_DB === '1')('public request Durable Object round trips (PERF-RL-DO)', () => {
   let storeId = '';
 
@@ -182,4 +223,91 @@ describe.skipIf(e.E2E_DB === '1')('public request Durable Object round trips (PE
     expect((await call('/public/stores/miss-99-x', {}, a)).status).toBe(429);
     expect((await call('/public/stores/miss-99-x', {}, '198.51.100.22')).status).toBe(404);
   });
+
+  /**
+   * DO-BUDGET-2 guard (2026-11-11 alert: 212k DO requests/day against a 33k/day line). The CAPS below are the contract: a PR that
+   * adds a serial AuthState call to a public read fails here. Mutation check: add one `applyOn` to the limiter path and the
+   * `toBeLessThanOrEqual` lines fail.
+   *   resolve, storefront render (verified HMAC): <= 1 AuthState call (the store-miss peek), 0 rate-limit HITS
+   *   products,  storefront render (verified HMAC): <= 1 AuthState call (the store-miss peek), 0 rate-limit HITS
+   *   resolve from the internet: 4 limiter calls (per-IP+miss batch, tenant by host, tenant by store id, store-resolve); the trusted render 1
+   */
+  it('a storefront render (verified HMAC) spends no rate-limit hit: resolve and products make at most ONE rate-limit call (the store-miss peek)', async () => {
+    for (const path of ['/public/store/resolve', '/public/products?limit=24']) {
+      const ip = nextIp();
+      const headers = {
+        'x-store-id': storeId,
+        'x-store-domain': 'rl-do-shop.ebda.app',
+        ...(await signedRender(path, ip, 'rl-do-shop.ebda.app')),
+      };
+      const s = await observe(await call(path, headers, '2a06:98c0:3600::103'));
+      expect(s.status, path).toBe(200);
+      expect(rlCalls(s).length, `${path}: ${JSON.stringify(s.calls)}`).toBeLessThanOrEqual(1);
+      expect(
+        s.calls.filter(c => c.op.startsWith('[["hit",')),
+        `${path}: no rate-limit hit`
+      ).toHaveLength(0);
+    }
+  });
+
+  it('the same calls from the internet are still limited: a typed marker or a wrong-secret signature buys nothing', async () => {
+    const ip = nextIp();
+    for (const headers of [
+      { 'x-ebda-trusted-ssr': '1', 'x-store-domain': 'rl-do-shop.ebda.app' },
+      {
+        'x-store-domain': 'rl-do-shop.ebda.app',
+        ...(await signedRender(
+          '/public/store/resolve',
+          ip,
+          'rl-do-shop.ebda.app',
+          'not-the-secret'
+        )),
+      },
+    ]) {
+      const s = await observe(await call('/public/store/resolve', headers, ip));
+      expect(s.status).toBe(200);
+      expect(rlCalls(s).length, JSON.stringify(s.calls)).toBeGreaterThanOrEqual(1);
+      // 4 since #868: the tenant bucket is predicted by host before the store resolves, then taken by store id after it
+      expect(rlCalls(s).length, JSON.stringify(s.calls)).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it('an unresolved host still 404s for a verified render (never defaults to a store)', async () => {
+    const ip = nextIp();
+    const headers = {
+      'x-store-domain': 'no-such-shop-zzz.ebda.app',
+      ...(await signedRender('/public/store/resolve', ip, 'no-such-shop-zzz.ebda.app')),
+    };
+    const res = await call('/public/store/resolve', headers, '2a06:98c0:3600::103');
+    expect(res.status).toBe(404);
+  });
+
+  it('a replayed signature (>60 s old) is limited like any caller', async () => {
+    const ip = nextIp();
+    const headers = {
+      'x-store-domain': 'rl-do-shop.ebda.app',
+      ...(await signedRender(
+        '/public/store/resolve',
+        ip,
+        'rl-do-shop.ebda.app',
+        undefined,
+        Date.now() - 61_000
+      )),
+    };
+    const s = await observe(await call('/public/store/resolve', headers, '2a06:98c0:3600::103'));
+    expect(s.status).toBe(200);
+    expect(s.calls.filter(c => c.op.startsWith('[["hit",')).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a hot shopper through SSR falls back to the exact limiters (scraper protection)', async () => {
+    const ip = nextIp();
+    let hits = 0;
+    for (let i = 0; i < 70; i++) {
+      const path = `/public/products?limit=${(i % 5) + 1}`;
+      const headers = { 'x-store-id': storeId, ...(await signedRender(path, ip, '')) };
+      const s = await observe(await call(path, headers, '2a06:98c0:3600::103'));
+      hits += s.calls.filter(c => c.op.startsWith('[["hit",')).length;
+    }
+    expect(hits).toBeGreaterThan(0);
+  }, 60_000);
 });

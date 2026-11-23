@@ -11,7 +11,12 @@ import {
 import { withLimitPlanner } from './limit-plan';
 import { isWorkers } from '../lib/runtime';
 import { resolvedStoreId } from '../utils/resolved-store';
-import { publicIpKey, publicTenantKey, skipPublicLimiters } from './public-limiter-keys';
+import {
+  ssrWithinLocalBudget,
+  publicIpKey,
+  publicTenantKey,
+  skipPublicLimiters,
+} from './public-limiter-keys';
 import { isAnonymousPublicRead } from './public-read-limit';
 import { hasSearchTerm } from './security';
 import { storeResolveIsNative } from './store-resolve-native';
@@ -49,7 +54,8 @@ export function plannedPublicHits(
     isAnonymousPublicRead(req) &&
     Boolean(b?.PUBLIC_IP_LIMITER && b.PUBLIC_TENANT_LIMITER) &&
     Boolean(resolvedStoreId(req));
-  if (!native)
+  // Ruling DO-BUDGET-2: a verified storefront render spends no public read bucket; only the store-miss peek remains.
+  if (!native && !ssrWithinLocalBudget(req))
     keys.push(`rl:public:${publicIpKey(req)}`, `rl:public-tenant:${publicTenantKey(req)}`);
   if (req.ip) {
     const ip = ipKeyGenerator(req.ip);

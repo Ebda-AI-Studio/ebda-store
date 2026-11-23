@@ -1,6 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { cfBindings } from '../cf/bindings';
-import { publicIpKey, skipPublicLimiters } from './public-limiter-keys';
+import { ssrWithinLocalBudget, publicIpKey, skipPublicLimiters } from './public-limiter-keys';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import { storeResolveIsNative } from './store-resolve-native';
 
@@ -65,7 +65,7 @@ const BODY = {
 
 export function publicReadLimit(exactLimiters: RequestHandler): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (skipPublicLimiters(req)) return next();
+    if (skipPublicLimiters(req) || ssrWithinLocalBudget(req)) return next();
     const b = cfBindings();
     // Store resolve (Ruling PERF-AUTHSTATE-1): the host is not a store yet, so only the per-address bucket applies (the same 300/min
     // as the exact limiter); no tenant bucket keyed on an attacker-supplied host. A binding error falls back to the exact limiters.
