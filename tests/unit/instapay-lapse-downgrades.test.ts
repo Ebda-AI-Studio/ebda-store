@@ -22,6 +22,7 @@ const h = vi.hoisted(() => {
     row: null as null | Record<string, unknown>,
     suspend: vi.fn(),
     effects: vi.fn(),
+    delivered: vi.fn(async (_e: unknown) => true),
     storeUpdate: vi.fn(),
     findManyArgs: [] as unknown[],
   };
@@ -50,6 +51,8 @@ const h = vi.hoisted(() => {
       },
     },
     plan: { findUnique: async () => ({ code: 'free', featureTier: 'free' }) },
+    // the `suspended` notice stage claim (BILL-NOTICE-2/3)
+    billingReminder: { createMany: async () => ({ count: 1 }) },
   };
   return Object.assign(st, { tx });
 });
@@ -72,7 +75,11 @@ vi.mock('@api/services/billing/account.service', () => ({
   assertPayableStore: vi.fn(),
   suspendForBilling: h.suspend,
 }));
-vi.mock('@api/services/billing/billing-notify', () => ({ runBillingEffects: h.effects }));
+vi.mock('@api/services/billing/billing-notify', () => ({
+  runBillingEffects: h.effects,
+  // the `suspended` notice goes through the outbox (BILL-NOTICE-3) when the grace-over path claimed the stage
+  deliverBillingEffect: h.delivered,
+}));
 vi.mock('@api/middleware/security', () => ({ auditLog: vi.fn() }));
 vi.mock('@api/lib/repo-factory', () => ({ storeUpdate: h.storeUpdate }));
 
@@ -88,6 +95,7 @@ const due = new Date(now.getTime() - 4 * DAY);
 beforeEach(() => {
   h.suspend.mockReset().mockResolvedValue(true);
   h.effects.mockReset();
+  h.delivered.mockClear();
   h.storeUpdate.mockReset();
   h.findManyArgs = [];
   h.row = {
@@ -106,7 +114,8 @@ beforeEach(() => {
   };
 });
 
-const expectLapsedToFree = () => {
+/** `viaOutbox`: the normal grace-over path (suspended notice claimed + delivered); the self-heal has no stage claim. */
+const expectLapsedToFree = (viaOutbox = true) => {
   expect(h.row).toMatchObject({ planCode: 'free', status: 'canceled', nextRetryAt: null });
   expect(h.storeUpdate).toHaveBeenCalledWith(expect.anything(), {
     where: { id: STORE },
@@ -116,7 +125,14 @@ const expectLapsedToFree = () => {
   const kinds = h.effects.mock.calls.flatMap(c =>
     (c[0] as Array<{ kind: string }>).map(e => e.kind)
   );
-  expect(kinds).toEqual(['store_suspended', 'downgraded']);
+  if (viaOutbox) {
+    expect(kinds).toEqual(['downgraded']);
+    expect(h.delivered).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'store_suspended', storeId: STORE, applied: true })
+    );
+  } else {
+    expect(kinds).toEqual(['store_suspended', 'downgraded']);
+  }
 };
 
 describe('InstaPay grace over: the subscription lapses to free (#836)', () => {
@@ -137,7 +153,7 @@ describe('InstaPay grace over: the subscription lapses to free (#836)', () => {
   it('self-heal: a row an earlier build left past_due with nextRetryAt=null is downgraded', async () => {
     h.row!.nextRetryAt = null;
     await expect(renewSubscription('sub-1', now)).resolves.toEqual({ action: 'suspended' });
-    expectLapsedToFree();
+    expectLapsedToFree(false);
   });
 
   it('the due scan selects such a row', async () => {

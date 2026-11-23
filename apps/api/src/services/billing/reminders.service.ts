@@ -291,7 +291,15 @@ export async function resendUnsentGraceNotices(now: Date = new Date()): Promise<
           where: { id: row.subscriptionId, storeId: row.storeId },
         })
       );
-      if (!sub || sub.status !== 'past_due') {
+      // Stale = the moment has passed (the store paid). `grace_start` / `grace_d1` are only true while the row is past_due.
+      // The `suspended` notice stays true after the grace-over lapse (#836) has moved the row to free / `canceled`: only a
+      // payment (the row is active/trialing again) makes it stale, otherwise the merchant is never told the store paused.
+      const stale =
+        !sub ||
+        (row.kind === 'suspended'
+          ? sub.status === 'active' || sub.status === 'trialing'
+          : sub.status !== 'past_due');
+      if (stale) {
         await stampSent(row, now);
         continue;
       }

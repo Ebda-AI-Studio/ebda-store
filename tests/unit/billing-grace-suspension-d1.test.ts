@@ -55,6 +55,12 @@ vi.mock('../../apps/api/src/services/billing/account.service', () => ({
     return h.restore!(id);
   },
 }));
+// The lapse downgrade (MONEY-LAPSE-1) also mirrors the plan onto the store row through storeUpdate, which needs a tenant
+// context this rig does not open (withStore is replaced by a raw transaction); the row's own write is what is under test.
+vi.mock('../../apps/api/src/lib/repo-factory', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  storeUpdate: vi.fn(async () => undefined),
+}));
 vi.mock('@ebda/database', async importOriginal => {
   const real = await importOriginal<typeof import('@ebda/database')>();
   // a real transaction, as on D1: a failed claim must roll the past_due decision back with it
@@ -106,6 +112,10 @@ function rig(migrated: boolean) {
   );
   db.prepare(
     `INSERT INTO plans (id, code, name_en, name_ar, feature_tier, limits) VALUES ('plan-growth','growth','g','g','professional','{}')`
+  ).run();
+  // the lapse downgrade (MONEY-LAPSE-1) moves the row to the seeded free plan (store_subscriptions.plan_code FK)
+  db.prepare(
+    `INSERT INTO plans (id, code, name_en, name_ar, feature_tier, limits) VALUES ('plan-free','free','f','f','free','{}')`
   ).run();
   db.prepare(
     `INSERT INTO stores (id, name, slug, owner_id, status) VALUES (?, 's', 's', 'o', 'active')`
@@ -366,12 +376,14 @@ describe('the outbox stops, and one worker owns a row (BILL-NOTICE-3)', () => {
     const db = rig(true);
     const t0 = new Date(PERIOD_END.getTime() + 1000);
     await unsent(db, t0);
-    await runBillingCycle(new Date(t0.getTime() + 3 * DAY)); // 3 days later: past the cutoff
+    // The outbox itself, not a full cycle: a cycle 3 days on would also lapse the subscription (#836: grace over -> free /
+    // canceled), and a lapsed row no longer has a grace_start notice worth sending.
+    await resendUnsentGraceNotices(new Date(t0.getTime() + 3 * DAY)); // 3 days later: past the cutoff
     expect(h2.sent.filter(e => e.kind.endsWith('grace_started'))).toEqual([]);
     expect(row(db).s).toBeNull();
     expect(row(db).a).toBe(0); // not even leased
 
-    await runBillingCycle(new Date(t0.getTime() + 1 * DAY)); // control: inside the window it IS re-sent
+    await resendUnsentGraceNotices(new Date(t0.getTime() + 1 * DAY)); // control: inside the window it IS re-sent
     expect(h2.sent.map(e => e.kind).filter(k => k === 'grace_started')).toEqual(['grace_started']);
   });
 

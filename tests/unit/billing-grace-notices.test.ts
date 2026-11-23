@@ -31,6 +31,7 @@ vi.mock('@api/services/billing/billing-notify', () => ({
   },
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: vi.fn() }));
+vi.mock('@api/lib/repo-factory', () => ({ storeUpdate: vi.fn() }));
 
 const tx = {
   storeSubscription: {
@@ -48,7 +49,10 @@ const tx = {
       Object.assign(s, data);
       return { count: 1 };
     },
+    // the lapse downgrade (MONEY-LAPSE-1 / #836)
+    update: async ({ data }: { data: Record<string, unknown> }) => Object.assign(h.sub!, data),
   },
+  plan: { findUnique: async () => ({ code: 'free', featureTier: 'free' }) },
   billingReminder: {
     createMany: async ({
       data,
