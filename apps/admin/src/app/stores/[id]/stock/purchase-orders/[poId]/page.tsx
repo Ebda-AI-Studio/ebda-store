@@ -7,13 +7,13 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
-import { formatPrice, minorToMajor } from '@/lib/format';
+import { formatPrice, minorToMajor, formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { RowActions } from '@/components/RowActions';
 import { PageState } from '@/components/PageState';
 import { useConfirm } from '@/hooks/useConfirm';
 
-import { minorToDecimalString, withNumerals } from '@ebda/shared';
+import { minorToDecimalString } from '@ebda/shared';
 import { FIELD_CLASSES } from '@/components/ui/tokens';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -302,14 +302,12 @@ export default function PurchaseOrderDetailPage() {
               <div className="text-sm text-muted-foreground space-x-4">
                 {po.expectedDate && (
                   <span>
-                    {t('expectedDate')}:{' '}
-                    {new Date(po.expectedDate).toLocaleDateString(undefined, withNumerals())}
+                    {t('expectedDate')}: {formatDate(po.expectedDate)}
                   </span>
                 )}
                 {po.receivedDate && (
                   <span>
-                    {t('receivedDate')}:{' '}
-                    {new Date(po.receivedDate).toLocaleDateString(undefined, withNumerals())}
+                    {t('receivedDate')}: {formatDate(po.receivedDate)}
                   </span>
                 )}
                 <span>

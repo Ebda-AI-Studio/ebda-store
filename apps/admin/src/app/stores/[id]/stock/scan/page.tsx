@@ -9,9 +9,9 @@
  *   Pick    — load order → scan items → track progress
  *   Count   — open/resume session → scan + count → close → reconcile
  *
- * Camera: BarcodeDetector Web API when available (Chrome/Safari mobile).
- * Manual text input fallback for all browsers (Firefox desktop, etc.).
- * No heavy external scanner library — zero new npm deps.
+ * Camera: native BarcodeDetector when it covers our formats (Chrome), else the lazy-loaded WASM ponyfill
+ * (iOS Safari + home-screen PWA have no native detector) — see lib/barcode-scanner.ts.
+ * Manual text input is always available.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -28,6 +28,7 @@ import { orderLineVariantTitle, searchQueryHeaders, withNumerals } from '@ebda/s
 
 import { Button } from '@/components/ui/Button';
 import { FIELD_CLASSES } from '@/components/ui/tokens';
+import { cameraScanAvailable, createScanDetector, type ScanDetector } from '@/lib/barcode-scanner';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,21 +126,12 @@ interface CountSession {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BarcodeDetector Web API type (browser global — not in @types/dom yet)
-// ─────────────────────────────────────────────────────────────────────────────
-declare class BarcodeDetector {
-  constructor(opts?: { formats?: string[] });
-  detect(source: ImageBitmapSource): Promise<Array<{ rawValue: string; format: string }>>;
-  static getSupportedFormats(): Promise<string[]>;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Hook: detect BarcodeDetector availability
+// Hook: camera scanning is available whenever getUserMedia is (the decoder is polyfilled)
 // ─────────────────────────────────────────────────────────────────────────────
 function useBarcodeDetectorSupported(): boolean {
   const [supported, setSupported] = useState(false);
   useEffect(() => {
-    setSupported(typeof BarcodeDetector !== 'undefined');
+    setSupported(cameraScanAvailable());
   }, []);
   return supported;
 }
@@ -159,12 +151,25 @@ function CameraScanner({ onDetected, onStop, onError }: CameraScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number>(0);
   const detectedRef = useRef(false);
+  const t = useT('stock.scan');
+  const [engineReady, setEngineReady] = useState(false);
 
   useEffect(() => {
     let active = true;
-    const detector = new BarcodeDetector({
-      formats: ['ean_13', 'ean_8', 'code_128', 'qr_code', 'upc_a', 'upc_e', 'code_39'],
-    });
+    let detector: ScanDetector | null = null;
+
+    // The decoder (native or WASM ponyfill) loads in parallel with the camera permission prompt.
+    createScanDetector()
+      .then(d => {
+        if (!active) return;
+        detector = d.detector;
+        setEngineReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        onError?.('camera-engine');
+        onStop();
+      });
 
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
@@ -181,7 +186,7 @@ function CameraScanner({ onDetected, onStop, onError }: CameraScannerProps) {
 
         const scan = async () => {
           if (!active || detectedRef.current) return;
-          if (videoRef.current && videoRef.current.readyState >= 2) {
+          if (detector && videoRef.current && videoRef.current.readyState >= 2) {
             try {
               const results = await detector.detect(videoRef.current);
               if (results.length > 0 && results[0].rawValue && !detectedRef.current) {
@@ -217,6 +222,14 @@ function CameraScanner({ onDetected, onStop, onError }: CameraScannerProps) {
   return (
     <div className="relative w-full max-w-sm mx-auto rounded-md overflow-hidden border border-border bg-black aspect-[4/3]">
       <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+      {!engineReady && (
+        <div
+          role="status"
+          className="absolute inset-x-0 bottom-0 bg-black/70 px-3 py-2 text-center text-xs text-white"
+        >
+          {t('cameraEngineLoading')}
+        </div>
+      )}
       {/* Viewfinder overlay */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-52 h-32 border-2 border-white/70 rounded-lg" />
@@ -312,6 +325,9 @@ function BarcodeInput({
       )}
       {cameraError === 'camera-permission' && (
         <p className="text-xs text-destructive-ink">{t('cameraPermission')}</p>
+      )}
+      {cameraError === 'camera-engine' && (
+        <p className="text-xs text-destructive-ink">{t('cameraEngineFailed')}</p>
       )}
     </div>
   );

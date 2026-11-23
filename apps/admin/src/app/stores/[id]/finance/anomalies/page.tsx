@@ -5,9 +5,8 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatDate } from '@/lib/format';
 import { useRequireFeature } from '@/hooks/useRequireFeature';
-import { withNumerals } from '@ebda/shared';
 
 import { Button } from '@/components/ui/Button';
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -99,9 +98,7 @@ function AnomalyRow({
             <span className="font-medium text-sm">{t(metricKey)}</span>
             <span className="text-xs text-muted-foreground capitalize">{item.scope}</span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {new Date(item.detectedAt).toLocaleDateString(undefined, withNumerals())}
-          </p>
+          <p className="text-xs text-muted-foreground">{formatDate(item.detectedAt)}</p>
         </div>
         <div className="flex items-center gap-2">
           <SeverityBadge severity={item.severity} t={t} />

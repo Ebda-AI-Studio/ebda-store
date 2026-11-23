@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { NotificationBell } from '../NotificationBell';
+import { LaunchReadinessChip } from './LaunchReadinessChip';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { DocumentTitle } from '../DocumentTitle';
 import { useT } from '@/i18n/useT';
@@ -122,6 +123,7 @@ export function TopBar({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 lg:gap-3">
+          <LaunchReadinessChip />
           <AdminLanguageSwitcher />
           <NotificationBell />
 

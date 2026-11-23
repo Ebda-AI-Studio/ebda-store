@@ -32,6 +32,7 @@ export function NeedsAction({ storeId }: { storeId: string }) {
     { key: 'stock', label: t('lowStock'), href: `${base}/stock/inventory`, count: counts.lowStock },
     { key: 'returns', label: t('returns'), href: `${base}/returns`, count: counts.pendingReturns },
     { key: 'reviews', label: t('reviews'), href: `${base}/reviews`, count: counts.pendingReviews },
+    { key: 'seo', label: t('seoMissing'), href: `${base}/seo`, count: counts.seoMissing },
   ];
 
   const loading = tiles.some(x => x.count === null);

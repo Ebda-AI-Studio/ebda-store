@@ -9,7 +9,7 @@ import { PageState } from '@/components/PageState';
 import { useT } from '@/i18n/useT';
 import { pickNarration } from '@/i18n/narration';
 import { apiGet } from '@/lib/api';
-import { minorToMajor } from '@/lib/format';
+import { minorToMajor, formatPrice } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -183,7 +183,7 @@ export default function InsightsSegmentsPage() {
                     <div>
                       <p className="text-xs opacity-70">{t('revenue')}</p>
                       <p className="font-mono font-semibold">
-                        {minorToMajor(seg.totalMonetaryFils)} {tc('egp')}
+                        {formatPrice(seg.totalMonetaryFils)}
                       </p>
                       <p className="text-xs opacity-60">
                         {t('shareOfTotal', { pct: revSharePct })}

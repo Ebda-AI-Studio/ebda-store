@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDate } from '@/lib/format';
 import { useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
 import { useToast } from '@ebda/ui';
@@ -9,7 +10,6 @@ import { apiGet, apiDelete, apiPut } from '../../../../lib/api';
 import { RowActions } from '../../../../components/RowActions';
 import { useConfirm } from '../../../../hooks/useConfirm';
 import { useT } from '@/i18n/useT';
-import { withNumerals } from '@ebda/shared';
 import { Button, buttonVariants } from '@/components/ui/Button';
 
 interface BlogPost {
@@ -291,11 +291,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                           </p>
                         )}
                         <p className="mt-1 text-xs text-muted-foreground">
-                          /{post.slug} ·{' '}
-                          {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
-                            undefined,
-                            withNumerals()
-                          )}
+                          /{post.slug} · {formatDate(post.publishedAt ?? post.createdAt)}
                         </p>
                       </div>
                     </Link>

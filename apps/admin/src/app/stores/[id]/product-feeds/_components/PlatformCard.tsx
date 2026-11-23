@@ -1,5 +1,6 @@
 'use client';
 
+import { FIELD_CLASSES } from '@/components/ui/tokens';
 import { useState } from 'react';
 import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';

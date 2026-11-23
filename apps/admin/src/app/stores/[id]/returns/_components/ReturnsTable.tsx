@@ -9,9 +9,9 @@ import type { ListMeta, ReturnRecord } from './types';
 
 import { formatDate } from '@/lib/format';
 
-import { formatMoney } from '@ebda/shared';
+import { formatPrice } from '@/lib/format';
 function formatCurrency(amount: number) {
-  return formatMoney(amount, 'en', { fixedDecimals: true });
+  return formatPrice(amount);
 }
 
 interface ReturnsTableProps {
@@ -72,7 +72,9 @@ export function ReturnsTable({
                   <p className="text-sm text-muted-foreground mb-2">
                     <span className="font-medium">{t('orderLabel')}:</span> #{ret.order.orderNumber}{' '}
                     |<span className="font-medium ms-2">{t('customerLabel')}:</span>{' '}
-                    {ret.customer.firstName} {ret.customer.lastName}
+                    {ret.customer
+                      ? `${ret.customer.firstName} ${ret.customer.lastName}`.trim()
+                      : '-'}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     <span className="font-medium">{t('reasonLabel')}:</span> {ret.reason}

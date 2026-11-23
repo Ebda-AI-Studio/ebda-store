@@ -236,4 +236,4 @@ Thank you for contributing!
 
 ## Merging
 
-Merge only through the gate: `scripts/ci/merge-gate.sh <pr> <expected-head-sha>`. Do not run `gh pr merge` yourself. The gate waits for CI, refuses on zero checks, a failed or cancelled check, a conflict or a head that moved since you reviewed it, and pins the merge to the reviewed commit. Details in `CLAUDE.md` ("Merging: always through the gate").
+Merge only through the gate: `scripts/ci/merge-gate.sh <pr> <expected-head-sha>`. Do not run `gh pr merge` yourself. The gate waits for CI, refuses on zero checks, a failed or cancelled check, a conflict or a head that moved since you reviewed it, and pins the merge to the reviewed commit. Details in `CLAUDE.md` ("Merging: always through the gate"). `scripts/ci/merge-gate.sh`, `merge-gate-required.mjs`, `pre-push-gate.sh` and `scripts/ops/cf-logs-setup.sh` are thin wrappers (F10): the scripts themselves are vendored from ebda-foundation into `scripts/foundation/` (`--ops`), never edited here; the Store's own pre-push steps are `scripts/ci/pre-push-extra.sh`.

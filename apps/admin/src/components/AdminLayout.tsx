@@ -5,6 +5,7 @@ import { Suspense, useState, useEffect, useMemo } from 'react';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { usePathname, useRouter } from 'next/navigation';
 import { storefrontOrigin } from '@ebda/shared';
+import { liveDomain } from '@/lib/store-url';
 import { useAuth } from '../lib/auth';
 import { useStore } from '../contexts/StoreContext';
 import { useCurrentStore } from '../hooks/useCurrentStore';
@@ -274,13 +275,22 @@ export function AdminLayout({
   const { store: fetchedStore } = useCurrentStore(currentStoreId);
 
   const viewStoreUrl = useMemo(() => {
-    const domain = storeDomain || fetchedStore?.domain;
+    const domain = liveDomain({
+      domain: storeDomain || fetchedStore?.domain,
+      domainStatus: fetchedStore?.domainStatus,
+    });
     const slug = storeSlug || fetchedStore?.slug;
     // Custom domain, else the store's own `<slug>.ebda.app` host.
     if (slug) return storefrontOrigin({ slug, domain });
     if (domain) return `https://${domain}`;
     return null;
-  }, [storeDomain, storeSlug, fetchedStore?.domain, fetchedStore?.slug]);
+  }, [
+    storeDomain,
+    storeSlug,
+    fetchedStore?.domain,
+    fetchedStore?.domainStatus,
+    fetchedStore?.slug,
+  ]);
 
   // Hide the back button on top-level "home" pages — there's nowhere to
   // go back to. For super_admins that's `/` and `/dashboard`. For
