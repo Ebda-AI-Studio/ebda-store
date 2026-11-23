@@ -39,6 +39,7 @@ export * from './region';
 export * from './order-lines';
 export * from './order-tax';
 export * from './order-action-visibility';
+export * from './order-payment-summary';
 export * from './order-status-transitions';
 export * from './payments';
 export * from './instapay-receipt';
