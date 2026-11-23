@@ -10003,7 +10003,6 @@
       "failed": "Failed",
       "refunded": "Refunded"
     },
-    "switchingTo": "switching to {interval}",
     "interval": {
       "monthly": "monthly",
       "yearly": "yearly"
@@ -10073,6 +10072,7 @@
         "nextCharge": "Next charge",
         "action": "Action"
       },
+      "switchingTo": "switching to {interval}",
       "interval": {
         "monthly": "monthly",
         "yearly": "annual"
