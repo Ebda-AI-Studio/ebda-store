@@ -123,10 +123,10 @@ export interface Merchant {
   slug: string;
 }
 let n = 0;
-/** A signed-in merchant with one LIVE store (create, look, trial plan, payment methods, go-live; `live:false` stops after create). `label` must be unique per file. */
+/** A signed-in merchant with one LIVE store (create, look, trial plan, payment methods, go-live; `live:false` stops after create, `look:false` skips the look PUT). `label` must be unique per file. */
 export async function bootstrapMerchant(
   label: string,
-  opts: { live?: boolean } = {}
+  opts: { live?: boolean; look?: boolean } = {}
 ): Promise<Merchant> {
   await seedPlatform();
   const i = ++n;
@@ -158,11 +158,13 @@ export async function bootstrapMerchant(
     throw new Error(`bootstrapMerchant(${label}): ${created.status} ${created.text.slice(0, 300)}`);
   token = await identityToken(sub, email, [{ id: storeId, role: 'owner' }]);
   await call('/auth/session', { method: 'POST', token });
-  await call(`/stores/${storeId}/look`, {
-    method: 'PUT',
-    token,
-    body: { lookId: 'qamar.atelier', design: 'reset' },
-  });
+  // `look: false` keeps the store on its onboarding defaults: the look PUT publishes page revisions (builder tests need rev 0)
+  if (opts.look !== false)
+    await call(`/stores/${storeId}/look`, {
+      method: 'PUT',
+      token,
+      body: { lookId: 'qamar.atelier', design: 'reset' },
+    });
   if (opts.live !== false) {
     const billing = await call(`/stores/${storeId}/billing`, { token });
     const plan = billing.json?.data?.availablePlans?.[0];
