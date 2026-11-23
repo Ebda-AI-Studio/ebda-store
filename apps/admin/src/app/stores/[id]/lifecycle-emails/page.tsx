@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { Button } from '@/components/ui/Button';
 import { ErrorState } from '../../../../components/ErrorState';
 import { useToast } from '@ebda/ui';
 import { apiGet, apiPost } from '../../../../lib/api';
@@ -103,14 +104,15 @@ export default function LifecycleEmailsPage() {
                       {e.reason ? t(`reason.${e.reason}`) : ''}
                     </td>
                     <td className="p-3">
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         type="button"
                         onClick={() => void sendTest(e.kind)}
                         disabled={sending !== null}
-                        className="rounded-lg border border-border px-3 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
                       >
                         {sending === e.kind ? t('testSending') : t('testSend')}
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
