@@ -51,6 +51,7 @@ interface OwnerResponseDraft {
 }
 
 import { formatDate } from '@/lib/format';
+import { TEXTAREA_CLASSES } from '@/components/ui/tokens';
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -58,7 +59,7 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
-          className={`h-4 w-4 ${i < rating ? 'text-warning-ink fill-yellow-400' : 'text-muted-foreground/60'}`}
+          className={`h-4 w-4 ${i < rating ? 'text-warning-ink fill-warning' : 'text-muted-foreground/60'}`}
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -331,12 +332,12 @@ export default function ReviewsPage() {
       </div>
 
       {/* Reviews List */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-md border bg-card shadow-sm">
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">{t('loading')}</div>
         ) : filteredReviews.length === 0 ? (
           <div className="force-empty-state px-6">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
               <svg
                 className="h-8 w-8 text-muted-foreground"
                 fill="none"
@@ -609,22 +610,22 @@ export default function ReviewsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
               {t('aiDraftEnLabel')}
             </label>
             <textarea
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               rows={4}
               value={draftEn}
               onChange={e => setDraftEn(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
               {t('aiDraftArLabel')}
             </label>
             <textarea
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={`${TEXTAREA_CLASSES} resize-none`}
               rows={4}
               dir="rtl"
               value={draftAr}

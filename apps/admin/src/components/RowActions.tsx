@@ -209,7 +209,7 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
                 ref={menuRef}
                 role="menu"
                 style={{ position: 'fixed', ...(pos ?? { top: 0, left: 0, visibility: 'hidden' }) }}
-                className="z-50 min-w-48 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+                className="z-50 min-w-48 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-md"
               >
                 {ordered.map((item, i) => {
                   const close = () => {

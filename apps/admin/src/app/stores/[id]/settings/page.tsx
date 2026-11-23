@@ -517,12 +517,12 @@ export default function StoreSettingsPage() {
             {Array.from({ length: 9 }).map((_, i) => (
               <div
                 key={i}
-                className="flex items-start gap-4 rounded-xl border bg-card p-6 shadow-sm animate-pulse"
+                className="flex items-start gap-4 rounded-md border bg-card p-6 shadow-sm animate-pulse"
               >
-                <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-muted" />
+                <div className="h-12 w-12 flex-shrink-0 rounded-md bg-muted" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-24 rounded bg-muted" />
-                  <div className="h-3 w-full rounded bg-muted" />
+                  <div className="h-4 w-24 rounded-md bg-muted" />
+                  <div className="h-3 w-full rounded-md bg-muted" />
                 </div>
               </div>
             ))}
@@ -540,10 +540,10 @@ export default function StoreSettingsPage() {
                     data-ui="tile"
                     key={card.href}
                     href={card.href}
-                    className="group flex min-h-20 items-start gap-4 rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md"
+                    className="group flex min-h-20 items-start gap-4 rounded-md border bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md"
                   >
                     <div
-                      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color} transition-transform group-hover:scale-110`}
+                      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md ${card.color} transition-transform group-hover:scale-110`}
                     >
                       {card.icon}
                     </div>
@@ -594,7 +594,7 @@ export default function StoreSettingsPage() {
             <h2 className="mb-3 font-semibold text-destructive-ink">
               {t('superAdmin.dangerZoneTitle')}
             </h2>
-            <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-5">
+            <div className="rounded-md border-2 border-destructive/40 bg-destructive/5 p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-foreground">
