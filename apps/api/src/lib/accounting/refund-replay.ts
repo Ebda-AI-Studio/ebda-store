@@ -20,7 +20,7 @@ const bump = (r: Record<string, number>, k: string, n = 1): void => {
 
 const isItemMarker = (m: string): boolean => (ITEM_MARKERS as readonly string[]).includes(m);
 
-export type Repo = Awaited<ReturnType<typeof storeRepo>>;
+type Repo = Awaited<ReturnType<typeof storeRepo>>;
 export type Money = NonNullable<Awaited<ReturnType<typeof storeMoney>>>;
 export interface PartialRefund {
   refundKey: string;
