@@ -187,10 +187,12 @@ export async function claimBillingEventD1(r: {
   relatedEventId: string | null;
   vatMinor: number;
   vat: unknown | null;
+  /** Stored at claim time (a refund's `keepAccess`): an async webhook settle reads it back (B3). */
+  raw?: unknown | null;
 }): Promise<boolean> {
   const changes = await d1Run(
-    `INSERT INTO billing_events (id, store_id, subscription_id, type, plan_code, billing_interval, for_period_end, attempt, amount_minor, currency, provider, idempotency_key, status, related_event_id, vat_minor, vat)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'EGP', ?10, ?11, 'pending', ?12, ?13, ?14)
+    `INSERT INTO billing_events (id, store_id, subscription_id, type, plan_code, billing_interval, for_period_end, attempt, amount_minor, currency, provider, idempotency_key, status, related_event_id, vat_minor, vat, raw)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'EGP', ?10, ?11, 'pending', ?12, ?13, ?14, ?15)
      ON CONFLICT (idempotency_key) DO NOTHING`,
     r.id,
     r.storeId,
@@ -205,7 +207,8 @@ export async function claimBillingEventD1(r: {
     r.idempotencyKey,
     r.relatedEventId,
     r.vatMinor,
-    r.vat === null || r.vat === undefined ? null : JSON.stringify(r.vat)
+    r.vat === null || r.vat === undefined ? null : JSON.stringify(r.vat),
+    r.raw === null || r.raw === undefined ? null : JSON.stringify(r.raw)
   );
   // `changes` includes the AFTER INSERT tax triggers' own writes (2 for one real insert, 0 for a skipped one)
   return changes > 0;

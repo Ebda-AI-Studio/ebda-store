@@ -13,6 +13,8 @@ export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
   'account.staff-accept-invite': { secret: 'invite token and new password' },
   'onboarding.signup': { secret: 'password / one-time code' },
   'billing.pay-card': { secret: 'card details' },
+  'billing.addons': { secret: 'card details on the hosted checkout' },
+  'billing.ai-topup': { secret: 'card details on the hosted checkout' },
   'payment.card-providers': { secret: 'provider API keys' },
   'payment.instapay-merchant': { secret: 'provider credentials' },
   'onboarding.slug-claim': {

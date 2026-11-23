@@ -92,7 +92,11 @@ export async function appendRenewalMarker(
   });
 }
 
-/** Running terms: succeeded, not refunded, `forPeriodEnd` still ahead. */
+/**
+ * Running terms: succeeded, not refunded, `forPeriodEnd` still ahead AND the term has started. A term bought while
+ * another runs is chained to start at the predecessor's end (`[end - ADDON_TERM_DAYS, end]`); counting it before that
+ * would give an additive AI pack 30 free days (B5).
+ */
 export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<ActiveAddon[]> {
   const rows = await tx.billingEvent.findMany({
     where: {
@@ -113,6 +117,7 @@ export async function activeAddons(tx: Tx, storeId: string, now: Date): Promise<
   for (const r of rows) {
     const sku = skuOfPlanCode(r.planCode);
     if (!sku || !r.forPeriodEnd) continue;
+    if (addDays(r.forPeriodEnd, -ADDON_TERM_DAYS) > now) continue; // chained term, not started yet
     out.push({ eventId: r.id, sku, endsAt: r.forPeriodEnd, cancelAtPeriodEnd: stopped.has(r.id) });
   }
   return out;
@@ -193,7 +198,9 @@ async function grantTerm(
   let predId = latest?.id ?? 'none';
   let predEnd = latest?.forPeriodEnd ?? null;
   let gen = 0;
-  for (let i = 0; i < CHAIN_TRIES; i++) {
+  // Only a LOST slot spends a try. A dead-anchor skip (`gen++`) never does: it is bounded by the number of dead markers
+  // under this predecessor, and counting it would strand every later purchase after CHAIN_TRIES dead payments (B4).
+  for (let tries = 0; tries < CHAIN_TRIES; ) {
     const start = predEnd && predEnd.getTime() > now.getTime() ? predEnd : now;
     const end = addDays(start, ADDON_TERM_DAYS);
     // `gen` > 0 only after the slot was held by a REFUNDED payment (a dead anchor, see below).
@@ -233,7 +240,10 @@ async function grantTerm(
       where: { storeId: row.storeId, idempotencyKey: key },
       select: { relatedEventId: true, forPeriodEnd: true },
     });
-    if (!held?.forPeriodEnd || !held.relatedEventId) continue;
+    if (!held?.forPeriodEnd || !held.relatedEventId) {
+      tries++;
+      continue;
+    }
     if (held.relatedEventId === row.id) return setEnd(held.forPeriodEnd); // already granted by another settle
     // A REFUNDED payment must not anchor the chain (ADDON-CHAIN-2): its slot is dead, so take the next slot under the
     // same predecessor instead of starting after the refunded term's end (that would leave a gap). Only `refunded` is
@@ -245,8 +255,9 @@ async function grantTerm(
     });
     if (isDeadAnchor(heldPayment, now)) {
       gen++;
-      continue;
+      continue; // dead anchor: does not spend a try
     }
+    tries++;
     predId = held.relatedEventId;
     predEnd = held.forPeriodEnd;
   }
