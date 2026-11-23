@@ -238,4 +238,40 @@ describe('POST /public/:storeId/promotions/preview', () => {
     // customer's segment/first-order status via a body-supplied id.
     expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
   });
+
+  describe('browse route (PDP / cart): no identity oracle', () => {
+    const FIRST_ORDER_PROMO = () => promo({ id: 'F', value: 10, firstOrderOnly: true });
+
+    it('ignores a body phone / email: a known customer gets the same answer as a stranger, and no order lookup runs', async () => {
+      mockPrisma.product.findMany.mockResolvedValue(PRODUCTS);
+      mockPrisma.promotion.findMany.mockResolvedValue([FIRST_ORDER_PROMO()]);
+      mockPrisma.order.count.mockResolvedValue(3); // this phone HAS prior orders
+
+      const withPhone = await request(app)
+        .post(`/api/v1/stores/public/${STORE_ID}/promotions/preview-browse`)
+        .send({ items: ITEMS, phone: '+201001234567', email: 'vip@example.com' });
+      const without = await request(app)
+        .post(`/api/v1/stores/public/${STORE_ID}/promotions/preview-browse`)
+        .send({ items: ITEMS });
+
+      expect(withPhone.status).toBe(200);
+      expect(withPhone.body.data).toEqual(without.body.data);
+      expect(withPhone.body.data.promotion).toEqual({ id: 'F', discount: 1000 });
+      expect(mockPrisma.order.count).not.toHaveBeenCalled();
+    });
+
+    it('checkout route still evaluates identity: a phone with prior orders loses a first-order promo', async () => {
+      mockPrisma.product.findMany.mockResolvedValue(PRODUCTS);
+      mockPrisma.promotion.findMany.mockResolvedValue([FIRST_ORDER_PROMO()]);
+      mockPrisma.order.count.mockResolvedValue(3);
+
+      const res = await request(app)
+        .post(`/api/v1/stores/public/${STORE_ID}/promotions/preview`)
+        .send({ items: ITEMS, phone: '+201001234567' });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.order.count).toHaveBeenCalledTimes(1);
+      expect(res.body.data.promotion).toBeNull();
+    });
+  });
 });

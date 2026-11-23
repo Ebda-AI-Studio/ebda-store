@@ -72,6 +72,9 @@ const previewSchema = z.object({
   phone: z.string().nullish(),
   email: z.string().nullish(),
 });
+// The browse (PDP / cart) preview takes ONLY items: a typed phone / email would let a 120/min caller probe which
+// phones are VIP / first-order customers. Unknown keys (phone, email, any identity field) are stripped, never read.
+const browsePreviewSchema = z.object({ items: z.array(previewItemSchema).max(500) });
 
 // GET /stores/:storeId/promotions - List all promotions
 router.get(
@@ -222,68 +225,71 @@ router.patch(
 // need this before/during checkout to preview which automatic promotion
 // applies. `router.param('storeId', tenantContext)` above still wraps this
 // route (it declares its own ':storeId'), same as coupons/validate.
-const previewHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const { items, phone, email } = previewSchema.parse(req.body);
+const makePreviewHandler =
+  (browse: boolean) => async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { items, phone, email } = browse
+        ? { ...browsePreviewSchema.parse(req.body), phone: undefined, email: undefined }
+        : previewSchema.parse(req.body);
 
-    // Lines are priced by the ONE resolver for the signed-in buyer (product level: the preview carries no variant, so a
-    // variant with its own price is previewed at the product price, display only). A line priced by a tier or a group
-    // price is excluded from the discount basis (Ruling B2B-5); the authoritative discount is recomputed at order creation.
-    const buyer = buyerFromRequest(req);
-    const products = await (
-      await storeDb(storeId)
-    ).product.findMany({
-      where: { id: { in: items.map(i => i.productId) }, storeId },
-      select: { id: true, price: true, categories: { select: { categoryId: true } } },
-    });
-    const productsById = new Map(products.map(p => [p.id, p]));
-    const resolver = await PriceResolver.forBuyer(storeId, buyer);
-    const priced = await resolver.priceCart(
-      items.flatMap((item, i) => {
+      // Lines are priced by the ONE resolver for the signed-in buyer (product level: the preview carries no variant, so a
+      // variant with its own price is previewed at the product price, display only). A line priced by a tier or a group
+      // price is excluded from the discount basis (Ruling B2B-5); the authoritative discount is recomputed at order creation.
+      const buyer = buyerFromRequest(req);
+      const products = await (
+        await storeDb(storeId)
+      ).product.findMany({
+        where: { id: { in: items.map(i => i.productId) }, storeId },
+        select: { id: true, price: true, categories: { select: { categoryId: true } } },
+      });
+      const productsById = new Map(products.map(p => [p.id, p]));
+      const resolver = await PriceResolver.forBuyer(storeId, buyer);
+      const priced = await resolver.priceCart(
+        items.flatMap((item, i) => {
+          const product = productsById.get(item.productId);
+          return product
+            ? [
+                {
+                  key: String(i),
+                  product: { id: product.id, price: product.price },
+                  qty: item.quantity,
+                },
+              ]
+            : [];
+        })
+      );
+      const cartItems = items.flatMap((item, i) => {
         const product = productsById.get(item.productId);
-        return product
-          ? [
-              {
-                key: String(i),
-                product: { id: product.id, price: product.price },
-                qty: item.quantity,
-              },
-            ]
-          : [];
-      })
-    );
-    const cartItems = items.flatMap((item, i) => {
-      const product = productsById.get(item.productId);
-      const line = priced.get(String(i));
-      if (!product || !line || line.source !== 'base') return [];
-      return [
-        {
-          productId: item.productId,
-          categoryIds: product.categories.map(c => c.categoryId),
-          quantity: item.quantity,
-          lineTotal: line.unitMinor * item.quantity,
+        const line = priced.get(String(i));
+        if (!product || !line || line.source !== 'base') return [];
+        return [
+          {
+            productId: item.productId,
+            categoryIds: product.categories.map(c => c.categoryId),
+            quantity: item.quantity,
+            lineTotal: line.unitMinor * item.quantity,
+          },
+        ];
+      });
+
+      // Group membership comes from the SESSION only (Ruling B2B-2c/2e): a typed phone / email never confers a group.
+      const ctx = {
+        ...(await resolveCustomerContext(storeId, { phone, email }, buyer)),
+        cartItems,
+      };
+      const best = await resolveBestPromotion(storeId, ctx);
+
+      res.json({
+        success: true,
+        data: {
+          promotion: best ? { id: best.promotionId, discount: best.discount } : null,
         },
-      ];
-    });
-
-    // Group membership comes from the SESSION only (Ruling B2B-2c/2e): a typed phone / email never confers a group.
-    const ctx = {
-      ...(await resolveCustomerContext(storeId, { phone, email }, buyer)),
-      cartItems,
-    };
-    const best = await resolveBestPromotion(storeId, ctx);
-
-    res.json({
-      success: true,
-      data: {
-        promotion: best ? { id: best.promotionId, discount: best.discount } : null,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
 // Checkout's bucket (20/min/IP). The PDP and the cart use the browse route below, never this one.
 router.post(
@@ -294,7 +300,7 @@ router.post(
   publicTenantLimiter,
   // The signed-in customer (never a body-supplied identity) decides group membership and group prices.
   optionalAuthenticate,
-  previewHandler
+  makePreviewHandler(false)
 );
 
 // Same preview for the PDP and the cart (its own, more generous bucket: see promotionBrowsePreviewLimiter).
@@ -303,7 +309,7 @@ router.post(
   promotionBrowsePreviewLimiter,
   publicTenantLimiter,
   optionalAuthenticate,
-  previewHandler
+  makePreviewHandler(true)
 );
 
 export default router;

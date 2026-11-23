@@ -28,8 +28,6 @@ describe('PDP automatic promotion line', () => {
     expect(screen.getByTestId('pdp-auto-promotion').textContent).toContain('EGP 15');
     expect(post).toHaveBeenCalledWith('/stores/public/store-1/promotions/preview-browse', {
       items: [{ productId: 'prod-1', quantity: 2 }],
-      phone: undefined,
-      email: undefined,
     });
   });
   it('renders nothing when no promotion applies', async () => {
