@@ -10,11 +10,12 @@
 //     then enforced against DIR's baseline, not the PR's copy: the PR baseline may not contain an id DIR's lacks, no violation outside DIR's
 //     baseline is allowed, and none of the PR's eslint-suppressions.json may total more per rule than DIR's. DIR's .pr-quality.json also wins.
 //     A DIR with no baseline yet (the adoption PR) falls back to the plain check.
-//   --merge-base-baseline FILE  (CI) the baseline as it was at merge-base(base, PR head). The "PR may not ADD an id" test then compares against
-//     THIS, not the base tip: an id main removed after the PR branched is not the PR's doing, so a shrinking main never fails open PRs.
-//     Without it (or a merge-base with no baseline) the base tip's baseline is used, as before.
-//   --merge-base-root DIR  (CI) a data tree holding the eslint-suppressions.json files as of that merge-base; the suppression-growth ratchet compares
-//     against it instead of the base tip (same reason). Used only when it holds at least one suppression file; otherwise the base tip.
+//   --merge-base-root DIR  (CI; built by merge-base-tree.sh) a data tree of the ratchet files as of merge-base(base, PR head) plus `.mb-touched`, the
+//     files the PR changed since then. Rule for EVERY ratchet entry (slop id, eslint suppression entry, capability baseline id): the allowed value is the
+//     base TIP's. The ONE exception: an entry the PR leaves unchanged (same key, its source file NOT in `.mb-touched`) may keep its merge-base value, so
+//     a main that shrank after the PR branched does not fail it. Anything the PR touches is judged against the tip, so an OLD merge-base cannot
+//     resurrect an exemption on code the PR edits. merge-base-tree.sh refuses (no `.mb-touched` written => plain tip comparison) when the merge-base is
+//     more than 200 commits or 7 days behind the tip (MB_MAX_COMMITS / MB_MAX_DAYS).
 // Config (.pr-quality.json): { "roots": ["apps","packages"], "locales": ["apps/web/messages"], "baseline": ".pr-quality-baseline.json",
 //   "skip": ["generated"], "frameworkExports": ["extra names"], "ruleExemptions": [{ "rule": "unused-export", "path": "<foundation.lock.json dir>",
 //   "reason": "...", "requires": "<foundation.lock.json parity test>" }] }.  Ruling SLOP-VENDORED-1: the ONLY exemption that exists. It waives the
@@ -178,6 +179,26 @@ export function scan({ root, config = {} }) {
   return viol;
 }
 
+/** the merge-base reference tree, or null when it is absent (no `.mb-touched` = disabled = tip comparison) */
+export function mergeBaseRef(dir) {
+  if (!dir || !existsSync(join(dir, '.mb-touched'))) return null;
+  return { dir, touched: new Set(readFileSync(join(dir, '.mb-touched'), 'utf8').split('\n').filter(Boolean)) };
+}
+/** the source file an id points at (`rule|path|...`), else the ratchet file that holds it */
+export const sourceOfId = (id, fallback) => { const p = id.split('|')[1]; return p && !p.startsWith('/') && /\.[a-z0-9]+$/i.test(p) ? p : fallback; };
+
+/** per ENTRY (`suppressions-file`, source key, rule) counts over every eslint-suppressions.json under root */
+export function eslintEntries(root, roots = ['apps', 'packages']) {
+  const rootFile = join(root, 'eslint-suppressions.json');
+  const names = [...(existsSync(rootFile) && lstatSync(rootFile).isFile() ? ['eslint-suppressions.json'] : []), ...walk(root, roots).filter((f) => f.endsWith('/eslint-suppressions.json'))];
+  const entries = new Map();
+  for (const f of names) {
+    const data = readJsonRegular(join(root, f));
+    for (const [src, rules] of Object.entries(data)) for (const [rule, v] of Object.entries(rules)) entries.set(JSON.stringify([f, src, rule]), { f, src, rule, n: v?.count ?? 0 });
+  }
+  return { entries, files: names.length };
+}
+
 /** sum of counts per `suppressions-file|rule` over every eslint-suppressions.json under root (a moved file keeps its total) */
 export function eslintTotals(root, roots = ['apps', 'packages']) {
   const rootFile = join(root, 'eslint-suppressions.json');
@@ -190,12 +211,25 @@ export function eslintTotals(root, roots = ['apps', 'packages']) {
   return { totals, files: names.length };
 }
 
-/** `file|rule` keys whose total grew over the base's. A base with no suppression files at all is the adoption PR: nothing to compare. */
-export function eslintGrowth(root, baseRoot, roots) {
-  const base = eslintTotals(baseRoot, roots);
+/** entries whose count exceeds the allowed one: the base TIP's, or (untouched source file, merge-base reference `mb`) the larger of tip and merge-base.
+ *  A base with no suppression files at all is the adoption PR: nothing to compare. Per ENTRY, never a per-file total: entries cannot be traded. */
+export function eslintGrowth(root, baseRoot, roots, mb = null) {
+  const base = eslintEntries(baseRoot, roots);
   if (base.files === 0) return [];
-  const cur = eslintTotals(root, roots);
-  return [...cur.totals].filter(([k, n]) => n > (base.totals.get(k) ?? 0)).map(([k, n]) => `${k} ${base.totals.get(k) ?? 0} -> ${n}`);
+  const cur = eslintEntries(root, roots);
+  const ref = mb ? eslintEntries(mb.dir, roots) : null;
+  const out = [];
+  for (const [k, e] of cur.entries) {
+    const tip = base.entries.get(k)?.n ?? 0;
+    let allowed = tip;
+    if (ref && ref.files > 0) {
+      const dir = e.f.includes('/') ? e.f.slice(0, e.f.lastIndexOf('/')) : '.';
+      const touched = mb.touched.has(e.src) || mb.touched.has(dir === '.' ? e.src : `${dir}/${e.src}`);
+      if (!touched) allowed = Math.max(tip, ref.entries.get(k)?.n ?? 0);
+    }
+    if (e.n > allowed) out.push(`${e.f}|${e.src}|${e.rule} ${tip} -> ${e.n}`);
+  }
+  return out;
 }
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -274,18 +308,19 @@ function main() {
   for (const id of added) { console.error(`slop-guard: NEW ${current.get(id)}`); bad++; }
   for (const id of stale) { console.error(`slop-guard: FIXED but still in the baseline: ${id}  (run: node ${relative(root, process.argv[1])} --update)`); bad++; }
   if (baseRoot) {
-    const bp = join(baseRoot, config.baseline ?? '.pr-quality-baseline.json');
-    const mbPath = arg('--merge-base-baseline', null);
-    const refPath = mbPath && existsSync(mbPath) ? mbPath : bp;
-    const label = refPath === bp ? "base branch's" : "merge-base's";
-    if (existsSync(refPath)) {
-      const B = new Set((readJsonRegular(refPath).ids ?? []).filter((id) => !waivedId(id)));
-      for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the ${label} does not (it can only shrink): ${id}`); bad++; }
-      for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the ${label} baseline: ${current.get(id)}`); bad++; }
+    const bpRel = config.baseline ?? '.pr-quality-baseline.json';
+    const bp = join(baseRoot, bpRel);
+    const mb = mergeBaseRef(arg('--merge-base-root', null));
+    const mbp = mb && join(mb.dir, bpRel);
+    const MB = new Set(mbp && existsSync(mbp) ? (readJsonRegular(mbp).ids ?? []).filter((id) => !waivedId(id)) : []);
+    // an id absent from the TIP is allowed only when the PR left it unchanged since the merge-base (in it, source file untouched)
+    const unchanged = (id) => MB.has(id) && !mb.touched.has(sourceOfId(id, bpRel));
+    if (existsSync(bp)) {
+      const B = new Set((readJsonRegular(bp).ids ?? []).filter((id) => !waivedId(id)));
+      for (const id of baseline ?? []) if (!B.has(id) && !unchanged(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
+      for (const id of current.keys()) if (!B.has(id) && !unchanged(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
     }
-    const mbRoot = arg('--merge-base-root', null);
-    const eslintRef = mbRoot && existsSync(mbRoot) && eslintTotals(mbRoot, config.roots).files > 0 ? mbRoot : baseRoot;
-    for (const g of eslintGrowth(root, eslintRef, config.roots)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
+    for (const g of eslintGrowth(root, baseRoot, config.roots, mb)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
   }
   if (bad) {
     if (added.length) console.error('Fix the new violation, or justify it inline with  pq-allow(<rule>): <reason>');
