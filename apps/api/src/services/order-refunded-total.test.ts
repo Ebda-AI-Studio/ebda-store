@@ -59,4 +59,17 @@ describe('refundedTotal', () => {
       )
     ).toBe(5000);
   });
+
+  it('a completed EXCHANGE adds 0: it moves no money, its refund_amount is only the create-time estimate', () => {
+    expect(
+      refundedTotal(
+        [{ refundedAmount: 0, metadata: {} }],
+        [],
+        [
+          { type: 'exchange', refundMethod: 'cash', refundAmount: 5000 },
+          { type: 'return', refundMethod: 'cash', refundAmount: 100 },
+        ]
+      )
+    ).toBe(100);
+  });
 });

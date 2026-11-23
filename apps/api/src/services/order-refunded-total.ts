@@ -27,6 +27,7 @@ export function refundedTotal(
   completedReturns: ReadonlyArray<{
     refundMethod?: string | null;
     refundAmount?: number | null;
+    type?: string | null;
   }> = []
 ): number {
   const mirrored = new Set<string>();
@@ -47,7 +48,7 @@ export function refundedTotal(
   }
   const viaReturns = completedReturns.reduce(
     (s, r) =>
-      GATEWAY_RETURN_METHODS.includes(r.refundMethod ?? '')
+      r.type === 'exchange' || GATEWAY_RETURN_METHODS.includes(r.refundMethod ?? '')
         ? s
         : s + Math.max(0, num(r.refundAmount)),
     0

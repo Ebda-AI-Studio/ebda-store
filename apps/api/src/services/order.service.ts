@@ -749,8 +749,9 @@ export class OrderService {
           }),
           // refunds made through the RETURNS path (cash / bank / manual / store credit; gateway ones are on the payment row)
           repo.db.return.findMany({
-            where: { storeId, orderId, status: 'completed' },
-            select: { refundMethod: true, refundAmount: true },
+            // an EXCHANGE moves no money (its refundAmount is only the create-time estimate): never a refund
+            where: { storeId, orderId, status: 'completed', type: { not: 'exchange' } },
+            select: { refundMethod: true, refundAmount: true, type: true },
           }),
         ]);
         refundedTotalMinor = refundedTotal(payMeta, [...partialA, ...partialB], doneReturns);
