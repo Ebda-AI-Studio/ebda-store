@@ -489,6 +489,9 @@ describe.skipIf(!hasDb)('signup funnel', () => {
         status: 'suspended',
         billingSuspendedReason: 'unpaid',
       });
+      // #836: the lapse also ends the paid plan (it used to stay past_due on Growth forever).
+      expect(await sub(storeId)).toMatchObject({ status: 'canceled', planCode: 'free' });
+      expect((await storeRow(storeId)).plan).toBe('free');
       expect(emailSpy).toHaveBeenCalledWith(
         storeId,
         expect.objectContaining({ kind: 'store_suspended' }),
@@ -825,6 +828,33 @@ describe.skipIf(!hasDb)('signup funnel', () => {
         status: 'active',
         billingSuspendedReason: null,
       });
+    });
+
+    it('a parent that lapses to canceled takes its children off the paid plan; its payment puts them back (#836)', async () => {
+      const { parent, childId } = await businessFamily('pclapsefree');
+      expect((await sub(childId)).planCode).toBe('business');
+      // the end state of a lapse (InstaPay grace over / card dunning): parent canceled on free
+      await withRlsBypass(tx =>
+        tx.storeSubscription.update({
+          where: { storeId: parent.storeId },
+          data: { planCode: 'free', status: 'canceled' },
+        })
+      );
+      await reconcileStoreAccess(parent.storeId);
+      expect(await sub(childId)).toMatchObject({ planCode: 'free', status: 'canceled' });
+      await recordManualPayment({
+        storeId: parent.storeId,
+        planCode: 'business',
+        interval: 'monthly',
+        amountMinor: 999000,
+        method: 'instapay',
+        reference: `PC-lapsefree2-${run}`,
+        paidAt: new Date(),
+        periodStart: new Date(),
+        periodEnd: addDays(new Date(), 30),
+        actorId: parent.ownerId,
+      });
+      expect(await sub(childId)).toMatchObject({ planCode: 'business', status: 'active' });
     });
 
     it('the billing parent cannot be hard-deleted while the owner has other stores', async () => {

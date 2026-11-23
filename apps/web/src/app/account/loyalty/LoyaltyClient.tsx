@@ -9,6 +9,7 @@ import { useFeatures } from '../../../contexts/FeatureContext';
 import { api, API_URL } from '../../../lib/api';
 import { formatDate as formatStoreDate } from '../../../lib/format-date';
 import { useToast } from '@ebda/ui';
+import { PointsBalance } from './PointsBalance';
 
 interface LoyaltyPoints {
   points: number;
@@ -405,10 +406,11 @@ export default function LoyaltyClient() {
                 <p className="text-sm font-medium text-muted-foreground">
                   {t('Current Balance', 'الرصيد الحالي')}
                 </p>
-                <p className="mt-1 text-5xl font-bold text-primary">
-                  {localize(loyaltyPoints.points.toLocaleString('en-US'))}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">{t('points', 'نقط')}</p>
+                <PointsBalance
+                  points={loyaltyPoints.points}
+                  language={language}
+                  localize={localize}
+                />
               </div>
               {loyaltyPoints.tier && (
                 <div className="text-right">

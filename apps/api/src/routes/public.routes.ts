@@ -1,4 +1,5 @@
 import { redeemWaCheckout } from '../lib/wa/bridge/redeem';
+import { signOrderStatusLinkToken } from '../lib/order-status-link-token';
 import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod/v3';
@@ -58,6 +59,7 @@ import { getStoreIdFromRequest } from '../utils/store-helpers';
 import { assertNotDemoStore } from '../services/plan-limit.service';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
+import { renderFeed } from '../lib/catalogue-feed/service';
 import { gateBackorderPayload } from '../lib/effective-inventory';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import {
@@ -744,6 +746,56 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     next(err);
   }
 });
+
+/**
+ * GET /public/feed/{google.xml,meta.xml,tiktok.csv}?lang=ar|en&part=N — the advertising product catalogue
+ * (`product_feeds`; every paid plan, Ruling FEEDS-1): the FULL catalogue, one item per purchasable variant, for Google
+ * Merchant Center, Meta Commerce Manager and TikTok Catalog Manager. Fail-closed like products.json: 404 when the
+ * feature is off, before any parameter is read. Cache + staleness class: lib/catalogue-feed/service.ts (Ruling FEEDS-4).
+ */
+const feedQuery = z.object({
+  lang: z.enum(['ar', 'en']).default('ar'),
+  part: z.coerce.number().int().min(1).max(200).default(1),
+});
+const feedHandler =
+  (platform: 'google' | 'meta' | 'tiktok') =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = await getStoreIdFromRequest(req);
+      if (!(await featureService.isFeatureEnabled(storeId, 'product_feeds'))) {
+        throw new AppError(404, 'NOT_FOUND', 'Not found');
+      }
+      const q = feedQuery.safeParse(req.query);
+      if (!q.success)
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'lang must be ar or en; part must be a positive integer'
+        );
+      const [backorderOn, bundlesEnabled] = await Promise.all([
+        featureService.isFeatureEnabled(storeId, 'inventory.backorder'),
+        featureService.isFeatureEnabled(storeId, 'bundles'),
+      ]);
+      const doc = await renderFeed({
+        storeId,
+        platform,
+        lang: q.data.lang,
+        part: q.data.part,
+        backorderOn,
+        bundlesEnabled,
+      });
+      if (!doc) throw new AppError(404, 'NOT_FOUND', 'Not found');
+      setEdgeCache(res, { sMaxAge: doc.edgeSeconds, staleWhileRevalidate: 0, neverStale: true });
+      res.setHeader('Content-Type', doc.contentType);
+      if (doc.nextPart) res.setHeader('X-Feed-Next-Part', String(doc.nextPart));
+      res.send(doc.body);
+    } catch (err) {
+      next(err);
+    }
+  };
+router.get('/feed/google.xml', feedHandler('google'));
+router.get('/feed/meta.xml', feedHandler('meta'));
+router.get('/feed/tiktok.csv', feedHandler('tiktok'));
 
 // GET /categories - List all categories (cached 120s)
 router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
@@ -1612,10 +1664,25 @@ router.get(
       res.setHeader('Cache-Control', 'private, no-store');
       res.vary('X-Order-View-Token');
 
+      // STORE-QA-41: a GUEST who proved possession of THIS order's view token gets the signed, 14-day, view-only status link
+      // (`/o/<token>`, minimal summary, bound to this store + order) so the success page can offer "view order status" without a login.
+      // Never issued without the view token, never for a customer-owned order.
+      let statusToken: string | undefined;
+      if (order.customerId === null && !isCustomer && requestHoldsOrderViewToken(req, order.id)) {
+        try {
+          statusToken = signOrderStatusLinkToken(storeId, order.id);
+        } catch {
+          statusToken = undefined; // ORDER_STATUS_LINK_SECRET unset: no link, the page falls back
+        }
+      }
+
       res.json({
         success: true,
         // The shopper's own order without the merchant's cost and the gold margin (Ruling B5-23).
-        data: { order: guestMayViewPii ? visible : maskGuestOrderView(visible) },
+        data: {
+          order: guestMayViewPii ? visible : maskGuestOrderView(visible),
+          ...(statusToken ? { statusToken } : {}),
+        },
       });
     } catch (error) {
       next(error);

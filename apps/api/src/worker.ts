@@ -7,7 +7,7 @@
  *
  *   - a POOL of Prisma clients per isolate, each leased to one request at a time and reused (the
  *     engine, ~3.3 MB, is built once per client, not per request), over a leased driver adapter.
- *     The pg connection (pool of one, over Hyperdrive) is per request and opened lazily: workerd
+ *     The pg connection (pool of one, from the Node-era pooler) is per request and opened lazily: workerd
  *     forbids reusing an I/O object (a socket) from another request (experiment B6/B9). One client
  *     shared by concurrent requests hangs, see packages/database/src/client-pool.ts. The
  *     connection is closed, and the client returned, through `ctx.waitUntil`, after the post-commit
@@ -116,7 +116,7 @@ const DRAIN_BUDGET_MS = 25_000;
 let redisReady: Promise<void> | undefined;
 
 /**
- * NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres (no HYPERDRIVE binding). Anything that still reaches the
+ * NEON-ZERO N-17 (Ruling NZ-D23): the Worker has no Postgres (no Postgres binding). Anything that still reaches the
  * exported `prisma` gets a client that throws POSTGRES_REMOVED at once (no socket, no hang). The first hit per isolate is
  * logged and raises a P1 alert; every hit is also an error response, so a missed path is seen in Sentry and by the caller.
  */
@@ -555,6 +555,9 @@ export class WhatsAppBridge extends WorkerEntrypoint<CfBindings> {
   }
   getOrderStatus(storeId: string, orderNumber: string, buyerKey: string, phoneE164?: string) {
     return this.bridge(b => b.getOrderStatus(storeId, orderNumber, buyerKey, phoneE164));
+  }
+  getRecommendations(storeId: string, req: unknown) {
+    return this.bridge(b => b.getRecommendations(storeId, req));
   }
   listCustomerOrders(storeId: string, buyerKey: string, limit: number, phoneE164?: string) {
     return this.bridge(b => b.listCustomerOrders(storeId, buyerKey, limit, phoneE164));

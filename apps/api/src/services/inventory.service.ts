@@ -1,4 +1,5 @@
 import { prisma, Prisma, InventoryChangeType, withStore } from '@ebda/database';
+import { cfWaitUntil } from '../cf/bindings';
 import { AppError } from '../middleware/error-handler';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { WarehouseService } from './warehouse.service';
@@ -555,10 +556,12 @@ export class InventoryService {
 
     // Fire back-in-stock notifications if stock went from 0 to >0
     if (previousStock <= 0 && newStock > 0) {
-      this.fireBackInStockNotifications(storeId, productId, updatedProduct.name).catch(err =>
-        logger.error(
-          { err, storeId, productId: productId },
-          '[InventoryService] Back-in-stock notification failed'
+      cfWaitUntil(
+        this.fireBackInStockNotifications(storeId, productId, updatedProduct.name).catch(err =>
+          logger.error(
+            { err, storeId, productId: productId },
+            '[InventoryService] Back-in-stock notification failed'
+          )
         )
       );
     }
@@ -626,10 +629,12 @@ export class InventoryService {
       }
       for (const p of r.applied) {
         if (p.previousStock <= 0 && p.newStock > 0) {
-          this.fireBackInStockNotifications(storeId, p.productId, p.name).catch(err =>
-            logger.error(
-              { err, storeId, productId: p.productId },
-              '[InventoryService] Back-in-stock notification failed'
+          cfWaitUntil(
+            this.fireBackInStockNotifications(storeId, p.productId, p.name).catch(err =>
+              logger.error(
+                { err, storeId, productId: p.productId },
+                '[InventoryService] Back-in-stock notification failed'
+              )
             )
           );
         }
@@ -719,12 +724,14 @@ export class InventoryService {
     // rolled back. Same fire-and-forget contract as adjustInventory.
     for (const p of plans) {
       if (p.previousStock <= 0 && p.newStock > 0) {
-        this.fireBackInStockNotifications(storeId, p.adjustment.productId, p.productName).catch(
-          err =>
-            logger.error(
-              { err, storeId, productId: p.adjustment.productId },
-              '[InventoryService] Back-in-stock notification failed'
-            )
+        cfWaitUntil(
+          this.fireBackInStockNotifications(storeId, p.adjustment.productId, p.productName).catch(
+            err =>
+              logger.error(
+                { err, storeId, productId: p.adjustment.productId },
+                '[InventoryService] Back-in-stock notification failed'
+              )
+          )
         );
       }
     }
