@@ -59,7 +59,7 @@ const PINNED_SHA256: Record<string, string> = {
   'ar/26-verification-codes-on-whatsapp.md':
     '4b3a3e97a5bcbba2aadec6c61bac90baee7be59ec60298753c43efc146f7ee60',
   'ar/27-connect-your-systems.md':
-    '0ae3e8a5eef5e5bc5a14eeee8e66fe2b23fb8a7400252bf7cd01710f7c5fa36b',
+    '651cd9d0f9cb8864af380cf7c7dfc7873f9873571a972c2ea370c5210ef78701',
   'ar/28-terms-privacy-and-meta-data-deletion.md':
     'a662cddd5d11f51f6ab4ad1d010f9c9fa82d7746b1aa5abe91890b7e0a571931',
   'ar/29-all-ebda-chat-guides.md':
@@ -112,7 +112,7 @@ const PINNED_SHA256: Record<string, string> = {
   'en/26-verification-codes-on-whatsapp.md':
     '212a13ddc9a919cb935a2bf608745a45bc4c360372161715c771e04701a216b9',
   'en/27-connect-your-systems.md':
-    'a3fbab228dd9245340910d5a1a85d2e2bd6cf311a0ebdea530a02ce65e46004c',
+    '8adae6b6959fa9ddf3627537ad668e216abdd3cc38b5d2b2e5775c354df08de7',
   'en/28-terms-privacy-and-meta-data-deletion.md':
     '4308de0bed6e58470cce48be6a3044a544f9944e61c47d45be0ae823bcc721c8',
   'en/29-all-ebda-chat-guides.md':
