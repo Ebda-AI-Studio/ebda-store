@@ -68,6 +68,8 @@ export const COMPLETE_ERROR_CODES = new Set([
   'FULL_RETURN_RESTOCK_ALL',
   // A guest return has no wallet: store credit is refused (GUEST-RET-1); the dialog also disables the option for it.
   'GUEST_STORE_CREDIT',
+  // REFUND-GATE-1: restock needs the `returns` plan feature; the money refund itself is never plan-gated.
+  'RETURNS_FEATURE_REQUIRED_FOR_RESTOCK',
 ]);
 
 /**

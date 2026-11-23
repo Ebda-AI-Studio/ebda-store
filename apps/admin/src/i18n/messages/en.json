@@ -1798,6 +1798,7 @@
           "NOTHING_REFUNDABLE": "This order has nothing left to refund.",
           "INVALID_QUANTITY": "One of the quantities is more than what is still open on that line. Reopen this window and try again.",
           "FULL_RETURN_RESTOCK_ALL": "Refunding every line puts every line back on the shelf. Leave one unit out, or keep restocking on.",
+          "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone.",
           "GUEST_ORDER_RETURN_UNSUPPORTED": "This order was placed as a guest, so a refund by line is not available for it yet.",
           "INVALID_ORDER": "This order cannot be refunded here. It must be delivered.",
           "PROVIDER_REFUND_INDETERMINATE": "The refund reached the payment provider but could not be finished here. Do NOT refund again. Check the provider dashboard first.",
@@ -4539,7 +4540,8 @@
         "OVERRIDE_OUT_OF_RANGE": "The override must be between 0 and the standard refund for that item.",
         "OVERRIDE_UNKNOWN_ITEM": "The override names an item that is not on this return. Reopen the dialog and try again.",
         "FULL_RETURN_RESTOCK_ALL": "Every line of this order is in this return, so every line goes back on the shelf. Open a new return that leaves one unit out if some goods are not coming back to stock.",
-        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually."
+        "GUEST_STORE_CREDIT": "Store credit needs a customer account. This order was placed as a guest, so refund it in cash, by bank transfer or manually.",
+        "RETURNS_FEATURE_REQUIRED_FOR_RESTOCK": "Putting refunded goods back on the shelf needs the Returns feature on your plan. Refund again without restocking: the money refund still goes through, only the stock is left alone."
       }
     },
     "modal": {
@@ -12475,5 +12477,17 @@
     "restock": "Put back on the shelf",
     "notTracked": "Stock is not tracked for this product",
     "wholeOrderRestockNote": "These lines cover the whole order, so every line is put back on the shelf. To skip restocking, leave one unit out."
+  },
+  "launchChip": {
+    "stepsLabel": "{done} of {total} steps",
+    "ordersLabel": "{done} of {goal} orders paid or delivered",
+    "openAria": "Launch readiness: {label}. Open the checklist",
+    "stepsTitle": "Get ready to launch",
+    "stepsHint": "Finish these steps so customers can start ordering.",
+    "ordersTitle": "Your first {goal} orders",
+    "ordersHint": "Share your store link with customers. This badge goes away after {goal} orders are paid or delivered (cash on delivery counts once delivered).",
+    "viewOrders": "See orders",
+    "open": "Open",
+    "done": "Done"
   }
 }
