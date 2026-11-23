@@ -50,6 +50,7 @@ vi.mock('@api/middleware/tenant-context', () => ({
 vi.mock('@api/middleware/security', () => ({
   uploadLimiter: (_q: any, _s: any, n: any) => n(),
   dailyUploadLimiter: (_q: any, _s: any, n: any) => n(),
+  adminReadLimiter: (_q: any, _s: any, n: any) => n(),
   auditLog: m.audit,
 }));
 vi.mock('@api/lib/platform-scope', () => ({
