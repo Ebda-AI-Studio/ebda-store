@@ -24,7 +24,7 @@ import { recordTiming } from '../lib/request-timing';
  * of the RLS cutover (see `docs/plans/done/2026-07-02-rls-cutover.md`), not a
  * live backstop. Tenant isolation today rests entirely on the application
  * layer (`requireStoreAccess` + explicit `where: { storeId }`). Once the
- * cutover flips `DATABASE_URL` to `ebda_app` and drops
+ * Node shell's connection string points at the `ebda_app` role and drops
  * `ALLOW_BYPASSRLS_ROLE`, this same wiring becomes a real database-level
  * backstop with zero code changes — that is the point of shipping it now.
  *
