@@ -345,7 +345,8 @@
         "reviews": "Reviews waiting for approval",
         "allClear": "Nothing is waiting for you right now.",
         "loadFailed": "We could not load what needs your attention right now.",
-        "retry": "Try again"
+        "retry": "Try again",
+        "seoMissing": "Store title and description for search engines are still empty"
       },
       "pulse": {
         "title": "Store pulse",
@@ -4096,6 +4097,7 @@
         "AI_QUOTA_DAILY_EXCEEDED": "Today's smart-tools limit is used up. Try again tomorrow.",
         "AI_QUOTA_MONTHLY_EXCEEDED": "This month's smart-tools limit is used up.",
         "AI_QUOTA_STORE_DAILY_EXCEEDED": "Today's smart-tools limit for your store is used up. Try again tomorrow.",
+        "AI_STORE_BILLING_SUSPENDED": "Smart tools are paused until your subscription is paid. Pay from the Billing page to turn them back on.",
         "AI_RATE_LIMITED": "Busy right now. Try this file again in a minute.",
         "AI_NOT_CONFIGURED": "Smart tools are not available right now.",
         "AI_UPSTREAM_ERROR": "Could not read this file. Try again.",
@@ -5525,7 +5527,7 @@
       "backToSettings": "Back to Settings",
       "manageRedirects": "Open redirects",
       "redirectsTitle": "Slug Redirects",
-      "redirectsSubtitle": "Old URLs that 301-redirect to a renamed product, category, or blog post.",
+      "redirectsSubtitle": "Old URLs that permanently (308) redirect to a renamed product, category, or blog post.",
       "redirectsFromSlug": "From",
       "redirectsToSlug": "To",
       "redirectsEntityType": "Type",
@@ -6617,6 +6619,7 @@
     },
     "guestCheckout": {
       "notTracked": "Not tracked for guest checkout",
+      "abandonedExplainer": "Abandoned carts are not recorded for guest checkout, so these figures are unavailable. Only registered customers' carts appear here.",
       "registeredOnly": "Registered customers only",
       "checkoutsTableNote": "Checkouts started are not tracked for guest checkout — those days show “—” instead of 0."
     },
@@ -7152,7 +7155,8 @@
       "couldntLoad": "Couldn't load",
       "lowStockScanNow": "Send low-stock alert now",
       "lowStockScanQueued": "Low-stock scan queued — the owner is emailed if any product newly dropped low",
-      "lowStockScanFailed": "Couldn't start the low-stock scan"
+      "lowStockScanFailed": "Couldn't start the low-stock scan",
+      "stockValueNoCost": "The value is zero because no cost price is entered for the products. Add the cost on each product so stock value can be calculated."
     },
     "inventory": {
       "title": "Inventory",
@@ -7254,14 +7258,16 @@
         "reconcileAction": "Approve differences"
       },
       "cameraPermission": "Allow camera access to scan barcodes, or enter manually below.",
-      "cameraNotSupported": "Camera scanning not supported in this browser. Use manual entry.",
+      "cameraNotSupported": "This device has no camera access for scanning. Use manual entry.",
+      "cameraEngineLoading": "Preparing the scanner…",
+      "cameraEngineFailed": "Could not load the scanner. Check your connection and try again, or enter the barcode manually.",
       "startCamera": "Start Camera",
       "stopCamera": "Stop Camera",
       "helpTitle": "What this page does",
       "helpReceive": "Scan a product barcode and enter a quantity to record incoming stock (a delivery from a supplier).",
       "helpPick": "Load an order by its number, then scan each item to mark it picked and track fulfillment.",
       "helpCount": "Run a cycle count: scan items on a shelf and enter the counted quantity — the system auto-adjusts any difference from the recorded stock.",
-      "helpCamera": "Camera scanning works in Chrome (Android/desktop) and Safari on iPhone (iOS 17+). On other browsers, type the barcode manually. Products must have a barcode set to be found.",
+      "helpCamera": "Camera scanning works on iPhone, Android and desktop, in the browser or the installed app. The first scan loads the scanner, which can take a few seconds. If the camera is blocked, allow it in your device settings, or type the barcode manually. Products must have a barcode set to be found.",
       "scanWithCamera": "Scan with camera",
       "pickChangeOrder": "Change",
       "colItem": "Item",
@@ -8010,7 +8016,9 @@
     "seePlansCta": "See plans",
     "contactCta": "Talk to us",
     "requiresFeature": "Requires the “{feature}” feature.",
-    "alsoIncluded": "Also included in this plan"
+    "alsoIncluded": "Also included in this plan",
+    "noSoldPlan": "This feature is not part of a plan you can buy. Our team switches it on for a single store, so get in touch if you need it.",
+    "contactOnlyCta": "Talk to our team"
   },
   "aiTools": {
     "title": "AI tools",
@@ -8626,7 +8634,7 @@
       "not_trialing": "Not on a trial",
       "no_order": "No order yet",
       "opted_out": "You unsubscribed",
-      "store_not_active": "Store not active",
+      "store_not_active": "The store was not live when this was due (not activated yet or suspended), so it was skipped",
       "no_recipient": "No owner email",
       "ENQUEUE_FAILED": "The email could not be queued",
       "unsubscribed_by_link": "Unsubscribed from an email link"
@@ -9509,15 +9517,19 @@
     "stubPay": "Simulate success",
     "stubDecline": "Simulate decline",
     "trial": {
-      "title": "Plan & trial",
+      "title": "Your plan and renewal",
       "chosenPlan": "Chosen plan",
       "nextCharge": "Next charge",
       "nextChargeLine": "{amount} ({interval}) for {plan} on {date}",
       "nextChargeNoAmount": "{plan} on {date}",
       "instapayDue": "Payment due",
       "instapayDueLine": "InstaPay payment due by {date}: {amount} ({interval}) for {plan}",
+      "switchingInterval": "Switching to {interval} billing from {date}, once your payment is confirmed",
       "instapayDueNoAmount": "InstaPay payment due by {date} for {plan}",
-      "returnsToFree": "Your plan returns to Free if it is not paid by then."
+      "returnsToFree": "Your plan returns to Free if it is not paid by then.",
+      "nextRenewal": "Next renewal",
+      "renewalLine": "Next renewal on {date}: {amount} {interval} for {plan}",
+      "renewalNoAmount": "Next renewal on {date} for {plan}"
     },
     "pay": {
       "title": "Payment method",
@@ -9545,7 +9557,8 @@
       "claimSent": "Thanks. The Ebda Store team will review your transfer and activate your plan once it is confirmed.",
       "instapayUnavailable": "InstaPay is not available right now",
       "instapayFailed": "We could not set up InstaPay",
-      "reviewerNote": "The Ebda Store team will review your transfer. Nothing changes until it is confirmed."
+      "reviewerNote": "The Ebda Store team will review your transfer. Nothing changes until it is confirmed.",
+      "instapayRenewalNote": "Nothing is due right now. We remind you before the renewal date, and the transfer details and receipt upload appear here then."
     },
     "claims": {
       "title": "Payment confirmations",
@@ -10105,6 +10118,7 @@
         "nextCharge": "Next charge",
         "action": "Action"
       },
+      "switchingTo": "switching to {interval}",
       "interval": {
         "monthly": "monthly",
         "yearly": "annual"
