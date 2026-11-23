@@ -7,8 +7,13 @@
  * (`/api/v1/*`, the route handler in app/api/v1/[...path]/route.ts) and these helpers make the relay safe:
  *  - the cookies the API sets are re-issued HOST-ONLY (no Domain) and `SameSite=Lax`, so they are first-party
  *    on whichever host served the storefront (custom domain or <slug>.ebda.app);
- *  - only the two session cookies go upstream, and `Origin` is the storefront's own origin so the API's
- *    store-binding / CORS-TB / CSRF rules see the same caller they always did.
+ *  - only the two session cookies go upstream. `Origin` is the BROWSER's own Origin when it sent one, so a cross-site
+ *    caller is still seen as cross-site by the API's CORS / CSRF / store-binding rules (replacing it with the storefront's
+ *    origin would have laundered every cross-site request into a same-site one). A request with no Origin (a same-origin
+ *    GET) gets the storefront's own origin, as before.
+ *  - the relayed request carries `x-ebda-proxy-hop`: the API's signed-client-address rule (apps/api/src/cf/ssr-client-ip.ts)
+ *    widens to it. That widening, and any rate-limit exemption built on it (#727), must stay limited to anonymous READS;
+ *    a relayed write such as sign-in is never exempt.
  */
 
 /** The only cookies relayed to the API. */
@@ -80,7 +85,7 @@ export function buildUpstreamHeaders(incoming: Headers, storefrontOrigin: string
   });
   const cookie = filterSessionCookies(incoming.get('cookie'));
   if (cookie) out.set('cookie', cookie);
-  out.set('origin', storefrontOrigin);
+  out.set('origin', incoming.get('origin') || storefrontOrigin);
   // Widens the API's signed-client-address rule to this relayed browser request (apps/api/src/cf/ssr-client-ip.ts).
   out.set('x-ebda-proxy-hop', '1');
   return out;

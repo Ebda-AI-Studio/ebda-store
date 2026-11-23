@@ -52,7 +52,7 @@ describe('rewriteSetCookie', () => {
 });
 
 describe('upstream request building', () => {
-  it('relays only the two session cookies and names the storefront as Origin', () => {
+  it('relays only the two session cookies and forwards the browser Origin (cross-site stays cross-site)', () => {
     const h = new Headers({
       cookie: 'force-language=ar; token=A; _ga=1; refresh_token=R',
       'x-forwarded-for': '1.2.3.4',
@@ -63,13 +63,23 @@ describe('upstream request building', () => {
     });
     const up = buildUpstreamHeaders(h, 'https://ameliaaurum.com');
     expect(up.get('cookie')).toBe('token=A; refresh_token=R');
-    expect(up.get('origin')).toBe('https://ameliaaurum.com');
+    expect(up.get('origin')).toBe('https://evil.example');
     expect(up.get('x-session-id')).toBe('s1');
     expect(up.get('x-csrf-token')).toBe('c1');
     expect(up.has('x-forwarded-for')).toBe(false);
     expect(up.has('cf-connecting-ip')).toBe(false);
     expect(up.get('x-ebda-proxy-hop')).toBe('1');
     expect(filterSessionCookies('a=1; b=2')).toBeNull();
+    // a same-origin request that carries no Origin is named as the storefront, and a same-origin one keeps its own
+    expect(buildUpstreamHeaders(new Headers(), 'https://ameliaaurum.com').get('origin')).toBe(
+      'https://ameliaaurum.com'
+    );
+    expect(
+      buildUpstreamHeaders(
+        new Headers({ origin: 'https://ameliaaurum.com' }),
+        'https://ameliaaurum.com'
+      ).get('origin')
+    ).toBe('https://ameliaaurum.com');
   });
 });
 
@@ -192,6 +202,20 @@ describe.each(HOSTS)('account flow on a %s (%s)', (_label, host) => {
       }),
       { params: Promise.resolve({ path: path.replace(/^\//, '').split('?')[0]!.split('/') }) }
     );
+
+  it('through the route: a cross-site Origin reaches the API unchanged, a missing one is the storefront', async () => {
+    const seen: Upstream = [];
+    installUpstream(seen);
+    const jar = new Jar(host);
+    await call(POST, '/auth/login', jar, {
+      method: 'POST',
+      body: '{}',
+      headers: { origin: 'https://evil.example' },
+    });
+    await call(GET, '/auth/me', jar);
+    expect(seen[0]!.headers.get('origin')).toBe('https://evil.example');
+    expect(seen[1]!.headers.get('origin')).toBe(`https://${host}`);
+  });
 
   it('sign in -> open account -> reload -> still signed in; refresh keeps it; cookies are first-party', async () => {
     const seen: Upstream = [];
