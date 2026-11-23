@@ -35,7 +35,10 @@ vi.mock('@api/middleware/store-access', () => ({
     next();
   },
 }));
-vi.mock('@api/middleware/security', () => ({ auditLog: m.audit }));
+vi.mock('@api/middleware/security', () => ({
+  auditLog: m.audit,
+  adminReadLimiter: (_q: unknown, _s: unknown, n: () => void) => n(),
+}));
 vi.mock('@api/lib/repo-factory', () => ({
   storeDb: async () => ({ auditLog: { findMany: m.findMany } }),
 }));

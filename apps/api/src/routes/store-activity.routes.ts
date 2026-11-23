@@ -15,7 +15,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
-import { auditLog } from '../middleware/security';
+import { adminReadLimiter, auditLog } from '../middleware/security';
 import { storeDb } from '../lib/repo-factory';
 import { getAccountsBrief } from '../lib/identity-client';
 import { maskEmail, maskIp, maskPhone, scrubEmails } from '../lib/pii-mask';
@@ -79,6 +79,8 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // per-user read limit (GETs skip the global mutation limiter; CodeQL js/missing-rate-limiting)
+  adminReadLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = querySchema.safeParse(req.query);

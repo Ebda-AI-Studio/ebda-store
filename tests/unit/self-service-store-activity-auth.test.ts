@@ -46,7 +46,10 @@ vi.mock('@api/lib/identity-client', () => ({
 vi.mock('@api/middleware/require-mfa', () => ({
   requireMfaEnrolled: (_q: any, _s: any, n: any) => n(),
 }));
-vi.mock('@api/middleware/security', () => ({ auditLog: m.audit }));
+vi.mock('@api/middleware/security', () => ({
+  auditLog: m.audit,
+  adminReadLimiter: (_q: unknown, _s: unknown, n: () => void) => n(),
+}));
 vi.mock('@api/services/platform/access-d1', () => ({
   onAccessD1: async () => false,
   gateRead: async () => ({ store: null, isStaff: false }),
