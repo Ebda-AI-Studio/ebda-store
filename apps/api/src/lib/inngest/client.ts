@@ -187,6 +187,17 @@ type InsightsRollupRequestedEvent = EventPayload & {
   };
 };
 
+type InsightsFunnelBackfillRequestedEvent = EventPayload & {
+  name: 'insights/funnel-backfill-requested';
+  data: {
+    storeId: string;
+    /** How many Cairo days back to check (1..400, default 90). */
+    daysBack?: number;
+    /** false/absent = DRY RUN (report only); true = rewrite the days whose stored revenue differs. */
+    apply?: boolean;
+  };
+};
+
 type ShipmentCreateRequestedEvent = EventPayload & {
   name: 'shipment/create.requested';
   data: {
@@ -428,6 +439,7 @@ export type AppEvent =
   | AccountingExpenseOcrProcessEvent
   | InstapayReceiptExtractEvent
   | InsightsRollupRequestedEvent
+  | InsightsFunnelBackfillRequestedEvent
   | PaymentWebhookReceivedEvent
   | ShipmentCreateRequestedEvent
   | BulkAiBalanceDescriptionsEvent

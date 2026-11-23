@@ -57,7 +57,7 @@ import { fromMinor, getLook, model3dSwatchColor } from '@ebda/shared';
 import { Model3dToggle, ProductModel3dPanel } from '../../../components/ProductModel3d';
 import { captureEvent } from '../../../components/PostHogProvider';
 import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
-import { REGION } from '@ebda/shared';
+import { REGION, catalogueItemId } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { InstalmentLine } from '../../../components/commerce/InstalmentLine';
@@ -384,6 +384,8 @@ export default function ProductDetailClient({
     if (initialProduct && product) {
       trackViewContent({
         contentId: product.id,
+        // a variant product is viewed as a GROUP (the feed's item_group_id); a simple product is its own item
+        contentType: (product.variants?.length ?? 0) > 0 ? 'product_group' : 'product',
         contentName: product.name,
         contentCategory: product.categories?.[0]?.category?.name,
         value: fromMinor(product.price),
@@ -432,6 +434,7 @@ export default function ProductDetailClient({
           // Fire ViewContent pixel event when product data is ready
           trackViewContent({
             contentId: loadedProduct.id,
+            contentType: (loadedProduct.variants?.length ?? 0) > 0 ? 'product_group' : 'product',
             contentName: loadedProduct.name,
             contentCategory: loadedProduct.categories?.[0]?.category?.name,
             value: fromMinor(loadedProduct.price),
@@ -556,7 +559,8 @@ export default function ProductDetailClient({
     if (!added) return;
 
     trackAddToCart({
-      contentId: product.id,
+      // THE catalogue item id: the chosen variant's id, else the product's - what the Google/Meta/TikTok feed `id` is
+      contentId: catalogueItemId({ productId: product.id, variantId: selectedVariant?.id }),
       contentName: product.name,
       quantity,
       value: fromMinor(selectedVariant ? selectedVariant.price : product.price),
