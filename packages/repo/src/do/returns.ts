@@ -482,12 +482,22 @@ export interface ReturnCreateArgs {
   /**
    * STORE-QA-76: the MERCHANT opens this return from the admin (a phone request, a partial refund). The order's own customer
    * is used (no customer match), the customer-facing return window does not bind the merchant's own decision, and the item
-   * list may carry a per-line `restock` choice. Never set from a shopper-facing route. A guest order (no customer) is refused
-   * until the nullable-customer return lands (GUEST-RET-1).
+   * list may carry a per-line `restock` choice. Never set from a shopper-facing route. A guest order (no customer) is allowed:
+   * `returns.customer_id` is NOT NULL, so the row carries the `guest:<orderId>` marker (GUEST-RET-1); it matches no account.
    */
   byMerchant?: boolean;
   now?: number;
 }
+
+/**
+ * `returns.customer_id` is NOT NULL and a guest order has no account, so a merchant-opened return on a guest order stores this
+ * marker (never a users.id: no wallet, no loyalty, no socket/email recipient is ever resolved from it).
+ */
+const GUEST_RETURN_PREFIX = 'guest:';
+export const guestReturnCustomerId = (orderId: string): string =>
+  `${GUEST_RETURN_PREFIX}${orderId}`;
+export const isGuestReturnCustomer = (customerId: unknown): boolean =>
+  typeof customerId === 'string' && customerId.startsWith(GUEST_RETURN_PREFIX);
 
 /** return_items.condition marker: the merchant chose not to restock this line (damaged / not resellable). */
 const NO_RESTOCK_CONDITION = 'no_restock';
@@ -537,13 +547,11 @@ export function createReturn(db: SyncSql, a: ReturnCreateArgs): { returnId: stri
     )[0];
     if (!o)
       throw new MoneyError('INVALID_ORDER', 'Order not found or not eligible for return', 400);
-    if (a.byMerchant && typeof o.customer_id !== 'string')
-      throw new MoneyError(
-        'GUEST_ORDER_RETURN_UNSUPPORTED',
-        'This order was placed as a guest; a return cannot be opened for it yet.',
-        409
-      );
-    const returnCustomerId = a.byMerchant ? (o.customer_id as string) : (a.customerId as string);
+    const returnCustomerId = a.byMerchant
+      ? typeof o.customer_id === 'string'
+        ? o.customer_id
+        : guestReturnCustomerId(o.id as string)
+      : (a.customerId as string);
     const lines = orderLines(db, o.id as string);
 
     // the merchant's published return window binds the seller (evaluateReturnWindow)
@@ -1012,6 +1020,13 @@ function planReturn(
   }));
   const isInventoryRestoring = type === 'return' || type === 'refund';
   const isGatewayRefund = GATEWAY_REFUND_METHODS.includes(refundMethod);
+  // a guest has no wallet to credit: store credit cannot be the refund method (cash / bank / manual / the gateway can)
+  if (isGuestReturnCustomer(ret.customer_id) && refundMethod === 'store_credit')
+    throw new MoneyError(
+      'GUEST_STORE_CREDIT',
+      'This order was placed as a guest and has no wallet, so it cannot be refunded as store credit. Choose cash, bank transfer or the original payment.',
+      409
+    );
 
   let isFullReturn = false;
   let lines: OrderLine[] = [];
@@ -1737,7 +1752,7 @@ export interface OrderRefundQuote {
   refundable: number;
   /** the provider of the newest captured payment (null: COD / unpaid), so the admin offers only the methods that can work */
   paymentProvider: string | null;
-  /** can a return be opened for this order right now (delivered, has a customer)? `reason` says why not */
+  /** can a return be opened for this order right now (delivered; a guest order is fine, GUEST-RET-1)? `reason` says why not */
   returnable: { ok: true } | { ok: false; reason: 'NOT_DELIVERED' | 'GUEST_ORDER' };
   lines: Array<{
     orderItemId: string;
@@ -1853,11 +1868,7 @@ export function quoteOrderRefund(
     refundable: Math.max(0, bal.refundable),
     paymentProvider: provider,
     returnable:
-      order.status !== 'delivered'
-        ? { ok: false, reason: 'NOT_DELIVERED' }
-        : order.customerId === null
-          ? { ok: false, reason: 'GUEST_ORDER' }
-          : { ok: true },
+      order.status !== 'delivered' ? { ok: false, reason: 'NOT_DELIVERED' } : { ok: true },
     lines: lines.map(l => ({
       orderItemId: l.id,
       productId: l.productId,
