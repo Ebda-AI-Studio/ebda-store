@@ -11,9 +11,9 @@ import { ReturnLifecycleTimeline } from '../../../../../components/return-timeli
 import { RETURN_COLORS } from './types';
 import type { ReturnItem, ReturnRecord } from './types';
 
-import { formatMoney } from '@ebda/shared';
+import { formatPrice } from '@/lib/format';
 function formatCurrency(amount: number) {
-  return formatMoney(amount, 'en', { fixedDecimals: true });
+  return formatPrice(amount);
 }
 
 export type ReturnDetailsEntry =

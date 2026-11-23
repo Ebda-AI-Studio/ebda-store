@@ -923,7 +923,6 @@ export interface MoneyClient {
   analyticsPeriod(a: { startMs: number; endMs: number; nonRevenue: string[] }): Promise<{
     revenue: number;
     orders: number;
-    customers: number;
     profit: number | null;
     costedLines: number;
     missingLines: number;
@@ -977,8 +976,12 @@ export interface MoneyClient {
     returningCustomers: number;
     top: Array<{ customerId: string | null; total: number; count: number }>;
   }>;
-  /** Paid orders since `sinceMs` grouped by the dashboard buyer key (insights repeat-purchase rate). */
-  analyticsRepeatBuyers(a: { sinceMs: number }): Promise<{ repeat: number; buyers: number }>;
+  /** Buyer identity rows (customer id, email, phone, order count) for the grouping-aware customer counts (QA98-ALIAS-1). */
+  analyticsBuyerIdentities(
+    a: { mode: 'all'; startMs: number; endMs: number } | { mode: 'paid'; sinceMs: number }
+  ): Promise<
+    Array<{ customerId: string | null; email: string | null; phone: string | null; n: number }>
+  >;
   analyticsStock(a: Record<string, never>): Promise<{
     stockValue: number;
     backorderCount: number;
@@ -1643,7 +1646,7 @@ export function makeMoneyClient(
     analyticsItems: a => call('analyticsItems', a),
     analyticsOrdersBy: a => call('analyticsOrdersBy', a),
     analyticsCustomers: a => call('analyticsCustomers', a),
-    analyticsRepeatBuyers: a => call('analyticsRepeatBuyers', a),
+    analyticsBuyerIdentities: a => call('analyticsBuyerIdentities', a),
     analyticsLowStock: a => call('analyticsLowStock', a),
     analyticsStock: a => call('analyticsStock', a),
     analyticsCashflow: a => call('analyticsCashflow', a),
