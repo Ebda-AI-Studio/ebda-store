@@ -19,6 +19,7 @@ const m = vi.hoisted(() => ({
   planFind: vi.fn(),
 }));
 
+vi.mock('@api/services/billing/addon-grant', () => ({ activeAddons: async () => [] }));
 vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn().mockResolvedValue(null), set: vi.fn(), delete: vi.fn() },
 }));

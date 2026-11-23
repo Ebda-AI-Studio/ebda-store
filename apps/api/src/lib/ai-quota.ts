@@ -1,4 +1,6 @@
-import { prisma } from '@ebda/database';
+import { prisma, withStore } from '@ebda/database';
+import { activeAddons } from '../services/billing/addon-grant';
+import { ADDON_CATALOG } from '../services/billing/addon-catalog';
 import { countAiUsage } from './definer';
 import { geminiKeyCount } from './ai/gemini-keys';
 import { AppError } from '../middleware/error-handler';
@@ -79,6 +81,78 @@ const DEFAULT_MONTHLY_REQUEST_CAP = 20000;
 const DEFAULT_STORE_DAILY_REQUEST_CAP = 150;
 
 /**
+ * The STORE's extra daily AI requests from running paid packs (SELF-SERVICE A9). Staleness class: NEVER-stale
+ * (entitlement) so it is NOT cached: one indexed ledger read per AI call, noise next to a model round trip, and a
+ * pack is usable the moment its payment settles. Only the per-store slice moves; the platform global daily/monthly
+ * caps below never read this, so a pack cannot spend the shared Gemini budget.
+ */
+export async function storeAiExtraRequests(storeId: string, now = new Date()): Promise<number> {
+  const running = await withStore(storeId, tx => activeAddons(tx, storeId, now));
+  return running.reduce((n, r) => n + (ADDON_CATALOG[r.sku]?.aiExtraRequests ?? 0), 0);
+}
+
+/** The platform's daily request cap (one Google project's ceiling, scaled by the Gemini keys unless set explicitly). */
+function platformDailyCap(): number {
+  return parseInt(
+    process.env.AI_DAILY_REQUEST_CAP ??
+      String(DEFAULT_DAILY_REQUEST_CAP * Math.max(1, geminiKeyCount())),
+    10
+  );
+}
+
+const pct = (env: string | undefined, dflt: number) => {
+  const n = parseInt(env ?? '', 10);
+  return Number.isFinite(n) && n > 0 && n <= 100 ? n : dflt;
+};
+
+/**
+ * Money-abuse audit P6: a pack raises ONE store's limit, but every call still draws on the SHARED platform pool, so one
+ * store on +1000 could drain the day for everyone (Business included). Two ceilings keep that impossible:
+ *  - a store's share: no store (pack or not) may spend more than AI_STORE_MAX_SHARE_PCT (default 50) of the platform day;
+ *  - a pool reserve: requests funded by a pack (past the store's base slice) stop once the platform has used
+ *    AI_TOPUP_POOL_CEILING_PCT (default 70) of its day, so the last 30% stays for base-slice calls of every store.
+ * What cannot be delivered is not sold (`quoteAddon` refuses) and the meter shows the deliverable number.
+ */
+export function maxStoreDailyRequests(): number {
+  const share = Math.floor(
+    (platformDailyCap() * pct(process.env.AI_STORE_MAX_SHARE_PCT, 50)) / 100
+  );
+  return Math.max(baseStoreDailyCap(), share);
+}
+
+function topupPoolCeiling(): number {
+  return Math.floor((platformDailyCap() * pct(process.env.AI_TOPUP_POOL_CEILING_PCT, 70)) / 100);
+}
+
+function baseStoreDailyCap(): number {
+  return parseInt(
+    process.env.AI_STORE_DAILY_REQUEST_CAP ?? String(DEFAULT_STORE_DAILY_REQUEST_CAP),
+    10
+  );
+}
+
+/** The multiplier a paid pack puts on the store's own daily limits (1 with no pack); the token budget scales by it. */
+export async function storeAiCapFactor(storeId: string): Promise<number> {
+  return 1 + (await storeAiExtraRequests(storeId)) / baseStoreDailyCap();
+}
+
+const countStoreUsage = (storeId: string, since: Date) =>
+  prisma.aiUsage.count({ where: { storeId, createdAt: { gte: since }, cachedHit: false } });
+
+/** What the merchant sees in AI settings: base cap, paid extra, used today, remaining. */
+export async function storeAiAllowance(storeId: string) {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const [extra, used] = await Promise.all([
+    storeAiExtraRequests(storeId),
+    countStoreUsage(storeId, startOfDay),
+  ]);
+  const baseCap = baseStoreDailyCap();
+  const cap = Math.min(baseCap + extra, maxStoreDailyRequests());
+  return { baseCap, extra, cap, used, remaining: Math.max(0, cap - used) };
+}
+
+/**
  * Enforce the platform AI request caps BEFORE spending a Gemini call.
  *
  * Layers (checked in order):
@@ -118,41 +192,46 @@ export async function assertAiQuota(
   // one statement; a per-store fan-out would cost a transaction per store on
   // every AI call. Same precedent as answer-engine/budget.ts.
   // The per-store slice stays on the ambient path — it IS store-filtered.
-  const [[today, thisMonth], storeToday] = await Promise.all([
+  const [[today, thisMonth], storeToday, storeExtra] = await Promise.all([
     Promise.all([
       countAiUsage({ since: startOfDay, cachedHit: false }),
       countAiUsage({ since: startOfMonth, cachedHit: false }),
     ]),
-    opts.storeId
-      ? prisma.aiUsage.count({
-          where: { storeId: opts.storeId, createdAt: { gte: startOfDay }, cachedHit: false },
-        })
-      : Promise.resolve(0),
+    opts.storeId ? countStoreUsage(opts.storeId, startOfDay) : Promise.resolve(0),
+    opts.storeId ? storeAiExtraRequests(opts.storeId) : Promise.resolve(0),
   ]);
 
   // The default daily cap models ONE Google project's free ceiling. Each extra
   // Gemini key is a separate project with its own quota (GEMINI-FAILOVER-1), so
   // the DEFAULT scales with the key count; an explicit AI_DAILY_REQUEST_CAP is
   // taken as the operator's total and is never scaled.
-  const dailyCap = parseInt(
-    process.env.AI_DAILY_REQUEST_CAP ??
-      String(DEFAULT_DAILY_REQUEST_CAP * Math.max(1, geminiKeyCount())),
-    10
-  );
+  const dailyCap = platformDailyCap();
   const monthlyCap = parseInt(
     process.env.AI_MONTHLY_REQUEST_CAP ?? String(DEFAULT_MONTHLY_REQUEST_CAP),
     10
   );
-  const storeDailyCap = parseInt(
-    process.env.AI_STORE_DAILY_REQUEST_CAP ?? String(DEFAULT_STORE_DAILY_REQUEST_CAP),
-    10
-  );
+  const storeDailyCap = Math.min(baseStoreDailyCap() + storeExtra, maxStoreDailyRequests());
 
   if (opts.storeId && storeToday >= storeDailyCap) {
     throw new AppError(
       429,
       AI_QUOTA_STORE_DAILY_CODE,
-      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC.`
+      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC. Need more? Buy a request pack in Billing > Add-ons.`
+    );
+  }
+
+  // A call past the base slice is funded by a pack: it may only use the pool while the pool is not nearly spent, so a
+  // top-up can never starve the base-slice calls of other stores.
+  if (
+    opts.storeId &&
+    storeExtra > 0 &&
+    storeToday >= baseStoreDailyCap() &&
+    today >= topupPoolCeiling()
+  ) {
+    throw new AppError(
+      429,
+      AI_QUOTA_DAILY_CODE,
+      `The shared AI capacity is busy (${today}/${dailyCap}), so top-up requests pause until it eases or resets at 00:00 UTC.`
     );
   }
 

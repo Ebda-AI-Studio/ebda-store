@@ -89,6 +89,9 @@ import {
   sweepFreeMonthGrants,
 } from './grants.service';
 import { assertPayableStore, isBillableStoreId, suspendForBilling } from './account.service';
+import { applyAddonGrant, replaceQueuedTerms } from './addon-grant';
+import { ADDON_MARKER_PREFIX, ADDON_PLAN_PREFIX, skuOfPlanCode } from './addon-catalog';
+import { renewDueAddons } from './addon-renewal';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
@@ -190,7 +193,7 @@ function vatColumns(charge: ChargeAmount | undefined) {
  * already claimed (another run / a retry): the caller must NOT call the provider.
  * `ON CONFLICT DO NOTHING` — a duplicate never aborts the surrounding tx.
  */
-async function claimEvent(input: ClaimInput): Promise<string | null> {
+export async function claimEvent(input: ClaimInput): Promise<string | null> {
   const id = crypto.randomUUID();
   const { count } = await withStore(input.storeId, tx =>
     tx.billingEvent.createMany({
@@ -220,7 +223,11 @@ async function claimEvent(input: ClaimInput): Promise<string | null> {
   return count === 1 ? id : null;
 }
 
-async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown): Promise<void> {
+export async function markFailedUnlessSettled(
+  id: string,
+  reason: string,
+  raw?: unknown
+): Promise<void> {
   await inEventStore(
     id,
     (tx, storeId) =>
@@ -273,6 +280,19 @@ async function applyPlan(tx: Tx, storeId: string, planCode: string): Promise<voi
   if (plan) await storeUpdate(tx, { where: { id: storeId }, data: { plan: plan.featureTier } });
 }
 
+/** A ledger row that bought an add-on or an AI pack (`upgrade` + `addon:<sku>`), not a plan. */
+function isAddonRow(row: { type: string; planCode: string | null }): boolean {
+  return row.type === 'upgrade' && !!row.planCode?.startsWith(ADDON_PLAN_PREFIX);
+}
+
+/**
+ * Zero-amount bookkeeping rows (`addon-cancel:` / `addon-resume:` here; `addon-grant:` / `addon-overlap:` up the stack)
+ * share `type: 'upgrade'` + `status: 'succeeded'` but are NOT payments: they must never read as a newer plan charge (B2).
+ */
+function isAddonMarkerRow(row: { planCode: string | null }): boolean {
+  return !!row.planCode?.startsWith(ADDON_MARKER_PREFIX);
+}
+
 async function applySuccess(
   tx: Tx,
   row: LedgerRow,
@@ -282,6 +302,11 @@ async function applySuccess(
 ): Promise<void> {
   if (row.type === 'card_setup') {
     await applyCardSaved(tx, row, o, now);
+    return;
+  }
+  if (isAddonRow(row)) {
+    // An add-on payment never touches the subscription (SELF-SERVICE A8/A9): it grants its own term.
+    await applyAddonGrant(tx, row, now, effects);
     return;
   }
   if (row.type === 'checkout' || row.type === 'upgrade') {
@@ -485,6 +510,10 @@ const SETTLE_LEASE_MS = 120_000;
  * notifications the interrupted attempt never sent.
  */
 async function healAppliedSuccess(tx: Tx, row: LedgerRow, effects: BillingEffect[]): Promise<void> {
+  if (isAddonRow(row)) {
+    effects.push({ kind: 'addon_granted', storeId: row.storeId });
+    return;
+  }
   const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
   const planCode = row.type === 'card_setup' ? null : (row.planCode ?? sub?.planCode ?? null);
   if (planCode) await applyPlan(tx, row.storeId, planCode);
@@ -499,6 +528,7 @@ async function healAppliedSuccess(tx: Tx, row: LedgerRow, effects: BillingEffect
 
 /** Did an earlier, interrupted settlement of this success already move the subscription? (D1 lease path only.) */
 async function alreadyApplied(tx: Tx, row: LedgerRow & { createdAt: Date }): Promise<boolean> {
+  if (isAddonRow(row)) return row.forPeriodEnd !== null; // the grant writes the term end; unset until granted
   const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
   if (!sub) return false;
   const started = sub.currentPeriodStart?.getTime();
@@ -690,7 +720,7 @@ async function settleDefinitive(eventId: string, o: Outcome, now: Date) {
 
 type ChargeAttempt = { settled: 'succeeded' | 'failed' } | { settled: 'pending'; reason?: string };
 
-async function chargeAndSettle(args: {
+export async function chargeAndSettle(args: {
   provider: BillingProvider;
   eventId: string;
   token: string;
@@ -1405,6 +1435,11 @@ export async function runBillingCycle(
       logger.error({ err }, '[billing] stuck-charge sweep failed')
     );
   }
+  if (!only) {
+    await renewDueAddons(now, provider).catch(err =>
+      logger.error({ err }, '[billing] add-on renewal pass failed')
+    );
+  }
   const ids = await findDueSubscriptionIds(now, only);
   for (const id of ids) {
     summary.examined++;
@@ -1981,18 +2016,21 @@ async function confirmAndApplyWebhook(
  */
 async function endAccessForRefund(
   tx: Tx,
-  charge: { id: string; storeId: string; type: string; createdAt: Date },
+  charge: { id: string; storeId: string; type: string; createdAt: Date; planCode?: string | null },
   keepAccess: boolean,
   now: Date,
   effects: BillingEffect[]
 ): Promise<void> {
   if (keepAccess || !['checkout', 'renewal', 'upgrade'].includes(charge.type)) return;
+  // An add-on / AI-pack payment (`upgrade` + `addon:<sku>`) bought no plan period: refunding it never touches the plan
+  // (its entitlement is revoked by settleRefundInTx), and it is never the "newer charge" that owns the period.
+  if (isAddonRow({ type: charge.type, planCode: charge.planCode ?? null })) return;
   const { storeId } = charge;
   const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
   if (!sub || !['active', 'past_due', 'trialing'].includes(sub.status)) return;
   if (sub.planCode === FREE_PLAN_CODE || isGrantedPlan(sub.planCode)) return;
   // only the NEWEST paid charge can own the current period: an older one bought a period already used up
-  const newer = await tx.billingEvent.findFirst({
+  const newerRows = await tx.billingEvent.findMany({
     where: {
       storeId,
       id: { not: charge.id },
@@ -2000,9 +2038,9 @@ async function endAccessForRefund(
       status: { in: ['succeeded', 'refunded'] },
       createdAt: { gt: charge.createdAt },
     },
-    select: { id: true },
+    select: { id: true, type: true, planCode: true },
   });
-  if (newer) return;
+  if (newerRows.some(r => !isAddonRow(r) && !isAddonMarkerRow(r))) return;
   // the free months this payment earned go too (FOUNDING-3)
   await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', now, storeId);
   await downgradeToFree(tx, storeId, 'canceled', effects);
@@ -2048,6 +2086,13 @@ async function settleRefundInTx(
     // referrer in another tenant is restored by restoreRevokedGrants / the daily sweep).
     if (flipped.count === 1) {
       await revokeGrantsForEvent(tx, charge.id, 'payment_refunded', new Date(), storeId);
+      // A refunded add-on stops being an entitlement AT ONCE: drop the cached feature map (NEVER-stale class).
+      if (isAddonRow(charge)) {
+        // A term queued behind the refunded one starts now instead of waiting for its end (F1).
+        const sku = skuOfPlanCode(charge.planCode);
+        if (sku) await replaceQueuedTerms(tx, storeId, sku, new Date());
+        effects?.push({ kind: 'addon_granted', storeId });
+      }
     }
   }
 }
@@ -2182,7 +2227,11 @@ const PUBLIC_FIELDS = {
 export async function listStoreCharges(storeId: string, limit = 50) {
   const rows = await withStore(storeId, tx =>
     tx.billingEvent.findMany({
-      where: { storeId },
+      // the append-only cancel / resume rows are bookkeeping, not charges
+      where: {
+        storeId,
+        OR: [{ planCode: null }, { NOT: { planCode: { startsWith: ADDON_MARKER_PREFIX } } }],
+      },
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(limit, 1), 200),
       select: PUBLIC_FIELDS,

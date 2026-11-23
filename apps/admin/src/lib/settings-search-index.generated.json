@@ -974,6 +974,16 @@
     "synAr": "باقة اشتراك ترقية فاتورة استخدام حدود"
   },
   {
+    "id": "page:/billing/addons",
+    "kind": "page",
+    "route": "/billing/addons",
+    "access": "owner",
+    "en": "Add-ons",
+    "ar": "الإضافات",
+    "synEn": "add-on addons buy feature widget wallet ai requests pack top up quota",
+    "synAr": "اضافة اضافات شراء ميزة زر عائم محفظة طلبات ذكاء اصطناعي باقة زيادة"
+  },
+  {
     "id": "page:/staff",
     "kind": "page",
     "route": "/staff",
