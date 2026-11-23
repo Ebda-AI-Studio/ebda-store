@@ -1,5 +1,6 @@
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { sendAlert } from './alerts.service';
 
 /** Expected refusals of a shopper closing their own account: a 409 with a plain ar + en message, never a 500. */
 export const CLOSURE_REFUSALS: Record<string, { en: string; ar: string }> = {
@@ -28,11 +29,15 @@ const both = (m: { en: string; ar: string }) => `${m.en} | ${m.ar}`;
  *     gone, so `lockIdentity` (status inactive + every session revoked) makes the account unable to sign in with half-erased
  *     data, and the caller gets a 503 that says so. A repeated closure replays safely (saved erasure scope + idempotent steps).
  */
-export async function runShopperErasure<E, I>(steps: {
-  erase: () => Promise<E>;
-  eraseIdentity: () => Promise<I>;
-  lockIdentity: () => Promise<unknown>;
-}): Promise<{ erase: E; identity: I }> {
+export async function runShopperErasure<E, I>(
+  ctx: { storeId: string; userId: string },
+  steps: {
+    erase: () => Promise<E>;
+    eraseIdentity: () => Promise<I>;
+    lockIdentity: () => Promise<unknown>;
+    alert?: typeof sendAlert;
+  }
+): Promise<{ erase: E; identity: I }> {
   let erase: E;
   try {
     erase = await steps.erase();
@@ -55,14 +60,21 @@ export async function runShopperErasure<E, I>(steps: {
         { err: second },
         '[auth.erase] identity erase failed twice; locking the account'
       );
-      await steps
+      const locked = await steps
         .lockIdentity()
-        .catch(err =>
-          logger.error(
-            { err },
-            '[auth.erase] P1: account could not be locked after a partial erase'
-          )
-        );
+        .then(() => true)
+        .catch(err => {
+          logger.error({ err }, '[auth.erase] account could not be locked after a partial erase');
+          return false;
+        });
+      // P1 with ids only (no other PII). The daily pending-erasure sweep retries the identity step until it lands.
+      void (steps.alert ?? sendAlert)({
+        level: 'p1',
+        source: 'auth.shopper-erasure',
+        title: 'Shopper closure stopped after the store erase',
+        body: `The identity erase failed twice (${locked ? 'account locked' : 'account NOT locked'}). The pending-erasure sweep will retry; if it alerts again, finish it from the merchant erase route.`,
+        context: { storeId: ctx.storeId, userId: ctx.userId },
+      }).catch(() => undefined);
       throw new AppError(503, 'ERASURE_INCOMPLETE', both(ERASURE_INCOMPLETE_MESSAGE));
     }
   }

@@ -2941,24 +2941,36 @@ export class AuthService {
       key && user.phone && (await phoneOnOwnOrder(storeId, userId, user.phone, db as never))
         ? key
         : undefined;
-    const { erase: doErase, identity: auth } = await runShopperErasure({
-      erase: () =>
-        doMoney.eraseShopper({
-          userId,
-          role: user.role,
-          email: user.email,
-          phone: user.phone,
-          smsPhoneKey: smsConsentPhoneKey(user.phone),
-          provenBuyerKey: provenKey ?? null,
-          actorId,
-          capWindowMs: SEND_CAP_WINDOW_MS,
-          // the shopper's own closure refuses while an order / return is in flight; the cron and the merchant route do not
-          refuseOpen: actorId === userId,
-        }),
-      eraseIdentity: () =>
-        client.call<{ erased: boolean; tokenVersion: number | null }>('eraseCustomer', { userId }),
-      lockIdentity: () => client.call('setStatus', { userId, status: 'inactive' }),
-    });
+    const { erase: doErase, identity: auth } = await runShopperErasure(
+      { storeId, userId },
+      {
+        erase: () =>
+          doMoney.eraseShopper({
+            userId,
+            role: user.role,
+            email: user.email,
+            phone: user.phone,
+            smsPhoneKey: smsConsentPhoneKey(user.phone),
+            provenBuyerKey: provenKey ?? null,
+            actorId,
+            capWindowMs: SEND_CAP_WINDOW_MS,
+            // the shopper's own closure refuses while an order / return is in flight; the cron and the merchant route do not
+            refuseOpen: actorId === userId,
+          }),
+        eraseIdentity: () =>
+          client.call<{ erased: boolean; tokenVersion: number | null }>('eraseCustomer', {
+            userId,
+          }),
+        // lock = inactive + every session revoked; the version is pushed so a live access token dies now, not at expiry
+        lockIdentity: async () => {
+          const r = await client.call<{ tokenVersion: number }>('setStatus', {
+            userId,
+            status: 'inactive',
+          });
+          await pushTokenVersion(userId, r.tokenVersion, 'auth.eraseAccount.lock-after-partial');
+        },
+      }
+    );
     if (auth.tokenVersion !== null)
       await pushTokenVersion(userId, auth.tokenVersion, 'auth.eraseAccount.revoke-sessions');
     // The stale Postgres copy of the same person goes too (queued + P1 if Postgres is unreachable).

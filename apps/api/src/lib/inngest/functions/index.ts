@@ -23,6 +23,7 @@ import {
   searchLogPurge,
   instapayReceiptRetention,
   softDeletedUserAnonymize,
+  pendingErasureSweep,
   orderAnonymizeAtFiveYears,
 } from './data-retention';
 import { alertsFailureWatch } from './alerts-failure-watch';
@@ -134,6 +135,7 @@ const allInngestFunctions: JobDef[] = [
   searchLogPurge,
   instapayReceiptRetention,
   softDeletedUserAnonymize,
+  pendingErasureSweep,
   orderAnonymizeAtFiveYears,
   alertsFailureWatch,
   gmailAlertPoller,

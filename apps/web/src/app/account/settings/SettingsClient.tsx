@@ -7,6 +7,8 @@ import { api, type SmsConsentResponse } from '@/lib/api';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import PasskeysCard from '../../../components/PasskeysCard';
+import { useWallet } from '../../../hooks/useWallet';
+import { useLocalePrice } from '../../../hooks/useLocalePrice';
 
 interface User {
   id: string;
@@ -20,6 +22,10 @@ export default function SettingsClient() {
   const router = useRouter();
   const { t } = useLanguage();
   const storeUrl = useStoreUrl();
+  const { wallet } = useWallet();
+  const money = useLocalePrice();
+  const walletBalance = wallet?.balance ?? 0;
+  const [forfeitAck, setForfeitAck] = useState(false);
   const [, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -255,6 +261,29 @@ export default function SettingsClient() {
     }
   }
 
+  /** The API answers a closure refusal with a stable code; the text is chosen here, in the shopper's language. */
+  function closeAccountError(code: string | undefined): string {
+    switch (code) {
+      case 'ACCOUNT_HAS_OPEN_ORDERS':
+        return t(
+          'You still have an order in progress. Close your account after it is delivered or cancelled.',
+          'لسه عندك طلب شغال. اقفل حسابك بعد ما يوصلك أو يتلغي.'
+        );
+      case 'ACCOUNT_HAS_OPEN_RETURN':
+        return t(
+          'You still have a return or refund in progress. Close your account once it is settled.',
+          'لسه عندك مرتجع أو استرداد جاري. اقفل حسابك بعد ما يخلص.'
+        );
+      case 'ERASURE_INCOMPLETE':
+        return t(
+          'We could not finish closing your account. It is locked and the closure will be completed shortly. Contact support if it is not.',
+          'معرفناش نكمّل قفل حسابك. الحساب اتقفل مؤقتًا وهنكمّل القفل خلال وقت قصير. كلّم الدعم لو ما اتكملش.'
+        );
+      default:
+        return t('Failed to delete account. Please try again.', 'حذف الحساب منفعش. جرّب تاني.');
+    }
+  }
+
   async function handleDeleteAccount() {
     setIsDeleting(true);
     setMessage(null);
@@ -278,22 +307,16 @@ export default function SettingsClient() {
         // Redirect to home after account deletion
         router.push(storeUrl('/'));
       } else {
-        toastError(
-          t('Delete failed', 'فشل الحذف'),
-          result.error?.message ||
-            t('Failed to delete account. Please try again.', 'حذف الحساب منفعش. جرّب تاني.')
-        );
-        setMessage({
-          type: 'error',
-          text: result.error?.message || 'Failed to delete account. Please try again.',
-        });
+        const text = closeAccountError(result.error?.code);
+        toastError(t('Delete failed', 'فشل الحذف'), text);
+        setMessage({ type: 'error', text });
       }
     } catch {
       toastError(
         t('Delete failed', 'فشل الحذف'),
         t('Failed to delete account. Please try again.', 'حذف الحساب منفعش. جرّب تاني.')
       );
-      setMessage({ type: 'error', text: 'Failed to delete account. Please try again.' });
+      setMessage({ type: 'error', text: closeAccountError(undefined) });
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -562,7 +585,10 @@ export default function SettingsClient() {
             </div>
             <Button
               variant="destructive"
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={() => {
+                setForfeitAck(false);
+                setShowDeleteConfirm(true);
+              }}
               isLoading={isDeleting}
             >
               {t('Delete Account', 'حذف الحساب')}
@@ -584,6 +610,23 @@ export default function SettingsClient() {
                 'اسمك وبريدك الإلكتروني وتليفونك وعناوينك هيتخفوا نهائي. سجلات طلباتك القديمة (من غير بيانات شخصية) هتفضل موجودة عشان الالتزامات الضريبية حسب القانون. وهنخرّجك من حسابك على طول. الخطوة دي مالهاش رجوع.'
               )}
             </p>
+            {walletBalance > 0 && (
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-destructive/40 p-3">
+                <input
+                  type="checkbox"
+                  checked={forfeitAck}
+                  onChange={e => setForfeitAck(e.target.checked)}
+                  disabled={isDeleting}
+                  className="mt-0.5 h-6 w-6 shrink-0 rounded border-input accent-primary focus:ring-2 focus:ring-primary"
+                />
+                <span className="text-sm text-foreground">
+                  {t(
+                    `Your remaining wallet balance of ${money(walletBalance)} will be forfeited and cannot be refunded or recovered. I understand and accept this.`,
+                    `رصيد المحفظة المتبقي ${money(walletBalance)} هيضيع ومش هيتردّ ولا هيترجّع. أنا فاهم وموافق.`
+                  )}
+                </span>
+              </label>
+            )}
             <div className="mt-6 flex items-center justify-end gap-3">
               <Button
                 variant="outline"
@@ -592,7 +635,12 @@ export default function SettingsClient() {
               >
                 {t('Cancel', 'إلغاء')}
               </Button>
-              <Button variant="destructive" onClick={handleDeleteAccount} isLoading={isDeleting}>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAccount}
+                isLoading={isDeleting}
+                disabled={walletBalance > 0 && !forfeitAck}
+              >
                 {t('Delete Account', 'حذف الحساب')}
               </Button>
             </div>

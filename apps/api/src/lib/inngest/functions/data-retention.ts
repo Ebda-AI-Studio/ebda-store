@@ -10,6 +10,7 @@ import { postgresRemovedOnThisWorker } from '../../postgres-present';
 import logger from '../../logger';
 import { shippingAddressNotAnonymized } from './order-anonymize-where';
 import { inngest } from '../client';
+import { sweepPendingErasures } from '../../../services/pending-erasure-sweep';
 import { auditLog } from '../../../middleware/security';
 import {
   purgeSearchLogAcrossStores,
@@ -377,4 +378,40 @@ export const orderAnonymizeAtFiveYears: JobDef = inngest.createFunction(
     );
     return { anonymized, failed };
   }
+);
+
+/**
+ * Shopper closures that stopped after the store half (the identity step failed twice and the account was locked): retried
+ * daily until the sign-in record is erased, with per-user backoff and a P1 from the third failed sweep (PDPL: nothing may wait on
+ * a human noticing). The same erasure the closure and the retention cron run; every step is idempotent.
+ */
+export const pendingErasureSweep: JobDef = inngest.createFunction(
+  {
+    id: 'pending-erasure-sweep-daily',
+    name: 'Finish shopper closures that stopped half-way',
+    retries: 1,
+    triggers: [{ cron: '30 3 * * *' }],
+  },
+  async ({ step }) =>
+    step.run('sweep', () =>
+      sweepPendingErasures({
+        storeIds: () => doStoreIdList(),
+        list: async storeId => {
+          const route = await customerAuthRoute(storeId, { write: false });
+          return route.kind === 'do'
+            ? route.client.call<Array<{ userId: string; tries: number }>>('pendingErasures', {
+                limit: 100,
+              })
+            : [];
+        },
+        erase: (storeId, userId) =>
+          AuthService.eraseAccount(userId, { actorId: 'system', storeHint: storeId }),
+        note: async (storeId, userId, ok) => {
+          const route = await customerAuthRoute(storeId, { write: true });
+          return route.kind === 'do'
+            ? route.client.call<{ tries: number }>('noteErasureRetry', { userId, ok })
+            : { tries: 0 };
+        },
+      })
+    )
 );
