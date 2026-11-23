@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPut, apiDelete, apiPatch } from '@/lib/api';
 import {
-  PLAN_LABELS,
-  isInBaseline,
   getSuperAdminFeatures,
+  publicPlanForStorePlan,
   type StorePlan,
   type FeatureKey,
   type FeatureCategory,
@@ -18,7 +17,8 @@ import {
 import { ToggleSwitch } from './_components/ToggleSwitch';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';
-import { SubscriptionPlanRow } from '@/components/billing/SubscriptionPlanRow';
+import { SubscriptionPlanRow, useStorePlan } from '@/components/billing/SubscriptionPlanRow';
+import { featureTriState, type TriState } from '@/lib/feature-state';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,27 +43,6 @@ interface StoreInfo {
   status: 'active' | 'suspended' | string;
 }
 
-type TriState = 'baseline_on' | 'override_on' | 'override_off' | 'baseline_off';
-
-function triState(
-  plan: StorePlan,
-  key: FeatureKey,
-  overrideRow: OverrideMetadata | undefined
-): TriState {
-  const inBaseline = isInBaseline(plan, key);
-  if (overrideRow !== undefined) {
-    if (overrideRow.enabled) {
-      // Row exists and is enabled
-      return inBaseline ? 'baseline_on' : 'override_on';
-    } else {
-      // Row exists and is disabled
-      return inBaseline ? 'override_off' : 'baseline_off';
-    }
-  }
-  // No override row
-  return inBaseline ? 'baseline_on' : 'baseline_off';
-}
-
 const CATEGORY_ORDER: FeatureCategory[] = [
   'commerce',
   'marketing',
@@ -76,10 +55,8 @@ import { formatDate } from '@/lib/format';
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
-function TriStateBadge({ state, plan }: { state: TriState; plan: StorePlan }) {
+function TriStateBadge({ state, planLabel }: { state: TriState; planLabel: string }) {
   const t = useT('features.matrix');
-  const locale = useLocale();
-  const planLabel = locale === 'ar' ? PLAN_LABELS[plan].ar : PLAN_LABELS[plan].en;
   const configs: Record<TriState, { color: string; dot: string; label: string }> = {
     baseline_on: {
       color:
@@ -119,33 +96,38 @@ function TriStateBadge({ state, plan }: { state: TriState; plan: StorePlan }) {
 
 interface FeatureRowProps {
   def: FeatureDefinition;
-  plan: StorePlan;
+  tier: StorePlan;
+  planLabel: string;
+  effective: Record<string, boolean>;
   overrideRow: OverrideMetadata | undefined;
   inFlight: boolean;
   onAction: (key: FeatureKey, state: TriState) => void;
 }
 
-function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureRowProps) {
+function FeatureRowItem({
+  def,
+  tier,
+  planLabel,
+  effective,
+  overrideRow,
+  inFlight,
+  onAction,
+}: FeatureRowProps) {
   const tFeatures = useT('features');
-  const state = triState(plan, def.key, overrideRow);
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
+  const state = featureTriState(tier, def.key, overrideRow, effective);
   const isEffectivelyOn = state === 'baseline_on' || state === 'override_on';
 
   return (
     <div className="flex items-start justify-between px-6 py-4 hover:bg-muted/30 transition-colors">
       <div className="flex-1 min-w-0 me-4">
-        <div className="flex flex-wrap items-center gap-2 mb-0.5">
-          <p className="font-medium text-foreground">{def.name}</p>
-          <span className="text-muted-foreground text-xs">·</span>
-          <p className="text-xs text-muted-foreground" dir="rtl">
-            {def.nameAr}
-          </p>
-        </div>
-        <p className="text-sm text-muted-foreground leading-snug">{def.description}</p>
-        <p className="text-xs text-muted-foreground leading-snug mt-0.5" dir="rtl">
-          {def.descriptionAr}
+        {/* STORE-QA-14: one language per locale. The English + Arabic stack read as a duplicate and leaked internal copy. */}
+        <p className="font-medium text-foreground">{locale === 'ar' ? def.nameAr : def.name}</p>
+        <p className="text-sm text-muted-foreground leading-snug">
+          {locale === 'ar' ? def.descriptionAr : def.description}
         </p>
         <div className="mt-1.5 flex flex-wrap gap-1.5 items-center">
-          <TriStateBadge state={state} plan={plan} />
+          <TriStateBadge state={state} planLabel={planLabel} />
           {def.hidden && (
             <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {tFeatures('row.hiddenFromMerchants')}
@@ -176,7 +158,9 @@ function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureR
 interface CategorySectionProps {
   category: FeatureCategory;
   features: FeatureDefinition[];
-  plan: StorePlan;
+  tier: StorePlan;
+  planLabel: string;
+  effective: Record<string, boolean>;
   overrideMap: Map<string, OverrideMetadata>;
   inFlightKeys: Set<string>;
   onAction: (key: FeatureKey, state: TriState) => void;
@@ -185,7 +169,9 @@ interface CategorySectionProps {
 function CategorySection({
   category,
   features,
-  plan,
+  tier,
+  planLabel,
+  effective,
   overrideMap,
   inFlightKeys,
   onAction,
@@ -210,7 +196,9 @@ function CategorySection({
           <FeatureRowItem
             key={def.key}
             def={def}
-            plan={plan}
+            tier={tier}
+            planLabel={planLabel}
+            effective={effective}
             overrideRow={overrideMap.get(def.key)}
             inFlight={inFlightKeys.has(def.key)}
             onAction={onAction}
@@ -235,10 +223,8 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   const t = useT('features.matrix');
   const tCommon = useT('common');
   const locale = useLocale();
-  const planLabelFor = useCallback(
-    (p: StorePlan) => (locale === 'ar' ? PLAN_LABELS[p].ar : PLAN_LABELS[p].en),
-    [locale]
-  );
+  // ONE plan source: billing's effective plan (name + feature tier). `stores.plan` is a legacy column and disagreed with it.
+  const planState = useStorePlan(storeId);
 
   // Store info (plan + name)
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
@@ -246,6 +232,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
 
   // Feature overrides from API
   const [overrideMap, setOverrideMap] = useState<Map<string, OverrideMetadata>>(new Map());
+  const [effective, setEffective] = useState<Record<string, boolean>>({});
   const [featuresLoading, setFeaturesLoading] = useState(true);
 
   // Per-key in-flight set
@@ -277,6 +264,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
       toastError(t('toasts.loadFeaturesFailed'), apiErr.message);
     } else if (data) {
       setOverrideMap(new Map(data.metadata.map(m => [m.featureKey, m])));
+      setEffective(data.features ?? {});
     }
     setFeaturesLoading(false);
   }, [storeId, toastError, t]);
@@ -392,17 +380,23 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
     grouped[def.category].push(def);
   }
 
-  const plan = storeInfo.plan as StorePlan;
+  const tier = (planState.plan?.featureTier ?? storeInfo.plan) as StorePlan;
+  const planName = planState.plan
+    ? locale === 'ar'
+      ? planState.plan.nameAr
+      : planState.plan.nameEn
+    : ((l: 'ar' | 'en') => {
+        const sold = publicPlanForStorePlan(storeInfo.plan);
+        return sold ? sold[l] : storeInfo.plan;
+      })(locale === 'ar' ? 'ar' : 'en');
   const isSuspended = storeInfo.status === 'suspended';
 
   return (
     <div className="space-y-8">
       {/* ── Plan: the subscription's priced plan + the one place to assign it (Ruling B1-PLAN-SOT-1) ── */}
       <div className="space-y-2">
-        <SubscriptionPlanRow storeId={storeId} />
-        <p className="text-xs text-muted-foreground">
-          {t('baselineTierNote', { plan: planLabelFor(plan) })}
-        </p>
+        <SubscriptionPlanRow storeId={storeId} state={planState} />
+        <p className="text-xs text-muted-foreground">{t('baselineTierNote', { plan: planName })}</p>
       </div>
 
       {/* ── Feature Matrix ───────────────────────────────────────────────────── */}
@@ -415,7 +409,9 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
               key={category}
               category={category}
               features={features}
-              plan={plan}
+              tier={tier}
+              planLabel={planName}
+              effective={effective}
               overrideMap={overrideMap}
               inFlightKeys={inFlightKeys}
               onAction={handleAction}
@@ -524,7 +520,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
         <p className="text-sm text-muted-foreground">
           {t.rich('modals.resetBody', {
             b: chunks => <strong>{chunks}</strong>,
-            plan: planLabelFor(plan),
+            plan: planName,
           })}
         </p>
         <div className="mt-6 flex justify-end gap-3">

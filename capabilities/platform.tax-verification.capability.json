@@ -11,7 +11,10 @@
     "GET /admin/tax-verification",
     "POST .../:storeId/decision",
     "GET/PUT /admin/platform-vat",
-    "/admin/fiscal-archive"
+    "/admin/fiscal-archive",
+    "GET /admin/tax-verification/change-requests",
+    "GET /admin/tax-verification/:storeId/change-request/file",
+    "POST /admin/tax-verification/:storeId/change-decision"
   ],
   "mcpTool": null,
   "planGate": null,
