@@ -13,7 +13,11 @@
  *
  * Input: EVENT = github.event_name, NEEDS = toJSON(needs) (job id -> { result }). Exit 0 = pass, 1 = fail.
  */
-export function verdict(event, needs) {
+import { HEAVY_ONLY_JOBS } from './mq-scope.mjs';
+
+export function verdict(event, needs, opts = {}) {
+  // MQ-SCOPE-1: when scripts/ci/mq-scope.mjs said heavy=false, these jobs were skipped ON PURPOSE and `skipped` counts as success for them only.
+  const lightSkippable = opts.heavy === 'false' ? new Set(HEAVY_ONLY_JOBS) : new Set();
   if (event === 'pull_request')
     return { ok: true, message: 'pull request: the full lane runs on the merge group' };
   if (event !== 'merge_group')
@@ -28,7 +32,11 @@ export function verdict(event, needs) {
       message: 'no upstream jobs reported: refusing to call an empty merge group green',
     };
   const bad = ids
-    .filter(id => needs[id]?.result !== 'success')
+    .filter(
+      id =>
+        needs[id]?.result !== 'success' &&
+        !(lightSkippable.has(id) && needs[id]?.result === 'skipped')
+    )
     .map(id => `${id}=${needs[id]?.result ?? 'missing'}`);
   if (bad.length)
     return { ok: false, message: `full lane not green on the merge group: ${bad.join(', ')}` };
@@ -42,7 +50,9 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
   } catch {
     /* an unreadable needs object is "no upstream jobs": fails closed on a merge group */
   }
-  const v = verdict(process.env.EVENT ?? '', needs);
+  const v = verdict(process.env.EVENT ?? '', needs, {
+    heavy: needs?.['tested-tree']?.outputs?.heavy,
+  });
   console.log(`merge-queue-gate: ${v.message}`);
   process.exit(v.ok ? 0 : 1);
 }
