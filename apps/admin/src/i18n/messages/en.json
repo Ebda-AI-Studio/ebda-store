@@ -4092,6 +4092,7 @@
         "AI_QUOTA_DAILY_EXCEEDED": "Today's smart-tools limit is used up. Try again tomorrow.",
         "AI_QUOTA_MONTHLY_EXCEEDED": "This month's smart-tools limit is used up.",
         "AI_QUOTA_STORE_DAILY_EXCEEDED": "Today's smart-tools limit for your store is used up. Try again tomorrow.",
+        "AI_STORE_BILLING_SUSPENDED": "Smart tools are paused until your subscription is paid. Pay from the Billing page to turn them back on.",
         "AI_RATE_LIMITED": "Busy right now. Try this file again in a minute.",
         "AI_NOT_CONFIGURED": "Smart tools are not available right now.",
         "AI_UPSTREAM_ERROR": "Could not read this file. Try again.",
