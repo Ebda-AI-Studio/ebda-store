@@ -133,7 +133,7 @@ export default function ContentListPage() {
             />
           </label>
           {newSlugInvalid && (
-            <p role="alert" className="mt-2 text-sm text-destructive">
+            <p role="alert" className="mt-2 text-sm text-destructive-ink">
               {t('newPageInvalid')}
             </p>
           )}
