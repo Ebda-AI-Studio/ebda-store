@@ -131,6 +131,39 @@ describe('merchant billing page', () => {
     expect(screen.getByText('priceTbd')).toBeTruthy();
   });
 
+  it('QA-STOR-1: storage shows "<used MB> of <limit>" from the usage counter, like the other limits', async () => {
+    mockApi(
+      billing({
+        usage: {
+          maxProducts: 45,
+          maxStaff: 1,
+          maxOrdersPerMonth: 120,
+          maxStorageMb: 120,
+          customDomain: 0,
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    await screen.findByText('Free', { selector: 'h2' });
+    const storage = screen
+      .getAllByRole('progressbar')
+      .find(b => b.getAttribute('aria-label') === 'maxStorageMb')!;
+    expect(storage.getAttribute('aria-valuenow')).toBe('120');
+    expect(storage.getAttribute('aria-valuemax')).toBe('500');
+    expect(screen.queryByTestId('storage-usage-unknown')).toBeNull();
+  });
+
+  it('QA-STOR-1: an unreadable storage counter says "not known right now", never 0', async () => {
+    mockApi(billing());
+    render(<StoreBillingPage />);
+    const row = await screen.findByTestId('storage-usage-unknown');
+    expect(row.textContent).toContain('storageUnknown');
+    expect(row.textContent).toContain('500');
+    expect(
+      screen.getAllByRole('progressbar').find(b => b.getAttribute('aria-label') === 'maxStorageMb')
+    ).toBeUndefined();
+  });
+
   it('shows the over-limit banner only when flagged for the current month, and never hides orders', async () => {
     const month = new Date().toISOString().slice(0, 7);
     mockApi(billing({ ordersOverLimitMonth: `${month}-01` }));
