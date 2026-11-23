@@ -90,7 +90,7 @@ export async function replayRefunds(
 }
 
 /**
- * After an order's sale journal exists: replay every refund that happened BEFORE it (event older than the sale entry) and whose
+ * After an order's sale journal exists: replay every refund that happened BEFORE it (event no newer than the sale entry) and whose
  * partial journal (or its cogs twin) is missing. Refunds made after the sale existed were journalled by the normal flow and are
  * never touched. Idempotent and safe to repeat, so a retry of a failed posting step completes what the first attempt left.
  * Returns how many refund journals were posted.
@@ -127,7 +127,8 @@ export async function pendingPreSaleRefunds(
   const saleAt = new Date(saleCreatedAt).getTime();
   const pending: PartialRefund[] = [];
   for (const r of await partialRefunds(repo, storeId, orderId)) {
-    if (!(r.at < saleAt)) continue;
+    // <=: a refund and the sale stamped in the same millisecond must not lose the refund (the replay is idempotent per key)
+    if (!(r.at <= saleAt)) continue;
     const base = `${orderId}:partial:${r.refundKey}`;
     const done = await repo.db.journalEntry.findFirst({
       where: { storeId, source: 'order', sourceId: { in: [base, `${base}:cogs`] } },

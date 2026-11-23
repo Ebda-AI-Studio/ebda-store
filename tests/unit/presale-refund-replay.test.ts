@@ -126,6 +126,13 @@ describe('sale posting replays pre-sale refund journals', () => {
     expect(journalAmountOnlyRefund).not.toHaveBeenCalled();
   });
 
+  it('a refund stamped in the same millisecond as the sale entry is still replayed', async () => {
+    ledger.set('o1', 2000); // sale entry at t=2000, same ms as the refund event below
+    events.o1 = [ev('partial_refund_recorded', 2000, { refundKey: 'refund:re_1', amount: 4000 })];
+    await postOrderPaymentJournal({ orderId: 'o1' });
+    expect(ledger.has('o1:partial:refund:re_1')).toBe(true);
+  });
+
   it('no replay when the sale itself was declined (accounting off / not paid)', async () => {
     saleDeclines = 'accounting_disabled';
     events.o1 = [ev('partial_refund_recorded', 2000, { refundKey: 'refund:re_1', amount: 4000 })];
