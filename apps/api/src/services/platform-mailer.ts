@@ -27,6 +27,10 @@ import {
   type FactorAddedNoticeData,
 } from './email-templates/factor-added-notice';
 import {
+  recoveryCodesChangedNoticeTemplate,
+  type RecoveryCodesChangedNoticeData,
+} from './email-templates/recovery-codes-changed-notice';
+import {
   factorEnrolCodeTemplate,
   type FactorEnrolCodeData,
 } from './email-templates/factor-enrol-code';
@@ -304,6 +308,33 @@ export async function sendFactorAddedNoticeEmail(
   await deliver({
     to: data.email,
     subject: factorAddedNoticeTemplate.subject[lang](data),
+    html,
+    ...(studio ? { fromName: BRAND.name } : {}),
+    replyTo: BRAND.supportEmail,
+  });
+}
+
+/** Security notice: the account's MFA recovery codes were regenerated (A23). Sent for the shared identity service: master brand. */
+export async function sendRecoveryCodesChangedNoticeEmail(
+  data: RecoveryCodesChangedNoticeData,
+  language?: Lang,
+  studio = false
+): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const html = renderBrandedShell(recoveryCodesChangedNoticeTemplate[lang](data), {
+    name: studio ? BRAND.name : BRAND.product.nameEn,
+    nameAr: studio ? BRAND.nameAr : BRAND.product.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+    hidePoweredBy: studio,
+  });
+  await deliver({
+    to: data.email,
+    subject: recoveryCodesChangedNoticeTemplate.subject[lang](data),
     html,
     ...(studio ? { fromName: BRAND.name } : {}),
     replyTo: BRAND.supportEmail,
