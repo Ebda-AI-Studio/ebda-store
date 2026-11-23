@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { resolveDefaultLanguage } from '@ebda/shared';
 import { API_URL } from '../lib/api';
-import { hideTags, hidesFromSearch } from '../lib/hide-from-search';
+import { hidesFromSearch } from '../lib/hide-from-search';
 import { classifyResolve } from '../lib/store-indexing';
 import { resolveStoreByDomain, StoreTemporarilyUnavailableError } from '../lib/store-resolver';
 import {
