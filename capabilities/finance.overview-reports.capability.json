@@ -26,6 +26,7 @@
   },
   "steps": ["Finance > Reports."],
   "edgeCases": [
+    "Finance revenue/profit come from the ledger (posted journal entries net of refund reversals), not the order-based net sales figure on Analytics; unpaid COD is not in it until booked",
     "Growth for basic; Business for tax reports",
     "MFA required",
     "Gateway fees/payouts not posted (plan #753)",

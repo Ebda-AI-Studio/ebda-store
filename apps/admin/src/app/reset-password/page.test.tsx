@@ -14,6 +14,9 @@ const { accountsFetch, push, replace } = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({ isAuthenticated: false, user: null, logout: () => undefined }),
+}));
 vi.mock('../../lib/accounts', () => ({
   accountsFetch,
   AccountsError: class AccountsError extends Error {
