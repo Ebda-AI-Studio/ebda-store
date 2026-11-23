@@ -7,7 +7,7 @@ import ar from '@/i18n/messages/ar.json';
 vi.mock('@/i18n/useT', () => ({ useT: () => (k: string) => k }));
 
 import { SlugField } from './SlugField';
-import { isValidProductSlug, slugForUpdate } from './slug-field';
+import { isValidProductSlug, savedSlugIfChanged, slugForUpdate } from './slug-field';
 
 afterEach(() => cleanup());
 
@@ -41,5 +41,18 @@ describe('product slug field (every-data-needs-UI: SlugRedirect trigger)', () =>
         .fields;
       expect(f.slug && f.slugHint && f.slugInvalid).toBeTruthy();
     }
+  });
+});
+
+describe('the slug the API actually saved', () => {
+  it('reports it only when a taken slug was suffixed', () => {
+    expect(savedSlugIfChanged('gold-ring', 'gold-ring-1')).toBe('gold-ring-1');
+    expect(savedSlugIfChanged('gold-ring', 'gold-ring')).toBeNull();
+    expect(savedSlugIfChanged(undefined, 'gold-ring')).toBeNull();
+    expect(savedSlugIfChanged('gold-ring', undefined)).toBeNull();
+  });
+  it('has the notice text in both languages', () => {
+    for (const m of [en, ar] as { products: { edit: { toast: Record<string, string> } } }[])
+      expect(m.products.edit.toast.savedSlugChanged).toContain('{slug}');
   });
 });

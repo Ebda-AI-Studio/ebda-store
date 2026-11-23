@@ -986,7 +986,8 @@
       "createdBanner": "Product added. Next step: add sizes or colours if it has any.",
       "addVariants": "Add variants",
       "toast": {
-        "saved": "Product saved"
+        "saved": "Product saved",
+        "savedSlugChanged": "Product saved. That link was already taken, so it is now: {slug}"
       },
       "tabs": {
         "label": "Product page sections",

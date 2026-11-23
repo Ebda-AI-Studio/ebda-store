@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { SearchTermsField } from '@/components/SearchTermsField';
 import { SlugField } from './_components/SlugField';
-import { isValidProductSlug, slugForUpdate } from './_components/slug-field';
+import { isValidProductSlug, savedSlugIfChanged, slugForUpdate } from './_components/slug-field';
 import { Badge, Input, Textarea, Select, cn, useToast } from '@ebda/ui';
 import { Button, buttonVariants } from '@/components/ui/Button';
 import { storefrontOrigin } from '@ebda/shared';
@@ -692,7 +692,7 @@ export default function EditProductPage() {
         body.categories = [];
       }
 
-      const { error: apiError } = await apiPut(
+      const { data: saved, error: apiError } = await apiPut<{ product?: { slug?: string } }>(
         `/api/v1/stores/${storeId}/products/${product.id}`,
         body
       );
@@ -707,7 +707,11 @@ export default function EditProductPage() {
       // `returnTo` (when present and same-store) restores the exact filtered list view. No router.refresh() and no
       // setSaving(false) on success: the bar stays busy until the route changes (UX:PN-1), and the list refetches
       // on mount.
-      queueFlashToast(t('toast.saved'));
+      // A taken slug is saved with `-1` appended: say which link the product really got.
+      const keptSlug = savedSlugIfChanged(body.slug as string | undefined, saved?.product?.slug);
+      queueFlashToast(
+        keptSlug ? t('toast.savedSlugChanged', { slug: keptSlug }) : t('toast.saved')
+      );
       router.push(returnTo);
     } catch {
       setError(t('updateFailed'));
