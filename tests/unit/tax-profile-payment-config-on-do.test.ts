@@ -5,7 +5,12 @@
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ audit: [] as unknown[], putPrivate: 0 }));
+const h = vi.hoisted(() => ({
+  audit: [] as unknown[],
+  putPrivate: 0,
+  storeUpdates: [] as unknown[],
+  applyTaxEnabled: (_id: string, _on: boolean): void => undefined,
+}));
 
 vi.mock('@ebda/database', async importOriginal => {
   const real = await importOriginal<typeof import('@ebda/database')>();
@@ -18,6 +23,22 @@ vi.mock('@ebda/database', async importOriginal => {
     runInTenantContext: boom('runInTenantContext'),
     withStore: async (_s: string, fn: (tx: unknown) => Promise<unknown>) => fn({}),
     withUser: async (_u: string, fn: () => Promise<unknown>) => fn(),
+  };
+});
+// `storeUpdate` routes through the platform directory (D1) to the DO; that routing is not this file's subject, so the write it is
+// asked to make (revoke switches the merchant's VAT switch off, TAX-3) is applied straight to the DO table and recorded.
+vi.mock('@api/lib/repo-factory', async importOriginal => {
+  const real = await importOriginal<typeof import('@api/lib/repo-factory')>();
+  return {
+    ...real,
+    storeUpdate: async (
+      _db: unknown,
+      a: { where: { id: string }; data: { taxEnabled?: boolean } }
+    ) => {
+      h.storeUpdates.push(a);
+      if (a.data.taxEnabled !== undefined) h.applyTaxEnabled(a.where.id, a.data.taxEnabled);
+      return {};
+    },
   };
 });
 vi.mock('@api/middleware/security', () => ({
@@ -52,6 +73,8 @@ import { loadCodFeeConfig } from '@api/services/payment-providers/cod.provider';
 import { InstapayService } from '@api/services/payment-providers/instapay.service';
 import { META, openSqlite } from '../../packages/repo/test/diff-harness';
 import { nodeSqlRunner } from '../../packages/repo/test/node-sql';
+import { nodeSyncSql } from '../../packages/repo/test/node-sync-sql';
+import { computeOrderTaxFields } from '../../packages/repo/src/do/tax';
 
 const STORE = '19b5dbd1-1774-49b5-b781-e06d0ee7b0fe';
 const ADMIN = '29b5dbd1-1774-49b5-b781-e06d0ee7b0fe';
@@ -96,10 +119,16 @@ beforeEach(() => {
   role = 'store_admin';
   afterFirstProfileRead = null;
   h.audit.length = 0;
+  h.storeUpdates.length = 0;
   sqlite.exec(
-    'DELETE FROM payment_configs; DELETE FROM store_tax_documents; DELETE FROM store_tax_profiles'
+    'DELETE FROM payment_configs; DELETE FROM store_tax_documents; DELETE FROM store_tax_profiles; DELETE FROM tax_rates; DELETE FROM store_config'
   );
 });
+
+h.applyTaxEnabled = (id, on) =>
+  void sqlite
+    .prepare('UPDATE store_config SET tax_enabled = ? WHERE store_id = ?')
+    .run(on ? 1 : 0, id);
 
 const PDF = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(64)]);
 
@@ -275,6 +304,94 @@ describe('tax profile on the DO', () => {
         )
       ).rejects.toBeTruthy();
     });
+  });
+});
+
+describe('the VAT gate end to end on the DO (ported from tests/integration/vat-gate.test.ts)', () => {
+  // The DO's order-pricing seam (the one the order write uses): the tax a 100.00 sale would carry, and the seller it freezes.
+  const rate = async () => {
+    const t = computeOrderTaxFields(nodeSyncSql(sqlite), STORE, {
+      subtotal: 10000,
+      discount: 0,
+      shipping: 0,
+    });
+    return {
+      ratePercent: (t.taxRateBps ?? 0) / 100,
+      tax: t.tax,
+      seller: t.sellerTaxRegistrationNumber
+        ? { taxRegistrationNumber: t.sellerTaxRegistrationNumber, legalName: t.sellerTaxLegalName }
+        : null,
+    };
+  };
+  const seedStore = () => {
+    sqlite.exec(
+      `DELETE FROM tax_rates; DELETE FROM store_config;
+       INSERT INTO store_config (store_id, tax_enabled) VALUES ('${STORE}', 1);
+       INSERT INTO tax_rates (id, store_id, name, rate, is_active) VALUES ('r14', '${STORE}', 'VAT', 1400, 1)`
+    );
+  };
+  const profile = async () => {
+    const actor = { userId: ADMIN };
+    await TaxProfileService.updateDetails(
+      STORE,
+      { taxRegistrationNumber: '123456789', legalName: 'Acme Trading LLC' },
+      actor
+    );
+    await TaxProfileService.addDocument(
+      STORE,
+      'tax_card' as never,
+      { buffer: PDF, originalname: 'card.pdf' },
+      actor
+    );
+    await TaxProfileService.submit(STORE, actor);
+  };
+
+  it('charges 0 VAT until VERIFIED, 14% with the seller frozen once approved, 0 again after revoke (switch off, no re-enable)', async () => {
+    seedStore();
+    // taxEnabled + an active 14% rate but no profile: nothing is charged
+    expect(await rate()).toMatchObject({ ratePercent: 0, seller: null });
+    await on(async () => profile());
+    // pending: still 0
+    expect(await rate()).toMatchObject({ ratePercent: 0, seller: null });
+    role = 'super_admin';
+    await on(() =>
+      TaxProfileService.review(STORE, { decision: 'approve' } as never, { userId: ADMIN })
+    );
+    expect(await rate()).toMatchObject({
+      ratePercent: 14,
+      tax: 1400,
+      seller: { taxRegistrationNumber: '123456789', legalName: 'Acme Trading LLC' },
+    });
+    await on(() =>
+      TaxProfileService.review(
+        STORE,
+        { decision: 'revoke', reason: 'certificate expired' } as never,
+        {
+          userId: ADMIN,
+        }
+      )
+    );
+    expect(await rate()).toMatchObject({ ratePercent: 0, seller: null });
+    expect(h.storeUpdates).toEqual([{ where: { id: STORE }, data: { taxEnabled: false } }]);
+    expect(rows('SELECT tax_enabled t FROM store_config')[0].t).toBe(0);
+    // the merchant cannot switch VAT back on while revoked
+    role = 'store_admin';
+    await expect(
+      on(() => TaxService.updateSettings(STORE, { taxEnabled: true } as never))
+    ).rejects.toMatchObject({ code: 'TAX_NOT_VERIFIED' });
+    expect(rows('SELECT tax_enabled t FROM store_config')[0].t).toBe(0);
+    // every transition is audit-logged
+    expect(h.audit.map(a => (a as { action: string }).action)).toEqual(
+      expect.arrayContaining(['tax_profile.approved', 'tax_profile.revoked'])
+    );
+  });
+
+  it("another store's verified profile never switches VAT on here", async () => {
+    seedStore();
+    sqlite.exec(
+      `INSERT INTO store_tax_profiles (id, store_id, status, tax_registration_number, legal_name, updated_at) VALUES ('other', 'other-store', 'verified', '123456789', 'Other LLC', 0)`
+    );
+    expect(await rate()).toMatchObject({ ratePercent: 0, seller: null });
   });
 });
 
