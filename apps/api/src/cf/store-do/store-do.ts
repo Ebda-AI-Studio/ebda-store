@@ -23,6 +23,7 @@
  * and lock paths are not here (PR D2).
  */
 import { DurableObject } from 'cloudflare:workers';
+import { wipeClosedStoreStorage } from './closed-store-wipe';
 import { publishIndexHealth } from './index-health';
 import { handleStoreAdmin } from '../../../../../packages/cf-migrate/src/store-admin.mjs';
 import {
@@ -1171,8 +1172,7 @@ export class StoreDO extends DurableObject<Record<string, unknown>> {
       return true;
     });
     if (!checked.ok) return checked;
-    await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
+    await wipeClosedStoreStorage(this.ctx.storage);
     return { ok: true, data: { wiped: true } };
   }
 

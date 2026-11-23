@@ -4,7 +4,6 @@
  * Nothing here decides anything; the rules live in the tested core. This module is wired ONLY by the `closed-store-purge` job.
  */
 import { createHash } from 'node:crypto';
-import { prisma } from '@ebda/database';
 import { d1All, d1Run } from '../services/platform/billing-d1';
 import { StorageService } from '../services/storage.service';
 import { sendClosedStorePurgeNoticeEmail } from '../services/platform-mailer';
@@ -12,6 +11,7 @@ import { sendAlert } from '../services/alerts.service';
 import { STORE_SCOPED_TABLES } from '../cf/erasure/platform-subject';
 import { storeDo } from './store-backend';
 import { retireStoreDirectoryRow } from './store-directory-sync';
+import { getAccountsBrief } from './identity-client';
 import logger from './logger';
 import type { ArchiveManifest, ClosedStore, PurgeLedger, PurgePorts } from './closed-store-purge';
 
@@ -96,10 +96,8 @@ export function closedStorePurgePorts(): PurgePorts {
             s.storeId
           )
         )[0];
-        const owner = row
-          ? await prisma.user.findUnique({ where: { id: row.owner_id }, select: { email: true } })
-          : null;
-        const email = owner?.email;
+        // the identity service answers for a live owner; an erased or unknown owner is simply absent from the result
+        const email = row ? (await getAccountsBrief([row.owner_id]))[0]?.email : undefined;
         // an erased owner carries a placeholder address: there is no one to tell
         if (!email || /@anonymized\.(local|invalid)$/.test(email)) return 'no_contact';
         await sendClosedStorePurgeNoticeEmail({
