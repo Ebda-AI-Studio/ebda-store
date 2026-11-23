@@ -56,6 +56,16 @@ describe('catalogue feed passthrough', () => {
     expect(res.headers.get('Content-Type')).toContain('application/xml');
   });
 
+  it('/en/feeds/google.xml (x-locale-path=en) asks the platform for lang=en; an explicit ?lang= still wins', async () => {
+    stub(200);
+    const { serveCatalogueFeed } = await import('../../lib/catalogue-feed-route');
+    headerBag.set('x-locale-path', 'en');
+    await serveCatalogueFeed('google.xml', req('/feeds/google.xml'));
+    expect(upstreamCalls[0]).toContain('lang=en');
+    await serveCatalogueFeed('google.xml', req('/feeds/google.xml?lang=ar'));
+    expect(upstreamCalls[1]).toContain('lang=ar');
+  });
+
   it.each([429, 500, 503])('upstream %i -> 503 no-store, never a cacheable 404', async status => {
     stub(status);
     const { serveCatalogueFeed } = await import('../../lib/catalogue-feed-route');

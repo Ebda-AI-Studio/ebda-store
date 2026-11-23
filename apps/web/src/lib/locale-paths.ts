@@ -143,7 +143,28 @@ export type LocalePathDecision =
   /** `/products` (an old URL): the root layout redirects it once it has the store's default language. */
   | { kind: 'pending'; rest: string }
   /** `/en/manifest.webmanifest`: serve the one manifest route in that language (Ruling PWA-MANIFEST-2). */
-  | { kind: 'manifest'; locale: PathLocale };
+  | { kind: 'manifest'; locale: PathLocale }
+  /** `/en/llms.txt`, `/en/feeds/products.json`: the machine file, served with that language's URLs (no redirect). */
+  | { kind: 'machine'; locale: PathLocale; rest: string };
+
+/**
+ * Machine files that answer under a language prefix (register row 238, Amelia QA 2026-11-23: `/en/feeds/products.json` 301'd to
+ * the unprefixed path and listed `/ar/` links, so an English agent could never get English URLs). The unprefixed path keeps
+ * answering in the store's default language; `/ar/<file>` and `/en/<file>` answer in their own, with the URL's language on the
+ * request (`x-locale-path`) and no cookie (a crawler sends none, and a Set-Cookie would stop the edge caching the file).
+ */
+export const MACHINE_FILE_PATHS: ReadonlySet<string> = new Set([
+  '/llms.txt',
+  '/feeds/products.json',
+  '/feeds/google.xml',
+  '/feeds/meta.xml',
+  '/feeds/tiktok.csv',
+]);
+
+/** The language the URL named for a machine file (`x-locale-path`), or null on the unprefixed path. */
+export function machineFileLocale(value: string | null | undefined): PathLocale | null {
+  return value === 'ar' || value === 'en' ? value : null;
+}
 
 /** The one web app manifest route (`app/manifest.webmanifest/route.ts`). */
 export const MANIFEST_PATH = '/manifest.webmanifest';
@@ -180,6 +201,8 @@ export function decideLocalePath(a: {
     // Exactly this path, before the redirect below: redirected to the shared URL it would answer in the
     // store's default language again, which is the defect (Ruling PWA-MANIFEST-2).
     if (prefixed.rest === MANIFEST_PATH) return { kind: 'manifest', locale: prefixed.locale };
+    if (MACHINE_FILE_PATHS.has(prefixed.rest))
+      return { kind: 'machine', locale: prefixed.locale, rest: prefixed.rest };
     // Open-redirect guard (Ruling LOCALE-PATHS-3): `/ar//evil.com` leaves rest = `//evil.com`, a protocol-relative URL.
     // A backslash anywhere (raw or %5C), or a decoded rest that starts with two slashes, is refused (no redirect, the
     // request falls through to a plain 404); leading slashes are otherwise collapsed so the target is always a path.

@@ -1,7 +1,13 @@
 import { resolveDefaultLanguage, storeOrigin } from '@ebda/shared';
 import { headers } from 'next/headers';
 import { API_URL } from './api';
-import { localePathsOn, localizeUrlsInText, storeKeyForHost } from './locale-paths';
+import {
+  LOCALE_PATH_HEADER,
+  localePathsOn,
+  localizeUrlsInText,
+  machineFileLocale,
+  storeKeyForHost,
+} from './locale-paths';
 
 /**
  * Passthrough for the advertising product feeds (`/feeds/google.xml`, `/feeds/meta.xml`, `/feeds/tiktok.csv`).
@@ -65,7 +71,9 @@ export async function serveCatalogueFeed(kind: FeedKind, request: Request): Prom
     });
   }
   const resolved = await resolveStore(domain);
-  const lang = (langParam as 'ar' | 'en' | null) ?? 'ar';
+  // `/en/feeds/google.xml`: the URL's language wins over the default (an explicit `?lang=` still wins over both).
+  const lang =
+    (langParam as 'ar' | 'en' | null) ?? machineFileLocale(h.get(LOCALE_PATH_HEADER)) ?? 'ar';
   const qs = new URLSearchParams({ lang, ...(partParam ? { part: partParam } : {}) });
   const upstream = await fetch(`${API_URL}/public/feed/${kind}?${qs}`, {
     headers: { 'x-store-domain': domain },

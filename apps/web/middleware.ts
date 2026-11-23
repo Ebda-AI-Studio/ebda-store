@@ -454,6 +454,14 @@ function handleStoreHost(
       response.headers.set('x-store-domain', host);
       return response;
     }
+    if (decision.kind === 'machine') {
+      requestHeaders.set(LOCALE_PATH_HEADER, decision.locale);
+      const target = request.nextUrl.clone();
+      target.pathname = decision.rest;
+      const response = NextResponse.rewrite(target, { request: { headers: requestHeaders } });
+      response.headers.set('x-store-domain', host);
+      return response;
+    }
     if (decision.kind === 'rewrite') {
       requestHeaders.set(LOCALE_PATH_HEADER, decision.locale);
       requestHeaders.set(LOCALE_REST_HEADER, decision.rest);
