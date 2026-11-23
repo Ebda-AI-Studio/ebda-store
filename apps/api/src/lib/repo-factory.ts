@@ -938,6 +938,19 @@ export interface MoneyClient {
     missingLines: number;
     missingRevenue: number;
   }>;
+  /** The ONE revenue definition's net total + order count (see packages/repo/src/revenue.ts); optional window, optional paid-only. */
+  analyticsNetRevenue(a: {
+    startMs?: number;
+    endMs?: number;
+    paidOnly?: boolean;
+    /** Whole-order totals (no partial-refund netting): only the GL reconciliation, whose credits are gross of partials. */
+    gross?: boolean;
+  }): Promise<{ revenue: number; orders: number }>;
+  /** The same, for many [fromMs, toMs) windows in ONE query (<= 400): one row per window, in order. */
+  analyticsNetRevenueDays(a: {
+    windows: Array<{ fromMs: number; toMs: number }>;
+    paidOnly?: boolean;
+  }): Promise<Array<{ revenue: number; orders: number }>>;
   analyticsSales(a: {
     startMs: number;
     endMs: number;
@@ -1624,6 +1637,8 @@ export function makeMoneyClient(
     analyticsImport: a => call('analyticsImport', a),
     analyticsImportFinish: a => call('analyticsImportFinish', a),
     analyticsPeriod: a => call('analyticsPeriod', a),
+    analyticsNetRevenue: a => call('analyticsNetRevenue', a),
+    analyticsNetRevenueDays: a => call('analyticsNetRevenueDays', a),
     analyticsSales: a => call('analyticsSales', a),
     analyticsItems: a => call('analyticsItems', a),
     analyticsOrdersBy: a => call('analyticsOrdersBy', a),
