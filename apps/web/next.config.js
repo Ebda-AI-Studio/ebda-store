@@ -10,6 +10,8 @@ const IMAGE_VARIANTS = process.env.NEXT_PUBLIC_IMAGE_VARIANTS === '1';
 const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
 
 /** @type {import('next').NextConfig} */
+const { authRedirects } = require('./auth-redirects');
+
 const nextConfig = {
   reactStrictMode: true,
   // Dev only: hosts (comma separated) allowed to load /_next dev assets, e.g. when a demo store host is
@@ -122,6 +124,11 @@ const nextConfig = {
 
   experimental: {
     optimizePackageImports: ['@ebda/shared', '@ebda/ui'],
+  },
+
+  // /account/register, /signup, /login ... -> the real /auth/* pages (auth-redirects.js)
+  async redirects() {
+    return authRedirects();
   },
 
   // Security headers

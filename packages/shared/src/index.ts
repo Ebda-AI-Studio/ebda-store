@@ -6,6 +6,7 @@ export * from './brand';
 // loader, so it must stay free of extensionless relative imports (the API integration job failed on exactly that).
 export * from './brand/billing-vat';
 export * from './buyer-key';
+export * from './guest-return';
 export * from './whatsapp-optin-wording';
 export * from './server-owned-settings';
 export * from './auth/jwt-claims';
@@ -38,6 +39,7 @@ export * from './region';
 export * from './order-lines';
 export * from './order-tax';
 export * from './order-action-visibility';
+export * from './order-payment-summary';
 export * from './order-status-transitions';
 export * from './payments';
 export * from './instapay-receipt';
