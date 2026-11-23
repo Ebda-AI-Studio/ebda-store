@@ -1,6 +1,10 @@
 import { settleFiscalOnReversal } from './fiscal';
 import { postWalletMovementJournal } from './ledger';
-import { reverseEarnedPointsFromOrder, reverseRedeemedPointsFromOrder } from './loyalty';
+import {
+  reverseEarnedPointsFromOrder,
+  reverseEarnedPointsPartial,
+  reverseRedeemedPointsFromOrder,
+} from './loyalty';
 import { recordTrimmedCredit, refundableBalance } from './refundable';
 import { recordMovement, restock } from './stock';
 import { releaseToWarehouses } from './warehouse-route';
@@ -636,6 +640,8 @@ export function refundOrder(
      */
     external?: boolean;
     keepPaymentStatus?: boolean;
+    /** partial `lines` only: order items whose goods are NOT going back on the shelf (the merchant's per-line choice, STORE-QA-76). */
+    skipRestock?: ReadonlySet<string>;
     now?: number;
   }
 ): RefundResult {
@@ -768,6 +774,10 @@ export function refundOrder(
     }
 
     const restored: Array<{ orderItemId: string; quantity: number }> = [];
+    // REFUNDED quantities per line (what the customer is given back), independent of restock: a line the merchant
+    // will not put back on the shelf (skipRestock), a backordered or already-restored unit still refunds money, so
+    // the loyalty clawback below must price these, never `restored` (REFUND-988-REV-1 R1)
+    const refunded = new Map<string, number>();
     if (a.lines !== undefined) {
       const items = new Map(loadItems(db, o.id).map(i => [i.id, i]));
       const already = alreadyRestoredByItem(db, a.storeId, o.id);
@@ -778,6 +788,11 @@ export function refundOrder(
           throw new MoneyError('UNKNOWN_LINE', 'a listed line does not belong to this order', 400);
       for (const l of a.lines) {
         const item = items.get(l.orderItemId)!;
+        refunded.set(
+          item.id,
+          Math.min(item.quantity, (refunded.get(item.id) ?? 0) + Math.max(0, l.quantity))
+        );
+        if (a.skipRestock?.has(item.id)) continue;
         const qty = Math.min(
           l.quantity,
           item.quantity - (already.get(item.id) ?? 0) - (neverTaken.get(item.id) ?? 0)
@@ -826,6 +841,30 @@ export function refundOrder(
       },
       now
     );
+    // loyalty: the share of the earned points matching what this partial refund gave back (clamped, never aborts)
+    if (o.customer_id) {
+      let value = 0;
+      if (a.lines !== undefined) {
+        const tot = new Map(
+          db
+            .all('SELECT id, quantity, total FROM order_items WHERE order_id = ?', [o.id])
+            .map(r => [r.id as string, r])
+        );
+        for (const [itemId, refundedQty] of refunded) {
+          const it = tot.get(itemId);
+          if (it && Number(it.quantity) > 0)
+            value += Math.floor((Number(it.total) * refundedQty) / Number(it.quantity));
+        }
+      } else value = amount ?? walletCredit ?? 0;
+      const e = reverseEarnedPointsPartial(db, {
+        storeId: a.storeId,
+        orderId: o.id,
+        refundKey: key,
+        value,
+        now,
+      });
+      out.loyalty = { ...out.loyalty, earnedReversed: e?.pointsReversed ?? 0 };
+    }
     if (review) out.review = review;
     return out;
   });

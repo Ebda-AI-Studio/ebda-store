@@ -79,6 +79,21 @@ export default function OrderDetailPage() {
     fetchOrder();
   }, [fetchOrder]);
 
+  // Re-read the order without the full-page loading state. A status write has server-side effects the
+  // client cannot guess (cash on delivery becomes paid on delivery, stock, refund fields), so every
+  // status write re-syncs the whole order instead of patching `status` locally.
+  const refreshOrder = useCallback(async () => {
+    if (!storeId || !orderId) return;
+    try {
+      const { data } = await apiGet<{ order: OrderDetail }>(
+        `/api/v1/stores/${storeId}/orders/${orderId}`
+      );
+      if (data?.order) setOrder(data.order);
+    } catch {
+      /* keep the optimistic row; the merchant can reload */
+    }
+  }, [storeId, orderId]);
+
   // Choosing "Refunded" only RECORDS a refund: no money moves (that is
   // "Refund via provider"). Confirm first, the same as the order list (#762) —
   // the footer offers it as the primary action on a paid, cancelled order.
@@ -111,6 +126,7 @@ export default function OrderDetailPage() {
         toastError(t('errors.statusUpdateFailed'), apiError.message ?? '');
       } else {
         setOrder(o => (o ? { ...o, status: newStatus } : o));
+        await refreshOrder();
         // QA-D6: name the new status (same toast the orders list shows) so the change is unmistakable.
         toastSuccess(
           tList('toast.statusUpdatedTitle'),

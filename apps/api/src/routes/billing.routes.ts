@@ -76,6 +76,8 @@ router.get(
             nameEn: e.planNameEn,
             nameAr: e.planNameAr,
             subscribedPlanCode: e.subscribedPlanCode,
+            /** The feature-baseline tier of the EFFECTIVE plan: what the super-admin feature matrix must compare against. */
+            featureTier: e.featureTier,
           },
           subscription: {
             status: e.status,
