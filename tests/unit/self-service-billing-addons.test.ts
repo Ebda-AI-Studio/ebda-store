@@ -274,6 +274,76 @@ describe('B5: a chained term counts only once it has started', () => {
   });
 });
 
+describe('F1: a term queued behind a refunded term starts now with its full 30 days', () => {
+  /** a ledger whose reads filter by status and whose guarded update really mutates */
+  const liveTx = () => ({
+    billingEvent: {
+      findMany: async ({ where }: any) =>
+        h.events.filter(
+          (e: any) =>
+            e.storeId === where.storeId &&
+            e.status === 'succeeded' &&
+            (typeof where.planCode === 'object'
+              ? e.planCode.startsWith(where.planCode.startsWith)
+              : e.planCode === where.planCode) &&
+            e.forPeriodEnd > where.forPeriodEnd.gt
+        ),
+      updateMany: async ({ where, data }: any) => {
+        const e = h.events.find((x: any) => x.id === where.id);
+        if (!e || !(e.forPeriodEnd > where.forPeriodEnd.gt)) return { count: 0 };
+        e.forPeriodEnd = data.forPeriodEnd;
+        return { count: 1 };
+      },
+    },
+  });
+  const A = () =>
+    ev({
+      id: 'A',
+      planCode: 'addon:ai:topup_300',
+      forPeriodEnd: new Date(NOW.getTime() + 10 * DAY),
+    });
+  const B = () =>
+    ev({
+      id: 'B',
+      planCode: 'addon:ai:topup_300',
+      forPeriodEnd: new Date(NOW.getTime() + 40 * DAY),
+    });
+  it('refund A: B is active at once and runs 30 days from now', async () => {
+    const { replaceQueuedTerms, activeAddons } = await import('@api/services/billing/addon-grant');
+    const t = liveTx() as any;
+    h.events = [A(), B()];
+    h.events[0].status = 'refunded'; // the refund flips A before the re-placement runs
+    expect(await activeAddons(t, 's1', NOW)).toEqual([]);
+    await replaceQueuedTerms(t, 's1', 'ai:topup_300', NOW);
+    const out = await activeAddons(t, 's1', NOW);
+    expect(out.map(a => a.eventId)).toEqual(['B']);
+    expect(out[0].endsAt).toEqual(new Date(NOW.getTime() + 30 * DAY));
+  });
+  it('refund the FIRST of three: the queue closes ranks, no gap and no overlap', async () => {
+    const { replaceQueuedTerms } = await import('@api/services/billing/addon-grant');
+    h.events = [
+      A(),
+      B(),
+      ev({
+        id: 'C',
+        planCode: 'addon:ai:topup_300',
+        forPeriodEnd: new Date(NOW.getTime() + 70 * DAY),
+      }),
+    ];
+    h.events[0].status = 'refunded';
+    await replaceQueuedTerms(liveTx() as any, 's1', 'ai:topup_300', NOW);
+    expect(h.events[1].forPeriodEnd).toEqual(new Date(NOW.getTime() + 30 * DAY));
+    expect(h.events[2].forPeriodEnd).toEqual(new Date(NOW.getTime() + 60 * DAY));
+  });
+  it('a running term is never moved, and a replay changes nothing', async () => {
+    const { replaceQueuedTerms } = await import('@api/services/billing/addon-grant');
+    h.events = [A(), B()];
+    await replaceQueuedTerms(liveTx() as any, 's1', 'ai:topup_300', NOW);
+    expect(h.events[0].forPeriodEnd).toEqual(new Date(NOW.getTime() + 10 * DAY));
+    expect(h.events[1].forPeriodEnd).toEqual(new Date(NOW.getTime() + 40 * DAY));
+  });
+});
+
 describe('purchase: confirm token, idempotency, ledger row', () => {
   const ctx = { storeId: 's1', userId: 'u1' };
   it('preview quotes the integer total and mints a token; no row, no provider call', async () => {
