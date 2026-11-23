@@ -672,7 +672,6 @@
     "route-uncovered|PATCH /stores/:storeId/suppliers/:id",
     "route-uncovered|PATCH /stores/:storeId/tax/rates/:id/toggle",
     "route-uncovered|POST /addresses/",
-    "route-uncovered|POST /admin/accounting/sale-journal-backfill",
     "route-uncovered|POST /admin/billing/claims/:id/reject",
     "route-uncovered|POST /admin/billing/events/:id/manual-refund",
     "route-uncovered|POST /admin/billing/events/:id/refund",
