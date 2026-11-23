@@ -1,4 +1,5 @@
 import type { SyncSql } from './sync-sql';
+import { ERASURE_LEDGER_DDL } from './erase-shopper';
 
 /**
  * Storefront CUSTOMER authentication on the StoreDO (NEON-ZERO-1 N-9, Ruling NZ-A3). One DO = one store, so every row here
@@ -630,6 +631,61 @@ export function expiredDeleted(db: SyncSql, a: { before: number; limit: number }
       )
       .map(r => r.id as string)
   );
+}
+
+// ---- stuck closures: the identity half of a shopper erasure that did not land -------------------------------------------------
+/** A ledger row younger than this may belong to a closure still in flight; the sweep leaves it alone. */
+export const PENDING_ERASURE_MIN_AGE_MS = 10 * 60 * 1000;
+const ERASURE_RETRY_DDL = `CREATE TABLE IF NOT EXISTS erasure_retry (
+  user_id TEXT PRIMARY KEY, tries INTEGER NOT NULL, next_at INTEGER NOT NULL)`;
+
+/**
+ * Accounts whose store half is erased (a ledger row exists) but whose sign-in record is not (`erased_at` NULL), and whose retry
+ * backoff has elapsed. The sweep re-runs the whole erasure for each (idempotent). Ids + try count only.
+ */
+export function pendingErasures(
+  db: SyncSql,
+  a: { limit: number },
+  now = Date.now()
+): Res<Array<{ userId: string; tries: number }>> {
+  db.run(ERASURE_LEDGER_DDL, []);
+  db.run(ERASURE_RETRY_DDL, []);
+  return ok(
+    db
+      .all(
+        `SELECT u.id AS id, COALESCE(r.tries, 0) AS tries
+           FROM erasure_ledger l JOIN _cauth_users u ON u.id = l.user_id
+           LEFT JOIN erasure_retry r ON r.user_id = u.id
+          WHERE u.erased_at IS NULL AND l.created_at < ? AND COALESCE(r.next_at, 0) <= ?
+          LIMIT ?`,
+        [now - PENDING_ERASURE_MIN_AGE_MS, now, Math.min(Math.max(1, a.limit | 0), 500)]
+      )
+      .map(r => ({ userId: r.id as string, tries: Number(r.tries) }))
+  );
+}
+
+/** Record one sweep attempt: success clears the row, failure counts a try and doubles the wait (1h, 2h, 4h ... capped at 24h). */
+export function noteErasureRetry(
+  db: SyncSql,
+  a: { userId: string; ok: boolean },
+  now = Date.now()
+): Res<{ tries: number }> {
+  db.run(ERASURE_RETRY_DDL, []);
+  if (a.ok) {
+    db.run('DELETE FROM erasure_retry WHERE user_id = ?', [a.userId]);
+    return ok({ tries: 0 });
+  }
+  const prev = Number(
+    db.all('SELECT tries FROM erasure_retry WHERE user_id = ?', [a.userId])[0]?.tries ?? 0
+  );
+  const tries = prev + 1;
+  const wait = Math.min(24 * 3_600_000, 3_600_000 * 2 ** (tries - 1));
+  db.run(
+    `INSERT INTO erasure_retry (user_id, tries, next_at) VALUES (?, ?, ?)
+       ON CONFLICT (user_id) DO UPDATE SET tries = excluded.tries, next_at = excluded.next_at`,
+    [a.userId, tries, now + wait]
+  );
+  return ok({ tries });
 }
 
 export function updateProfile(

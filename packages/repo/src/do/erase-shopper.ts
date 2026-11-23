@@ -69,6 +69,22 @@ export function finalizeErasure(
   };
 }
 
+/** Order / return states that are still in flight: closing the account under them would orphan a delivery or a refund. */
+export const OPEN_ORDER_STATUSES = [
+  'pending',
+  'awaiting_payment_confirmation',
+  'confirmed',
+  'processing',
+  'shipped',
+] as const;
+export const OPEN_RETURN_STATUSES = [
+  'pending',
+  'approved',
+  'shipped',
+  'received',
+  'inspecting',
+] as const;
+
 export const ANONYMIZED_ADDRESS = '{"anonymized":true}';
 
 export interface EraseShopperInput {
@@ -85,6 +101,11 @@ export interface EraseShopperInput {
   actorId: string;
   /** Send-cap window in ms (`SEND_CAP_WINDOW_MS`). */
   capWindowMs: number;
+  /**
+   * Self-service closure only: refuse (409, before anything is written) while the shopper has an order still moving or a return
+   * not yet settled. Off for the retention cron and the merchant route, which erase an account regardless.
+   */
+  refuseOpen?: boolean;
   now?: number;
 }
 
@@ -130,6 +151,24 @@ export function eraseShopper(db: SyncSql, a: EraseShopperInput): EraseShopperRes
     walletNotesScrubbed: false,
   };
   return db.transactionSync(() => {
+    // -1. expected refusals, decided BEFORE the ledger or any other write (a refusal leaves nothing behind)
+    if (a.refuseOpen) {
+      const n = (sql: string) => Number(db.all(sql, [storeId, userId])[0]?.n ?? 0);
+      if (
+        n(`SELECT COUNT(*) AS n FROM orders WHERE store_id = ? AND customer_id = ?
+             AND status IN (${OPEN_ORDER_STATUSES.map(x => `'${x}'`).join(',')})`) > 0
+      )
+        throw new MoneyError('ACCOUNT_HAS_OPEN_ORDERS', 'shopper has an open order', 409);
+      if (
+        n(`SELECT COUNT(*) AS n FROM returns WHERE store_id = ? AND customer_id = ?
+             AND status IN (${OPEN_RETURN_STATUSES.map(x => `'${x}'`).join(',')})`) > 0
+      )
+        throw new MoneyError(
+          'ACCOUNT_HAS_OPEN_RETURN',
+          'shopper has an open return or refund',
+          409
+        );
+    }
     // 0. the erasure scope, saved BEFORE any destructive step. A replay MERGES the saved scope with a fresh read (an order
     //    placed, a receipt filed between the attempts is still erased); the merged scope is saved again. Only ids and
     //    hashes are kept, and only what a resume needs: order ids, their buyer-key hashes, the earliest order day, receipt ids.

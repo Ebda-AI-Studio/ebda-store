@@ -13,6 +13,8 @@ import {
 } from '../lib/identity-client';
 import { postgresRemovedOnThisWorker } from '../lib/postgres-present';
 import { hubOnD1, hubOwnedStores } from '../lib/platform-hub';
+import { shopperOneSignalPlayerIds } from './shopper-push-ids';
+import { runShopperErasure } from './shopper-erasure-flow';
 import { eraseHubUserData, exportHubUserPlatform } from './platform/hub-user-data';
 import crypto from 'crypto';
 import {
@@ -2933,30 +2935,41 @@ export class AuthService {
     if (!doMoney)
       throw new AppError(503, 'STORE_BACKEND_UNAVAILABLE', 'Store backend is unavailable');
     const db = await storeDb(storeId);
-    const oneSignalPlayerIds =
-      (
-        await (db as any).oneSignalSubscription
-          ?.findMany({ where: { userId }, select: { playerId: true } })
-          .catch(() => [])
-      )?.map((x: { playerId: string }) => x.playerId) ?? [];
+    const oneSignalPlayerIds = await shopperOneSignalPlayerIds(db, userId);
     const key = await buyerKeyForErasure(user.phone);
     const provenKey =
       key && user.phone && (await phoneOnOwnOrder(storeId, userId, user.phone, db as never))
         ? key
         : undefined;
-    const doErase = await doMoney.eraseShopper({
-      userId,
-      role: user.role,
-      email: user.email,
-      phone: user.phone,
-      smsPhoneKey: smsConsentPhoneKey(user.phone),
-      provenBuyerKey: provenKey ?? null,
-      actorId,
-      capWindowMs: SEND_CAP_WINDOW_MS,
-    });
-    const auth = await client.call<{ erased: boolean; tokenVersion: number | null }>(
-      'eraseCustomer',
-      { userId }
+    const { erase: doErase, identity: auth } = await runShopperErasure(
+      { storeId, userId },
+      {
+        erase: () =>
+          doMoney.eraseShopper({
+            userId,
+            role: user.role,
+            email: user.email,
+            phone: user.phone,
+            smsPhoneKey: smsConsentPhoneKey(user.phone),
+            provenBuyerKey: provenKey ?? null,
+            actorId,
+            capWindowMs: SEND_CAP_WINDOW_MS,
+            // the shopper's own closure refuses while an order / return is in flight; the cron and the merchant route do not
+            refuseOpen: actorId === userId,
+          }),
+        eraseIdentity: () =>
+          client.call<{ erased: boolean; tokenVersion: number | null }>('eraseCustomer', {
+            userId,
+          }),
+        // lock = inactive + every session revoked; the version is pushed so a live access token dies now, not at expiry
+        lockIdentity: async () => {
+          const r = await client.call<{ tokenVersion: number }>('setStatus', {
+            userId,
+            status: 'inactive',
+          });
+          await pushTokenVersion(userId, r.tokenVersion, 'auth.eraseAccount.lock-after-partial');
+        },
+      }
     );
     if (auth.tokenVersion !== null)
       await pushTokenVersion(userId, auth.tokenVersion, 'auth.eraseAccount.revoke-sessions');

@@ -351,6 +351,7 @@ Single index of everything under `docs/`. One line per doc, grouped by area. Rul
 
 ## runbooks - Runbooks
 
+- [runbooks/shopper-closure-stuck.md](runbooks/shopper-closure-stuck.md) - A shopper account closure stopped after the store erase: the daily sweep and the manual finish
 - [runbooks/STAGING-DEPLOYMENT.md](runbooks/STAGING-DEPLOYMENT.md) - Staging deployment + promotion flow
 - [runbooks/SUPER-ADMIN-PLAYBOOK.md](runbooks/SUPER-ADMIN-PLAYBOOK.md) - Super-admin playbook
 - [runbooks/analytics-cutover.md](runbooks/analytics-cutover.md) - Per-store analytics to the StoreDO, AiUsage to D1 (controller runs it)

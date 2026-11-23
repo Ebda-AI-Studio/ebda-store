@@ -802,6 +802,7 @@ export interface MoneyClient {
     provenBuyerKey: string | null;
     actorId: string;
     capWindowMs: number;
+    refuseOpen?: boolean;
   }): Promise<{
     orderIds: string[];
     buyerKeys: string[];

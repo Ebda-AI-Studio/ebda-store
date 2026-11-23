@@ -30,3 +30,19 @@ describe('closure gates (BE:S-11, BE:S-29)', () => {
     ).toContain("requireFeature('loyalty')");
   });
 });
+
+describe('GET /auth/me/closure-preview', () => {
+  const c = () => chain('auth.routes.ts', 'router', 'get', '/me/closure-preview');
+  it('needs a signed-in user (authenticate answers 401 without a token) and a per-user read limit', () => {
+    expect(c()).toContain('authenticate');
+    expect(c()).toContain('adminReadLimiter');
+  });
+  it('reads only the caller own balance: ids come from req.user, never from the request', () => {
+    const src = readFileSync(join(__dirname, '..', 'auth.routes.ts'), 'utf8');
+    const i = src.indexOf("'/me/closure-preview'");
+    const body = src.slice(i, src.indexOf('router.post(', i));
+    expect(body).toContain('req.user!');
+    expect(body).toContain('WalletService.getBalance(storeId, userId)');
+    expect(body).not.toMatch(/req\.(params|query|body)/);
+  });
+});

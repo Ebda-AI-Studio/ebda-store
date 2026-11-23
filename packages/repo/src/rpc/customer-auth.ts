@@ -35,6 +35,8 @@ const SYNC_OPS = {
   newest: A.newest,
   search: A.search,
   expiredDeleted: A.expiredDeleted,
+  pendingErasures: A.pendingErasures,
+  noteErasureRetry: A.noteErasureRetry,
   exportCustomer: A.exportCustomer,
   importRows: A.importRows,
   exportRowsPage: A.exportRowsPage,
