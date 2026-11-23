@@ -223,7 +223,7 @@ describe('agent-write-denied-watch — dispatch at threshold', () => {
     );
     await handleAgentWriteDeniedWatch();
     const title = mockSendAlert.mock.calls[0][0].title as string;
-    // sendAlert throttles on sha1(level + title + source); a count in the title
+    // sendAlert throttles on sha256(level + title + source); a count in the title
     // makes every tick a "new" alert and defeats the throttle entirely.
     expect(title).not.toMatch(/\d/);
   });
