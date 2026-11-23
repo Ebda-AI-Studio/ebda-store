@@ -1,23 +1,64 @@
 import { describe, it, expect } from 'vitest';
-import { orderPaymentSummary } from '../order-payment-summary';
+import { orderPaymentSummary, orderPaymentState } from '../order-payment-summary';
+import { orderActionVisibility } from '../order-action-visibility';
 
 const base = { status: 'delivered', total: 16000 };
 
 describe('orderPaymentSummary', () => {
-  it('a fully refunded COD order is Refunded with nothing owed, not Unpaid / Remain', () => {
-    const s = orderPaymentSummary({
-      ...base,
-      status: 'refunded',
-      paymentStatus: 'refunded',
-      payments: [{ refundedAmount: 16000 }],
+  it('fully refunded COD (paymentStatus refunded): Refunded, nothing owed', () => {
+    expect(
+      orderPaymentSummary({
+        ...base,
+        status: 'refunded',
+        paymentStatus: 'refunded',
+        payments: [{ refundedAmount: 16000 }],
+      })
+    ).toEqual({ state: 'refunded', refunded: 16000, remain: 0 });
+  });
+  it('refunded paymentStatus with no payment rows stamped reports the total (it was paid)', () => {
+    expect(orderPaymentSummary({ ...base, paymentStatus: 'refunded', payments: [] })).toEqual({
+      state: 'refunded',
+      refunded: 16000,
+      remain: 0,
     });
-    expect(s).toEqual({ state: 'refunded', refunded: 16000, remain: 0 });
   });
-  it('refunded by status only (payment rows not yet stamped) still reports the order total as refunded', () => {
-    const s = orderPaymentSummary({ ...base, paymentStatus: 'refunded', payments: [] });
-    expect(s).toEqual({ state: 'refunded', refunded: 16000, remain: 0 });
+  it('status-only refund of a never-paid COD order: Refunded, nothing owed, nothing refunded', () => {
+    expect(orderPaymentSummary({ ...base, status: 'refunded', paymentStatus: 'unpaid' })).toEqual({
+      state: 'refunded',
+      refunded: 0,
+      remain: 0,
+    });
   });
-  it('paid stays paid, and a partial refund shows what went back without owing anything', () => {
+  it('status-only refund of a paid order: Refunded (not Paid), total back when no amount is recorded', () => {
+    expect(orderPaymentSummary({ ...base, status: 'refunded', paymentStatus: 'paid' })).toEqual({
+      state: 'refunded',
+      refunded: 16000,
+      remain: 0,
+    });
+    expect(
+      orderPaymentSummary({
+        ...base,
+        status: 'refunded',
+        paymentStatus: 'paid',
+        refundedTotal: 9000,
+      }).refunded
+    ).toBe(9000);
+  });
+  it('disputed owes nothing', () => {
+    expect(orderPaymentSummary({ ...base, paymentStatus: 'disputed' })).toEqual({
+      state: 'disputed',
+      refunded: 0,
+      remain: 0,
+    });
+  });
+  it('a cancelled unpaid order owes nothing', () => {
+    expect(orderPaymentSummary({ ...base, status: 'cancelled', paymentStatus: 'unpaid' })).toEqual({
+      state: 'unpaid',
+      refunded: 0,
+      remain: 0,
+    });
+  });
+  it('paid stays paid; a partial refund (API refundedTotal, which includes merchant-booked ones) shows without owing', () => {
     expect(orderPaymentSummary({ ...base, paymentStatus: 'paid' })).toEqual({
       state: 'paid',
       refunded: 0,
@@ -25,7 +66,16 @@ describe('orderPaymentSummary', () => {
     });
     expect(
       orderPaymentSummary({ ...base, paymentStatus: 'paid', payments: [{ refundedAmount: 5000 }] })
-    ).toEqual({ state: 'paid', refunded: 5000, remain: 0 });
+        .refunded
+    ).toBe(5000);
+    expect(
+      orderPaymentSummary({
+        ...base,
+        paymentStatus: 'paid',
+        payments: [{ refundedAmount: 0 }],
+        refundedTotal: 3000,
+      })
+    ).toEqual({ state: 'paid', refunded: 3000, remain: 0 });
   });
   it('unpaid owes the total less the wallet part', () => {
     expect(
@@ -35,6 +85,27 @@ describe('orderPaymentSummary', () => {
         paymentStatus: 'unpaid',
         walletAmount: 1000,
       })
-    ).toEqual({ state: 'unpaid', refunded: 0, remain: 15000 });
+    ).toEqual({
+      state: 'unpaid',
+      refunded: 0,
+      remain: 15000,
+    });
   });
+});
+
+describe('card and buttons agree (orderActionVisibility.showMarkPaid === state is unpaid)', () => {
+  const cases = [
+    { status: 'refunded', paymentStatus: 'refunded' },
+    { status: 'refunded', paymentStatus: 'unpaid' },
+    { status: 'refunded', paymentStatus: 'paid' },
+    { status: 'delivered', paymentStatus: 'disputed' },
+    { status: 'delivered', paymentStatus: 'paid' },
+    { status: 'pending', paymentStatus: 'unpaid' },
+  ];
+  for (const c of cases)
+    it(`${c.status}/${c.paymentStatus}`, () => {
+      expect(orderActionVisibility({ ...c, payments: [] }).showMarkPaid).toBe(
+        orderPaymentState(c) === 'unpaid'
+      );
+    });
 });

@@ -82,7 +82,9 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
       <div className="flex items-start gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-            isUnpaid ? 'bg-destructive/10 text-destructive-ink' : 'bg-success/10 text-success-ink'
+            isUnpaid || state === 'disputed'
+              ? 'bg-destructive/10 text-destructive-ink'
+              : 'bg-success/10 text-success-ink'
           }`}
         >
           <svg
@@ -103,7 +105,7 @@ export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <div className="font-semibold text-foreground">
-              {state === 'refunded' ? t('refunded') : state === 'paid' ? t('paid') : t('unpaid')}
+              {t(state === 'unpaid' ? 'unpaid' : state)}
             </div>
             <div className="font-semibold text-foreground">
               {formatMoney(order.total, order.currency)}

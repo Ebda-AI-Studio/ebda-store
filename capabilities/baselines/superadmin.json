@@ -24,6 +24,7 @@
     "superadmin-route-unreasoned|GET /admin/tax-verification/:storeId/documents/:documentId/file",
     "superadmin-route-unreasoned|GET /admin/users/:userId/legal-acceptances",
     "superadmin-route-unreasoned|GET /stores/stores/:id/features",
+    "superadmin-route-unreasoned|POST /admin/accounting/sale-journal-backfill",
     "superadmin-route-unreasoned|POST /admin/legal-policies/:docKey/:version/resume",
     "superadmin-route-unreasoned|POST /admin/legal-policies/:docKey/:version/retry-failed",
     "superadmin-route-unreasoned|POST /admin/legal-policies/:docKey/:version/send-notice",

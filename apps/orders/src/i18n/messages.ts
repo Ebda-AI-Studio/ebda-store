@@ -129,6 +129,7 @@ export interface Messages {
     unpaid: string;
     remain: string;
     refunded: string;
+    disputed: string;
     refundedAmount: string;
     delivery: string;
     deliverTo: string;
@@ -346,6 +347,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       delivered: 'Delivered',
       cancelled: 'Cancelled',
       refunded: 'Refunded',
+      disputed: 'Disputed',
     },
     instapay: {
       confirm: 'Payment received',
@@ -673,6 +675,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       unpaid: 'غير مدفوع',
       remain: 'المتبقّي: {amount}',
       refunded: 'مسترد',
+      disputed: 'متنازع عليه',
       refundedAmount: 'المسترد {amount}',
       delivery: 'التوصيل',
       deliverTo: 'التوصيل إلى',

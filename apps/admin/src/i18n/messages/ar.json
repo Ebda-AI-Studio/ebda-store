@@ -1563,6 +1563,7 @@
       "remain": "المتبقي {amount}",
       "refunded": "مسترد",
       "refundedAmount": "المسترد {amount}",
+      "disputed": "متنازع عليه",
       "paymentMethod": "طريقة الدفع",
       "methodCod": "الدفع عند الاستلام",
       "paymentTransactionId": "رقم العملية",

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { BRAND } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { cfWaitUntil } from '../cf/bindings';
 import { isDemoStore } from '../lib/demo-store';
 import { redis } from './redis.service';
 
@@ -204,6 +205,10 @@ export function sendAlert(opts: AlertOptions): Promise<AlertOutcome> {
     inFlightAlerts.delete(p);
   });
   inFlightAlerts.add(p);
+  // On a Worker, `void sendAlert(..)` (47 call sites, incl. the P1 "Refund needs review", webhook and orphaned-invoice
+  // alerts) is cancelled when the response returns: inFlightAlerts only serves a Node SIGTERM drain. Keep it alive past the
+  // response (ctx.waitUntil); outside a Worker request this is a detached no-op.
+  cfWaitUntil(p);
   return p;
 }
 
