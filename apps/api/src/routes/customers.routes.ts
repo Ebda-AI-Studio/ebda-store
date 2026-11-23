@@ -19,7 +19,6 @@ import { AppError } from '../middleware/error-handler';
 import { writeLimiter, auditLog } from '../middleware/security';
 import { invalidateCustomersCache } from '../lib/public-cache';
 import { CustomerGroups } from '../lib/customer-groups';
-import { loadCustomerGroups } from '../lib/customer-groups-store';
 import { searchTermOf } from '../lib/search-term';
 import { SmsConsentService } from '../services/sms-consent.service';
 import {
@@ -625,14 +624,9 @@ router.get(
       // SMS-marketing consent per row (issue 206) — this page's rows only,
       // read live (never from the cached aggregate) so a withdrawal shows at once.
       // Each row's key AND phone, the same rows the send gate matches (issue 2423).
-      const consentGroups = await loadCustomerGroups(storeId);
       const smsConsentOf = await SmsConsentService.statusForKeys(
         storeId,
-        pageSlice.map(c => ({
-          key: c.id,
-          phone: c.phone,
-          group: consentGroups.groupOfMemberKey(c.id) ?? undefined,
-        }))
+        pageSlice.map(c => ({ key: c.id, phone: c.phone }))
       );
       const pageItems = pageSlice.map(c => {
         const smsMarketingConsent = smsConsentOf.get(c.id) ?? 'none';

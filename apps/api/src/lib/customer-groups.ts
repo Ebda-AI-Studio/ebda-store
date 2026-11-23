@@ -1,11 +1,12 @@
-import { canonicalPhone, customerKeyOf, isGuestOrder } from './customer-key';
+import { customerKeyOf, isGuestOrder } from './customer-key';
+import { smsConsentPhoneKey } from './sms-consent';
 
 /**
  * Ruling QA98-ALIAS-1: ONE customer grouping for every surface (list, detail, export, RFM, SMS consent, erasure, analytics).
  *
  * Stored keys never change (consent rows, RFM hashes and bookmarked links all hold `customerKeyOf` values). Instead guests who
  * are provably the same person are grouped at read time: two guest identities are linked when they share a lowercased email OR
- * a canonical phone (last 10 digits), transitively. A group is addressed by its smallest member key, so the result does not
+ * a normalised FULL phone number (country code included), transitively. A group is addressed by its smallest member key, so the result does not
  * depend on the order orders arrive in. Registered customers are their own group (the user id); a guest with no contact is the
  * `guest:<orderId>` row, handled by the callers.
  *
@@ -34,6 +35,20 @@ export interface CustomerGroup {
   emails: string[];
   /** Raw phones as stored on member orders. */
   phones: string[];
+}
+
+/**
+ * The phone identity a guest group links on: the FULL number in digits with its country code (the same normalisation the SMS consent
+ * gate uses, `smsConsentPhoneKey`: an Egyptian mobile in any spelling is one key, any other number keeps its country code, so
+ * +965 12345678 and +91 6512345678 never meet). '' for something that cannot identify a person: under 8 digits, or an obvious
+ * placeholder (the last 8 digits all the same, e.g. a manual order typed 01000000000), so manual orders do not collapse into one row.
+ */
+function groupPhoneKey(phone: unknown): string {
+  if (typeof phone !== 'string') return '';
+  const key = smsConsentPhoneKey(phone);
+  if (!key || key.length < 8) return '';
+  if (/^(\d)\1+$/.test(key.slice(-8))) return '';
+  return key;
 }
 
 function identityOf(order: OrderLike): GuestIdentity | null {
@@ -82,7 +97,7 @@ export class CustomerGroups {
     const nodesOf = (i: GuestIdentity): string[] => {
       const nodes: string[] = [];
       if (i.email) nodes.push(`e:${i.email}`);
-      const cp = canonicalPhone(i.phone);
+      const cp = groupPhoneKey(i.phone);
       if (cp) nodes.push(`p:${cp}`);
       if (nodes.length === 0) nodes.push(`k:${i.key}`);
       return nodes;
@@ -116,7 +131,7 @@ export class CustomerGroups {
       for (const k of memberKeys) this.groupOfKey.set(k, group);
       for (const e of group.emails) this.groupOfEmail.set(e, group);
       for (const p of group.phones) {
-        const cp = canonicalPhone(p);
+        const cp = groupPhoneKey(p);
         if (cp) this.groupOfPhone.set(cp, group);
       }
     }
@@ -162,7 +177,7 @@ export class CustomerGroups {
     const e = typeof contact.email === 'string' ? contact.email.trim().toLowerCase() : '';
     const g1 = e ? this.groupOfEmail.get(e) : undefined;
     if (g1) out.add(g1);
-    const cp = canonicalPhone(contact.phone);
+    const cp = groupPhoneKey(contact.phone);
     const g2 = cp ? this.groupOfPhone.get(cp) : undefined;
     if (g2) out.add(g2);
     return [...out];

@@ -450,7 +450,7 @@ export class AnalyticsService {
   /**
    * Distinct customers with a (non-deleted) order in the store — optionally
    * only orders created in [startDate, endDate] — keyed exactly like the
-   * Customers page (`CUSTOMER_KEY_SQL`, the SQL twin of `customerKeyOf`).
+   * Customers page (`CustomerGroups`, Ruling QA98-ALIAS-1).
    * Every order status counts, as the list's rows do; the page's `buyers`
    * KPI (non-cancelled/refunded) and its zero-order registered rows are
    * intentionally different measures — docs/RULINGS.md.
@@ -461,10 +461,28 @@ export class AnalyticsService {
     endDate?: Date
   ): Promise<number> {
     // QA98-ALIAS-1: both backends return identity rows and the ONE customer grouping folds them (lib/buyer-counts.ts).
-    return countDistinctCustomersGrouped(
-      storeId,
-      startDate && endDate ? startDate : new Date(0),
-      startDate && endDate ? endDate : new Date(8_640_000_000_000_000)
+    const start = startDate && endDate ? startDate : new Date(0);
+    const end = startDate && endDate ? endDate : new Date(8_640_000_000_000_000);
+    return countDistinctCustomersGrouped(storeId, start, end, async () =>
+      // Postgres store: exact GROUP BY of the (customer id, email, phone) buckets, grouped in JS by the one customer grouping.
+      (
+        await prisma.$queryRaw<
+          Array<{
+            customerId: string | null;
+            email: string | null;
+            phone: string | null;
+            n: number;
+          }>
+        >`
+          SELECT NULLIF(o.customer_id::text, '') AS "customerId",
+                 LOWER(CASE WHEN jsonb_typeof(o.shipping_address -> 'email') = 'string' THEN o.shipping_address ->> 'email' END) AS email,
+                 CASE WHEN jsonb_typeof(o.shipping_address -> 'phone') = 'string' THEN o.shipping_address ->> 'phone' END AS phone,
+                 COUNT(*)::int AS n
+          FROM public.orders o
+          WHERE o.store_id = ${storeId} AND o.deleted_at IS NULL
+            AND o.created_at >= ${start} AND o.created_at <= ${end}
+          GROUP BY 1, 2, 3`
+      ).map(r => ({ ...r, n: Number(r.n) }))
     );
   }
 
@@ -506,7 +524,7 @@ export class AnalyticsService {
       return {
         revenue: d.revenue,
         orders: d.orders,
-        customers: await countDistinctCustomersGrouped(storeId, startDate, endDate),
+        customers: await AnalyticsService.countDistinctCustomers(storeId, startDate, endDate),
         profit: d.costedLines === 0 ? (d.missingLines > 0 ? null : 0) : (d.profit ?? 0),
         itemsMissingCost: d.missingLines,
         revenueMissingCost: d.missingRevenue,

@@ -81,4 +81,27 @@ describe('CustomerGroups', () => {
     expect(g.keyOfContact({ email: null, phone: '+20 100-000-0002' })).toBe(rowKey); // a spelling no order used
     expect(g.keyOfContact({ email: 'new@x.test', phone: null })).toBe('new@x.test');
   });
+
+  it('links on the FULL number: +965 12345678 and +91 6512345678 are different people (no last-10-digits collision)', () => {
+    const kw = guest(null, '+965 12345678');
+    const inn = guest(null, '+91 6512345678');
+    const g = CustomerGroups.fromOrders([kw, inn]);
+    expect(g.keyOf(kw)).not.toBe(g.keyOf(inn));
+    // the same number in other spellings is still one person
+    const eg1 = guest(null, '+20 100 000 1234');
+    const eg2 = guest('x@x.test', '01000001234');
+    const g2 = CustomerGroups.fromOrders([eg1, eg2]);
+    expect(g2.keyOf(eg1)).toBe(g2.keyOf(eg2));
+  });
+
+  it('ignores placeholder phones: manual orders typed 01000000000 or a too-short number do not collapse into one row', () => {
+    const a = guest('a@x.test', '01000000000');
+    const b = guest('b@x.test', '0100 0000 000');
+    const c = guest('c@x.test', '1234567');
+    const d = guest('d@x.test', '1234567');
+    const g = CustomerGroups.fromOrders([a, b, c, d]);
+    const keys = [a, b, c, d].map(o => g.keyOf(o));
+    expect(new Set(keys).size).toBe(4);
+    expect(g.groupsOfContact({ phone: '01000000000' })).toEqual([]);
+  });
 });

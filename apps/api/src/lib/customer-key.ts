@@ -55,12 +55,6 @@ export function customerKeyOf(order: OrderIdentity): string | null {
   return email || phone || null;
 }
 
-/** Phone reduced to its last 10 digits so `+20 100…`, `0100…` and `20100…` compare equal. '' when too short. */
-export function canonicalPhone(phone: unknown): string {
-  const digits = typeof phone === 'string' ? phone.replace(/\D/g, '') : '';
-  return digits.length >= 10 ? digits.slice(-10) : '';
-}
-
 /** True when `customerKeyOf` fell back to the guest contact. */
 export function isGuestOrder(order: OrderIdentity): boolean {
   return !(order.customer?.id || order.customerId);

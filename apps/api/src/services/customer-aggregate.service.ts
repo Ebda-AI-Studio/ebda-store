@@ -1058,8 +1058,7 @@ export async function getCustomerProfile(storeId: string, customerKey: string) {
   const smsMarketingConsent = await SmsConsentService.getForCustomerKey(
     storeId,
     newest.customer?.id ?? decodedKey,
-    customer.phone,
-    guestGroups?.groupOfMemberKey(customer.id) ?? undefined
+    customer.phone
   );
 
   return { customer: { ...customer, groupId, group }, orders, truncated, smsMarketingConsent };

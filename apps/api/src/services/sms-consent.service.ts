@@ -2,8 +2,6 @@ import crypto from 'crypto';
 import { prisma } from '@ebda/database';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 import { storeDb, storeRepo, storeWriter } from '../lib/repo-factory';
-import { loadCustomerGroups } from '../lib/customer-groups-store';
-import type { CustomerGroup } from '../lib/customer-groups';
 
 /**
  * Promotional-SMS consent, per customer per store (issue 206).
@@ -146,17 +144,9 @@ export class SmsConsentService {
     source: 'account' | 'unsubscribe'
   ): Promise<number> {
     const phoneKey = smsConsentPhoneKey(target.phone);
-    const or: Array<Record<string, unknown>> = [];
+    const or: Array<Record<string, string>> = [];
     if (phoneKey) or.push({ phoneKey });
     if (target.userId) or.push({ customerKey: target.userId });
-    // QA98-ALIAS-1: an opt-out recorded through any member of a guest group applies to the whole group (every phone and key).
-    if (phoneKey) {
-      for (const g of (await loadCustomerGroups(storeId)).groupsOfContact({
-        phone: target.phone,
-      })) {
-        or.push({ phoneKey: { in: groupPhoneKeys(g) } }, { customerKey: { in: g.memberKeys } });
-      }
-    }
     if (or.length === 0) return 0;
     // A DO store writes its own consent rows (same filter, same phone-wide withdrawal); Postgres is unchanged.
     const writer =
@@ -216,26 +206,7 @@ export class SmsConsentService {
     if (!phoneKey) return null;
     // Through the store's own backend: a DO store's consent rows are on its Durable Object (`withStore` there only opens a
     // lazy Postgres scope, POSTGRES_REMOVED); a Postgres store keeps the store-scoped read.
-    const db = await storeDb(storeId);
-    // QA98-ALIAS-1: the customer is the whole guest group. If ANY member key or phone of it has opted out, nobody in the group is
-    // texted, whatever another member granted: consent fails toward NOT texting.
-    const groups = (await loadCustomerGroups(storeId)).groupsOfContact({ phone });
-    if (groups.length > 0) {
-      const optedOut = await db.smsMarketingConsent.findFirst({
-        where: {
-          storeId,
-          granted: false,
-          revokedAt: { not: null },
-          OR: groups.flatMap(g => [
-            { phoneKey: { in: groupPhoneKeys(g) } },
-            { customerKey: { in: g.memberKeys } },
-          ]),
-        },
-        select: { id: true },
-      });
-      if (optedOut) return null;
-    }
-    return db.smsMarketingConsent.findFirst({
+    return (await storeDb(storeId)).smsMarketingConsent.findFirst({
       where: { storeId, phoneKey, granted: true },
       select: { id: true },
       orderBy: { grantedAt: 'desc' },
@@ -259,17 +230,15 @@ export class SmsConsentService {
   static async getForCustomerKey(
     storeId: string,
     customerKey: string,
-    phone?: string | null,
-    /** QA98-ALIAS-1: the guest group this key belongs to; every member key and phone counts, and any opt-out wins. */
-    group?: CustomerGroup
+    phone?: string | null
   ): Promise<SmsConsentView> {
     const rows = await (
       await storeDb(storeId)
     ).smsMarketingConsent.findMany({
-      where: { storeId, OR: consentScope(customerKey, phone, group) },
+      where: { storeId, OR: consentScope(customerKey, phone) },
       select: { ...VIEW_SELECT, updatedAt: true },
     });
-    return toConsentView(group ? pickGroupConsentRow(rows) : pickConsentRow(rows));
+    return toConsentView(pickConsentRow(rows));
   }
 
   /**
@@ -278,13 +247,13 @@ export class SmsConsentService {
    */
   static async statusForKeys(
     storeId: string,
-    customers: Array<{ key: string; phone?: string | null; group?: CustomerGroup }>
+    customers: Array<{ key: string; phone?: string | null }>
   ): Promise<Map<string, SmsConsentView['status']>> {
     const out = new Map<string, SmsConsentView['status']>();
     if (customers.length === 0) return out;
-    const keys = customers.flatMap(c => [c.key, ...(c.group?.memberKeys ?? [])]);
+    const keys = customers.map(c => c.key);
     const phoneKeys = customers
-      .flatMap(c => [smsConsentPhoneKey(c.phone), ...(c.group ? groupPhoneKeys(c.group) : [])])
+      .map(c => smsConsentPhoneKey(c.phone))
       .filter((k): k is string => k !== null);
     const rows = await (
       await storeDb(storeId)
@@ -305,14 +274,11 @@ export class SmsConsentService {
       },
     });
     for (const c of customers) {
-      const mineKeys = new Set([c.key, ...(c.group?.memberKeys ?? [])]);
-      const minePhones = new Set(
-        [smsConsentPhoneKey(c.phone), ...(c.group ? groupPhoneKeys(c.group) : [])].filter(
-          (k): k is string => k !== null
-        )
+      const phoneKey = smsConsentPhoneKey(c.phone);
+      const mine = rows.filter(
+        r => r.customerKey === c.key || (phoneKey !== null && r.phoneKey === phoneKey)
       );
-      const mine = rows.filter(r => mineKeys.has(r.customerKey) || minePhones.has(r.phoneKey));
-      const row = c.group ? pickGroupConsentRow(mine) : pickConsentRow(mine);
+      const row = pickConsentRow(mine);
       if (row) out.set(c.key, statusOf(row));
     }
     return out;
@@ -320,42 +286,11 @@ export class SmsConsentService {
 }
 
 /** The rows a customer's consent is made of: their key row + their phone's rows. */
-function consentScope(
-  customerKey: string,
-  phone: string | null | undefined,
-  group?: CustomerGroup
-) {
+function consentScope(customerKey: string, phone: string | null | undefined) {
   const phoneKey = smsConsentPhoneKey(phone);
-  const or: Array<
-    { customerKey: string | { in: string[] } } | { phoneKey: string | { in: string[] } }
-  > = [{ customerKey }];
+  const or: Array<{ customerKey: string } | { phoneKey: string }> = [{ customerKey }];
   if (phoneKey) or.push({ phoneKey });
-  if (group) {
-    or.push({ customerKey: { in: group.memberKeys } }, { phoneKey: { in: groupPhoneKeys(group) } });
-  }
   return or;
-}
-
-/** The consent phone keys of every phone a guest group has used. */
-function groupPhoneKeys(group: CustomerGroup): string[] {
-  return [
-    ...new Set(group.phones.map(p => smsConsentPhoneKey(p)).filter((k): k is string => k !== null)),
-  ];
-}
-
-/**
- * A guest GROUP's consent: any withdrawal among its rows wins (the group fails toward NOT texting), newest withdrawal shown;
- * otherwise the usual rule (the newest grant, else the most recent row).
- */
-// pq-allow(unused-export): test seam, imported by tests/unit/sms-consent-group.test.ts
-export function pickGroupConsentRow<
-  T extends { granted: boolean; revokedAt?: Date | null; updatedAt: Date; grantedAt?: Date | null },
->(rows: T[]): T | null {
-  const revoked = rows.filter(r => !r.granted && r.revokedAt);
-  if (revoked.length > 0) {
-    return revoked.reduce((a, b) => (b.updatedAt.getTime() > a.updatedAt.getTime() ? b : a));
-  }
-  return pickConsentRow(rows);
 }
 
 /**

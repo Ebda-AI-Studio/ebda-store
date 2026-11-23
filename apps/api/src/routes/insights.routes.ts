@@ -111,12 +111,26 @@ export function computeRepeatPurchase(
  * same `typeof === 'string'` test `contactOf` applies. An order with none of
  * the three is skipped. Returns two integers, never the rows.
  */
-export async function repeatPurchaseInDb(
+async function repeatPurchaseInDb(
   storeId: string,
   since: Date
 ): Promise<{ repeatPurchaseRate: number | null; identifiedBuyers: number }> {
   // QA98-ALIAS-1: both backends return buyer identity rows; the ONE customer grouping folds them (lib/buyer-counts.ts).
-  const r = await repeatBuyersGrouped(storeId, since);
+  const r = await repeatBuyersGrouped(storeId, since, async () =>
+    // Postgres store: exact GROUP BY of the paid-order (customer id, email, phone) buckets, grouped in JS by the one customer grouping.
+    (
+      await prisma.$queryRaw<
+        Array<{ customerId: string | null; email: string | null; phone: string | null; n: number }>
+      >`
+        SELECT NULLIF(o.customer_id::text, '') AS "customerId",
+               LOWER(CASE WHEN jsonb_typeof(o.shipping_address -> 'email') = 'string' THEN o.shipping_address ->> 'email' END) AS email,
+               CASE WHEN jsonb_typeof(o.shipping_address -> 'phone') = 'string' THEN o.shipping_address ->> 'phone' END AS phone,
+               COUNT(*)::int AS n
+        FROM public.orders o
+        WHERE o.store_id = ${storeId} AND o.payment_status = 'paid' AND o.created_at >= ${since}
+        GROUP BY 1, 2, 3`
+    ).map(r => ({ ...r, n: Number(r.n) }))
+  );
   if (r.buyers === 0) return { repeatPurchaseRate: null, identifiedBuyers: 0 };
   return { repeatPurchaseRate: r.repeat / r.buyers, identifiedBuyers: r.buyers };
 }

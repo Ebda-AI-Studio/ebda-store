@@ -48,7 +48,6 @@ const money = {
     {
       revenue: 5000,
       orders: 3,
-      customers: 2,
       profit: 700,
       costedLines: 2,
       missingLines: 0,

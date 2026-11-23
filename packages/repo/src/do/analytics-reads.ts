@@ -23,17 +23,9 @@ const statuses = (v: unknown): string[] => {
 const marks = (n: number, from = 1): string =>
   Array.from({ length: n }, (_, i) => `?${from + i}`).join(', ');
 
-/** SQLite twin of CUSTOMER_KEY_SQL (lib/customer-key-sql.ts); the orders table is aliased `o`. Keep the two in lockstep. */
-const CUSTOMER_KEY = `COALESCE(
-  NULLIF(o.customer_id, ''),
-  NULLIF(LOWER(CASE WHEN json_type(o.shipping_address, '$.email') = 'text' THEN json_extract(o.shipping_address, '$.email') END), ''),
-  NULLIF(CASE WHEN json_type(o.shipping_address, '$.phone') = 'text' THEN json_extract(o.shipping_address, '$.phone') END, ''),
-  'guest:' || o.id
-)`;
-
 const num = (v: unknown): number => Number(v ?? 0);
 
-/** getPeriodStats: revenue + order count + distinct customers + profit lines for [start, end]. */
+/** getPeriodStats: revenue + order count + profit lines (distinct customers: `analyticsBuyerIdentities`, grouped by the API) for [start, end]. */
 export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
   const start = intArg(a.startMs, 'startMs');
   const end = intArg(a.endMs, 'endMs');
@@ -46,11 +38,6 @@ export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string
       WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3
         AND ${counts}`,
     win
-  )[0] as Record<string, unknown>;
-  const cust = db.all(
-    `SELECT COUNT(DISTINCT ${CUSTOMER_KEY}) AS n FROM orders o
-      WHERE o.store_id = ?1 AND o.deleted_at IS NULL AND o.created_at >= ?2 AND o.created_at <= ?3`,
-    [storeId, start, end]
   )[0] as Record<string, unknown>;
   const p = db.all(
     `SELECT
@@ -66,7 +53,6 @@ export function analyticsPeriodOp(db: SyncSql, storeId: string, a: Record<string
   return {
     revenue: num(agg.revenue),
     orders: num(agg.orders),
-    customers: num(cust.n),
     profit: p.profit === null || p.profit === undefined ? null : num(p.profit),
     costedLines: num(p.costed_lines),
     missingLines: num(p.missing_lines),
@@ -197,33 +183,10 @@ export function analyticsCustomersOp(db: SyncSql, storeId: string, a: Record<str
 }
 
 /**
- * repeatPurchaseInDb (insights.routes.ts): paid orders since `sinceMs` grouped by the buyer key the dashboard uses (customer
- * id, else the shipping email LOWERCASED, else the shipping phone verbatim; each only a non-empty JSON string). An order with
- * none of the three is skipped (no `'guest:' || id` fallback, unlike CUSTOMER_KEY). Returns two counts, never the rows.
- */
-export function analyticsRepeatBuyersOp(db: SyncSql, storeId: string, a: Record<string, unknown>) {
-  const since = intArg(a.sinceMs, 'sinceMs');
-  const row = db.all(
-    `SELECT COALESCE(SUM(CASE WHEN n >= 2 THEN 1 ELSE 0 END), 0) AS repeat, COUNT(*) AS buyers FROM (
-       SELECT COALESCE(
-         NULLIF(o.customer_id, ''),
-         NULLIF(LOWER(CASE WHEN json_type(o.shipping_address, '$.email') = 'text' THEN json_extract(o.shipping_address, '$.email') END), ''),
-         NULLIF(CASE WHEN json_type(o.shipping_address, '$.phone') = 'text' THEN json_extract(o.shipping_address, '$.phone') END, '')
-       ) AS buyer_key, COUNT(*) AS n
-       FROM orders o
-       WHERE o.store_id = ?1 AND o.payment_status = 'paid' AND o.created_at >= ?2
-       GROUP BY 1
-     ) per_buyer WHERE buyer_key IS NOT NULL`,
-    [storeId, since]
-  )[0] as Record<string, unknown> | undefined;
-  return { repeat: num(row?.repeat), buyers: num(row?.buyers) };
-}
-
-/**
  * Buyer identities (QA98-ALIAS-1): orders grouped by (customer id, lowercased shipping email, shipping phone) with a count each,
  * so the API can fold guests into the ONE customer grouping (`CustomerGroups`) and count customers the way the list does.
  * `all` = not deleted, created in [startMs, endMs] (distinct customers); `paid` = paid since `sinceMs` (repeat buyers, the
- * same population `analyticsRepeatBuyersOp` reads). Returns identity rows, never order rows.
+ * the repeat-buyer population). Returns identity rows, never order rows.
  */
 export function analyticsBuyerIdentitiesOp(
   db: SyncSql,
