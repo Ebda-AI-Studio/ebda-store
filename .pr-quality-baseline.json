@@ -1378,7 +1378,6 @@
     "unused-export|apps/api/src/services/billing/account.service.ts|ManualPaymentResult",
     "unused-export|apps/api/src/services/billing/account.service.ts|enforceStoreAllowance",
     "unused-export|apps/api/src/services/billing/account.service.ts|manualPeriodFor",
-    "unused-export|apps/api/src/services/billing/account.service.ts|restoreFromBilling",
     "unused-export|apps/api/src/services/billing/account.service.ts|syncChildSubscriptions",
     "unused-export|apps/api/src/services/billing/account.service.ts|undoSubmittedReceipt",
     "unused-export|apps/api/src/services/billing/billing-parent.ts|ChildCoverage",

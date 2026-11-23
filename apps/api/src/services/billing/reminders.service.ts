@@ -193,7 +193,7 @@ async function sendDueReminderInner(subscriptionId: string, now: Date): Promise<
  * and it is won BEFORE anything is sent (inside the transaction that takes the decision where there is one),
  * so a retry, a re-run or a second worker sends nothing twice. `dueAt` is the period end the grace counts from.
  */
-export type GraceStage = 'grace_start' | 'grace_d1' | 'suspended';
+type GraceStage = 'grace_start' | 'grace_d1' | 'suspended';
 
 export async function claimGraceStage(
   tx: Pick<typeof prisma, 'billingReminder'>,
@@ -237,11 +237,12 @@ export async function deliverGraceStage(stage: StageKey, effect: BillingEffect):
  * A claimed-but-unsent stage is re-sent only after this long (the first run is still in its send), and not forever:
  * never once it is older than RESEND_GIVE_UP_MS, nor after RESEND_MAX_ATTEMPTS resends. `created_at` is immutable.
  */
-export const RESEND_AFTER_MS = 5 * 60_000;
-export const RESEND_GIVE_UP_MS = 2 * DAY;
+const RESEND_AFTER_MS = 5 * 60_000;
+const RESEND_GIVE_UP_MS = 2 * DAY;
+// pq-allow(unused-export): test seam, imported by tests/unit/billing-grace-suspension-d1.test.ts
 export const RESEND_MAX_ATTEMPTS = 5;
 /** How long one worker holds a row it is re-sending. */
-export const RESEND_LEASE_MS = 5 * 60_000;
+const RESEND_LEASE_MS = 5 * 60_000;
 const GRACE_STAGES = ['grace_start', 'grace_d1', 'suspended'] as const;
 
 /**
@@ -315,6 +316,7 @@ export async function resendUnsentGraceNotices(now: Date = new Date()): Promise<
  * `changes = 1`. It re-checks everything the scan filtered on (still unsent, no live lease, under the attempts cap, the
  * attempts value it read) and never touches `created_at`.
  */
+// pq-allow(unused-export): test seam, imported by tests/unit/billing-grace-suspension-d1.test.ts
 export async function leaseGraceStage(
   id: string,
   attemptsSeen: number,
