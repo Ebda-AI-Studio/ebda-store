@@ -10,6 +10,9 @@
 //     then enforced against DIR's baseline, not the PR's copy: the PR baseline may not contain an id DIR's lacks, no violation outside DIR's
 //     baseline is allowed, and none of the PR's eslint-suppressions.json may total more per rule than DIR's. DIR's .pr-quality.json also wins.
 //     A DIR with no baseline yet (the adoption PR) falls back to the plain check.
+//   --merge-base-baseline FILE  (CI) the baseline as it was at merge-base(base, PR head). The "PR may not ADD an id" test then compares against
+//     THIS, not the base tip: an id main removed after the PR branched is not the PR's doing, so a shrinking main never fails open PRs.
+//     Without it (or a merge-base with no baseline) the base tip's baseline is used, as before.
 // Config (.pr-quality.json): { "roots": ["apps","packages"], "locales": ["apps/web/messages"], "baseline": ".pr-quality-baseline.json",
 //   "skip": ["generated"], "frameworkExports": ["extra names"], "ruleExemptions": [{ "rule": "unused-export", "path": "<foundation.lock.json dir>",
 //   "reason": "...", "requires": "<foundation.lock.json parity test>" }] }.  Ruling SLOP-VENDORED-1: the ONLY exemption that exists. It waives the
@@ -270,10 +273,13 @@ function main() {
   for (const id of stale) { console.error(`slop-guard: FIXED but still in the baseline: ${id}  (run: node ${relative(root, process.argv[1])} --update)`); bad++; }
   if (baseRoot) {
     const bp = join(baseRoot, config.baseline ?? '.pr-quality-baseline.json');
-    if (existsSync(bp)) {
-      const B = new Set((readJsonRegular(bp).ids ?? []).filter((id) => !waivedId(id)));
-      for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the base branch's does not (it can only shrink): ${id}`); bad++; }
-      for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the base branch's baseline: ${current.get(id)}`); bad++; }
+    const mbPath = arg('--merge-base-baseline', null);
+    const refPath = mbPath && existsSync(mbPath) ? mbPath : bp;
+    const label = refPath === bp ? "base branch's" : "merge-base's";
+    if (existsSync(refPath)) {
+      const B = new Set((readJsonRegular(refPath).ids ?? []).filter((id) => !waivedId(id)));
+      for (const id of baseline ?? []) if (!B.has(id)) { console.error(`slop-guard: the PR baseline holds an id the ${label} does not (it can only shrink): ${id}`); bad++; }
+      for (const id of current.keys()) if (!B.has(id)) { console.error(`slop-guard: NEW vs the ${label} baseline: ${current.get(id)}`); bad++; }
     }
     for (const g of eslintGrowth(root, baseRoot, config.roots)) { console.error(`slop-guard: eslint suppressions grew vs the base branch (they can only shrink): ${g}`); bad++; }
   }

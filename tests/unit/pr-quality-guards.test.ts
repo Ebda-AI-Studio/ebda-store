@@ -189,6 +189,43 @@ describe('base-branch enforcement', () => {
     spawnSync('node', [cli, '--root', pr, '--update']);
     expect(guard(pr, b.root).status).toBe(0);
   });
+  describe('merge-base reference (main shrinks after the PR branched)', () => {
+    // merge-base = 2 baselined ids; main then fixes one (tip = 1 id); the PR branched before and is untouched
+    const setup = () => {
+      const mb = seed(2);
+      const tipFiles = { ...mb.files };
+      delete tipFiles['apps/a/src/f1.ts'];
+      delete tipFiles['apps/a/src/g1.ts'];
+      const tip = repo(tipFiles);
+      spawnSync('node', [cli, '--root', tip, '--update']);
+      const mbBaseline = join(mkdtempSync(join(tmpdir(), 'mb-')), 'baseline.json');
+      writeFileSync(mbBaseline, mb.files['.pr-quality-baseline.json']);
+      return { mb, tip, mbBaseline };
+    };
+    const guardMb = (pr: string, base: string, mbBaseline: string) =>
+      spawnSync(
+        'node',
+        [cli, '--root', pr, '--base-root', base, '--merge-base-baseline', mbBaseline],
+        {
+          encoding: 'utf8',
+        }
+      );
+    it('the tip alone false-fails an untouched PR, the merge-base reference passes it', () => {
+      const { mb, tip, mbBaseline } = setup();
+      const pr = repo(mb.files); // identical to the merge-base: the PR added nothing
+      expect(guard(pr, tip).status).toBe(1); // the structural false failure
+      expect(guardMb(pr, tip, mbBaseline).status).toBe(0);
+    });
+    it('a PR that ADDS an id still fails against the merge-base', () => {
+      const { mb, tip, mbBaseline } = setup();
+      const pr = repo({ ...mb.files, 'apps/a/src/f9.ts': src(9), 'apps/a/src/g9.ts': use(9) });
+      rmSync(join(pr, '.pr-quality-baseline.json'));
+      spawnSync('node', [cli, '--root', pr, '--update', '--init']); // self-consistent, hides the new id
+      const r = guardMb(pr, tip, mbBaseline);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/holds an id the merge-base's does not/);
+    });
+  });
   it('base config wins: a PR cannot narrow roots to skip files', () => {
     const b = seed(1);
     const pr = repo({ ...b.files, '.pr-quality.json': '{"roots":["nowhere"]}' });
