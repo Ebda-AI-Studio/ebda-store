@@ -7,6 +7,7 @@ const e = env as unknown as {
     get(id: unknown): {
       query(storeId: string, q: unknown[]): Promise<DoAnswer>;
       mutate(storeId: string, m: unknown): Promise<DoAnswer>;
+      authOp(storeId: string, op: string, argsJson: string): Promise<unknown>;
       applySettings(
         storeId: string,
         fieldsJson: string
@@ -76,4 +77,13 @@ export async function doDeleteMany(
     ops: [{ model, op: 'deleteMany', args: { where } }],
   });
   if (!a.ok) throw new Error(`DO refused: ${a.code} ${a.message ?? ''}`);
+}
+
+/** A customer-auth op on the StoreDO (what /auth/register and friends call): the customer accounts are `_cauth_*` tables, not Prisma models. */
+export function doAuthOp(
+  storeId: string,
+  op: string,
+  args: Record<string, unknown>
+): Promise<unknown> {
+  return e.STORE_DO.get(e.STORE_DO.idFromName(storeId)).authOp(storeId, op, JSON.stringify(args));
 }
