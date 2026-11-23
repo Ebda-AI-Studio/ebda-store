@@ -43,7 +43,7 @@ interface FeaturesContextType {
 }
 
 /** 404 STORE_NOT_FOUND (no such store) or 403 FORBIDDEN (not yours): both read as "not found" to the merchant. */
-export function isStoreMissingError(
+function isStoreMissingError(
   error: { status?: number; code?: string } | null | undefined
 ): boolean {
   if (!error) return false;

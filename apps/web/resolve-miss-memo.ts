@@ -12,6 +12,7 @@
  * first miss; `clearResolveMemory` (called on purge in this isolate) drops it at once. ONLY a definitive 404 is
  * recorded: a 429 / 5xx / network error / timeout is "could not ask" and is NEVER written here.
  */
+// pq-allow(unused-export): test seam, imported by apps/web/src/lib/__tests__/store-resolve-miss-memo.test.ts
 export const MISS_MEMO_TTL_MS = 10_000;
 const MAX_ENTRIES = 2_000;
 const SLOT = Symbol.for('ebda.web.resolveMissMemo');
