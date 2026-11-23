@@ -6,7 +6,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 const { apiGet, apiPut } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
 const confirmMock = vi.hoisted(() => vi.fn());
 vi.mock('../../hooks/useConfirm', () => ({ useConfirm: () => confirmMock }));
-vi.mock('../../lib/api', () => ({ apiGet, apiPut }));
+vi.mock('../../lib/api', async importActual => ({
+  ...(await importActual<typeof import('../../lib/api')>()),
+  apiGet,
+  apiPut,
+}));
 vi.mock('../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -20,7 +24,12 @@ vi.mock('../../i18n/useT', () => {
 });
 vi.mock('@ebda/ui', () => ({
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
-  Input: ({ label, ...p }: { label?: string }) => <input aria-label={label} {...p} />,
+  Input: ({ label, error, ...p }: { label?: string; error?: string }) => (
+    <>
+      <input aria-label={label} {...p} />
+      {error ? <span data-testid={`err-${label}`}>{error}</span> : null}
+    </>
+  ),
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 
@@ -83,5 +92,18 @@ describe('platform settings — Ebda VAT', () => {
     fireEvent.click(screen.getByRole('switch'));
     fireEvent.click(screen.getByText('vat.save'));
     expect(apiPut).not.toHaveBeenCalled();
+  });
+
+  it('renders the API field error under the field it names', async () => {
+    apiGet.mockResolvedValue({ data: { vat: off }, error: null });
+    apiPut.mockResolvedValue({
+      data: null,
+      error: { message: 'bad', status: 400, details: { rate: ['Rate out of range'] } },
+    });
+    render(<PlatformSettingsPage />);
+    await screen.findByText('vat.title');
+    fireEvent.click(screen.getByText('vat.save'));
+    await waitFor(() => expect(apiPut).toHaveBeenCalled());
+    expect((await screen.findByTestId('err-vat.rate')).textContent).toBe('Rate out of range');
   });
 });

@@ -17,7 +17,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { FeatureUpgradeGate } from '@/components/FeatureUpgradeGate';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiGet, apiPost, fieldErrorsFrom } from '@/lib/api';
+import { FieldError } from '@/components/FieldError';
 import { ALLOWED_CURRENCIES, withNumerals } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -65,6 +66,7 @@ export default function FxRatesPage() {
   const [formDate, setFormDate] = useState(todayIso());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formSuccess, setFormSuccess] = useState(false);
 
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function FxRatesPage() {
 
   async function handleSubmit() {
     setFormError(null);
+    setFieldErrors({});
     setFormSuccess(false);
     if (!formCurrency) {
       setFormError(t('errorCurrencyRequired'));
@@ -119,6 +122,7 @@ export default function FxRatesPage() {
         rateDate: formDate || undefined,
       });
       if (error) {
+        setFieldErrors(fieldErrorsFrom(error.details));
         setFormError(error.message ?? t('errorSaveFailed'));
         return;
       }
@@ -193,6 +197,7 @@ export default function FxRatesPage() {
                   </option>
                 ))}
               </select>
+              <FieldError message={fieldErrors.currency} />
             </label>
 
             <label className="block space-y-1">
@@ -208,6 +213,7 @@ export default function FxRatesPage() {
                 placeholder={t('rateExample2')}
                 className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
               />
+              <FieldError message={fieldErrors.rate} />
             </label>
 
             <label className="block space-y-1">
@@ -218,6 +224,7 @@ export default function FxRatesPage() {
                 onChange={e => setFormDate(e.target.value)}
                 className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
               />
+              <FieldError message={fieldErrors.rateDate} />
             </label>
           </div>
 

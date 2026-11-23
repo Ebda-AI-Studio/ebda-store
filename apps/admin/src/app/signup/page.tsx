@@ -7,7 +7,7 @@ import { useLocale } from 'next-intl';
 import { Input } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { PublicShell } from '../../components/onboarding/PublicShell';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, fieldErrorsFrom } from '../../lib/api';
 import { getEbdaTracker } from '../../lib/ebda-tracker';
 import { useAuth } from '../../lib/auth';
 import { validateSignup, type SignupFields } from '../../lib/onboarding-validation';
@@ -129,7 +129,24 @@ export default function SignupPage() {
         void loadFormToken();
         setFormError(tErr(error.code === 'SIGNUP_TOO_FAST' ? 'tooFast' : 'formExpired'));
       } else if (error.code === 'VALIDATION_ERROR' && error.details) {
-        setFormError(tErr('generic'));
+        // The API's field-level refusals land under the field they name, with that field's own (ar/en) sentence.
+        const fieldKeys = {
+          name: 'nameRequired',
+          email: 'emailInvalid',
+          phone: 'phoneInvalid',
+          password: 'passwordWeak',
+        } as const;
+        const flagged = Object.keys(fieldErrorsFrom(error.details)).filter(
+          (k): k is keyof typeof fieldKeys => k in fieldKeys
+        );
+        if (flagged.length > 0) {
+          setErrors(prev => ({
+            ...prev,
+            ...Object.fromEntries(flagged.map(k => [k, fieldKeys[k]])),
+          }));
+        } else {
+          setFormError(tErr('generic'));
+        }
       } else {
         setFormError(error.status === 429 ? tErr('rateLimited') : tErr('generic'));
       }

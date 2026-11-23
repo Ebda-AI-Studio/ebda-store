@@ -5,7 +5,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Badge, Modal, ModalBody, ModalFooter, Input, Label, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
+import { apiGet, apiPost, apiDelete, fieldErrorsFrom } from '../../../../lib/api';
+import { FieldError } from '../../../../components/FieldError';
 import { useAuth } from '../../../../lib/auth';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/i18n/useT';
@@ -55,6 +56,7 @@ export default function StoreStaffPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteFieldErrors, setInviteFieldErrors] = useState<Record<string, string>>({});
   const [inviteForm, setInviteForm] = useState({
     email: '',
     firstName: '',
@@ -71,6 +73,7 @@ export default function StoreStaffPage() {
   function resetInviteForm() {
     setInviteForm({ email: '', firstName: '', lastName: '' });
     setInviteError(null);
+    setInviteFieldErrors({});
   }
 
   function formatDate(date: string | null) {
@@ -111,6 +114,7 @@ export default function StoreStaffPage() {
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     setInviteError(null);
+    setInviteFieldErrors({});
     setInviting(true);
     try {
       const { data: added, error: apiError } = await apiPost<{ status?: string }>(
@@ -118,6 +122,7 @@ export default function StoreStaffPage() {
         inviteForm
       );
       if (apiError) {
+        setInviteFieldErrors(fieldErrorsFrom(apiError.details));
         setInviteError(apiError.message || t('toasts.addFailedDefault'));
         return;
       }
@@ -370,6 +375,7 @@ export default function StoreStaffPage() {
                 value={inviteForm.email}
                 onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })}
               />
+              <FieldError message={inviteFieldErrors.email} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -380,6 +386,7 @@ export default function StoreStaffPage() {
                   value={inviteForm.firstName}
                   onChange={e => setInviteForm({ ...inviteForm, firstName: e.target.value })}
                 />
+                <FieldError message={inviteFieldErrors.firstName} />
               </div>
               <div>
                 <Label htmlFor="staff-last">{t('addModal.lastNameLabel')}</Label>
@@ -389,6 +396,7 @@ export default function StoreStaffPage() {
                   value={inviteForm.lastName}
                   onChange={e => setInviteForm({ ...inviteForm, lastName: e.target.value })}
                 />
+                <FieldError message={inviteFieldErrors.lastName} />
               </div>
             </div>
             {inviteError && (

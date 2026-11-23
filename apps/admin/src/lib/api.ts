@@ -1038,6 +1038,8 @@ export function adminUiLocale(): 'ar' | 'en' {
  * Per-field messages from a VALIDATION_ERROR's `details` (`{ field: string[] }`, plus the bilingual sentence keys
  * which are skipped), so a form can show the error under the field instead of one generic line.
  */
+const FIELD_INVALID_AR = 'القيمة دي مش مظبوطة. راجعها وجرّب تاني.';
+
 export function fieldErrorsFrom(
   details: Record<string, unknown> | undefined
 ): Record<string, string> {
@@ -1050,7 +1052,9 @@ export function fieldErrorsFrom(
   const bilingual = bilingualOrRaw('', details);
   for (const [field, value] of fields) {
     const first = (value as unknown[]).find((v): v is string => typeof v === 'string');
-    if (first) out[field] = fields.length === 1 && bilingual ? bilingual : first;
+    // zod issue text is English only: in the Arabic UI a field without its own bilingual sentence gets a fixed Arabic one.
+    const own = fields.length === 1 && bilingual ? bilingual : null;
+    if (first) out[field] = own ?? (adminUiLocale() === 'ar' ? FIELD_INVALID_AR : first);
   }
   return out;
 }

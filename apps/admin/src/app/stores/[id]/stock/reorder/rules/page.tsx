@@ -11,7 +11,8 @@ import { RowActions } from '@/components/RowActions';
 import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useT } from '@/i18n/useT';
-import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost, fieldErrorsFrom } from '@/lib/api';
+import { FieldError } from '@/components/FieldError';
 
 interface Rule {
   id: string;
@@ -90,6 +91,7 @@ export default function ReorderRulesPage() {
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     if (!storeId) return;
@@ -174,6 +176,7 @@ export default function ReorderRulesPage() {
     }
     setSaving(true);
     setFormError(null);
+    setFieldErrors({});
     const common = {
       minQty,
       reorderQty,
@@ -192,6 +195,7 @@ export default function ReorderRulesPage() {
         });
     setSaving(false);
     if (apiError) {
+      setFieldErrors(fieldErrorsFrom(apiError.details));
       setFormError(apiError.status === 409 ? t('form.duplicate') : t('form.saveFailed'));
       return;
     }
@@ -231,6 +235,7 @@ export default function ReorderRulesPage() {
         onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
         className={FIELD}
       />
+      <FieldError message={fieldErrors[k]} />
     </label>
   );
 
@@ -325,6 +330,7 @@ export default function ReorderRulesPage() {
                     </option>
                   ))}
                 </select>
+                <FieldError message={fieldErrors.productId} />
               </label>
               {variants.length > 0 && (
                 <label className="block space-y-1 text-sm">
@@ -341,6 +347,7 @@ export default function ReorderRulesPage() {
                       </option>
                     ))}
                   </select>
+                  <FieldError message={fieldErrors.variantId} />
                 </label>
               )}
             </>
@@ -365,6 +372,7 @@ export default function ReorderRulesPage() {
                 </option>
               ))}
             </select>
+            <FieldError message={fieldErrors.preferredSupplierId} />
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input

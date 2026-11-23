@@ -11,7 +11,7 @@ import { type DragEndEvent } from '@dnd-kit/core';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { SearchInput } from '../../../../components/SearchInput';
-import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete, fieldErrorsFrom } from '../../../../lib/api';
 import { textFieldValue } from '../../../../lib/form-text';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryTable, type Category } from './CategoryTable';
@@ -384,8 +384,16 @@ export default function StoreCategoriesPage() {
         setTimeout(closeForm, 800);
       } else {
         const msg = apiError.message || (isEditing ? tForm('updateFailed') : tForm('createFailed'));
+        const apiFieldErrors = fieldErrorsFrom(apiError.details);
+        const shown = (['name', 'nameAr', 'slug'] as const).filter(k => apiFieldErrors[k]);
         if (msg.toLowerCase().includes('slug')) {
           setFormErrors(prev => ({ ...prev, slug: tForm('slugInUse') }));
+        } else if (shown.length > 0) {
+          // The API's field-level messages land under the field they belong to.
+          setFormErrors(prev => ({
+            ...prev,
+            ...Object.fromEntries(shown.map(k => [k, apiFieldErrors[k]])),
+          }));
         } else {
           setSaveMessage(msg);
         }

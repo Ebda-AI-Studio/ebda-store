@@ -12,7 +12,15 @@ import {
   type WebhookEventType,
 } from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../../../lib/api';
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+  fieldErrorsFrom,
+  type ApiError,
+} from '../../../../lib/api';
+import { FieldError } from '../../../../components/FieldError';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { planNamesJoined } from '@/lib/plan-labels';
@@ -74,6 +82,7 @@ export default function WebhooksPage() {
   const [editing, setEditing] = useState<Endpoint | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [secret, setSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -132,6 +141,7 @@ export default function WebhooksPage() {
   const openForm = (ep: Endpoint | null) => {
     setEditing(ep);
     setFormError(null);
+    setFieldErrors({});
     setForm(
       ep
         ? {
@@ -154,6 +164,7 @@ export default function WebhooksPage() {
     }
     setBusy('save');
     setFormError(null);
+    setFieldErrors({});
     const body = {
       url: form.url.trim(),
       description: form.description.trim() || null,
@@ -165,6 +176,7 @@ export default function WebhooksPage() {
       : await apiPost<{ endpoint: Endpoint; secret: string }>(base, body);
     setBusy(null);
     if (res.error) {
+      setFieldErrors(fieldErrorsFrom(res.error.details));
       setFormError(errText(res.error));
       return;
     }
@@ -440,6 +452,7 @@ export default function WebhooksPage() {
             <span className="mt-1 block text-xs font-normal text-muted-foreground">
               {t('form.urlHelp')}
             </span>
+            <FieldError message={fieldErrors.url} />
           </label>
           <label className="block text-xs font-medium text-foreground" dir="auto">
             {t('form.descriptionLabel')}
@@ -450,6 +463,7 @@ export default function WebhooksPage() {
               maxLength={120}
               dir="auto"
             />
+            <FieldError message={fieldErrors.description} />
           </label>
           <fieldset className="space-y-1">
             <legend className="text-xs font-medium text-foreground" dir="auto">
@@ -469,6 +483,7 @@ export default function WebhooksPage() {
                 <span>{eventLabel(ev)}</span>
               </label>
             ))}
+            <FieldError message={fieldErrors.events} />
           </fieldset>
           <label className="flex items-start gap-2 text-xs" dir="auto">
             <input

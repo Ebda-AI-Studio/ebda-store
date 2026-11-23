@@ -22,7 +22,7 @@ import {
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { Toggle } from '../../components/Toggle';
-import { apiGet, apiPut } from '../../lib/api';
+import { apiGet, apiPut, fieldErrorsFrom } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import { useConfirm } from '@/hooks/useConfirm';
 
@@ -39,6 +39,7 @@ function PlatformSettingsInner() {
   const [trn, setTrn] = useState('');
   const [legalName, setLegalName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   const apply = useCallback((v: PlatformVat) => {
@@ -61,6 +62,7 @@ function PlatformSettingsInner() {
 
   const save = async () => {
     setFormError(null);
+    setFieldErrors({});
     const rateNum = Number(rate);
     if (!Number.isFinite(rateNum) || rateNum <= 0 || rateNum > 100) {
       return setFormError(t('vat.invalidRate'));
@@ -92,6 +94,7 @@ function PlatformSettingsInner() {
     });
     setSaving(false);
     if (error || !data?.vat) {
+      setFieldErrors(fieldErrorsFrom(error?.details));
       setFormError(t('vat.saveFailed', { message: error?.message ?? '' }));
       toastError(t('vat.saveFailed', { message: error?.message ?? '' }));
       return;
@@ -133,6 +136,7 @@ function PlatformSettingsInner() {
             min={0}
             max={100}
             step="0.01"
+            error={fieldErrors.rate}
             value={rate}
             onChange={e => setRate(e.target.value)}
           />
@@ -155,11 +159,13 @@ function PlatformSettingsInner() {
             label={t('vat.trn')}
             dir="ltr"
             inputMode="numeric"
+            error={fieldErrors.trn}
             value={trn}
             onChange={e => setTrn(e.target.value)}
           />
           <Input
             label={t('vat.legalName')}
+            error={fieldErrors.legalName}
             value={legalName}
             onChange={e => setLegalName(e.target.value)}
           />
