@@ -34,7 +34,7 @@ export interface RefundQuote {
   canRefundToOriginal: boolean;
 }
 
-export interface LineChoice {
+interface LineChoice {
   checked: boolean;
   quantity: number;
   restock: boolean;

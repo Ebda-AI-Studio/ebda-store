@@ -490,7 +490,7 @@ export interface ReturnCreateArgs {
 }
 
 /** return_items.condition marker: the merchant chose not to restock this line (damaged / not resellable). */
-export const NO_RESTOCK_CONDITION = 'no_restock';
+const NO_RESTOCK_CONDITION = 'no_restock';
 
 function returnNumber(now: number): string {
   const b = new Uint8Array(3);
