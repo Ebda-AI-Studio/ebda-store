@@ -1,7 +1,15 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { cn } from '@ebda/ui';
@@ -39,9 +47,7 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  // The menu lives in a portal on <body>: inside a card grid every card is its own stacking context
-  // (transform animations, overflow clip), so an in-flow absolute menu rendered UNDER the next card.
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<CSSProperties | null>(null);
   const menuId = useId();
   const ordered = orderRowActionItems(items);
   const firstDestructive = ordered.findIndex(i => i.destructive);
@@ -53,36 +59,36 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
       if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
       setOpen(false);
     };
-    const onMove = () => setOpen(false);
+    const close = () => setOpen(false);
     document.addEventListener('mousedown', onDown);
-    window.addEventListener('resize', onMove);
-    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
     return () => {
       document.removeEventListener('mousedown', onDown);
-      window.removeEventListener('resize', onMove);
-      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
     };
   }, [open]);
 
-  // Place the menu against the trigger's inline-end edge, flipping above it when the viewport is short below.
+  // QA-86: the menu lives in a portal with fixed coordinates, so a table card's overflow (DataTable's
+  // overflow-x-auto) can never clip it. It sits under the trigger, end-aligned (left edge in RTL), and flips above
+  // the trigger when there is no room below.
   useLayoutEffect(() => {
-    if (!open || !triggerRef.current || !menuRef.current) {
-      setPos(null);
-      return;
-    }
+    if (!open || !triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
-    const m = menuRef.current.getBoundingClientRect();
+    const h = menuRef.current?.offsetHeight ?? 0;
+    const below = r.bottom + 4;
+    const top = below + h > window.innerHeight && r.top - 4 - h >= 0 ? r.top - 4 - h : below;
     const rtl = getComputedStyle(triggerRef.current).direction === 'rtl';
-    const left = rtl ? r.left : r.right - m.width;
-    const top = r.bottom + 4 + m.height > window.innerHeight ? r.top - 4 - m.height : r.bottom + 4;
-    setPos({
-      top: Math.max(4, top),
-      left: Math.min(Math.max(4, left), window.innerWidth - m.width - 4),
-    });
-  }, [open]);
+    setPos(
+      rtl
+        ? { top, left: Math.max(8, r.left) }
+        : { top, right: Math.max(8, window.innerWidth - r.right) }
+    );
+  }, [open, ordered.length]);
 
   useEffect(() => {
-    if (open && pos)
+    if (open)
       menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus();
   }, [open, pos]);
 
@@ -114,7 +120,7 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
     <div className="flex items-center gap-1">
       {primary}
       {ordered.length > 0 && (
-        <div className="relative" ref={rootRef}>
+        <div className="relative" ref={rootRef} onKeyDown={open ? onMenuKey : undefined}>
           <Button
             variant="outline"
             size="icon"
@@ -139,13 +145,7 @@ export function RowActions({ primary, items, menuLabel }: RowActionsProps) {
                 id={menuId}
                 ref={menuRef}
                 role="menu"
-                onKeyDown={onMenuKey}
-                style={{
-                  position: 'fixed',
-                  top: pos?.top ?? 0,
-                  left: pos?.left ?? 0,
-                  visibility: pos ? 'visible' : 'hidden',
-                }}
+                style={{ position: 'fixed', ...(pos ?? { top: 0, left: 0, visibility: 'hidden' }) }}
                 className="z-50 min-w-48 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
               >
                 {ordered.map((item, i) => {
