@@ -350,6 +350,27 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     cancelAtPeriodEnd: false,
   };
 
+  it('awaiting payment: no "renews on" date for a plan nobody has paid for', async () => {
+    mockApi(
+      billing({
+        subscription: {
+          status: 'active',
+          currentPeriodEnd: '2027-11-12T00:00:00.000Z',
+          trialEndsAt: null,
+          cancelAtPeriodEnd: false,
+        },
+        availablePlans: plans,
+        billing: {
+          ...instapayChosen,
+          nextCharge: { at: '2026-11-20T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect((await screen.findAllByText('status.awaiting_payment')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('renewsOn')).toBeNull();
+  });
+
   it('Plan & trial: trial end, chosen plan + interval, next charge with amount and plan', async () => {
     mockApi(
       billing({
@@ -465,6 +486,30 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     render(<StoreBillingPage />);
     expect(await screen.findByText('trial.nextCharge')).toBeTruthy();
     expect(screen.getByText(/^trial\.nextChargeLine:.*"interval":"intervalMonthly"/)).toBeTruthy();
+  });
+
+  it('BILLING-INTERVAL-PENDING-1: renewal quote keeps the current interval; the pending switch is its own line', async () => {
+    mockApi(
+      billing({
+        subscription: trialing,
+        availablePlans: plans,
+        billing: {
+          ...billingFixture(),
+          billingMethod: null,
+          cardBilling: false,
+          billingInterval: 'yearly',
+          pendingBillingInterval: 'monthly',
+          nextCharge: { at: '2027-11-12T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(
+      await screen.findByText(/^trial\.instapayDueLine:.*"interval":"intervalYearly"/)
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/^trial\.switchingInterval:.*"interval":"intervalMonthly"/)
+    ).toBeTruthy();
   });
 
   it('card on file: shows •••• 4242 and Replace card starts a billing-origin card setup', async () => {
