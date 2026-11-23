@@ -132,4 +132,13 @@ describe('decommission-neon guards', () => {
     expect(r.status).toBe(residueClean() ? 0 : 1);
     expect(r.stdout).toMatch(/file\(s\) still name Postgres/);
   });
+
+  it('the residue count never grows past the committed ratchet (shrinking-only)', () => {
+    const { max } = JSON.parse(
+      fs.readFileSync(path.join(root, 'scripts/cf/residue-ratchet.json'), 'utf8')
+    );
+    const n = Number(run(['residue']).stdout.match(/^(\d+) file\(s\)/)?.[1]);
+    expect(Number.isInteger(n)).toBe(true);
+    expect(n).toBeLessThanOrEqual(max);
+  });
 });
