@@ -65,6 +65,22 @@ const archiveListQuery = z.object({
 const localeQuery = z.object({ locale: z.enum(['ar', 'en']).optional() });
 const UUID = z.string().uuid();
 
+/**
+ * A printable document is inert HTML: every dynamic value is escaped in the renderer, and the response
+ * also forbids script (CSP), sniffing and caching, so stored data can never execute in the viewer's origin.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/fiscal-document-html-xss.test.ts
+export function sendFiscalHtml(res: Response, html: string): void {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'"
+  );
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.send(html);
+}
+
 const merchant = [
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
@@ -226,7 +242,7 @@ fiscalArchiveRoutes.get(
       if (deleted) {
         const d = deleted.documents.find(r => r.id === docId);
         if (!d) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-        res.type('html').send(renderFiscalDocumentHtml(d, locale ?? 'ar'));
+        sendFiscalHtml(res, renderFiscalDocumentHtml(d, locale ?? 'ar'));
         return;
       }
       const rows = (await hubOnD1())
@@ -234,7 +250,7 @@ fiscalArchiveRoutes.get(
         : await withUser(req.user!.userId, () => fiscalArchive(storeId));
       const doc = rows.find(r => r.id === docId);
       if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-      res.type('html').send(renderFiscalDocumentHtml(doc, locale ?? 'ar'));
+      sendFiscalHtml(res, renderFiscalDocumentHtml(doc, locale ?? 'ar'));
     } catch (error) {
       next(error);
     }
