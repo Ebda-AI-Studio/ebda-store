@@ -2065,8 +2065,7 @@ const GUEST_RETURN_BODY = {
 export const GUEST_RETURN_IP_MAX = 10;
 // pq-allow(unused-export): test seam, imported by apps/api/src/middleware/__tests__/guest-return-limiter.test.ts
 export const GUEST_RETURN_ORDER_MAX = 5;
-export const guestReturnIpLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'guest-return-ip'),
+export const guestReturnIpLimiter = plannedRateLimit('guest-return-ip', {
   windowMs: GUEST_RETURN_WINDOW_MS,
   max: GUEST_RETURN_IP_MAX,
   message: GUEST_RETURN_BODY,
@@ -2090,8 +2089,8 @@ function guestReturnOrderKey(req: Request): string {
     hdr('x-store-domain').toLowerCase();
   return createHash('sha256').update(`${store}:${num}`).digest('hex');
 }
-export const guestReturnOrderLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'guest-return-order'),
+export const guestReturnOrderLimiter = plannedRateLimit('guest-return-order', {
+  keyReadsBody: true, // the key is the order number from the body (plus the resolved store)
   windowMs: GUEST_RETURN_WINDOW_MS,
   max: GUEST_RETURN_ORDER_MAX,
   message: GUEST_RETURN_BODY,
