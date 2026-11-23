@@ -10,6 +10,9 @@
  * tombstone; a separate reserved-prefix list would add nothing (the reserved set lives in the vendored foundation and is exact-match).
  * ORDER matters: the row is first made unresolvable (soft-deleted, inactive) in a statement of its own, and only then renamed, so
  * the store stops resolving even if the rename fails.
+ *
+ * wa-plan: not-plan-state (the store_subscriptions UPDATE below clears only the card reference and the provider customer id; plan,
+ * status and period are untouched, so the WhatsApp plan observer has nothing to be told).
  */
 export const PURGED_SLUG_PREFIX = '~purged~';
 
@@ -49,13 +52,10 @@ export function tombstoneStatements(storeId: string, now: number = Date.now()): 
       `UPDATE "store_subscriptions" SET "provider_customer_id" = NULL, "payment_method_last4" = NULL WHERE "store_id" = ?1`
     ),
     set(
-      `UPDATE "instapay_receipts" SET "payer_name" = NULL, "payer_address" = NULL, "payer_mobile" = NULL, "payer_bank" = NULL, ` +
-        `"receiver_name" = NULL, "receiver_handle" = NULL, "receiver_mobile" = NULL, "note" = NULL, "extracted" = NULL, ` +
-        `"review_note" = NULL, "reviewed_by" = NULL, "personal_scrubbed_at" = COALESCE("personal_scrubbed_at", ?2) WHERE "store_id" = ?1`
+      `UPDATE "instapay_receipts" SET "payer_name" = NULL, "payer_address" = NULL, "payer_mobile" = NULL, "payer_bank" = NULL, "receiver_name" = NULL, "receiver_handle" = NULL, "receiver_mobile" = NULL, "note" = NULL, "extracted" = NULL, "review_note" = NULL, "reviewed_by" = NULL, "personal_scrubbed_at" = COALESCE("personal_scrubbed_at", ?2) WHERE "store_id" = ?1`
     ),
     set(
-      `UPDATE "manual_payment_claims" SET "payer_reference" = 'erased:' || "id", "proof_url" = NULL, "review_note" = NULL, ` +
-        `"reviewed_by" = NULL WHERE "store_id" = ?1 AND "payer_reference" NOT LIKE 'erased:%'`
+      `UPDATE "manual_payment_claims" SET "payer_reference" = 'erased:' || "id", "proof_url" = NULL, "review_note" = NULL, "reviewed_by" = NULL WHERE "store_id" = ?1 AND "payer_reference" NOT LIKE 'erased:%'`
     ),
     // the request kind, status and dates stay; the requester and the free text the merchant wrote do not
     set(
@@ -68,11 +68,7 @@ export function tombstoneStatements(storeId: string, now: number = Date.now()): 
       `UPDATE "provider_activation_requests" SET "requested_by_id" = NULL, "decided_by_id" = NULL WHERE "store_id" = ?1`
     ),
     {
-      sql:
-        `UPDATE "stores" SET "name" = '[purged]', "name_ar" = NULL, "slug" = '${PURGED_SLUG_PREFIX}' || "id", ` +
-        `"domain" = NULL, "domain_status" = NULL, "pending_domain" = NULL, "domain_claimed_at" = NULL, ` +
-        `"domain_verified_at" = NULL, "domain_provider" = NULL, "email_domain_id" = NULL, "email_domain_status" = NULL, ` +
-        `"email_domain_verified_at" = NULL, "logo" = NULL, "logo_ar" = NULL, "favicon" = NULL, "updated_at" = ?2 WHERE "id" = ?1`,
+      sql: `UPDATE "stores" SET "name" = '[purged]', "name_ar" = NULL, "slug" = '${PURGED_SLUG_PREFIX}' || "id", "domain" = NULL, "domain_status" = NULL, "pending_domain" = NULL, "domain_claimed_at" = NULL, "domain_verified_at" = NULL, "domain_provider" = NULL, "email_domain_id" = NULL, "email_domain_status" = NULL, "email_domain_verified_at" = NULL, "logo" = NULL, "logo_ar" = NULL, "favicon" = NULL, "updated_at" = ?2 WHERE "id" = ?1`,
       params: [storeId, now],
     },
   ];
