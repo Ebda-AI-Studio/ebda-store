@@ -17,3 +17,7 @@
 # SEO-4: content-hashed build output never changes under the same URL (staleness class: NEVER-changes).
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Barcode scanner WASM (zxing-wasm 3.1.7, self-hosted; version in the path, so the URL never changes content).
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable

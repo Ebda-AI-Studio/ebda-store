@@ -1,0 +1,4 @@
+{
+  "_": "NEON-ZERO residue ratchet: `node scripts/cf/decommission-neon.mjs residue` must report <= max. Lower it in the same PR that removes files; never raise it.",
+  "max": 415
+}

@@ -2,7 +2,7 @@
  * FIX-003 — the DB role guard runs and is awaited BEFORE listen(), fails
  * CLOSED in production, covers superusers, and keeps the explicit
  * ALLOW_BYPASSRLS_ROLE hatch (inherited from Ebda). Node shell only; the
- * Workers shell's guard is cf/database-role-guard.ts.
+ * Workers shell has no guard (no Postgres).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
