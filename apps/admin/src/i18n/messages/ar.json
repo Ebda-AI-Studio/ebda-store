@@ -599,7 +599,11 @@
         "draft": "مسودة",
         "archived": "مؤرشف",
         "allCategories": "كل الفئات",
-        "categoryAriaLabel": "تصفية المنتجات حسب الفئة"
+        "categoryAriaLabel": "تصفية المنتجات حسب الفئة",
+        "model3dAriaLabel": "فلتر المنتجات حسب الموديل 3D",
+        "model3dAny": "أي موديل 3D",
+        "model3dWith": "عندها موديل 3D",
+        "model3dWithout": "من غير موديل 3D"
       },
       "status": {
         "active": "نشط",

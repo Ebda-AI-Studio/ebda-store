@@ -14,6 +14,9 @@ interface ProductFiltersProps {
   categoryFilter: string;
   categoryOptions: { value: string; label: string }[];
   onCategoryFilterChange: (categoryId: string) => void;
+  /** '' = all products, 'yes' = only with a 3D model, 'no' = only without. */
+  model3dFilter: '' | 'yes' | 'no';
+  onModel3dFilterChange: (value: '' | 'yes' | 'no') => void;
 }
 
 const STATUS_VALUES: StatusFilter[] = ['all', 'active', 'draft', 'archived'];
@@ -26,6 +29,8 @@ export function ProductFilters({
   categoryFilter,
   categoryOptions,
   onCategoryFilterChange,
+  model3dFilter,
+  onModel3dFilterChange,
 }: ProductFiltersProps) {
   const t = useT('products.list.filters');
 
@@ -57,6 +62,17 @@ export function ProductFilters({
             ))}
           </select>
         )}
+        <select
+          value={model3dFilter}
+          onChange={e => onModel3dFilterChange(e.target.value as '' | 'yes' | 'no')}
+          aria-label={t('model3dAriaLabel')}
+          data-testid="filter-has-3d"
+          className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+        >
+          <option value="">{t('model3dAny')}</option>
+          <option value="yes">{t('model3dWith')}</option>
+          <option value="no">{t('model3dWithout')}</option>
+        </select>
       </div>
 
       <StatusFilterPills

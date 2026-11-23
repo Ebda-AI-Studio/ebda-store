@@ -57,6 +57,10 @@ export default function StoreProductsPage() {
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
   const [categoryFilter, setCategoryFilter] = useState<string>(searchParams.get('category') ?? '');
+  const [model3dFilter, setModel3dFilter] = useState<'' | 'yes' | 'no'>(() => {
+    const v = searchParams.get('model3d');
+    return v === 'yes' || v === 'no' ? v : '';
+  });
   const [categories, setCategories] = useState<{ id: string; name: string; nameAr?: string }[]>([]);
   const [page, setPage] = useState(() => {
     const p = parseInt(searchParams.get('page') ?? '1', 10);
@@ -93,6 +97,7 @@ export default function StoreProductsPage() {
       });
       if (statusFilter !== 'all') queryParams.append('status', statusFilter);
       if (categoryFilter) queryParams.append('category', categoryFilter);
+      if (model3dFilter) queryParams.append('has3d', model3dFilter === 'yes' ? 'true' : 'false');
       if (search) queryParams.append('search', search);
 
       // API returns `{ products, meta }`; we used to read `data.pagination`,
@@ -114,7 +119,17 @@ export default function StoreProductsPage() {
     } finally {
       if (isLatest()) setLoading(false);
     }
-  }, [isAuthenticated, storeId, page, limit, statusFilter, categoryFilter, search, beginRequest]);
+  }, [
+    isAuthenticated,
+    storeId,
+    page,
+    limit,
+    statusFilter,
+    categoryFilter,
+    model3dFilter,
+    search,
+    beginRequest,
+  ]);
 
   // Load the category list once (for the category filter dropdown).
   useEffect(() => {
@@ -136,10 +151,11 @@ export default function StoreProductsPage() {
     if (search) qp.set('q', search);
     if (statusFilter !== 'active') qp.set('status', statusFilter);
     if (categoryFilter) qp.set('category', categoryFilter);
+    if (model3dFilter) qp.set('model3d', model3dFilter);
     if (page > 1) qp.set('page', String(page));
     const qs = qp.toString();
     return `/stores/${storeId}/products${qs ? `?${qs}` : ''}`;
-  }, [storeId, search, statusFilter, categoryFilter, page]);
+  }, [storeId, search, statusFilter, categoryFilter, model3dFilter, page]);
 
   // Mirror the current filter state into the URL (replace, no history spam) so
   // Back from a product restores the same search + category + status + page.
@@ -251,7 +267,8 @@ export default function StoreProductsPage() {
   const hasActiveFilters =
     Boolean(search) ||
     (statusFilter !== 'all' && statusFilter !== 'active') ||
-    Boolean(categoryFilter);
+    Boolean(categoryFilter) ||
+    Boolean(model3dFilter);
 
   return (
     <AdminLayout
@@ -267,6 +284,11 @@ export default function StoreProductsPage() {
         categoryFilter={categoryFilter}
         categoryOptions={categoryOptions}
         onCategoryFilterChange={handleCategoryFilterChange}
+        model3dFilter={model3dFilter}
+        onModel3dFilterChange={value => {
+          setModel3dFilter(value);
+          setPage(1);
+        }}
       />
 
       <ProductsTable
