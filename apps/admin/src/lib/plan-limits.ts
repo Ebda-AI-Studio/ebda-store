@@ -10,7 +10,7 @@
  */
 export type LimitLevel = 'ok' | 'warn' | 'full';
 
-export const WARN_AT = 0.8;
+const WARN_AT = 0.8;
 
 export function limitPct(used: number, limit: number | null): number {
   if (limit === null) return 0;

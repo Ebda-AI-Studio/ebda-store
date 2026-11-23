@@ -17,6 +17,7 @@ import { useT } from '@/i18n/useT';
 import { apiDelete, apiFetch, apiGet, apiPost, apiPut, localizedApiMessage } from '@/lib/api';
 import { openProtectedDocument } from '@/lib/open-document';
 import { useConfirm } from '@/hooks/useConfirm';
+import { TaxChangeRequest } from './TaxChangeRequest';
 
 import { Button } from '@/components/ui/Button';
 export interface TaxDocument {
@@ -446,6 +447,8 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
           <p className="text-xs text-muted-foreground">{t('submit.disclaimer')}</p>
         </div>
       )}
+
+      {status === 'verified' && <TaxChangeRequest storeId={storeId} />}
 
       {message && (
         <p
