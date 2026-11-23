@@ -17,9 +17,9 @@
     "note": "n/a"
   },
   "operatorReason": {
-    "code": "money-dispute",
-    "text": "repairs ledger rows for paid orders the books missed; money data, a dry run first",
-    "validUnderRule": false
+    "code": "critical",
+    "text": "repairs missing ledger rows for paid orders; a books-integrity fix only staff can run (dry run first, idempotent)",
+    "validUnderRule": true
   },
   "helpArticle": null,
   "questions": {
