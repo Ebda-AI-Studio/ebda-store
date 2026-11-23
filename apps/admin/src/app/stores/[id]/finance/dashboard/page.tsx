@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
@@ -84,6 +85,7 @@ export default function FinanceDashboardPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('finance.dashboard');
+  const adminLocale = useLocale() === 'ar' ? 'ar' : 'en';
   const tc = useT('common');
 
   const [period, setPeriod] = useState<Period>('this_month');
@@ -236,16 +238,8 @@ export default function FinanceDashboardPage() {
     {
       header: '',
       primaryOnMobile: true,
-      cell: row => (
-        <>
-          {row.nameEn}
-          {row.nameAr && (
-            <span className="text-muted-foreground ms-2 text-xs" dir="rtl">
-              — {row.nameAr}
-            </span>
-          )}
-        </>
-      ),
+      // STORE-QA-11: one name in the page language, never "English— Arabic" glued together.
+      cell: row => <>{(adminLocale === 'ar' && row.nameAr) || row.nameEn}</>,
     },
     {
       header: '',

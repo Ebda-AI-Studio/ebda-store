@@ -37,8 +37,6 @@ interface StatsGridProps {
   guestCheckout?: boolean;
 }
 
-const formatMajor = formatPrice;
-
 /**
  * Four-column summary cards at the top of the abandoned carts page.
  * Pure presentational component — receives already-fetched stats.
@@ -49,13 +47,16 @@ export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
 
   // Nothing recorded on a guest-checkout store = not tracked, not "0".
   if (isUntrackedForGuests(stats?.totalAbandoned ?? 0, guestCheckout)) {
-    const note = tGuest('notTracked');
+    // STORE-QA-27: four tiles repeating the caveat read as a broken page. Dashes in the tiles, ONE sentence explaining why.
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={t('totalAbandoned')} value={note} muted />
-        <StatCard label={t('recovered')} value={note} muted />
-        <StatCard label={t('recoveryRate')} value={note} muted />
-        <StatCard label={t('recoveredRevenue')} value={note} muted />
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label={t('totalAbandoned')} value="—" muted />
+          <StatCard label={t('recovered')} value="—" muted />
+          <StatCard label={t('recoveryRate')} value="—" muted />
+          <StatCard label={t('recoveredRevenue')} value="—" muted />
+        </div>
+        <p className="text-xs text-muted-foreground">{tGuest('abandonedExplainer')}</p>
       </div>
     );
   }
@@ -81,11 +82,7 @@ export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
       />
       <StatCard
         label={t('recoveredRevenue')}
-        value={
-          stats?.recoveredRevenue != null
-            ? t('baseValue', { amount: formatMajor(stats.recoveredRevenue) })
-            : notTracked
-        }
+        value={stats?.recoveredRevenue != null ? formatPrice(stats.recoveredRevenue) : notTracked}
         muted={stats?.recoveredRevenue == null}
         sub={sub}
       />

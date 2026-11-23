@@ -7,8 +7,8 @@ import { useT } from '@/i18n/useT';
 import { apiGetQuiet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 
-import { formatPrice } from '../../../../lib/format';
-import { ledgerCostsStatus, stockValueState } from '../../../../lib/money-truth';
+import { formatPrice } from '@/lib/format';
+import { ledgerCostsStatus, stockValueState } from '@/lib/money-truth';
 interface FinanceDashboard {
   thisMonth: {
     revenue: number;
