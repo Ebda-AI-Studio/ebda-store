@@ -63,6 +63,8 @@ function rig() {
 describe('registration', () => {
   it.each([
     'analyticsPeriod',
+    'analyticsNetRevenue',
+    'analyticsNetRevenueDays',
     'analyticsSales',
     'analyticsItems',
     'analyticsOrdersBy',
@@ -280,5 +282,236 @@ describe('analyticsCashflow', () => {
       { dayMs: day, net: 700 },
       { dayMs: day + D, net: 200 },
     ]);
+  });
+});
+
+// STORE-QA-7: a refunded order is not revenue (full refund excluded, partial refund netted), on every DO revenue read.
+describe('refunds are not revenue (STORE-QA-7)', () => {
+  const refund = (raw: any, id: string, orderId: string, amount: number, status = 'completed') =>
+    raw
+      .prepare(
+        `INSERT INTO returns (id, store_id, order_id, customer_id, return_number, type, status, reason, refund_amount)
+         VALUES (?, 's1', ?, 'u1', ?, 'return', ?, 'r', ?)`
+      )
+      .run(id, orderId, `R-${id}`, status, amount);
+  const pay = (raw: any, id: string, orderId: string, refunded: number) =>
+    raw
+      .prepare(
+        `INSERT INTO payments (id, order_id, provider, status, amount, refunded_amount) VALUES (?, ?, 'cod', 'completed', 5000, ?)`
+      )
+      .run(id, orderId, refunded);
+  const win = { startMs: T0 - D, endMs: T0 + D, nonRevenue: NON_REV };
+
+  it('a delivered order whose payment is refunded counts as 0 in every revenue read', () => {
+    const { op, order, item } = rig();
+    order('ok', T0, 'delivered', 'paid', 1000, 'u1');
+    order('qa7', T0 + H, 'delivered', 'refunded', 4850, 'u2'); // the Amelia order: delivered + payment refunded
+    item('a', 'ok', 'p1', 1, 1000, null);
+    item('b', 'qa7', 'p2', 1, 4850, null);
+    expect(op('analyticsPeriod', win)).toMatchObject({ revenue: 1000, orders: 1 });
+    expect(
+      op('analyticsSales', { ...win, offsetMinutes: 0, granularity: 'day' }).map(
+        (r: any) => r.revenue
+      )
+    ).toEqual([1000]);
+    expect(op('analyticsItems', { ...win, by: 'product' })).toEqual([
+      { productId: 'p1', quantity: 1, total: 1000 },
+    ]);
+    expect(op('analyticsCustomers', win).top).toEqual([
+      { customerId: 'u1', total: 1000, count: 1 },
+    ]);
+    expect(op('analyticsNetRevenue', {})).toEqual({ revenue: 1000, orders: 1 });
+    expect(op('analyticsNetRevenue', { paidOnly: true })).toEqual({ revenue: 1000, orders: 1 });
+  });
+
+  it('a PARTIAL refund is netted: completed non-exchange returns count, pending/cancelled ones do not', () => {
+    const { raw, op, order } = rig();
+    order('o1', T0, 'delivered', 'paid', 5000, 'u1');
+    refund(raw, 'r1', 'o1', 1200);
+    refund(raw, 'r2', 'o1', 300);
+    refund(raw, 'r3', 'o1', 9999, 'pending'); // not refunded yet
+    refund(raw, 'r4', 'o1', 9999, 'cancelled');
+    expect(op('analyticsPeriod', win)).toMatchObject({ revenue: 5000 - 1500, orders: 1 });
+    expect(op('analyticsSales', { ...win, offsetMinutes: 0, granularity: 'day' })[0].revenue).toBe(
+      3500
+    );
+    expect(op('analyticsCustomers', win).top[0].total).toBe(3500);
+    expect(op('analyticsNetRevenue', { paidOnly: true }).revenue).toBe(3500);
+  });
+
+  it('one refund recorded on BOTH the return and the payment is subtracted once (GREATEST, not +)', () => {
+    const { raw, op, order } = rig();
+    order('o1', T0, 'delivered', 'paid', 5000, 'u1');
+    refund(raw, 'r1', 'o1', 2000);
+    pay(raw, 'p1', 'o1', 2000);
+    expect(op('analyticsPeriod', win).revenue).toBe(3000);
+  });
+
+  it('a payment-only partial refund (provider dashboard) is netted; the refund is capped at the order total', () => {
+    const { raw, op, order } = rig();
+    order('o1', T0, 'delivered', 'paid', 5000, 'u1');
+    pay(raw, 'p1', 'o1', 700);
+    expect(op('analyticsPeriod', win).revenue).toBe(4300);
+    pay(raw, 'p2', 'o1', 99999);
+    expect(op('analyticsPeriod', win).revenue).toBe(0);
+  });
+
+  it('per-line revenue nets a partial refund pro rata and the lines add back to the order net (no piastre lost)', () => {
+    const { raw, op, order, item } = rig();
+    order('o1', T0, 'delivered', 'paid', 3000, 'u1');
+    item('a', 'o1', 'p1', 1, 1000, null); // 1/3
+    item('b', 'o1', 'p2', 1, 2000, null); // 2/3
+    refund(raw, 'r1', 'o1', 1000);
+    const by = Object.fromEntries(
+      op('analyticsItems', { ...win, by: 'product' }).map((r: any) => [r.productId, r.total])
+    );
+    expect(by.p1 + by.p2).toBe(2000); // == the order net (analyticsPeriod)
+    expect(op('analyticsPeriod', win).revenue).toBe(2000);
+    expect(by).toEqual({ p1: 667, p2: 1333 });
+    // price-source buckets use the same net lines
+    const src = op('analyticsItems', { ...win, by: 'priceSource' });
+    expect(src.reduce((n: number, r: any) => n + r.total, 0)).toBe(2000);
+  });
+
+  it('a fully refunded order has no line revenue; an unrefunded order is unchanged', () => {
+    const { raw, op, order, item } = rig();
+    order('o1', T0, 'delivered', 'paid', 1000, 'u1');
+    item('a', 'o1', 'p1', 1, 1000, null);
+    order('o2', T0 + H, 'delivered', 'paid', 500, 'u2');
+    item('b', 'o2', 'p2', 1, 500, null);
+    pay(raw, 'pm', 'o1', 99999);
+    expect(op('analyticsItems', { ...win, by: 'product' })).toEqual([
+      { productId: 'p2', quantity: 1, total: 500 }, // top first
+      { productId: 'p1', quantity: 1, total: 0 }, // fully refunded: no line revenue
+    ]);
+  });
+
+  it('gross mode (the GL reconciliation) keeps whole-order totals but still drops refunded/cancelled populations', () => {
+    const { raw, op, order } = rig();
+    order('o1', T0, 'delivered', 'paid', 5000, 'u1');
+    refund(raw, 'r1', 'o1', 1500);
+    order('o2', T0 + H, 'delivered', 'refunded', 700, 'u2');
+    expect(op('analyticsNetRevenue', { paidOnly: true, gross: true })).toEqual({
+      revenue: 5000,
+      orders: 1,
+    });
+    expect(op('analyticsNetRevenue', { paidOnly: true })).toEqual({ revenue: 3500, orders: 1 });
+  });
+
+  it('line allocation never goes negative: refund > line sum (shipping in the refund) leaves every line at 0', () => {
+    const { raw, op, order, item } = rig();
+    // total 4910 = lines 4850 + 60 shipping; the full 4910 is recorded on the payment while payment_status is still 'paid'
+    order('o1', T0, 'delivered', 'paid', 4910, 'u1');
+    item('a', 'o1', 'p1', 1, 1850, null);
+    item('b', 'o1', 'p2', 1, 3000, null);
+    pay(raw, 'pm', 'o1', 4910);
+    const rows = op('analyticsItems', { ...win, by: 'product' });
+    expect(rows.map((r: any) => r.total)).toEqual([0, 0]);
+    expect(
+      op('analyticsItems', { ...win, by: 'priceSource' }).reduce(
+        (n: number, r: any) => n + r.total,
+        0
+      )
+    ).toBe(0);
+  });
+
+  it('refund exactly equal to the line sum leaves every line at 0', () => {
+    const { raw, op, order, item } = rig();
+    order('o1', T0, 'delivered', 'paid', 4850, 'u1');
+    item('a', 'o1', 'p1', 1, 1850, null);
+    item('b', 'o1', 'p2', 1, 3000, null);
+    refund(raw, 'r1', 'o1', 4850);
+    expect(op('analyticsItems', { ...win, by: 'product' }).map((r: any) => r.total)).toEqual([
+      0, 0,
+    ]);
+  });
+
+  it('STORE-QA-54: one unpaid COD + one paid: sales surfaces count both, paid surfaces count the paid one only', () => {
+    const { op, order } = rig();
+    order('paid', T0, 'delivered', 'paid', 4850, 'u1');
+    order('cod', T0 + H, 'pending', 'unpaid', 4910, 'u2'); // pending unpaid COD
+    // "sales" (analytics KPI, chart): base definition, unpaid COD included
+    expect(op('analyticsPeriod', win)).toMatchObject({ revenue: 9760, orders: 2 });
+    expect(op('analyticsNetRevenue', {})).toEqual({ revenue: 9760, orders: 2 });
+    // "paid" / cash surfaces (rollups, usage snapshot, insights, platform dashboards): paidOnly
+    expect(op('analyticsNetRevenue', { paidOnly: true })).toEqual({ revenue: 4850, orders: 1 });
+  });
+
+  const payWith = (
+    raw: any,
+    id: string,
+    orderId: string,
+    provider: string,
+    createdAt = 1,
+    status = 'pending'
+  ) =>
+    raw
+      .prepare(
+        `INSERT INTO payments (id, order_id, provider, status, amount, refunded_amount, created_at) VALUES (?, ?, ?, ?, 5000, 0, ?)`
+      )
+      .run(id, orderId, provider, status, createdAt);
+
+  it('REVENUE-DEF-1: an unpaid order counts only when it is COD / has no online attempt; an abandoned card checkout is 0', () => {
+    const { raw, op, order } = rig();
+    order('cod', T0, 'pending', 'unpaid', 3000, 'u1');
+    payWith(raw, 'pc', 'cod', 'cod');
+    order('phone', T0 + H, 'pending', 'unpaid', 500, 'u2'); // admin/phone order: no payment row at all
+    order('card', T0 + 2 * H, 'pending', 'unpaid', 4910, 'u3'); // abandoned at the gateway
+    payWith(raw, 'pk', 'card', 'paymob');
+    order('wallet', T0 + 3 * H, 'pending', 'unpaid', 700, 'u4');
+    payWith(raw, 'pw', 'wallet', 'fawry');
+    order('cardpaid', T0 + 4 * H, 'confirmed', 'paid', 1000, 'u5'); // an online order that WAS paid is a sale
+    payWith(raw, 'pp', 'cardpaid', 'paymob');
+    expect(op('analyticsPeriod', win)).toMatchObject({ revenue: 3000 + 500 + 1000, orders: 3 });
+    expect(op('analyticsNetRevenue', {})).toEqual({ revenue: 4500, orders: 3 });
+    expect(op('analyticsNetRevenue', { paidOnly: true })).toEqual({ revenue: 1000, orders: 1 });
+    expect(op('analyticsSales', { ...win, offsetMinutes: 0, granularity: 'day' })[0].revenue).toBe(
+      4500
+    );
+    expect(
+      op('analyticsCustomers', win)
+        .top.map((r: any) => r.customerId)
+        .sort()
+    ).toEqual(['u1', 'u2', 'u5']);
+  });
+
+  it('REVENUE-DEF-1b: the LATEST payment row decides: failed card then COD counts, a pending card alone does not', () => {
+    const { raw, op, order } = rig();
+    // card failed, then the shopper chose COD: the latest attempt is COD -> a sale
+    order('switch', T0, 'pending', 'unpaid', 2000, 'u1');
+    payWith(raw, 'a1', 'switch', 'paymob', 100, 'failed');
+    payWith(raw, 'a2', 'switch', 'cod', 200, 'cod_pending');
+    // only a pending card attempt -> abandoned at the gateway
+    order('pending-card', T0 + H, 'pending', 'unpaid', 3000, 'u2');
+    payWith(raw, 'b1', 'pending-card', 'paymob', 100, 'pending');
+    // COD first, then the shopper went online and left: the latest attempt is online -> not a sale
+    order('cod-then-card', T0 + 2 * H, 'pending', 'unpaid', 700, 'u3');
+    payWith(raw, 'c1', 'cod-then-card', 'cod', 100, 'cod_pending');
+    payWith(raw, 'c2', 'cod-then-card', 'fawry', 200, 'pending');
+    // equal created_at: the higher id is the later row
+    order('tie', T0 + 3 * H, 'pending', 'unpaid', 400, 'u4');
+    payWith(raw, 'd1', 'tie', 'paymob', 100, 'failed');
+    payWith(raw, 'd2', 'tie', 'cod', 100, 'cod_pending');
+    expect(op('analyticsPeriod', win)).toMatchObject({ revenue: 2000 + 400, orders: 2 });
+    expect(op('analyticsNetRevenue', {})).toEqual({ revenue: 2400, orders: 2 });
+  });
+
+  it('netRevenueDays: ONE query returns each window own net total (refunds netted, windows disjoint)', () => {
+    const { raw, op, order } = rig();
+    order('d1', T0, 'delivered', 'paid', 5000, 'u1');
+    refund(raw, 'r1', 'd1', 1200);
+    order('d2', T0 + D, 'delivered', 'paid', 700, 'u2');
+    order('d2b', T0 + D + H, 'delivered', 'unpaid', 300, 'u3'); // not paid-only
+    const w = [
+      { fromMs: T0 - H, toMs: T0 + H },
+      { fromMs: T0 + D - H, toMs: T0 + D + 2 * H },
+      { fromMs: T0 + 5 * D, toMs: T0 + 6 * D }, // empty window still returns a row
+    ];
+    expect(op('analyticsNetRevenueDays', { windows: w, paidOnly: true })).toEqual([
+      { revenue: 3800, orders: 1 },
+      { revenue: 700, orders: 1 },
+      { revenue: 0, orders: 0 },
+    ]);
+    expect(op('analyticsNetRevenueDays', { windows: w })[1]).toEqual({ revenue: 1000, orders: 2 });
   });
 });

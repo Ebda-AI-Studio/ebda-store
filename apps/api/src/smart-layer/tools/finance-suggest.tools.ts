@@ -645,7 +645,7 @@ const financeOverview = readTool<{ from?: string; to?: string }>({
   name: 'finance_overview',
   capabilityId: 'finance.overview-reports',
   description:
-    'The finance dashboard (أرباحي الشهر ده كام؟ / المصروفات كام؟): revenue, expenses and net profit for a period (default this month), cash and bank balances, stock value and balance-sheet totals, all in EGP.',
+    'The finance dashboard (أرباحي الشهر ده كام؟ / المصروفات كام؟): revenue, expenses and net profit for a period (default this month; revenue and profit come from the LEDGER, i.e. posted journal entries, so refunds reverse them and unpaid COD is not in it until it is booked), cash and bank balances, stock value and balance-sheet totals, all in EGP.',
   schema: rangeShape,
   gate: FINANCE_READ,
   read: async (ctx, a) => {
@@ -684,7 +684,7 @@ const financePnl = readTool<{ from?: string; to?: string }>({
   name: 'finance_profit_and_loss',
   capabilityId: 'finance.overview-reports',
   description:
-    'Profit and loss report (تقرير الأرباح والخسائر) for a period (default last 30 days): top revenue and expense accounts, totals and net income in EGP.',
+    'Profit and loss report (تقرير الأرباح والخسائر) for a period (default last 30 days): top revenue and expense accounts, totals and net income in EGP, from the LEDGER (posted journal entries, net of posted refund reversals), not the order-based sales figure.',
   schema: rangeShape,
   gate: FINANCE_READ,
   read: async (ctx, a) => {
