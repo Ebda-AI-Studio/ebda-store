@@ -1,31 +1,47 @@
 {
   "id": "self.provider-self-activation",
-  "status": "planned",
-  "plan": "audit gap 5",
+  "status": "live",
   "area": "payments",
   "version": 1,
   "versionDate": "2026-11-14",
-  "titleAr": "تفعيل البوابة تلقائي",
-  "titleEn": "Provider auto-activates when my Test connection passes",
-  "screens": ["/stores/[id]/payment-settings"],
-  "api": ["(planned)"],
+  "titleAr": "شغّل بوابة الدفع أو شركة الشحن بنفسي",
+  "titleEn": "Turn on a payment gateway or shipping carrier myself",
+  "screens": ["/stores/[id]/payment-settings", "/stores/[id]/shipping-carriers"],
+  "api": [
+    "POST /provider-activation/store/:storeId/:provider/activate/preview",
+    "POST /provider-activation/store/:storeId/:provider/activate/confirm"
+  ],
   "mcpTool": null,
   "planGate": null,
   "roles": ["owner", "super_admin"],
-  "policy": "preview",
+  "policy": "confirm",
   "undo": {
-    "class": "reversible",
-    "note": "yes"
+    "class": "compensating"
   },
-  "helpArticle": null,
+  "helpArticle": "payment-providers",
   "questions": {
-    "ar": ["ليه البوابة لسه مش مفعلة؟"],
-    "en": ["Why is my provider not active yet?"]
+    "ar": ["ليه البوابة لسه مش مفعلة؟", "ازاي أشغّل باي موب؟", "الاختبار فشل ومش عارف ليه"],
+    "en": [
+      "Why is my provider not active yet?",
+      "How do I turn on Kashier?",
+      "The connection test failed, why?"
+    ]
   },
-  "steps": ["Today: Test then request activation, super-admin completes."],
-  "edgeCases": [
-    "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",
-    "Concurrency: preview carries the etag/version read; if data changed before apply the assistant re-previews instead of applying"
+  "steps": [
+    "Save the provider keys on the card",
+    "Press the on switch: Ebda Store tests the saved keys on the server",
+    "If the test passes, confirm Test and turn on; if it fails, read the one-sentence reason and fix the keys"
   ],
-  "gaps": ["gap 5"]
+  "edgeCases": [
+    "The test result always comes from the server; nothing in the request can make it pass",
+    "The confirmation is single use, expires in 2 minutes and is bound to this provider, this mode and this exact test run: a newer test, edited keys or another user refuses it",
+    "The confirm call needs an Idempotency-Key; the same key twice enables once",
+    "A provider with no safe test call turns on with an unverified warning and the Ebda Store team is paged on its first connection (P1)",
+    "Another store's provider answers 404; staff without store settings permission are refused",
+    "The failure sentence is AI-written from the measured error code only (never keys); the fixed sentence is the fallback",
+    "Turn it off from the same switch; platform staff can also deactivate it for a store with a note",
+    "The old toggle and carrier switch refuse a merchant turning a provider ON with 409 CONFIRMATION_REQUIRED; turning OFF is free",
+    "A provider the platform team turned off for a store answers 409 PROVIDER_BLOCKED until they unblock it"
+  ],
+  "gaps": []
 }

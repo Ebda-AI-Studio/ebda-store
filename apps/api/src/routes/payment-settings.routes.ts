@@ -11,6 +11,8 @@ import { auditLog } from '../middleware/security';
 import { PaymentService } from '../services/payment.service';
 import { getAuthUser } from '../utils/store-helpers';
 import { paymentSettingsRouteContext } from '../middleware/tenant-context';
+import { recordAdminEnable } from '../services/provider-activation.service';
+import { adminEnableNeedsLedger, refuseUnconfirmedEnable } from '../lib/provider-confirm-gate';
 
 import { REGION, PAYMENT_PROVIDER_CODES, getProviderEntry } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
@@ -499,6 +501,10 @@ router.put(
       }
 
       refuseLegacyGatewayCredentials(provider, req.body ?? {});
+      // The confirm rule on this route's off -> on transition (the enable test gate runs inside the shared writer).
+      if (data.isEnabled === true && !existing.isEnabled) {
+        refuseUnconfirmedEnable(getAuthUser(req).role, provider);
+      }
       const config = await applyStorePaymentConfigUpdate(
         storeId,
         provider,
@@ -506,6 +512,26 @@ router.put(
         data,
         updateData
       );
+
+      if (
+        data.isEnabled === true &&
+        !existing.isEnabled &&
+        adminEnableNeedsLedger(getAuthUser(req).role, provider)
+      ) {
+        await recordAdminEnable({
+          storeId,
+          provider,
+          mode: (data.testMode ?? existing.testMode) === false ? 'live' : 'sandbox',
+          revert: async () => {
+            const w = await storeWriter(storeId);
+            await w.paymentConfig.update({
+              where: { id: existing.id, storeId },
+              data: { isEnabled: false },
+            });
+            PaymentService.clearCache(storeId);
+          },
+        });
+      }
 
       await auditLog({
         action: 'store_payment_config.updated',
@@ -682,6 +708,8 @@ router.post(
       // successful Test connection of the credentials stored now (PROVIDERS-2 + plan 4.2/5).
       if (enabled === true) {
         assertEnableAllowed(existing);
+        // Checkout-visible: a merchant turns a provider ON through /provider-activation/.../activate (confirm step).
+        refuseUnconfirmedEnable(user.role, provider);
       } else if (enabled !== false) {
         throw new AppError(400, 'VALIDATION_ERROR', '`enabled` must be true or false');
       }
@@ -695,6 +723,24 @@ router.post(
           updatedBy: userId,
         },
       });
+
+      // The super-admin override leaves the same append-only ledger row as a self-activation (reverted if it cannot be written).
+      if (enabled === true && adminEnableNeedsLedger(user.role, provider)) {
+        await recordAdminEnable({
+          storeId,
+          provider,
+          mode: existing.testMode === false ? 'live' : 'sandbox',
+          revert: async () => {
+            await (
+              await storeWriter(storeId)
+            ).paymentConfig.update({
+              where: { id: existing.id, storeId },
+              data: { isEnabled: false },
+            });
+            PaymentService.clearCache(storeId);
+          },
+        });
+      }
 
       await auditLog({
         action: enabled ? 'store_payment_config.enabled' : 'store_payment_config.disabled',

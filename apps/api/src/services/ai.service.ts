@@ -58,6 +58,8 @@ type Feature =
   | 'store-categories'
   // Visual builder Phase 5: a structured, reviewable patch to the store's page document.
   | 'builder-patch'
+  // Self-service provider activation: a plain sentence about a FAILED connection test (extract/explain only).
+  | 'provider-check'
   // Smart Layer assistant turns (the Ebda assistant side panel): usage is labelled so the meter and the per-feature cost views can tell it apart.
   | 'assistant'
   // Accounting smart layer — called through accounting/gemini-ai.service.ts,
@@ -179,6 +181,15 @@ const TRANSLATE_INSTRUCTION =
   'Preserve brand names, product codes, sizes, units, and numbers exactly. ' +
   'Keep the same tone (formal/casual) as the source. ' +
   'Output only the translation as plain text — no quotes, no labels, no commentary.';
+
+const PROVIDER_CHECK_INSTRUCTION =
+  'You help the owner of an Egyptian online store fix a failed payment or shipping connection test. ' +
+  'You are given the provider name, the mode and a machine CODE with a fixed reason. You never decide anything and you never see credentials. ' +
+  'Output only valid JSON matching this shape exactly: {"en": string, "ar": string}. ' +
+  'Each value is ONE or TWO plain sentences (max 240 characters) telling the owner what to check next, based ONLY on the code and the reason. ' +
+  'Do not invent URLs, field names, amounts or promises, and do not repeat any secret-looking value. ' +
+  '"en" is English, "ar" is Egyptian Arabic in full sentences with Western digits only. ' +
+  EGYPTIAN_ARABIC_REGISTER;
 
 const SEO_INSTRUCTION =
   'You write SEO meta for Egyptian e-commerce stores. Output only valid JSON ' +
@@ -484,7 +495,78 @@ export function parseAiJson<T>(
 
 export type ExtractedPalette = z.infer<typeof paletteExtractionSchema>;
 
+/** The AI sentence is shown to a merchant: short, no URL, no long digit/token runs (an echoed secret). */
+const providerCheckSentenceSchema = z.object({
+  en: z.string().trim().min(8).max(300),
+  ar: z.string().trim().min(8).max(300),
+});
+function providerCheckSentenceSafe(s: { en: string; ar: string }): boolean {
+  return [s.en, s.ar].every(
+    t => !/https?:|www\./i.test(t) && !/[A-Za-z0-9_-]{24,}/.test(t) && !/\d{8,}/.test(t)
+  );
+}
+
 export class AIService {
+  /**
+   * Self-service provider activation: a plain bilingual sentence for a FAILED connection test. AI only
+   * explains the code the server already measured; the pass/fail decision never depends on this. Cached
+   * per provider + mode + code. Throws on any AI problem: the caller falls back to the fixed sentence.
+   */
+  static async triageProviderCheck(input: {
+    storeId: string;
+    provider: string;
+    mode: string;
+    code: string;
+    reasonEn: string;
+  }): Promise<{ en: string; ar: string }> {
+    ensureEnabled();
+    const key = cacheKey(
+      'provider-check',
+      { provider: input.provider, mode: input.mode, code: input.code },
+      PROVIDER_CHECK_INSTRUCTION
+    );
+    const hit = await redis.get(key);
+    if (hit) {
+      const cached = providerCheckSentenceSchema.safeParse(JSON.parse(hit));
+      if (cached.success && providerCheckSentenceSafe(cached.data)) {
+        await recordUsage(input.storeId, 'provider-check', 0, 0, true);
+        return cached.data;
+      }
+    }
+    await assertAiQuota({ storeId: input.storeId });
+    await checkBudget(input.storeId);
+    const model = getClient().getGenerativeModel({
+      model: MODEL,
+      systemInstruction: PROVIDER_CHECK_INSTRUCTION,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+    let res;
+    try {
+      res = await model.generateContent(
+        `Provider: ${input.provider}\nMode: ${input.mode}\nCode: ${input.code}\nReason: ${input.reasonEn}`
+      );
+    } catch (err) {
+      rethrowAsAppError(err, 'AI provider triage failed');
+    }
+    const parsed = parseAiJson(providerCheckSentenceSchema, stripJsonFences(res.response.text()), {
+      storeId: input.storeId,
+      kind: 'provider-check',
+    });
+    const usage = res.response.usageMetadata;
+    await recordUsage(
+      input.storeId,
+      'provider-check',
+      usage?.promptTokenCount ?? 0,
+      usage?.candidatesTokenCount ?? 0,
+      false
+    );
+    if (!providerCheckSentenceSafe(parsed)) {
+      throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an unsafe sentence.');
+    }
+    await redis.set(key, JSON.stringify(parsed), CACHE_TTL_SECONDS);
+    return parsed;
+  }
+
   /**
    * Translate a string between English and Arabic. The kind argument
    * lets the model adjust tone (product-name vs free text vs meta

@@ -8,6 +8,8 @@ import { BRAND, PROVIDER_CATALOG, providerRequestMailto } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
+import { selfActivateProvider } from '../../../../lib/provider-self-activation';
+import { useConfirm } from '@/hooks/useConfirm';
 import {
   ProviderCard,
   type ProviderDef,
@@ -48,6 +50,7 @@ export default function StorePaymentSettingsPage() {
   const storeId = params?.id as string;
   const t = useT('paymentSettings');
   const isAr = useLocale() === 'ar';
+  const askConfirm = useConfirm();
 
   const [configs, setConfigs] = useState<AnyConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -200,9 +203,28 @@ export default function StorePaymentSettingsPage() {
     }
   }
 
-  // A gateway can be turned off from the strip any time; turning it ON needs a saved, tested connection.
+  // A gateway can be turned off from the strip any time. Turning it ON is "Test and turn on" (gap A7): the server
+  // runs the check, the merchant confirms; the old /toggle refuses an unconfirmed ON.
   async function toggleGateway(code: string, enabled: boolean) {
     setGatewayBusy(code);
+    if (enabled) {
+      const entry = GATEWAYS.find(g => g.code === code);
+      const r = await selfActivateProvider(storeId, code, async ({ mode }) =>
+        askConfirm({
+          object: entry ? (isAr ? entry.name.ar : entry.name.en) : code,
+          consequence: t('connect.enable.confirmConsequence', {
+            mode: t(`connect.modes.${mode === 'live' ? 'live' : 'sandbox'}`),
+          }),
+          confirmLabel: t('connect.enable.confirmLabel'),
+          tone: 'default',
+        })
+      );
+      setGatewayBusy(null);
+      if (r.status === 'failed') setError(isAr ? r.triage.ar : r.triage.en);
+      else if (r.status === 'error') setError(r.message || t('errors.loadFailed'));
+      await fetchConfigs();
+      return;
+    }
     const { error: toggleError } = await apiPost(
       `/api/v1/payment-settings/store/${storeId}/${code}/toggle`,
       { enabled }

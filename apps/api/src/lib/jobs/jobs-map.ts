@@ -62,6 +62,11 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
   },
   'catalog-import-uploads-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
   'domain-claim-sweep': { group: '2-housekeeping', kind: 'queue', trigger: 'cron' },
+  'provider-activation-ledger-reconcile': {
+    group: '2-housekeeping',
+    kind: 'queue',
+    trigger: 'cron',
+  },
   'instapay-receipt-retention-daily': {
     group: '2-housekeeping',
     kind: 'queue',

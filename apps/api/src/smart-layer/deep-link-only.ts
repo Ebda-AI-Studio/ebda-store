@@ -19,6 +19,10 @@ export const DEEP_LINK_ONLY: Record<string, { secret: string }> = {
   },
   'payment.card-providers': { secret: 'provider API keys' },
   'payment.instapay-merchant': { secret: 'provider credentials' },
+  'self.provider-self-activation': {
+    secret:
+      'provider API keys (the on switch runs a server-side connection test with the saved keys and a single-use, test-run-bound confirmation; chat cannot stand in for that screen)',
+  },
   'onboarding.slug-claim': {
     secret:
       'proof-of-ownership evidence (document link) for a protected address; filed before a store exists, so it has no store for the assistant to act in',

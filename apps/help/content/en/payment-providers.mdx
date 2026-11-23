@@ -8,6 +8,7 @@ capabilities:
   - payment.card-providers@1
   - payment.instalments@1
   - payment.methods-cod@1
+  - self.provider-self-activation@1
 ---
 
 <Callout title="New connections: we watch the first order">
@@ -39,6 +40,16 @@ only a credentials step in **Settings > Payments**:
    checked again (press **Test connection** to re-run the check any time).
 5. Copy the **webhook URL** shown on the card where the card asks you to (see below). That is how the
    provider tells your store a payment succeeded.
+
+## Turning a provider on yourself
+
+You never wait for Ebda Store to activate a provider. Press the **Accept payments with this provider** switch on the card:
+
+1. Ebda Store tests your saved keys right then, on the server. Nothing you type on the page can make the test pass.
+2. If the test passes, you are asked to confirm, because from that moment customers can pay with this provider at checkout. Press **Test and turn on**.
+3. If the test fails, you get one plain sentence about what to check next (for example, the keys belong to the other mode). Nothing is turned on. Fix the keys and press the switch again.
+
+Every activation is recorded, and the Ebda Store team is told when a provider nobody has verified yet is turned on for the first time, so we watch its first real order. If something is wrong, we can turn the provider off for your store and tell you why.
 
 ## Paymob
 

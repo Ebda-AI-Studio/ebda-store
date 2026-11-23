@@ -129,13 +129,15 @@ function ActivationRequestsInner() {
     if (trimmed.length < 3) return setNoteError(true);
     setNoteError(false);
     setBusy(rowId(rejecting));
-    const { error } = await apiPost(`${base(rejecting)}/reject`, { note: trimmed });
+    // Super-admin override: an ACTIVATED row is turned off (deactivate); a pending one is rejected.
+    const action = rejecting.status === 'activated' ? 'deactivate' : 'reject';
+    const { error } = await apiPost(`${base(rejecting)}/${action}`, { note: trimmed });
     setBusy(null);
     if (error) {
       toastError(t('actions.failed', { message: error.message }));
       return;
     }
-    toastSuccess(t('actions.rejected'));
+    toastSuccess(t(rejecting.status === 'activated' ? 'actions.deactivated' : 'actions.rejected'));
     setRejecting(null);
     setNote('');
     setRefreshKey(k => k + 1);
@@ -230,7 +232,7 @@ function ActivationRequestsInner() {
                   setNoteError(false);
                 }}
               >
-                {t('actions.reject')}
+                {t(r.status === 'activated' ? 'actions.deactivate' : 'actions.reject')}
               </Button>
             )}
           </div>
