@@ -1325,9 +1325,9 @@
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["raw", "buyer_tax_id"],
+    "piiColumns": ["raw"],
     "subjectKeys": [],
-    "note": "Money record, kept (tax law: an invoice and its ETA fields are retained, FOLD-VAT). seller_legal_name / seller_tax_id are the SELLER (the company issuing the invoice), not a person. eta_uuid, eta_long_id, eta_hash and eta_rejection_reason are ETA document identifiers / ETA text, no person. buyer_tax_id (B2B, optional) is the store owner's tax id: nothing writes it yet; when something does, reclassify this table legal-retention with buyer_tax_id as the PII column.",
+    "note": "Money record, kept (tax law: an invoice and its ETA fields are retained, FOLD-VAT). seller_legal_name / seller_tax_id are the SELLER (the company issuing the invoice), not a person. eta_uuid, eta_long_id, eta_hash and eta_rejection_reason are ETA document identifiers / ETA text, no person. buyer_tax_id (B2B, optional) is the store owner's tax id: nothing writes it yet; when something does, reclassify this table legal-retention with buyer_tax_id as the PII column. buyer_tax_id (a company's B2B e-invoice record) is KEPT for the whole retention period: not a natural person's data; only `raw` (the gateway payload, write-only) is cleared at purge.",
     "reviewedNotPii": [
       "seller_legal_name",
       "seller_tax_id",
@@ -1359,7 +1359,8 @@
       "vat_rate_bp",
       "gross_minor",
       "eta_status",
-      "eta_submitted_at"
+      "eta_submitted_at",
+      "buyer_tax_id"
     ]
   },
   "d1:instapay_receipts": {
@@ -1547,14 +1548,14 @@
     "db": "d1",
     "class": "merchant-pii",
     "action": "scrub",
-    "piiColumns": ["actor_id"],
+    "piiColumns": ["actor_id", "meta"],
     "subjectKeys": ["userId"],
-    "note": "actor id nulled on user erasure",
+    "note": "actor id nulled on user erasure meta is free JSON: classified personal; the known personal keys (lib/audit-meta-redact.ts) are removed on user erasure and at store purge, the action, target and time stay.",
     "userIdColumns": ["actor_id"],
     "actorScrub": {
       "actor_id": null
     },
-    "reviewedNotPii": ["id", "action", "target_type", "target_id", "store_id", "meta", "created_at"]
+    "reviewedNotPii": ["id", "action", "target_type", "target_id", "store_id", "created_at"]
   },
   "d1:provider_verifications": {
     "db": "d1",

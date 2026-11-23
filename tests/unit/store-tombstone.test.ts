@@ -199,6 +199,7 @@ describe('no personal identifier survives on a kept platform table (drift guard 
     'instapay_receipts.extracted': '{"payer":"PII-extracted"}',
     'webhook_events.payload': '{"payer":"PII-payload"}',
     'billing_events.raw': '{"payer":"PII-raw"}',
+    'platform_audit_log.meta': '{"email":"PII-meta"}',
   };
   const DELETED_BY_TOMBSTONE = new Set(['store_staff', 'merchant_api_keys', 'staff_invites']);
 

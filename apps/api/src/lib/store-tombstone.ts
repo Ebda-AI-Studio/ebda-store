@@ -14,6 +14,8 @@
  * wa-plan: not-plan-state (the store_subscriptions UPDATE below clears only the card reference and the provider customer id; plan,
  * status and period are untouched, so the WhatsApp plan observer has nothing to be told).
  */
+import { redactedMetaSql } from './audit-meta-redact';
+
 export const PURGED_SLUG_PREFIX = '~purged~';
 
 export const isPurgedSlug = (slug: string | null | undefined): boolean =>
@@ -51,9 +53,11 @@ export function tombstoneStatements(storeId: string, now: number = Date.now()): 
     set(
       `UPDATE "store_subscriptions" SET "provider_customer_id" = NULL, "payment_method_last4" = NULL, "provider_payment_method_ref" = NULL WHERE "store_id" = ?1`
     ),
-    // Ebda's own invoices keep amounts, dates, numbers, ETA fields and the seller; the gateway's raw payload and the buyer tax id go
-    // (the purge runs after the legal period that the classification of billing_events names for them)
-    set(`UPDATE "billing_events" SET "raw" = NULL, "buyer_tax_id" = NULL WHERE "store_id" = ?1`),
+    // Ebda's own invoices keep amounts, currency, gateway transaction id, status, dates, numbers, ETA fields, the seller AND the buyer
+    // tax id (a company's B2B e-invoice record needs it for the whole retention period; it is not a natural person's data). Only the
+    // gateway's raw payload goes: it is write-only (no refund or reconciliation code reads it; those use amount_minor, currency,
+    // provider_ref, status and the dates, all separate columns).
+    set(`UPDATE "billing_events" SET "raw" = NULL WHERE "store_id" = ?1`),
     // idempotency key, provider, status and result stay (dedupe); the payload, the raw body and the error text (may quote a payer) go
     set(
       `UPDATE "webhook_events" SET "payload" = '{}', "raw_body" = '', "last_error" = NULL WHERE "store_id" = ?1`
@@ -71,6 +75,9 @@ export function tombstoneStatements(storeId: string, now: number = Date.now()): 
     set(`UPDATE "store_features" SET "enabled_by" = NULL WHERE "store_id" = ?1`),
     // the audit trail keeps what happened and when; who did it is removed (classification: actor id nulled)
     set(`UPDATE "platform_audit_log" SET "actor_id" = NULL WHERE "store_id" = ?1`),
+    set(
+      `UPDATE "platform_audit_log" SET "meta" = ${redactedMetaSql()} WHERE "store_id" = ?1 AND json_valid("meta")`
+    ),
     set(
       `UPDATE "provider_activation_requests" SET "requested_by_id" = NULL, "decided_by_id" = NULL, "note" = NULL WHERE "store_id" = ?1`
     ),
