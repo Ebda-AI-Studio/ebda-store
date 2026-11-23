@@ -339,5 +339,9 @@
     // Billing is InstaPay-only until Kashier is approved (Rulings EBDA-FUNNEL-17, BILLING-NONE-1): "none" acknowledges it, so
     // an unset provider no longer pages a P1 at every boot (M-032). Card billing refuses cleanly; set "kashier" to turn cards on.
     "BILLING_PROVIDER": "none",
+    // PDPL erasure job (cf/erasure/job.ts): "true" since Ahmad's approval of 2026-11-20 (register row 33, M-024). Closure of a merchant /
+    // staff account (POST /auth/me/close-account) then erases instead of recording + answering 503 ERASURE_NOT_ENABLED. A wrangler var on
+    // purpose: a dashboard var is wiped by the next deploy. Verify after deploy: super-admin /health checks.pdplErasure=true.
+    "PDPL_CF_ERASURE_ENABLED": "true",
   },
 }
