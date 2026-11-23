@@ -29,12 +29,18 @@
       "اطبع باركود للمنتجات",
       "QR بيوجه لفين؟",
       "غير لون الـ QR",
-      "خلي كود المتجر بإطار دهبي"
+      "خلي كود المتجر بإطار دهبي",
+      "اطبع ملصق فيه باركود و QR للمنتج"
     ],
-    "en": ["How do I print a QR code for my store?", "Change my QR code colours"]
+    "en": [
+      "How do I print a QR code for my store?",
+      "Change my QR code colours",
+      "Print a label with a barcode and a product QR"
+    ]
   },
   "steps": ["Codes page."],
   "edgeCases": [
+    "Combined barcode + QR product label (label settings, Codes screen only, not an assistant tool): the QR links to the product page on the store's own domain (custom domain when active, else <slug>.ebda.app); both codes keep a scannable minimum size; on a label too small for both (A4 5x13, or a very long custom domain on the smallest rolls) the page refuses with a message offering a bigger label or one code only",
     "QR scans recorded on DO stores had a P0 bug (#752 open)",
     "Plan: Enterprise/Business for barcode",
     "Mobile: admin pages are responsive; Arabic/RTL: numbers and mixed Arabic/English text must render correctly (Arabic-Indic digits normalised on input)",

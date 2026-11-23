@@ -5,7 +5,12 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Modal, useToast } from '@ebda/ui';
 import { Button } from '@/components/ui/Button';
-import { WEBHOOK_EVENT_TYPES, withNumerals, type WebhookEventType } from '@ebda/shared';
+import {
+  WEBHOOK_EVENT_TYPES,
+  webhookUrlShapeError,
+  withNumerals,
+  type WebhookEventType,
+} from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiDelete, apiGet, apiPatch, apiPost, type ApiError } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -78,6 +83,13 @@ export default function WebhooksPage() {
   const [logFor, setLogFor] = useState<Endpoint | null>(null);
   const [log, setLog] = useState<Delivery[] | null>(null);
 
+  // Event types carry dots ('webhook.test'); next-intl reads a dot as nesting, so the keys use underscores (QA-83).
+  // An event type this build has no copy for shows as its raw type, never as a raw i18n key.
+  const eventLabel = (ev: string) => {
+    const key = `events.${ev.replace(/\./g, '_')}`;
+    return t.has(key) ? t(key) : ev;
+  };
+
   const errText = useCallback(
     (e: ApiError) =>
       e.status === 402
@@ -134,6 +146,12 @@ export default function WebhooksPage() {
   };
 
   const save = async () => {
+    // QA-84: say WHY the address is refused (Ebda host, http, IP...) instead of the API's generic validation text.
+    const shapeError = webhookUrlShapeError(form.url.trim());
+    if (shapeError) {
+      setFormError(t(`urlError.${shapeError}`));
+      return;
+    }
     setBusy('save');
     setFormError(null);
     const body = {
@@ -322,7 +340,7 @@ export default function WebhooksPage() {
                 <div className="flex flex-wrap gap-1">
                   {ep.events.map(ev => (
                     <span key={ev} className={`${badge} bg-muted text-foreground`} dir="auto">
-                      {t(`events.${ev.replace('.', '_')}`)}
+                      {eventLabel(ev)}
                     </span>
                   ))}
                 </div>
@@ -448,7 +466,7 @@ export default function WebhooksPage() {
                   checked={form.events.includes(ev)}
                   onChange={() => toggleEvent(ev)}
                 />
-                <span>{t(`events.${ev.replace('.', '_')}`)}</span>
+                <span>{eventLabel(ev)}</span>
               </label>
             ))}
           </fieldset>
@@ -614,7 +632,7 @@ export default function WebhooksPage() {
               <li key={d.id} className="rounded-lg border p-2 text-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-foreground" dir="auto">
-                    {t(`events.${d.eventType}`)}
+                    {eventLabel(d.eventType)}
                     {d.isTest ? ` · ${t('log.test')}` : ''}
                   </span>
                   <span

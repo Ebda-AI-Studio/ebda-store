@@ -24,13 +24,16 @@ export function isValidCspNonce(nonce: unknown): nonce is string {
  *    lack strict-dynamic (the nonce is still required there for inline code).
  *  - No `'unsafe-inline'`, so an injected `<script>` or `javascript:` URL does not run.
  *  - `'unsafe-eval'` only when the caller proves it needs it.
+ *  - `'wasm-unsafe-eval'` (WebAssembly only, no eval()) when the page loads a wasm decoder.
  */
 export function nonceScriptSrc(
   nonce: string,
-  opts: { hosts?: readonly string[]; unsafeEval?: boolean } = {}
+  opts: { hosts?: readonly string[]; unsafeEval?: boolean; wasmUnsafeEval?: boolean } = {}
 ): string {
   const parts = ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"];
   if (opts.unsafeEval) parts.push("'unsafe-eval'");
+  // WebAssembly compile only (the 3D viewer's meshopt decoder); JS eval() stays blocked.
+  if (opts.wasmUnsafeEval) parts.push("'wasm-unsafe-eval'");
   parts.push(...(opts.hosts ?? []));
   return `script-src ${parts.join(' ')}`;
 }

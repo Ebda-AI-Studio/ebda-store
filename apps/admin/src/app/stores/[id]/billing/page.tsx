@@ -22,6 +22,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Select, useToast } from '@ebda/ui';
+import { billingDisplayStatus, trialDaysLeft } from '@/lib/billing-state';
 import { Button } from '@/components/ui/Button';
 import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -507,6 +508,10 @@ export default function StoreBillingPage() {
   // InstaPay-only deployment (BILLING_PROVIDER=none) or a store that pays by transfer: a payment is DUE, nothing is
   // charged automatically (Ruling BILLING-NONE-COPY-1).
   const instapayDue = info?.cardBilling === false || instapayChosen;
+  // QA-88: a payment is due and nothing is paid yet -> say so instead of "active".
+  const displayStatus = data
+    ? billingDisplayStatus(data.subscription.status, !!info?.nextCharge && instapayDue)
+    : 'none';
   // What the merchant is shown to transfer: the plan just picked, else the stored quote.
   const payDetails = instapay && quote ? { ...instapay, ...quote } : instapay;
   const showCardControls =
@@ -712,14 +717,16 @@ export default function StoreBillingPage() {
               </div>
               <Badge
                 variant={
-                  data.subscription.status === 'past_due'
+                  displayStatus === 'past_due'
                     ? 'destructive'
-                    : data.subscription.status === 'comped'
+                    : displayStatus === 'comped' || displayStatus === 'trialing'
                       ? 'info'
-                      : 'success'
+                      : displayStatus === 'awaiting_payment'
+                        ? 'warning'
+                        : 'success'
                 }
               >
-                {t(`status.${data.subscription.status}`)}
+                {t(`status.${displayStatus}`)}
               </Badge>
             </div>
             <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
@@ -776,19 +783,23 @@ export default function StoreBillingPage() {
                 <h2 className="text-base font-semibold">{t('trial.title')}</h2>
                 <Badge
                   variant={
-                    data.subscription.status === 'past_due'
+                    displayStatus === 'past_due'
                       ? 'destructive'
-                      : data.subscription.status === 'trialing' ||
-                          data.subscription.status === 'comped'
+                      : displayStatus === 'trialing' || displayStatus === 'comped'
                         ? 'info'
-                        : data.subscription.status === 'active'
-                          ? 'success'
-                          : 'secondary'
+                        : displayStatus === 'awaiting_payment'
+                          ? 'warning'
+                          : displayStatus === 'active'
+                            ? 'success'
+                            : 'secondary'
                   }
                 >
-                  {t(`status.${data.subscription.status}`)}
+                  {t(`status.${displayStatus}`)}
                 </Badge>
               </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t(`stateLine.${displayStatus}`)}
+              </p>
               <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                 {(info.trialEndsAt ?? data.subscription.trialEndsAt) && (
                   <div className="flex justify-between gap-2">
@@ -796,6 +807,18 @@ export default function StoreBillingPage() {
                     <dd>{fmtDate(info.trialEndsAt ?? data.subscription.trialEndsAt)}</dd>
                   </div>
                 )}
+                {displayStatus === 'trialing' &&
+                  trialDaysLeft(info.trialEndsAt ?? data.subscription.trialEndsAt) !== null && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">{t('trialDaysLeftLabel')}</dt>
+                      <dd>
+                        {t('trialDaysLeft', {
+                          count:
+                            trialDaysLeft(info.trialEndsAt ?? data.subscription.trialEndsAt) ?? 0,
+                        })}
+                      </dd>
+                    </div>
+                  )}
                 {info.pendingPlanCode && (
                   <div className="flex justify-between gap-2">
                     <dt className="text-muted-foreground">{t('trial.chosenPlan')}</dt>
@@ -992,16 +1015,32 @@ export default function StoreBillingPage() {
                   />
                 );
               })}
-              <div className="flex items-baseline justify-between gap-2 text-sm">
-                <span className="font-medium">{tLimits('maxStorageMb')}</span>
-                <span className="text-muted-foreground">
-                  {data.limits.maxStorageMb === null
-                    ? t('unlimited')
-                    : t('storageNotTracked', {
-                        limit: data.limits.maxStorageMb.toLocaleString('en'),
-                      })}
-                </span>
-              </div>
+              {data.usage.maxStorageMb === null ? (
+                // QA-STOR-1: the storage counter could not be read right now: say so, never show 0
+                <div
+                  className="flex items-baseline justify-between gap-2 text-sm"
+                  data-testid="storage-usage-unknown"
+                >
+                  <span className="font-medium">{tLimits('maxStorageMb')}</span>
+                  <span className="text-muted-foreground">
+                    {t('storageUnknown')} ·{' '}
+                    {data.limits.maxStorageMb === null
+                      ? t('unlimited')
+                      : data.limits.maxStorageMb.toLocaleString('en')}
+                  </span>
+                </div>
+              ) : (
+                <UsageBar
+                  label={tLimits('maxStorageMb')}
+                  used={data.usage.maxStorageMb}
+                  limit={data.limits.maxStorageMb}
+                  unlimitedLabel={t('unlimited')}
+                  usedOfLabel={t('usedOf', {
+                    used: data.usage.maxStorageMb.toLocaleString('en'),
+                    limit: (data.limits.maxStorageMb ?? 0).toLocaleString('en'),
+                  })}
+                />
+              )}
             </div>
           </section>
 
