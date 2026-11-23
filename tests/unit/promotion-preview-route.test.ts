@@ -61,6 +61,7 @@ vi.mock('@api/middleware/store-access', () => ({
 
 vi.mock('@api/middleware/security', () => ({
   promotionPreviewLimiter: (_req: any, _res: any, next: any) => next(),
+  promotionBrowsePreviewLimiter: (_req: any, _res: any, next: any) => next(),
   publicTenantLimiter: (_req: any, _res: any, next: any) => next(),
 }));
 
