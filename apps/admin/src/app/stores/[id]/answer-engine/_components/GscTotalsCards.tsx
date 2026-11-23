@@ -26,7 +26,7 @@ export function GscTotalsCards({ totals }: GscTotalsCardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map(card => (
-        <div key={card.label} className="bg-card rounded-xl border border-border p-5">
+        <div key={card.label} className="bg-card rounded-md border border-border p-5">
           <p className="text-sm font-medium text-foreground">{card.label}</p>
           <p className="mt-2 text-2xl font-bold text-foreground">{card.value}</p>
         </div>

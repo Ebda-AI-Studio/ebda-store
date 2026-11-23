@@ -291,7 +291,7 @@ export default function NotificationsPage() {
           {pushEnabled && <WebPushToggleCard storeId={storeId} />}
 
           {/* 2. Channel credentials: set once, then out of the way */}
-          <details className="rounded-xl border border-border bg-card p-4" open={needsChannelSetup}>
+          <details className="rounded-md border border-border bg-card p-4" open={needsChannelSetup}>
             <summary className="cursor-pointer text-sm font-semibold text-foreground">
               {tPage('channelsTitle')}
             </summary>
@@ -325,7 +325,7 @@ export default function NotificationsPage() {
 
           {/* 3. A one-off message to every subscriber is a campaign, not a setting */}
           {pushEnabled && (
-            <details className="rounded-xl border border-border bg-card p-4">
+            <details className="rounded-md border border-border bg-card p-4">
               <summary className="cursor-pointer text-sm font-semibold text-foreground">
                 {tPage('broadcastTitle')}
               </summary>
