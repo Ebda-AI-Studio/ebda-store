@@ -18,8 +18,6 @@ const { prismaMock, orderDb, emailServiceMock, loggerMock, socketMock, moneyMock
       order: { findFirst: vi.fn() },
       return: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
       orderEvent: { findMany: vi.fn().mockResolvedValue([]) },
-      $executeRaw: vi.fn().mockResolvedValue(1),
-      $queryRaw: vi.fn().mockResolvedValue([{ locked: true }]),
     },
     orderDb: {
       order: { findFirst: vi.fn(), findMany: vi.fn() },
