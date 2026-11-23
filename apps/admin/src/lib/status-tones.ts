@@ -9,7 +9,7 @@
  * Rules (enforced by status-tones.test.ts):
  *  - inside ONE family no two statuses share a tone;
  *  - a surface never defines its own status colour map; it renders <StatusBadge family=... status=... />;
- *  - raw palette classes (cyan/violet) live here only. Everything else uses the design tokens.
+ *  - tokens only, no raw palette classes (tests/unit/admin-design-tokens.test.ts).
  *
  * Labels stay in the i18n catalogues (en + ar) under each family's `labelNamespace`; the test checks every
  * registry key has a label in both locales so no status can render as a raw key.
@@ -60,10 +60,10 @@ export type StatusTone =
   | 'info'
   | 'danger'
   | 'brand'
-  | 'teal'
-  | 'violet';
+  | 'outline'
+  | 'solid';
 
-/** Pill classes per tone. Tokens first; teal/violet are the two extra hues the 8-step order lifecycle needs. */
+/** Pill classes per tone, design tokens only (admin-design-tokens guard). outline + solid give the 8-step order lifecycle its 7th and 8th distinct looks. */
 export const TONE_CLASSES: Record<StatusTone, string> = {
   neutral: 'bg-muted text-foreground',
   inactive: 'bg-muted text-muted-foreground',
@@ -72,8 +72,9 @@ export const TONE_CLASSES: Record<StatusTone, string> = {
   info: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink',
   danger: 'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
   brand: 'bg-primary/10 text-primary-ink dark:bg-primary/30 dark:text-primary-ink',
-  teal: 'bg-cyan-50 text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-200',
-  violet: 'bg-violet-50 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200',
+  // Two extra looks built from tokens only (no raw palette): an outlined info chip and a solid night chip.
+  outline: 'bg-card text-info-ink ring-1 ring-inset ring-info/40',
+  solid: 'bg-foreground text-background',
 };
 
 export interface StatusEntry {
@@ -93,9 +94,9 @@ export const STATUS_FAMILIES = {
     statuses: {
       pending: e('warning', Clock),
       awaiting_payment_confirmation: e('brand', Hourglass),
-      confirmed: e('teal', BadgeCheck),
+      confirmed: e('outline', BadgeCheck),
       processing: e('info', PackageOpen),
-      shipped: e('violet', Truck),
+      shipped: e('solid', Truck),
       delivered: e('success', PackageCheck),
       cancelled: e('danger', XCircle),
       refunded: e('neutral', Undo2),
@@ -123,7 +124,7 @@ export const STATUS_FAMILIES = {
     statuses: {
       created: e('neutral', FileText),
       picked_up: e('info', PackageSearch),
-      in_transit: e('violet', Truck),
+      in_transit: e('solid', Truck),
       out_for_delivery: e('brand', Send),
       delivered: e('success', PackageCheck),
       failed: e('danger', AlertTriangle),
@@ -143,9 +144,9 @@ export const STATUS_FAMILIES = {
     labelNamespace: 'returns.status',
     statuses: {
       pending: e('warning', Clock),
-      approved: e('teal', BadgeCheck),
+      approved: e('outline', BadgeCheck),
       rejected: e('danger', XCircle),
-      shipped: e('violet', Truck),
+      shipped: e('solid', Truck),
       received: e('info', Inbox),
       inspecting: e('brand', Search),
       completed: e('success', CheckCircle2),
@@ -157,8 +158,8 @@ export const STATUS_FAMILIES = {
     statuses: {
       pending: e('warning', ShoppingCart),
       step1_sent: e('info', Mail),
-      step2_sent: e('teal', Mail),
-      step3_sent: e('violet', Mail),
+      step2_sent: e('outline', Mail),
+      step3_sent: e('solid', Mail),
       recovered: e('success', CheckCircle2),
       expired: e('neutral', Clock),
     },
@@ -169,7 +170,7 @@ export const STATUS_FAMILIES = {
     statuses: {
       pending: e('neutral', CircleDashed),
       queued: e('info', Send),
-      sent: e('teal', MailCheck),
+      sent: e('outline', MailCheck),
       delivered: e('success', CheckCircle2),
       failed: e('danger', MailX),
     },
@@ -178,7 +179,7 @@ export const STATUS_FAMILIES = {
     labelNamespace: 'campaigns.status',
     statuses: {
       draft: e('neutral', FileEdit),
-      scheduled: e('teal', Clock),
+      scheduled: e('outline', Clock),
       sending: e('warning', Send),
       sent: e('success', CheckCircle2),
       cancelled: e('inactive', Ban),
@@ -199,7 +200,7 @@ export const STATUS_FAMILIES = {
     labelNamespace: 'codReconciliation.statuses',
     statuses: {
       awaiting: e('neutral', Hourglass),
-      flagged: e('violet', ShieldAlert),
+      flagged: e('solid', ShieldAlert),
       partial: e('warning', Banknote),
       settled: e('success', CheckCircle2),
       over_remitted: e('brand', Banknote),
@@ -266,7 +267,7 @@ export const STATUS_FAMILIES = {
     statuses: {
       active: e('success', CheckCircle2),
       trialing: e('info', Sparkles),
-      comped: e('teal', Star),
+      comped: e('outline', Star),
       awaiting_payment: e('warning', Hourglass),
       past_due: e('danger', AlertTriangle),
       canceled: e('inactive', Ban),
@@ -282,7 +283,7 @@ export const STATUS_FAMILIES = {
       new_return: e('brand', Undo2),
       low_stock: e('danger', AlertTriangle),
       order_status: e('info', Receipt),
-      return_status: e('teal', RotateCcw),
+      return_status: e('outline', RotateCcw),
     },
   },
 } as const satisfies Record<

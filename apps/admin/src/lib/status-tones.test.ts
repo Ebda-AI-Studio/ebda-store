@@ -81,7 +81,7 @@ describe('status tone registry', () => {
   );
 
   it('uses no orange in the tone palette (Ebda palette)', () => {
-    expect(Object.values(TONE_CLASSES).join(' ')).not.toMatch(/orange|amber/);
+    expect(Object.values(TONE_CLASSES).join(' ')).not.toMatch(/orange|amber|violet|cyan/);
   });
 });
 
