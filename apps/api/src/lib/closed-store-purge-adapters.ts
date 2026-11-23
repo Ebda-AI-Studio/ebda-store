@@ -181,6 +181,16 @@ export function closedStorePurgePorts(): PurgePorts {
       for (const st of tombstoneStatements(storeId)) await d1Run(st.sql, ...st.params);
     },
     alert: (title, body) => sendAlert({ level: 'p1', source: 'closed-store-purge', title, body }),
-    log: (msg, fields) => logger.info(fields ?? {}, msg),
+    // explicit fields only (the core passes the store id, a row count, an archive key and a reason code: none is personal data)
+    log: (msg, fields) =>
+      logger.info(
+        {
+          storeId: fields?.storeId,
+          rows: fields?.rows,
+          archive: fields?.archive,
+          reason: fields?.reason,
+        },
+        msg
+      ),
   };
 }
