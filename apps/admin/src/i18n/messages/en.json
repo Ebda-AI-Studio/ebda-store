@@ -10397,7 +10397,7 @@
       "rejected": "Your submission was rejected: {reason}. Fix the details and submit again.",
       "revoked": "Your VAT verification was revoked: {reason}. VAT is switched off until you are verified again."
     },
-    "verifiedNote": "To change these details, use Contact Ebda Store.",
+    "verifiedNote": "These details are locked while your registration is verified. To change them, send a change request below. Your current verification stays active until it is approved.",
     "form": {
       "trn": "Tax registration number",
       "trnHint": "9 digits, as printed on your tax card. Spaces and dashes are fine.",
@@ -10445,7 +10445,27 @@
       "incomplete": "Add your tax registration number, legal name and at least one document first.",
       "disclaimer": "Ebda Store does not file taxes or issue e-receipts on your behalf. You stay responsible for your own VAT filings."
     },
-    "error": "Something went wrong. Please try again."
+    "error": "Something went wrong. Please try again.",
+    "change": {
+      "title": "Change your VAT registration details",
+      "hint": "Your current verification stays active, and VAT keeps working, until Ebda Store approves the new details.",
+      "open": "Request a change",
+      "newTrn": "New tax registration number",
+      "newLegalName": "New legal business name",
+      "newDocument": "New tax card or certificate",
+      "send": "Review and send",
+      "sending": "Sending…",
+      "cancel": "Cancel",
+      "confirmObject": "Change to tax number {trn}, \"{name}\"",
+      "confirmConsequence": "The request goes to Ebda AI Studio for review. Nothing changes on your store until it is approved.",
+      "confirmLabel": "Send the change request",
+      "sent": "Change request sent. We will review it and your current verification stays active meanwhile.",
+      "pendingTitle": "A change request is waiting for review",
+      "pendingBody": "Requested: tax number {trn}, \"{name}\". Your current verification is still active.",
+      "withdraw": "Withdraw the request",
+      "withdrawn": "Request withdrawn.",
+      "rejected": "Your last change request was rejected: {reason}. Your current verification is unchanged."
+    }
   },
   "invoices": {
     "title": "Invoices & credit notes",
@@ -10575,6 +10595,34 @@
       "revoked": "Revoked",
       "failed": "Decision failed: {message}",
       "revokeObject": "Tax verification for this store"
+    },
+    "changes": {
+      "title": "Change requests from verified merchants ({count})",
+      "subtitle": "The merchant stays verified until you decide. The automatic read of the document only helps you spot differences; you approve or reject.",
+      "precheck": {
+        "clean": "Pre-check: no differences found",
+        "flagged": "Pre-check: needs a look"
+      },
+      "flags": {
+        "trn_mismatch": "The number on the document differs from the one entered",
+        "name_mismatch": "The name on the document differs from the one entered",
+        "trn_unreadable": "The number could not be read from the document",
+        "name_unreadable": "The name could not be read from the document",
+        "looks_edited": "The document looks edited",
+        "low_confidence": "The automatic read was not confident",
+        "not_pre_checked": "Not pre-checked (a PDF, or the automatic read was unavailable): read the document yourself",
+        "trn_in_use_by_other_store": "The number is already held by another store (verified or pending): check before approving"
+      },
+      "read": "Read from the document: {trn}, {name}",
+      "viewDocument": "View the document",
+      "approve": "Approve the change",
+      "reject": "Reject",
+      "reasonLabel": "Reason for the merchant",
+      "confirmReject": "Send the rejection",
+      "approveObject": "Change to tax number {trn}, \"{name}\"",
+      "approveConsequence": "The new number and name replace the verified ones and appear on the merchant's later tax invoices.",
+      "approved": "Change approved.",
+      "rejected": "Change rejected."
     }
   },
   "platformSettings": {
