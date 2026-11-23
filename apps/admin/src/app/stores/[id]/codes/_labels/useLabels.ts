@@ -2,6 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { storeOrigin } from '@ebda/shared';
+import { liveDomain } from '@/lib/store-url';
 import {
   DEFAULT_LABEL_SETTINGS,
   labelPresetById,
@@ -92,7 +93,8 @@ export function useLabels(storeId: string) {
       }
       setSettings(s.data.settings);
       setSaved(JSON.stringify(s.data.settings));
-      setOrigin(s.data.domain ? `https://${s.data.domain}` : storeOrigin(s.data.slug));
+      const live = liveDomain(s.data);
+      setOrigin(live ? `https://${live}` : storeOrigin(s.data.slug));
       if (q.data?.settings?.design) setQrDesign(q.data.settings.design);
       setLoading(false);
     })();
