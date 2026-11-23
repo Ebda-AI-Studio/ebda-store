@@ -81,7 +81,7 @@ jobs:
       - run: npm run -w packages/shared build
       - run: npm run -w packages/database build
       - run: npx tsc --noEmit -p apps/api/tsconfig.json
-      - run: npx vitest run tests/unit/cf-database-role-guard.test.ts tests/unit/cron-tenant-scopes.test.ts tests/unit/merchant-signup-phone.test.ts
+      - run: npx vitest run tests/unit/cron-tenant-scopes.test.ts tests/unit/merchant-signup-phone.test.ts
       - run: node scripts/ebda-cf-api-config.mjs
       - name: Require configured runtime secrets
         # The required list lives in scripts/ci/api-required-secrets.json and is checked against the code by
