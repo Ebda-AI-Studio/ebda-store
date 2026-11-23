@@ -131,28 +131,13 @@ function toAlertMessage(opts: AlertOptions): AlertMessage {
  * a title. Platform alerts share a single bucket (no storeId).
  */
 export function throttleKey(level: AlertLevel, title: string, storeId?: string): string {
-  const seed = storeId ? `${level}:${title}:${storeId}` : `${level}:${title}`;
-  return `alert-throttle:${bucketHash(seed)}`;
-}
-
-/**
- * A bucket name, not a secret: cyrb53 (two 32-bit multiply/xor lanes, 53 bits), so no `crypto` hash is involved. The
- * previous sha1 digest of `level:title:storeId` made CodeQL report js/weak-cryptographic-algorithm and
- * js/insufficient-password-hash on every PR touching this file, because alert titles carry text from sign-in and
- * password flows ("Password changed"); nothing here is ever a credential. 53 bits keep an accidental collision of two live
- * alert titles at about 1 in 9e15, and a collision would only throttle a similar alert, never leak or authorise anything.
- */
-function bucketHash(str: string): string {
-  let h1 = 0xdeadbeef;
-  let h2 = 0x41c6ce57;
-  for (let i = 0; i < str.length; i++) {
-    const c = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, 2654435761);
-    h2 = Math.imul(h2 ^ c, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
+  // No hash at all: the bucket name IS the identity, so two distinct (level, store, title) can never share a bucket and a crafted
+  // title cannot suppress a real P1. `level` is a fixed set, and the store id and the title each carry their own length, so no field can
+  // spill into another. (The previous sha1 digest raised CodeQL js/weak-cryptographic-algorithm and js/insufficient-password-hash
+  // on every PR touching this file, because alert titles carry sign-in and password wording; a digest of any speed would still
+  // trip the second rule, and nothing here needs one.)
+  const store = storeId ?? '';
+  return `alert-throttle:${level}:${store.length}:${store}:${title.length}:${title}`;
 }
 
 /**
