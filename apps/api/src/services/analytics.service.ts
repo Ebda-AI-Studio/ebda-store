@@ -4,6 +4,16 @@ import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql
 import { storeDb, storeMoney, storeRepo } from '../lib/repo-factory';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
+import { netRevenue } from './revenue.service';
+import { topCustomersNet } from '../lib/order-refunds';
+import {
+  netLinesInnerSql,
+  netLinesWrapSql,
+  NON_REVENUE_PAYMENT_STATUSES,
+  orderNetRevenueSql,
+  refundJoinsSql,
+  revenueOrderPredicateSql,
+} from '../lib/revenue-sql';
 import { profitAndLoss } from './accounting/reports.service';
 import {
   NON_REVENUE_ORDER_STATUSES,
@@ -29,6 +39,69 @@ export function currentMonthStart(now: Date): Date {
 }
 export function currentYearStart(now: Date): Date {
   return regionMonthStart(`${regionYearMonth(now).slice(0, 4)}-01`);
+}
+
+/**
+ * Postgres twin of `analyticsItems`: order lines of revenue-population orders grouped by product or price source, each line net of
+ * its pro-rata share of the order's partial refund (REVENUE-DEF-1, lib/revenue-sql.ts).
+ */
+async function pgLineRevenue(
+  storeId: string,
+  startDate: Date,
+  endDate: Date,
+  by: 'product' | 'priceSource',
+  limit?: number
+): Promise<
+  Array<{
+    productId: string;
+    priceSource: string | null;
+    priceGroupApplied: boolean | null;
+    quantity: number;
+    total: number;
+  }>
+> {
+  const wrap = netLinesWrapSql('pg');
+  const inner = Prisma.raw(netLinesInnerSql('pg'));
+  const head = Prisma.raw(wrap.head);
+  const tail = Prisma.raw(wrap.tail);
+  const counts = Prisma.raw(revenueOrderPredicateSql('o', 'pg'));
+  const rows =
+    by === 'product'
+      ? await prisma.$queryRaw<Array<Record<string, unknown>>>`
+        SELECT l.product_id AS "productId", COALESCE(SUM(l.quantity), 0)::bigint AS quantity,
+               COALESCE(SUM(l.net_total), 0)::bigint AS total
+          FROM ${head}${inner}
+         WHERE o.store_id = ${storeId} AND o.created_at >= ${startDate} AND o.created_at <= ${endDate} AND ${counts}${tail}
+         GROUP BY l.product_id ORDER BY total DESC, l.product_id ASC LIMIT ${limit ?? 100000}`
+      : await prisma.$queryRaw<Array<Record<string, unknown>>>`
+        SELECT l.price_source AS "priceSource", l.price_group_applied AS "priceGroupApplied",
+               COALESCE(SUM(l.quantity), 0)::bigint AS quantity, COALESCE(SUM(l.net_total), 0)::bigint AS total
+          FROM ${head}${inner}
+         WHERE o.store_id = ${storeId} AND o.created_at >= ${startDate} AND o.created_at <= ${endDate} AND ${counts}${tail}
+         GROUP BY l.price_source, l.price_group_applied`;
+  return rows.map(r => ({
+    productId: String(r.productId ?? ''),
+    priceSource: (r.priceSource as string | null) ?? null,
+    priceGroupApplied: r.priceGroupApplied == null ? null : Boolean(r.priceGroupApplied),
+    quantity: Number(r.quantity),
+    total: Number(r.total),
+  }));
+}
+
+/**
+ * The named contact on an order's shipping address, shaped like the customer relation. An order whose account did not join (a
+ * guest, an erased account, directory lag) still carries the name the buyer typed; the Customers page shows that name, so the
+ * recent-orders card must not call the same buyer a visitor (STORE-QA-22). Null only when no name was given.
+ */
+function shippingContact(
+  shipping: unknown
+): { firstName: string; lastName: string; email: string } | null {
+  const a = (shipping ?? null) as Record<string, unknown> | null;
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  const firstName = str(a?.firstName);
+  const lastName = str(a?.lastName);
+  if (!firstName && !lastName) return null;
+  return { firstName, lastName, email: str(a?.email) };
 }
 
 // ==========================================
@@ -448,14 +521,6 @@ export class AnalyticsService {
     // analytics. Schema marks Order soft-deletable but no caller sets
     // deletedAt today; future archive-order workflows would otherwise
     // double-count revenue here.
-    const where: Prisma.OrderWhereInput = {
-      storeId,
-      deletedAt: null,
-      createdAt: { gte: startDate, lte: endDate },
-      status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-      paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
-    };
-
     const money = await storeMoney(storeId);
     if (money) {
       const d = await money.analyticsPeriod({
@@ -475,11 +540,8 @@ export class AnalyticsService {
 
     // Use aggregate for revenue and order count — avoids loading all rows into JS
     const [aggregate, customerCount, profitRows] = await Promise.all([
-      prisma.order.aggregate({
-        where,
-        _sum: { total: true },
-        _count: { id: true },
-      }),
+      // ONE revenue definition (lib/revenue-sql.ts): excludes refunded orders, nets partial refunds.
+      netRevenue(storeId, { from: startDate, to: endDate }),
       // Distinct customers who ordered in the window, keyed like the
       // Customers page (guests included, every order status, as that page
       // counts them) — see lib/customer-key.ts.
@@ -509,8 +571,7 @@ export class AnalyticsService {
           AND o.deleted_at IS NULL
           AND o.created_at >= ${startDate}
           AND o.created_at <= ${endDate}
-          AND o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
-          AND o.payment_status <> 'failed'
+          AND ${Prisma.raw(revenueOrderPredicateSql('o', 'pg'))}
       `,
     ]);
 
@@ -522,8 +583,8 @@ export class AnalyticsService {
     const profit = costedLines === 0 ? (itemsMissingCost > 0 ? null : 0) : Number(p?.profit ?? 0);
 
     return {
-      revenue: aggregate._sum.total ?? 0,
-      orders: aggregate._count.id,
+      revenue: aggregate.revenue,
+      orders: aggregate.orders,
       customers: customerCount,
       profit,
       itemsMissingCost,
@@ -600,14 +661,14 @@ export class AnalyticsService {
       : await prisma.$queryRaw<Array<{ period: Date; revenue: number; orders: bigint }>>`
       SELECT
         date_trunc(${granularity}, "created_at" + (${tzOffsetMinutes}::int * interval '1 minute')) AS period,
-        COALESCE(SUM(total), 0) AS revenue,
+        COALESCE(SUM(${Prisma.raw(orderNetRevenueSql('o', 'pg'))}), 0) AS revenue,
         COUNT(*)::bigint AS orders
-      FROM public.orders
+      FROM public.orders o
+      ${Prisma.raw(refundJoinsSql('o', 'pg'))}
       WHERE store_id = ${storeId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
-        AND status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
-        AND payment_status <> 'failed'
+        AND ${Prisma.raw(revenueOrderPredicateSql('o', 'pg'))}
       GROUP BY period
       ORDER BY period ASC
     `;
@@ -667,18 +728,11 @@ export class AnalyticsService {
           priceGroupApplied: r.priceGroupApplied ?? null,
           _sum: { quantity: r.quantity, total: r.total },
         }))
-      : await prisma.orderItem.groupBy({
-          by: ['priceSource', 'priceGroupApplied'],
-          where: {
-            order: {
-              storeId,
-              createdAt: { gte: startDate, lte: endDate },
-              status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-              paymentStatus: { not: 'failed' },
-            },
-          },
-          _sum: { quantity: true, total: true },
-        });
+      : (await pgLineRevenue(storeId, startDate, endDate, 'priceSource')).map(r => ({
+          priceSource: r.priceSource,
+          priceGroupApplied: r.priceGroupApplied,
+          _sum: { quantity: r.quantity, total: r.total },
+        }));
     const bucket = { revenue: 0, units: 0 };
     const out = { retail: { ...bucket }, tier: { ...bucket }, group: { ...bucket } };
     for (const g of grouped) {
@@ -727,20 +781,10 @@ export class AnalyticsService {
           productId: r.productId as string,
           _sum: { quantity: r.quantity, total: r.total },
         }))
-      : await prisma.orderItem.groupBy({
-          by: ['productId'],
-          where: {
-            order: {
-              storeId,
-              createdAt: { gte: startDate, lte: endDate },
-              status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-              paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
-            },
-          },
-          _sum: { quantity: true, total: true },
-          orderBy: { _sum: { total: 'desc' } },
-          take: limit,
-        });
+      : (await pgLineRevenue(storeId, startDate, endDate, 'product', limit)).map(r => ({
+          productId: r.productId,
+          _sum: { quantity: r.quantity, total: r.total },
+        }));
 
     if (grouped.length === 0) return [];
 
@@ -806,18 +850,10 @@ export class AnalyticsService {
             nonRevenue: NON_REVENUE,
           })
         ).map(r => ({ productId: r.productId as string, _sum: { total: r.total } }))
-      : await prisma.orderItem.groupBy({
-          by: ['productId'],
-          where: {
-            order: {
-              storeId,
-              createdAt: { gte: startDate, lte: endDate },
-              status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-              paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
-            },
-          },
-          _sum: { total: true },
-        });
+      : (await pgLineRevenue(storeId, startDate, endDate, 'product')).map(r => ({
+          productId: r.productId,
+          _sum: { total: r.total },
+        }));
 
     if (grouped.length === 0) return [];
 
@@ -982,20 +1018,8 @@ export class AnalyticsService {
             return { newCustomers, returningCustomers };
           })(),
 
-      // Top customers by total spend — aggregate at DB level, return top 10
-      odb.order.groupBy({
-        by: ['customerId'],
-        where: {
-          storeId,
-          deletedAt: null,
-          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
-          paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
-        },
-        _sum: { total: true },
-        _count: true,
-        orderBy: { _sum: { total: 'desc' } },
-        take: 10,
-      }),
+      // Top customers by NET spend (REVENUE-DEF-1), through the store's own backend, never raw SQL on public.orders.
+      topCustomersNet(odb, storeId, 10),
     ]);
 
     // Resolve customer details for the top spenders in a single query
@@ -1055,11 +1079,13 @@ export class AnalyticsService {
         const c = o.customerId ? byId.get(o.customerId) : undefined;
         return {
           ...o,
-          customer: c ? { firstName: c.firstName, lastName: c.lastName, email: c.email } : null,
+          customer: c
+            ? { firstName: c.firstName, lastName: c.lastName, email: c.email }
+            : shippingContact(o.shippingAddress),
         };
       });
     }
-    return prisma.order.findMany({
+    const pgOrders = await prisma.order.findMany({
       where: { storeId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -1081,6 +1107,10 @@ export class AnalyticsService {
         },
       },
     });
+    return pgOrders.map(o => ({
+      ...o,
+      customer: o.customer ?? shippingContact(o.shippingAddress),
+    }));
   }
 
   /**

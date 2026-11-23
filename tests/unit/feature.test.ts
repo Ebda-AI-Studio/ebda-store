@@ -75,8 +75,9 @@ describe('Feature Registry', () => {
     // 2026-10-21: 48 keys (added `b2b.wholesale` — B2B wholesale pricing, decided by the plan layer, in NO baseline).
     // 2026-10-26: 49 keys (added `eta_ereceipt` — Egypt ETA e-receipt connector, hidden, in NO baseline; Ruling ETA-1).
     // 2026-10-29: 50 keys (added `customer_intelligence` — CI-3 smart hints, merchant-visible, in NO baseline; Ruling CI-10).
-    it('has exactly 50 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(50);
+    // 2026-11-14: 51 keys (added `product_feeds` - Google/Meta/TikTok catalogue feeds, in every paid plan baseline; Ruling FEEDS-1).
+    it('has exactly 51 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(51);
     });
   });
 
