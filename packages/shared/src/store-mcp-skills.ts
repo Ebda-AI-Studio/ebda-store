@@ -121,8 +121,13 @@ export interface SkillStoreCtx {
   mcpUrl: string;
 }
 
+/**
+ * The description carries the MERCHANT-CHOSEN store name, so it is emitted as a YAML double-quoted scalar: a name with `:`, `#`,
+ * quotes, a leading `-`/`[`/`{`/`&`/`*`/`!` or a line break can no longer break out of the value or add keys to the front matter.
+ * A JSON string is a valid YAML 1.2 double-quoted scalar. `name` is derived from the tool registry, never from merchant input.
+ */
 const frontmatter = (name: string, description: string) =>
-  `---\nname: ${name}\ndescription: ${description.replace(/\n/g, ' ')}\n---\n`;
+  `---\nname: ${name}\ndescription: ${JSON.stringify(description.replace(/\s*[\r\n\u2028\u2029]+\s*/g, ' '))}\n---\n`;
 
 function renderToolSkill(t: StoreMcpToolSkill, ctx: SkillStoreCtx): StoreMcpSkill {
   const name = skillNameForTool(t.name);

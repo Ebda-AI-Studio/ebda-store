@@ -4,6 +4,7 @@
  * or a manifest entry whose tool is gone, fails here - so a published skill can never name a tool the
  * server does not expose, nor hide one it does.
  */
+import { parse as parseYaml } from 'yaml';
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@ebda/database', async importOriginal => ({
@@ -64,6 +65,33 @@ describe('store MCP skills == real tool registry', () => {
       .map(m => m[1])
       .filter(n => n.includes('_'));
     for (const n of named) if (n !== 'x_agent_key') expect(real.has(n)).toBe(true);
+  });
+
+  it('a store name with colons, quotes, a leading dash or a line break stays one YAML string in the front matter', () => {
+    const hostile = [
+      'Bob: the "best" shop',
+      "O'Neil's: #1 - [gold] {rings}",
+      '- evil\nname: injected\nrole: admin',
+      '& *alias !tag | > key: v',
+      'Back\\slash "q" \u2028 sep',
+    ];
+    for (const storeName of hostile) {
+      for (const s of renderStoreMcpSkills({ ...ctx, storeName })) {
+        const m = /^---\n([\s\S]*?)\n---\n/.exec(s.body);
+        expect(m, `${s.name}: front matter is not closed`).not.toBeNull();
+        const fm = parseYaml(m![1]) as Record<string, unknown>;
+        expect(
+          Object.keys(fm).sort(),
+          `${storeName}: extra keys leaked into the front matter`
+        ).toEqual(['description', 'name']);
+        expect(fm.name).toBe(s.name);
+        expect(typeof fm.description).toBe('string');
+        // the store name survives (line breaks flattened to one space), it is only quoted
+        expect(fm.description as string).toContain(
+          storeName.replace(/\s*[\r\n\u2028\u2029]+\s*/g, ' ')
+        );
+      }
+    }
   });
 
   it('skills leak no secret-shaped values', () => {
