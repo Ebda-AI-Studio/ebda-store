@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { publicTenantKey } from './public-limiter-keys';
+import { resolvedStoreId } from '../utils/resolved-store';
 import { isVerifiedCatalogueMiss } from './catalogue-miss';
 import rateLimit, {
   ipKeyGenerator,
@@ -2078,7 +2079,15 @@ export const guestReturnIpLimiter = rateLimit({
 function guestReturnOrderKey(req: Request): string {
   const raw = (req.body as Record<string, unknown> | undefined)?.orderNumber;
   const num = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
-  const store = String((req.params as Record<string, string> | undefined)?.storeId ?? '');
+  // The RESOLVED store id (set by publicStoreContext from the host before the limiters run): POST /public/returns/guest has no
+  // :storeId param, so keying on the param alone put the same order number of every store in one bucket (cross-store lockout).
+  // The param / header fallbacks are only for an unresolved request, which is refused right after.
+  const hdr = (k: string) => (typeof req.headers[k] === 'string' ? (req.headers[k] as string) : '');
+  const store =
+    (resolvedStoreId(req) ??
+      String((req.params as Record<string, string> | undefined)?.storeId ?? '')) ||
+    hdr('x-store-id') ||
+    hdr('x-store-domain').toLowerCase();
   return createHash('sha256').update(`${store}:${num}`).digest('hex');
 }
 export const guestReturnOrderLimiter = rateLimit({

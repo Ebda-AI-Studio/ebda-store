@@ -10,6 +10,7 @@ import {
   GUEST_RETURN_IP_MAX,
   GUEST_RETURN_ORDER_MAX,
 } from '../security';
+import { setResolvedStoreId } from '../../utils/resolved-store';
 
 // Foundation criterion 19 / Ruling GUEST-RET-1: the guest return route is bounded per IP and per order.
 // The real limiters + their in-process store; one route stands in for POST /public/returns/guest.
@@ -22,6 +23,16 @@ beforeAll(async () => {
   app.use(express.json());
   app.post('/stores/:storeId/guest', guestReturnIpLimiter, guestReturnOrderLimiter, (_req, res) =>
     res.json({ ok: true })
+  );
+  // the real public route has NO :storeId param: the store is resolved from the host first (publicStoreContext)
+  app.post(
+    '/public-guest',
+    (req, _res, next) => {
+      setResolvedStoreId(req, String(req.headers['x-test-resolved-store']));
+      next();
+    },
+    guestReturnOrderLimiter,
+    (_req, res) => res.json({ ok: true })
   );
   await new Promise<void>(r => {
     server = app.listen(0, r);
@@ -49,6 +60,24 @@ describe('guest return limiters', () => {
     // another order, and the same number in another store, are unaffected
     expect((await post('10.1.9.8', 'ORD-2')).status).toBe(200);
     expect((await post('10.1.9.7', 'ORD-1', 's2')).status).toBe(200);
+  });
+
+  it('keys on the RESOLVED store: the same order number on two stores (no :storeId param) gets separate buckets', async () => {
+    const hit = (store: string, ip: string) =>
+      fetch(`${base}/public-guest`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': ip,
+          'x-test-resolved-store': store,
+        },
+        body: JSON.stringify({ orderNumber: 'ORD-SHARED' }),
+      }).then(r => r.status);
+    for (let i = 0; i < GUEST_RETURN_ORDER_MAX; i++)
+      expect(await hit('store-a', `10.7.0.${i}`)).toBe(200);
+    expect(await hit('store-a', '10.7.1.1')).toBe(429);
+    // store B's customers asking for the same order number are not locked out by store A's traffic
+    expect(await hit('store-b', '10.7.2.1')).toBe(200);
   });
 
   it('trips per IP: one IP walking many order numbers is stopped at the cap', async () => {
