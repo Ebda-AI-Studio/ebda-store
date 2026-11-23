@@ -8,16 +8,9 @@
  * carries 'wasm-unsafe-eval' (QA-109) and `connect-src 'self'` covers the fetch (tests/unit/admin-barcode-scanner.test.ts).
  */
 
-export type ScanFormat =
-  | 'ean_13'
-  | 'ean_8'
-  | 'upc_a'
-  | 'upc_e'
-  | 'code_128'
-  | 'code_39'
-  | 'qr_code';
+type ScanFormat = 'ean_13' | 'ean_8' | 'upc_a' | 'upc_e' | 'code_128' | 'code_39' | 'qr_code';
 
-export const SCAN_FORMATS: ScanFormat[] = [
+const SCAN_FORMATS: ScanFormat[] = [
   'ean_13',
   'ean_8',
   'code_128',
@@ -30,14 +23,14 @@ export const SCAN_FORMATS: ScanFormat[] = [
 /** Formats the products/labels actually use; native is only trusted when it covers all of these. */
 const REQUIRED_FORMATS: ScanFormat[] = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'];
 
-export const ZXING_WASM_VERSION = '3.1.7';
-export const ZXING_WASM_URL = `/vendor/zxing-wasm-${ZXING_WASM_VERSION}/zxing_reader.wasm`;
+const ZXING_WASM_VERSION = '3.1.7';
+const ZXING_WASM_URL = `/vendor/zxing-wasm-${ZXING_WASM_VERSION}/zxing_reader.wasm`;
 
 export interface ScanDetector {
   detect(source: ImageBitmapSource): Promise<Array<{ rawValue: string; format: string }>>;
 }
 
-export type EngineKind = 'native' | 'wasm';
+type EngineKind = 'native' | 'wasm';
 
 interface NativeCtor {
   new (opts?: { formats?: string[] }): ScanDetector;
