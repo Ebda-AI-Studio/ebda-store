@@ -58,6 +58,7 @@ const INVOICE_LABELS = {
     invoice: 'Invoice',
     taxInvoice: 'Tax invoice',
     receipt: 'Sales receipt',
+    orderConfirmation: 'Order confirmation',
     orderSummary: 'Order summary',
     orderNo: 'Order',
     codFee: 'Cash on delivery fee',
@@ -101,6 +102,7 @@ const INVOICE_LABELS = {
     invoice: 'فاتورة',
     taxInvoice: 'فاتورة ضريبية',
     receipt: 'إيصال بيع',
+    orderConfirmation: 'تأكيد الطلب',
     orderSummary: 'ملخص الطلب',
     orderNo: 'طلب',
     codFee: 'رسوم الدفع عند الاستلام',
@@ -273,7 +275,16 @@ function documentHeading(
   const sale = docs?.sale;
   if (sale?.number) {
     return {
-      title: sale.docType === 'tax_invoice' ? labels.taxInvoice : labels.receipt,
+      // STORE-QA-67: a receipt says money was received. A COD order is numbered (RCT-) when it is placed, but until
+      // it is paid the printed document is an ORDER CONFIRMATION under the same gap-free number, never a "sales receipt".
+      title:
+        sale.docType === 'tax_invoice'
+          ? labels.taxInvoice
+          : ['paid', 'refunded', 'partially_refunded'].includes(
+                (order as { paymentStatus?: string }).paymentStatus ?? ''
+              )
+            ? labels.receipt
+            : labels.orderConfirmation,
       number: sale.number,
       issuedAt: new Date(sale.issuedAt),
       cancelled: sale.status === 'cancelled',

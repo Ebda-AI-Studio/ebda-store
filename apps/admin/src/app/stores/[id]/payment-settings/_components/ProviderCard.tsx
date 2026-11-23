@@ -84,9 +84,7 @@ export function ProviderCard({
             <h3 className="font-semibold text-foreground">
               {isAr ? provider.nameAr : provider.name}
             </h3>
-            <p className="text-xs text-muted-foreground" lang={isAr ? 'en' : 'ar'}>
-              {isAr ? provider.name : provider.nameAr}
-            </p>
+            {/* STORE-QA-26/32: one script per locale. The other language's name ("Cash on delivery" in AR, Arabic in EN) was a duplicate. */}
           </div>
         </div>
 

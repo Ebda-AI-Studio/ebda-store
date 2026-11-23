@@ -161,6 +161,22 @@ export function Canvas({
           sandbox="allow-scripts allow-same-origin allow-forms"
         />
       </div>
+      {/* STORE-QA-19: a skeleton of a page (header, hero, a row of cards) instead of blank white while the frame loads. */}
+      {!ready && (
+        <div
+          aria-hidden="true"
+          data-testid="builder-canvas-skeleton"
+          className="pointer-events-none absolute inset-x-0 top-12 mx-auto flex w-[min(100%,48rem)] flex-col gap-4 px-4"
+        >
+          <div className="force-skeleton h-10 rounded-lg" />
+          <div className="force-skeleton h-56 rounded-xl" />
+          <div className="grid grid-cols-3 gap-3">
+            <div className="force-skeleton h-32 rounded-lg" />
+            <div className="force-skeleton h-32 rounded-lg" />
+            <div className="force-skeleton h-32 rounded-lg" />
+          </div>
+        </div>
+      )}
       {!ready && (
         <p
           role="status"

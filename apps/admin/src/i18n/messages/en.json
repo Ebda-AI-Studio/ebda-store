@@ -3404,7 +3404,9 @@
       "title": "Store time zone",
       "description": "Your store's one time zone. It decides which calendar day each sale, expense and tax period belongs to in your reports and VAT figures, and it is also the clock your storefront uses: delivery-window cutoffs at checkout and the dates customers see on orders and invoices.",
       "label": "Time zone",
-      "saved": "Time zone saved"
+      "saved": "Time zone saved",
+      "zoneCairo": "Cairo (Egypt time)",
+      "zoneUtc": "Universal time (UTC)"
     },
     "rates": {
       "title": "Tax Rates",
@@ -4971,21 +4973,21 @@
     },
     "sms": {
       "title": "SMS",
-      "subtitle": "SMS via Unifonic",
+      "subtitle": "SMS to your customers",
       "fields": {
-        "appSid": "App key from Unifonic",
+        "appSid": "App key from your SMS provider",
         "senderId": "Sender name the customer sees"
       },
       "placeholders": {
-        "appSid": "The key in your Unifonic account",
+        "appSid": "The key in your SMS provider account",
         "senderId": "e.g. MyStore"
       }
     },
     "push": {
       "title": "Push Notifications",
-      "subtitle": "Standards-based Web Push (W3C Push API)",
+      "subtitle": "Browser push notifications",
       "subscribers": "{count, number, latn} subscribers",
-      "platformNote": "Push notifications use the platform VAPID configuration. No per-store setup needed — just toggle Enabled."
+      "platformNote": "Push notifications use the platform configuration. No per-store setup needed — just toggle Enabled."
     },
     "broadcast": {
       "title": "Send a broadcast",
@@ -5258,8 +5260,8 @@
       "retry": "Retry"
     },
     "toggle": {
-      "enabled": "Enabled",
-      "disabled": "Disabled"
+      "enabled": "On",
+      "disabled": "Off"
     },
     "configure": "Configure",
     "cod": {

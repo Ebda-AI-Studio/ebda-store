@@ -528,6 +528,26 @@ function forBackend<const I extends { customer?: unknown }>(onDo: boolean, inclu
   return rest as I;
 }
 
+/**
+ * `id -> nameAr` for a set of product ids, in ONE query selecting only those two columns, keyed on the primary key
+ * (`id IN (...)`, scoped by store): the plan is a PK lookup, so no new index is needed. At most `limit` (<=100) orders
+ * x their lines, de-duplicated.
+ */
+// pq-allow(unused-export): test seam, imported by tests/unit/storeqa-rest-2.test.ts (asserts the query shape)
+export async function productArabicNames(
+  db: { product: { findMany: (args: { where: object; select: object }) => Promise<unknown> } },
+  storeId: string,
+  productIds: Array<string | null | undefined>
+): Promise<Map<string, string>> {
+  const ids = [...new Set(productIds.filter((v): v is string => !!v))];
+  if (ids.length === 0) return new Map();
+  const rows = (await db.product.findMany({
+    where: { storeId, id: { in: ids } },
+    select: { id: true, nameAr: true },
+  })) as Array<{ id: string; nameAr: string | null }>;
+  return new Map(rows.filter(r => r.nameAr).map(r => [r.id, r.nameAr as string]));
+}
+
 export class OrderService {
   /**
    * WHERE clause for the order list and its export. Async because a search
@@ -659,11 +679,26 @@ export class OrderService {
     const pageRows = cursor && ordersRaw.length > limit ? ordersRaw.slice(0, limit) : ordersRaw;
     // QA-D1: the list rows carried only `payments[]`, so a consumer reading `paymentMethod` got null. The
     // method is the provider of the completed payment, else of the newest one (same rule as the detail card).
+    // STORE-QA-8: the line's Arabic name for the list (lines snapshot only the English one). ONE extra read of
+    // `products.nameAr` by primary key for the page's distinct product ids: no join, no include widening.
+    const arNames = await productArabicNames(
+      repo.db,
+      storeId,
+      pageRows.flatMap(o =>
+        ((o as { items?: Array<{ productId?: string | null }> }).items ?? []).map(i => i.productId)
+      )
+    );
     const orders = pageRows.map(o => {
       const pays = ((o as { payments?: Array<{ provider: string; status: string }> }).payments ??
         []) as Array<{ provider: string; status: string }>;
       const chosen = pays.find(p => p.status === 'completed') ?? pays[0];
-      return { ...o, paymentMethod: chosen?.provider ?? null };
+      const items = ((o as { items?: Array<{ productId?: string | null }> }).items ?? []).map(
+        i => ({
+          ...i,
+          product: { nameAr: (i.productId && arNames.get(i.productId)) || null },
+        })
+      );
+      return { ...o, items, paymentMethod: chosen?.provider ?? null };
     });
     const nextCursor =
       cursor && ordersRaw.length > limit ? (ordersRaw[limit] as { id: string }).id : undefined;
