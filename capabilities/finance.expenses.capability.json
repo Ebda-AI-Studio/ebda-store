@@ -11,7 +11,8 @@
     "GET/POST /stores/:storeId/expenses",
     "GET .../expenses/:id",
     "POST .../approve|post|reject",
-    "POST .../expenses/upload-receipt"
+    "POST .../expenses/upload-receipt",
+    "GET /stores/:storeId/expenses/:expenseId/receipt"
   ],
   "mcpTool": null,
   "planGate": "accounting.expenses",

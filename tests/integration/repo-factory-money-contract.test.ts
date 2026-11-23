@@ -213,6 +213,12 @@ async function parity(fx: Fx, scenario: () => Promise<unknown>) {
   return pg as any;
 }
 
+/** The DO backend alone (production). For a rule where the backends diverge ON PURPOSE (a Ruling names it). */
+async function doOnly(fx: Fx, scenario: () => Promise<unknown>) {
+  const out = await settle(() => onDo(scenario));
+  return scrub({ out, state: await onDo(() => state(fx.names)) }, fx.names) as any;
+}
+
 beforeAll(async () => {
   const user = await prisma.user.create({
     data: {

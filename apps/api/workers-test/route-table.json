@@ -291,6 +291,7 @@
   "GET /stores/:storeId/customers/search",
   "GET /stores/:storeId/eta/connection",
   "GET /stores/:storeId/expenses",
+  "GET /stores/:storeId/expenses/:expenseId/receipt",
   "GET /stores/:storeId/expenses/:id",
   "GET /stores/:storeId/finance/accounts",
   "GET /stores/:storeId/finance/anomalies",

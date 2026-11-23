@@ -45,6 +45,15 @@ describe('BillingStatusBanner', () => {
     expect(apiGet).toHaveBeenCalledWith('/api/v1/stores/s1/billing');
   });
 
+  it('shows a read-only alert for a platform-suspended store (no billing reason), TEN-1', async () => {
+    apiGet.mockResolvedValue({
+      data: { billing: billingFixture({ suspension: null }), storeStatus: 'suspended' },
+      error: null,
+    });
+    render(<BillingStatusBanner storeId="s1" />);
+    expect((await screen.findByRole('alert')).textContent).toContain('suspendedTitle');
+  });
+
   it('shows due-soon (<=7 days) as a calm status, and nothing for a healthy store', async () => {
     reply(billingFixture({ dueSoon: { dueAt: '2026-11-08T00:00:00.000Z', daysLeft: 4 } }));
     render(<BillingStatusBanner storeId="s1" />);
@@ -87,5 +96,7 @@ describe('billingNotice priority', () => {
     expect(billingNotice({ ...all, suspension: null })).toBe('overdue');
     expect(billingNotice({ ...all, suspension: null, overdue: false })).toBe('dueSoon');
     expect(billingNotice(null)).toBeNull();
+    expect(billingNotice({ ...all, suspension: null }, 'suspended')).toBe('suspended');
+    expect(billingNotice({ ...all, suspension: null }, 'active')).toBe('overdue');
   });
 });

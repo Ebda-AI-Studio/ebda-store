@@ -21,6 +21,8 @@ export const NO_STORE_DATA_JOBS: ReadonlySet<string> = new Set([
   'gmail-alert-poller',
   'alerts-failure-watch',
   'audit-log-archive-weekly',
+  // storefront cache purge by store id over the service binding: no store table is read (#663)
+  'storefront-order-purge',
   'billing-renewal-daily',
   // reads the webhook inbox (a platform table) and re-sends events; it never opens a store table (Ruling CF-JOBS-4)
   'payment-webhook-stuck-sweep',

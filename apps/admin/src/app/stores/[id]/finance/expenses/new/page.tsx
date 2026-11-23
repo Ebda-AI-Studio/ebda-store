@@ -317,7 +317,8 @@ export default function NewExpensePage() {
         currency,
         notes: notes || undefined,
         notesAr: notesAr || undefined,
-        receiptUrl: receiptUrl || undefined,
+        // the API field is receiptImageUrl (the old `receiptUrl` key was silently dropped by the schema)
+        receiptImageUrl: receiptUrl.trim() || undefined,
       };
 
       // Include FX fields only for non-EGP currencies

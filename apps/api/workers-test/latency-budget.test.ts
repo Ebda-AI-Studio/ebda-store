@@ -101,11 +101,18 @@ const ops: Record<string, string[]> = {};
  * (`rl:auth-ip-fail`): the launch rate limits of #473 (Ruling PERF-LAT-1 addendum), a deliberate security hop, not a regression.
  * PERF-RL-DO (Ruling PERF-RL-DO-1): the public limiters' hits are prefetched in ONE batch on the client's shard, so store resolve
  * 3 -> 1 call (3 -> 2 waves), product list / pdp 4 -> 3 (5 -> 4), cart add 16 -> 15, order create 31 -> 30 (38 -> 37).
+ * Ruling PERF-ORDER-PURGE-1 - order create 30 -> 31 remote calls (waves unchanged): #665's durable trailing purge makes ONE
+ * `do-other:storefront-order-purge|debounce|<store>:touch` call per order. That touch IS the guarantee that the LAST order of a
+ * burst purges the NEVER-stale inventory caches, so it cannot be skipped, folded into the createOrder money op (a different DO
+ * and a different failure policy: the enqueue must never fail an order) or sent off the request path (waitUntil can be dropped).
+ * Cost if wrong: one extra DO hop per order; remove it if the purge moves into the StoreDO alarm.
  * `remote` = D1 + StoreDO + AuthState + other DO + identity calls (KV is edge-local and not counted).
  * PERF-BATCH-1 (Ruling PERF-BATCH-1): every limiter hit of a request is prefetched in ONE call per AuthState shard before the
  * global limiter runs (sign-in rl:global + rl:auth-ip-fail + rl:auth; cart add / order create rl:global + the public family +
  * rl:cart / rl:write), so sign-in 9 -> 7 waves, cart add 15 -> 13 waves (calls unchanged: one per shard, 14-15 by where the store's tenant key lands), order create 37 -> 17 waves (the
  * 37 ceiling was stale: 19 measured before this change).
+ * Merge of PERF-ORDER-PURGE-1 onto PERF-BATCH-1: order create is 31 calls / 18 waves (measured on workerd, 2026-11-19): the purge touch
+ * is one serial wave after the batched limiter prefetch brought the order path to 17. Cost if wrong: one serial DO hop (~1 wave) on order create.
  * The NEON-SCALE-1 targets (public reads 0 D1 / 0 DO; a cart or order write ONE batched DO call) are NOT met yet: the order and
  * cart paths still make 10 StoreDO calls each (see the PR's follow-ups). Lower a ceiling whenever a change lowers the count.
  */
@@ -115,7 +122,7 @@ const BUDGET: Record<string, { remote: number; waves: number }> = {
   pdp: { remote: 3, waves: 4 },
   'cart get': { remote: 2, waves: 2 },
   'cart add (guest)': { remote: 15, waves: 13 },
-  'order create (guest, cod)': { remote: 30, waves: 17 },
+  'order create (guest, cod)': { remote: 31, waves: 18 },
   'customer sign-in': { remote: 13, waves: 7 },
   'customer /auth/me': { remote: 4, waves: 3 },
   'merchant order list': { remote: 6, waves: 4 },

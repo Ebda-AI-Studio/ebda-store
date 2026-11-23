@@ -10,6 +10,7 @@ import { invoiceEmail } from './invoice-email';
 import { heartbeat } from './heartbeat';
 import { storefrontPurgeRetry, storefrontBundleBoundary } from './storefront-purge';
 import { auditLogArchive } from './audit-log-archive';
+import { storefrontOrderPurge } from './storefront-order-purge';
 import { bulkAiTranslate } from './bulk-ai-translate';
 import { bulkAiSeo } from './bulk-ai-seo';
 import { bulkAiFaqAeo, bulkAiHowtoAeo, bulkAiMetaAeo } from './bulk-ai-aeo';
@@ -118,6 +119,7 @@ const allInngestFunctions: JobDef[] = [
   storefrontPurgeRetry,
   storefrontBundleBoundary,
   auditLogArchive,
+  storefrontOrderPurge,
   bulkAiTranslate,
   bulkAiSeo,
   bulkAiFaqAeo,

@@ -99,6 +99,38 @@ describe('patchStoreSettings', () => {
     expect(read(sql, ['settings']).settings).not.toHaveProperty('drop');
   });
 
+  it('merge: settings.contact keys merge inside the transaction; a concurrent writer of another contact key survives (#739)', async () => {
+    const { sql } = rig();
+    applyStoreSettings(sql, META as never, 's1', {
+      settings: { base: 1, contact: { addressUrl: 'old', whatsapp: 'w0' } },
+    });
+    for (let i = 0; i < 20; i++) {
+      await Promise.all([
+        Promise.resolve().then(() =>
+          patchStoreSettings(sql, META as never, 's1', {
+            json: { settings: { merge: { contact: { addressUrl: `u${i}`, addressLink: true } } } },
+          })
+        ),
+        Promise.resolve().then(() =>
+          patchStoreSettings(sql, META as never, 's1', {
+            json: { settings: { merge: { contact: { whatsapp: `w${i}` } } } },
+          })
+        ),
+      ]);
+      expect(read(sql, ['settings']).settings, `round ${i}`).toEqual({
+        base: 1,
+        contact: { addressUrl: `u${i}`, addressLink: true, whatsapp: `w${i}` },
+      });
+    }
+    patchStoreSettings(sql, META as never, 's1', {
+      json: { settings: { merge: { contact: { addressUrl: null } } } },
+    });
+    expect((read(sql, ['settings']).settings as { contact: object }).contact).toEqual({
+      addressLink: true,
+      whatsapp: 'w19',
+    });
+  });
+
   it('a refused part writes NOTHING (no partial bundle)', () => {
     const { sql } = rig();
     applyStoreSettings(sql, META as never, 's1', { settings: { keep: true }, heroTitle: 'old' });

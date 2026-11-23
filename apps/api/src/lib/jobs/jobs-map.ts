@@ -207,6 +207,7 @@ export const JOBS_MAP: Readonly<Record<string, JobMapEntry>> = {
     trigger: 'cron',
     alarm: true,
   },
+  'storefront-order-purge': { group: '5-integrations', kind: 'queue', trigger: 'event' },
   'search-product-index': { group: '5-integrations', kind: 'workflow', trigger: 'event' },
   'wa-plan-sync': { group: '5-integrations', kind: 'queue', trigger: 'cron', alarm: true },
   'wa-store-events': { group: '5-integrations', kind: 'queue', trigger: 'event' },

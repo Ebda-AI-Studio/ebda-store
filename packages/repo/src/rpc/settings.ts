@@ -87,7 +87,16 @@ export function applyStoreSettings(
 
 /** The JSON columns `patchStoreSettings` merges key by key (Prisma `Store` field names). */
 export const PATCHABLE_JSON_FIELDS = ['settings', 'theme', 'socialLinks'] as const;
-export type JsonKeyPatch = { set?: Record<string, unknown>; remove?: string[] };
+export type JsonKeyPatch = {
+  set?: Record<string, unknown>;
+  remove?: string[];
+  /**
+   * One level deeper: for each top-level key, merge these keys INTO the object stored there (a `null` value deletes that
+   * nested key), inside the same synchronous transaction. `settings.contact` uses it, so a save of addressUrl never
+   * overwrites a contact key another writer set meanwhile (#739 review). Applied after `set` / `remove`.
+   */
+  merge?: Record<string, Record<string, unknown>>;
+};
 
 /**
  * BE:F-2 / BE:F-3: the DO's atomic settings PATCH. The service used to read `settings` (or `theme`,
@@ -127,6 +136,19 @@ export function patchStoreSettings(
           ...(patch.set ?? {}),
         };
         for (const k of patch.remove ?? []) delete next[k];
+        for (const [k, sub] of Object.entries(patch.merge ?? {})) {
+          const curSub = next[k];
+          const merged: Record<string, unknown> = {
+            ...(curSub && typeof curSub === 'object' && !Array.isArray(curSub)
+              ? (curSub as Record<string, unknown>)
+              : {}),
+          };
+          for (const [sk, sv] of Object.entries(sub ?? {})) {
+            if (sv === null) delete merged[sk];
+            else merged[sk] = sv;
+          }
+          next[k] = merged;
+        }
         fields[n] = next;
       }
     }

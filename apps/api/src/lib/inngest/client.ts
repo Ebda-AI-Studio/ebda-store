@@ -387,6 +387,12 @@ type LegalNoticeSendRequestedEvent = EventPayload & {
   data: { sendId: string; docKey: string; version: string; sentBy: string };
 };
 
+// #663: the durable, per-store debounced trailing purge of storefront product caches after an order.
+type StorefrontOrderPurgeRequestedEvent = EventPayload & {
+  name: 'storefront/order-purge-requested';
+  data: { storeId: string };
+};
+
 // Search program Task 11: ask the product embedding indexer to look at one store (debounced per
 // store). Sent by every product-text writer outside ProductService.create/update, the backstop cron
 // and the indexer's own continuation.
@@ -460,6 +466,7 @@ export type AppEvent =
   | EtaReceiptScheduledEvent
   | LegalNoticeSendRequestedEvent
   | SearchStoreReindexRequestedEvent
+  | StorefrontOrderPurgeRequestedEvent
   | WebhookDeliveryRequestedEvent
   | WebhookInventoryLowEvent
   | StoreSelfServeProvisionedEvent;

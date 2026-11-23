@@ -9,11 +9,8 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 
 const { uploadMock, sendMock } = vi.hoisted(() => ({
-  uploadMock: vi.fn(async (buf: Buffer, _name: string, opts: { contentType: string }) => ({
-    key: 'stores/store-1/misc/r',
-    url: 'https://cdn.example/r',
-    size: buf.length,
-    contentType: opts.contentType,
+  uploadMock: vi.fn(async (_buf: Buffer, _args: { contentType: string; ext: string }) => ({
+    key: 'stores/store-1/receipts/r.jpg',
   })),
   sendMock: vi.fn(async () => undefined),
 }));
@@ -38,9 +35,10 @@ vi.mock('@api/middleware/feature-gate', () => ({
 vi.mock('@api/middleware/security', () => ({
   uploadLimiter: (_req: any, _res: any, next: any) => next(),
   dailyUploadLimiter: (_req: any, _res: any, next: any) => next(),
+  receiptReadLimiter: (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/services/storage.service', () => ({
-  StorageService: { upload: uploadMock, isAvailable: vi.fn(() => true) },
+  StorageService: { putPrivate: uploadMock, isAvailable: vi.fn(() => true) },
 }));
 vi.mock('@api/services/image-resize.service', () => ({
   enforceMaxDimensions: vi.fn(async (buf: Buffer) => buf),
@@ -65,6 +63,7 @@ describe('expense receipt upload is judged by its bytes', () => {
   beforeAll(async () => {
     const { default: router } = await import('@api/routes/expenses.routes');
     app = express();
+    app.use(express.json());
     app.use('/api/v1/stores', router);
     app.use(errorHandler);
   });
@@ -100,7 +99,36 @@ describe('expense receipt upload is judged by its bytes', () => {
       .attach('file', JPEG, { filename: 'receipt.png', contentType: 'image/png' });
     expect(res.status).toBe(202);
     const call = uploadMock.mock.calls.at(-1)!;
-    expect(call[1]).toBe('receipt.jpg');
-    expect(call[2].contentType).toBe('image/jpeg');
+    expect(call[1].ext).toBe('.jpg');
+    expect(call[1].contentType).toBe('image/jpeg');
+    // private reference, never a public URL
+    expect(res.body.receiptUrl).toBe('private:stores/store-1/receipts/r.jpg');
+  });
+
+  it.each(['private:stores/store-1/instapay/proof.jpg', ' PRIVATE:stores/store-1/tax/card.pdf'])(
+    'create-expense rejects a client-sent private reference (%s)',
+    async ref => {
+      const res = await request(app).post('/api/v1/stores/store-1/expenses').send({
+        amount: 100,
+        expenseAccountId: '11111111-1111-4111-8111-111111111111',
+        paidFromAccountId: '22222222-2222-4222-8222-222222222222',
+        expenseDate: '2026-11-01',
+        receiptImageUrl: ref,
+      });
+      expect(res.status).toBe(422);
+      expect(JSON.stringify(res.body)).toContain('receiptImageUrl');
+    }
+  );
+});
+
+describe('the admin create form sends the field the API reads (#739 review)', () => {
+  it('posts receiptImageUrl (the old `receiptUrl` key was silently dropped by the schema)', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync(
+      'apps/admin/src/app/stores/[id]/finance/expenses/new/page.tsx',
+      'utf8'
+    );
+    expect(src).toMatch(/receiptImageUrl: receiptUrl\.trim\(\) \|\| undefined/);
+    expect(src).not.toMatch(/^\s*receiptUrl: receiptUrl/m);
   });
 });

@@ -97,6 +97,68 @@ export function posthogAssetsHost(apiHost: string): string {
   return apiHost.replace('.i.posthog.com', '-assets.i.posthog.com');
 }
 
+/**
+ * Personal-data keys. The long words match anywhere in the key (`first_name`, `contact[email]`); the short ones (`q`, `tel`,
+ * `search`) only as a whole segment, so `faq`, `quote`, `hotel` or `sequence` no longer silence the pixel (#739 review).
+ */
+const PIXEL_SENSITIVE_KEY =
+  /e[-_]?mail|phone|mobile|whats(app)?|name|address|(?:^|[[\]._-])(?:q|tel|search)(?:$|[[\]._-])/i;
+/**
+ * Keys whose VALUE is a long opaque or numeric id, never personal data, so the 7+ digit rule skips them: ad click ids, and the
+ * campaign ids Meta's own URL parameters carry (`utm_id={{campaign.id}}`, `ad_id`, `adset_id`, `campaign_id`, utm_*). Without
+ * this every paid Meta visit was untracked. The `@` and personal-key rules still apply to them.
+ */
+const CLICK_ID_KEY =
+  /^(fbclid|gclid|ttclid|msclkid|wbraid|gbraid|utm_[a-z_]+|ad_id|adset_id|campaign_id|placement|site_source_name)$/i;
+
+function safeDecode(v: string): string {
+  // Decode until stable (max 3 passes): `%2540` is a double-encoded `@`.
+  let cur = v;
+  for (let i = 0; i < 3; i++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(cur.replace(/\+/g, ' '));
+    } catch {
+      break;
+    }
+    if (next === cur) break;
+    cur = next;
+  }
+  return cur;
+}
+
+/** Arabic-Indic (U+0660-0669) and Persian (U+06F0-06F9) digits -> ASCII, so a phone typed in Arabic digits counts. */
+function asciiDigits(v: string): string {
+  return v.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, ch => {
+    const c = ch.charCodeAt(0);
+    return String(c >= 0x06f0 ? c - 0x06f0 : c - 0x0660);
+  });
+}
+
+/**
+ * Meta reads the page URL and referrer itself, so the pixel stays silent on a URL whose query holds
+ * personal data. Decided by KEY (e-mail, phone, mobile, tel, whatsapp, name, address, q, search, also
+ * nested like contact[email]) and by VALUE (an `@`, or a run of 7+ digits ignoring separators).
+ * Exported for tests. Blocking (not rewriting the URL) is deliberate: history.replaceState would
+ * change what the visitor sees and the app's own routing state.
+ */
+// pq-allow(unused-export): exported for unit tests
+export function pixelQuerySensitive(search: string | null | undefined): boolean {
+  if (!search) return false;
+  if (urlCarriesSensitiveQuery(search)) return true;
+  for (const pair of search.replace(/^\?/, '').split('&')) {
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    const key = safeDecode(eq < 0 ? pair : pair.slice(0, eq));
+    const value = eq < 0 ? '' : safeDecode(pair.slice(eq + 1));
+    if (PIXEL_SENSITIVE_KEY.test(key)) return true;
+    if (value.includes('@')) return true;
+    if (!CLICK_ID_KEY.test(key) && /\d{7,}/.test(asciiDigits(value).replace(/[\s\-.()+_/]/g, '')))
+      return true;
+  }
+  return false;
+}
+
 const COPY = CONSENT_UI;
 
 export function createTracker(config: TrackerConfig, win: Window): Tracker {
@@ -135,7 +197,17 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
    * on a URL carrying a typed term, an email, a phone or a one-time token (`/verify-email?token=`,
    * Ruling PIXEL-CONSENT-1). The server-side Conversions API event for the same step still goes.
    */
-  const urlBlockedForPixel = () => urlCarriesSensitiveQuery(win.location.search);
+  const urlBlockedForPixel = () => {
+    if (pixelQuerySensitive(win.location.search)) return true;
+    // fbevents also reads the referrer (`rl`) and sends it on EVERY event, including later SPA routes (document.referrer
+    // does not change on pushState), so a sensitive landing referrer keeps the pixel silent for the whole visit: on purpose.
+    try {
+      const ref = doc.referrer;
+      return !!ref && pixelQuerySensitive(new URL(ref).search);
+    } catch {
+      return false;
+    }
+  };
 
   function loadMeta(): void {
     if (metaLoaded || !config.metaPixelId || urlBlockedForPixel()) return;
@@ -156,6 +228,14 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
       s.src = META_SRC;
       doc.head.appendChild(s);
     }
+    // Our tracker is the ONLY PageView sender: fbevents would otherwise auto-fire on history.pushState,
+    // bypassing the URL gate above and double counting every route change. Set before init.
+    w.fbq.disablePushState = true;
+    w.fbq.allowDuplicatePageViews = false;
+    // No automatic button-click / microdata events (they would scrape page content), and no
+    // advanced matching: init takes the id only, never an email or phone.
+    w.fbq('set', 'autoConfig', false, config.metaPixelId);
+    w.fbq('consent', 'grant');
     w.fbq('init', config.metaPixelId);
   }
 
@@ -253,6 +333,9 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
     }
     const c = readConsent();
     const replay = held.splice(0);
+    // Marketing withdrawn after the pixel was loaded: fire() already stops on the cookie; also tell the
+    // library so it queues nothing further. It is not reloaded on later navigations (start() checks consent).
+    if (metaLoaded && !c?.marketing) w.fbq?.('consent', 'revoke');
     if (!hasAnyConsent(c)) return;
     start();
     for (const h of replay) fire(h.step, h.opts, c!);

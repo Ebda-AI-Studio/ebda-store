@@ -78,9 +78,13 @@ describe('branding page save', () => {
     const [url, body] = apiPut.mock.calls[0] as [string, Record<string, unknown>];
     expect(url).toBe('/api/v1/stores/s1/branding-bundle');
     expect((body.branding as { name: string }).name).toBe('Renamed');
-    // Only this page's keys: settings carries `contact` alone (extra stored contact keys kept), no blogEnabled.
-    expect(Object.keys(body.settings as object)).toEqual(['contact']);
-    expect((body.settings as { contact: Record<string, unknown> }).contact.mapPin).toBe(7);
+    // Only the keys the merchant changed travel: a rename sends `branding.name` alone. Untouched contact/social/settings are
+    // not sent, so stored `settings.contact` keys (mapPin) are never rewritten from the copy loaded at mount (the API merges
+    // `settings.contact` per key, store.service.ts).
+    expect(body.branding).toEqual({ name: 'Renamed' });
+    expect(body).not.toHaveProperty('settings');
+    expect(body).not.toHaveProperty('contact');
+    expect(body).not.toHaveProperty('social');
     expect(body).not.toHaveProperty('blogEnabled');
     // Untouched theme is not sent; the whole settings blob is never fetched again for a merge.
     expect(body).not.toHaveProperty('theme');

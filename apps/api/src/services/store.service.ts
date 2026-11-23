@@ -10,6 +10,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@ebda/database';
+import { mergeNestedPatch } from '../lib/merge-nested-patch';
 import { hubOnD1 } from '../lib/platform-hub';
 import {
   copyStoreSettings,
@@ -386,7 +387,12 @@ function queueBrandingImageCleanup(storeId: string, store: unknown, branding: Br
 
 /** The social-links change a bundle carries: keys to set and keys to remove (a cleared field). */
 export type SocialLinksPatch = { set: Record<string, string>; remove: string[] };
-type JsonKeyPatchInput = { set?: Record<string, unknown>; remove?: string[] };
+type JsonKeyPatchInput = {
+  set?: Record<string, unknown>;
+  remove?: string[];
+  /** One level deeper, merged inside the DO transaction (null deletes a nested key). */
+  merge?: Record<string, Record<string, unknown>>;
+};
 
 /** Apply a `SocialLinksPatch` to the stored links (the Postgres path; a DO store applies it inside the DO). */
 export function applySocialLinksPatch(
@@ -1834,6 +1840,25 @@ export class StoreService {
     }
   ) {
     const before = await this.getById(storeId);
+    // `settings.contact` is a nested object under ONE top-level key, which the settings merge replaces whole. The Branding page
+    // owns only addressUrl / addressLink inside it, so the patch is merged per key into the LIVE object (null deletes a key)
+    // inside the write's own transaction: on a DO store as the DO patch's `merge` (atomic, #739 review); on Postgres inside the
+    // bundle transaction below. Other keys, written meanwhile or by another surface, survive.
+    const settingsIn =
+      parts.settings && typeof parts.settings === 'object' && !Array.isArray(parts.settings)
+        ? (parts.settings as Record<string, unknown>)
+        : null;
+    const contactPatch =
+      settingsIn?.contact &&
+      typeof settingsIn.contact === 'object' &&
+      !Array.isArray(settingsIn.contact)
+        ? (settingsIn.contact as Record<string, unknown>)
+        : null;
+    if (contactPatch && settingsIn) {
+      const { contact: _contact, ...rest } = settingsIn;
+      void _contact;
+      parts = { ...parts, settings: rest as Prisma.InputJsonValue };
+    }
     const onDo = await storeWritesToDo(storeId);
     if (onDo) {
       const fields: Record<string, unknown> = {};
@@ -1862,6 +1887,8 @@ export class StoreService {
         json.settings = {
           set: stripServerOwnedSettings(parts.settings as Record<string, unknown>),
         };
+      if (contactPatch)
+        json.settings = { ...(json.settings ?? {}), merge: { contact: contactPatch } };
       await storePatchOnDo(storeId, { fields, json });
       if (parts.branding) queueBrandingImageCleanup(storeId, before, parts.branding);
     } else {
@@ -1875,6 +1902,21 @@ export class StoreService {
             storeId,
             applySocialLinksPatch(stored.socialLinks, parts.social)
           );
+        }
+        if (contactPatch) {
+          // Postgres: read the live contact INSIDE this transaction, merge, and write it with the rest of settings
+          const live = await this.getById(storeId);
+          const storedContact =
+            ((live.settings as Record<string, unknown> | null)?.contact as
+              | Record<string, unknown>
+              | undefined) ?? {};
+          parts = {
+            ...parts,
+            settings: {
+              ...((parts.settings as Record<string, unknown> | undefined) ?? {}),
+              contact: mergeNestedPatch(storedContact, contactPatch),
+            } as Prisma.InputJsonValue,
+          };
         }
         if (parts.settings !== undefined || parts.blogEnabled !== undefined) {
           await this.update(storeId, {

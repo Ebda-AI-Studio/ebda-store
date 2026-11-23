@@ -100,7 +100,8 @@ describe('settings writers on a DO store send a key patch (BE:F-2 / BE:F-3)', ()
     expect(patch.json).toEqual({
       theme: { set: { font: 'x' }, remove: ['gone'] },
       socialLinks: { set: { instagram: 'u' }, remove: ['tiktok'] },
-      settings: { set: { contact: { b: 2 } } },
+      // settings.contact is merged one level deep INSIDE the DO transaction (#739 review), never read-modify-written here
+      settings: { set: {}, merge: { contact: { b: 2 } } },
     });
     expect(h.update).not.toHaveBeenCalled();
   });

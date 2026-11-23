@@ -442,6 +442,21 @@ export class StorageService {
     return { key };
   }
 
+  /** Write a pre-built key (an ops archive such as `audit-archive/...`) into the PRIVATE bucket only. */
+  static async putPrivateObject(key: string, body: Buffer, contentType: string): Promise<void> {
+    const bucket = this.privateBucket();
+    const client = await this.getClient();
+    await client.send(
+      new (await loadS3()).PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+        CacheControl: 'private, no-store',
+      })
+    );
+  }
+
   /** Read a private object's bytes. The caller authorises the request first. */
   static async getPrivate(key: string): Promise<{ body: Buffer; contentType: string | null }> {
     const bucket = this.privateBucket();

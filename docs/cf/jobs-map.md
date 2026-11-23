@@ -98,6 +98,7 @@ Generated from `apps/api/src/lib/jobs/jobs-map.ts` (the code is the source of tr
 | `eta-receipt-redrive`                      | 5-integrations  | workflow | event   |             |
 | `eta-receipt-submit`                       | 5-integrations  | queue    | event   |             |
 | `order-capi-conversion`                    | 5-integrations  | workflow | event   |             |
+| `storefront-order-purge`                   | 5-integrations  | queue    | event   |             |
 | `search-index-backstop`                    | 5-integrations  | workflow | cron    |             |
 | `wa-plan-sync`                             | 5-integrations  | queue    | cron    |             |
 | `wa-store-events`                          | 5-integrations  | queue    | event   |             |

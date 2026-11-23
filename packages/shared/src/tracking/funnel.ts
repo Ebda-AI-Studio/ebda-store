@@ -6,6 +6,7 @@
 export type FunnelStep =
   | 'page_view'
   | 'pricing_viewed'
+  | 'contact_submitted'
   | 'signup_submitted'
   | 'registration_completed'
   | 'store_created'
@@ -21,6 +22,7 @@ export interface FunnelEvent {
 export const EBDA_FUNNEL: Record<FunnelStep, FunnelEvent> = {
   page_view: { meta: 'PageView', posthog: '$pageview' },
   pricing_viewed: { meta: 'ViewContent', posthog: 'pricing_viewed' },
+  contact_submitted: { meta: 'Lead', posthog: 'contact_submitted' },
   signup_submitted: { meta: 'Lead', posthog: 'signup_submitted' },
   registration_completed: { meta: 'CompleteRegistration', posthog: 'registration_completed' },
   store_created: { meta: 'StoreCreated', metaCustom: true, posthog: 'store_created' },

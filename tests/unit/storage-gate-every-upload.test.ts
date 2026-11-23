@@ -44,7 +44,6 @@ describe('every public-bucket upload checks the plan storage ceiling', () => {
     for (const f of [
       'apps/api/src/routes/upload.routes.ts',
       'apps/api/src/routes/product-model.routes.ts',
-      'apps/api/src/routes/expenses.routes.ts',
       'apps/api/src/services/pwa.service.ts',
     ])
       expect(files, f).toContain(f);
