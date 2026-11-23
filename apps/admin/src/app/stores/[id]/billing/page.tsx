@@ -497,6 +497,9 @@ export default function StoreBillingPage() {
   const planPrice = (p: PlanSummary) =>
     interval === 'yearly' ? p.priceYearlyMinor : p.priceMonthlyMinor;
 
+  // Clock read after mount (render stays deterministic); 0 = not yet known -> no renewal wording.
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => setNowMs(Date.now()), []);
   const info = data?.billing;
   const notice = billingNotice(info);
   const noticeCopy = info && notice ? noticeText(notice, info, tNotice, locale) : null;
@@ -509,7 +512,7 @@ export default function StoreBillingPage() {
   // charged automatically (Ruling BILLING-NONE-COPY-1).
   // Renewal wording only while the next charge is still ahead: a charge already at/behind today with nothing paid is a
   // payment awaited (#1042/#896: awaiting badge, no "renews on" date), whatever the 7-day notice window says.
-  const nextChargeAhead = !!info?.nextCharge && Date.parse(info.nextCharge.at) > Date.now();
+  const nextChargeAhead = !!info?.nextCharge && Date.parse(info.nextCharge.at) > nowMs;
   const renewalOnly =
     isRenewalOnly(data?.subscription.status, info, !!quote) &&
     (nextChargeAhead || !info?.nextCharge);
