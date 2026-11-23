@@ -32,6 +32,7 @@ type Findings = {
   taps: string[];
   tiny: string[];
   unscrollable: string[];
+  motion: string[];
   pageWidth: number;
 };
 
@@ -44,6 +45,7 @@ function measure(vw: number): Findings {
     taps: [],
     tiny: [],
     unscrollable: [],
+    motion: [],
     pageWidth: 0,
   };
   const name = (e: Element) =>
@@ -140,6 +142,17 @@ function measure(vw: number): Findings {
       }
     }
   });
+  // 6: motion. reduced motion = nothing animates; text is never animated letter by letter (breaks Arabic joining)
+  document.getAnimations().forEach(a => {
+    if (a.playState === 'running' && a.timeline?.constructor.name !== 'ScrollTimeline')
+      f.motion.push(`running animation under reduced motion: ${a.constructor.name}`);
+  });
+  document.querySelectorAll('h1, h2, h3, p, a, span, li').forEach(e => {
+    const spans = [...e.children].filter(
+      c => c.tagName === 'SPAN' && (c.textContent || '').trim().length === 1
+    );
+    if (spans.length >= 5) f.motion.push(`per-letter spans in ${name(e)}`);
+  });
   f.pageWidth = document.documentElement.scrollWidth;
   return f;
 }
@@ -164,6 +177,7 @@ for (const vw of WIDTHS) {
       add('tap<24', f.taps);
       add('text<12', f.tiny);
       add('overflow', f.unscrollable);
+      add('motion', f.motion);
       if (f.pageWidth > vw) failures.push(`${path} page is ${f.pageWidth}px wide`);
       if (vw < 800) {
         // the open Menu on a phone: panel and CTA stay inside the viewport
@@ -178,5 +192,76 @@ for (const vw of WIDTHS) {
     }
     await ctx.close();
     expect(failures, failures.join('\n')).toEqual([]);
+  });
+}
+
+// Dark OS: the site is light-only by design; the page must stay one coherent light theme (no half-flipped controls).
+test('marketing stays one coherent light theme under a dark OS (ar + en)', async ({
+  browser,
+  request,
+}) => {
+  test.setTimeout(240_000);
+  const paths = await sitemapPaths(request);
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 800 },
+    colorScheme: 'dark',
+    reducedMotion: 'reduce',
+  });
+  const page = await ctx.newPage();
+  const failures: string[] = [];
+  for (const path of paths) {
+    await page.goto(path, { waitUntil: 'networkidle' });
+    const r = await page.evaluate(() => {
+      const lum = (c: string) => {
+        const m = c.match(/[\d.]+/g)!.map(Number);
+        return (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255;
+      };
+      const body = getComputedStyle(document.body);
+      return {
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+        bg: lum(getComputedStyle(document.documentElement).backgroundColor),
+        fg: lum(body.color),
+      };
+    });
+    if (r.scheme !== 'light') failures.push(`${path} color-scheme is ${r.scheme}, not light`);
+    if (r.bg < 0.8 || r.fg > 0.35)
+      failures.push(`${path} not light-on-dark-text: bg ${r.bg.toFixed(2)} fg ${r.fg.toFixed(2)}`);
+  }
+  await ctx.close();
+  expect(failures, failures.join('\n')).toEqual([]);
+});
+
+// Token ratchet + logical-property checks live in tests/unit/marketing-design-tokens.test.ts (base-branch baseline).
+
+// The scroller's edge fade shows only on a side that still has content (start gone at the start, end gone at the end),
+// in LTR and RTL.
+for (const url of ['/store/', '/en/store/']) {
+  test(`product bar edge fade follows the scroll position ${url}`, async ({ browser }) => {
+    const ctx = await browser.newContext({
+      viewport: { width: 360, height: 800 },
+      reducedMotion: 'reduce',
+    });
+    const page = await ctx.newPage();
+    await page.goto(url, { waitUntil: 'networkidle' });
+    const read = () =>
+      page.evaluate(() => {
+        const row = document.querySelector('.product-row')!;
+        const cs = getComputedStyle(row);
+        return {
+          s: parseFloat(cs.getPropertyValue('--fade-s')),
+          e: parseFloat(cs.getPropertyValue('--fade-e')),
+        };
+      });
+    const atStart = await read();
+    expect(atStart.s, 'start fade hidden at the start').toBe(0);
+    expect(atStart.e, 'end fade shown while more is to come').toBeGreaterThan(0);
+    await page.evaluate(() => {
+      const row = document.querySelector('.product-row')!;
+      const max = row.scrollWidth - row.clientWidth;
+      row.scrollLeft = getComputedStyle(row).direction === 'rtl' ? -max : max;
+    });
+    await expect.poll(async () => (await read()).e).toBeLessThan(4); // sub-pixel scroll rounding: not exactly 0
+    expect((await read()).s, 'start fade shown once scrolled').toBeGreaterThan(0);
+    await ctx.close();
   });
 }

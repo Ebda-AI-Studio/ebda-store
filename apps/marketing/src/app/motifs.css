@@ -71,7 +71,7 @@
   display: block;
   width: 168px;
   height: 17px;
-  margin-top: 16px;
+  margin-top: var(--space-4);
   background: url(/motifs/orn.svg) center / contain no-repeat;
 }
 .studio-home #start::after {
@@ -87,7 +87,7 @@
 .sh-facts li {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .sh-facts li::before {
   content: '';
@@ -108,8 +108,8 @@
 }
 .sh-win-in::before {
   inset-block-start: 14px;
-  left: 50%;
-  margin-left: -9px;
+  inset-inline-start: 50%;
+  margin-inline-start: -9px;
 }
 .sh-win-in::after {
   inset-block-end: 9px;
@@ -196,7 +196,7 @@ body:has(.wa-head) .page-sec > h2::after {
   display: block;
   width: 120px;
   height: 12px;
-  margin-top: 12px;
+  margin-top: var(--space-3);
   background: url(/motifs/orn.svg) center / contain no-repeat;
 }
 body:has(.wa-head) #features::after {
