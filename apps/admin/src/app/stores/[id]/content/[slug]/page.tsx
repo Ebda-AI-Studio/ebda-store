@@ -3,14 +3,15 @@
 import { Button } from '@/components/ui/Button';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@ebda/ui';
 import { recommendedSizeText } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
+import { useConfirm } from '@/hooks/useConfirm';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { Toggle } from '../../../../../components/Toggle';
 import { ImageUpload } from '../../../../../components/ImageUpload';
-import { apiGet, apiPut } from '../../../../../lib/api';
+import { apiDelete, apiGet, apiPut } from '../../../../../lib/api';
 
 // ---------- Block schema (mirrors apps/api/src/services/pages.service.ts) ----------
 
@@ -128,6 +129,9 @@ interface StorePageData {
   isPublished: boolean;
 }
 
+/** Legal pages a store_admin edits but never deletes (mirrors apps/api pages.routes.ts). */
+const PROTECTED_LEGAL_SLUGS = new Set(['privacy', 'terms', 'shipping', 'returns', 'refund-policy']);
+
 const BUILT_IN_TITLES: Record<string, { en: string; ar: string }> = {
   about: { en: 'About Us', ar: 'من نحن' },
   privacy: { en: 'Privacy Policy', ar: 'سياسة الخصوصية' },
@@ -195,6 +199,8 @@ export default function ContentEditorPage() {
   const storeId = params?.id as string;
   const slug = decodeURIComponent((params?.slug as string) || '');
   const t = useT('content.editor');
+  const router = useRouter();
+  const askConfirm = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [data, setData] = useState<StorePageData>({
@@ -260,6 +266,26 @@ export default function ContentEditorPage() {
     }
   };
 
+  // Self-service delete (gap A15): custom pages only. The legal pages stay (the API refuses them for a store_admin).
+  const canDelete = !PROTECTED_LEGAL_SLUGS.has(slug);
+  const handleDelete = async () => {
+    if (!storeId || !slug) return;
+    const ok = await askConfirm({
+      object: t('deleteObject', { slug }),
+      consequence: t('deleteConfirm'),
+      confirmLabel: t('delete'),
+    });
+    if (!ok) return;
+    const { error } = await apiDelete(
+      `/api/v1/stores/${storeId}/pages/${encodeURIComponent(slug)}`
+    );
+    if (error) toastError(t('deleteError'));
+    else {
+      toastSuccess(t('deleted'));
+      router.push(`/stores/${storeId}/content`);
+    }
+  };
+
   const previewEn = useMemo(
     () => renderBlocksToHtml(data.contentBlocks ?? []),
     [data.contentBlocks]
@@ -285,6 +311,16 @@ export default function ContentEditorPage() {
           >
             {t('backToList')}
           </Link>
+          {canDelete && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDelete}
+              disabled={isSaving || isLoading}
+            >
+              {t('delete')}
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleSave}

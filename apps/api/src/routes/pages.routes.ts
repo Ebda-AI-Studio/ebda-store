@@ -5,6 +5,19 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { PagesService } from '../services/pages.service';
 import { tenantContext } from '../middleware/tenant-context';
+import { AppError } from '../middleware/error-handler';
+
+/** Legal pages a store_admin may edit but never delete (platform override only). */
+const PROTECTED_LEGAL_PAGE_SLUGS = new Set([
+  'privacy',
+  'terms',
+  'shipping',
+  'returns',
+  'refund-policy',
+]);
+function isProtectedLegalPageSlug(slug: string): boolean {
+  return PROTECTED_LEGAL_PAGE_SLUGS.has(slug.trim().toLowerCase());
+}
 
 const router = Router();
 
@@ -148,20 +161,29 @@ router.put(
   }
 );
 
-// DELETE /stores/:storeId/pages/:slug - super_admin only.
+// DELETE /stores/:storeId/pages/:slug - store_admin (own store) or super_admin.
 //
-// Keeps the platform from accidentally letting a store_admin nuke a
-// critical legal page (Privacy/Terms). Merchants edit content; only
-// platform staff delete shells.
+// Self-service (SELF-SERVICE gap A15): a merchant deletes the custom pages
+// they created. The legal pages (Privacy/Terms/Shipping/Returns) stay
+// protected for a store_admin - merchants edit their content, only platform
+// staff (override) delete those shells. The tenant id comes from the path and
+// is checked by requireStoreAccess, never from the body.
 router.delete(
   '/stores/:storeId/pages/:slug',
   authenticate,
   requireMfaEnrolled,
-  authorize('super_admin'),
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, slug } = req.params;
+      if (req.user?.role !== 'super_admin' && isProtectedLegalPageSlug(slug)) {
+        throw new AppError(
+          403,
+          'LEGAL_PAGE_PROTECTED',
+          'Legal pages cannot be deleted. Edit their content instead.'
+        );
+      }
       await PagesService.remove(storeId, slug);
       res.json({ success: true });
     } catch (error) {

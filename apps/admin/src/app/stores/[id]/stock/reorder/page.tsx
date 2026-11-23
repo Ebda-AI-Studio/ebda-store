@@ -287,7 +287,7 @@ export default function ReorderPage() {
           >
             {t('rules.manage')}
           </a>
-          {isSuperAdmin && (
+          {(isSuperAdmin || user?.role === 'store_admin') && (
             <Button
               type="button"
               onClick={handleRescan}
